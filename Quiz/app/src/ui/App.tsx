@@ -94,6 +94,7 @@ export function App() {
     durationMs: 3000,
     useSameBackground: true,
     backgroundVideoUrl: undefined,
+    backgroundType: 'video',
     showText: true,
     text: 'Thank You!',
     textSizePercent: 8,
@@ -734,6 +735,36 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   <button className="ios-card px-3 py-2" onClick={() => updateBackground({ type: 'image', imageUrl: '' })}>Clear</button>
                 )}
                 </div>
+                <div className="mt-3 space-y-3 border border-iosborder/60 rounded-lg p-3 bg-black/10">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={quiz.settings?.bgZoomEnabled ?? false}
+                      onChange={e => updateSettings(s => ({ ...s, bgZoomEnabled: e.target.checked }))}
+                    />
+                    Enable zoom animation
+                  </label>
+                  {quiz.settings?.bgZoomEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <LabeledSlider
+                        label="Zoom Amount (x)"
+                        value={quiz.settings?.bgZoomScale ?? 1.1}
+                        min={1}
+                        max={2}
+                        step={0.01}
+                        onChange={v => updateSettings(s => ({ ...s, bgZoomScale: v }))}
+                      />
+                      <LabeledSlider
+                        label="Zoom Duration (ms)"
+                        value={quiz.settings?.bgZoomDurationMs ?? 6000}
+                        min={500}
+                        max={20000}
+                        step={100}
+                        onChange={v => updateSettings(s => ({ ...s, bgZoomDurationMs: v }))}
+                      />
+                    </div>
+                )}
+                </div>
               </div>
             )}
             {quiz.background.type === 'video' && (
@@ -951,33 +982,43 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     </div>
 
                     <div className="space-y-3">
-                      <div className="text-sm text-gray-300">Background Video</div>
+                      <div className="text-sm text-gray-300">Background Source</div>
                       <div className="flex items-center gap-2 mb-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
                             type="radio" 
                             name="ctaBackground"
                             checked={currentCTA.useSameBackground}
-                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: true, backgroundVideoUrl: undefined }))}
+                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: true, backgroundVideoUrl: undefined, imageUrl: undefined, backgroundType: 'video' }))}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
                           />
                           <span className="text-sm text-gray-300">Use same background as quiz/meme</span>
                         </label>
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
                             type="radio" 
                             name="ctaBackground"
-                            checked={!currentCTA.useSameBackground}
-                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false }))}
+                            checked={!currentCTA.useSameBackground && currentCTA.backgroundType === 'video'}
+                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false, backgroundType: 'video', imageUrl: undefined }))}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
                           />
-                          <span className="text-sm text-gray-300">Use custom CTA background video</span>
+                          <span className="text-sm text-gray-300">Use custom CTA video</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="ctaBackground"
+                            checked={!currentCTA.useSameBackground && currentCTA.backgroundType === 'image'}
+                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false, backgroundType: 'image', backgroundVideoUrl: undefined }))}
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-300">Use custom CTA image</span>
                         </label>
                       </div>
 
-                        {!currentCTA.useSameBackground && (
+                        {!currentCTA.useSameBackground && currentCTA.backgroundType === 'video' && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
@@ -990,7 +1031,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                                   const file = e.target.files?.[0]
                                   if (!file) return
                                   const url = URL.createObjectURL(file)
-                                  applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: url, useSameBackground: false }))
+                                  applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: url, imageUrl: undefined, useSameBackground: false, backgroundType: 'video' }))
                                 }}
                               />
                             </label>
@@ -1006,6 +1047,40 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                           {currentCTA.backgroundVideoUrl && (
                             <div className="text-xs text-iossub">
                               CTA video loaded successfully
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                        {!currentCTA.useSameBackground && currentCTA.backgroundType === 'image' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
+                              {currentCTA.imageUrl ? 'Change CTA image' : 'Upload CTA image'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  const url = URL.createObjectURL(file)
+                                  applyCTAUpdate(cta => ({ ...cta, imageUrl: url, backgroundVideoUrl: undefined, useSameBackground: false, backgroundType: 'image' }))
+                                }}
+                              />
+                            </label>
+                            {currentCTA.imageUrl && (
+                              <button
+                                className="ios-card px-3 py-2"
+                                onClick={() => applyCTAUpdate(cta => ({ ...cta, imageUrl: undefined }))}
+                              >
+                                Clear CTA Image
+                              </button>
+                            )}
+                          </div>
+                          {currentCTA.imageUrl && (
+                            <div className="text-xs text-iossub">
+                              CTA image loaded successfully
                             </div>
                           )}
                         </div>

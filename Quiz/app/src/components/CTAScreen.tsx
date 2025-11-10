@@ -81,7 +81,16 @@ export function CTAScreen({
 
     if (cta.useSameBackground) {
       return quiz.background
-    } else if (cta.backgroundVideoUrl) {
+    }
+
+    if (cta.backgroundType === 'image' && cta.imageUrl) {
+      return {
+        type: 'image' as const,
+        imageUrl: cta.imageUrl
+      }
+    }
+
+    if (cta.backgroundType === 'video' && cta.backgroundVideoUrl) {
       return {
         type: 'video' as const,
         videoUrl: cta.backgroundVideoUrl

@@ -79,6 +79,7 @@ export interface QuizSettings {
   questionShadowColor?: string
   bgZoomEnabled?: boolean
   bgZoomScale?: number
+  bgZoomDurationMs?: number
   answerWidthPercent?: number
   answerWidth?: number // Legacy property for migration
   bgOverlayColor?: string
@@ -103,12 +104,14 @@ export interface QuizSettings {
     durationMs: number
     useSameBackground: boolean
     backgroundVideoUrl?: string
+    backgroundType?: 'video' | 'image'
     showText?: boolean
     text?: string
     textSizePercent?: number
     textColor?: string
     textShadowEnabled?: boolean
     textShadowColor?: string
+    imageUrl?: string
       fontFamily?: string
     fadeInMs?: number
     holdMs?: number
