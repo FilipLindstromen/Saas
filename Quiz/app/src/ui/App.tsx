@@ -1494,6 +1494,42 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
             </div>
           </div>
 
+              {/* Correct Answer Styling */}
+              <div className="bg-gray-100/20 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-300 mb-3">🎯 Correct Answer Styling</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-iossub mb-1">Button Color</label>
+                    <input
+                      type="color"
+                      className="ios-input w-full h-10"
+                      value={quiz.settings?.correctAnswerButtonColor ?? quiz.settings?.correctAnswerColor ?? '#10b981'}
+                      onChange={e =>
+                        updateSettings(s => ({
+                          ...s,
+                          correctAnswerButtonColor: e.target.value,
+                          correctAnswerColor: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-iossub mb-1">Text Color</label>
+                    <input
+                      type="color"
+                      className="ios-input w-full h-10"
+                      value={quiz.settings?.correctAnswerTextColor ?? '#ffffff'}
+                      onChange={e =>
+                        updateSettings(s => ({
+                          ...s,
+                          correctAnswerTextColor: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Questions List */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">

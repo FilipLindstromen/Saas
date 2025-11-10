@@ -1169,7 +1169,8 @@ export class CanvasRecorder {
     
     // Position answers after question within the centered content block
     const answerY = contentStartY + questionFontSize * 1.2 + questionMarginBottom + answerGap
-    const correctColor = settings?.correctAnswerColor || '#10b981'
+    const correctButtonColor = settings?.correctAnswerButtonColor || settings?.correctAnswerColor || '#10b981'
+    const correctTextColor = settings?.correctAnswerTextColor || '#ffffff'
     const answerTextColor = settings?.answerColor || '#111111'
     const neutralBg = '#ffffff'
     const neutralStroke = 'rgba(255,255,255,0.15)'
@@ -1217,8 +1218,8 @@ export class CanvasRecorder {
       ctx.translate(0, answerYOffset)
       
       // Determine style based on correct reveal timing
-      const bg = showCorrect && isCorrect ? correctColor : neutralBg
-      const stroke = showCorrect && isCorrect ? correctColor : neutralStroke
+      const bg = showCorrect && isCorrect ? correctButtonColor : neutralBg
+      const stroke = showCorrect && isCorrect ? correctButtonColor : neutralStroke
 
       // Match preview CSS: center within container and use 2vh gap
       const answerYPos = answerY + index * (pillHeight + answerGap)
@@ -1237,7 +1238,7 @@ export class CanvasRecorder {
       )
       
       // Answer text with proper wrapping
-      ctx.fillStyle = showCorrect && isCorrect ? '#ffffff' : answerTextColor
+      ctx.fillStyle = showCorrect && isCorrect ? correctTextColor : answerTextColor
       ctx.font = `600 ${answerFontSize}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`
       ctx.textAlign = 'left'
       

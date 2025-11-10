@@ -17,6 +17,8 @@ export function useQuizState(initial?: Partial<QuizData>) {
     questionColor: '#ffffff',
     answerColor: '#111113',
     correctAnswerColor: '#10b981',
+    correctAnswerButtonColor: '#10b981',
+    correctAnswerTextColor: '#ffffff',
     overlayColor: '#000000',
     overlayOpacity: 0.4,
     bgZoomEnabled: false,
@@ -49,13 +51,22 @@ export function useQuizState(initial?: Partial<QuizData>) {
       const raw = localStorage.getItem('quiz_settings')
       if (!raw) return null
       const parsed = JSON.parse(raw) as Partial<QuizSettings>
-      return { 
+      const merged: QuizSettings = { 
         ...defaultSettings, 
         ...parsed, 
         sfx: { ...defaultSettings.sfx, ...(parsed.sfx || {}) }, 
         music: parsed.music,
         cta: { ...defaultSettings.cta, ...(parsed.cta || {}) }
       }
+      if (parsed.correctAnswerButtonColor === undefined && parsed.correctAnswerColor) {
+        merged.correctAnswerButtonColor = parsed.correctAnswerColor
+      }
+      if (parsed.correctAnswerTextColor === undefined) {
+        merged.correctAnswerTextColor = merged.correctAnswerTextColor ?? '#ffffff'
+      }
+      // Maintain legacy field in sync
+      merged.correctAnswerColor = merged.correctAnswerButtonColor ?? merged.correctAnswerColor
+      return merged
     } catch {
       return null
     }

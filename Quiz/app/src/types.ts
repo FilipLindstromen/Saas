@@ -68,6 +68,8 @@ export interface QuizSettings {
   questionColor: string
   answerColor: string
   correctAnswerColor: string
+  correctAnswerButtonColor?: string
+  correctAnswerTextColor?: string
   overlayColor?: string
   overlayOpacity?: number
   titleShadowEnabled?: boolean
