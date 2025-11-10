@@ -19,6 +19,38 @@ export interface QuizTimeline {
 export function computeQuizTimeline(quiz: any): QuizTimeline {
   const settings = quiz?.settings ?? {}
 
+  if (settings.animationType === 'overlay') {
+    const overlay = settings.overlay
+    const overlayItems = Array.isArray(overlay?.items) ? overlay.items : []
+    const overlayEnabled = Boolean(overlay?.enabled)
+
+    let overlayDuration = 0
+    if (overlayEnabled && overlayItems.length > 0) {
+      overlayDuration = overlayItems.reduce((max: number, item: any) => {
+        const start = Number(item?.startOffsetMs ?? 0)
+        const inMs = Number(item?.animationInDurationMs ?? 500)
+        const holdMs = Number(item?.displayDurationMs ?? 2000)
+        const outMs = Number(item?.animationOutDurationMs ?? 500)
+        return Math.max(max, start + inMs + holdMs + outMs)
+      }, 0)
+    }
+
+    const endDelay = Number(settings.endDelayMs ?? 0)
+
+    return {
+      showTitle: false,
+      titleDuration: 0,
+      titleInMs: Number(settings.titleInMs ?? 600),
+      titleHoldMs: Number(settings.titleHoldMs ?? 900),
+      titleOutMs: Number(settings.titleOutMs ?? 600),
+      questionTimings: [],
+      totalQuestionDuration: 0,
+      totalContentDuration: overlayDuration,
+      ctaDuration: 0,
+      endDelay,
+    }
+  }
+
   const showTitle = settings.showTitle ?? true
   const titleInMs = Number(settings.titleInMs ?? 600)
   const titleHoldMs = Number(settings.titleHoldMs ?? 900)
@@ -46,7 +78,12 @@ export function computeQuizTimeline(quiz: any): QuizTimeline {
 
   const totalQuestionDuration = cumulative
   const totalContentDuration = titleDuration + totalQuestionDuration
-  const ctaDuration = settings.cta?.enabled ? Number(settings.cta?.durationMs ?? 3000) : 0
+  const ctaEnabled = Boolean(settings.cta?.enabled)
+  const ctaFadeInMs = Number(settings.cta?.fadeInMs ?? 600)
+  const ctaHoldMs = Number(settings.cta?.holdMs ?? 1800)
+  const ctaBaseDuration = ctaEnabled ? ctaFadeInMs + ctaHoldMs : 0
+  const ctaConfiguredDuration = ctaEnabled ? Number(settings.cta?.durationMs ?? 0) : 0
+  const ctaDuration = ctaEnabled ? Math.max(ctaConfiguredDuration, ctaBaseDuration) : 0
   const endDelay = Number(settings.endDelayMs ?? 0)
 
   return {
