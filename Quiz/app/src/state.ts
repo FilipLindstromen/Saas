@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { QuizData, QuizQuestion, QuizAnswer, QuizBackground, QuizSettings } from './types'
+import { QuizData, QuizQuestion, QuizAnswer, QuizBackground, QuizSettings, OverlayTextItem } from './types'
 
 export function useQuizState(initial?: Partial<QuizData>) {
   // defaults
@@ -27,23 +27,27 @@ export function useQuizState(initial?: Partial<QuizData>) {
     fontFamily: 'Impact',
     music: undefined,
     sfx: { appearVolume: 0.6, correctVolume: 0.8 },
+    overlay: {
+      enabled: false,
+      items: []
+    },
     cta: {
       enabled: false,
       durationMs: 3000,
       useSameBackground: true,
       backgroundVideoUrl: undefined,
-    backgroundType: 'video',
+      backgroundType: 'video',
       showText: true,
       text: 'Thank You!',
       textSizePercent: 8,
       textColor: '#ffffff',
       textShadowEnabled: true,
       textShadowColor: '#000000',
-    imageUrl: undefined,
+      imageUrl: undefined,
       fontFamily: 'Impact',
       fadeInMs: 600,
       holdMs: 1800,
-      fadeOutMs: 600,
+      fadeOutMs: 0,
       overlayEnabled: false,
       overlayColor: '#000000',
       overlayOpacity: 0.4
@@ -78,6 +82,31 @@ export function useQuizState(initial?: Partial<QuizData>) {
         merged.cta.fontFamily = merged.cta.fontFamily ?? defaultSettings.cta?.fontFamily
         merged.cta.imageUrl = merged.cta.imageUrl ?? defaultSettings.cta?.imageUrl
         merged.cta.backgroundType = merged.cta.backgroundType ?? defaultSettings.cta?.backgroundType ?? 'video'
+      }
+      if (parsed.overlay || defaultSettings.overlay) {
+        const createOverlayId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))
+        const sourceItems = parsed.overlay?.items ?? defaultSettings.overlay?.items ?? []
+        merged.overlay = {
+          enabled: parsed.overlay?.enabled ?? defaultSettings.overlay?.enabled ?? false,
+          items: sourceItems.map(item => ({
+            id: item.id ?? createOverlayId(),
+            text: item.text ?? '',
+            fontFamily: item.fontFamily ?? defaultSettings.fontFamily ?? 'Impact',
+            fontSizePercent: item.fontSizePercent ?? 4,
+            textColor: item.textColor ?? '#ffffff',
+            backgroundColor: item.backgroundColor ?? '#000000',
+            backgroundOpacity: item.backgroundOpacity ?? 0.7,
+            padding: item.padding ?? 12,
+            align: item.align ?? 'center',
+            verticalPosition: item.verticalPosition ?? 'center',
+            animationIn: item.animationIn ?? 'fade',
+            animationOut: item.animationOut ?? 'fade',
+            animationInDurationMs: item.animationInDurationMs ?? 500,
+            animationOutDurationMs: item.animationOutDurationMs ?? 500,
+            displayDurationMs: item.displayDurationMs ?? 2000,
+            startOffsetMs: item.startOffsetMs ?? 0
+          }))
+        }
       }
       // Maintain legacy field in sync
       merged.correctAnswerColor = merged.correctAnswerButtonColor ?? merged.correctAnswerColor

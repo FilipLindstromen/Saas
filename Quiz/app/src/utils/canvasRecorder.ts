@@ -7,6 +7,7 @@
  */
 
 import { computeQuizTimeline } from './quizTiming'
+import { OverlayTextItem, OverlayAnimation } from '../types'
 
 // Helper function to format answer labels
 function formatAnswerLabel(index: number, format: string = 'letters'): string {
@@ -438,11 +439,16 @@ export class CanvasRecorder {
         // Determine what stage to render based on frame time
         if (ctaEnabled && frameTime >= ctaStartTime) {
           const ctaFrameTime = frameTime - ctaStartTime
-          this.renderCTAFrame(ctx, quiz, ctaFrameTime, duration, targetResolution)
+          this.renderCTAFrame(ctx, quiz, ctaFrameTime, frameTime, targetResolution)
+        } else if (quiz.settings?.animationType === 'overlay') {
+          this.renderOverlayOnlyFrame(ctx, quiz, frameTime, duration, targetResolution)
         } else if (quiz.settings?.animationType === 'meme') {
-          this.renderMemeFrame(ctx, quiz, frameTime, duration, targetResolution)
+          this.renderMemeFrame(ctx, quiz, frameTime, targetResolution)
         } else {
           this.renderQuizFrame(ctx, quiz, frameTime, duration, targetResolution, timeline)
+        }
+        if (quiz.settings?.animationType !== 'overlay') {
+          this.renderOverlayTexts(ctx, quiz, frameTime, canvas.width, canvas.height)
         }
         
         // Update progress
@@ -462,6 +468,57 @@ export class CanvasRecorder {
     }
 
     renderNextFrame()
+  }
+
+  private static renderOverlayOnlyFrame(
+    ctx: CanvasRenderingContext2D,
+    quiz: any,
+    frameTime: number,
+    _totalDuration: number,
+    targetResolution: { width: number; height: number }
+  ): void {
+    const { width, height } = targetResolution
+
+    this.renderBackground(ctx, quiz.background, width, height, quiz.__assets, frameTime)
+
+    const overlayColor = quiz.settings?.overlayColor || 'transparent'
+    const overlayOpacity = Number(quiz.settings?.overlayOpacity ?? 0)
+    if (overlayOpacity > 0 && overlayColor && overlayColor !== 'transparent') {
+      ctx.save()
+      ctx.globalAlpha = overlayOpacity
+      ctx.fillStyle = overlayColor
+      ctx.fillRect(0, 0, width, height)
+      ctx.restore()
+    }
+
+    const bgOverlayColor = quiz.settings?.bgOverlayColor || 'transparent'
+    const bgOverlayOpacity = Number(quiz.settings?.bgOverlayOpacity ?? 0)
+    if (bgOverlayOpacity > 0 && bgOverlayColor && bgOverlayColor !== 'transparent') {
+      ctx.save()
+      ctx.globalAlpha = bgOverlayOpacity
+      ctx.fillStyle = bgOverlayColor
+      ctx.fillRect(0, 0, width, height)
+      ctx.restore()
+    }
+
+    this.renderOverlayTexts(ctx, quiz, frameTime, width, height)
+  }
+
+  private static hexToRgba(hex: string | undefined, alpha: number): string {
+    const defaultHex = '#000000'
+    let normalized = (hex || defaultHex).replace('#', '')
+    if (normalized.length === 3) {
+      normalized = normalized.split('').map(c => c + c).join('')
+    }
+    if (normalized.length !== 6) {
+      normalized = defaultHex.replace('#', '')
+    }
+    const num = parseInt(normalized, 16)
+    const r = (num >> 16) & 255
+    const g = (num >> 8) & 255
+    const b = num & 255
+    const clampedAlpha = Math.min(Math.max(alpha, 0), 1)
+    return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`
   }
 
   /**
@@ -504,11 +561,11 @@ export class CanvasRecorder {
         if (questionIndex === -1 && questionTimings.length > 0) {
           // Clamp to last question
           questionIndex = questionTimings.length - 1
-          stageProgress = 1
+      stageProgress = 1
         }
-      } else {
+    } else {
         stage = 'postQuestions'
-        stageProgress = 1
+      stageProgress = 1
       }
     }
     
@@ -577,7 +634,6 @@ export class CanvasRecorder {
     ctx: CanvasRenderingContext2D,
     quiz: any,
     frameTime: number,
-    totalDuration: number,
     targetResolution: { width: number; height: number }
   ): void {
     const { width, height } = targetResolution
@@ -894,6 +950,149 @@ export class CanvasRecorder {
     }
   }
 
+  private static renderOverlayTexts(
+    ctx: CanvasRenderingContext2D,
+    quiz: any,
+    frameTime: number,
+    width: number,
+    height: number
+  ): void {
+    const overlay = quiz.settings?.overlay
+    if (!overlay?.enabled || !Array.isArray(overlay.items) || overlay.items.length === 0) {
+      return
+    }
+
+    overlay.items.forEach((item: OverlayTextItem) => {
+      const text = item.text ?? ''
+      if (!text.trim()) return
+
+      const start = Number(item.startOffsetMs ?? 0)
+      const inDuration = Number(item.animationInDurationMs ?? 500)
+      const holdDuration = Number(item.displayDurationMs ?? 2000)
+      const outDuration = Number(item.animationOutDurationMs ?? 500)
+      const totalVisible = start + inDuration + holdDuration + outDuration
+
+      if (frameTime < start || frameTime > totalVisible) return
+
+      const elapsed = frameTime - start
+      let opacity = 1
+      if (elapsed < inDuration) {
+        opacity = inDuration > 0 ? Math.min(Math.max(elapsed / inDuration, 0), 1) : 1
+      } else if (elapsed > inDuration + holdDuration) {
+        const outElapsed = elapsed - (inDuration + holdDuration)
+        opacity = outDuration > 0 ? Math.max(0, 1 - outElapsed / outDuration) : 0
+      }
+
+      const animationIn: OverlayAnimation = item.animationIn ?? 'fade'
+      const animationOut: OverlayAnimation = item.animationOut ?? animationIn
+      let translateY = 0
+      let scale = 1
+
+      if (elapsed < inDuration && inDuration > 0) {
+        const progress = Math.min(Math.max(elapsed / inDuration, 0), 1)
+        switch (animationIn) {
+          case 'slide-up':
+            translateY = (1 - progress) * 40
+            break
+          case 'slide-down':
+            translateY = (progress - 1) * 40
+            break
+          case 'scale':
+            scale = 0.9 + 0.1 * progress
+            break
+          default:
+            break
+        }
+      } else if (elapsed > inDuration + holdDuration && outDuration > 0) {
+        const outProgress = Math.min(Math.max((elapsed - (inDuration + holdDuration)) / outDuration, 0), 1)
+        switch (animationOut) {
+          case 'slide-up':
+            translateY = -40 * outProgress
+            break
+          case 'slide-down':
+            translateY = 40 * outProgress
+            break
+          case 'scale':
+            scale = 1 - 0.1 * outProgress
+            break
+          default:
+            break
+        }
+      }
+
+      const fontSizePercent = item.fontSizePercent ?? 4
+      const fontSize = Math.max(height * (fontSizePercent / 100), 12)
+      const fontFamily = item.fontFamily ?? quiz.settings?.fontFamily ?? 'Impact'
+      ctx.save()
+      ctx.font = `600 ${Math.round(fontSize)}px ${fontFamily}, system-ui, -apple-system, Segoe UI, sans-serif`
+      ctx.textBaseline = 'middle'
+
+      const lines = text.split('\n')
+      const lineHeight = fontSize * 1.2
+      const padding = item.padding ?? 12
+      let maxLineWidth = 0
+      lines.forEach(line => {
+        const metrics = ctx.measureText(line)
+        maxLineWidth = Math.max(maxLineWidth, metrics.width)
+      })
+
+      const boxWidth = maxLineWidth + padding * 2
+      const boxHeight = lineHeight * lines.length + padding * 2
+
+      let boxX: number
+      const align = item.align ?? 'center'
+      const horizontalMargin = width * 0.08
+      if (align === 'left') {
+        boxX = horizontalMargin
+        ctx.textAlign = 'left'
+      } else if (align === 'right') {
+        boxX = width - boxWidth - horizontalMargin
+        ctx.textAlign = 'right'
+      } else {
+        boxX = (width - boxWidth) / 2
+        ctx.textAlign = 'center'
+      }
+
+      let boxY: number
+      const vertical = item.verticalPosition ?? 'center'
+      const verticalMargin = height * 0.12
+      if (vertical === 'top') {
+        boxY = verticalMargin
+      } else if (vertical === 'bottom') {
+        boxY = height - boxHeight - verticalMargin
+      } else {
+        boxY = (height - boxHeight) / 2
+      }
+
+      const centerX = boxX + boxWidth / 2
+      const centerY = boxY + boxHeight / 2
+      ctx.translate(centerX, centerY + translateY)
+      ctx.scale(scale, scale)
+      ctx.translate(-centerX, -centerY)
+
+      ctx.globalAlpha = opacity
+      const backgroundColor = this.hexToRgba(item.backgroundColor ?? '#000000', item.backgroundOpacity ?? 0.7)
+      ctx.fillStyle = backgroundColor
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
+
+      ctx.fillStyle = item.textColor ?? '#ffffff'
+      lines.forEach((line, idx) => {
+        let textX: number
+        if (align === 'left') {
+          textX = boxX + padding
+        } else if (align === 'right') {
+          textX = boxX + boxWidth - padding
+        } else {
+          textX = boxX + boxWidth / 2
+        }
+        const textY = boxY + padding + lineHeight * idx + lineHeight / 2
+        ctx.fillText(line, textX, textY)
+      })
+
+      ctx.restore()
+    })
+  }
+
   /**
    * Render CTA screen frame
    */
@@ -901,7 +1100,7 @@ export class CanvasRecorder {
     ctx: CanvasRenderingContext2D,
     quiz: any,
     frameTime: number,
-    totalDuration: number,
+    absoluteFrameTime: number,
     targetResolution: { width: number; height: number }
   ): void {
     const { width, height } = targetResolution
@@ -909,7 +1108,8 @@ export class CanvasRecorder {
     
     // Determine background to use
     let backgroundToUse = quiz.background
-    if (cta?.useSameBackground === false) {
+    const useCustomBackground = cta?.useSameBackground === false && (cta?.imageUrl || cta?.backgroundVideoUrl)
+    if (useCustomBackground) {
       if (cta?.imageUrl) {
         backgroundToUse = {
           type: 'image',
@@ -922,6 +1122,7 @@ export class CanvasRecorder {
         }
       }
     }
+    const backgroundFrameTime = useCustomBackground ? frameTime : absoluteFrameTime
     
     // Render background
     this.renderBackground(ctx, {
@@ -929,7 +1130,7 @@ export class CanvasRecorder {
       zoomEnabled: quiz.settings?.bgZoomEnabled,
       zoomScale: quiz.settings?.bgZoomScale,
       zoomDurationMs: quiz.settings?.bgZoomDurationMs
-    }, width, height, quiz.__assets, frameTime)
+    }, width, height, quiz.__assets, backgroundFrameTime)
     
     // Render background overlay
     if (quiz.settings?.bgOverlayColor && quiz.settings?.bgOverlayOpacity) {
@@ -942,16 +1143,13 @@ export class CanvasRecorder {
     // Calculate CTA timing and opacity for fade in/out
     const fadeInMs = cta?.fadeInMs ?? 600
     const holdMs = cta?.holdMs ?? 1800
-    const fadeOutMs = cta?.fadeOutMs ?? 600
-    
-    // Calculate opacity based on frame time within CTA duration
-    let ctaOpacity = 1
-    if (frameTime < fadeInMs) {
-      ctaOpacity = frameTime / fadeInMs
-    } else if (frameTime >= fadeInMs + holdMs) {
-      const fadeOutProgress = (frameTime - (fadeInMs + holdMs)) / fadeOutMs
-      ctaOpacity = Math.max(0, 1 - fadeOutProgress)
-    }
+    const totalDuration = Math.max(cta?.durationMs ?? fadeInMs + holdMs, fadeInMs)
+
+    const ctaOpacity = frameTime < fadeInMs
+      ? Math.min(Math.max(frameTime / fadeInMs, 0), 1)
+      : frameTime < totalDuration
+        ? 1
+        : 0
     
     // Render CTA video overlay with fade
     if (cta?.overlayEnabled && cta?.overlayColor && cta?.overlayOpacity) {
@@ -1532,9 +1730,9 @@ export class CanvasRecorder {
           upperVideo.src = bg.upperVideoUrl
           upperVideo.playsInline = true
           upperVideo.muted = true
-        await upperVideo.play().catch(() => {})
-        upperVideo.pause()
-        upperVideo.currentTime = 0
+          await upperVideo.play().catch(() => {})
+          upperVideo.pause()
+          upperVideo.currentTime = 0
           assets.upperVideoEl = upperVideo
         }
         
@@ -1546,9 +1744,9 @@ export class CanvasRecorder {
           lowerVideo.src = bg.lowerVideoUrl
           lowerVideo.playsInline = true
           lowerVideo.muted = true
-        await lowerVideo.play().catch(() => {})
-        lowerVideo.pause()
-        lowerVideo.currentTime = 0
+          await lowerVideo.play().catch(() => {})
+          lowerVideo.pause()
+          lowerVideo.currentTime = 0
           assets.lowerVideoEl = lowerVideo
         }
       }

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useQuizState, createBooleanQuestion, createMultipleChoiceQuestion } from '../state'
 import { useMemeState } from '../memeState'
-import { QuizQuestion, QuizData, QuizAnswer, AspectRatio, MemeData, QuizBackground, QuizSettings } from '../types'
+import { QuizQuestion, QuizData, QuizAnswer, AspectRatio, MemeData, QuizBackground, QuizSettings, OverlayTextItem, OverlaySettings, OverlayAnimation, OverlayHorizontalAlign, OverlayVerticalPosition } from '../types'
 import { CanvasRecorder, CanvasRecordingOptions } from '../utils/canvasRecorder'
 import { computeQuizTimeline } from '../utils/quizTiming'
 import { AIModal } from '../components/AIModal'
@@ -54,7 +54,7 @@ export function App() {
   const [recordingProgress, setRecordingProgress] = useState(0)
   const [videoQuality, setVideoQuality] = useState<'low' | 'medium' | 'high' | 'ultra'>('high')
   const [exportFormat, setExportFormat] = useState<'webm' | 'mp4'>('webm')
-  const [activeTab, setActiveTab] = useState<'settings' | 'questions' | 'meme'>('settings')
+  const [activeTab, setActiveTab] = useState<'settings' | 'questions' | 'meme' | 'overlay'>('settings')
 
   // AI state
   const [customInstructions, setCustomInstructions] = useState(() => localStorage.getItem('customInstructions') || '')
@@ -88,6 +88,49 @@ export function App() {
     () => ['Impact', 'Arial Black', 'Helvetica', 'Comic Sans MS', 'Times New Roman', 'Georgia', 'Verdana', 'Trebuchet MS'],
     []
   )
+  const overlayAnimationOptions = useMemo<{ value: OverlayAnimation; label: string }[]>(() => [
+    { value: 'none', label: 'None' },
+    { value: 'fade', label: 'Fade' },
+    { value: 'slide-up', label: 'Slide Up' },
+    { value: 'slide-down', label: 'Slide Down' },
+    { value: 'scale', label: 'Scale' }
+  ], [])
+
+  const overlayVerticalOptions = useMemo<{ value: OverlayVerticalPosition; label: string }[]>(() => [
+    { value: 'top', label: 'Top' },
+    { value: 'center', label: 'Center' },
+    { value: 'bottom', label: 'Bottom' }
+  ], [])
+
+  const overlayAlignOptions = useMemo<{ value: OverlayHorizontalAlign; label: string }[]>(() => [
+    { value: 'left', label: 'Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'right', label: 'Right' }
+  ], [])
+
+  const defaultOverlaySettings = useMemo<OverlaySettings>(() => ({
+    enabled: false,
+    items: []
+  }), [])
+
+  const applyOverlayUpdate = useCallback(
+    (updater: (overlay: OverlaySettings) => OverlaySettings) => {
+      updateSettings(s => {
+        const mergedOverlay: OverlaySettings = {
+          enabled: s.overlay?.enabled ?? defaultOverlaySettings.enabled,
+          items: [...(s.overlay?.items ?? defaultOverlaySettings.items)]
+        }
+        const updatedOverlay = updater(mergedOverlay)
+        return { ...s, overlay: updatedOverlay }
+      })
+    },
+    [updateSettings, defaultOverlaySettings]
+  )
+
+  const currentOverlay = useMemo<OverlaySettings>(() => ({
+    enabled: quiz.settings?.overlay?.enabled ?? defaultOverlaySettings.enabled,
+    items: [...(quiz.settings?.overlay?.items ?? defaultOverlaySettings.items)]
+  }), [defaultOverlaySettings, quiz.settings?.overlay])
 
   const defaultCTASettings = useMemo<NonNullable<QuizSettings['cta']>>(() => ({
     enabled: false,
@@ -104,7 +147,7 @@ export function App() {
     fontFamily: 'Impact',
     fadeInMs: 600,
     holdMs: 1800,
-    fadeOutMs: 600,
+    fadeOutMs: 0,
     overlayEnabled: false,
     overlayColor: '#000000',
     overlayOpacity: 0.4
@@ -125,6 +168,47 @@ export function App() {
     () => ({ ...defaultCTASettings, ...(quiz.settings?.cta ?? {}) }),
     [defaultCTASettings, quiz.settings?.cta]
   )
+
+  const createOverlayItem = useCallback((): OverlayTextItem => ({
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    text: 'Overlay text',
+    fontFamily: quiz.settings?.fontFamily ?? 'Impact',
+    fontSizePercent: 4,
+    textColor: '#ffffff',
+    backgroundColor: '#000000',
+    backgroundOpacity: 0.7,
+    padding: 12,
+    align: 'center',
+    verticalPosition: 'center',
+    animationIn: 'fade',
+    animationOut: 'fade',
+    animationInDurationMs: 500,
+    animationOutDurationMs: 500,
+    displayDurationMs: 2000,
+    startOffsetMs: 0
+  }), [quiz.settings?.fontFamily])
+
+  const handleAddOverlay = useCallback(() => {
+    const newItem = createOverlayItem()
+    applyOverlayUpdate(overlay => ({
+      ...overlay,
+      items: [...overlay.items, newItem]
+    }))
+  }, [applyOverlayUpdate, createOverlayItem])
+
+  const updateOverlayItem = useCallback((id: string, updater: (item: OverlayTextItem) => OverlayTextItem) => {
+    applyOverlayUpdate(overlay => ({
+      ...overlay,
+      items: overlay.items.map(item => (item.id === id ? updater(item) : item))
+    }))
+  }, [applyOverlayUpdate])
+
+  const removeOverlayItem = useCallback((id: string) => {
+    applyOverlayUpdate(overlay => ({
+      ...overlay,
+      items: overlay.items.filter(item => item.id !== id)
+    }))
+  }, [applyOverlayUpdate])
 
   // Background state
   const [previousBackground, setPreviousBackground] = useState<{image?: string, video?: string}>(() => {
@@ -631,6 +715,16 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
             >
               😂 Meme Generator
             </button>
+            <button
+              className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                activeTab === 'overlay' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('overlay')}
+            >
+              🖋 Overlay Text
+            </button>
           </div>
 
           {/* Settings Tab */}
@@ -672,10 +766,19 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     <select
                       className="ios-input w-full"
                       value={quiz.settings?.animationType || 'quiz'}
-                      onChange={e => updateSettings(s => ({ ...s, animationType: e.target.value as 'quiz' | 'meme' }))}
+                      onChange={e => updateSettings(s => {
+                        const animationType = e.target.value as 'quiz' | 'meme' | 'overlay'
+                        const next: QuizSettings = { ...s, animationType }
+                        if (animationType === 'overlay') {
+                          const currentOverlay: OverlaySettings = s.overlay ?? { enabled: false, items: [] }
+                          next.overlay = { ...currentOverlay, enabled: true }
+                        }
+                        return next
+                      })}
                     >
                       <option value="quiz">Quiz</option>
                       <option value="meme">Meme</option>
+                      <option value="overlay">Text Overlay</option>
                     </select>
                   </div>
                 </div>
@@ -1172,7 +1275,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <LabeledSlider 
                           label="Fade In (ms)" 
                           value={currentCTA.fadeInMs ?? 600}
@@ -1186,13 +1289,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                           min={500} 
                           max={5000} 
                           onChange={v => applyCTAUpdate(cta => ({ ...cta, holdMs: v }))}
-                        />
-                        <LabeledSlider 
-                          label="Fade Out (ms)" 
-                          value={currentCTA.fadeOutMs ?? 600}
-                          min={200} 
-                          max={2000} 
-                          onChange={v => applyCTAUpdate(cta => ({ ...cta, fadeOutMs: v }))}
                         />
                       </div>
                       </div>
@@ -1348,6 +1444,231 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
             </div>
           </div>
 
+            </div>
+          )}
+
+          {activeTab === 'overlay' && (
+            <div className="space-y-4">
+              <div className="bg-gray-100/20 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-300 mb-3">🖋 Overlay Text Blocks</div>
+
+                <label className="flex items-center gap-2 text-sm mb-3">
+                  <input
+                    type="checkbox"
+                    checked={currentOverlay.enabled}
+                    onChange={e => applyOverlayUpdate(o => ({ ...o, enabled: e.target.checked }))}
+                  />
+                  Enable overlay text
+                </label>
+
+                {currentOverlay.enabled && (
+                  <div className="space-y-4">
+                    <button className="ios-card px-3 py-2 text-sm" onClick={handleAddOverlay}>
+                      + Add Overlay Block
+                    </button>
+
+                    {currentOverlay.items.length === 0 && (
+                      <div className="text-sm text-iossub">No overlay blocks added yet.</div>
+                    )}
+
+                    {currentOverlay.items.map((item, index) => (
+                      <div key={item.id} className="ios-card p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-gray-300">
+                            Overlay #{index + 1}
+                </div>
+                          <button
+                            className="text-red-400 text-xs"
+                            onClick={() => removeOverlayItem(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+
+                        <textarea
+                          className="ios-input w-full min-h-[80px] resize-y"
+                          value={item.text}
+                          onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, text: e.target.value }))}
+                          placeholder="Enter overlay text... (Shift+Enter for line breaks)"
+                        />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-sm text-iossub mb-1">Font Family</div>
+                            <select
+                              className="ios-input w-full"
+                              value={item.fontFamily ?? quiz.settings?.fontFamily ?? 'Impact'}
+                              onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, fontFamily: e.target.value }))}
+                            >
+                              {fontOptions.map(font => (
+                                <option key={font} value={font}>{font}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <LabeledSlider
+                              label="Font Size %"
+                              value={item.fontSizePercent ?? 4}
+                              min={2}
+                              max={20}
+                              step={0.5}
+                              onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, fontSizePercent: v }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <div className="text-sm text-iossub">Text Color</div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={item.textColor ?? '#ffffff'}
+                                onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, textColor: e.target.value }))}
+                                className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={item.textColor ?? '#ffffff'}
+                                onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, textColor: e.target.value }))}
+                                className="ios-input flex-1"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-sm text-iossub">Background Color</div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={item.backgroundColor ?? '#000000'}
+                                onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, backgroundColor: e.target.value }))}
+                                className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={item.backgroundColor ?? '#000000'}
+                                onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, backgroundColor: e.target.value }))}
+                                className="ios-input flex-1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <LabeledSlider
+                            label="Background Opacity"
+                            value={item.backgroundOpacity ?? 0.7}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, backgroundOpacity: v }))}
+                          />
+                          <LabeledSlider
+                            label="Padding (px)"
+                            value={item.padding ?? 12}
+                            min={0}
+                            max={80}
+                            step={1}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, padding: v }))}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-sm text-iossub mb-1">Horizontal Alignment</div>
+                            <select
+                              className="ios-input w-full"
+                              value={item.align ?? 'center'}
+                              onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, align: e.target.value as OverlayHorizontalAlign }))}
+                            >
+                              {overlayAlignOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-sm text-iossub mb-1">Vertical Position</div>
+                            <select
+                              className="ios-input w-full"
+                              value={item.verticalPosition ?? 'center'}
+                              onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, verticalPosition: e.target.value as OverlayVerticalPosition }))}
+                            >
+                              {overlayVerticalOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <LabeledSlider
+                            label="Start Offset (ms)"
+                            value={item.startOffsetMs ?? 0}
+                            min={0}
+                            max={60000}
+                            step={100}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, startOffsetMs: v }))}
+                          />
+                          <LabeledSlider
+                            label="Display Duration (ms)"
+                            value={item.displayDurationMs ?? 2000}
+                            min={500}
+                            max={60000}
+                            step={100}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, displayDurationMs: v }))}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-sm text-iossub mb-1">Animation In</div>
+                            <select
+                              className="ios-input w-full"
+                              value={item.animationIn ?? 'fade'}
+                              onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, animationIn: e.target.value as OverlayAnimation }))}
+                            >
+                              {overlayAnimationOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-sm text-iossub mb-1">Animation Out</div>
+                            <select
+                              className="ios-input w-full"
+                              value={item.animationOut ?? item.animationIn ?? 'fade'}
+                              onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, animationOut: e.target.value as OverlayAnimation }))}
+                            >
+                              {overlayAnimationOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <LabeledSlider
+                            label="Animation In Duration (ms)"
+                            value={item.animationInDurationMs ?? 500}
+                            min={0}
+                            max={5000}
+                            step={50}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, animationInDurationMs: v }))}
+                          />
+                          <LabeledSlider
+                            label="Animation Out Duration (ms)"
+                            value={item.animationOutDurationMs ?? 500}
+                            min={0}
+                            max={5000}
+                            step={50}
+                            onChange={v => updateOverlayItem(item.id, overlay => ({ ...overlay, animationOutDurationMs: v }))}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

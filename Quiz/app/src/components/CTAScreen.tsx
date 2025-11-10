@@ -18,54 +18,56 @@ export function CTAScreen({
   const timeoutRef = useRef<NodeJS.Timeout>()
   const [showText, setShowText] = useState(false)
   const cta = quiz.settings?.cta
+  const fadeInMs = cta?.fadeInMs ?? 600
+  const holdMs = cta?.holdMs ?? 1800
+  const baseDuration = fadeInMs + holdMs
+  const totalDuration = Math.max(cta?.durationMs ?? baseDuration, baseDuration)
+  const hasCustomImage = Boolean(cta?.backgroundType === 'image' && cta?.imageUrl)
+  const hasCustomVideo = Boolean(cta?.backgroundType === 'video' && cta?.backgroundVideoUrl)
+  const useCustomBackground = Boolean(cta?.enabled && cta?.useSameBackground === false && (hasCustomImage || hasCustomVideo))
 
   // Calculate CTA opacity based on time (for fade in/out)
   const getCTAOpacity = (): number => {
     if (!isRecording) return 1 // During preview, use CSS transitions
     
-    const fadeInMs = cta?.fadeInMs ?? 600
-    const holdMs = cta?.holdMs ?? 1800
-    const fadeOutMs = cta?.fadeOutMs ?? 600
-    
     if (recordingTime < fadeInMs) {
-      return recordingTime / fadeInMs
-    } else if (recordingTime < fadeInMs + holdMs) {
-      return 1
-    } else {
-      const fadeOutElapsed = recordingTime - (fadeInMs + holdMs)
-      if (fadeOutElapsed > fadeOutMs) return 0
-      return 1 - (fadeOutElapsed / fadeOutMs)
+      return fadeInMs > 0 ? recordingTime / fadeInMs : 1
     }
+    if (recordingTime < totalDuration) {
+      return 1
+    }
+    return 0
   }
 
   // Animation logic for text appearance
   useEffect(() => {
     if (isRecording) {
       // During recording, calculate when to show text based on recording time
-      const fadeInMs = cta?.fadeInMs ?? 600
-      setShowText(recordingTime >= fadeInMs)
+      setShowText(recordingTime >= fadeInMs && recordingTime < totalDuration)
     } else {
       // During preview, animate text with timing
-      const fadeInMs = cta?.fadeInMs ?? 600
-      
+      setShowText(false)
       // Show text after fade in delay
       const textTimer = setTimeout(() => {
         setShowText(true)
       }, fadeInMs)
+      const hideTimer = setTimeout(() => {
+        setShowText(false)
+      }, totalDuration)
       
       return () => {
         clearTimeout(textTimer)
+        clearTimeout(hideTimer)
       }
     }
-  }, [isRecording, recordingTime, cta?.fadeInMs])
+  }, [isRecording, recordingTime, fadeInMs, totalDuration])
 
   // Auto-finish after duration
   useEffect(() => {
     if (!isRecording && onFinished) {
-      const duration = cta?.durationMs ?? 3000
       timeoutRef.current = setTimeout(() => {
         onFinished()
-      }, duration)
+      }, totalDuration)
     }
 
     return () => {
@@ -73,31 +75,27 @@ export function CTAScreen({
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [onFinished, cta?.durationMs, isRecording])
+  }, [onFinished, totalDuration, isRecording])
 
   // Determine background to use
   const getCTABackground = () => {
-    if (!cta?.enabled) return quiz.background
+    if (!useCustomBackground) return null
 
-    if (cta.useSameBackground) {
-      return quiz.background
-    }
-
-    if (cta.backgroundType === 'image' && cta.imageUrl) {
+    if (hasCustomImage) {
       return {
         type: 'image' as const,
-        imageUrl: cta.imageUrl
+        imageUrl: cta!.imageUrl!
       }
     }
 
-    if (cta.backgroundType === 'video' && cta.backgroundVideoUrl) {
+    if (hasCustomVideo) {
       return {
         type: 'video' as const,
-        videoUrl: cta.backgroundVideoUrl
+        videoUrl: cta!.backgroundVideoUrl!
       }
     }
 
-    return quiz.background
+    return null
   }
 
   const ctaBackground = getCTABackground()
@@ -121,13 +119,15 @@ export function CTAScreen({
   return (
     <div className="absolute inset-0 flex items-center justify-center">
       {/* Background */}
-      <BackgroundRenderer
-        background={ctaBackground}
-        zoom={quiz.settings?.bgZoomEnabled ? (quiz.settings?.bgZoomScale ?? 1.1) : 1}
-        isPlaying={true}
-        playKey={0}
-        quiz={quiz}
-      />
+      {useCustomBackground && ctaBackground && (
+        <BackgroundRenderer
+          background={ctaBackground}
+          zoom={quiz.settings?.bgZoomEnabled ? (quiz.settings?.bgZoomScale ?? 1.1) : 1}
+          isPlaying={!isRecording}
+          playKey={0}
+          quiz={quiz}
+        />
+      )}
       
       {/* Video Overlay */}
       {cta?.overlayEnabled && (

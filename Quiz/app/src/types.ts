@@ -52,7 +52,35 @@ export type AspectRatio = '1:1' | '3:4' | '9:16'
 
 export type AnswerFormat = 'letters' | 'numbers' | 'steps'
 
-export type AnimationType = 'quiz' | 'meme'
+export type AnimationType = 'quiz' | 'meme' | 'overlay'
+
+export type OverlayAnimation = 'none' | 'fade' | 'slide-up' | 'slide-down' | 'scale'
+export type OverlayVerticalPosition = 'top' | 'center' | 'bottom'
+export type OverlayHorizontalAlign = 'left' | 'center' | 'right'
+
+export interface OverlayTextItem {
+  id: string
+  text: string
+  fontFamily?: string
+  fontSizePercent?: number
+  textColor?: string
+  backgroundColor?: string
+  backgroundOpacity?: number
+  padding?: number
+  align?: OverlayHorizontalAlign
+  verticalPosition?: OverlayVerticalPosition
+  animationIn?: OverlayAnimation
+  animationOut?: OverlayAnimation
+  animationInDurationMs?: number
+  animationOutDurationMs?: number
+  displayDurationMs?: number
+  startOffsetMs?: number
+}
+
+export interface OverlaySettings {
+  enabled: boolean
+  items: OverlayTextItem[]
+}
 
 export interface QuizSettings {
   aspectRatio: AspectRatio
@@ -80,6 +108,7 @@ export interface QuizSettings {
   bgZoomEnabled?: boolean
   bgZoomScale?: number
   bgZoomDurationMs?: number
+  overlay?: OverlaySettings
   answerWidthPercent?: number
   answerWidth?: number // Legacy property for migration
   bgOverlayColor?: string
