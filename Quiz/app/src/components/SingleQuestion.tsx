@@ -42,6 +42,10 @@ export function SingleQuestion({
   const [showAnswers, setShowAnswers] = useState(false)
   const [showCorrect, setShowCorrect] = useState(false)
   const [fadeOut, setFadeOut] = useState(false)
+  const correctButtonColor = settings?.correctAnswerButtonColor ?? settings?.correctAnswerColor ?? '#10b981'
+  const correctTextColor = settings?.correctAnswerTextColor ?? '#ffffff'
+  const defaultAnswerTextColor = settings?.answerColor ?? '#111113'
+  const defaultAnswerBackground = '#ffffff'
 
   // Calculate timing for recording
   useEffect(() => {
@@ -178,12 +182,10 @@ export function SingleQuestion({
                 className="flex items-center justify-center"
               >
                 <div 
-                  className={`rounded-full font-semibold transition-all duration-300 ${
-                    showCorrect && answer.isCorrect
-                      ? 'bg-green-500 text-white'
-                      : 'bg-white text-gray-900 hover:bg-gray-100'
-                  }`}
+                  className="rounded-full font-semibold transition-all duration-300"
                   style={{ 
+                    backgroundColor: showCorrect && answer.isCorrect ? correctButtonColor : defaultAnswerBackground,
+                    color: showCorrect && answer.isCorrect ? correctTextColor : defaultAnswerTextColor,
                     whiteSpace: 'pre-line',
                     width: `${settings?.answerWidthPercent ?? 50}%`, // Direct percentage setting
                     height: '7.5vh', // Percentage of viewport height
@@ -274,12 +276,10 @@ export function SingleQuestion({
                 className="flex items-center justify-center"
               >
                 <div 
-                  className={`rounded-full font-semibold transition-all duration-300 ${
-                    isCorrectRevealed && answer.isCorrect
-                      ? 'bg-green-500 text-white'
-                      : 'bg-white text-gray-900'
-                  }`}
+                  className="rounded-full font-semibold transition-all duration-300"
                   style={{ 
+                    backgroundColor: isCorrectRevealed && answer.isCorrect ? correctButtonColor : defaultAnswerBackground,
+                    color: isCorrectRevealed && answer.isCorrect ? correctTextColor : defaultAnswerTextColor,
                     whiteSpace: 'pre-line',
                     width: `${settings?.answerWidthPercent ?? 50}%`, // Direct percentage setting
                     height: '7.5vh', // Percentage of viewport height
