@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useCallback } from 'react'
 import { QuizData } from '../types'
+import { computeQuizTimeline } from '../utils/quizTiming'
 
 interface BackgroundRendererProps {
   background: QuizData['background']
@@ -12,27 +13,8 @@ interface BackgroundRendererProps {
 }
 
 function computeExactDuration(quiz: QuizData): number {
-  const settings = quiz.settings!
-  const numQuestions = quiz.questions.length
-  
-  // Title duration (if enabled)
-  const titleDuration = (settings.showTitle ?? true) 
-    ? (settings.titleInMs + settings.titleHoldMs + settings.titleOutMs)
-    : 0
-  
-  // Per question duration
-  const answersPerQuestion = 3
-  const perQuestionDuration = settings.questionInMs + 
-    (settings.answersStaggerMs * (answersPerQuestion - 1)) + 
-    settings.correctRevealMs + 
-    settings.questionHoldMs
-  
-  // Total duration
-  const contentDuration = titleDuration + (perQuestionDuration * numQuestions)
-  const endDelay = settings.endDelayMs ?? 1000
-  const totalDuration = contentDuration + endDelay
-  
-  return totalDuration
+  const timeline = computeQuizTimeline(quiz)
+  return timeline.totalContentDuration + timeline.endDelay
 }
 
 export function BackgroundRenderer({ 
@@ -46,16 +28,76 @@ export function BackgroundRenderer({
 }: BackgroundRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  const applyVideoOffset = useCallback(
+    (media?: HTMLVideoElement | null, options: { resume?: boolean } = {}) => {
+      if (!media) return
+
+      const desired = Math.max(0, background.type === 'video' ? background.videoStartOffsetSeconds ?? 0 : 0)
+
+      const seekToOffset = () => {
+        const duration = media.duration
+        const clamped = Number.isFinite(duration) && duration > 0
+          ? Math.min(Math.max(0, desired), Math.max(0, duration - 0.05))
+          : desired
+
+        if (Number.isNaN(clamped)) return
+
+        const shouldResume = options.resume && isPlaying
+
+        if (Math.abs(media.currentTime - clamped) < 0.01) {
+          if (shouldResume) {
+            media.play().catch(console.error)
+          }
+          return
+        }
+
+        try {
+          media.currentTime = clamped
+        } catch (error) {
+          console.warn('Failed to set background video offset:', error)
+          return
+        }
+
+        if (shouldResume) {
+          const resumePlayback = () => {
+            media.play().catch(console.error)
+            media.removeEventListener('seeked', resumePlayback)
+          }
+          media.addEventListener('seeked', resumePlayback, { once: true })
+        }
+      }
+
+      if (media.readyState >= 1) {
+        seekToOffset()
+      } else {
+        const handleLoaded = () => {
+          seekToOffset()
+          media.removeEventListener('loadeddata', handleLoaded)
+          media.removeEventListener('loadedmetadata', handleLoaded)
+        }
+        media.addEventListener('loadeddata', handleLoaded)
+        media.addEventListener('loadedmetadata', handleLoaded)
+      }
+    },
+    [background, isPlaying]
+  )
+
   // Ensure video plays when isPlaying changes
   useEffect(() => {
     if (background.type === 'video' && videoRef.current) {
       if (isPlaying) {
-        videoRef.current.play().catch(console.error)
+        applyVideoOffset(videoRef.current, { resume: true })
       } else {
         videoRef.current.pause()
       }
     }
-  }, [isPlaying, background.type])
+  }, [isPlaying, background.type, applyVideoOffset])
+
+  useEffect(() => {
+    if (background.type === 'video' && videoRef.current) {
+      applyVideoOffset(videoRef.current, { resume: isPlaying })
+    }
+  }, [background.type, background.videoStartOffsetSeconds, background.videoUrl, playKey, isPlaying, applyVideoOffset])
   if (background.type === 'color') {
     return <div className="absolute inset-0" style={{ background: background.color ?? '#000' }} />
   }
@@ -117,7 +159,7 @@ export function BackgroundRenderer({
           transition: isRecording ? 'none' : undefined
         }} 
         autoPlay 
-        loop 
+        loop
         muted 
         playsInline 
         preload="auto"
@@ -126,7 +168,7 @@ export function BackgroundRenderer({
         onLoadedData={() => {
           // Ensure video plays when loaded
           if (videoRef.current) {
-            videoRef.current.play().catch(console.error)
+            applyVideoOffset(videoRef.current, { resume: isPlaying })
           }
         }}
         onError={(e) => {
@@ -139,8 +181,13 @@ export function BackgroundRenderer({
         }}
         onCanPlay={() => {
           // Ensure video plays when it can play
-          if (videoRef.current && isPlaying) {
-            videoRef.current.play().catch(console.error)
+          if (videoRef.current) {
+            applyVideoOffset(videoRef.current, { resume: isPlaying })
+          }
+        }}
+        onEnded={() => {
+          if (videoRef.current) {
+            applyVideoOffset(videoRef.current, { resume: isPlaying })
           }
         }}
       />

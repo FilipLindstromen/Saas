@@ -31,6 +31,7 @@ export interface QuizBackground {
   color?: string
   imageUrl?: string
   videoUrl?: string
+  videoStartOffsetSeconds?: number
   memeUrl?: string
   memeTitle?: string
   isGif?: boolean
@@ -91,12 +92,13 @@ export interface QuizSettings {
     name: string
     url: string
     volume: number
+    startOffsetSeconds?: number
   }
   sfx: {
     appearVolume: number
     correctVolume: number
   }
-  cta?: {
+    cta?: {
     enabled: boolean
     durationMs: number
     useSameBackground: boolean
@@ -107,6 +109,7 @@ export interface QuizSettings {
     textColor?: string
     textShadowEnabled?: boolean
     textShadowColor?: string
+      fontFamily?: string
     fadeInMs?: number
     holdMs?: number
     fadeOutMs?: number

@@ -6,6 +6,8 @@
  * when the quiz is fully canvas-based.
  */
 
+import { computeQuizTimeline } from './quizTiming'
+
 // Helper function to format answer labels
 function formatAnswerLabel(index: number, format: string = 'letters'): string {
   switch (format) {
@@ -65,6 +67,30 @@ export class CanvasRecorder {
     ultra: { bitrate: 15000000, crf: 18 }
   }
 
+  private static applyMediaOffset(media: HTMLMediaElement | null | undefined, offsetSeconds?: number) {
+    if (!media) return
+    const desired = Math.max(0, offsetSeconds ?? 0)
+    const setOffset = () => {
+      const duration = media.duration
+      const max = Number.isFinite(duration) && duration > 0 ? Math.max(0, duration - 0.05) : undefined
+      const clamped = max !== undefined ? Math.min(desired, max) : desired
+      if (!Number.isNaN(clamped)) {
+        try {
+          media.currentTime = clamped
+        } catch (error) {
+          console.warn('Failed to set media offset:', error)
+        }
+      }
+    }
+
+    if (media.readyState >= 1) {
+      setOffset()
+    } else {
+      const handler = () => setOffset()
+      media.addEventListener('loadedmetadata', handler, { once: true })
+    }
+  }
+
   /**
    * Record video using client-side canvas method
    */
@@ -79,6 +105,8 @@ export class CanvasRecorder {
       onProgress,
       onStatus
     } = options
+
+    let cleanupPlayback: () => void = () => {}
 
     try {
       onStatus?.('Initializing canvas recording...')
@@ -124,13 +152,65 @@ export class CanvasRecorder {
       let audioDest: MediaStreamAudioDestinationNode | null = null
       let musicEl: HTMLAudioElement | null = null
 
+      const cleanupCallbacks: Array<() => void> = []
+      let cleanedUp = false
+
+      cleanupPlayback = () => {
+        if (cleanedUp) return
+        cleanedUp = true
+        cleanupCallbacks.forEach(fn => {
+          try {
+            fn()
+          } catch {
+            // ignore cleanup errors
+          }
+        })
+
+        if (musicEl) {
+          try {
+            musicEl.pause()
+            musicEl.currentTime = 0
+          } catch {
+            // ignore
+          }
+        }
+
+        ;[assets.videoEl, assets.upperVideoEl, assets.lowerVideoEl].forEach(el => {
+          if (el) {
+            try {
+              el.pause()
+            } catch {
+              // ignore
+            }
+          }
+        })
+
+        if (audioSource) {
+          try {
+            audioSource.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+        if (audioDest) {
+          try {
+            audioDest.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+        if (audioContext) {
+          audioContext.close().catch(() => {})
+        }
+      }
+
       if (includeMusic && assets.musicEl) {
         try {
           onStatus?.('Attaching background music...')
           audioContext = new AudioContext()
           musicEl = assets.musicEl
-          // Ensure playback starts at t=0 and matches duration
-          musicEl.currentTime = 0
+          // Ensure playback starts at desired offset
+          this.applyMediaOffset(musicEl, quiz.settings?.music?.startOffsetSeconds)
           musicEl.crossOrigin = 'anonymous'
           musicEl.loop = false
           audioSource = audioContext.createMediaElementSource(musicEl)
@@ -185,6 +265,7 @@ export class CanvasRecorder {
         }
 
         recorder.onstop = () => {
+          cleanupPlayback()
           if (chunks.length === 0) {
             reject(new Error('No video data recorded'))
             return
@@ -204,6 +285,7 @@ export class CanvasRecorder {
         }
 
         recorder.onerror = (e) => {
+          cleanupPlayback()
           reject(new Error('MediaRecorder error during canvas recording'))
         }
 
@@ -230,22 +312,72 @@ export class CanvasRecorder {
         )
 
         // Start background video/music playback aligned to render loop
-        if (assets.videoEl) {
-          assets.videoEl.currentTime = 0
-          assets.videoEl.muted = true
-          assets.videoEl.play().catch(() => {})
+        let shouldLoopVideo = false
+        if (quiz.background?.type === 'video' && assets.videoEl) {
+          const bgVideoEl = assets.videoEl
+          this.applyMediaOffset(
+            bgVideoEl,
+            quiz.background.videoStartOffsetSeconds
+          )
+          bgVideoEl.muted = true
+          bgVideoEl.loop = false
+
+          const bgDuration = bgVideoEl.duration
+          if (Number.isFinite(bgDuration) && bgDuration > 0) {
+            shouldLoopVideo = duration > (bgDuration * 1000)
+          }
+
+          bgVideoEl.play().catch(() => {})
+
+          if (shouldLoopVideo) {
+            const handleEnded = () => {
+              this.applyMediaOffset(
+                bgVideoEl,
+                quiz.background?.videoStartOffsetSeconds
+              )
+              bgVideoEl.play().catch(() => {})
+            }
+            bgVideoEl.addEventListener('ended', handleEnded)
+            cleanupCallbacks.push(() => bgVideoEl.removeEventListener('ended', handleEnded))
+          }
         }
         
         // Start split screen videos playback
         if (assets.upperVideoEl) {
-          assets.upperVideoEl.currentTime = 0
-          assets.upperVideoEl.muted = true
-          assets.upperVideoEl.play().catch(() => {})
+          const upperVideoEl = assets.upperVideoEl
+          upperVideoEl.currentTime = 0
+          upperVideoEl.muted = true
+          upperVideoEl.play().catch(() => {})
+          if (
+            Number.isFinite(upperVideoEl.duration) &&
+            upperVideoEl.duration > 0 &&
+            duration > upperVideoEl.duration * 1000
+          ) {
+            const handleUpperEnded = () => {
+              upperVideoEl.currentTime = 0
+              upperVideoEl.play().catch(() => {})
+            }
+            upperVideoEl.addEventListener('ended', handleUpperEnded)
+            cleanupCallbacks.push(() => upperVideoEl.removeEventListener('ended', handleUpperEnded))
+          }
         }
         if (assets.lowerVideoEl) {
-          assets.lowerVideoEl.currentTime = 0
-          assets.lowerVideoEl.muted = true
-          assets.lowerVideoEl.play().catch(() => {})
+          const lowerVideoEl = assets.lowerVideoEl
+          lowerVideoEl.currentTime = 0
+          lowerVideoEl.muted = true
+          lowerVideoEl.play().catch(() => {})
+          if (
+            Number.isFinite(lowerVideoEl.duration) &&
+            lowerVideoEl.duration > 0 &&
+            duration > lowerVideoEl.duration * 1000
+          ) {
+            const handleLowerEnded = () => {
+              lowerVideoEl.currentTime = 0
+              lowerVideoEl.play().catch(() => {})
+            }
+            lowerVideoEl.addEventListener('ended', handleLowerEnded)
+            cleanupCallbacks.push(() => lowerVideoEl.removeEventListener('ended', handleLowerEnded))
+          }
         }
         if (musicEl) {
           // Resume audio context then play
@@ -258,6 +390,7 @@ export class CanvasRecorder {
       })
 
     } catch (error) {
+      cleanupPlayback()
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       options.onError?.(new Error(`Canvas recording failed: ${errorMessage}`))
       throw error
@@ -278,6 +411,9 @@ export class CanvasRecorder {
     onStatus?: (status: string) => void,
     onComplete?: () => void
   ): void {
+    const timeline = computeQuizTimeline(quiz)
+    const ctaEnabled = Boolean(quiz.settings?.cta?.enabled && timeline.ctaDuration > 0)
+    const ctaStartTime = timeline.totalContentDuration
     const frameCount = Math.ceil((duration / 1000) * frameRate)
     const frameInterval = 1000 / frameRate
     let frameIndex = 0
@@ -300,30 +436,13 @@ export class CanvasRecorder {
         
         
         // Determine what stage to render based on frame time
-        const cta = quiz.settings?.cta
-        const ctaEnabled = cta?.enabled
-        const ctaStartTime = duration - (cta?.durationMs ?? 3000)
-        
-        // Debug CTA timing
-        if (frameIndex === 0) {
-          console.log('CTA Debug:', {
-            ctaEnabled,
-            ctaStartTime,
-            duration,
-            ctaDurationMs: cta?.durationMs,
-            frameTime: frameTime,
-            shouldShowCTA: ctaEnabled && frameTime >= ctaStartTime
-          })
-        }
-        
         if (ctaEnabled && frameTime >= ctaStartTime) {
-          // Render CTA screen - adjust frame time to be relative to CTA start
           const ctaFrameTime = frameTime - ctaStartTime
           this.renderCTAFrame(ctx, quiz, ctaFrameTime, duration, targetResolution)
         } else if (quiz.settings?.animationType === 'meme') {
           this.renderMemeFrame(ctx, quiz, frameTime, duration, targetResolution)
         } else {
-          this.renderQuizFrame(ctx, quiz, frameTime, duration, targetResolution)
+          this.renderQuizFrame(ctx, quiz, frameTime, duration, targetResolution, timeline)
         }
         
         // Update progress
@@ -353,49 +472,44 @@ export class CanvasRecorder {
     quiz: any,
     frameTime: number,
     totalDuration: number,
-    targetResolution: { width: number; height: number }
+    targetResolution: { width: number; height: number },
+    timeline: ReturnType<typeof computeQuizTimeline>
   ): void {
     const { width, height } = targetResolution
     
     // Calculate animation progress (0 to 1)
     const progress = Math.min(frameTime / totalDuration, 1)
     
-    // Determine which stage we're in using quiz settings (fallbacks provided)
-    const s = quiz.settings || {}
-    const titleIn = Number(s.titleIn ?? 600)
-    const titleHold = Number(s.titleHold ?? 900)
-    const titleOut = Number(s.titleOut ?? 600)
-    const titleDuration = titleIn + titleHold + titleOut
-    const questionIn = Number(s.questionIn ?? 300)
-    const questionHold = Number(s.questionHold ?? 2200)
-    const answersStagger = Number(s.answersStagger ?? 70)
-    const correctReveal = Number(s.correctReveal ?? 500)
-    const endDelay = Number(s.endDelayMs ?? 1000) // Default 1 second end delay
-    const perQuestion = questionIn + questionHold + correctReveal
-    const questionDuration = perQuestion
-    const totalQuestions = quiz.questions.length
-    const totalQuestionTime = totalQuestions * questionDuration
-    const totalContentTime = titleDuration + totalQuestionTime
-    const totalDurationWithDelay = totalContentTime + endDelay
+    const { showTitle, titleDuration, questionTimings, totalQuestionDuration } = timeline
     
-    let stage: 'title' | 'question' | 'end' | 'endDelay' = 'title'
-    let questionIndex = 0
+    let stage: 'title' | 'question' | 'postQuestions' = 'title'
+    let questionIndex = -1
     let stageProgress = 0
     
-    if (frameTime < titleDuration) {
+    if (showTitle && frameTime < titleDuration) {
       stage = 'title'
       stageProgress = frameTime / titleDuration
-    } else if (frameTime < titleDuration + totalQuestionTime) {
-      stage = 'question'
-      const questionTime = frameTime - titleDuration
-      questionIndex = Math.floor(questionTime / questionDuration)
-      stageProgress = (questionTime % questionDuration) / questionDuration
-    } else if (frameTime < totalContentTime) {
-      stage = 'end'
-      stageProgress = 1
     } else {
-      stage = 'endDelay'
-      stageProgress = 1
+      const questionTime = frameTime - titleDuration
+      if (questionTime >= 0 && questionTime < totalQuestionDuration) {
+      stage = 'question'
+        for (let i = 0; i < questionTimings.length; i++) {
+          const timing = questionTimings[i]
+          if (questionTime >= timing.start && questionTime < timing.start + timing.duration) {
+            questionIndex = i
+            stageProgress = (questionTime - timing.start) / timing.duration
+            break
+          }
+        }
+        if (questionIndex === -1 && questionTimings.length > 0) {
+          // Clamp to last question
+          questionIndex = questionTimings.length - 1
+          stageProgress = 1
+        }
+      } else {
+        stage = 'postQuestions'
+        stageProgress = 1
+      }
     }
     
     // Render background (color/image/video) and overlay
@@ -428,19 +542,21 @@ export class CanvasRecorder {
         this.renderTitle(ctx, quiz.title, quiz.settings, width, height, stageProgress, targetResolution)
         break
       case 'question':
-        if (questionIndex < quiz.questions.length) {
-          this.renderQuestion(ctx, quiz.questions[questionIndex], quiz.settings, width, height, stageProgress, targetResolution, questionIndex === totalQuestions - 1)
+        if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
+          this.renderQuestion(
+            ctx,
+            quiz.questions[questionIndex],
+            quiz.settings,
+            width,
+            height,
+            stageProgress,
+            targetResolution,
+            questionIndex === quiz.questions.length - 1
+          )
         }
         break
-      case 'end':
-        this.renderEnd(ctx, quiz, width, height, targetResolution)
-        break
-      case 'endDelay':
-        // Show the last question during end delay
-        if (quiz.questions.length > 0) {
-          const lastQuestion = quiz.questions[quiz.questions.length - 1]
-          this.renderQuestion(ctx, lastQuestion, quiz.settings, width, height, 1, targetResolution, true)
-        }
+      case 'postQuestions':
+        // Background already rendered; nothing to overlay so fade stays clear
         break
     }
   }
@@ -838,7 +954,7 @@ export class CanvasRecorder {
     const textSize = (width * textSizePercent) / 100
     
     // Set font
-    const fontFamily = quiz.settings?.fontFamily || 'Impact'
+    const fontFamily = cta?.fontFamily || quiz.settings?.fontFamily || 'Impact'
     const fontWeight = fontFamily === 'Impact' ? 'normal' : 'bold'
     ctx.font = `${fontWeight} ${textSize}px ${fontFamily}`
     ctx.textAlign = 'center'
@@ -1154,7 +1270,7 @@ export class CanvasRecorder {
     // Calculate total content height to center the entire block like preview
     const questionMarginBottom = height * 0.06 // 6vh - increased spacing between question and answers
     const answerGap = height * 0.02 // 2vh gap between answers
-    const answersPerQuestion = 3
+    const answersPerQuestion = question.answers?.length ?? 3
     const totalAnswerHeight = (pillHeight + answerGap) * answersPerQuestion - answerGap // Total height of all answers
     const totalContentHeight = questionFontSize * 1.2 + questionMarginBottom + totalAnswerHeight
     
@@ -1196,8 +1312,10 @@ export class CanvasRecorder {
         (answersStaggerMs * (answersPerQuestion - 1)) + 
         correctRevealMs + 
         questionHold
+
       const fadeOutStartTime = questionDuration - 1000 // Start fade 1 second before end
-      const fadeOutProgress = Math.max(0, (progress * perQuestionMs - fadeOutStartTime) / 1000)
+      const currentTime = progress * perQuestionMs
+      const fadeOutProgress = Math.max(0, (currentTime - fadeOutStartTime) / 1000)
       fadeOutOpacity = Math.max(0, 1 - fadeOutProgress)
     }
     
@@ -1352,7 +1470,7 @@ export class CanvasRecorder {
         v.muted = true
         await v.play().catch(() => {})
         v.pause()
-        v.currentTime = 0
+        this.applyMediaOffset(v, bg.videoStartOffsetSeconds)
         assets.videoEl = v
       }
     } catch {}
@@ -1369,7 +1487,7 @@ export class CanvasRecorder {
         ctaVideo.muted = true
         await ctaVideo.play().catch(() => {})
         ctaVideo.pause()
-        ctaVideo.currentTime = 0
+        this.applyMediaOffset(ctaVideo, 0)
         // Store CTA video in the same videoEl since we only use one at a time
         assets.videoEl = ctaVideo
       }
@@ -1385,9 +1503,9 @@ export class CanvasRecorder {
           upperVideo.src = bg.upperVideoUrl
           upperVideo.playsInline = true
           upperVideo.muted = true
-          await upperVideo.play().catch(() => {})
-          upperVideo.pause()
-          upperVideo.currentTime = 0
+        await upperVideo.play().catch(() => {})
+        upperVideo.pause()
+        upperVideo.currentTime = 0
           assets.upperVideoEl = upperVideo
         }
         
@@ -1399,9 +1517,9 @@ export class CanvasRecorder {
           lowerVideo.src = bg.lowerVideoUrl
           lowerVideo.playsInline = true
           lowerVideo.muted = true
-          await lowerVideo.play().catch(() => {})
-          lowerVideo.pause()
-          lowerVideo.currentTime = 0
+        await lowerVideo.play().catch(() => {})
+        lowerVideo.pause()
+        lowerVideo.currentTime = 0
           assets.lowerVideoEl = lowerVideo
         }
       }
@@ -1425,6 +1543,7 @@ export class CanvasRecorder {
         
         await a.load
         assets.musicEl = a
+        this.applyMediaOffset(a, music.startOffsetSeconds)
       }
     } catch (error) {
       console.log('Canvas recorder music error:', error)

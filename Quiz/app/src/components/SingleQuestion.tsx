@@ -64,7 +64,7 @@ export function SingleQuestion({
     }
 
     // Show correct answer after all answers are shown + correct reveal timing
-    const answersPerQuestion = 3
+    const answersPerQuestion = Math.max(question.answers.length, 1)
     const allAnswersShownTime = questionInMs + answersStaggerMs + (answersStaggerMs * (answersPerQuestion - 1))
     const correctRevealTime = allAnswersShownTime + correctRevealMs
     if (elapsed >= correctRevealTime && !showCorrect) {
@@ -73,8 +73,8 @@ export function SingleQuestion({
     }
 
     // Fade out for last question - start fade 1 second before question ends
-    const questionDuration = questionInMs + 
-      (answersStaggerMs * (answersPerQuestion - 1)) + 
+    const questionDuration = questionInMs +
+      (answersStaggerMs * answersPerQuestion) +
       correctRevealMs + 
       questionHoldMs
     const fadeOutStartTime = questionDuration - 1000 // Start fade 1 second before end
@@ -99,7 +99,7 @@ export function SingleQuestion({
     React.useEffect(() => {
       if (!isRecording) {
         // Calculate correct reveal timing to match recording - after all answers are shown
-        const answersPerQuestion = 3
+        const answersPerQuestion = Math.max(question.answers.length, 1)
         const allAnswersShownTime = settings!.questionInMs + settings!.answersStaggerMs + (settings!.answersStaggerMs * (answersPerQuestion - 1))
         const correctRevealTimer = setTimeout(() => {
           setShowCorrect(true)
@@ -107,8 +107,8 @@ export function SingleQuestion({
         }, allAnswersShownTime + settings!.correctRevealMs)
 
         // Set up timer for question completion
-        const questionDuration = settings!.questionInMs + 
-          (settings!.answersStaggerMs * (answersPerQuestion - 1)) + 
+        const questionDuration = settings!.questionInMs +
+          (settings!.answersStaggerMs * answersPerQuestion) +
           settings!.correctRevealMs + 
           settings!.questionHoldMs
 
@@ -138,7 +138,7 @@ export function SingleQuestion({
         transition={{ duration: settings!.questionInMs / 1000 }}
         onAnimationStart={onAppear}
         className="absolute inset-0 flex items-center justify-center p-6"
-        style={{ opacity: fadeOut ? 0 : 1 }}
+        style={{ opacity: fadeOut ? 0 : 1, transition: fadeOut ? 'opacity 1s ease-out' : undefined }}
       >
         <div className="text-center w-full" style={{ maxWidth: '90%', margin: '0 auto' }}>
           {/* Question */}
@@ -146,7 +146,7 @@ export function SingleQuestion({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            style={{ marginBottom: '6vh' }}
+            style={{ marginBottom: '6vh', opacity: fadeOut ? 0 : 1, transition: fadeOut ? 'opacity 1s ease-out' : undefined }}
           >
             <h2 
               className={`font-bold ${settings?.questionShadowEnabled ? 'drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]' : ''}`}
@@ -168,7 +168,7 @@ export function SingleQuestion({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: (settings!.questionInMs + settings!.answersStaggerMs) / 1000 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: '2vh' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '2vh', opacity: fadeOut ? 0 : 1, transition: fadeOut ? 'opacity 1s ease-out' : undefined }}
           >
             {question.answers.map((answer, idx) => (
               <motion.div
@@ -212,9 +212,15 @@ export function SingleQuestion({
   const questionInMs = settings!.questionInMs
   const answersStaggerMs = settings!.answersStaggerMs
   const correctRevealMs = settings!.correctRevealMs
+  const answersPerQuestion = question.answers.length
+  const questionDuration = questionInMs + (answersStaggerMs * (answersPerQuestion - 1)) + correctRevealMs + settings!.questionHoldMs
+  const fadeOutStartMs = questionDuration - 1000
+  const fadeElapsed = fadeOut ? Math.max(0, elapsed - fadeOutStartMs) : 0
+  const fadeMultiplier = fadeOut ? Math.max(0, 1 - Math.min(fadeElapsed / 1000, 1)) : 1
 
-  const questionOpacity = Math.min(elapsed / questionInMs, 1)
-  const answersOpacity = elapsed >= questionInMs + answersStaggerMs ? 1 : 0
+  const questionOpacity = Math.min(elapsed / questionInMs, 1) * fadeMultiplier
+  const answersBaseOpacity = elapsed >= questionInMs + answersStaggerMs ? 1 : 0
+  const answersOpacity = answersBaseOpacity * fadeMultiplier
 
   return (
     <div 
@@ -262,7 +268,8 @@ export function SingleQuestion({
           {question.answers.map((answer, idx) => {
             const answerStartTime = questionInMs + answersStaggerMs + (idx * answersStaggerMs)
             const answerElapsed = elapsed - answerStartTime
-            const answerOpacity = Math.max(0, Math.min(answerElapsed / 300, 1))
+            const baseAnswerOpacity = Math.max(0, Math.min(answerElapsed / 300, 1))
+            const answerOpacity = baseAnswerOpacity * fadeMultiplier
             const isCorrectRevealed = elapsed >= questionInMs + answersStaggerMs + correctRevealMs
 
             return (

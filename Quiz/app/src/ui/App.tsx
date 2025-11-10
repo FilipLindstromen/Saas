@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useQuizState, createBooleanQuestion, createMultipleChoiceQuestion } from '../state'
 import { useMemeState } from '../memeState'
-import { QuizQuestion, QuizData, QuizAnswer, AspectRatio, MemeData, QuizBackground } from '../types'
+import { QuizQuestion, QuizData, QuizAnswer, AspectRatio, MemeData, QuizBackground, QuizSettings } from '../types'
 import { CanvasRecorder, CanvasRecordingOptions } from '../utils/canvasRecorder'
+import { computeQuizTimeline } from '../utils/quizTiming'
 import { AIModal } from '../components/AIModal'
 import { StockMediaModal } from '../components/StockMediaModal'
 import { PixabayMusicModal } from '../components/PixabayMusicModal'
@@ -83,6 +84,47 @@ export function App() {
   const [showYouTubeAudio, setShowYouTubeAudio] = useState(false)
   const [showRealMusic, setShowRealMusic] = useState(false)
 
+  const fontOptions = useMemo(
+    () => ['Impact', 'Arial Black', 'Helvetica', 'Comic Sans MS', 'Times New Roman', 'Georgia', 'Verdana', 'Trebuchet MS'],
+    []
+  )
+
+  const defaultCTASettings = useMemo<NonNullable<QuizSettings['cta']>>(() => ({
+    enabled: false,
+    durationMs: 3000,
+    useSameBackground: true,
+    backgroundVideoUrl: undefined,
+    showText: true,
+    text: 'Thank You!',
+    textSizePercent: 8,
+    textColor: '#ffffff',
+    textShadowEnabled: true,
+    textShadowColor: '#000000',
+    fontFamily: 'Impact',
+    fadeInMs: 600,
+    holdMs: 1800,
+    fadeOutMs: 600,
+    overlayEnabled: false,
+    overlayColor: '#000000',
+    overlayOpacity: 0.4
+  }), [])
+
+  const applyCTAUpdate = useCallback(
+    (updater: (cta: typeof defaultCTASettings) => typeof defaultCTASettings) => {
+      updateSettings(s => {
+        const merged = { ...defaultCTASettings, ...(s.cta ?? {}) }
+        const updated = updater(merged)
+        return { ...s, cta: updated }
+      })
+    },
+    [updateSettings, defaultCTASettings]
+  )
+
+  const currentCTA = useMemo(
+    () => ({ ...defaultCTASettings, ...(quiz.settings?.cta ?? {}) }),
+    [defaultCTASettings, quiz.settings?.cta]
+  )
+
   // Background state
   const [previousBackground, setPreviousBackground] = useState<{image?: string, video?: string}>(() => {
     try {
@@ -126,7 +168,11 @@ export function App() {
   }
 
   const handleStockVideoSelect = (video: any) => {
-    updateBackground({ type: 'video', videoUrl: video.url })
+    updateBackground({ 
+      ...quiz.background,
+      type: 'video', 
+      videoUrl: video.url 
+    })
     savePreviousBackground('video', video.url)
   }
 
@@ -589,22 +635,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
           {/* Settings Tab */}
           {activeTab === 'settings' && (
             <div className="space-y-4">
-              {/* Title */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">Title</div>
-                <textarea 
-                  className="ios-input w-full mb-2 min-h-[60px] resize-y" 
-                  value={quiz.title} 
-                  onChange={e => updateTitle(e.target.value)} 
-                  placeholder="Your Quiz Title&#10;Use Enter for line breaks" 
-                  rows={2}
-                />
-                <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={quiz.settings?.showTitle ?? true} onChange={e => updateSettings(s => ({ ...s, showTitle: e.target.checked }))} />
-            Show title
-          </label>
-              </div>
-
               {/* Background */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-300 mb-3">🎨 Background</div>
@@ -618,7 +648,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   const type = e.target.value as QuizData['background']['type']
                   if (type === 'color') updateBackground({ type, color: quiz.background.color ?? '#0b0b0c' })
                   if (type === 'image') updateBackground({ type, imageUrl: '' })
-                  if (type === 'video') updateBackground({ type, videoUrl: '' })
+                  if (type === 'video') updateBackground({ type, videoUrl: '', videoStartOffsetSeconds: quiz.background.videoStartOffsetSeconds ?? 0 })
                   if (type === 'meme') updateBackground({ type, memeUrl: '', memeTitle: '' })
                   if (type === 'splitScreen') updateBackground({ type, splitScreen: true, upperVideoUrl: '', lowerVideoUrl: '' })
                 }}
@@ -647,25 +677,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                       <option value="meme">Meme</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Font Family */}
-                <div className="mb-3">
-                  <div className="text-sm text-iossub mb-1">Font Family</div>
-                  <select
-                    className="ios-input w-full"
-                    value={quiz.settings?.fontFamily || 'Impact'}
-                    onChange={e => updateSettings(s => ({ ...s, fontFamily: e.target.value }))}
-                  >
-                    <option value="Impact">Impact</option>
-                    <option value="Arial Black">Arial Black</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Comic Sans MS">Comic Sans MS</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Trebuchet MS">Trebuchet MS</option>
-                  </select>
                 </div>
 
                 {/* Background Overlay */}
@@ -734,7 +745,11 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     const f = e.target.files?.[0]
                     if (!f) return
                     const url = URL.createObjectURL(f)
-                    updateBackground({ type: 'video', videoUrl: url })
+                    updateBackground({ 
+                      ...quiz.background,
+                      type: 'video', 
+                      videoUrl: url 
+                    })
                       savePreviousBackground('video', url)
                   }} />
                 </label>
@@ -749,15 +764,35 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   {previousBackground.video && (
                     <button 
                       className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => updateBackground({ type: 'video', videoUrl: previousBackground.video! })}
+                      onClick={() => updateBackground({ 
+                        ...quiz.background,
+                        type: 'video', 
+                        videoUrl: previousBackground.video! 
+                      })}
                     >
                       Use Previous
                     </button>
                   )}
                 {quiz.background.videoUrl && (
-                  <button className="ios-card px-3 py-2" onClick={() => updateBackground({ type: 'video', videoUrl: '' })}>Clear</button>
+                  <button className="ios-card px-3 py-2" onClick={() => updateBackground({ 
+                    ...quiz.background,
+                    type: 'video', 
+                    videoUrl: '' 
+                  })}>Clear</button>
                 )}
                 </div>
+                <LabeledSlider 
+                  label="Start Offset (s)" 
+                  value={quiz.background.videoStartOffsetSeconds ?? 0} 
+                  min={0} 
+                  max={120} 
+                  step={0.1} 
+                  onChange={v => updateBackground({ 
+                    ...quiz.background, 
+                    type: 'video', 
+                    videoStartOffsetSeconds: Number.isFinite(v) ? v : 0 
+                  })} 
+                />
               </div>
             )}
             {quiz.background.type === 'meme' && (
@@ -885,91 +920,45 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                 )}
               </div>
             )}
-          </div>
-
-              {/* Timing Settings */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">⏱️ Timing</div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-                  <LabeledSlider label="Title in" value={quiz.settings!.titleInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleInMs: v }))} />
-                  <LabeledSlider label="Title hold" value={quiz.settings!.titleHoldMs} min={200} max={3000} onChange={v => updateSettings(s => ({ ...s, titleHoldMs: v }))} />
-                  <LabeledSlider label="Title out" value={quiz.settings!.titleOutMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleOutMs: v }))} />
-                  <LabeledSlider label="Question in" value={quiz.settings!.questionInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, questionInMs: v }))} />
-                  <LabeledSlider label="Question hold" value={quiz.settings!.questionHoldMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, questionHoldMs: v }))} />
-                  <LabeledSlider label="Answers stagger" value={quiz.settings!.answersStaggerMs} min={50} max={2000} onChange={v => updateSettings(s => ({ ...s, answersStaggerMs: v }))} />
-                  <LabeledSlider label="Correct reveal" value={quiz.settings!.correctRevealMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, correctRevealMs: v }))} />
-                  <LabeledSlider label="End delay" value={quiz.settings!.endDelayMs ?? 1000} min={0} max={5000} onChange={v => updateSettings(s => ({ ...s, endDelayMs: v }))} />
-            </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <LabeledSlider label="Answer width %" value={quiz.settings!.answerWidthPercent ?? 50} min={20} max={100} onChange={v => updateSettings(s => ({ ...s, answerWidthPercent: v }))} />
-                </div>
               </div>
 
               {/* CTA Settings */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-300 mb-3">📢 Call-to-Action Screen</div>
                 
-                {/* CTA Toggle */}
                 <div className="flex items-center gap-2 mb-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
                       type="checkbox" 
-                      checked={quiz.settings?.cta?.enabled ?? false}
-                      onChange={e => updateSettings(s => ({ 
-                        ...s, 
-                        cta: { 
-                          ...s.cta,
-                          enabled: e.target.checked,
-                          durationMs: s.cta?.durationMs ?? 3000,
-                          useSameBackground: s.cta?.useSameBackground ?? true,
-                          backgroundVideoUrl: s.cta?.backgroundVideoUrl
-                        } 
-                      }))}
+                      checked={currentCTA.enabled}
+                      onChange={e => applyCTAUpdate(cta => ({ ...cta, enabled: e.target.checked }))}
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span className="text-sm text-gray-300">Show CTA screen after completion</span>
                   </label>
                 </div>
 
-                {quiz.settings?.cta?.enabled && (
-                  <div className="space-y-3">
-                    {/* CTA Duration */}
+                {currentCTA.enabled && (
+                  <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-3">
                       <LabeledSlider 
                         label="CTA Duration (ms)" 
-                        value={quiz.settings.cta?.durationMs ?? 3000} 
+                        value={currentCTA.durationMs}
                         min={1000} 
                         max={10000} 
-                        onChange={v => updateSettings(s => ({ 
-                          ...s, 
-                          cta: { 
-                            enabled: s.cta?.enabled ?? false,
-                            durationMs: v,
-                            useSameBackground: s.cta?.useSameBackground ?? true,
-                            backgroundVideoUrl: s.cta?.backgroundVideoUrl
-                          }
-                        }))} 
+                        onChange={v => applyCTAUpdate(cta => ({ ...cta, durationMs: v }))}
                       />
                     </div>
 
-                    {/* Background Options */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="text-sm text-gray-300">Background Video</div>
                       <div className="flex items-center gap-2 mb-2">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
                             type="radio" 
                             name="ctaBackground"
-                            checked={quiz.settings.cta?.useSameBackground ?? true}
-                            onChange={() => updateSettings(s => ({ 
-                              ...s, 
-                              cta: { 
-                                enabled: s.cta?.enabled ?? false,
-                                durationMs: s.cta?.durationMs ?? 3000,
-                                useSameBackground: true,
-                                backgroundVideoUrl: undefined
-                              } 
-                            }))}
+                            checked={currentCTA.useSameBackground}
+                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: true, backgroundVideoUrl: undefined }))}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
                           />
                           <span className="text-sm text-gray-300">Use same background as quiz/meme</span>
@@ -980,61 +969,41 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                           <input 
                             type="radio" 
                             name="ctaBackground"
-                            checked={!(quiz.settings.cta?.useSameBackground ?? true)}
-                            onChange={() => updateSettings(s => ({ 
-                              ...s, 
-                              cta: { 
-                                enabled: s.cta?.enabled ?? false,
-                                durationMs: s.cta?.durationMs ?? 3000,
-                                useSameBackground: false,
-                                backgroundVideoUrl: s.cta?.backgroundVideoUrl
-                              } 
-                            }))}
+                            checked={!currentCTA.useSameBackground}
+                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false }))}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
                           />
                           <span className="text-sm text-gray-300">Use custom CTA background video</span>
                         </label>
                       </div>
 
-                      {/* Custom CTA Video Upload */}
-                      {!(quiz.settings.cta?.useSameBackground ?? true) && (
+                        {!currentCTA.useSameBackground && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                              {quiz.settings.cta?.backgroundVideoUrl ? 'Change CTA video' : 'Upload CTA video'}
-                              <input type="file" accept="video/*" className="hidden" onChange={e => {
-                                const f = e.target.files?.[0]
-                                if (!f) return
-                                const url = URL.createObjectURL(f)
-                                updateSettings(s => ({ 
-                                  ...s, 
-                                  cta: { 
-                                    enabled: s.cta?.enabled ?? false,
-                                    durationMs: s.cta?.durationMs ?? 3000,
-                                    useSameBackground: s.cta?.useSameBackground ?? true,
-                                    backgroundVideoUrl: url
-                                  } 
-                                }))
-                              }} />
+                              {currentCTA.backgroundVideoUrl ? 'Change CTA video' : 'Upload CTA video'}
+                              <input
+                                type="file"
+                                accept="video/*"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  const url = URL.createObjectURL(file)
+                                  applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: url, useSameBackground: false }))
+                                }}
+                              />
                             </label>
-                            {quiz.settings.cta?.backgroundVideoUrl && (
+                            {currentCTA.backgroundVideoUrl && (
                               <button 
                                 className="ios-card px-3 py-2" 
-                                onClick={() => updateSettings(s => ({ 
-                                  ...s, 
-                                  cta: { 
-                                    enabled: s.cta?.enabled ?? false,
-                                    durationMs: s.cta?.durationMs ?? 3000,
-                                    useSameBackground: s.cta?.useSameBackground ?? true,
-                                    backgroundVideoUrl: undefined
-                                  } 
-                                }))}
+                                onClick={() => applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: undefined }))}
                               >
                                 Clear CTA Video
                               </button>
                             )}
                           </div>
-                          {quiz.settings.cta?.backgroundVideoUrl && (
+                          {currentCTA.backgroundVideoUrl && (
                             <div className="text-xs text-iossub">
                               CTA video loaded successfully
                             </div>
@@ -1043,274 +1012,160 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                       )}
                     </div>
 
-                    {/* CTA Text Settings */}
                     <div className="space-y-3">
                       <div className="text-sm text-gray-300">CTA Text</div>
-                      
-                      {/* Text Input */}
-                      <div>
                         <textarea
                           placeholder="Enter CTA text... (use Shift+Enter for line breaks)"
-                          value={quiz.settings.cta?.text || 'Thank You!'}
-                          onChange={e => updateSettings(s => ({ 
-                            ...s, 
-                            cta: { 
-                              enabled: s.cta?.enabled ?? false,
-                              durationMs: s.cta?.durationMs ?? 3000,
-                              useSameBackground: s.cta?.useSameBackground ?? true,
-                              backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                              showText: s.cta?.showText ?? true,
-                              text: e.target.value,
-                              textSizePercent: s.cta?.textSizePercent ?? 8,
-                              textColor: s.cta?.textColor ?? '#ffffff',
-                              textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                              textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                              fadeInMs: s.cta?.fadeInMs ?? 600,
-                              holdMs: s.cta?.holdMs ?? 1800,
-                              fadeOutMs: s.cta?.fadeOutMs ?? 600
-                            }
-                          }))}
+                        value={currentCTA.text}
+                        onChange={e => applyCTAUpdate(cta => ({ ...cta, text: e.target.value }))}
                           className="ios-input w-full"
                           rows={3}
                         />
-                      </div>
 
-                      {/* Text Size Slider */}
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <div className="text-sm text-iossub">Font Family</div>
+                          <select
+                            className="ios-input w-full"
+                            value={currentCTA.fontFamily}
+                            onChange={e => applyCTAUpdate(cta => ({ ...cta, fontFamily: e.target.value }))}
+                          >
+                            {fontOptions.map(font => (
+                              <option key={font} value={font}>
+                                {font}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
                         <LabeledSlider 
                           label="Text Size %" 
-                          value={quiz.settings.cta?.textSizePercent ?? 8} 
+                            value={currentCTA.textSizePercent ?? 8}
                           min={2} 
                           max={20} 
-                          onChange={v => updateSettings(s => ({ 
-                            ...s, 
-                            cta: { 
-                              enabled: s.cta?.enabled ?? false,
-                              durationMs: s.cta?.durationMs ?? 3000,
-                              useSameBackground: s.cta?.useSameBackground ?? true,
-                              backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                              showText: s.cta?.showText ?? true,
-                              text: s.cta?.text ?? 'Thank You!',
-                              textSizePercent: v,
-                              textColor: s.cta?.textColor ?? '#ffffff',
-                              textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                              textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                              fadeInMs: s.cta?.fadeInMs ?? 600,
-                              holdMs: s.cta?.holdMs ?? 1800,
-                              fadeOutMs: s.cta?.fadeOutMs ?? 600
-                            }
-                          }))} 
-                        />
+                            onChange={v => applyCTAUpdate(cta => ({ ...cta, textSizePercent: v }))}
+                          />
+                        </div>
                       </div>
 
-                      {/* Animation Timing */}
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <div className="text-sm text-iossub">Text Color</div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={currentCTA.textColor}
+                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textColor: e.target.value }))}
+                              className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              value={currentCTA.textColor}
+                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textColor: e.target.value }))}
+                              className="ios-input flex-1"
+                              placeholder="#FFFFFF"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-2 text-iossub">
+                            <input
+                              type="checkbox"
+                              checked={currentCTA.textShadowEnabled}
+                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowEnabled: e.target.checked }))}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            Enable text shadow
+                          </label>
+                          {currentCTA.textShadowEnabled && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={currentCTA.textShadowColor}
+                                onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowColor: e.target.value }))}
+                                className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={currentCTA.textShadowColor}
+                                onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowColor: e.target.value }))}
+                                className="ios-input flex-1"
+                                placeholder="#000000"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <LabeledSlider 
                           label="Fade In (ms)" 
-                          value={quiz.settings.cta?.fadeInMs ?? 600} 
+                          value={currentCTA.fadeInMs ?? 600}
                           min={200} 
                           max={2000} 
-                          onChange={v => updateSettings(s => ({ 
-                            ...s, 
-                            cta: { 
-                              enabled: s.cta?.enabled ?? false,
-                              durationMs: s.cta?.durationMs ?? 3000,
-                              useSameBackground: s.cta?.useSameBackground ?? true,
-                              backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                              showText: s.cta?.showText ?? true,
-                              text: s.cta?.text ?? 'Thank You!',
-                              textSizePercent: s.cta?.textSizePercent ?? 8,
-                              textColor: s.cta?.textColor ?? '#ffffff',
-                              textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                              textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                              fadeInMs: v,
-                              holdMs: s.cta?.holdMs ?? 1800,
-                              fadeOutMs: s.cta?.fadeOutMs ?? 600
-                            }
-                          }))} 
+                          onChange={v => applyCTAUpdate(cta => ({ ...cta, fadeInMs: v }))}
                         />
                         <LabeledSlider 
                           label="Hold (ms)" 
-                          value={quiz.settings.cta?.holdMs ?? 1800} 
+                          value={currentCTA.holdMs ?? 1800}
                           min={500} 
                           max={5000} 
-                          onChange={v => updateSettings(s => ({ 
-                            ...s, 
-                            cta: { 
-                              enabled: s.cta?.enabled ?? false,
-                              durationMs: s.cta?.durationMs ?? 3000,
-                              useSameBackground: s.cta?.useSameBackground ?? true,
-                              backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                              showText: s.cta?.showText ?? true,
-                              text: s.cta?.text ?? 'Thank You!',
-                              textSizePercent: s.cta?.textSizePercent ?? 8,
-                              textColor: s.cta?.textColor ?? '#ffffff',
-                              textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                              textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                              fadeInMs: s.cta?.fadeInMs ?? 600,
-                              holdMs: v,
-                              fadeOutMs: s.cta?.fadeOutMs ?? 600
-                            }
-                          }))} 
+                          onChange={v => applyCTAUpdate(cta => ({ ...cta, holdMs: v }))}
                         />
                         <LabeledSlider 
                           label="Fade Out (ms)" 
-                          value={quiz.settings.cta?.fadeOutMs ?? 600} 
+                          value={currentCTA.fadeOutMs ?? 600}
                           min={200} 
                           max={2000} 
-                          onChange={v => updateSettings(s => ({ 
-                            ...s, 
-                            cta: { 
-                              enabled: s.cta?.enabled ?? false,
-                              durationMs: s.cta?.durationMs ?? 3000,
-                              useSameBackground: s.cta?.useSameBackground ?? true,
-                              backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                              showText: s.cta?.showText ?? true,
-                              text: s.cta?.text ?? 'Thank You!',
-                              textSizePercent: s.cta?.textSizePercent ?? 8,
-                              textColor: s.cta?.textColor ?? '#ffffff',
-                              textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                              textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                              fadeInMs: s.cta?.fadeInMs ?? 600,
-                              holdMs: s.cta?.holdMs ?? 1800,
-                              fadeOutMs: v
-                            }
-                          }))} 
+                          onChange={v => applyCTAUpdate(cta => ({ ...cta, fadeOutMs: v }))}
                         />
                       </div>
+                      </div>
 
-                      {/* Video Overlay Settings */}
                       <div className="space-y-3">
                         <div className="text-sm text-gray-300">Video Overlay</div>
-                        
-                        {/* Overlay Toggle */}
-                        <div className="flex items-center gap-2">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input 
                               type="checkbox" 
-                              checked={quiz.settings.cta?.overlayEnabled ?? false}
-                              onChange={e => updateSettings(s => ({ 
-                                ...s, 
-                                cta: { 
-                                  enabled: s.cta?.enabled ?? false,
-                                  durationMs: s.cta?.durationMs ?? 3000,
-                                  useSameBackground: s.cta?.useSameBackground ?? true,
-                                  backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                                  showText: s.cta?.showText ?? true,
-                                  text: s.cta?.text ?? 'Thank You!',
-                                  textSizePercent: s.cta?.textSizePercent ?? 8,
-                                  textColor: s.cta?.textColor ?? '#ffffff',
-                                  textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                                  textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                                  fadeInMs: s.cta?.fadeInMs ?? 600,
-                                  holdMs: s.cta?.holdMs ?? 1800,
-                                  fadeOutMs: s.cta?.fadeOutMs ?? 600,
-                                  overlayEnabled: e.target.checked,
-                                  overlayColor: s.cta?.overlayColor ?? '#000000',
-                                  overlayOpacity: s.cta?.overlayOpacity ?? 0.4
-                                } 
-                              }))}
+                          checked={currentCTA.overlayEnabled}
+                          onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayEnabled: e.target.checked }))}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-300">Enable video overlay</span>
                           </label>
-                        </div>
 
-                        {quiz.settings.cta?.overlayEnabled && (
+                      {currentCTA.overlayEnabled && (
                           <div className="space-y-3">
-                            {/* Overlay Color */}
-                            <div className="space-y-2">
-                              <div className="text-sm text-gray-300">Overlay Color</div>
+                          <div className="space-y-1">
+                            <div className="text-sm text-iossub">Overlay Color</div>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="color"
-                                  value={quiz.settings.cta?.overlayColor || '#000000'}
-                                  onChange={e => updateSettings(s => ({ 
-                                    ...s, 
-                                    cta: { 
-                                      enabled: s.cta?.enabled ?? false,
-                                      durationMs: s.cta?.durationMs ?? 3000,
-                                      useSameBackground: s.cta?.useSameBackground ?? true,
-                                      backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                                      showText: s.cta?.showText ?? true,
-                                      text: s.cta?.text ?? 'Thank You!',
-                                      textSizePercent: s.cta?.textSizePercent ?? 8,
-                                      textColor: s.cta?.textColor ?? '#ffffff',
-                                      textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                                      textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                                      fadeInMs: s.cta?.fadeInMs ?? 600,
-                                      holdMs: s.cta?.holdMs ?? 1800,
-                                      fadeOutMs: s.cta?.fadeOutMs ?? 600,
-                                      overlayEnabled: s.cta?.overlayEnabled ?? false,
-                                      overlayColor: e.target.value,
-                                      overlayOpacity: s.cta?.overlayOpacity ?? 0.4
-                                    }
-                                  }))}
+                                value={currentCTA.overlayColor ?? '#000000'}
+                                onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayColor: e.target.value }))}
                                   className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
                                 />
                                 <input
                                   type="text"
-                                  value={quiz.settings.cta?.overlayColor || '#000000'}
-                                  onChange={e => updateSettings(s => ({ 
-                                    ...s, 
-                                    cta: { 
-                                      enabled: s.cta?.enabled ?? false,
-                                      durationMs: s.cta?.durationMs ?? 3000,
-                                      useSameBackground: s.cta?.useSameBackground ?? true,
-                                      backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                                      showText: s.cta?.showText ?? true,
-                                      text: s.cta?.text ?? 'Thank You!',
-                                      textSizePercent: s.cta?.textSizePercent ?? 8,
-                                      textColor: s.cta?.textColor ?? '#ffffff',
-                                      textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                                      textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                                      fadeInMs: s.cta?.fadeInMs ?? 600,
-                                      holdMs: s.cta?.holdMs ?? 1800,
-                                      fadeOutMs: s.cta?.fadeOutMs ?? 600,
-                                      overlayEnabled: s.cta?.overlayEnabled ?? false,
-                                      overlayColor: e.target.value,
-                                      overlayOpacity: s.cta?.overlayOpacity ?? 0.4
-                                    }
-                                  }))}
+                                value={currentCTA.overlayColor ?? '#000000'}
+                                onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayColor: e.target.value }))}
                                   className="ios-input flex-1"
                                   placeholder="#000000"
                                 />
                               </div>
                             </div>
 
-                            {/* Overlay Opacity */}
                             <div className="grid grid-cols-1 gap-3">
                               <LabeledSlider 
                                 label="Overlay Opacity" 
-                                value={Math.round((quiz.settings.cta?.overlayOpacity ?? 0.4) * 100)} 
+                              value={Math.round((currentCTA.overlayOpacity ?? 0.4) * 100)}
                                 min={0} 
                                 max={100} 
-                                onChange={v => updateSettings(s => ({ 
-                                  ...s, 
-                                  cta: { 
-                                    enabled: s.cta?.enabled ?? false,
-                                    durationMs: s.cta?.durationMs ?? 3000,
-                                    useSameBackground: s.cta?.useSameBackground ?? true,
-                                    backgroundVideoUrl: s.cta?.backgroundVideoUrl,
-                                    showText: s.cta?.showText ?? true,
-                                    text: s.cta?.text ?? 'Thank You!',
-                                    textSizePercent: s.cta?.textSizePercent ?? 8,
-                                    textColor: s.cta?.textColor ?? '#ffffff',
-                                    textShadowEnabled: s.cta?.textShadowEnabled ?? true,
-                                    textShadowColor: s.cta?.textShadowColor ?? '#000000',
-                                    fadeInMs: s.cta?.fadeInMs ?? 600,
-                                    holdMs: s.cta?.holdMs ?? 1800,
-                                    fadeOutMs: s.cta?.fadeOutMs ?? 600,
-                                    overlayEnabled: s.cta?.overlayEnabled ?? false,
-                                    overlayColor: s.cta?.overlayColor ?? '#000000',
-                                    overlayOpacity: v / 100
-                                  }
-                                }))} 
+                              onChange={v => applyCTAUpdate(cta => ({ ...cta, overlayOpacity: v / 100 }))}
                               />
                             </div>
                           </div>
                         )}
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1387,7 +1242,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     </div>
                   </div>
                   {quiz.settings?.music?.url && (
-                    <div>
+                  <div className="space-y-3">
                       <LabeledSlider 
                         label="Music Volume" 
                         value={quiz.settings.music.volume} 
@@ -1395,6 +1250,14 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                         max={1} 
                         step={0.01} 
                         onChange={v => updateSettings(s => ({ ...s, music: { ...s.music!, volume: v } }))} 
+                      />
+                    <LabeledSlider 
+                      label="Start Offset (s)" 
+                      value={quiz.settings.music.startOffsetSeconds ?? 0} 
+                      min={0} 
+                      max={120} 
+                      step={0.1} 
+                      onChange={v => updateSettings(s => ({ ...s, music: { ...s.music!, startOffsetSeconds: Number.isFinite(v) ? v : 0 } }))} 
                       />
                     </div>
                   )}
@@ -1410,21 +1273,32 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
             </div>
           </div>
 
-              {/* Fonts Settings */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">🔤 Fonts</div>
-                <div className="grid grid-cols-3 gap-3">
-                  <LabeledSlider label="Title size %" value={quiz.settings!.titleSizePercent ?? 6.0} min={2} max={12} step={0.1} onChange={v => updateSettings(s => ({ ...s, titleSizePercent: v }))} />
-                  <LabeledSlider label="Question size %" value={quiz.settings!.questionSizePercent ?? 4.5} min={2} max={10} step={0.1} onChange={v => updateSettings(s => ({ ...s, questionSizePercent: v }))} />
-                  <LabeledSlider label="Answer size %" value={quiz.settings!.answerSizePercent ?? 2.2} min={1} max={6} step={0.1} onChange={v => updateSettings(s => ({ ...s, answerSizePercent: v }))} />
-                </div>
-              </div>
             </div>
           )}
 
           {/* Questions Tab */}
           {activeTab === 'questions' && (
             <div className="space-y-4">
+              {/* Quiz Title */}
+              <div className="bg-gray-100/20 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-300 mb-3">📝 Quiz Title</div>
+                <textarea 
+                  className="ios-input w-full mb-2 min-h-[60px] resize-y" 
+                  value={quiz.title} 
+                  onChange={e => updateTitle(e.target.value)} 
+                  placeholder="Your Quiz Title&#10;Use Enter for line breaks" 
+                  rows={2}
+                />
+                <label className="flex items-center gap-2 text-sm">
+                  <input 
+                    type="checkbox" 
+                    checked={quiz.settings?.showTitle ?? true} 
+                    onChange={e => updateSettings(s => ({ ...s, showTitle: e.target.checked }))} 
+                  />
+                  Show title
+                </label>
+              </div>
+
               {/* AI Question Generator */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-300 mb-3">🤖 AI Question Generator</div>
@@ -1529,6 +1403,53 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   </div>
                 </div>
               </div>
+
+              {/* Quiz Timing */}
+              <div className="bg-gray-100/20 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-300 mb-3">⏱️ Quiz Timing</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <LabeledSlider label="Title in" value={quiz.settings!.titleInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleInMs: v }))} />
+                  <LabeledSlider label="Title hold" value={quiz.settings!.titleHoldMs} min={200} max={3000} onChange={v => updateSettings(s => ({ ...s, titleHoldMs: v }))} />
+                  <LabeledSlider label="Title out" value={quiz.settings!.titleOutMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleOutMs: v }))} />
+                  <LabeledSlider label="Question in" value={quiz.settings!.questionInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, questionInMs: v }))} />
+                  <LabeledSlider label="Question hold" value={quiz.settings!.questionHoldMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, questionHoldMs: v }))} />
+                  <LabeledSlider label="Answers stagger" value={quiz.settings!.answersStaggerMs} min={50} max={2000} onChange={v => updateSettings(s => ({ ...s, answersStaggerMs: v }))} />
+                  <LabeledSlider label="Correct reveal" value={quiz.settings!.correctRevealMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, correctRevealMs: v }))} />
+                  <LabeledSlider label="End delay" value={quiz.settings!.endDelayMs ?? 1000} min={0} max={5000} onChange={v => updateSettings(s => ({ ...s, endDelayMs: v }))} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <LabeledSlider label="Answer width %" value={quiz.settings!.answerWidthPercent ?? 50} min={20} max={100} onChange={v => updateSettings(s => ({ ...s, answerWidthPercent: v }))} />
+                </div>
+              </div>
+
+              {/* Quiz Fonts */}
+              <div className="bg-gray-100/20 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-300 mb-3">🔤 Quiz Fonts</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-sm text-iossub mb-1">Font Family</div>
+                    <select
+                      className="ios-input w-full"
+                      value={quiz.settings?.fontFamily || 'Impact'}
+                      onChange={e => updateSettings(s => ({ ...s, fontFamily: e.target.value }))}
+                    >
+                      <option value="Impact">Impact</option>
+                      <option value="Arial Black">Arial Black</option>
+                      <option value="Helvetica">Helvetica</option>
+                      <option value="Comic Sans MS">Comic Sans MS</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Verdana">Verdana</option>
+                      <option value="Trebuchet MS">Trebuchet MS</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <LabeledSlider label="Title size %" value={quiz.settings!.titleSizePercent ?? 6.0} min={2} max={12} step={0.1} onChange={v => updateSettings(s => ({ ...s, titleSizePercent: v }))} />
+                  <LabeledSlider label="Question size %" value={quiz.settings!.questionSizePercent ?? 4.5} min={2} max={10} step={0.1} onChange={v => updateSettings(s => ({ ...s, questionSizePercent: v }))} />
+                  <LabeledSlider label="Answer size %" value={quiz.settings!.answerSizePercent ?? 2.2} min={1} max={6} step={0.1} onChange={v => updateSettings(s => ({ ...s, answerSizePercent: v }))} />
+            </div>
+          </div>
 
               {/* Questions List */}
               <div className="bg-gray-100/20 rounded-lg p-3">
@@ -1961,26 +1882,7 @@ function computeExactDuration(quiz: QuizData): number {
     return totalDuration
   }
   
-  // Original quiz logic
-  const numQuestions = quiz.questions.length
-  
-  // Title duration (if enabled)
-  const titleDuration = (settings.showTitle ?? true) 
-    ? (settings.titleInMs + settings.titleHoldMs + settings.titleOutMs)
-    : 0
-  
-  // Per question duration
-  const answersPerQuestion = 3
-  const perQuestionDuration = settings.questionInMs + 
-    (settings.answersStaggerMs * (answersPerQuestion - 1)) + 
-    settings.correctRevealMs + 
-    settings.questionHoldMs
-  
-  // Total duration
-  const contentDuration = titleDuration + (perQuestionDuration * numQuestions)
-  const endDelay = settings.endDelayMs ?? 1000
-  const ctaDuration = settings.cta?.enabled ? (settings.cta.durationMs ?? 3000) : 0
-  const totalDuration = contentDuration + endDelay + ctaDuration
-
+  const timeline = computeQuizTimeline(quiz)
+  const totalDuration = timeline.totalContentDuration + timeline.ctaDuration + timeline.endDelay
   return totalDuration
 }
