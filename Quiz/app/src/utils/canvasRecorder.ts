@@ -513,7 +513,16 @@ export class CanvasRecorder {
     }
     
     // Render background (color/image/video) and overlay
-    this.renderBackground(ctx, quiz.background, width, height, quiz.__assets, frameTime)
+    const backgroundForFrame = quiz.background?.type === 'image'
+      ? {
+          ...quiz.background,
+          zoomEnabled: quiz.settings?.bgZoomEnabled,
+          zoomScale: quiz.settings?.bgZoomScale,
+          zoomDurationMs: quiz.settings?.bgZoomDurationMs
+        }
+      : quiz.background
+
+    this.renderBackground(ctx, backgroundForFrame, width, height, quiz.__assets, frameTime)
     // Overlay layer to match preview (optional)
     const overlayColor = quiz.settings?.overlayColor || 'transparent'
     const overlayOpacity = Number(quiz.settings?.overlayOpacity ?? 0)
@@ -610,7 +619,8 @@ export class CanvasRecorder {
     this.renderBackground(ctx, {
       ...quiz.background,
       zoomEnabled: quizSettings.bgZoomEnabled,
-      zoomScale: quizSettings.bgZoomScale
+      zoomScale: quizSettings.bgZoomScale,
+      zoomDurationMs: quizSettings.bgZoomDurationMs
     }, width, height, quiz.__assets, frameTime)
     
     // Render background overlay
@@ -899,10 +909,17 @@ export class CanvasRecorder {
     
     // Determine background to use
     let backgroundToUse = quiz.background
-    if (cta?.useSameBackground === false && cta?.backgroundVideoUrl) {
-      backgroundToUse = {
-        type: 'video',
-        videoUrl: cta.backgroundVideoUrl
+    if (cta?.useSameBackground === false) {
+      if (cta?.imageUrl) {
+        backgroundToUse = {
+          type: 'image',
+          imageUrl: cta.imageUrl
+        }
+      } else if (cta?.backgroundVideoUrl) {
+        backgroundToUse = {
+          type: 'video',
+          videoUrl: cta.backgroundVideoUrl
+        }
       }
     }
     
@@ -910,7 +927,8 @@ export class CanvasRecorder {
     this.renderBackground(ctx, {
       ...backgroundToUse,
       zoomEnabled: quiz.settings?.bgZoomEnabled,
-      zoomScale: quiz.settings?.bgZoomScale
+      zoomScale: quiz.settings?.bgZoomScale,
+      zoomDurationMs: quiz.settings?.bgZoomDurationMs
     }, width, height, quiz.__assets, frameTime)
     
     // Render background overlay
@@ -1007,7 +1025,18 @@ export class CanvasRecorder {
 
     // Draw image or video if present
     const zoomEnabled = background?.zoomEnabled || false
-    const zoomScale = Number(background?.zoomScale ?? 1)
+    const zoomTarget = Number(background?.zoomScale ?? 1)
+    const zoomDurationMs = Number(background?.zoomDurationMs ?? 0)
+    const isImageBackground = background?.type === 'image'
+    const shouldAnimateZoom = isImageBackground && zoomEnabled && zoomTarget > 1 && frameTime !== undefined
+
+    const dynamicScale = () => {
+      if (!shouldAnimateZoom) return zoomTarget > 0 ? zoomTarget : 1
+      const duration = zoomDurationMs > 0 ? zoomDurationMs : 1
+      const time = frameTime ?? 0
+      const progress = Math.min(Math.max(time, 0) / duration, 1)
+      return 1 + (progress * ((zoomTarget > 0 ? zoomTarget : 1) - 1))
+    }
     const drawMedia = (mediaW: number, mediaH: number, draw: (dx: number, dy: number, dw: number, dh: number) => void) => {
       // object-fit: cover
       const canvasRatio = width / height
@@ -1021,7 +1050,7 @@ export class CanvasRecorder {
         dw = width
         dh = dw / mediaRatio
       }
-      const scale = zoomEnabled ? zoomScale : 1
+      const scale = zoomEnabled ? dynamicScale() : 1
       dw *= scale
       dh *= scale
       const dx = (width - dw) / 2
@@ -1106,7 +1135,7 @@ export class CanvasRecorder {
             dw = width
             dh = dw / mediaRatio
           }
-          const scale = zoomEnabled ? zoomScale : 1
+          const scale = zoomEnabled ? dynamicScale() : 1
           dw *= scale
           dh *= scale
           const dx = (width - dw) / 2
@@ -1149,7 +1178,7 @@ export class CanvasRecorder {
             dw = width
             dh = dw / mediaRatio
           }
-          const scale = zoomEnabled ? zoomScale : 1
+          const scale = zoomEnabled ? dynamicScale() : 1
           dw *= scale
           dh *= scale
           const dx = (width - dw) / 2

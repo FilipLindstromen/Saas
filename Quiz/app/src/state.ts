@@ -23,6 +23,7 @@ export function useQuizState(initial?: Partial<QuizData>) {
     overlayOpacity: 0.4,
     bgZoomEnabled: false,
     bgZoomScale: 1.1,
+    bgZoomDurationMs: 6000,
     fontFamily: 'Impact',
     music: undefined,
     sfx: { appearVolume: 0.6, correctVolume: 0.8 },
@@ -31,12 +32,14 @@ export function useQuizState(initial?: Partial<QuizData>) {
       durationMs: 3000,
       useSameBackground: true,
       backgroundVideoUrl: undefined,
+    backgroundType: 'video',
       showText: true,
       text: 'Thank You!',
       textSizePercent: 8,
       textColor: '#ffffff',
       textShadowEnabled: true,
       textShadowColor: '#000000',
+    imageUrl: undefined,
       fontFamily: 'Impact',
       fadeInMs: 600,
       holdMs: 1800,
@@ -68,8 +71,13 @@ export function useQuizState(initial?: Partial<QuizData>) {
       if (merged.music) {
         merged.music.startOffsetSeconds = merged.music.startOffsetSeconds ?? 0
       }
+      merged.bgZoomEnabled = merged.bgZoomEnabled ?? defaultSettings.bgZoomEnabled
+      merged.bgZoomScale = merged.bgZoomScale ?? defaultSettings.bgZoomScale
+      merged.bgZoomDurationMs = merged.bgZoomDurationMs ?? defaultSettings.bgZoomDurationMs
       if (merged.cta) {
         merged.cta.fontFamily = merged.cta.fontFamily ?? defaultSettings.cta?.fontFamily
+        merged.cta.imageUrl = merged.cta.imageUrl ?? defaultSettings.cta?.imageUrl
+        merged.cta.backgroundType = merged.cta.backgroundType ?? defaultSettings.cta?.backgroundType ?? 'video'
       }
       // Maintain legacy field in sync
       merged.correctAnswerColor = merged.correctAnswerButtonColor ?? merged.correctAnswerColor

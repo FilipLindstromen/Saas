@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { QuizData } from '../types'
 import { computeQuizTimeline } from '../utils/quizTiming'
 
@@ -27,6 +27,23 @@ export function BackgroundRenderer({
   quiz 
 }: BackgroundRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [previewZoom, setPreviewZoom] = useState(1)
+  const targetZoom = zoom
+  const zoomDurationMs = quiz.settings?.bgZoomDurationMs ?? computeExactDuration(quiz)
+
+  useEffect(() => {
+    if (background.type !== 'image') {
+      setPreviewZoom(1)
+      return
+    }
+    if (isRecording || !quiz.settings?.bgZoomEnabled || targetZoom <= 1) {
+      setPreviewZoom(1)
+      return
+    }
+    setPreviewZoom(1)
+    const frame = requestAnimationFrame(() => setPreviewZoom(targetZoom))
+    return () => cancelAnimationFrame(frame)
+  }, [background.type, isRecording, targetZoom, quiz.settings?.bgZoomEnabled, playKey, quiz.background?.imageUrl])
 
   const applyVideoOffset = useCallback(
     (media?: HTMLVideoElement | null, options: { resume?: boolean } = {}) => {
@@ -103,15 +120,19 @@ export function BackgroundRenderer({
   }
   
   if (background.type === 'image') {
-    // Calculate zoom progress for recording
-    const getZoomProgress = () => {
-      if (!isRecording || zoom <= 1) return 1
-      const totalDuration = computeExactDuration(quiz)
-      const progress = Math.min(recordingTime / totalDuration, 1)
-      return 1 + (progress * (zoom - 1))
+    const zoomEnabled = quiz.settings?.bgZoomEnabled && targetZoom > 1
+    const effectiveTarget = zoomEnabled ? targetZoom : 1
+    const getRecordingZoom = () => {
+      if (!zoomEnabled) return 1
+      const duration = Math.max(zoomDurationMs, 1)
+      const progress = Math.min(Math.max(recordingTime, 0) / duration, 1)
+      return 1 + (progress * (effectiveTarget - 1))
     }
 
-    const zoomScale = getZoomProgress()
+    const zoomScale = isRecording ? getRecordingZoom() : (zoomEnabled ? previewZoom : 1)
+    const transitionStyle = !isRecording && zoomEnabled && effectiveTarget > 1
+      ? `${Math.max(zoomDurationMs, 0) / 1000}s linear`
+      : undefined
 
     return (
       <div className="absolute inset-0 overflow-hidden">
@@ -123,7 +144,7 @@ export function BackgroundRenderer({
             backgroundSize: 'cover', 
             backgroundPosition: 'center', 
             transform: `scale(${zoomScale})`,
-            transition: isRecording ? 'none' : undefined
+            transition: transitionStyle ? `transform ${transitionStyle}` : 'none'
           }} 
         />
         {/* Background color overlay */}
