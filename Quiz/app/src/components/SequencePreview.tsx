@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { QuizData } from '../types'
 import { SingleQuestion } from './SingleQuestion'
 import { CTAScreen } from './CTAScreen'
+import { computeQuizTimeline } from '../utils/quizTiming'
 
 interface SequencePreviewProps {
   quiz: QuizData
@@ -168,6 +169,27 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
   const [stage, setStage] = useState<'title' | 'question' | 'cta'>('title')
   const [qIndex, setQIndex] = useState(0)
   const [currentQuestionStartTime, setCurrentQuestionStartTime] = useState(0)
+  const timeline = useMemo(() => computeQuizTimeline(quiz), [quiz])
+  const titleDuration = timeline.showTitle ? timeline.titleDuration : 0
+  const totalQuestionDuration = timeline.totalQuestionDuration
+  const questionTimings = timeline.questionTimings
+  const ctaStartTime = timeline.totalContentDuration
+
+  const applyMusicOffset = React.useCallback((media?: HTMLMediaElement | null) => {
+    if (!media) return
+    const desired = Math.max(0, settings.music?.startOffsetSeconds ?? 0)
+    const duration = media.duration
+    const clamped = Number.isFinite(duration) && duration > 0
+      ? Math.min(Math.max(0, desired), Math.max(0, duration - 0.05))
+      : desired
+    if (!Number.isNaN(clamped)) {
+      try {
+        media.currentTime = clamped
+      } catch (error) {
+        console.warn('Failed to set music offset:', error)
+      }
+    }
+  }, [settings.music?.startOffsetSeconds])
 
   // Single music play effect - handles all music playback
   React.useEffect(() => {
@@ -177,10 +199,10 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
       try {
         // Set volume first
         musicRef.current!.volume = settings.music!.volume
+        applyMusicOffset(musicRef.current!)
         
         // Only play if we haven't started music yet or if it's a new URL
         if (!musicStartedRef.current || musicRef.current!.ended) {
-          musicRef.current!.currentTime = 0
           musicStartedRef.current = true
           
           await musicRef.current!.play()
@@ -205,46 +227,74 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
     musicStartedRef.current = false
   }, [settings.music?.url])
 
+  React.useEffect(() => {
+    applyMusicOffset(musicRef.current)
+  }, [applyMusicOffset, musicRef])
 
-  // Calculate timing for questions
-  const titleDuration = (settings.showTitle ?? true) 
-    ? (settings.titleInMs + settings.titleHoldMs + settings.titleOutMs)
-    : 0
-
-  const answersPerQuestion = 3
-  const perQuestionDuration = settings.questionInMs + 
-    (settings.answersStaggerMs * (answersPerQuestion - 1)) + 
-    settings.correctRevealMs + 
-    settings.questionHoldMs
 
   // During recording, calculate stage and question index based on recording time
   React.useEffect(() => {
     if (!isRecording) return
 
-    if (recordingTime < titleDuration) {
+    if (timeline.showTitle && recordingTime < titleDuration) {
       setStage('title')
       setQIndex(0)
-    } else {
-      setStage('question')
-      const questionTime = recordingTime - titleDuration
-      const currentQuestionIndex = Math.floor(questionTime / perQuestionDuration)
-      const clampedIndex = Math.min(currentQuestionIndex, quiz.questions.length - 1)
-      setQIndex(clampedIndex)
-      
-      // Calculate when current question started
-      const questionStartTime = titleDuration + (clampedIndex * perQuestionDuration)
-      setCurrentQuestionStartTime(questionStartTime)
+      setCurrentQuestionStartTime(0)
+      return
     }
-  }, [recordingTime, isRecording, settings, quiz.questions.length, titleDuration, perQuestionDuration])
+
+    const adjustedTime = recordingTime - titleDuration
+
+    if (questionTimings.length === 0 || adjustedTime < 0) {
+      if (settings.cta?.enabled) {
+        setStage('cta')
+      } else {
+        setStage('question')
+      }
+      return
+    }
+
+    if (adjustedTime >= totalQuestionDuration) {
+      if (settings.cta?.enabled) {
+        setStage('cta')
+      } else {
+        setStage('question')
+        const lastTiming = questionTimings[questionTimings.length - 1]
+        setQIndex(Math.max(questionTimings.length - 1, 0))
+        setCurrentQuestionStartTime(titleDuration + lastTiming.start)
+      }
+      return
+    }
+
+    setStage('question')
+    let currentIdx = questionTimings.length - 1
+    for (let i = questionTimings.length - 1; i >= 0; i--) {
+      if (adjustedTime >= questionTimings[i].start) {
+        currentIdx = i
+        break
+      }
+    }
+    setQIndex(currentIdx)
+    setCurrentQuestionStartTime(titleDuration + questionTimings[currentIdx].start)
+  }, [isRecording, recordingTime, settings.cta?.enabled, questionTimings, titleDuration, totalQuestionDuration, timeline.showTitle])
 
   // Reset stage and question index when not recording
   React.useEffect(() => {
     if (!isRecording) {
-      setStage((settings.showTitle ?? true) ? 'title' : 'question')
+      if (timeline.showTitle) {
+        setStage('title')
+        setCurrentQuestionStartTime(0)
+      } else if (quiz.questions.length > 0) {
+        setStage('question')
+        setCurrentQuestionStartTime(0)
+      } else if (settings.cta?.enabled) {
+        setStage('cta')
+      } else {
+        setStage('question')
+      }
       setQIndex(0)
-      setCurrentQuestionStartTime(0)
     }
-  }, [isRecording, settings.showTitle])
+  }, [isRecording, timeline.showTitle, quiz.questions.length, settings.cta?.enabled])
 
   // Stop music/SFX on unmount
   React.useEffect(() => () => {
@@ -283,6 +333,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
             style={{ display: 'none' }}
           onLoadedData={() => { 
             console.log('Music loaded successfully:', settings.music?.url)
+            applyMusicOffset(musicRef.current as any)
             // Volume is set in the main useEffect, no need to play here
           }}
           onError={(e) => {
@@ -297,6 +348,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
           }}
           onCanPlay={() => {
             console.log('Music can play:', settings.music?.url)
+            applyMusicOffset(musicRef.current as any)
             // Play logic is handled in the main useEffect
           }}
           />
@@ -311,6 +363,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
             crossOrigin="anonymous"
             onLoadedData={() => { 
               console.log('Music loaded successfully:', settings.music?.url)
+              applyMusicOffset(musicRef.current)
               // Volume and play logic is handled in the main useEffect
             }}
             onError={(e) => {
@@ -320,6 +373,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
             }}
             onCanPlay={() => {
               console.log('Music can play:', settings.music?.url)
+              applyMusicOffset(musicRef.current)
               // Play logic is handled in the main useEffect
             }}
           />
@@ -329,7 +383,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
       <audio ref={correctRef} src={correctUrl} />
 
       <AnimatePresence mode="wait">
-        {stage === 'title' && (settings.showTitle ?? true) && (
+        {stage === 'title' && timeline.showTitle && (
           <TitleScreen 
             key="title" 
             title={quiz.title} 
@@ -362,7 +416,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
           quiz={quiz}
           onFinished={onFinished}
           isRecording={isRecording}
-          recordingTime={recordingTime}
+          recordingTime={isRecording ? Math.max(0, recordingTime - ctaStartTime) : 0}
         />
       )}
     </div>

@@ -37,6 +37,7 @@ export function useQuizState(initial?: Partial<QuizData>) {
       textColor: '#ffffff',
       textShadowEnabled: true,
       textShadowColor: '#000000',
+      fontFamily: 'Impact',
       fadeInMs: 600,
       holdMs: 1800,
       fadeOutMs: 600,
@@ -55,7 +56,7 @@ export function useQuizState(initial?: Partial<QuizData>) {
         ...defaultSettings, 
         ...parsed, 
         sfx: { ...defaultSettings.sfx, ...(parsed.sfx || {}) }, 
-        music: parsed.music,
+        music: parsed.music ? { ...parsed.music } : undefined,
         cta: { ...defaultSettings.cta, ...(parsed.cta || {}) }
       }
       if (parsed.correctAnswerButtonColor === undefined && parsed.correctAnswerColor) {
@@ -63,6 +64,12 @@ export function useQuizState(initial?: Partial<QuizData>) {
       }
       if (parsed.correctAnswerTextColor === undefined) {
         merged.correctAnswerTextColor = merged.correctAnswerTextColor ?? '#ffffff'
+      }
+      if (merged.music) {
+        merged.music.startOffsetSeconds = merged.music.startOffsetSeconds ?? 0
+      }
+      if (merged.cta) {
+        merged.cta.fontFamily = merged.cta.fontFamily ?? defaultSettings.cta?.fontFamily
       }
       // Maintain legacy field in sync
       merged.correctAnswerColor = merged.correctAnswerButtonColor ?? merged.correctAnswerColor

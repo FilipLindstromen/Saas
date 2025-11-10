@@ -141,8 +141,8 @@ export function CTAScreen({
           style={{
             fontSize: getTextSize(),
             color: cta?.textColor || '#ffffff',
-            fontFamily: quiz.settings?.fontFamily || 'Impact',
-            fontWeight: (quiz.settings?.fontFamily || 'Impact') === 'Impact' ? 'normal' : 'bold',
+            fontFamily: cta?.fontFamily || quiz.settings?.fontFamily || 'Impact',
+            fontWeight: (cta?.fontFamily || quiz.settings?.fontFamily || 'Impact') === 'Impact' ? 'normal' : 'bold',
             opacity: isRecording ? getCTAOpacity() : undefined,
             ...getShadowStyle()
           }}

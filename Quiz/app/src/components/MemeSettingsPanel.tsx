@@ -31,6 +31,23 @@ export function MemeSettingsPanel({ settings, onUpdate }: MemeSettingsPanelProps
         </label>
       </div>
 
+      {/* Global Text Size */}
+      <div>
+        <LabeledSlider
+          label="Overall Text Size"
+          value={((settings.topTextSizePercent ?? 8) + (settings.bottomTextSizePercent ?? 8)) / 2}
+          min={2}
+          max={20}
+          step={0.5}
+          onChange={(value) => onUpdate(s => ({
+            ...s,
+            topTextSizePercent: value,
+            bottomTextSizePercent: value
+          }))}
+          unit="%"
+        />
+      </div>
+
       {/* Text Colors */}
       <div className="grid grid-cols-2 gap-3">
         <div>
