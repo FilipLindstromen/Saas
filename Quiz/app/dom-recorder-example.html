@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM Recorder Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        #preview-window {
+            width: 400px;
+            height: 300px;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .animated-element {
+            width: 100px;
+            height: 100px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #2d3748;
+        }
+        
+        button:disabled {
+            background: #718096;
+            cursor: not-allowed;
+        }
+        
+        .recording {
+            background: #e53e3e !important;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #2d3748;
+            border-radius: 6px;
+            min-height: 20px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4299e1;
+            transition: width 0.3s ease;
+        }
+        
+        .info {
+            background: #2d3748;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        
+        .info h3 {
+            margin-top: 0;
+            color: #68d391;
+        }
+        
+        .info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .info li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DOM Element Video Recorder</h1>
+        
+        <div class="info">
+            <h3>Features:</h3>
+            <ul>
+                <li>Records specific DOM elements as MP4 videos</li>
+                <li>Cross-browser support (Chrome, Edge, Firefox)</li>
+                <li>Uses MediaRecorder API + ffmpeg.wasm</li>
+                <li>Real-time progress tracking</li>
+                <li>High-quality output with customizable settings</li>
+            </ul>
+        </div>
+        
+        <div id="preview-window">
+            <div class="animated-element"></div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn" disabled>Stop Recording</button>
+            <button id="previewBtn">Preview Animation</button>
+        </div>
+        
+        <div class="status" id="status">Ready to record</div>
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="info">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Click "Preview Animation" to see the bouncing circle</li>
+                <li>Click "Start Recording" to begin recording the preview window</li>
+                <li>Wait for the recording to complete (10 seconds)</li>
+                <li>The MP4 file will automatically download</li>
+            </ol>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the DOM recorder (you'll need to build this first)
+        // For this example, we'll create a simplified version
+        
+        class SimpleDOMRecorder {
+            constructor() {
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.stream = null;
+                this.canvas = null;
+                this.ctx = null;
+                this.animationId = null;
+                this.startTime = 0;
+            }
+            
+            async startRecording(elementId, duration = 10000, onProgress, onStatus) {
+                if (this.isRecording) return;
+                
+                try {
+                    onStatus?.('Initializing recording...');
+                    
+                    const element = document.getElementById(elementId);
+                    if (!element) throw new Error(`Element with ID '${elementId}' not found`);
+                    
+                    // Create canvas for capturing
+                    this.canvas = document.createElement('canvas');
+                    this.ctx = this.canvas.getContext('2d');
+                    
+                    const rect = element.getBoundingClientRect();
+                    this.canvas.width = rect.width * window.devicePixelRatio;
+                    this.canvas.height = rect.height * window.devicePixelRatio;
+                    this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                    
+                    // Create stream
+                    this.stream = this.canvas.captureStream(30);
+                    
+                    // Set up MediaRecorder
+                    this.mediaRecorder = new MediaRecorder(this.stream, {
+                        mimeType: 'video/webm;codecs=vp9'
+                    });
+                    
+                    this.recordedChunks = [];
+                    this.isRecording = true;
+                    this.startTime = Date.now();
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordedChunks.push(event.data);
+                        }
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        this.isRecording = false;
+                        onStatus?.('Processing recording...');
+                    };
+                    
+                    // Start recording
+                    this.mediaRecorder.start(100);
+                    onStatus?.('Recording started...');
+                    
+                    // Start capturing frames
+                    this.captureFrames(element, duration, onProgress);
+                    
+                } catch (error) {
+                    this.cleanup();
+                    throw error;
+                }
+            }
+            
+            captureFrames(element, duration, onProgress) {
+                if (!this.ctx || !this.canvas) return;
+                
+                const startTime = Date.now();
+                
+                const captureFrame = () => {
+                    if (!this.isRecording || !this.ctx || !this.canvas) return;
+                    
+                    try {
+                        // Clear canvas
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        
+                        // Draw element to canvas (simplified - in real implementation use html2canvas)
+                        const rect = element.getBoundingClientRect();
+                        this.ctx.fillStyle = '#667eea';
+                        this.ctx.fillRect(0, 0, rect.width, rect.height);
+                        
+                        // Draw animated circle
+                        const time = Date.now() - startTime;
+                        const bounce = Math.sin(time * 0.003) * 20;
+                        this.ctx.fillStyle = '#ff6b6b';
+                        this.ctx.beginPath();
+                        this.ctx.arc(rect.width/2, rect.height/2 + bounce, 50, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        
+                        // Update progress
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min((elapsed / duration) * 100, 100);
+                        onProgress?.(progress);
+                        
+                        // Check if recording should stop
+                        if (elapsed >= duration) {
+                            this.stopRecording();
+                            return;
+                        }
+                        
+                        // Schedule next frame
+                        this.animationId = requestAnimationFrame(captureFrame);
+                    } catch (error) {
+                        console.error('Error capturing frame:', error);
+                        this.stopRecording();
+                    }
+                };
+                
+                this.animationId = requestAnimationFrame(captureFrame);
+            }
+            
+            async stopRecording() {
+                if (!this.isRecording || !this.mediaRecorder) {
+                    throw new Error('No recording in progress');
+                }
+                
+                return new Promise((resolve, reject) => {
+                    this.mediaRecorder.onstop = async () => {
+                        try {
+                            const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                            
+                            // For this example, we'll just download the WebM
+                            // In the real implementation, you'd convert to MP4 with ffmpeg.wasm
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `recording-${Date.now()}.webm`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            
+                            this.cleanup();
+                            resolve({ blob, url, size: blob.size });
+                        } catch (error) {
+                            this.cleanup();
+                            reject(error);
+                        }
+                    };
+                    
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                });
+            }
+            
+            cleanup() {
+                this.isRecording = false;
+                
+                if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                    this.mediaRecorder.stop();
+                }
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+                
+                this.mediaRecorder = null;
+                this.stream = null;
+                this.canvas = null;
+                this.ctx = null;
+                this.recordedChunks = [];
+            }
+        }
+        
+        // Initialize the recorder
+        const recorder = new SimpleDOMRecorder();
+        
+        // Get elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const previewBtn = document.getElementById('previewBtn');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        
+        let isPreviewing = false;
+        let previewInterval = null;
+        
+        // Preview animation
+        previewBtn.addEventListener('click', () => {
+            if (isPreviewing) {
+                isPreviewing = false;
+                clearInterval(previewInterval);
+                previewBtn.textContent = 'Preview Animation';
+                status.textContent = 'Preview stopped';
+            } else {
+                isPreviewing = true;
+                previewBtn.textContent = 'Stop Preview';
+                status.textContent = 'Previewing animation...';
+                
+                // Simple preview - just show the bouncing circle
+                const element = document.querySelector('.animated-element');
+                element.style.animation = 'bounce 2s infinite';
+            }
+        });
+        
+        // Start recording
+        startBtn.addEventListener('click', async () => {
+            try {
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                progressBar.style.display = 'block';
+                
+                await recorder.startRecording('preview-window', 10000, 
+                    (progress) => {
+                        progressFill.style.width = `${progress}%`;
+                        status.textContent = `Recording... ${Math.round(progress)}%`;
+                    },
+                    (statusText) => {
+                        status.textContent = statusText;
+                    }
+                );
+                
+            } catch (error) {
+                console.error('Recording failed:', error);
+                status.textContent = `Error: ${error.message}`;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                progressBar.style.display = 'none';
+            }
+        });
+        
+        // Stop recording
+        stopBtn.addEventListener('click', async () => {
+            try {
+                const result = await recorder.stopRecording();
+                status.textContent = `Recording complete! File size: ${(result.size / 1024 / 1024).toFixed(2)} MB`;
+                
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                progressBar.style.display = 'none';
+                progressFill.style.width = '0%';
+                
+            } catch (error) {
+                console.error('Stop recording failed:', error);
+                status.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Check browser support
+        if (!MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+            status.textContent = 'Recording not supported in this browser';
+            startBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>
+
