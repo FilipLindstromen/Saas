@@ -498,6 +498,8 @@ Question: [The question text]
 a) True
 b) False
 
+ Append " (correct)" to the end of the correct answer option (for true/false, append it to the correct statement). Only one option per question should have this marker.
+
 Separate each question with a blank line. Generate as many questions as requested in the instructions.`
             },
             {
@@ -535,6 +537,38 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
         
         let questionsAdded = 0
         
+        const parseAnswer = (raw: string) => {
+          const original = raw
+          let text = raw.trim()
+          let isCorrect = false
+
+          const suffixPatterns = [
+            /\s*\((?:correct answer|correct|right answer)\)\s*$/i,
+            /\s*\[(?:correct answer|correct|right answer)\]\s*$/i,
+            /\s*<\s*correct\s*>\s*$/i,
+            /\s*\{\s*correct\s*\}\s*$/i,
+            /\s*--?\s*correct\s*$/i,
+            /\s*\*\s*correct\s*\*$/i
+          ]
+          for (const pattern of suffixPatterns) {
+            if (pattern.test(text)) {
+              text = text.replace(pattern, '').trim()
+              isCorrect = true
+              break
+            }
+          }
+
+          if (!isCorrect) {
+            const prefixPattern = /^\s*(?:correct answer:|correct:|answer:\s*)/i
+            if (prefixPattern.test(text)) {
+              text = text.replace(prefixPattern, '').trim()
+              isCorrect = true
+            }
+          }
+
+          return { text: text || original.trim(), isCorrect }
+        }
+
         for (const block of questionBlocks) {
           const lines = (block as string).split('\n').map((l: string) => l.trim()).filter(Boolean)
           
@@ -572,15 +606,51 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                 
                 if (isTrueFalse) {
                   question = createBooleanQuestion(questionText) as QuizQuestion
-                  question.answers[0].text = answerTexts[0]
-                  question.answers[1].text = answerTexts[1]
+                  const parsedAnswers = answerTexts.slice(0, 2).map(parseAnswer)
+                  parsedAnswers.forEach((ans, idx) => {
+                    question.answers[idx].text = ans.text
+                  })
+                  let correctIndex = parsedAnswers.findIndex(ans => ans.isCorrect)
+                  if (correctIndex === -1) {
+                    correctIndex = parsedAnswers.findIndex(ans => /^true\b/i.test(ans.text))
+                  }
+                  if (correctIndex === -1 && parsedAnswers.length === 2) {
+                    const falseIndex = parsedAnswers.findIndex(ans => /^false\b/i.test(ans.text))
+                    if (falseIndex !== -1) {
+                      correctIndex = falseIndex === 0 ? 1 : 0
+                    }
+                  }
+                  if (correctIndex === -1) correctIndex = 0
+                  question.answers = [
+                    { ...question.answers[0], isCorrect: correctIndex === 0 },
+                    { ...question.answers[1], isCorrect: correctIndex === 1 }
+                  ] as typeof question.answers
                 } else {
                   question = createMultipleChoiceQuestion(questionText) as QuizQuestion
-                  question.answers.forEach((ans, i) => {
-                    if (answerTexts[i]) {
-                      ans.text = answerTexts[i]
+                  const parsedAnswers = answerTexts.slice(0, question.answers.length).map(parseAnswer)
+                  parsedAnswers.forEach((ans, idx) => {
+                    if (question.answers[idx]) {
+                      question.answers[idx].text = ans.text
                     }
                   })
+                  let correctIndex = parsedAnswers.findIndex(ans => ans.isCorrect)
+                  if (correctIndex === -1) {
+                    const letterMatch = parsedAnswers.findIndex(ans => /^correct\s*[.:]/i.test(ans.text))
+                    if (letterMatch !== -1) {
+                      correctIndex = letterMatch
+                    }
+                  }
+                  if (correctIndex === -1) {
+                    const markerMatch = parsedAnswers.findIndex(ans => /\b(correct answer|right answer)\b/i.test(ans.text))
+                    if (markerMatch !== -1) {
+                      correctIndex = markerMatch
+                    }
+                  }
+                  if (correctIndex === -1) correctIndex = 0
+                  question.answers = question.answers.map((ans, idx) => ({
+                    ...ans,
+                    isCorrect: idx === correctIndex
+                  })) as typeof question.answers
                 }
                 
                 addQuestion(question)
@@ -663,6 +733,13 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
     } as QuizQuestion
     updateQuestion(updated)
   }
+
+  const deleteAllQuestions = useCallback(() => {
+    if (quiz.questions.length === 0) return
+    if (!confirm('Delete all questions?')) return
+    quiz.questions.forEach(q => removeQuestion(q.id))
+    setSelectedQuestionId(null)
+  }, [quiz.questions, removeQuestion])
 
   async function handleSaveJson() {
     const contents = toJsonString()
@@ -1868,11 +1945,19 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-sm font-medium text-gray-300">Questions</div>
-            <div className="flex gap-2">
+                  <div className="flex gap-2">
                     <button className="ios-card px-3 py-1" onClick={() => addQuestion(createBooleanQuestion('New True/False') as QuizQuestion)}>+ True/False</button>
                     <button className="ios-card px-3 py-1" onClick={() => addQuestion(createMultipleChoiceQuestion('New Multiple Choice') as QuizQuestion)}>+ Multiple</button>
-            </div>
-          </div>
+                    {quiz.questions.length > 0 && (
+                      <button
+                        className="ios-card px-3 py-1 text-red-400 hover:text-red-200"
+                        onClick={deleteAllQuestions}
+                      >
+                        🗑 Delete All
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 <div className="space-y-2">
             {quiz.questions.map(q => (
