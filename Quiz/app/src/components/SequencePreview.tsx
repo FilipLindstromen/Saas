@@ -4,6 +4,8 @@ import { QuizData, OverlayTextItem, OverlayAnimation } from '../types'
 import { SingleQuestion } from './SingleQuestion'
 import { CTAScreen } from './CTAScreen'
 import { computeQuizTimeline } from '../utils/quizTiming'
+import appearSfxUrl from '../../sfx/appear.wav'
+import correctSfxUrl from '../../sfx/correct.wav'
 
 const arraysEqual = (a: string[], b: string[]) => {
   if (a.length !== b.length) return false
@@ -128,24 +130,33 @@ interface SequencePreviewProps {
   onFinished?: () => void
   isRecording?: boolean
   recordingTime?: number
+  playSignal?: number
 }
 
-function useAudio(quiz: QuizData, playKey: number) {
+function useAudio() {
   const musicRef = useRef<HTMLAudioElement | null>(null)
   const appearRef = useRef<HTMLAudioElement | null>(null)
   const correctRef = useRef<HTMLAudioElement | null>(null)
 
-  // Generate simple sfx using WebAudio osc if no files; else use small embedded beeps
-  const appearUrl = useMemo(() => {
-    // tiny beep wav (data URL)
-    return 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAAAAB/////'
-  }, [])
-  const correctUrl = useMemo(() => {
-    return 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAAAAB/////'
-  }, [])
+  const appearUrl = appearSfxUrl
+  const correctUrl = correctSfxUrl
 
-  function playAppear(vol: number) { if (appearRef.current) { appearRef.current.volume = vol; appearRef.current.currentTime = 0; appearRef.current.play() } }
-  function playCorrect(vol: number) { if (correctRef.current) { correctRef.current.volume = vol; correctRef.current.currentTime = 0; correctRef.current.play() } }
+  function playSound(ref: React.MutableRefObject<HTMLAudioElement | null>, vol: number) {
+    const base = ref.current
+    if (!base) return
+    const clamp = Math.min(Math.max(vol, 0), 1)
+    const canReuse = base.paused || base.ended
+    const audio = canReuse ? base : (base.cloneNode(true) as HTMLAudioElement)
+    audio.volume = clamp
+    audio.currentTime = 0
+    void audio.play().catch((error) => {
+      if (error instanceof Error && error.name === 'NotAllowedError') return
+      console.warn('SFX play failed:', error)
+    })
+  }
+
+  function playAppear(vol: number) { playSound(appearRef, vol) }
+  function playCorrect(vol: number) { playSound(correctRef, vol) }
 
   return { musicRef, appearRef, correctRef, appearUrl, correctUrl, playAppear, playCorrect }
 }
@@ -237,6 +248,7 @@ function TitleScreen({
             style={{ 
               color: settings!.questionColor, 
               whiteSpace: 'pre-line', 
+              fontFamily: settings?.fontFamily ?? 'Impact',
               textShadow: settings?.titleShadowEnabled && settings?.titleShadowColor ? `0 1px 1px ${settings.titleShadowColor}` : undefined,
               fontSize: `${settings?.titleSizePercent ?? 6.0}vh`, // User-controlled percentage of viewport height
               lineHeight: '1.2'
@@ -267,6 +279,7 @@ function TitleScreen({
           style={{ 
             color: settings!.questionColor, 
             whiteSpace: 'pre-line', 
+            fontFamily: settings?.fontFamily ?? 'Impact',
             textShadow: settings?.titleShadowEnabled && settings?.titleShadowColor ? `0 1px 1px ${settings.titleShadowColor}` : undefined,
             fontSize: `${settings?.titleSizePercent ?? 6.0}vh`, // User-controlled percentage of viewport height
             lineHeight: '1.2'
@@ -279,10 +292,9 @@ function TitleScreen({
   )
 }
 
-export function SequencePreview({ quiz, onFinished, isRecording = false, recordingTime = 0 }: SequencePreviewProps) {
-  const [playKey, setPlayKey] = useState(0)
+export function SequencePreview({ quiz, onFinished, isRecording = false, recordingTime = 0, playSignal }: SequencePreviewProps) {
   const settings = quiz.settings!
-  const { musicRef, appearRef, correctRef, appearUrl, correctUrl, playAppear, playCorrect } = useAudio(quiz, playKey)
+  const { musicRef, appearRef, correctRef, appearUrl, correctUrl, playAppear, playCorrect } = useAudio()
   const musicStartedRef = useRef(false)
   const [stage, setStage] = useState<'title' | 'question' | 'cta'>('title')
   const [qIndex, setQIndex] = useState(0)
@@ -342,38 +354,40 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
   // Single music play effect - handles all music playback
   React.useEffect(() => {
     if (!musicRef.current || !settings.music?.url) return
+    if (isRecording) return
+
+    const media = musicRef.current as HTMLMediaElement
 
     const playMusic = async () => {
       try {
-        // Set volume first
-        musicRef.current!.volume = settings.music!.volume
-        applyMusicOffset(musicRef.current!)
-        
-        // Only play if we haven't started music yet or if it's a new URL
-        if (!musicStartedRef.current || musicRef.current!.ended) {
+        media.pause()
+        media.currentTime = 0
+        applyMusicOffset(media)
+        const desiredVolume = Math.min(Math.max(settings.music?.volume ?? 0.6, 0), 1)
+        media.volume = desiredVolume
+
+        if (!musicStartedRef.current || media.ended) {
           musicStartedRef.current = true
-          
-          await musicRef.current!.play()
+          await media.play()
           console.log('Music started playing:', settings.music!.url)
         }
       } catch (error) {
-        // Only log non-AbortError issues
-        if (error instanceof Error && error.name !== 'AbortError') {
+        if (error instanceof Error && error.name === 'AbortError') return
           console.log('Music play failed:', error)
-        }
       }
     }
 
-    // Small delay to ensure audio element is ready
-    const timer = setTimeout(playMusic, 300)
-    
-    return () => clearTimeout(timer)
-  }, [settings.music?.url]) // Only depend on URL changes
+    const timer = window.setTimeout(playMusic, 150)
 
-  // Reset music started flag when URL changes
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [settings.music?.url, playSignal, isRecording, applyMusicOffset])
+
+  // Reset music started flag when URL changes or preview restarts
   React.useEffect(() => {
     musicStartedRef.current = false
-  }, [settings.music?.url])
+  }, [settings.music?.url, playSignal])
 
   React.useEffect(() => {
     applyMusicOffset(musicRef.current)
@@ -547,7 +561,7 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
   }
 
   return (
-    <div key={playKey} className="relative z-10 w-full h-full flex items-center justify-center">
+    <div className="relative z-10 w-full h-full flex items-center justify-center">
       {/* Music */}
       {settings.music?.url && (
         settings.music.url.includes('pixabay') ? (
@@ -610,8 +624,8 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
           />
         )
       )}
-      <audio ref={appearRef} src={appearUrl} />
-      <audio ref={correctRef} src={correctUrl} />
+      <audio ref={appearRef} src={appearUrl} preload="auto" />
+      <audio ref={correctRef} src={correctUrl} preload="auto" />
 
       {settings.animationType === 'overlay' ? (
         overlayEnabled && (
@@ -656,7 +670,8 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
               key={`question-${qIndex}`}
               question={quiz.questions[qIndex]}
               settings={settings}
-              onAppear={() => playAppear(settings.sfx.appearVolume)}
+              onQuestionAppear={() => playAppear(settings.sfx.appearVolume)}
+              onAnswerAppear={() => playAppear(settings.sfx.appearVolume)}
               onCorrect={() => playCorrect(settings.sfx.correctVolume)}
               onComplete={handleQuestionComplete}
               isRecording={isRecording}

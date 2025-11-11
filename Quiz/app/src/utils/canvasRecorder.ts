@@ -8,6 +8,8 @@
 
 import { computeQuizTimeline } from './quizTiming'
 import { OverlayTextItem, OverlayAnimation } from '../types'
+import appearSfxUrl from '../../sfx/appear.wav'
+import correctSfxUrl from '../../sfx/correct.wav'
 
 // Helper function to format answer labels
 function formatAnswerLabel(index: number, format: string = 'letters'): string {
@@ -144,14 +146,30 @@ export class CanvasRecorder {
 
       // Preload assets (background image/video, music)
       const assets = await this.preloadAssets(quiz, onStatus)
+      const timeline = computeQuizTimeline(quiz)
+      const sfxEvents = this.computeSfxEvents(quiz, timeline)
+      const appearVolumeSetting = this.clampVolume(quiz.settings?.sfx?.appearVolume)
+      const correctVolumeSetting = this.clampVolume(quiz.settings?.sfx?.correctVolume)
+      const shouldAttachMusic = includeMusic && Boolean(assets.musicEl)
+      const shouldIncludeSfx = sfxEvents.length > 0 && (appearVolumeSetting > 0 || correctVolumeSetting > 0)
+      const wantsAudioTrack = shouldAttachMusic || shouldIncludeSfx
+      const frameIntervalMs = 1000 / frameRate
+      const pendingSfxEvents = shouldIncludeSfx ? [...sfxEvents] : []
 
       // Create media stream from canvas and optionally add audio
       const videoStream = canvas.captureStream(frameRate)
       let stream: MediaStream = videoStream
       let audioContext: AudioContext | null = null
-      let audioSource: MediaElementAudioSourceNode | null = null
       let audioDest: MediaStreamAudioDestinationNode | null = null
       let musicEl: HTMLAudioElement | null = null
+      let musicSource: MediaElementAudioSourceNode | null = null
+      let musicGain: GainNode | null = null
+      let appearGain: GainNode | null = null
+      let correctGain: GainNode | null = null
+      let appearBuffer: AudioBuffer | null = null
+      let correctBuffer: AudioBuffer | null = null
+      const sfxSources: AudioBufferSourceNode[] = []
+      let musicStartTimeout: number | null = null
 
       const cleanupCallbacks: Array<() => void> = []
       let cleanedUp = false
@@ -166,6 +184,11 @@ export class CanvasRecorder {
             // ignore cleanup errors
           }
         })
+
+        if (musicStartTimeout !== null) {
+          clearTimeout(musicStartTimeout)
+          musicStartTimeout = null
+        }
 
         if (musicEl) {
           try {
@@ -186,13 +209,51 @@ export class CanvasRecorder {
           }
         })
 
-        if (audioSource) {
+        sfxSources.forEach(source => {
           try {
-            audioSource.disconnect()
+            source.stop(0)
+          } catch {
+            // ignore
+          }
+          try {
+            source.disconnect()
+          } catch {
+            // ignore
+          }
+        })
+
+        if (musicSource) {
+          try {
+            musicSource.disconnect()
           } catch {
             // ignore
           }
         }
+
+        if (musicGain) {
+          try {
+            musicGain.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+
+        if (appearGain) {
+          try {
+            appearGain.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+
+        if (correctGain) {
+          try {
+            correctGain.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+
         if (audioDest) {
           try {
             audioDest.disconnect()
@@ -205,27 +266,94 @@ export class CanvasRecorder {
         }
       }
 
-      if (includeMusic && assets.musicEl) {
+      if (wantsAudioTrack) {
+        try {
+          audioContext = new AudioContext()
+          audioDest = audioContext.createMediaStreamDestination()
+          const combined = new MediaStream()
+          videoStream.getVideoTracks().forEach(track => combined.addTrack(track))
+          audioDest.stream.getAudioTracks().forEach(track => combined.addTrack(track))
+          stream = combined
+        } catch (error) {
+          console.warn('Failed to initialize audio context:', error)
+          audioContext = null
+          audioDest = null
+        }
+      }
+
+      if (audioContext && audioDest && shouldAttachMusic && assets.musicEl) {
         try {
           onStatus?.('Attaching background music...')
-          audioContext = new AudioContext()
           musicEl = assets.musicEl
-          // Ensure playback starts at desired offset
           this.applyMediaOffset(musicEl, quiz.settings?.music?.startOffsetSeconds)
           musicEl.crossOrigin = 'anonymous'
           musicEl.loop = false
-          audioSource = audioContext.createMediaElementSource(musicEl)
-          audioDest = audioContext.createMediaStreamDestination()
-          audioSource.connect(audioDest)
-          // Also connect to destination to hear locally if needed
-          audioSource.connect(audioContext.destination)
-          const combined = new MediaStream()
-          videoStream.getVideoTracks().forEach(t => combined.addTrack(t))
-          audioDest.stream.getAudioTracks().forEach(t => combined.addTrack(t))
-          stream = combined
+          musicSource = audioContext.createMediaElementSource(musicEl)
+          musicGain = audioContext.createGain()
+          musicGain.gain.value = this.clampVolume(quiz.settings?.music?.volume ?? musicEl.volume ?? 1)
+          musicSource.connect(musicGain)
+          musicGain.connect(audioDest)
+          musicGain.connect(audioContext.destination)
         } catch (e) {
           console.warn('Failed to attach music:', e)
         }
+      }
+
+      let triggerSfxForFrame: ((frameTime: number) => void) | undefined
+
+      if (audioContext && audioDest && shouldIncludeSfx) {
+        appearGain = audioContext.createGain()
+        appearGain.gain.value = appearVolumeSetting
+        correctGain = audioContext.createGain()
+        correctGain.gain.value = correctVolumeSetting
+
+        appearGain.connect(audioDest)
+        correctGain.connect(audioDest)
+        appearGain.connect(audioContext.destination)
+        correctGain.connect(audioContext.destination)
+
+        const [loadedAppear, loadedCorrect] = await Promise.all([
+          appearVolumeSetting > 0 ? this.loadAudioBuffer(audioContext, appearSfxUrl) : Promise.resolve(null),
+          correctVolumeSetting > 0 ? this.loadAudioBuffer(audioContext, correctSfxUrl) : Promise.resolve(null)
+        ])
+
+        appearBuffer = loadedAppear
+        correctBuffer = loadedCorrect
+
+        const triggerSfx = (type: 'appear' | 'correct') => {
+          if (!audioContext) return
+          const buffer = type === 'appear' ? appearBuffer : correctBuffer
+          const gainNode = type === 'appear' ? appearGain : correctGain
+          if (!buffer || !gainNode) return
+          try {
+            const source = audioContext.createBufferSource()
+            source.buffer = buffer
+            source.connect(gainNode)
+            const startAt = audioContext.currentTime + 0.01
+            source.start(startAt)
+            sfxSources.push(source)
+          } catch (error) {
+            console.warn('Failed to trigger SFX playback:', error)
+          }
+        }
+
+        let sfxIndex = 0
+        triggerSfxForFrame = (frameTime: number) => {
+          if (!audioContext) return
+          const lookahead = 1
+          while (sfxIndex < pendingSfxEvents.length && pendingSfxEvents[sfxIndex].time <= frameTime + lookahead) {
+            const event = pendingSfxEvents[sfxIndex]
+            triggerSfx(event.type)
+            sfxIndex++
+          }
+        }
+      }
+
+      let resumePromise: Promise<void> | undefined
+      if (audioContext) {
+        resumePromise = audioContext.resume().catch(error => {
+          console.warn('AudioContext resume failed:', error)
+        })
       }
       
       // Try different MIME types based on requested format
@@ -309,7 +437,8 @@ export class CanvasRecorder {
                 recorder.stop()
               }
             }, 1000)
-          }
+          },
+          triggerSfxForFrame
         )
 
         // Start background video/music playback aligned to render loop
@@ -381,12 +510,20 @@ export class CanvasRecorder {
           }
         }
         if (musicEl) {
-          // Resume audio context then play
-          audioContext?.resume().then(() => {
+          const startPlayback = () => {
             musicEl!.play().catch(() => {})
-          }).catch(() => {
-            musicEl!.play().catch(() => {})
-          })
+          }
+          const schedulePlayback = () => {
+            musicStartTimeout = window.setTimeout(startPlayback, 150)
+          }
+          if (resumePromise) {
+            resumePromise.then(schedulePlayback).catch(schedulePlayback)
+          } else {
+            schedulePlayback()
+          }
+        } else if (resumePromise) {
+          // Ensure audio context runs even if we only have SFX
+          resumePromise.catch(() => {})
         }
       })
 
@@ -410,7 +547,8 @@ export class CanvasRecorder {
     targetResolution: { width: number; height: number },
     onProgress?: (progress: number) => void,
     onStatus?: (status: string) => void,
-    onComplete?: () => void
+    onComplete?: () => void,
+    onFrame?: (frameTime: number) => void
   ): void {
     const timeline = computeQuizTimeline(quiz)
     const ctaEnabled = Boolean(quiz.settings?.cta?.enabled && timeline.ctaDuration > 0)
@@ -431,6 +569,7 @@ export class CanvasRecorder {
       
       try {
         onStatus?.(`Rendering frame ${frameIndex + 1}/${frameCount} at ${frameTime.toFixed(0)}ms`)
+        onFrame?.(frameTime)
         
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -1405,6 +1544,7 @@ export class CanvasRecorder {
     // Use percentage-based sizing for consistent scaling
     const titleSizePercent = settings?.titleSizePercent ?? 6.0
     const fontSize = Math.round(height * (titleSizePercent / 100))
+    const fontStack = this.getFontStack(settings?.fontFamily)
     
     // Fade in animation
     const opacity = Math.min(progress * 2, 1)
@@ -1425,7 +1565,7 @@ export class CanvasRecorder {
       ctx.shadowBlur = 0
       ctx.shadowOffsetY = 0
     }
-    ctx.font = `600 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`
+    ctx.font = `600 ${fontSize}px ${fontStack}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     
@@ -1457,22 +1597,44 @@ export class CanvasRecorder {
     const answerSizePercent = settings?.answerSizePercent ?? 2.2
     const questionFontSize = Math.round(height * (questionSizePercent / 100))
     const answerFontSize = Math.round(height * (answerSizePercent / 100))
+    const fontStack = this.getFontStack(settings?.fontFamily)
     
     // Use percentage setting directly (0-100%)
     const answerWidthPercent = settings?.answerWidthPercent ?? 50 // Default 50% of container width
-    const pillWidth = Math.round((width * 0.9) * (answerWidthPercent / 100)) // Apply to container width
+    const paddingPx = 24 // Tailwind p-6
+    const innerWidth = width - (paddingPx * 2)
+    const innerHeight = height - (paddingPx * 2)
+    const containerMaxWidth = innerWidth * 0.9
+    const pillWidth = Math.round(containerMaxWidth * (answerWidthPercent / 100))
     const pillHeight = Math.round(height * 0.075) // ~7.5% of height
     const radius = pillHeight / 2
     
-    // Fade in animation
-    const opacity = Math.min(progress * 2, 1)
-    const yOffset = (1 - progress) * 12
+    const questionInMs = Math.max(Number(settings?.questionInMs ?? 0), 0)
+    const answersPerQuestion = question.answers?.length ?? 3
+    const questionHold = Number(settings?.questionHoldMs ?? 2200)
+    const correctRevealMs = Number(settings?.correctRevealMs ?? 500)
+    const answersStaggerMs = Number(settings?.answersStaggerMs ?? 70)
+    const answerStages = Math.max(answersPerQuestion - 1, 0)
+    const allAnswersShownTime = questionInMs + answersStaggerMs + (answersStaggerMs * answerStages)
+    const perQuestionMs = allAnswersShownTime + correctRevealMs + questionHold
+    const correctRevealTime = (allAnswersShownTime + correctRevealMs) / perQuestionMs
+    const questionDuration = questionInMs + (answersStaggerMs * answersPerQuestion) + correctRevealMs + questionHold
+    const ease = (t: number) => 1 - Math.pow(1 - Math.min(Math.max(t, 0), 1), 3)
+    const elapsedInQuestion = progress * perQuestionMs
+    const questionProgress = questionInMs > 0 ? ease(Math.min(elapsedInQuestion / questionInMs, 1)) : 1
+    const yOffset = (1 - questionProgress) * 20
     
-    // Add fade out for last question - will be calculated after variables are declared
+    // Add fade out for last question
     let fadeOutOpacity = 1
-    
+    if (isLastQuestion) {
+      const fadeOutStartTime = Math.max(questionDuration - 1000, 0) // Start fade 1 second before end when possible
+      const currentTime = progress * perQuestionMs
+      const fadeOutProgress = Math.max(0, (currentTime - fadeOutStartTime) / 1000)
+      fadeOutOpacity = Math.max(0, 1 - fadeOutProgress)
+    }
+
     ctx.save()
-    ctx.globalAlpha = opacity * fadeOutOpacity
+    ctx.globalAlpha = questionProgress * fadeOutOpacity
     ctx.translate(0, yOffset)
     
     // Draw question with proper wrapping to match preview exactly
@@ -1486,72 +1648,51 @@ export class CanvasRecorder {
       ctx.shadowBlur = 0
       ctx.shadowOffsetY = 0
     }
-    ctx.font = `600 ${questionFontSize}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`
+    ctx.font = `600 ${questionFontSize}px ${fontStack}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     
     // Match preview CSS exactly: maxWidth: '90%', margin: '0 auto'
-    const containerMaxWidth = width * 0.9 // 90% of width
     const containerX = (width - containerMaxWidth) / 2 // Center the container
     
     // Calculate total content height to center the entire block like preview
-    const questionMarginBottom = height * 0.06 // 6vh - increased spacing between question and answers
+    const questionMarginBottom = height * 0.06 // 6vh between question and answers
     const answerGap = height * 0.02 // 2vh gap between answers
-    const answersPerQuestion = question.answers?.length ?? 3
-    const totalAnswerHeight = (pillHeight + answerGap) * answersPerQuestion - answerGap // Total height of all answers
-    const totalContentHeight = questionFontSize * 1.2 + questionMarginBottom + totalAnswerHeight
+    const lineHeightQuestion = questionFontSize * 1.2
+    const wrappedQuestion = this.wrapText(ctx, question.title ?? '', containerMaxWidth)
+    const questionLines = wrappedQuestion ? wrappedQuestion.split('\n') : ['']
+    const questionTextHeight = lineHeightQuestion * questionLines.length
+    const totalAnswerHeight = (pillHeight * answersPerQuestion) + (answerGap * Math.max(answersPerQuestion - 1, 0))
+    const totalContentHeight = questionTextHeight + questionMarginBottom + totalAnswerHeight
     
     // Center the entire content block like preview (flex items-center justify-center)
-    const contentStartY = (height - totalContentHeight) / 2
-    const questionY = contentStartY + (questionFontSize * 1.2) / 2
+    const contentStartY = paddingPx + Math.max((innerHeight - totalContentHeight) / 2, 0)
+    const questionCenterY = contentStartY + (questionTextHeight / 2)
     
-    // Wrap question text to fit container width
-    const maxQuestionWidth = containerMaxWidth
-    const wrappedQuestion = this.wrapText(ctx, question.title, maxQuestionWidth)
-    this.drawMultilineCentered(ctx, wrappedQuestion, width / 2, questionY, Math.round(questionFontSize * 1.2))
+    this.drawMultilineCentered(ctx, wrappedQuestion, width / 2, questionCenterY, lineHeightQuestion)
     
     // Position answers after question within the centered content block
-    const answerY = contentStartY + questionFontSize * 1.2 + questionMarginBottom + answerGap
+    const answersStartY = contentStartY + questionTextHeight + questionMarginBottom
     const correctButtonColor = settings?.correctAnswerButtonColor || settings?.correctAnswerColor || '#10b981'
     const correctTextColor = settings?.correctAnswerTextColor || '#ffffff'
     const answerTextColor = settings?.answerColor || '#111111'
     const neutralBg = '#ffffff'
     const neutralStroke = 'rgba(255,255,255,0.15)'
-    
-    // Timing
-    // Use settings-driven correct reveal timing and make answers pre-delay based on answersStagger
-    // stageProgress is 0..1 across a single question timeline (questionIn + questionHold + correctReveal)
-    const s = settings || {}
-    const questionIn = Number(s.questionInMs ?? 300)
-    const questionHold = Number(s.questionHoldMs ?? 2200)
-    const correctRevealMs = Number(s.correctRevealMs ?? 500)
-    const answersStaggerMs = Number(s.answersStaggerMs ?? 70)
-    const allAnswersShownTime = questionIn + answersStaggerMs + (answersStaggerMs * (answersPerQuestion - 1))
-    const perQuestionMs = allAnswersShownTime + correctRevealMs + questionHold
-    const preDelayMs = answersStaggerMs // delay before first answer
-    const perAnswerGapMs = answersStaggerMs // gap between answers
-    const correctRevealTime = (allAnswersShownTime + correctRevealMs) / perQuestionMs
-    const answersStartTime = (questionIn + preDelayMs) / perQuestionMs
-    
-    // Calculate fade out for last question - start fade 1 second before question ends
-    if (isLastQuestion) {
-      const questionDuration = questionIn + 
-        (answersStaggerMs * (answersPerQuestion - 1)) + 
-        correctRevealMs + 
-        questionHold
 
-      const fadeOutStartTime = questionDuration - 1000 // Start fade 1 second before end
-      const currentTime = progress * perQuestionMs
-      const fadeOutProgress = Math.max(0, (currentTime - fadeOutStartTime) / 1000)
-      fadeOutOpacity = Math.max(0, 1 - fadeOutProgress)
-    }
+    // Answers do not use text shadow in preview
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+
+    const answerFadeDuration = Math.max(questionInMs, 1)
     
     question.answers.forEach((answer: any, index: number) => {
-      const delay = (index * perAnswerGapMs) / perQuestionMs
-      const staged = Math.max(0, progress - answersStartTime - delay)
-      const answerProgress = Math.min(staged * 3, 1) // Faster appearance
-      const answerOpacity = Math.max(0, answerProgress)
-      const answerYOffset = (1 - answerProgress) * 8
+      const answerStartMs = questionInMs + answersStaggerMs + (index * answersStaggerMs)
+      const timeForAnswer = Math.max(elapsedInQuestion - answerStartMs, 0)
+      const easeAnswer = questionInMs > 0 ? ease(Math.min(timeForAnswer / answerFadeDuration, 1)) : 1
+      const answerOpacity = Math.max(0, easeAnswer)
+      const answerYOffset = (1 - easeAnswer) * 20
       
       // Determine if we should show correct styling
       const isCorrect = !!(answer.correct || answer.isCorrect)
@@ -1567,14 +1708,14 @@ export class CanvasRecorder {
       const stroke = showCorrect && isCorrect ? correctButtonColor : neutralStroke
 
       // Match preview CSS: center within container and use 2vh gap
-      const answerYPos = answerY + index * (pillHeight + answerGap)
+      const answerTop = answersStartY + index * (pillHeight + answerGap)
       const pillX = containerX + (containerMaxWidth - pillWidth) / 2 // Center within container
       
       // Rounded pill background
       this.roundedRect(
         ctx,
         pillX,
-        answerYPos - pillHeight / 2,
+        answerTop,
         pillWidth,
         pillHeight,
         radius,
@@ -1584,14 +1725,18 @@ export class CanvasRecorder {
       
       // Answer text with proper wrapping
       ctx.fillStyle = showCorrect && isCorrect ? correctTextColor : answerTextColor
-      ctx.font = `600 ${answerFontSize}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`
+      ctx.font = `600 ${answerFontSize}px ${fontStack}`
       ctx.textAlign = 'left'
-      
+      ctx.textBaseline = 'middle'
+
       // Match preview CSS: padding: '0 8%' of pill width
       const horizontalPadding = Math.round(pillWidth * 0.08) // 8% of pill width for padding
       const answerText = `${formatAnswerLabel(index, settings?.answerFormat)} ${answer.text}`
-      const wrappedText = this.wrapText(ctx, answerText, pillWidth - (horizontalPadding * 2))
-      this.drawMultilineLeft(ctx, wrappedText, pillX + horizontalPadding, answerYPos, Math.round(answerFontSize * 1.2))
+      const textMaxWidth = pillWidth - (horizontalPadding * 2)
+      const wrappedText = this.wrapText(ctx, answerText, textMaxWidth)
+      const lineHeightAnswer = answerFontSize * 1.4
+      const answerCenterY = answerTop + (pillHeight / 2)
+      this.drawMultilineLeft(ctx, wrappedText, pillX + horizontalPadding, answerCenterY, lineHeightAnswer)
       
       ctx.restore()
     })
@@ -1650,6 +1795,75 @@ export class CanvasRecorder {
       ctx.strokeStyle = stroke
       ctx.stroke()
     }
+  }
+
+  private static clampVolume(value: number | undefined): number {
+    if (typeof value !== 'number' || Number.isNaN(value)) return 0
+    return Math.min(Math.max(value, 0), 1)
+  }
+
+  private static getFontStack(fontFamily?: string): string {
+    const fallback = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+    if (!fontFamily) return fallback
+    const sanitized = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily
+    return `${sanitized}, ${fallback}`
+  }
+
+  private static async loadAudioBuffer(context: AudioContext, url: string): Promise<AudioBuffer | null> {
+    try {
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio asset (${response.status})`)
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      return await context.decodeAudioData(arrayBuffer.slice(0))
+    } catch (error) {
+      console.warn('Failed to load audio buffer:', url, error)
+      return null
+    }
+  }
+
+  private static computeSfxEvents(
+    quiz: any,
+    timeline: ReturnType<typeof computeQuizTimeline>
+  ): Array<{ time: number; type: 'appear' | 'correct' }> {
+    const events: Array<{ time: number; type: 'appear' | 'correct' }> = []
+    const settings = quiz?.settings ?? {}
+    if (settings.animationType && settings.animationType !== 'quiz') {
+      return events
+    }
+
+    const titleDuration = timeline.showTitle ? timeline.titleDuration : 0
+    const questionInMs = Number(settings.questionInMs ?? 500)
+    const answersStaggerMs = Number(settings.answersStaggerMs ?? 180)
+    const correctRevealMs = Number(settings.correctRevealMs ?? 900)
+
+    const questions = Array.isArray(quiz?.questions) ? quiz.questions : []
+
+    timeline.questionTimings.forEach((timing, index) => {
+      const question = questions[index]
+      if (!question) return
+
+      const baseTime = titleDuration + timing.start
+      events.push({ time: baseTime, type: 'appear' })
+
+      const answers = Array.isArray(question.answers) ? question.answers : []
+      answers.forEach((_answer: any, answerIndex: number) => {
+        const answerTime = baseTime + questionInMs + answersStaggerMs + (answerIndex * answersStaggerMs)
+        events.push({ time: answerTime, type: 'appear' })
+      })
+
+      const answersCount = answers.length
+      const revealOffset =
+        answersCount > 0
+          ? questionInMs + answersStaggerMs + (Math.max(answersCount - 1, 0) * answersStaggerMs)
+          : questionInMs
+      const correctTime = baseTime + revealOffset + correctRevealMs
+      events.push({ time: correctTime, type: 'correct' })
+    })
+
+    events.sort((a, b) => a.time - b.time)
+    return events
   }
 
   /** Preload background image/video and music */
@@ -1817,26 +2031,41 @@ export class CanvasRecorder {
     text: string,
     maxWidth: number
   ): string {
-    const words = text.split(' ')
-    const lines: string[] = []
-    let currentLine = ''
+    if (!text) return ''
+    if (maxWidth <= 0) return text
 
-    for (const word of words) {
-      const testLine = currentLine + (currentLine ? ' ' : '') + word
-      const metrics = ctx.measureText(testLine)
-      
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = testLine
+    const paragraphs = String(text ?? '').split(/\r?\n/)
+    const lines: string[] = []
+
+    paragraphs.forEach(paragraph => {
+      const trimmed = paragraph
+      if (!trimmed) {
+        lines.push('')
+        return
       }
-    }
-    
-    if (currentLine) {
-      lines.push(currentLine)
-    }
-    
+
+      const words = trimmed.split(' ')
+      let currentLine = ''
+
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word
+        const metrics = ctx.measureText(testLine)
+
+        if (metrics.width > maxWidth && currentLine) {
+          lines.push(currentLine)
+          currentLine = word
+        } else {
+          currentLine = testLine
+        }
+      }
+
+      if (currentLine) {
+        lines.push(currentLine)
+      } else if (lines.length === 0 || lines[lines.length - 1] !== '') {
+        lines.push('')
+      }
+    })
+
     return lines.join('\n')
   }
 

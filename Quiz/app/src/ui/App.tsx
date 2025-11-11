@@ -85,7 +85,24 @@ export function App() {
   const [showRealMusic, setShowRealMusic] = useState(false)
 
   const fontOptions = useMemo(
-    () => ['Impact', 'Arial Black', 'Helvetica', 'Comic Sans MS', 'Times New Roman', 'Georgia', 'Verdana', 'Trebuchet MS'],
+    () => [
+      'Impact',
+      'Arial Black',
+      'Helvetica',
+      'Poppins',
+      'Montserrat',
+      'Lato',
+      'Playfair Display',
+      'Oswald',
+      'Roboto Condensed',
+      'Bebas Neue',
+      'Pacifico',
+      'Comic Sans MS',
+      'Times New Roman',
+      'Georgia',
+      'Verdana',
+      'Trebuchet MS'
+    ],
     []
   )
   const overlayAnimationOptions = useMemo<{ value: OverlayAnimation; label: string }[]>(() => [
@@ -1807,7 +1824,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   <LabeledSlider label="Title in" value={quiz.settings!.titleInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleInMs: v }))} />
                   <LabeledSlider label="Title hold" value={quiz.settings!.titleHoldMs} min={200} max={3000} onChange={v => updateSettings(s => ({ ...s, titleHoldMs: v }))} />
                   <LabeledSlider label="Title out" value={quiz.settings!.titleOutMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, titleOutMs: v }))} />
-                  <LabeledSlider label="Question in" value={quiz.settings!.questionInMs} min={200} max={2000} onChange={v => updateSettings(s => ({ ...s, questionInMs: v }))} />
+                  <LabeledSlider label="Question in" value={quiz.settings!.questionInMs} min={0} max={2000} onChange={v => updateSettings(s => ({ ...s, questionInMs: v }))} />
                   <LabeledSlider label="Question hold" value={quiz.settings!.questionHoldMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, questionHoldMs: v }))} />
                   <LabeledSlider label="Answers stagger" value={quiz.settings!.answersStaggerMs} min={50} max={2000} onChange={v => updateSettings(s => ({ ...s, answersStaggerMs: v }))} />
                   <LabeledSlider label="Correct reveal" value={quiz.settings!.correctRevealMs} min={200} max={6000} onChange={v => updateSettings(s => ({ ...s, correctRevealMs: v }))} />
@@ -2065,6 +2082,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     key={playVersion} 
                     quiz={quiz} 
                     onFinished={() => setIsPlaying(false)} 
+                    playSignal={playVersion}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-iossub"></div>
