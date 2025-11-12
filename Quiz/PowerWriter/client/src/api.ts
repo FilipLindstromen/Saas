@@ -41,12 +41,13 @@ export async function getFolderDetails(
 
 export async function saveFolderInstructions(
   path: string,
-  instructions: string
+  instructions: string,
+  color?: string
 ) {
   const response = await fetch("/api/folder", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ path, instructions })
+    body: JSON.stringify({ path, instructions, color })
   });
   return handleResponse<{ success: true }>(response);
 }
