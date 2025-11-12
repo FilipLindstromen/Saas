@@ -1,24 +1,27 @@
 .app {
   display: flex;
   height: 100%;
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.12), #050b18);
+  color: #e2e8f0;
 }
 
 .sidebar {
-  border-right: 1px solid #d0d5dd;
-  background: #fff;
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.82);
   display: flex;
   flex-direction: column;
   min-width: 200px;
-  max-width: 480px;
+  max-width: 420px;
+  backdrop-filter: blur(12px);
 }
 
 .sidebar-header {
-  padding: 16px;
-  border-bottom: 1px solid #e4e7ec;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .resizer {
-  background: #d0d5dd;
+  background: rgba(148, 163, 184, 0.2);
   flex: 0 0 auto;
   transition: background 0.2s ease;
 }
@@ -29,31 +32,49 @@
 }
 
 .resizer:hover {
-  background: #9aa4b2;
+  background: rgba(148, 163, 184, 0.45);
 }
 
 .sidebar-resizer {
   background: transparent;
-  border-left: 1px solid #d0d5dd;
-  border-right: 1px solid #d0d5dd;
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  border-right: 1px solid rgba(148, 163, 184, 0.06);
 }
 
 .panel-resizer {
   background: transparent;
-  border-left: 1px solid #e4e7ec;
-  border-right: 1px solid #e4e7ec;
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
   margin: 0 8px;
 }
 
 .sidebar-header h1 {
   margin: 0;
   font-size: 18px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.sidebar-header p {
+  margin: 6px 0 0;
+  color: rgba(226, 232, 240, 0.66);
+  font-size: 13px;
 }
 
 .tree {
   flex: 1;
   overflow-y: auto;
   padding: 8px 0;
+  scrollbar-width: thin;
+}
+
+.tree::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tree::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
 }
 
 .tree-item {
@@ -61,6 +82,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  color: #cbd5f5;
 }
 
 .tree-item button {
@@ -73,15 +95,15 @@
 }
 
 .tree-item.active {
-  background-color: #eaf1ff;
+  background-color: rgba(59, 130, 246, 0.18);
 }
 
 .tree-item-completed {
-  background-color: rgba(187, 247, 208, 0.35);
+  background-color: rgba(34, 197, 94, 0.12);
 }
 
 .tree-item-completed .title {
-  color: #047857;
+  color: #6ee7b7;
 }
 
 .tree-actions {
@@ -102,18 +124,19 @@
   background: none;
   padding: 2px 4px;
   font-size: 12px;
-  color: #475467;
+  color: rgba(203, 213, 225, 0.65);
 }
 
 .tree-actions button:hover {
-  color: #1d4ed8;
+  color: #93c5fd;
 }
 
 .tree-item .title {
   flex: 1;
   text-align: left;
   font-size: 14px;
-  color: #101828;
+  color: inherit;
+  font-weight: 500;
 }
 
 .tree-children {
@@ -125,23 +148,27 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: rgba(10, 15, 30, 0.92);
+  backdrop-filter: blur(8px);
 }
 
 .main-header {
   padding: 16px 24px;
-  border-bottom: 1px solid #e4e7ec;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  background: rgba(12, 19, 33, 0.6);
 }
 
 .settings-panel {
   padding: 16px 24px;
-  border-bottom: 1px solid #e4e7ec;
-  background: #f9fafb;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  background: rgba(12, 19, 33, 0.8);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  color: #e2e8f0;
 }
 
 .settings-row {
@@ -153,24 +180,25 @@
 .settings-row label {
   font-size: 13px;
   font-weight: 600;
-  color: #344054;
+  color: rgba(226, 232, 240, 0.75);
 }
 
 .settings-row input {
-  border: 1px solid #d0d5dd;
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 8px;
   padding: 10px 12px;
-  background: #fff;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2eaf7;
 }
 
 .settings-row input:focus {
-  outline: 3px solid #dbe8ff;
+  outline: 3px solid rgba(59, 130, 246, 0.35);
 }
 
 .settings-hint {
   margin: 0;
   font-size: 12px;
-  color: #667085;
+  color: rgba(203, 213, 225, 0.66);
 }
 
 .main-content {
@@ -187,6 +215,11 @@
   padding: 24px;
   overflow: hidden;
   min-width: 220px;
+  background: rgba(12, 19, 33, 0.72);
+  border-radius: 18px;
+  margin: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 24px 40px rgba(5, 12, 26, 0.45);
 }
 
 .aggregated-panel {
@@ -197,7 +230,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(16, 24, 40, 0.4);
+  background: rgba(5, 11, 24, 0.6);
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
@@ -205,15 +238,26 @@
   z-index: 40;
 }
 
+.overlay.aggregated-overlay {
+  z-index: 50;
+}
+
+.overlay.variant-overlay {
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 60;
+}
+
 .aggregated-dialog {
   width: min(420px, 90vw);
-  background: #fff;
+  background: rgba(10, 15, 30, 0.95);
   border-radius: 12px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-  border: 1px solid #e4e7ec;
+  box-shadow: 0 30px 60px rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   display: flex;
   flex-direction: column;
   max-height: 80vh;
+  color: #e2e8f0;
 }
 
 .aggregated-dialog .panel-body {
@@ -227,15 +271,130 @@
 
 .aggregated-dialog textarea {
   min-height: 200px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #e2e8f0;
 }
 
 .panel-label {
   margin: 0 0 8px;
   font-weight: 600;
   font-size: 13px;
-  color: #475467;
+  color: rgba(203, 213, 225, 0.75);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.selection-menu {
+  position: fixed;
+  z-index: 70;
+  background: rgba(24, 34, 58, 0.94);
+  color: #f8fafc;
+  border-radius: 8px;
+  display: flex;
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+  overflow: hidden;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+}
+
+.selection-menu button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 8px 14px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.selection-menu button:hover {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.selection-menu button + button {
+  border-left: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.variant-dialog {
+  width: min(520px, 95vw);
+  background: rgba(9, 14, 28, 0.96);
+  border-radius: 16px;
+  box-shadow: 0 36px 72px rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  color: #e2e8f0;
+}
+
+.variant-dialog .panel-header {
+  padding: 24px 24px 12px;
+  margin: 0;
+}
+
+.variant-dialog .panel-body {
+  padding: 0 24px 24px;
+  overflow-y: auto;
+}
+
+.variant-source {
+  margin: 0 0 16px;
+  padding: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.variant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.variant-card {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(18, 27, 46, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.35);
+}
+
+.variant-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.variant-card pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.variant-card button {
+  align-self: flex-start;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(99, 102, 241, 0.16);
+  color: #cbd5f5;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.variant-card button:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #e0e7ff;
 }
 
 .panel-header {
@@ -243,6 +402,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  color: #f8fafc;
 }
 
 .panel-header h2 {
@@ -263,19 +423,20 @@
   resize: none;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #d0d5dd;
-  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.88);
   min-height: 120px;
+  color: #e2e8f0;
 }
 
 .panel-body textarea:focus,
 .panel-body input:focus {
-  outline: 3px solid #dbe8ff;
+  outline: 3px solid rgba(99, 102, 241, 0.35);
 }
 
 .panel-body .readonly {
-  background: #f2f4f7;
-  border: 1px dashed #d0d5dd;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px dashed rgba(148, 163, 184, 0.24);
 }
 
 .toolbar {
@@ -285,10 +446,19 @@
 
 .toolbar button {
   border-radius: 6px;
-  border: 1px solid #d0d5dd;
-  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(24, 34, 58, 0.85);
   padding: 6px 12px;
   font-weight: 500;
+  color: #e2e8f0;
+  transition: background 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toolbar button:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.35);
 }
 
 .toolbar .toolbar-checkbox {
@@ -296,7 +466,7 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #475467;
+  color: rgba(203, 213, 225, 0.75);
 }
 
 .toolbar .toolbar-checkbox input {
@@ -304,9 +474,10 @@
 }
 
 .toolbar button.primary {
-  background: #3b82f6;
-  color: #fff;
-  border-color: #3b82f6;
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #f8fafc;
+  border-color: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 18px 28px rgba(59, 130, 246, 0.35);
 }
 
 .toolbar button:disabled {
@@ -315,25 +486,25 @@
 }
 
 .status-bar {
-  border-top: 1px solid #e4e7ec;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
   padding: 12px 24px;
-  background: #fff;
+  background: rgba(12, 19, 33, 0.72);
   font-size: 13px;
-  color: #475467;
+  color: rgba(226, 232, 240, 0.72);
 }
 
 .status-success {
-  color: #028a0f;
+  color: #4ade80;
 }
 
 .status-error {
-  color: #dc2626;
+  color: #f87171;
 }
 
 .chat-panel {
-  border-top: 1px solid #e4e7ec;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
   padding: 24px;
-  background: #fff;
+  background: rgba(12, 19, 33, 0.78);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -342,14 +513,18 @@
 
 .chat-panel textarea {
   min-height: 80px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
 }
 
 .chat-responses {
   flex: 1;
   overflow-y: auto;
   border-radius: 8px;
-  border: 1px solid #e4e7ec;
+  border: 1px solid rgba(148, 163, 184, 0.16);
   padding: 16px;
-  background: #f8f9fc;
+  background: rgba(15, 23, 42, 0.75);
+  color: rgba(226, 232, 240, 0.85);
 }
 

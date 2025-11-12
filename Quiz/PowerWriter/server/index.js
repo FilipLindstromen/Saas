@@ -43,6 +43,15 @@ const INSTRUCTIONS_SUFFIX = ".instructions.txt";
 const ORDER_FILE = "_order.json";
 const DOCUMENT_META_SUFFIX = ".meta.json";
 
+const VARIANT_MODE_INSTRUCTIONS = {
+  simplify:
+    "Simplify the text while preserving its meaning, tone, and key details. Make it easier to read without losing important information.",
+  expand:
+    "Expand the text with additional sensory detail and context while keeping the original voice and intent. Avoid repeating sentences verbatim.",
+  rephrase:
+    "Rephrase the text using different wording while keeping the same meaning, tone, and approximate length."
+};
+
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join("/");
 }
@@ -650,6 +659,110 @@ app.post("/api/order", async (req, res) => {
     res.status(500).send(
       error instanceof Error ? error.message : "Unable to reorder"
     );
+  }
+});
+
+app.post("/api/generate-variants", async (req, res) => {
+  try {
+    const { path: relative, text, mode } = req.body;
+    const hasMode = Object.prototype.hasOwnProperty.call(
+      VARIANT_MODE_INSTRUCTIONS,
+      mode
+    );
+    if (
+      typeof text !== "string" ||
+      !text.trim() ||
+      typeof mode !== "string" ||
+      !hasMode
+    ) {
+      return res
+        .status(400)
+        .send("Mode or text missing. Modes: simplify, expand, rephrase.");
+    }
+
+    const headerKey = req.headers["x-openai-key"];
+    const providedKey =
+      typeof headerKey === "string"
+        ? headerKey.trim()
+        : Array.isArray(headerKey)
+        ? headerKey[0]?.trim()
+        : "";
+    const effectiveKey = providedKey || envApiKey;
+
+    if (!effectiveKey) {
+      return res
+        .status(400)
+        .send(
+          "OpenAI API key is not configured. Add one in settings or set OPENAI_API_KEY."
+        );
+    }
+
+    const client = new OpenAI({ apiKey: effectiveKey });
+
+    const pathString =
+      typeof relative === "string" ? relative : relative ?? "";
+
+    const aggregated =
+      typeof relative === "string"
+        ? await gatherAggregatedInstructions(
+            pathString,
+            pathString.endsWith(".txt") ? "document" : "folder"
+          )
+        : "";
+
+    const systemPrompt =
+      aggregated ||
+      "You are a helpful writing assistant that rewrites user-provided passages.";
+
+    const taskInstruction = VARIANT_MODE_INSTRUCTIONS[mode];
+
+    const userPrompt = [
+      `Task: ${taskInstruction}`,
+      "Original text:",
+      text.trim(),
+      "",
+      "Provide exactly three distinct variations that satisfy the task.",
+      "Respond strictly as JSON in the format:",
+      '["Variant 1", "Variant 2", "Variant 3"]',
+      "Do not include any additional commentary."
+    ].join("\n");
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7
+    });
+
+    const rawContent =
+      completion.choices?.[0]?.message?.content?.trim() ?? "[]";
+    let variants;
+    try {
+      variants = JSON.parse(rawContent);
+      if (!Array.isArray(variants)) {
+        throw new Error("Expected JSON array");
+      }
+      variants = variants
+        .filter((value) => typeof value === "string")
+        .slice(0, 3);
+    } catch (error) {
+      return res
+        .status(500)
+        .send(
+          `Unable to parse response from OpenAI. Received: ${rawContent.slice(
+            0,
+            200
+          )}`
+        );
+    }
+
+    res.json({ variants });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to generate variants";
+    res.status(500).send(message);
   }
 });
 
