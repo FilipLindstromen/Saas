@@ -1,14 +1,16 @@
-Guided Visualization Script Instructions (Pro Mode v5)
+Guided Visualization Script Instructions
 Creative Goal
 
-Write guided stories that feel alive, cinematic, and strange in the best way.
+Write stories that feel alive, cinematic, weird and strange in the best way.
 Every story should grab attention immediately, move fast, and end with a surprising but satisfying emotional truth.
 
-The listener should feel both grounded in reality and transported into a dream — something between a mindfulness journey and a surreal commercial that makes you feel seen.
+The stories should have a lot of scene and object shifts, like the old spice ad "I'm on a horse".
+
+The listener should feel both grounded in reality and transported into a surreal dream.
 
 Tone: playful, vivid, confident, emotionally real.
 
-Length: 500–700 words.
+Length: 600–700 words.
 
 1. Opening Hook
 
@@ -16,21 +18,12 @@ Start with a line that surprises.
 Something unexpected, thought-provoking, or slightly absurd — yet emotionally tied to the story’s theme.
 It should instantly trigger curiosity.
 
-Examples:
-
-“Your phone won’t stop buzzing, but when you pick it up, it’s the ocean calling.”
-
-“You open your fridge and find a small, glowing sun humming quietly behind the milk.”
-
-“The elevator doors open, and instead of an office, there’s a beach stretching for miles.”
-
-“The sky is green today, and for some reason, that feels right.”
-
 After the first 1–2 sentences, say:
-
 “If you haven’t already, it’s time to close your eyes.”
+"It's time to close your eyes"
+or similar.
 
-Then, begin to move the listener through action and sensation. The world should feel familiar but tilted.
+Then, begin to move the listener through action and sensation. The world should feel familiar but twisted.
 
 2. The Curiosity Loop
 
@@ -63,7 +56,7 @@ Keep tone cool, cinematic, and direct.
 
 4. Scene Transitions (Rapid Cuts)
 
-Change scenes or objects every 3–5 sentences.
+Change scenes or objects every 2–4 sentences.
 Transitions should be fast, smooth, and surprising — like dream logic or a music video.
 
 Example chain:
@@ -71,7 +64,7 @@ Example chain:
 “You step into the elevator. The doors close.
 When they open, you’re underwater.
 You swim upward. The surface breaks into sunlight.
-You’re standing in a field of golden clocks.”
+You look down, you’re standing in a field of golden sand.”
 
 Each transition should feel natural in rhythm but visually bold.
 Every change moves the listener closer to an emotional realization.
@@ -105,19 +98,19 @@ Each short scene uses a new sense or combination.
 
 Examples:
 
-“The air tastes like oranges and salt.”
+“The air smells like oranges.”
 
 “You feel sand sliding between your fingers.”
 
 “You smell rain before it falls.”
 
-“Your shoes squeak on marble that glows from below.”
+“Your shoes squeak on polished marble.”
 
 Every line should let the listener feel inside the world.
 
 7. Emotional Arc
 
-Follow a fast, clear arc — like a 3-minute short film:
+Follow a fast, clear arc — like a 5-minute short film:
 
 Tension / Curiosity: The strange beginning.
 
@@ -180,14 +173,18 @@ Always close with a clear, uplifting image that ties back to the hook.
 
  Every sentence uses clear, active verbs.
 
- Scene and object changes happen rapidly (every 3–5 sentences).
+ Scene and object changes happen rapidly (every 2–4 sentences).
 
  One symbol evolves through three stages and ties to the theme.
 
- Each transition feels surprising but natural.
+ Each transition feels surprising but seamless.
 
  Emotional arc is tight (Curiosity → Transformation → Realization → Release).
 
  Tone mixes relatable and absurd — playful but sincere.
 
  Ending resolves the hook and grounds the listener in the body.
+
+Use simple easy to understand language.
+
+Give the story a title.

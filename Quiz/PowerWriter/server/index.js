@@ -49,7 +49,13 @@ const VARIANT_MODE_INSTRUCTIONS = {
   expand:
     "Expand the text with additional sensory detail and context while keeping the original voice and intent. Avoid repeating sentences verbatim.",
   rephrase:
-    "Rephrase the text using different wording while keeping the same meaning, tone, and approximate length."
+    "Rephrase the text using different wording while keeping the same meaning, tone, and approximate length.",
+  summarize:
+    "Summarize the text in one or two graceful sentences that keep the core idea, emotional tone, and pacing.",
+  punchUp:
+    "Punch up the text by sharpening the imagery, tightening the pacing, and boosting dramatic impact while preserving the author’s intent.",
+  sensory:
+    "Enrich the text with vivid sensory detail, adding sounds, scents, textures, and visuals that immerse the reader without changing the core meaning."
 };
 
 function toPosix(relativePath) {
@@ -80,6 +86,22 @@ async function readTextIfExists(filePath) {
 async function writeText(filePath, content) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, content, "utf8");
+}
+
+async function writeOptionalText(filePath, content) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  const trimmed = (content ?? "").trim();
+  if (!trimmed) {
+    try {
+      await fs.unlink(filePath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    return;
+  }
+  await fs.writeFile(filePath, trimmed, "utf8");
 }
 
 function getOrderFilePath(directoryPath) {
@@ -247,12 +269,15 @@ async function listTree(currentDir = meditationDir, relative = "") {
         absolutePath,
         FOLDER_INSTRUCTIONS_FILE
       );
+      const colorPath = path.join(absolutePath, "_color.txt");
       const instructions = await readTextIfExists(instructionsPath);
+      const color = (await readTextIfExists(colorPath)).trim() || null;
       nodes.push({
         type: "folder",
         name: entry.name,
         path: toPosix(relativePath),
         instructions,
+        color,
         children
       });
     } else if (entry.isFile() && entry.name.endsWith(".txt")) {
@@ -338,12 +363,16 @@ app.get("/api/folder", async (req, res) => {
       return res.status(400).send("Path is not a folder");
     }
     const instructions = await getFolderInstructions(safePath);
+    const color = (
+      await readTextIfExists(path.join(folderPath, "_color.txt"))
+    ).trim();
     const aggregated = await gatherAggregatedInstructions(safePath, "folder");
     res.json({
       name: path.basename(folderPath),
       path: toPosix(safePath),
       instructions,
-      aggregatedInstructions: aggregated
+      aggregatedInstructions: aggregated,
+      color: color || null
     });
   } catch (error) {
     res.status(500).send(
@@ -354,7 +383,11 @@ app.get("/api/folder", async (req, res) => {
 
 app.post("/api/folder", async (req, res) => {
   try {
-    const { path: relative, instructions = "" } = req.body;
+    const {
+      path: relative,
+      instructions = "",
+      color = ""
+    } = req.body;
     if (typeof relative !== "string") {
       return res.status(400).send("Missing folder path");
     }
@@ -365,6 +398,7 @@ app.post("/api/folder", async (req, res) => {
     }
     const instructionsPath = path.join(folderPath, FOLDER_INSTRUCTIONS_FILE);
     await writeText(instructionsPath, instructions);
+    await writeOptionalText(path.join(folderPath, "_color.txt"), color);
     res.json({ success: true });
   } catch (error) {
     res.status(500).send(

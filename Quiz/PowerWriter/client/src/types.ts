@@ -3,6 +3,7 @@ export type TreeNode = {
   name: string;
   path: string;
   instructions?: string | null;
+  color?: string | null;
   children?: TreeNode[];
   completed?: boolean;
 };
@@ -12,6 +13,7 @@ export type FolderDetails = {
   name: string;
   instructions: string;
   aggregatedInstructions: string;
+  color: string | null;
 };
 
 export type DocumentDetails = {

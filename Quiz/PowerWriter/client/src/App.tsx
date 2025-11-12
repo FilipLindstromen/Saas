@@ -26,6 +26,7 @@ type Selection =
       type: "folder";
       path: string;
       name: string;
+      color?: string | null;
     }
   | {
       type: "document";
@@ -33,7 +34,13 @@ type Selection =
       name: string;
     };
 
-type VariantMode = "simplify" | "expand" | "rephrase";
+type VariantMode =
+  | "simplify"
+  | "expand"
+  | "rephrase"
+  | "summarize"
+  | "punchUp"
+  | "sensory";
 
 type SelectionMenuState = {
   text: string;
@@ -54,18 +61,85 @@ const SELECTION_MENU_WIDTH = 180;
 const SELECTION_MENU_HEIGHT = 48;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
-const MIN_PANEL_RATIO = 0.25;
-const MAX_PANEL_RATIO = 0.75;
 const STORAGE_KEYS = {
   openAiApiKey: "powerwriter.openaiKey"
 } as const;
+const LS_KEYS = {
+  sidebarWidth: "powerwriter.sidebarWidth",
+  instructionsWidth: "powerwriter.instructionsWidth",
+  inlineWidth: "powerwriter.inlineWidth"
+} as const;
+const DEFAULT_SIDEBAR_WIDTH = 280;
+const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
+const DEFAULT_INLINE_RATIO = 0.26;
+const MIN_INSTRUCTIONS_RATIO = 0.18;
+const MIN_INLINE_RATIO = 0.18;
+const MIN_DOCUMENT_RATIO = 0.28;
+const DEFAULT_FOLDER_COLOR = "#6b6b6b";
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const normalizeRatios = (instructions: number, inline: number) => {
+  let inst = clamp(instructions, MIN_INSTRUCTIONS_RATIO, 0.7);
+  let inl = clamp(inline, MIN_INLINE_RATIO, 0.7);
+  const maxSum = 1 - MIN_DOCUMENT_RATIO;
+  if (inst + inl > maxSum) {
+    const scale = maxSum / (inst + inl);
+    inst *= scale;
+    inl *= scale;
+  }
+  return [inst, inl] as const;
+};
+
+function getInitialSidebarWidth() {
+  if (typeof window !== "undefined") {
+    const stored = parseInt(
+      window.localStorage.getItem(LS_KEYS.sidebarWidth) ?? "",
+      10
+    );
+    if (Number.isFinite(stored)) {
+      return clamp(stored, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+    }
+  }
+  return DEFAULT_SIDEBAR_WIDTH;
+}
+
+function getInitialRatios() {
+  if (typeof window !== "undefined") {
+    const storedInstructions = parseFloat(
+      window.localStorage.getItem(LS_KEYS.instructionsWidth) ?? ""
+    );
+    const storedInline = parseFloat(
+      window.localStorage.getItem(LS_KEYS.inlineWidth) ?? ""
+    );
+    const [inst, inl] = normalizeRatios(
+      Number.isFinite(storedInstructions)
+        ? storedInstructions
+        : DEFAULT_INSTRUCTIONS_RATIO,
+      Number.isFinite(storedInline)
+        ? storedInline
+        : DEFAULT_INLINE_RATIO
+    );
+    return { instructions: inst, inline: inl };
+  }
+  const [inst, inl] = normalizeRatios(
+    DEFAULT_INSTRUCTIONS_RATIO,
+    DEFAULT_INLINE_RATIO
+  );
+  return { instructions: inst, inline: inl };
+}
 
 const VARIANT_LABELS: Record<VariantMode, string> = {
   simplify: "Simplify",
   expand: "Expand",
-  rephrase: "Rephrase"
+  rephrase: "Rephrase",
+  summarize: "Summarize",
+  punchUp: "Punch Up",
+  sensory: "Enrich Detail"
 };
-const VARIANT_ORDER: VariantMode[] = ["simplify", "expand", "rephrase"];
+const SELECTION_ACTIONS: VariantMode[] = ["simplify", "expand", "rephrase"];
+const PARAGRAPH_ACTIONS: VariantMode[] = ["summarize", "punchUp", "sensory"];
 
 function Tree({
   nodes,
@@ -173,12 +247,15 @@ function TreeNodeItem({
   const isActive = node.path === selectedPath;
   const isCompleted = node.type === "document" && node.completed;
   const paddingLeft = 16 + depth * 16;
+  const accentColor =
+    node.type === "folder" && node.color ? node.color : undefined;
 
   const handleSelect = () => {
     onSelect({
       type: node.type,
       path: node.path,
-      name: node.name
+      name: node.name,
+      color: node.color ?? undefined
     });
   };
 
@@ -199,9 +276,13 @@ function TreeNodeItem({
         className={clsx(
           "tree-item",
           isActive && "tree-item active",
-          isCompleted && "tree-item-completed"
+          isCompleted && "tree-item-completed",
+          accentColor && "tree-item-colored"
         )}
-        style={{ paddingLeft }}
+        style={{
+          paddingLeft,
+          borderLeft: accentColor ? `3px solid ${accentColor}` : undefined
+        }}
         onDragOver={(event) => {
           if (allowDrop) {
             event.preventDefault();
@@ -226,6 +307,12 @@ function TreeNodeItem({
         ) : (
           <span style={{ width: 14 }} />
         )}
+        {isFolder && accentColor ? (
+          <span
+            className="color-dot"
+            style={{ backgroundColor: accentColor }}
+          />
+        ) : null}
         <button
           type="button"
           className="title"
@@ -370,6 +457,11 @@ function App() {
     useState<SelectionMenuState | null>(null);
   const [variantModal, setVariantModal] =
     useState<VariantModalState | null>(null);
+  const [inlineActionsEnabled, setInlineActionsEnabled] = useState(true);
+  const [documentNameInput, setDocumentNameInput] = useState("");
+  const [folderColorInput, setFolderColorInput] =
+    useState<string>(DEFAULT_FOLDER_COLOR);
+  const [folderColorCustom, setFolderColorCustom] = useState(false);
   const [showAggregated, setShowAggregated] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
@@ -393,9 +485,51 @@ function App() {
     return "Select a folder or document to see aggregated instructions.";
   }, [aggregatedInstructions, selected]);
 
+  const paragraphEntries = useMemo(() => {
+    if (!inlineActionsEnabled || selected?.type !== "document") return [];
+    const content = documentDetails?.content ?? "";
+    return content
+      .split(/\n{2,}/)
+      .map((text, index) => ({
+        id: `${index}-${text.slice(0, 8)}`,
+        text: text.trim()
+      }))
+      .filter((entry) => entry.text.length > 0);
+  }, [selected?.type, documentDetails?.content]);
+
   useEffect(() => {
     setSelectionMenu(null);
   }, [selected?.path]);
+
+  useEffect(() => {
+    if (selected?.type === "document") {
+      setDocumentNameInput(selected.name);
+    } else {
+      setDocumentNameInput("");
+    }
+  }, [selected?.type, selected?.name]);
+
+  useEffect(() => {
+    if (selected?.type === "folder" && folderDetails) {
+      if (folderDetails.color) {
+        setFolderColorInput(folderDetails.color);
+        setFolderColorCustom(true);
+      } else {
+        setFolderColorInput(DEFAULT_FOLDER_COLOR);
+        setFolderColorCustom(false);
+      }
+    }
+    if (selected?.type !== "folder") {
+      setFolderColorInput(DEFAULT_FOLDER_COLOR);
+      setFolderColorCustom(false);
+    }
+  }, [selected?.type, folderDetails?.color]);
+
+  useEffect(() => {
+    if (!inlineActionsEnabled) {
+      setSelectionMenu(null);
+    }
+  }, [inlineActionsEnabled]);
 
   useEffect(() => {
     if (variantModal) {
@@ -535,6 +669,8 @@ function App() {
         if (selected.type === "folder") {
           const details = await getFolderDetails(selected.path);
           setFolderDetails(details);
+          setFolderColorInput(details.color ?? DEFAULT_FOLDER_COLOR);
+          setFolderColorCustom(Boolean(details.color));
           setDocumentDetails(null);
         } else {
           const details = await getDocumentDetails(selected.path);
@@ -567,12 +703,25 @@ function App() {
   const handleSaveFolderInstructions = async () => {
     if (selected?.type !== "folder" || !folderDetails) return;
     try {
-      await saveFolderInstructions(selected.path, folderDetails.instructions);
+    await saveFolderInstructions(
+      selected.path,
+      folderDetails.instructions,
+      folderColorCustom ? folderColorInput : ""
+    );
       setStatus({ type: "success", message: "Folder instructions saved" });
       await refreshTree();
       setSelected((prev) =>
-        prev ? { ...prev } : prev
+      prev
+        ? {
+            ...prev,
+            color: folderColorCustom ? folderColorInput : undefined
+          }
+        : prev
       ); // trigger refresh
+    setFolderDetails({
+      ...folderDetails,
+      color: folderColorCustom ? folderColorInput : null
+    });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to save folder";
@@ -717,6 +866,28 @@ function App() {
     }
   };
 
+  const handleFolderColorChange = (value: string) => {
+    setFolderColorInput(value);
+    setFolderColorCustom(true);
+    if (folderDetails) {
+      setFolderDetails({
+        ...folderDetails,
+        color: value
+      });
+    }
+  };
+
+  const handleFolderColorReset = () => {
+    setFolderColorInput(DEFAULT_FOLDER_COLOR);
+    setFolderColorCustom(false);
+    if (folderDetails) {
+      setFolderDetails({
+        ...folderDetails,
+        color: null
+      });
+    }
+  };
+
   const handleRename = async (item: Selection) => {
     const label =
       item.type === "folder" ? "New folder name" : "New document name";
@@ -843,9 +1014,61 @@ function App() {
     void handleDropInto(null, draggedItem);
   };
 
+  const handleDocumentNameSubmit = async () => {
+    if (selected?.type !== "document") return;
+    const trimmed = documentNameInput.trim();
+    if (!trimmed || trimmed === selected.name) {
+      setDocumentNameInput(selected.name);
+      return;
+    }
+    const finalName = trimmed.endsWith(".txt") ? trimmed : `${trimmed}.txt`;
+    try {
+      const result = await renameDocument(selected.path, finalName);
+      setStatus({ type: "success", message: "Document renamed" });
+      await refreshTree();
+      const newPath = result.path;
+      setSelected({
+        type: "document",
+        path: newPath,
+        name: finalName
+      });
+      setDocumentDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: finalName,
+              path: newPath
+            }
+          : prev
+      );
+      setDocumentNameInput(finalName);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to rename document";
+      setStatus({ type: "error", message });
+      setDocumentNameInput(selected.name);
+    }
+  };
+
+  const handleDocumentNameKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleDocumentNameSubmit();
+    } else if (event.key === "Escape" && selected?.type === "document") {
+      setDocumentNameInput(selected.name);
+      event.currentTarget.blur();
+    }
+  };
+
   const handleDocumentMouseUp = (
     event: React.MouseEvent<HTMLTextAreaElement>
   ) => {
+    if (!inlineActionsEnabled) {
+      setSelectionMenu(null);
+      return;
+    }
     if (selected?.type !== "document" || !documentDetails) {
       setSelectionMenu(null);
       return;
@@ -881,19 +1104,15 @@ function App() {
     });
   };
 
-  const handleVariantOption = async (mode: VariantMode) => {
-    if (!selectionMenu?.text) return;
+  const startVariantFlow = async (mode: VariantMode, source: string) => {
     if (!selected || selected.type !== "document") {
       setStatus({
         type: "error",
         message: "Select a document before using writing tools."
       });
-      setSelectionMenu(null);
       return;
     }
 
-    const source = selectionMenu.text;
-    setSelectionMenu(null);
     setVariantModal({
       mode,
       source,
@@ -927,6 +1146,21 @@ function App() {
           : prev
       );
     }
+  };
+
+  const handleVariantOption = async (mode: VariantMode) => {
+    if (!selectionMenu?.text) return;
+    const source = selectionMenu.text;
+    setSelectionMenu(null);
+    await startVariantFlow(mode, source);
+  };
+
+  const handleParagraphAction = async (
+    mode: VariantMode,
+    paragraph: string
+  ) => {
+    if (!paragraph.trim()) return;
+    await startVariantFlow(mode, paragraph.trim());
   };
 
   const handleCopyVariant = async (value: string) => {
@@ -1056,6 +1290,12 @@ function App() {
             </button>
             <button
               type="button"
+              onClick={() => setInlineActionsEnabled((prev) => !prev)}
+            >
+              {inlineActionsEnabled ? "Inline Actions: On" : "Inline Actions: Off"}
+            </button>
+            <button
+              type="button"
               onClick={() => setIsSettingsOpen((prev) => !prev)}
             >
               {isSettingsOpen ? "Close Settings" : "Settings"}
@@ -1155,6 +1395,36 @@ function App() {
                       : "Add document-specific instructions that refine the prompt."
                   }
                 />
+                {showFolderPanel && folderDetails ? (
+                  <div className="color-control">
+                    <label htmlFor="folder-color">Folder accent color</label>
+                    <div className="color-control-row">
+                      <input
+                        id="folder-color"
+                        type="color"
+                        value={folderColorInput}
+                        onChange={(event) =>
+                          handleFolderColorChange(event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={handleFolderColorReset}
+                      >
+                        Use default
+                      </button>
+                      <span
+                        className="color-preview"
+                        style={{
+                          backgroundColor: folderColorCustom
+                            ? folderColorInput
+                            : DEFAULT_FOLDER_COLOR
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
           )}
@@ -1173,7 +1443,28 @@ function App() {
               style={{ flexBasis: `${(1 - instructionsRatio) * 100}%` }}
             >
               <div className="panel-header">
-                <h2>{selected?.name}</h2>
+                {selected?.type === "document" ? (
+                  <form
+                    className="name-input-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleDocumentNameSubmit();
+                    }}
+                  >
+                    <input
+                      className="name-input"
+                      value={documentNameInput}
+                      onChange={(event) =>
+                        setDocumentNameInput(event.target.value)
+                      }
+                      onBlur={() => void handleDocumentNameSubmit()}
+                      onKeyDown={handleDocumentNameKeyDown}
+                      placeholder="Document name"
+                    />
+                  </form>
+                ) : (
+                  <h2>{selected?.name}</h2>
+                )}
                 <div className="toolbar">
                   {documentDetails ? (
                     <label className="toolbar-checkbox">
@@ -1223,6 +1514,39 @@ function App() {
                   placeholder="Start writing your meditation script..."
                 />
               </div>
+              {paragraphEntries.length > 0 ? (
+                <div className="paragraph-actions-container">
+                  <div className="paragraph-actions-header">
+                    <span>Inline AI actions</span>
+                    <p>
+                      Choose a paragraph to quickly summarize, punch up the
+                      energy, or enrich sensory detail.
+                    </p>
+                  </div>
+                  <div className="paragraph-action-list">
+                    {paragraphEntries.map((entry, index) => (
+                      <div className="paragraph-card" key={entry.id}>
+                        <div className="paragraph-card-text">
+                          {entry.text}
+                        </div>
+                        <div className="paragraph-card-actions">
+                          {PARAGRAPH_ACTIONS.map((mode) => (
+                            <button
+                              type="button"
+                              key={`${entry.id}-${mode}`}
+                              onClick={() =>
+                                void handleParagraphAction(mode, entry.text)
+                              }
+                            >
+                              {VARIANT_LABELS[mode]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : (
             <section
@@ -1301,7 +1625,7 @@ function App() {
         )}
       </main>
 
-      {selectionMenu ? (
+      {inlineActionsEnabled && selectionMenu ? (
         <div
           className="selection-menu"
           style={{
@@ -1309,7 +1633,7 @@ function App() {
             left: selectionMenu.x
           }}
         >
-          {VARIANT_ORDER.map((mode) => (
+          {SELECTION_ACTIONS.map((mode) => (
             <button
               type="button"
               key={mode}
