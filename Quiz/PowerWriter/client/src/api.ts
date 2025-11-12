@@ -194,6 +194,30 @@ export async function generateAnswer(params: {
   return handleResponse<{ message: string }>(response);
 }
 
+export async function generateVariants(params: {
+  path: string | null;
+  text: string;
+  mode: "simplify" | "expand" | "rephrase";
+  apiKey?: string;
+}): Promise<{ variants: string[] }> {
+  const response = await fetch("/api/generate-variants", {
+    method: "POST",
+    headers: buildHeaders(
+      params.apiKey
+        ? {
+            "x-openai-key": params.apiKey
+          }
+        : undefined
+    ),
+    body: JSON.stringify({
+      path: params.path,
+      text: params.text,
+      mode: params.mode
+    })
+  });
+  return handleResponse<{ variants: string[] }>(response);
+}
+
 export async function renameItem(sourcePath: string, targetPath: string) {
   const response = await fetch("/api/rename", {
     method: "POST",

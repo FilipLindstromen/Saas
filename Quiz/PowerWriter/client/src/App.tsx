@@ -7,6 +7,7 @@ import {
   createFolder,
   fetchTree,
   generateAnswer,
+  generateVariants,
   getDocumentDetails,
   getFolderDetails,
   moveDocument,
@@ -32,7 +33,25 @@ type Selection =
       name: string;
     };
 
+type VariantMode = "simplify" | "expand" | "rephrase";
+
+type SelectionMenuState = {
+  text: string;
+  x: number;
+  y: number;
+};
+
+type VariantModalState = {
+  mode: VariantMode;
+  source: string;
+  variants: string[];
+  loading: boolean;
+  error: string | null;
+};
+
 const COMMON_STATUS_TIMEOUT = 2500;
+const SELECTION_MENU_WIDTH = 180;
+const SELECTION_MENU_HEIGHT = 48;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const MIN_PANEL_RATIO = 0.25;
@@ -40,6 +59,13 @@ const MAX_PANEL_RATIO = 0.75;
 const STORAGE_KEYS = {
   openAiApiKey: "powerwriter.openaiKey"
 } as const;
+
+const VARIANT_LABELS: Record<VariantMode, string> = {
+  simplify: "Simplify",
+  expand: "Expand",
+  rephrase: "Rephrase"
+};
+const VARIANT_ORDER: VariantMode[] = ["simplify", "expand", "rephrase"];
 
 function Tree({
   nodes,
@@ -340,6 +366,10 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
   const [draggedItem, setDraggedItem] = useState<Selection | null>(null);
+  const [selectionMenu, setSelectionMenu] =
+    useState<SelectionMenuState | null>(null);
+  const [variantModal, setVariantModal] =
+    useState<VariantModalState | null>(null);
   const [showAggregated, setShowAggregated] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
@@ -362,6 +392,32 @@ function App() {
     }
     return "Select a folder or document to see aggregated instructions.";
   }, [aggregatedInstructions, selected]);
+
+  useEffect(() => {
+    setSelectionMenu(null);
+  }, [selected?.path]);
+
+  useEffect(() => {
+    if (variantModal) {
+      setSelectionMenu(null);
+    }
+  }, [variantModal]);
+
+  useEffect(() => {
+    if (showAggregated) {
+      setSelectionMenu(null);
+    }
+  }, [showAggregated]);
+
+  useEffect(() => {
+    const hideMenu = () => setSelectionMenu(null);
+    window.addEventListener("scroll", hideMenu, true);
+    window.addEventListener("resize", hideMenu);
+    return () => {
+      window.removeEventListener("scroll", hideMenu, true);
+      window.removeEventListener("resize", hideMenu);
+    };
+  }, []);
 
   const currentInstructions = useMemo(() => {
     if (selected?.type === "document") {
@@ -787,6 +843,107 @@ function App() {
     void handleDropInto(null, draggedItem);
   };
 
+  const handleDocumentMouseUp = (
+    event: React.MouseEvent<HTMLTextAreaElement>
+  ) => {
+    if (selected?.type !== "document" || !documentDetails) {
+      setSelectionMenu(null);
+      return;
+    }
+    const { selectionStart, selectionEnd, value } = event.currentTarget;
+    if (
+      selectionStart === null ||
+      selectionEnd === null ||
+      selectionStart === selectionEnd
+    ) {
+      setSelectionMenu(null);
+      return;
+    }
+    const selectedText = value
+      .slice(selectionStart, selectionEnd)
+      .trim();
+    if (!selectedText) {
+      setSelectionMenu(null);
+      return;
+    }
+    const x = Math.min(
+      event.clientX,
+      window.innerWidth - SELECTION_MENU_WIDTH
+    );
+    const y = Math.min(
+      event.clientY,
+      window.innerHeight - SELECTION_MENU_HEIGHT
+    );
+    setSelectionMenu({
+      text: selectedText,
+      x,
+      y
+    });
+  };
+
+  const handleVariantOption = async (mode: VariantMode) => {
+    if (!selectionMenu?.text) return;
+    if (!selected || selected.type !== "document") {
+      setStatus({
+        type: "error",
+        message: "Select a document before using writing tools."
+      });
+      setSelectionMenu(null);
+      return;
+    }
+
+    const source = selectionMenu.text;
+    setSelectionMenu(null);
+    setVariantModal({
+      mode,
+      source,
+      variants: [],
+      loading: true,
+      error: null
+    });
+
+    try {
+      const response = await generateVariants({
+        path: selected.path,
+        text: source,
+        mode,
+        apiKey: userApiKey || undefined
+      });
+      setVariantModal((prev) =>
+        prev && prev.mode === mode && prev.source === source
+          ? {
+              ...prev,
+              variants: response.variants,
+              loading: false
+            }
+          : prev
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to generate variants";
+      setVariantModal((prev) =>
+        prev && prev.mode === mode && prev.source === source
+          ? { ...prev, loading: false, error: message }
+          : prev
+      );
+    }
+  };
+
+  const handleCopyVariant = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setStatus({ type: "success", message: "Variant copied to clipboard" });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to copy variant";
+      setStatus({ type: "error", message });
+    }
+  };
+
+  const closeVariantModal = () => {
+    setVariantModal(null);
+  };
+
   const handleSaveApiKey = () => {
     const trimmed = settingsKey.trim();
     if (!trimmed) {
@@ -1060,6 +1217,9 @@ function App() {
                       });
                     }
                   }}
+                  onMouseUp={handleDocumentMouseUp}
+                  onScroll={() => setSelectionMenu(null)}
+                  onBlur={() => setSelectionMenu(null)}
                   placeholder="Start writing your meditation script..."
                 />
               </div>
@@ -1141,9 +1301,90 @@ function App() {
         )}
       </main>
 
+      {selectionMenu ? (
+        <div
+          className="selection-menu"
+          style={{
+            top: selectionMenu.y,
+            left: selectionMenu.x
+          }}
+        >
+          {VARIANT_ORDER.map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleVariantOption(mode);
+              }}
+            >
+              {VARIANT_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {variantModal ? (
+        <div
+          className="overlay variant-overlay"
+          role="presentation"
+          onClick={closeVariantModal}
+        >
+          <div
+            className="variant-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${VARIANT_LABELS[variantModal.mode]} suggestions`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <h2>{VARIANT_LABELS[variantModal.mode]}</h2>
+              <div className="toolbar">
+                <button type="button" onClick={closeVariantModal}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="panel-body">
+              <div className="variant-source">{variantModal.source}</div>
+              {variantModal.loading ? (
+                <p style={{ margin: 0, color: "#475467" }}>
+                  Generating variations…
+                </p>
+              ) : variantModal.error ? (
+                <p className="status-error" style={{ margin: 0 }}>
+                  {variantModal.error}
+                </p>
+              ) : variantModal.variants.length === 0 ? (
+                <p style={{ margin: 0, color: "#475467" }}>
+                  No variations returned.
+                </p>
+              ) : (
+                <div className="variant-list">
+                  {variantModal.variants.map((variant, index) => (
+                    <div className="variant-card" key={`${variant}-${index}`}>
+                      <div className="variant-card-header">
+                        <span>Version {index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyVariant(variant)}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <pre>{variant}</pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showAggregated ? (
         <div
-          className="overlay"
+          className="overlay aggregated-overlay"
           role="presentation"
           onClick={() => setShowAggregated(false)}
         >
