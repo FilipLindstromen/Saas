@@ -21,6 +21,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
+import multer from "multer";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs/promises";
@@ -41,7 +42,9 @@ if (!fsSync.existsSync(meditationDir)) {
 const FOLDER_INSTRUCTIONS_FILE = "instructions.txt";
 const INSTRUCTIONS_SUFFIX = ".instructions.txt";
 const ORDER_FILE = "_order.json";
+const FOLDER_COLOR_FILE = "_color.txt";
 const DOCUMENT_META_SUFFIX = ".meta.json";
+const AUDIO_SUFFIX = ".webm";
 
 const VARIANT_MODE_INSTRUCTIONS = {
   simplify:
@@ -187,11 +190,13 @@ async function readDocumentMeta(documentAbsolutePath) {
     );
     const meta = JSON.parse(raw);
     return {
-      completed: Boolean(meta?.completed)
+      completed: Boolean(meta?.completed),
+      audioFileName:
+        typeof meta?.audioFileName === "string" ? meta.audioFileName : null
     };
   } catch (error) {
     if (error.code === "ENOENT") {
-      return { completed: false };
+      return { completed: false, audioFileName: null };
     }
     throw error;
   }
@@ -200,17 +205,65 @@ async function readDocumentMeta(documentAbsolutePath) {
 async function writeDocumentMeta(documentAbsolutePath, meta) {
   const filePath = getDocumentMetaPath(documentAbsolutePath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
+  const existing = await readDocumentMeta(documentAbsolutePath);
+  const next = { ...existing };
+  if (Object.prototype.hasOwnProperty.call(meta, "completed")) {
+    next.completed = Boolean(meta.completed);
+  }
+  if (Object.prototype.hasOwnProperty.call(meta, "audioFileName")) {
+    next.audioFileName =
+      typeof meta.audioFileName === "string" ? meta.audioFileName : null;
+  }
   await fs.writeFile(
     filePath,
     JSON.stringify(
-      {
-        completed: Boolean(meta?.completed)
-      },
+      next,
       null,
       2
     ),
     "utf8"
   );
+}
+
+function getDocumentAudioAbsolutePath(documentAbsolutePath, fileName) {
+  return path.join(path.dirname(documentAbsolutePath), fileName);
+}
+
+function generateAudioFileName() {
+  return `recording-${Date.now()}${AUDIO_SUFFIX}`;
+}
+
+function inferAudioExtension(file) {
+  const allowed = new Set([".webm", ".wav", ".mp3", ".ogg", ".m4a"]);
+  if (file?.originalname) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.has(ext)) {
+      return ext;
+    }
+  }
+  switch (file?.mimetype) {
+    case "audio/mpeg":
+      return ".mp3";
+    case "audio/wav":
+      return ".wav";
+    case "audio/ogg":
+      return ".ogg";
+    case "audio/mp4":
+    case "audio/aac":
+      return ".m4a";
+    case "audio/webm":
+    default:
+      return ".webm";
+  }
+}
+
+async function removeExistingAudio(documentAbsolutePath, meta) {
+  if (!meta?.audioFileName) return;
+  const existingPath = getDocumentAudioAbsolutePath(
+    documentAbsolutePath,
+    meta.audioFileName
+  );
+  await fs.rm(existingPath, { force: true });
 }
 
 async function renameIfExists(oldPath, newPath) {
@@ -227,6 +280,7 @@ function shouldSkipEntry(name) {
   return (
     name === ORDER_FILE ||
     name === FOLDER_INSTRUCTIONS_FILE ||
+    name === FOLDER_COLOR_FILE ||
     name.endsWith(INSTRUCTIONS_SUFFIX) ||
     name.endsWith(DOCUMENT_META_SUFFIX)
   );
@@ -269,7 +323,7 @@ async function listTree(currentDir = meditationDir, relative = "") {
         absolutePath,
         FOLDER_INSTRUCTIONS_FILE
       );
-      const colorPath = path.join(absolutePath, "_color.txt");
+      const colorPath = path.join(absolutePath, FOLDER_COLOR_FILE);
       const instructions = await readTextIfExists(instructionsPath);
       const color = (await readTextIfExists(colorPath)).trim() || null;
       nodes.push({
@@ -341,6 +395,12 @@ async function gatherAggregatedInstructions(relativePath, type) {
 const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: "2mb" }));
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024
+  }
+});
 
 app.get("/api/tree", async (_req, res) => {
   try {
@@ -364,7 +424,7 @@ app.get("/api/folder", async (req, res) => {
     }
     const instructions = await getFolderInstructions(safePath);
     const color = (
-      await readTextIfExists(path.join(folderPath, "_color.txt"))
+      await readTextIfExists(path.join(folderPath, FOLDER_COLOR_FILE))
     ).trim();
     const aggregated = await gatherAggregatedInstructions(safePath, "folder");
     res.json({
@@ -398,7 +458,7 @@ app.post("/api/folder", async (req, res) => {
     }
     const instructionsPath = path.join(folderPath, FOLDER_INSTRUCTIONS_FILE);
     await writeText(instructionsPath, instructions);
-    await writeOptionalText(path.join(folderPath, "_color.txt"), color);
+    await writeOptionalText(path.join(folderPath, FOLDER_COLOR_FILE), color);
     res.json({ success: true });
   } catch (error) {
     res.status(500).send(
@@ -447,13 +507,31 @@ app.get("/api/document", async (req, res) => {
       readDocumentMeta(documentPath)
     ]);
 
+    let audioUrl = null;
+    if (meta.audioFileName) {
+      const audioPath = path.join(
+        path.dirname(documentPath),
+        meta.audioFileName
+      );
+      try {
+        const stats = await fs.stat(audioPath);
+        const version = Math.floor(stats.mtimeMs).toString(36);
+        audioUrl = `/api/document/audio?path=${encodeURIComponent(
+          toPosix(relative)
+        )}&v=${version}`;
+      } catch (error) {
+        audioUrl = null;
+      }
+    }
+
     res.json({
       name: path.basename(documentPath),
       path: toPosix(relative),
       content,
       instructions,
       aggregatedInstructions: aggregated,
-      completed: Boolean(meta.completed)
+      completed: Boolean(meta.completed),
+      audioUrl
     });
   } catch (error) {
     res.status(500).send(
@@ -486,6 +564,82 @@ app.post("/api/document", async (req, res) => {
     );
   }
 });
+
+app.get("/api/document/audio", async (req, res) => {
+  try {
+    const { path: relative } = req.query;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a file");
+    }
+    const meta = await readDocumentMeta(documentPath);
+    if (!meta.audioFileName) {
+      return res.status(404).send("No audio found for this document");
+    }
+    const audioAbsolute = getDocumentAudioAbsolutePath(
+      documentPath,
+      meta.audioFileName
+    );
+    await fs.access(audioAbsolute);
+    res.sendFile(audioAbsolute);
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error ? error.message : "Unable to load audio"
+    );
+  }
+});
+
+app.post(
+  "/api/document/audio",
+  upload.single("audio"),
+  async (req, res) => {
+    try {
+      const { path: relative } = req.body ?? {};
+      if (typeof relative !== "string") {
+        return res.status(400).send("Missing document path");
+      }
+      if (!req.file) {
+        return res.status(400).send("Missing audio file");
+      }
+      const documentPath = resolveMeditationPath(relative);
+      const stat = await fs.stat(documentPath);
+      if (!stat.isFile()) {
+        return res.status(400).send("Path is not a file");
+      }
+      const meta = await readDocumentMeta(documentPath);
+      const extension = inferAudioExtension(req.file);
+      const candidateName = `${path.basename(
+        documentPath,
+        path.extname(documentPath)
+      )}-audio${extension}`;
+      const fileName = meta.audioFileName
+        ? meta.audioFileName
+        : generateAudioFileName().replace(AUDIO_SUFFIX, extension);
+      const audioAbsolute = getDocumentAudioAbsolutePath(
+        documentPath,
+        fileName
+      );
+      await fs.writeFile(audioAbsolute, req.file.buffer);
+      await removeExistingAudio(documentPath, meta);
+      await writeDocumentMeta(documentPath, { audioFileName: fileName });
+      const version = Date.now().toString(36);
+      res.json({
+        success: true,
+        audioUrl: `/api/document/audio?path=${encodeURIComponent(
+          toPosix(relative)
+        )}&v=${version}`
+      });
+    } catch (error) {
+      res.status(500).send(
+        error instanceof Error ? error.message : "Unable to save audio"
+      );
+    }
+  }
+);
 
 app.post("/api/document/create", async (req, res) => {
   try {
@@ -547,6 +701,7 @@ app.post("/api/document/rename", async (req, res) => {
     }
     const parentRelative = getParentRelativePath(relative);
     const oldDocumentPath = resolveMeditationPath(relative);
+    const meta = await readDocumentMeta(oldDocumentPath);
     const newRelativePath = path.join(parentRelative, newName);
     const newDocumentPath = resolveMeditationPath(newRelativePath);
     await fs.rename(oldDocumentPath, newDocumentPath);
@@ -558,6 +713,12 @@ app.post("/api/document/rename", async (req, res) => {
       getDocumentMetaPath(oldDocumentPath),
       getDocumentMetaPath(newDocumentPath)
     );
+    if (meta.audioFileName) {
+      await renameIfExists(
+        getDocumentAudioAbsolutePath(oldDocumentPath, meta.audioFileName),
+        getDocumentAudioAbsolutePath(newDocumentPath, meta.audioFileName)
+      );
+    }
     const parentAbsolute = resolveMeditationPath(parentRelative);
     await replaceInOrder(
       parentAbsolute,
@@ -599,9 +760,16 @@ app.post("/api/document/delete", async (req, res) => {
     }
     const parentRelative = getParentRelativePath(relative);
     const documentPath = resolveMeditationPath(relative);
+    const meta = await readDocumentMeta(documentPath);
     await fs.rm(documentPath, { force: true });
     await fs.rm(`${documentPath}${INSTRUCTIONS_SUFFIX}`, { force: true });
     await fs.rm(getDocumentMetaPath(documentPath), { force: true });
+    if (meta.audioFileName) {
+      await fs.rm(
+        getDocumentAudioAbsolutePath(documentPath, meta.audioFileName),
+        { force: true }
+      );
+    }
     const parentAbsolute = resolveMeditationPath(parentRelative);
     await removeFromOrder(parentAbsolute, path.basename(relative));
     res.json({ success: true });
@@ -655,6 +823,7 @@ app.post("/api/document/move", async (req, res) => {
     const name = path.basename(relative);
     const oldParent = getParentRelativePath(relative);
     const documentPath = resolveMeditationPath(relative);
+    const meta = await readDocumentMeta(documentPath);
     const newRelativePath = path.join(targetFolder, name);
     const newDocumentPath = resolveMeditationPath(newRelativePath);
     await fs.rename(documentPath, newDocumentPath);
@@ -666,6 +835,12 @@ app.post("/api/document/move", async (req, res) => {
       getDocumentMetaPath(documentPath),
       getDocumentMetaPath(newDocumentPath)
     );
+    if (meta.audioFileName) {
+      await renameIfExists(
+        getDocumentAudioAbsolutePath(documentPath, meta.audioFileName),
+        getDocumentAudioAbsolutePath(newDocumentPath, meta.audioFileName)
+      );
+    }
     const oldParentAbsolute = resolveMeditationPath(oldParent);
     const newParentAbsolute = resolveMeditationPath(targetFolder);
     await removeFromOrder(oldParentAbsolute, name);

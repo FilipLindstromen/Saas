@@ -219,6 +219,34 @@ export async function generateVariants(params: {
   return handleResponse<{ variants: string[] }>(response);
 }
 
+export async function uploadDocumentAudio(
+  path: string,
+  file: Blob
+): Promise<{ audioUrl: string }> {
+  const formData = new FormData();
+  formData.append("path", path);
+  const extension =
+    file.type === "audio/mpeg"
+      ? "mp3"
+      : file.type === "audio/wav"
+      ? "wav"
+      : file.type === "audio/ogg"
+      ? "ogg"
+      : file.type === "audio/mp4"
+      ? "m4a"
+      : "webm";
+  formData.append("audio", file, `recording.${extension}`);
+  const response = await fetch("/api/document/audio", {
+    method: "POST",
+    body: formData
+  });
+  const result = await handleResponse<{
+    success: true;
+    audioUrl: string;
+  }>(response);
+  return { audioUrl: result.audioUrl };
+}
+
 export async function renameItem(sourcePath: string, targetPath: string) {
   const response = await fetch("/api/rename", {
     method: "POST",

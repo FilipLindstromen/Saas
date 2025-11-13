@@ -1,8 +1,8 @@
 Guided Visualization Script Instructions
-Creative Goal
 
-Write stories that feel alive, cinematic, weird and strange in the best way.
-Every story should grab attention immediately, move fast, and end with a surprising but satisfying emotional truth.
+Write a story that feels like a dream. It should feel alive, cinematic, weird and strange in the best way.
+
+Every story should grab attention immediately, move fast, and end with a surprising but satisfying conclusion connected to the theme.
 
 The stories should have a lot of scene and object shifts, like the old spice ad "I'm on a horse".
 
@@ -27,13 +27,13 @@ Then, begin to move the listener through action and sensation. The world should 
 
 2. The Curiosity Loop
 
-The hook must tie to the core theme — courage, calm, change, freedom, forgiveness, joy, etc.
+The hook must tie to the core theme..
 Something strange happens early, and by the end, it’s revealed to mean something simple and true.
 
 Example:
 
 Hook: “You wake up to find your name written in the sky.”
-Resolution: “You realize you were always meant to take up space.”
+Conclusion: “You realize you were always meant to take up space.”
 
 This loop creates an emotional throughline and makes the absurd meaningful.
 
@@ -41,9 +41,13 @@ This loop creates an emotional throughline and makes the absurd meaningful.
 
 Always write in second person (“you”).
 
+Use a simple language, avoid difficult words.
+
 Use short, confident sentences.
 
 Keep verbs strong and clear — walk, lift, breathe, turn, open, run, float, laugh.
+
+Use a language that is sensory, so the reader really feels what it's like.
 
 Cut filler words: no almost, kind of, seems, slightly, just enough.
 
@@ -54,9 +58,12 @@ Describe what is happening, not what might be.
 
 Keep tone cool, cinematic, and direct.
 
+Avoid: You find yourself...
+Instead: You stand...
+
 4. Scene Transitions (Rapid Cuts)
 
-Change scenes or objects every 2–4 sentences.
+Change scenes or objects every 1–4 sentences.
 Transitions should be fast, smooth, and surprising — like dream logic or a music video.
 
 Example chain:
@@ -64,7 +71,7 @@ Example chain:
 “You step into the elevator. The doors close.
 When they open, you’re underwater.
 You swim upward. The surface breaks into sunlight.
-You look down, you’re standing in a field of golden sand.”
+You look down, now you’re standing in a field of golden sand.”
 
 Each transition should feel natural in rhythm but visually bold.
 Every change moves the listener closer to an emotional realization.
@@ -102,8 +109,6 @@ Examples:
 
 “You feel sand sliding between your fingers.”
 
-“You smell rain before it falls.”
-
 “Your shoes squeak on polished marble.”
 
 Every line should let the listener feel inside the world.
@@ -125,7 +130,7 @@ Bring the listener full circle — same theme, new understanding.
 
 8. Pacing
 
-Think in beats — every few sentences, a cut or revelation.
+Think in beats — every few sentences, a cut, transition or revelation.
 Use rhythm to control emotion:
 
 Fast for surprise or action.
@@ -157,33 +162,32 @@ Keep phrasing direct and embodied, not abstract.
 
 End decisively. Bring the listener back with sensory action.
 
-“You breathe in. Feel your hands, your feet, your heartbeat.
-The world is still here — brighter now.
+“Take a deep breath. Feel your fingers, your toes, your heartbeat.
+
 When you’re ready, open your eyes.”
 
 Always close with a clear, uplifting image that ties back to the hook.
 
-“And somewhere, the phone rings again — but this time, you already know what it’s saying.”
 
-✅ Final Creative Checklist (Pro Mode v5)
+✅ Final Creative Checklist
 
- Story opens with an unexpected, curiosity-grabbing hook.
+Story opens with an unexpected, curiosity-grabbing hook.
 
- “If you haven’t already, it’s time to close your eyes” follows early.
+“If you haven’t already, it’s time to close your eyes” follows early.
 
- Every sentence uses clear, active verbs.
+Every sentence uses clear, active verbs.
 
- Scene and object changes happen rapidly (every 2–4 sentences).
+Scene and object changes happen rapidly (every 2–4 sentences).
 
- One symbol evolves through three stages and ties to the theme.
+One symbol evolves through three stages and ties to the theme.
 
- Each transition feels surprising but seamless.
+Each transition feels surprising but seamless.
 
- Emotional arc is tight (Curiosity → Transformation → Realization → Release).
+Emotional arc is tight (Curiosity → Transformation → Realization → Release).
 
- Tone mixes relatable and absurd — playful but sincere.
+Tone mixes relatable and absurd — playful but sincere.
 
- Ending resolves the hook and grounds the listener in the body.
+Ending resolves the hook and grounds the listener in the body.
 
 Use simple easy to understand language.
 
