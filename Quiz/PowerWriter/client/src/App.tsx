@@ -67,7 +67,8 @@ const STORAGE_KEYS = {
 const LS_KEYS = {
   sidebarWidth: "powerwriter.sidebarWidth",
   instructionsWidth: "powerwriter.instructionsWidth",
-  inlineWidth: "powerwriter.inlineWidth"
+  inlineWidth: "powerwriter.inlineWidth",
+  inlineEditorHeight: "powerwriter.inlineEditorHeight"
 } as const;
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
@@ -75,6 +76,9 @@ const DEFAULT_INLINE_RATIO = 0.26;
 const MIN_INSTRUCTIONS_RATIO = 0.18;
 const MIN_INLINE_RATIO = 0.18;
 const MIN_DOCUMENT_RATIO = 0.28;
+const DEFAULT_INLINE_EDITOR_RATIO = 0.55;
+const MIN_INLINE_EDITOR_RATIO = 0.2;
+const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
 
 const clamp = (value: number, min: number, max: number) =>
@@ -128,6 +132,22 @@ function getInitialRatios() {
     DEFAULT_INLINE_RATIO
   );
   return { instructions: inst, inline: inl };
+}
+
+function getInitialInlineEditorRatio() {
+  if (typeof window !== "undefined") {
+    const stored = parseFloat(
+      window.localStorage.getItem(LS_KEYS.inlineEditorHeight) ?? ""
+    );
+    if (Number.isFinite(stored)) {
+      return clamp(
+        stored,
+        MIN_INLINE_EDITOR_RATIO,
+        MAX_INLINE_EDITOR_RATIO
+      );
+    }
+  }
+  return DEFAULT_INLINE_EDITOR_RATIO;
 }
 
 const VARIANT_LABELS: Record<VariantMode, string> = {
@@ -429,10 +449,14 @@ function App() {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [instructionsRatio, setInstructionsRatio] = useState(0.5);
+  const initialRatiosRef = useRef(getInitialRatios());
+  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
+  const [instructionsRatio, setInstructionsRatio] = useState(
+    initialRatiosRef.current.instructions
+  );
+  const [inlineRatio, setInlineRatio] = useState(initialRatiosRef.current.inline);
   const [draggingResizer, setDraggingResizer] = useState<
-    "sidebar" | "instructions" | null
+    "sidebar" | "instructions" | "inline" | "inlineHeight" | null
   >(null);
 
   const [status, setStatus] = useState<
@@ -466,6 +490,45 @@ function App() {
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [instructionsVisible, setInstructionsVisible] = useState(true);
+  const [documentVisible, setDocumentVisible] = useState(true);
+  const [inlineEditorVisible, setInlineEditorVisible] = useState(true);
+  const [chatVisible, setChatVisible] = useState(true);
+  const [inlineEditorRatio, setInlineEditorRatio] = useState(
+    getInitialInlineEditorRatio
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.sidebarWidth,
+      String(Math.round(sidebarWidth))
+    );
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.instructionsWidth,
+      instructionsRatio.toFixed(4)
+    );
+  }, [instructionsRatio]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.inlineWidth,
+      inlineRatio.toFixed(4)
+    );
+  }, [inlineRatio]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.inlineEditorHeight,
+      inlineEditorRatio.toFixed(4)
+    );
+  }, [inlineEditorRatio]);
 
   const aggregatedInstructions = useMemo(() => {
     if (selected?.type === "document") {
@@ -573,6 +636,35 @@ function App() {
   const showFolderPanel = selected?.type === "folder";
 
   const mainContentRef = useRef<HTMLDivElement | null>(null);
+  const inlinePanelRef = useRef<HTMLDivElement | null>(null);
+  const hasEditableInstructions = showFolderPanel || showDocumentPanel;
+  const inlinePanelVisible = inlineEditorVisible || chatVisible;
+  const instructionsShare = instructionsVisible ? instructionsRatio : 0;
+  const inlineShare = inlinePanelVisible ? inlineRatio : 0;
+  const baseDocumentShare = documentVisible
+    ? Math.max(MIN_DOCUMENT_RATIO, 1 - instructionsShare - inlineShare)
+    : 0;
+  const totalShare =
+    (instructionsVisible ? instructionsShare : 0) +
+      (documentVisible ? baseDocumentShare : 0) +
+      (inlinePanelVisible ? inlineShare : 0) || 1;
+  const instructionsFlexBasis = instructionsVisible
+    ? `${(instructionsShare / totalShare) * 100}%`
+    : undefined;
+  const documentFlexBasis = documentVisible
+    ? `${(baseDocumentShare / totalShare) * 100}%`
+    : undefined;
+  const inlineFlexBasis = inlinePanelVisible
+    ? `${(inlineShare / totalShare) * 100}%`
+    : undefined;
+  const instructionsPlaceholder = showFolderPanel
+    ? "Add folder-specific instructions that are applied to documents inside this folder."
+    : showDocumentPanel
+    ? "Add document-specific instructions that refine the prompt."
+    : "Select a folder or document to edit its instructions.";
+  const instructionsValue = hasEditableInstructions
+    ? currentInstructions
+    : aggregatedPreview;
 
   const refreshTree = useCallback(async () => {
     try {
@@ -594,23 +686,69 @@ function App() {
 
     const handleMove = (event: MouseEvent) => {
       if (draggingResizer === "sidebar") {
-        const next = Math.min(
-          Math.max(event.clientX, MIN_SIDEBAR_WIDTH),
-          MAX_SIDEBAR_WIDTH
-        );
+        const next = clamp(event.clientX, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
         setSidebarWidth(next);
         return;
       }
       if (
-        draggingResizer === "instructions" &&
+        (draggingResizer === "instructions" ||
+          draggingResizer === "inline") &&
         mainContentRef.current
       ) {
         const rect = mainContentRef.current.getBoundingClientRect();
         const offset = event.clientX - rect.left;
-        const ratio = offset / rect.width;
-        setInstructionsRatio(
-          Math.min(Math.max(ratio, MIN_PANEL_RATIO), MAX_PANEL_RATIO)
+        const width = rect.width;
+        if (width <= 0) {
+          return;
+        }
+
+        if (draggingResizer === "instructions") {
+          const maxInstructions = Math.max(
+            MIN_INSTRUCTIONS_RATIO,
+            1 - inlineRatio - MIN_DOCUMENT_RATIO
+          );
+          const desired =
+            offset / width < 0
+              ? MIN_INSTRUCTIONS_RATIO
+              : offset / width;
+          const clamped = clamp(desired, MIN_INSTRUCTIONS_RATIO, maxInstructions);
+          const [inst, inl] = normalizeRatios(clamped, inlineRatio);
+          setInstructionsRatio(inst);
+          setInlineRatio(inl);
+        } else if (draggingResizer === "inline") {
+          const desiredInline =
+            offset / width > 1
+              ? MIN_INLINE_RATIO
+              : 1 - offset / width;
+          const maxInline = Math.max(
+            MIN_INLINE_RATIO,
+            1 - instructionsRatio - MIN_DOCUMENT_RATIO
+          );
+          const clamped = clamp(desiredInline, MIN_INLINE_RATIO, maxInline);
+          const [inst, inl] = normalizeRatios(instructionsRatio, clamped);
+          setInstructionsRatio(inst);
+          setInlineRatio(inl);
+        }
+        return;
+      }
+      if (
+        draggingResizer === "inlineHeight" &&
+        inlinePanelRef.current &&
+        inlineEditorVisible &&
+        chatVisible
+      ) {
+        const rect = inlinePanelRef.current.getBoundingClientRect();
+        const offset = event.clientY - rect.top;
+        const height = rect.height;
+        if (height <= 0) {
+          return;
+        }
+        const desiredRatio = clamp(
+          offset / height,
+          MIN_INLINE_EDITOR_RATIO,
+          MAX_INLINE_EDITOR_RATIO
         );
+        setInlineEditorRatio(desiredRatio);
       }
     };
 
@@ -622,7 +760,9 @@ function App() {
     window.addEventListener("mouseup", handleUp);
     const previousCursor = document.body.style.cursor;
     const previousSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
+    const cursor =
+      draggingResizer === "inlineHeight" ? "row-resize" : "col-resize";
+    document.body.style.cursor = cursor;
     document.body.style.userSelect = "none";
 
     return () => {
@@ -631,7 +771,13 @@ function App() {
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousSelect;
     };
-  }, [draggingResizer]);
+  }, [
+    draggingResizer,
+    instructionsRatio,
+    inlineRatio,
+    inlineEditorVisible,
+    chatVisible
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1281,25 +1427,55 @@ function App() {
               selected document.
             </p>
           </div>
-          <div className="toolbar">
-            <button
-              type="button"
-              onClick={() => setShowAggregated(true)}
-            >
-              View Aggregated
-            </button>
-            <button
-              type="button"
-              onClick={() => setInlineActionsEnabled((prev) => !prev)}
-            >
-              {inlineActionsEnabled ? "Inline Actions: On" : "Inline Actions: Off"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen((prev) => !prev)}
-            >
-              {isSettingsOpen ? "Close Settings" : "Settings"}
-            </button>
+          <div className="main-header-actions">
+            <div className="toolbar panel-toggle-toolbar">
+              <button
+                type="button"
+                aria-pressed={instructionsVisible}
+                className={clsx(!instructionsVisible && "toggle-off")}
+                onClick={() => setInstructionsVisible((prev) => !prev)}
+              >
+                Instructions
+              </button>
+              <button
+                type="button"
+                aria-pressed={documentVisible}
+                className={clsx(!documentVisible && "toggle-off")}
+                onClick={() => setDocumentVisible((prev) => !prev)}
+              >
+                Text Editor
+              </button>
+              <button
+                type="button"
+                aria-pressed={inlineEditorVisible}
+                className={clsx(!inlineEditorVisible && "toggle-off")}
+                onClick={() => setInlineEditorVisible((prev) => !prev)}
+              >
+                Inline Editor
+              </button>
+              <button
+                type="button"
+                aria-pressed={chatVisible}
+                className={clsx(!chatVisible && "toggle-off")}
+                onClick={() => setChatVisible((prev) => !prev)}
+              >
+                Generate with ChatGPT
+              </button>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                onClick={() => setShowAggregated(true)}
+              >
+                View Aggregated
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
+              >
+                {isSettingsOpen ? "Close Settings" : "Settings"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1339,19 +1515,22 @@ function App() {
         ) : null}
 
         <div className="main-content" ref={mainContentRef}>
-          {(showFolderPanel || showDocumentPanel) && (
+          {instructionsVisible && (
             <section
               className="instructions-panel"
-              style={{ flexBasis: `${instructionsRatio * 100}%` }}
+              style={{
+                flexBasis: instructionsFlexBasis,
+                flexGrow: 0,
+                flexShrink: 0
+              }}
             >
               <p className="panel-label">Instructions</p>
               <div className="panel-header">
                 <h2>
-                  {selected?.name ?? "Instructions"}{" "}
-                  {loadingSelection ? "…" : ""}
+                  {selected?.name ?? "Instructions"} {loadingSelection ? "…" : ""}
                 </h2>
                 <div className="toolbar">
-                  {(showFolderPanel || showDocumentPanel) && (
+                  {hasEditableInstructions && (
                     <button
                       type="button"
                       className="primary"
@@ -1374,8 +1553,10 @@ function App() {
               </div>
               <div className="panel-body">
                 <textarea
-                  value={currentInstructions}
+                  value={instructionsValue}
+                  readOnly={!hasEditableInstructions}
                   onChange={(event) => {
+                    if (!hasEditableInstructions) return;
                     if (selected?.type === "folder" && folderDetails) {
                       setFolderDetails({
                         ...folderDetails,
@@ -1389,11 +1570,7 @@ function App() {
                       });
                     }
                   }}
-                  placeholder={
-                    selected?.type === "folder"
-                      ? "Add folder-specific instructions that are applied to documents inside this folder."
-                      : "Add document-specific instructions that refine the prompt."
-                  }
+                  placeholder={instructionsPlaceholder}
                 />
                 {showFolderPanel && folderDetails ? (
                   <div className="color-control">
@@ -1429,18 +1606,22 @@ function App() {
             </section>
           )}
 
-          {(showFolderPanel || showDocumentPanel) && (
+          {instructionsVisible && documentVisible && (
             <div
-              className="resizer resizer-vertical panel-resizer"
+              className="resizer resizer-vertical panel-resizer instructions-resizer"
               onMouseDown={() => setDraggingResizer("instructions")}
               role="presentation"
             />
           )}
 
-          {showDocumentPanel ? (
+          {documentVisible && showDocumentPanel ? (
             <section
               className="document-panel"
-              style={{ flexBasis: `${(1 - instructionsRatio) * 100}%` }}
+              style={{
+                flexBasis: documentFlexBasis,
+                flexGrow: 1,
+                flexShrink: 0
+              }}
             >
               <div className="panel-header">
                 {selected?.type === "document" ? (
@@ -1514,44 +1695,15 @@ function App() {
                   placeholder="Start writing your meditation script..."
                 />
               </div>
-              {paragraphEntries.length > 0 ? (
-                <div className="paragraph-actions-container">
-                  <div className="paragraph-actions-header">
-                    <span>Inline AI actions</span>
-                    <p>
-                      Choose a paragraph to quickly summarize, punch up the
-                      energy, or enrich sensory detail.
-                    </p>
-                  </div>
-                  <div className="paragraph-action-list">
-                    {paragraphEntries.map((entry, index) => (
-                      <div className="paragraph-card" key={entry.id}>
-                        <div className="paragraph-card-text">
-                          {entry.text}
-                        </div>
-                        <div className="paragraph-card-actions">
-                          {PARAGRAPH_ACTIONS.map((mode) => (
-                            <button
-                              type="button"
-                              key={`${entry.id}-${mode}`}
-                              onClick={() =>
-                                void handleParagraphAction(mode, entry.text)
-                              }
-                            >
-                              {VARIANT_LABELS[mode]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </section>
-          ) : (
+          ) : documentVisible ? (
             <section
               className="document-panel"
-              style={{ flexBasis: `${(1 - instructionsRatio) * 100}%` }}
+              style={{
+                flexBasis: documentFlexBasis,
+                flexGrow: 1,
+                flexShrink: 0
+              }}
             >
               <div className="panel-header">
                 <h2>No document selected</h2>
@@ -1565,47 +1717,145 @@ function App() {
                 </p>
               </div>
             </section>
+          ) : null}
+
+          {documentVisible && inlinePanelVisible && (
+            <div
+              className="resizer resizer-vertical panel-resizer inline-resizer"
+              onMouseDown={() => setDraggingResizer("inline")}
+              role="presentation"
+            />
+          )}
+
+          {inlinePanelVisible && (
+            <section
+              className="inline-panel"
+              style={{
+                flexBasis: inlineFlexBasis,
+                flexGrow: 0,
+                flexShrink: 0
+              }}
+              ref={inlinePanelRef}
+            >
+              {inlineEditorVisible && (
+                <div
+                  className="inline-panel-section inline-editor-section"
+                  style={{
+                    flexBasis: `${inlineEditorRatio * 100}%`
+                  }}
+                >
+                  <div className="panel-header">
+                    <h2>Inline Editor</h2>
+                    <div className="toolbar">
+                      <button
+                        type="button"
+                        onClick={() => setInlineActionsEnabled((prev) => !prev)}
+                      >
+                        {inlineActionsEnabled
+                          ? "Inline Actions: On"
+                          : "Inline Actions: Off"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="panel-body inline-editor-body">
+                    {!documentDetails ? (
+                      <p className="inline-editor-placeholder">
+                        Select a document to enable inline actions.
+                      </p>
+                    ) : !inlineActionsEnabled ? (
+                      <p className="inline-editor-placeholder">
+                        Inline actions are currently disabled.
+                      </p>
+                    ) : paragraphEntries.length === 0 ? (
+                      <p className="inline-editor-placeholder">
+                        Write paragraphs in the document to see inline actions.
+                      </p>
+                    ) : (
+                      <div className="inline-editor-list">
+                        {paragraphEntries.map((entry) => (
+                          <div className="paragraph-card" key={entry.id}>
+                            <div className="paragraph-card-text">
+                              {entry.text}
+                            </div>
+                            <div className="paragraph-card-actions">
+                              {PARAGRAPH_ACTIONS.map((mode) => (
+                                <button
+                                  type="button"
+                                  key={`${entry.id}-${mode}`}
+                                  onClick={() =>
+                                    void handleParagraphAction(mode, entry.text)
+                                  }
+                                >
+                                  {VARIANT_LABELS[mode]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {inlineEditorVisible && chatVisible && (
+                <div
+                  className="resizer resizer-horizontal panel-resizer inline-height-resizer"
+                  onMouseDown={() => setDraggingResizer("inlineHeight")}
+                  role="presentation"
+                />
+              )}
+
+              {chatVisible && (
+                <div
+                  className="inline-panel-section inline-chat-section"
+                  style={{
+                    flexBasis: `${
+                      (inlineEditorVisible ? 1 - inlineEditorRatio : 1) * 100
+                    }%`
+                  }}
+                >
+                  <div className="panel-header">
+                    <h2>Generate with ChatGPT</h2>
+                    <div className="toolbar">
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={handleGenerate}
+                        disabled={isGenerating || !chatPrompt.trim()}
+                      >
+                        {isGenerating ? "Generating…" : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="panel-body inline-chat-body">
+                    <textarea
+                      value={chatPrompt}
+                      onChange={(event) => setChatPrompt(event.target.value)}
+                      placeholder="Ask ChatGPT for ideas, revisions, or expansions..."
+                    />
+                    <div className="chat-responses">
+                      {chatResponses.length === 0 ? (
+                        <p style={{ color: "#667085", margin: 0 }}>
+                          Responses will appear here.
+                        </p>
+                      ) : (
+                        chatResponses.map((item) => (
+                          <article
+                            key={item.id}
+                            style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
+                          >
+                            {item.message}
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
           )}
         </div>
-
-        <section className="chat-panel">
-          <div className="panel-header">
-            <h2>Generate with ChatGPT</h2>
-            <div className="toolbar">
-              <button
-                type="button"
-                className="primary"
-                onClick={handleGenerate}
-                disabled={isGenerating || !chatPrompt.trim()}
-              >
-                {isGenerating ? "Generating…" : "Send"}
-              </button>
-            </div>
-          </div>
-          <div className="panel-body">
-            <textarea
-              value={chatPrompt}
-              onChange={(event) => setChatPrompt(event.target.value)}
-              placeholder="Ask ChatGPT for ideas, revisions, or expansions..."
-            />
-            <div className="chat-responses">
-              {chatResponses.length === 0 ? (
-                <p style={{ color: "#667085", margin: 0 }}>
-                  Responses will appear here.
-                </p>
-              ) : (
-                chatResponses.map((item) => (
-                  <article
-                    key={item.id}
-                    style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
-                  >
-                    {item.message}
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
 
         {status ? (
           <div

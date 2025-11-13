@@ -45,7 +45,15 @@
   background: transparent;
   border-left: 1px solid rgba(148, 163, 184, 0.16);
   border-right: 1px solid rgba(148, 163, 184, 0.16);
-  margin: 0 8px;
+  margin: 0;
+}
+
+.resizer-horizontal {
+  width: 100%;
+  height: 6px;
+  cursor: row-resize;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
 }
 
 .sidebar-header h1 {
@@ -161,6 +169,18 @@
   background: rgba(12, 19, 33, 0.6);
 }
 
+.main-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.panel-toggle-toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .settings-panel {
   padding: 16px 24px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08);
@@ -206,10 +226,13 @@
   display: flex;
   gap: 0;
   overflow: hidden;
+  padding: 16px;
+  align-items: stretch;
 }
 
 .instructions-panel,
-.document-panel {
+.document-panel,
+.inline-panel {
   display: flex;
   flex-direction: column;
   padding: 24px;
@@ -217,9 +240,20 @@
   min-width: 220px;
   background: rgba(12, 19, 33, 0.72);
   border-radius: 18px;
-  margin: 16px;
   border: 1px solid rgba(148, 163, 184, 0.12);
   box-shadow: 0 24px 40px rgba(5, 12, 26, 0.45);
+  min-height: 0;
+}
+
+.inline-panel {
+  min-height: 0;
+}
+
+.inline-panel-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .aggregated-panel {
@@ -492,6 +526,7 @@
   flex-direction: column;
   gap: 12px;
   overflow: visible;
+  min-height: 0;
 }
 
 .panel-body textarea {
@@ -518,6 +553,10 @@
 .toolbar {
   display: flex;
   gap: 8px;
+}
+
+.toolbar button.toggle-off {
+  opacity: 0.55;
 }
 
 .toolbar button {
@@ -561,6 +600,27 @@
   cursor: not-allowed;
 }
 
+.inline-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inline-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inline-editor-placeholder {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(203, 213, 225, 0.7);
+}
+
 .status-bar {
   border-top: 1px solid rgba(148, 163, 184, 0.08);
   padding: 12px 24px;
@@ -577,23 +637,6 @@
   color: #f87171;
 }
 
-.chat-panel {
-  border-top: 1px solid rgba(148, 163, 184, 0.08);
-  padding: 24px;
-  background: rgba(12, 19, 33, 0.78);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 280px;
-}
-
-.chat-panel textarea {
-  min-height: 80px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.85);
-  color: #e2e8f0;
-}
-
 .chat-responses {
   flex: 1;
   overflow-y: auto;
@@ -602,5 +645,19 @@
   padding: 16px;
   background: rgba(15, 23, 42, 0.75);
   color: rgba(226, 232, 240, 0.85);
+}
+
+.inline-chat-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inline-chat-body textarea {
+  flex: 0 0 120px;
+  min-height: 120px;
+  resize: vertical;
 }
 
