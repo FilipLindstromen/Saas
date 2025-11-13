@@ -87,6 +87,31 @@ const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
 const AUTO_SAVE_DELAY_MS = 1200;
 
+const inferBlobExtension = (mimeType: string): string => {
+  if (mimeType.includes("audio/mpeg")) return "mp3";
+  if (mimeType.includes("audio/wav")) return "wav";
+  if (mimeType.includes("audio/ogg")) return "ogg";
+  if (mimeType.includes("audio/mp4") || mimeType.includes("audio/aac")) {
+    return "m4a";
+  }
+  return "webm";
+};
+
+const buildOptimisticAudioFileName = (
+  documentName: string | undefined,
+  mimeType: string
+) => {
+  const baseName = documentName
+    ? documentName.replace(/\.[^./\\]+$/g, "")
+    : "recording";
+  const sanitizedBase = baseName
+    .normalize("NFKD")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .trim() || "recording";
+  const extension = inferBlobExtension(mimeType);
+  return `${sanitizedBase}.${extension}`;
+};
+
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
 const createIcon = (path: ReactNode, viewBox = "0 0 24 24") =>
@@ -626,6 +651,7 @@ function TreeNodeItem({
 }
 
 function App() {
+  console.info("[PowerWriter] bundle version 2025-02-20-1");
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -690,6 +716,17 @@ function App() {
   const shouldDiscardRecordingRef = useRef(false);
   const isMountedRef = useRef(true);
   const localAudioUrlRef = useRef<string | null>(null);
+  const recordingIntervalRef = useRef<number | null>(null);
+  const recordingStartRef = useRef<number | null>(null);
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
+  const [recordingFileName, setRecordingFileName] = useState<string | null>(null);
+  const formattedElapsed = useMemo(() => {
+    const minutes = Math.floor(recordingElapsed / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (recordingElapsed % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }, [recordingElapsed]);
   const [documentDirty, setDocumentDirty] = useState(false);
   const [folderDirty, setFolderDirty] = useState(false);
   const [documentSavingPath, setDocumentSavingPath] = useState<string | null>(
@@ -719,6 +756,14 @@ function App() {
       window.clearTimeout(folderSaveTimeoutRef.current);
       folderSaveTimeoutRef.current = null;
     }
+  }, []);
+  const clearRecordingTimer = useCallback(() => {
+    if (recordingIntervalRef.current !== null) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    recordingStartRef.current = null;
+    setRecordingElapsed(0);
   }, []);
 
   useEffect(() => {
@@ -762,6 +807,7 @@ function App() {
   }, [inlineBeforeDocument]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (
@@ -779,13 +825,16 @@ function App() {
         URL.revokeObjectURL(localAudioUrlRef.current);
         localAudioUrlRef.current = null;
       }
+      clearRecordingTimer();
     };
-  }, []);
+  }, [clearRecordingTimer]);
 
   useEffect(() => {
     if (selected?.type !== "document") {
+      clearRecordingTimer();
       setAudioUrl(null);
       setAudioError(null);
+      setRecordingFileName(null);
       if (localAudioUrlRef.current) {
         URL.revokeObjectURL(localAudioUrlRef.current);
         localAudioUrlRef.current = null;
@@ -794,11 +843,18 @@ function App() {
     }
     const remoteUrl = documentDetails?.audioUrl ?? null;
     setAudioUrl(remoteUrl);
+    setRecordingFileName(documentDetails?.audioFileName ?? null);
     if (remoteUrl && localAudioUrlRef.current) {
       URL.revokeObjectURL(localAudioUrlRef.current);
       localAudioUrlRef.current = null;
     }
-  }, [selected?.type, selected?.path, documentDetails?.audioUrl]);
+  }, [
+    selected?.type,
+    selected?.path,
+    documentDetails?.audioUrl,
+    documentDetails?.audioFileName,
+    clearRecordingTimer
+  ]);
 
   useEffect(() => {
     if (audioPlayerRef.current) {
@@ -837,9 +893,20 @@ function App() {
         pathForUpload,
         blobSize: blob.size
       });
+      const optimisticFileName = buildOptimisticAudioFileName(
+        documentDetails?.name ??
+          (selected?.type === "document" ? selected.name : undefined),
+        blob.type
+      );
+      setRecordingFileName(optimisticFileName);
       setIsUploadingAudio(true);
       setAudioError(null);
       try {
+        console.log("[Recorder] sending form data", {
+          pathForUpload,
+          mimeType: blob.type,
+          optimisticFileName
+        });
         const result = await uploadDocumentAudio(pathForUpload, blob);
         if (!isMountedRef.current) return;
         console.log("[Recorder] upload success", result.audioUrl);
@@ -848,8 +915,15 @@ function App() {
           localAudioUrlRef.current = null;
         }
         setAudioUrl(result.audioUrl);
+        setRecordingFileName(result.audioFileName);
         setDocumentDetails((prev) =>
-          prev ? { ...prev, audioUrl: result.audioUrl } : prev
+          prev
+            ? {
+                ...prev,
+                audioUrl: result.audioUrl,
+                audioFileName: result.audioFileName
+              }
+            : prev
         );
         setStatus({
           type: "success",
@@ -864,6 +938,7 @@ function App() {
             : "Unable to save audio recording.";
         setAudioError(message);
         setStatus({ type: "error", message });
+        setRecordingFileName(null);
       } finally {
         if (isMountedRef.current) {
           setIsUploadingAudio(false);
@@ -931,15 +1006,23 @@ function App() {
         stopMediaStream();
         const chunks = audioChunksRef.current.slice();
         audioChunksRef.current = [];
+        console.log("[Recorder] onstop details", {
+          discard,
+          chunkCount: chunks.length,
+          isMounted: isMountedRef.current
+        });
         if (!isMountedRef.current) {
+          console.warn("[Recorder] upload skipped: component unmounted");
           return;
         }
         setIsRecordingAudio(false);
+        clearRecordingTimer();
         if (discard || chunks.length === 0) {
           if (!discard && chunks.length === 0) {
             setAudioError(
               "No audio data was captured. Please try recording again."
             );
+            console.warn("[Recorder] upload skipped: empty chunks");
           }
           return;
         }
@@ -969,6 +1052,17 @@ function App() {
       console.log("[Recorder] started", recorder.mimeType);
       setIsRecordingAudio(true);
       setAudioError(null);
+      recordingStartRef.current = Date.now();
+      setRecordingElapsed(0);
+      if (recordingIntervalRef.current !== null) {
+        window.clearInterval(recordingIntervalRef.current);
+      }
+      recordingIntervalRef.current = window.setInterval(() => {
+        if (!recordingStartRef.current) return;
+        setRecordingElapsed(
+          Math.floor((Date.now() - recordingStartRef.current) / 1000)
+        );
+      }, 250);
     } catch (error) {
       stopMediaStream();
       const message =
@@ -1005,7 +1099,8 @@ function App() {
     }
     mediaRecorderRef.current.stop();
     setIsRecordingAudio(false);
-  }, []);
+    clearRecordingTimer();
+  }, [clearRecordingTimer]);
 
   const cancelRecording = useCallback(() => {
     if (
@@ -1025,7 +1120,8 @@ function App() {
     }
     mediaRecorderRef.current.stop();
     setIsRecordingAudio(false);
-  }, []);
+    clearRecordingTimer();
+  }, [clearRecordingTimer]);
 
   const handlePlayAudio = useCallback(() => {
     if (!audioPlayerRef.current) return;
@@ -1071,7 +1167,7 @@ function App() {
   const audioStatusText = isUploadingAudio
     ? "Uploading…"
     : isRecordingAudio
-    ? "Recording…"
+    ? `Recording ${formattedElapsed}`
     : audioUrl
     ? "Audio ready"
     : null;
@@ -1584,6 +1680,7 @@ function App() {
           pendingDocumentSaveRef.current = null;
           const details = await getDocumentDetails(selected.path);
           setDocumentDetails(details);
+          setRecordingFileName(details.audioFileName ?? null);
           setFolderDetails(null);
           documentLastSavedRef.current = toDocumentSnapshot(details);
           setDocumentDirty(false);
@@ -2305,6 +2402,15 @@ function App() {
               </a>
             ) : null}
             {audioError ? <p className="audio-error">{audioError}</p> : null}
+            <div className="audio-meta">
+              {isRecordingAudio ? (
+                <span className="audio-timer">{formattedElapsed}</span>
+              ) : (
+                <span className="audio-filename">
+                  {recordingFileName ?? "No recording saved"}
+                </span>
+              )}
+            </div>
             <audio
               ref={audioPlayerRef}
               src={audioUrl ?? undefined}

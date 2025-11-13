@@ -222,7 +222,7 @@ export async function generateVariants(params: {
 export async function uploadDocumentAudio(
   path: string,
   file: Blob
-): Promise<{ audioUrl: string }> {
+): Promise<{ audioUrl: string; audioFileName: string }> {
   const formData = new FormData();
   formData.append("path", path);
   const extension =
@@ -243,8 +243,9 @@ export async function uploadDocumentAudio(
   const result = await handleResponse<{
     success: true;
     audioUrl: string;
+    audioFileName: string;
   }>(response);
-  return { audioUrl: result.audioUrl };
+  return { audioUrl: result.audioUrl, audioFileName: result.audioFileName };
 }
 
 export async function renameItem(sourcePath: string, targetPath: string) {

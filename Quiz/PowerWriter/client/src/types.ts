@@ -24,5 +24,6 @@ export type DocumentDetails = {
   aggregatedInstructions: string;
   completed: boolean;
   audioUrl: string | null;
+  audioFileName: string | null;
 };
 
