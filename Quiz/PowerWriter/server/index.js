@@ -45,6 +45,19 @@ const ORDER_FILE = "_order.json";
 const FOLDER_COLOR_FILE = "_color.txt";
 const DOCUMENT_META_SUFFIX = ".meta.json";
 const AUDIO_SUFFIX = ".webm";
+const AUDIO_DIRECTORY_NAME = "_audio";
+
+const AUDIO_MIME_EXTENSIONS = new Map(
+  Object.entries({
+    "audio/webm": "webm",
+    "audio/webm; codecs=opus": "webm",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/mp4": "m4a",
+    "audio/aac": "m4a"
+  })
+);
 
 const VARIANT_MODE_INSTRUCTIONS = {
   simplify:
@@ -214,6 +227,11 @@ async function writeDocumentMeta(documentAbsolutePath, meta) {
     next.audioFileName =
       typeof meta.audioFileName === "string" ? meta.audioFileName : null;
   }
+  console.info("[Audio] writeDocumentMeta", {
+    documentAbsolutePath,
+    filePath,
+    next
+  });
   await fs.writeFile(
     filePath,
     JSON.stringify(
@@ -226,11 +244,11 @@ async function writeDocumentMeta(documentAbsolutePath, meta) {
 }
 
 function getDocumentAudioAbsolutePath(documentAbsolutePath, fileName) {
-  return path.join(path.dirname(documentAbsolutePath), fileName);
-}
-
-function generateAudioFileName() {
-  return `recording-${Date.now()}${AUDIO_SUFFIX}`;
+  const parentDirectory = path.dirname(documentAbsolutePath);
+  if (fileName.includes("/") || fileName.includes("\\")) {
+    return path.join(parentDirectory, fileName);
+  }
+  return path.join(parentDirectory, AUDIO_DIRECTORY_NAME, fileName);
 }
 
 function inferAudioExtension(file) {
@@ -241,33 +259,102 @@ function inferAudioExtension(file) {
       return ext;
     }
   }
-  switch (file?.mimetype) {
-    case "audio/mpeg":
-      return ".mp3";
-    case "audio/wav":
-      return ".wav";
-    case "audio/ogg":
-      return ".ogg";
-    case "audio/mp4":
-    case "audio/aac":
-      return ".m4a";
-    case "audio/webm":
-    default:
-      return ".webm";
+  const fromMap = AUDIO_MIME_EXTENSIONS.get(file?.mimetype?.toLowerCase?.() ?? "");
+  if (fromMap) {
+    return `.${fromMap}`;
   }
+  return ".webm";
 }
 
 async function removeExistingAudio(documentAbsolutePath, meta) {
-  if (!meta?.audioFileName) return;
+  if (!meta?.audioFileName) {
+    console.info("[Audio] No prior recording to remove", {
+      documentAbsolutePath
+    });
+    return;
+  }
   const existingPath = getDocumentAudioAbsolutePath(
     documentAbsolutePath,
     meta.audioFileName
   );
+  console.info("[Audio] Removing old recording", {
+    documentAbsolutePath,
+    audioFile: meta.audioFileName,
+    existingPath
+  });
   await fs.rm(existingPath, { force: true });
+  try {
+    const directory = path.dirname(existingPath);
+    const audioDirectory = path.join(
+      path.dirname(documentAbsolutePath),
+      AUDIO_DIRECTORY_NAME
+    );
+    if (path.normalize(directory) !== path.normalize(audioDirectory)) {
+      console.info("[Audio] Old recording was not in managed directory");
+      return;
+    }
+    const contents = await fs.readdir(directory);
+    if (contents.length === 0) {
+      await fs.rmdir(directory);
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") {
+      throw error;
+    }
+  }
+}
+
+function sanitizeAudioBaseName(name) {
+  const normalized = name.normalize("NFKD");
+  const stripped = normalized.replace(/[\\/:*?"<>|]/g, "").trim();
+  return stripped || "recording";
+}
+
+function buildAudioFileName(documentAbsolutePath, extensionWithDot) {
+  const baseDocumentName = path.basename(
+    documentAbsolutePath,
+    path.extname(documentAbsolutePath)
+  );
+  const safeBase = sanitizeAudioBaseName(baseDocumentName);
+  const ext = extensionWithDot.startsWith(".")
+    ? extensionWithDot
+    : `.${extensionWithDot}`;
+  return `${safeBase}${ext}`;
+}
+
+async function saveDocumentAudioFile(documentAbsolutePath, file) {
+  console.info("[Audio] saveDocumentAudioFile:start", {
+    documentAbsolutePath,
+    mimeType: file.mimetype,
+    size: file.size
+  });
+  const meta = await readDocumentMeta(documentAbsolutePath);
+  await removeExistingAudio(documentAbsolutePath, meta);
+  const extension = inferAudioExtension(file);
+  const fileName = buildAudioFileName(documentAbsolutePath, extension);
+  const audioDirectory = path.join(
+    path.dirname(documentAbsolutePath),
+    AUDIO_DIRECTORY_NAME
+  );
+  await fs.mkdir(audioDirectory, { recursive: true });
+  const absoluteTarget = path.join(audioDirectory, fileName);
+  await fs.writeFile(absoluteTarget, file.buffer);
+  await writeDocumentMeta(documentAbsolutePath, { audioFileName: fileName });
+  const stats = await fs.stat(absoluteTarget);
+  console.info("[Audio] saveDocumentAudioFile:complete", {
+    absoluteTarget,
+    fileName,
+    mtimeMs: stats.mtimeMs
+  });
+  return {
+    fileName,
+    version: Math.floor(stats.mtimeMs).toString(36)
+  };
 }
 
 async function renameIfExists(oldPath, newPath) {
   try {
+    await fs.mkdir(path.dirname(newPath), { recursive: true });
     await fs.rename(oldPath, newPath);
   } catch (error) {
     if (error.code !== "ENOENT") {
@@ -509,8 +596,8 @@ app.get("/api/document", async (req, res) => {
 
     let audioUrl = null;
     if (meta.audioFileName) {
-      const audioPath = path.join(
-        path.dirname(documentPath),
+      const audioPath = getDocumentAudioAbsolutePath(
+        documentPath,
         meta.audioFileName
       );
       try {
@@ -531,7 +618,8 @@ app.get("/api/document", async (req, res) => {
       instructions,
       aggregatedInstructions: aggregated,
       completed: Boolean(meta.completed),
-      audioUrl
+      audioUrl,
+      audioFileName: meta.audioFileName ?? null
     });
   } catch (error) {
     res.status(500).send(
@@ -599,41 +687,52 @@ app.post(
   async (req, res) => {
     try {
       const { path: relative } = req.body ?? {};
+      console.info("[Audio] Incoming upload", {
+        relative,
+        mimeType: req.file?.mimetype,
+        size: req.file?.size
+      });
       if (typeof relative !== "string") {
+        console.warn("[Audio] Missing document path in request body");
         return res.status(400).send("Missing document path");
       }
       if (!req.file) {
+        console.warn("[Audio] No file attached to upload request", {
+          relative
+        });
         return res.status(400).send("Missing audio file");
       }
       const documentPath = resolveMeditationPath(relative);
       const stat = await fs.stat(documentPath);
       if (!stat.isFile()) {
+        console.warn("[Audio] Target path is not a file", { relative });
         return res.status(400).send("Path is not a file");
       }
-      const meta = await readDocumentMeta(documentPath);
-      const extension = inferAudioExtension(req.file);
-      const candidateName = `${path.basename(
+      console.info("[Audio] Saving recording", {
         documentPath,
-        path.extname(documentPath)
-      )}-audio${extension}`;
-      const fileName = meta.audioFileName
-        ? meta.audioFileName
-        : generateAudioFileName().replace(AUDIO_SUFFIX, extension);
-      const audioAbsolute = getDocumentAudioAbsolutePath(
+        bytes: req.file.size
+      });
+      const { fileName, version } = await saveDocumentAudioFile(
         documentPath,
-        fileName
+        req.file
       );
-      await fs.writeFile(audioAbsolute, req.file.buffer);
-      await removeExistingAudio(documentPath, meta);
-      await writeDocumentMeta(documentPath, { audioFileName: fileName });
-      const version = Date.now().toString(36);
+      console.info("[Audio] Saved recording", {
+        relative,
+        fileName,
+        version
+      });
       res.json({
         success: true,
         audioUrl: `/api/document/audio?path=${encodeURIComponent(
           toPosix(relative)
-        )}&v=${version}`
+        )}&v=${version}`,
+        audioFileName: fileName
       });
     } catch (error) {
+      console.error("[Audio] Failed to save recording", {
+        error,
+        stack: error?.stack
+      });
       res.status(500).send(
         error instanceof Error ? error.message : "Unable to save audio"
       );
@@ -714,10 +813,20 @@ app.post("/api/document/rename", async (req, res) => {
       getDocumentMetaPath(newDocumentPath)
     );
     if (meta.audioFileName) {
-      await renameIfExists(
-        getDocumentAudioAbsolutePath(oldDocumentPath, meta.audioFileName),
-        getDocumentAudioAbsolutePath(newDocumentPath, meta.audioFileName)
+      const oldAudioPath = getDocumentAudioAbsolutePath(
+        oldDocumentPath,
+        meta.audioFileName
       );
+      const ext = path.extname(meta.audioFileName) || AUDIO_SUFFIX;
+      const newAudioFileName = buildAudioFileName(newDocumentPath, ext);
+      const newAudioPath = getDocumentAudioAbsolutePath(
+        newDocumentPath,
+        newAudioFileName
+      );
+      await renameIfExists(oldAudioPath, newAudioPath);
+      await writeDocumentMeta(newDocumentPath, {
+        audioFileName: newAudioFileName
+      });
     }
     const parentAbsolute = resolveMeditationPath(parentRelative);
     await replaceInOrder(
