@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import type { ReactNode, SVGProps } from "react";
 import clsx from "clsx";
 import "./App.css";
 import type { DocumentDetails, FolderDetails, TreeNode } from "./types";
@@ -18,7 +20,8 @@ import {
   saveDocument,
   saveFolderInstructions,
   deleteDocument,
-  deleteFolder
+  deleteFolder,
+  uploadDocumentAudio
 } from "./api";
 
 type Selection =
@@ -62,13 +65,15 @@ const SELECTION_MENU_HEIGHT = 48;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const STORAGE_KEYS = {
-  openAiApiKey: "powerwriter.openaiKey"
+  openAiApiKey: "powerwriter.openaiKey",
+  lastSelection: "powerwriter.lastSelection"
 } as const;
 const LS_KEYS = {
   sidebarWidth: "powerwriter.sidebarWidth",
   instructionsWidth: "powerwriter.instructionsWidth",
   inlineWidth: "powerwriter.inlineWidth",
-  inlineEditorHeight: "powerwriter.inlineEditorHeight"
+  inlineEditorHeight: "powerwriter.inlineEditorHeight",
+  inlineOrder: "powerwriter.inlineOrder"
 } as const;
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
@@ -80,6 +85,161 @@ const DEFAULT_INLINE_EDITOR_RATIO = 0.55;
 const MIN_INLINE_EDITOR_RATIO = 0.2;
 const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
+const AUTO_SAVE_DELAY_MS = 1200;
+
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+
+const createIcon = (path: ReactNode, viewBox = "0 0 24 24") =>
+  function Icon({ size = 18, ...props }: IconProps) {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox={viewBox}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        {...props}
+      >
+        {path}
+      </svg>
+    );
+  };
+
+const IconRecord = createIcon(
+  <circle cx="12" cy="12" r="6" fill="currentColor" stroke="none" />
+);
+const IconStop = createIcon(<rect x="7" y="7" width="10" height="10" rx="2" />);
+const IconPlay = createIcon(
+  <polygon points="9 6.5 18 12 9 17.5" fill="currentColor" stroke="none" />
+);
+const IconPause = createIcon(
+  <>
+    <rect x="7" y="6" width="3.5" height="12" rx="1.2" />
+    <rect x="13.5" y="6" width="3.5" height="12" rx="1.2" />
+  </>
+);
+const IconRewind = createIcon(
+  <>
+    <polygon points="11 12 19 7 19 17" />
+    <polygon points="5 12 13 7 13 17" />
+  </>
+);
+const IconSwap = createIcon(
+  <>
+    <path d="M7 7h10" />
+    <path d="M17 7l-3-3" />
+    <path d="M17 7l-3 3" />
+    <path d="M7 17h10" />
+    <path d="M7 17l3-3" />
+    <path d="M7 17l3 3" />
+  </>
+);
+const IconDocument = createIcon(
+  <>
+    <path d="M8 4h5l5 5v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    <path d="M13 4v4h4" />
+  </>
+);
+const IconTextEditor = createIcon(
+  <>
+    <path d="M5 5h14" />
+    <path d="M5 9h14" />
+    <path d="M9 9v10" />
+    <path d="M15 9v6" />
+    <path d="M13 19h4" />
+  </>
+);
+const IconInline = createIcon(
+  <>
+    <path d="M12 4v4" />
+    <path d="M12 16v4" />
+    <path d="M7 9l2 3-2 3" />
+    <path d="M17 9l-2 3 2 3" />
+    <circle cx="12" cy="12" r="3.2" />
+  </>
+);
+const IconChat = createIcon(
+  <>
+    <path d="M5 19l1.3-3.9A7 7 0 1 1 12 19a6.9 6.9 0 0 1-2.9-.6z" />
+  </>
+);
+const IconLayers = createIcon(
+  <>
+    <path d="m12 3 9 5-9 5-9-5z" />
+    <path d="m3 13 9 5 9-5" />
+    <path d="m3 18 9 5 9-5" />
+  </>
+);
+const IconSettings = createIcon(
+  <>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </>
+);
+const IconSimplify = createIcon(
+  <>
+    <path d="M7 6h10" />
+    <path d="M5 10h14" />
+    <path d="M8 14h8" />
+    <path d="M10 18h4" />
+  </>
+);
+const IconPunch = createIcon(
+  <>
+    <path d="M13 2v4" />
+    <path d="m6 11 3-3 2 2 3-3 2 2" />
+    <path d="M5 22h14" />
+    <path d="M9 22v-4h1.5l2.5-3" />
+  </>
+);
+const IconSensory = createIcon(
+  <>
+    <path d="M12 8c-1.5 0-3 .75-3 2s1.5 2 3 2 3 .75 3 2-1.5 2-3 2" />
+    <path d="M12 5v1" />
+    <path d="M12 20v-1" />
+    <path d="M16 4l-.5 1" />
+    <path d="M8.5 19l-.5 1" />
+    <path d="M19 9l-1 .5" />
+    <path d="M6 14.5 5 15" />
+    <path d="m18 15-1-.5" />
+    <path d="m7 9.5-1-.5" />
+  </>
+);
+
+const VARIANT_ICONS: Partial<Record<VariantMode, (props: IconProps) => JSX.Element>> = {
+  simplify: IconSimplify,
+  punchUp: IconPunch,
+  sensory: IconSensory,
+  expand: IconInline,
+  rephrase: IconTextEditor,
+  summarize: IconDocument
+};
+
+type DocumentSnapshot = {
+  content: string;
+  instructions: string;
+  completed: boolean;
+};
+
+type FolderSnapshot = {
+  instructions: string;
+  color: string | null;
+};
+
+const toDocumentSnapshot = (details: DocumentDetails): DocumentSnapshot => ({
+  content: details.content,
+  instructions: details.instructions,
+  completed: details.completed
+});
+
+const toFolderSnapshot = (details: FolderDetails): FolderSnapshot => ({
+  instructions: details.instructions,
+  color: details.color
+});
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -159,7 +319,27 @@ const VARIANT_LABELS: Record<VariantMode, string> = {
   sensory: "Enrich Detail"
 };
 const SELECTION_ACTIONS: VariantMode[] = ["simplify", "expand", "rephrase"];
-const PARAGRAPH_ACTIONS: VariantMode[] = ["summarize", "punchUp", "sensory"];
+const PARAGRAPH_ACTIONS: VariantMode[] = ["simplify", "punchUp", "sensory"];
+
+function findNodeByPath(nodes: TreeNode[], targetPath: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.path === targetPath) {
+      return node;
+    }
+    if (node.type === "folder" && node.children) {
+      const found = findNodeByPath(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function getInitialInlineOrder() {
+  if (typeof window !== "undefined") {
+    return window.localStorage.getItem(LS_KEYS.inlineOrder) === "true";
+  }
+  return false;
+}
 
 function Tree({
   nodes,
@@ -458,6 +638,8 @@ function App() {
   const [draggingResizer, setDraggingResizer] = useState<
     "sidebar" | "instructions" | "inline" | "inlineHeight" | null
   >(null);
+  const [inlineBeforeDocument, setInlineBeforeDocument] =
+    useState(getInitialInlineOrder);
 
   const [status, setStatus] = useState<
     { type: "success" | "error"; message: string } | null
@@ -493,10 +675,51 @@ function App() {
   const [instructionsVisible, setInstructionsVisible] = useState(true);
   const [documentVisible, setDocumentVisible] = useState(true);
   const [inlineEditorVisible, setInlineEditorVisible] = useState(true);
-  const [chatVisible, setChatVisible] = useState(true);
+  const [chatVisible, setChatVisible] = useState(false);
   const [inlineEditorRatio, setInlineEditorRatio] = useState(
     getInitialInlineEditorRatio
   );
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const shouldDiscardRecordingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const localAudioUrlRef = useRef<string | null>(null);
+  const [documentDirty, setDocumentDirty] = useState(false);
+  const [folderDirty, setFolderDirty] = useState(false);
+  const [documentSavingPath, setDocumentSavingPath] = useState<string | null>(
+    null
+  );
+  const [folderSavingPath, setFolderSavingPath] = useState<string | null>(null);
+  const documentSaveTimeoutRef = useRef<number | null>(null);
+  const folderSaveTimeoutRef = useRef<number | null>(null);
+  const documentLastSavedRef = useRef<DocumentSnapshot | null>(null);
+  const folderLastSavedRef = useRef<FolderSnapshot | null>(null);
+  const pendingDocumentSaveRef = useRef<{
+    path: string;
+    state: DocumentSnapshot;
+  } | null>(null);
+  const pendingFolderSaveRef = useRef<{
+    path: string;
+    state: FolderSnapshot;
+  } | null>(null);
+  const clearDocumentSaveTimeout = useCallback(() => {
+    if (documentSaveTimeoutRef.current !== null) {
+      window.clearTimeout(documentSaveTimeoutRef.current);
+      documentSaveTimeoutRef.current = null;
+    }
+  }, []);
+  const clearFolderSaveTimeout = useCallback(() => {
+    if (folderSaveTimeoutRef.current !== null) {
+      window.clearTimeout(folderSaveTimeoutRef.current);
+      folderSaveTimeoutRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -530,6 +753,342 @@ function App() {
     );
   }, [inlineEditorRatio]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.inlineOrder,
+      inlineBeforeDocument ? "true" : "false"
+    );
+  }, [inlineBeforeDocument]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        shouldDiscardRecordingRef.current = true;
+        mediaRecorderRef.current.stop();
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((track) => track.stop());
+        audioStreamRef.current = null;
+      }
+      if (localAudioUrlRef.current) {
+        URL.revokeObjectURL(localAudioUrlRef.current);
+        localAudioUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selected?.type !== "document") {
+      setAudioUrl(null);
+      setAudioError(null);
+      if (localAudioUrlRef.current) {
+        URL.revokeObjectURL(localAudioUrlRef.current);
+        localAudioUrlRef.current = null;
+      }
+      return;
+    }
+    const remoteUrl = documentDetails?.audioUrl ?? null;
+    setAudioUrl(remoteUrl);
+    if (remoteUrl && localAudioUrlRef.current) {
+      URL.revokeObjectURL(localAudioUrlRef.current);
+      localAudioUrlRef.current = null;
+    }
+  }, [selected?.type, selected?.path, documentDetails?.audioUrl]);
+
+  useEffect(() => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      audioPlayerRef.current.load();
+    }
+  }, [audioUrl]);
+
+  useEffect(() => {
+    if (!isRecordingAudio) return;
+    if (selected?.type !== "document") {
+      shouldDiscardRecordingRef.current = true;
+      mediaRecorderRef.current?.stop();
+      setIsRecordingAudio(false);
+    }
+  }, [isRecordingAudio, selected?.type]);
+
+  const stopMediaStream = () => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      audioStreamRef.current = null;
+    }
+  };
+
+  const uploadRecording = useCallback(
+    async (blob: Blob, previewUrl: string | null) => {
+      const pathForUpload =
+        documentDetails?.path ??
+        (selected?.type === "document" ? selected.path : null);
+      if (!pathForUpload) {
+        setAudioError("Select a document before recording audio.");
+        return;
+      }
+      console.log("[Recorder] upload start", {
+        pathForUpload,
+        blobSize: blob.size
+      });
+      setIsUploadingAudio(true);
+      setAudioError(null);
+      try {
+        const result = await uploadDocumentAudio(pathForUpload, blob);
+        if (!isMountedRef.current) return;
+        console.log("[Recorder] upload success", result.audioUrl);
+        if (previewUrl && localAudioUrlRef.current === previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          localAudioUrlRef.current = null;
+        }
+        setAudioUrl(result.audioUrl);
+        setDocumentDetails((prev) =>
+          prev ? { ...prev, audioUrl: result.audioUrl } : prev
+        );
+        setStatus({
+          type: "success",
+          message: "Audio recording saved to this document"
+        });
+      } catch (error) {
+        console.error("[Recorder] upload error", error);
+        if (!isMountedRef.current) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to save audio recording.";
+        setAudioError(message);
+        setStatus({ type: "error", message });
+      } finally {
+        if (isMountedRef.current) {
+          setIsUploadingAudio(false);
+        }
+        console.log("[Recorder] upload end");
+      }
+    },
+    [documentDetails?.path, selected?.type, selected?.path]
+  );
+
+  const startRecording = useCallback(async () => {
+    if (
+      isRecordingAudio ||
+      isUploadingAudio ||
+      selected?.type !== "document"
+    ) {
+      return;
+    }
+    if (
+      typeof window === "undefined" ||
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function" ||
+      typeof window.MediaRecorder === "undefined"
+    ) {
+      setAudioError("Audio recording is not supported in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      shouldDiscardRecordingRef.current = false;
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          console.log(
+            "[Recorder] ondataavailable chunk",
+            event.data.size,
+            event.data.type
+          );
+          audioChunksRef.current.push(event.data);
+        } else {
+          console.log("[Recorder] ondataavailable zero-size chunk");
+        }
+      };
+      recorder.onerror = (event) => {
+        console.error("MediaRecorder error", event.error);
+        stopMediaStream();
+        audioChunksRef.current = [];
+        if (!isMountedRef.current) return;
+        setIsRecordingAudio(false);
+        setAudioError(
+          event.error?.message ?? "Recording failed. Please try again."
+        );
+      };
+      recorder.onstop = () => {
+        console.log(
+          "[Recorder] onstop triggered, chunks:",
+          audioChunksRef.current.length
+        );
+        const discard = shouldDiscardRecordingRef.current;
+        shouldDiscardRecordingRef.current = false;
+        stopMediaStream();
+        const chunks = audioChunksRef.current.slice();
+        audioChunksRef.current = [];
+        if (!isMountedRef.current) {
+          return;
+        }
+        setIsRecordingAudio(false);
+        if (discard || chunks.length === 0) {
+          if (!discard && chunks.length === 0) {
+            setAudioError(
+              "No audio data was captured. Please try recording again."
+            );
+          }
+          return;
+        }
+        const blob = new Blob(chunks, { type: recorder.mimeType });
+        console.log(
+          "[Recorder] Captured audio blob",
+          blob.size,
+          recorder.mimeType
+        );
+        if (localAudioUrlRef.current) {
+          URL.revokeObjectURL(localAudioUrlRef.current);
+          localAudioUrlRef.current = null;
+        }
+        const previewUrl = URL.createObjectURL(blob);
+        localAudioUrlRef.current = previewUrl;
+        setAudioUrl(previewUrl);
+        console.log("[Recorder] calling uploadRecording");
+        uploadRecording(blob, previewUrl)
+          .then(() => {
+            console.log("[Recorder] upload promise resolved");
+          })
+          .catch((error) => {
+            console.error("[Recorder] upload promise rejected", error);
+          });
+      };
+      recorder.start();
+      console.log("[Recorder] started", recorder.mimeType);
+      setIsRecordingAudio(true);
+      setAudioError(null);
+    } catch (error) {
+      stopMediaStream();
+      const message =
+        error instanceof Error
+          ? error.message.includes("denied")
+            ? "Microphone permission denied."
+            : error.message
+          : "Unable to access the microphone.";
+      setAudioError(message);
+    }
+  }, [
+    documentDetails,
+    isRecordingAudio,
+    isUploadingAudio,
+    selected?.type,
+    uploadRecording
+  ]);
+
+  const stopRecording = useCallback(() => {
+    if (
+      !mediaRecorderRef.current ||
+      mediaRecorderRef.current.state === "inactive"
+    ) {
+      return;
+    }
+    console.log("[Recorder] stop requested");
+    shouldDiscardRecordingRef.current = false;
+    if (mediaRecorderRef.current.state === "recording") {
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch (error) {
+        console.warn("requestData failed", error);
+      }
+    }
+    mediaRecorderRef.current.stop();
+    setIsRecordingAudio(false);
+  }, []);
+
+  const cancelRecording = useCallback(() => {
+    if (
+      !mediaRecorderRef.current ||
+      mediaRecorderRef.current.state === "inactive"
+    ) {
+      return;
+    }
+    console.log("[Recorder] cancel requested");
+    shouldDiscardRecordingRef.current = true;
+    if (mediaRecorderRef.current.state === "recording") {
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch (error) {
+        console.warn("requestData failed", error);
+      }
+    }
+    mediaRecorderRef.current.stop();
+    setIsRecordingAudio(false);
+  }, []);
+
+  const handlePlayAudio = useCallback(() => {
+    if (!audioPlayerRef.current) return;
+    audioPlayerRef.current.currentTime = Math.max(
+      audioPlayerRef.current.currentTime,
+      0
+    );
+    audioPlayerRef.current
+      .play()
+      .then(() => {
+        setAudioError(null);
+      })
+      .catch(() => {
+        setAudioError("Unable to play audio. Try downloading instead.");
+      });
+  }, []);
+
+  const handlePauseAudio = useCallback(() => {
+    audioPlayerRef.current?.pause();
+  }, []);
+
+  const handleRewindAudio = useCallback(() => {
+    if (!audioPlayerRef.current) return;
+    audioPlayerRef.current.pause();
+    audioPlayerRef.current.currentTime = 0;
+  }, []);
+
+  const previousDocumentPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentDocumentPath =
+      selected?.type === "document" ? selected.path : null;
+    if (
+      previousDocumentPathRef.current &&
+      currentDocumentPath &&
+      previousDocumentPathRef.current !== currentDocumentPath &&
+      isRecordingAudio
+    ) {
+      cancelRecording();
+    }
+    previousDocumentPathRef.current = currentDocumentPath;
+  }, [selected?.path, selected?.type, isRecordingAudio, cancelRecording]);
+
+  const audioStatusText = isUploadingAudio
+    ? "Uploading…"
+    : isRecordingAudio
+    ? "Recording…"
+    : audioUrl
+    ? "Audio ready"
+    : null;
+
+  const audioStatusClass = clsx("audio-status", {
+    recording: isRecordingAudio,
+    uploading: isUploadingAudio,
+    ready: !isRecordingAudio && !isUploadingAudio && audioUrl
+  });
+
+  const hasAudio = Boolean(audioUrl);
+  const canStartRecording =
+    selected?.type === "document" &&
+    Boolean(documentDetails) &&
+    !isRecordingAudio &&
+    !isUploadingAudio;
+
   const aggregatedInstructions = useMemo(() => {
     if (selected?.type === "document") {
       return documentDetails?.aggregatedInstructions ?? "";
@@ -558,11 +1117,68 @@ function App() {
         text: text.trim()
       }))
       .filter((entry) => entry.text.length > 0);
-  }, [selected?.type, documentDetails?.content]);
+  }, [selected?.type, documentDetails?.content, inlineActionsEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const nodes =
+      document.querySelectorAll<HTMLTextAreaElement>(".paragraph-card-textarea");
+    nodes.forEach((element) => {
+      element.style.height = "auto";
+      element.style.height = `${element.scrollHeight}px`;
+    });
+  }, [paragraphEntries]);
 
   useEffect(() => {
     setSelectionMenu(null);
   }, [selected?.path]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selected) {
+      window.localStorage.setItem(
+        STORAGE_KEYS.lastSelection,
+        JSON.stringify({ type: selected.type, path: selected.path })
+      );
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.lastSelection);
+    }
+  }, [selected?.path, selected?.type]);
+
+  useEffect(() => {
+    if (selected || tree.length === 0) return;
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(STORAGE_KEYS.lastSelection);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as {
+        type: Selection["type"];
+        path: string;
+      };
+      if (!parsed?.path || !parsed?.type) return;
+      const node = findNodeByPath(tree, parsed.path);
+      if (!node || node.type !== parsed.type) {
+        window.localStorage.removeItem(STORAGE_KEYS.lastSelection);
+        return;
+      }
+      if (node.type === "document") {
+        setSelected({
+          type: "document",
+          path: node.path,
+          name: node.name
+        });
+      } else {
+        setSelected({
+          type: "folder",
+          path: node.path,
+          name: node.name,
+          color: node.color ?? undefined
+        });
+      }
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEYS.lastSelection);
+    }
+  }, [selected, tree]);
 
   useEffect(() => {
     if (selected?.type === "document") {
@@ -639,6 +1255,51 @@ function App() {
   const inlinePanelRef = useRef<HTMLDivElement | null>(null);
   const hasEditableInstructions = showFolderPanel || showDocumentPanel;
   const inlinePanelVisible = inlineEditorVisible || chatVisible;
+  const isDocumentSelected = selected?.type === "document";
+  const isFolderSelected = selected?.type === "folder";
+  const currentDocumentSaving =
+    isDocumentSelected && documentSavingPath === selected?.path;
+  const currentFolderSaving =
+    isFolderSelected && folderSavingPath === selected?.path;
+  const currentDocumentDirty = isDocumentSelected && documentDirty;
+  const currentFolderDirty = isFolderSelected && folderDirty;
+  const instructionsSaving = showFolderPanel
+    ? currentFolderSaving
+    : showDocumentPanel
+    ? currentDocumentSaving
+    : false;
+  const instructionsDirty = showFolderPanel
+    ? currentFolderDirty
+    : showDocumentPanel
+    ? currentDocumentDirty
+    : false;
+  const instructionsAutosaveLabel = instructionsSaving
+    ? "Saving…"
+    : instructionsDirty
+    ? "Unsaved changes"
+    : "All changes saved";
+  const instructionsAutosaveClass = instructionsSaving
+    ? "saving"
+    : instructionsDirty
+    ? "dirty"
+    : "saved";
+  const documentAutosaveLabel = currentDocumentSaving
+    ? "Saving…"
+    : currentDocumentDirty
+    ? "Unsaved changes"
+    : "All changes saved";
+  const documentAutosaveClass = currentDocumentSaving
+    ? "saving"
+    : currentDocumentDirty
+    ? "dirty"
+    : "saved";
+  const fallbackStatusMessage = loadingSelection
+    ? "Loading selection..."
+    : currentDocumentSaving || currentFolderSaving
+    ? "Saving changes…"
+    : currentDocumentDirty || currentFolderDirty
+    ? "Unsaved changes will auto-save shortly."
+    : "Ready to write mindful experiences.";
   const instructionsShare = instructionsVisible ? instructionsRatio : 0;
   const inlineShare = inlinePanelVisible ? inlineRatio : 0;
   const baseDocumentShare = documentVisible
@@ -665,6 +1326,7 @@ function App() {
   const instructionsValue = hasEditableInstructions
     ? currentInstructions
     : aggregatedPreview;
+  const selectedName = selected?.name ?? "Document";
 
   const refreshTree = useCallback(async () => {
     try {
@@ -680,6 +1342,88 @@ function App() {
   useEffect(() => {
     refreshTree();
   }, [refreshTree]);
+
+  const performDocumentSave = useCallback(
+    async (path: string, snapshot: DocumentSnapshot) => {
+      clearDocumentSaveTimeout();
+      pendingDocumentSaveRef.current = null;
+      const previousSnapshot = documentLastSavedRef.current;
+      const shouldRefreshTree =
+        previousSnapshot?.completed !== snapshot.completed;
+      setDocumentSavingPath(path);
+      try {
+        await saveDocument(path, snapshot.content, snapshot.instructions, {
+          completed: snapshot.completed
+        });
+        if (shouldRefreshTree) {
+          await refreshTree();
+        }
+        if (selected?.type === "document" && selected.path === path) {
+          documentLastSavedRef.current = snapshot;
+          setDocumentDirty(false);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to save document";
+        setStatus({ type: "error", message });
+        pendingDocumentSaveRef.current = { path, state: snapshot };
+      } finally {
+        setDocumentSavingPath((prev) => (prev === path ? null : prev));
+      }
+    },
+    [
+      clearDocumentSaveTimeout,
+      refreshTree,
+      selected?.path,
+      selected?.type,
+      setStatus
+    ]
+  );
+
+  const performFolderSave = useCallback(
+    async (path: string, snapshot: FolderSnapshot) => {
+      clearFolderSaveTimeout();
+      pendingFolderSaveRef.current = null;
+      const previousSnapshot = folderLastSavedRef.current;
+      const colorChanged =
+        (previousSnapshot?.color ?? null) !== (snapshot.color ?? null);
+      setFolderSavingPath(path);
+      try {
+        await saveFolderInstructions(
+          path,
+          snapshot.instructions,
+          snapshot.color ?? ""
+        );
+        if (colorChanged) {
+          await refreshTree();
+          setSelected((prev) =>
+            prev && prev.type === "folder" && prev.path === path
+              ? { ...prev, color: snapshot.color ?? undefined }
+              : prev
+          );
+        }
+        if (selected?.type === "folder" && selected.path === path) {
+          folderLastSavedRef.current = snapshot;
+          setFolderDirty(false);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to save folder";
+        setStatus({ type: "error", message });
+        pendingFolderSaveRef.current = { path, state: snapshot };
+      } finally {
+        setFolderSavingPath((prev) => (prev === path ? null : prev));
+      }
+    },
+    [
+      clearFolderSaveTimeout,
+      refreshTree,
+      selected?.path,
+      selected?.type,
+      setSelected,
+      setStatus
+    ]
+  );
 
   useEffect(() => {
     if (!draggingResizer) return;
@@ -807,21 +1551,47 @@ function App() {
       if (!selected) {
         setFolderDetails(null);
         setDocumentDetails(null);
+        documentLastSavedRef.current = null;
+        folderLastSavedRef.current = null;
+        pendingDocumentSaveRef.current = null;
+        pendingFolderSaveRef.current = null;
+        clearDocumentSaveTimeout();
+        clearFolderSaveTimeout();
+        setDocumentDirty(false);
+        setFolderDirty(false);
+        setDocumentSavingPath(null);
+        setFolderSavingPath(null);
         return;
       }
 
       setLoadingSelection(true);
       try {
         if (selected.type === "folder") {
+          clearFolderSaveTimeout();
+          pendingFolderSaveRef.current = null;
           const details = await getFolderDetails(selected.path);
           setFolderDetails(details);
           setFolderColorInput(details.color ?? DEFAULT_FOLDER_COLOR);
           setFolderColorCustom(Boolean(details.color));
           setDocumentDetails(null);
+          folderLastSavedRef.current = toFolderSnapshot(details);
+          setFolderDirty(false);
+          setFolderSavingPath((prev) => (prev === selected.path ? null : prev));
+          documentLastSavedRef.current = null;
+          setDocumentDirty(false);
         } else {
+          clearDocumentSaveTimeout();
+          pendingDocumentSaveRef.current = null;
           const details = await getDocumentDetails(selected.path);
           setDocumentDetails(details);
           setFolderDetails(null);
+          documentLastSavedRef.current = toDocumentSnapshot(details);
+          setDocumentDirty(false);
+          setDocumentSavingPath((prev) =>
+            prev === selected.path ? null : prev
+          );
+          folderLastSavedRef.current = null;
+          setFolderDirty(false);
         }
       } catch (error) {
         const message =
@@ -835,6 +1605,90 @@ function App() {
     void fetchDetails();
   }, [selected]);
 
+  useEffect(() => {
+    if (selected?.type !== "document" || !documentDetails) {
+      pendingDocumentSaveRef.current = null;
+      clearDocumentSaveTimeout();
+      setDocumentDirty(false);
+      return;
+    }
+    if (documentDetails.path !== selected.path) {
+      return;
+    }
+    const snapshot = toDocumentSnapshot(documentDetails);
+    const savedSnapshot = documentLastSavedRef.current;
+    const isDirty =
+      !savedSnapshot ||
+      savedSnapshot.content !== snapshot.content ||
+      savedSnapshot.instructions !== snapshot.instructions ||
+      savedSnapshot.completed !== snapshot.completed;
+    setDocumentDirty(isDirty);
+    if (!isDirty) {
+      pendingDocumentSaveRef.current = null;
+      clearDocumentSaveTimeout();
+      return;
+    }
+    pendingDocumentSaveRef.current = { path: selected.path, state: snapshot };
+    clearDocumentSaveTimeout();
+    documentSaveTimeoutRef.current = window.setTimeout(() => {
+      const pending = pendingDocumentSaveRef.current;
+      if (!pending) return;
+      pendingDocumentSaveRef.current = null;
+      void performDocumentSave(pending.path, pending.state);
+    }, AUTO_SAVE_DELAY_MS);
+  }, [
+    documentDetails,
+    selected?.type,
+    selected?.path,
+    clearDocumentSaveTimeout,
+    performDocumentSave
+  ]);
+
+  useEffect(() => {
+    if (selected?.type !== "folder" || !folderDetails) {
+      pendingFolderSaveRef.current = null;
+      clearFolderSaveTimeout();
+      setFolderDirty(false);
+      return;
+    }
+    if (folderDetails.path !== selected.path) {
+      return;
+    }
+    const snapshot = toFolderSnapshot(folderDetails);
+    const savedSnapshot = folderLastSavedRef.current;
+    const isDirty =
+      !savedSnapshot ||
+      savedSnapshot.instructions !== snapshot.instructions ||
+      (savedSnapshot.color ?? null) !== (snapshot.color ?? null);
+    setFolderDirty(isDirty);
+    if (!isDirty) {
+      pendingFolderSaveRef.current = null;
+      clearFolderSaveTimeout();
+      return;
+    }
+    pendingFolderSaveRef.current = { path: selected.path, state: snapshot };
+    clearFolderSaveTimeout();
+    folderSaveTimeoutRef.current = window.setTimeout(() => {
+      const pending = pendingFolderSaveRef.current;
+      if (!pending) return;
+      pendingFolderSaveRef.current = null;
+      void performFolderSave(pending.path, pending.state);
+    }, AUTO_SAVE_DELAY_MS);
+  }, [
+    folderDetails,
+    selected?.type,
+    selected?.path,
+    clearFolderSaveTimeout,
+    performFolderSave
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearDocumentSaveTimeout();
+      clearFolderSaveTimeout();
+    };
+  }, [clearDocumentSaveTimeout, clearFolderSaveTimeout]);
+
   const handleToggle = (path: string) => {
     setCollapsed((prev) => ({
       ...prev,
@@ -843,57 +1697,41 @@ function App() {
   };
 
   const handleSelect = (item: Selection) => {
+    const switchingToDifferentItem = selected?.path
+      ? selected.path !== item.path
+      : true;
+    if (
+      switchingToDifferentItem &&
+      selected?.type === "document" &&
+      documentDetails &&
+      (documentDirty ||
+        documentSaveTimeoutRef.current !== null ||
+        pendingDocumentSaveRef.current)
+    ) {
+      const snapshot = toDocumentSnapshot(documentDetails);
+      clearDocumentSaveTimeout();
+      pendingDocumentSaveRef.current = null;
+      void performDocumentSave(selected.path, snapshot);
+    }
+    if (
+      switchingToDifferentItem &&
+      selected?.type === "folder" &&
+      folderDetails &&
+      (folderDirty ||
+        folderSaveTimeoutRef.current !== null ||
+        pendingFolderSaveRef.current)
+    ) {
+      const snapshot = toFolderSnapshot(folderDetails);
+      clearFolderSaveTimeout();
+      pendingFolderSaveRef.current = null;
+      void performFolderSave(selected.path, snapshot);
+    }
     setSelected(item);
-  };
-
-  const handleSaveFolderInstructions = async () => {
-    if (selected?.type !== "folder" || !folderDetails) return;
-    try {
-    await saveFolderInstructions(
-      selected.path,
-      folderDetails.instructions,
-      folderColorCustom ? folderColorInput : ""
-    );
-      setStatus({ type: "success", message: "Folder instructions saved" });
-      await refreshTree();
-      setSelected((prev) =>
-      prev
-        ? {
-            ...prev,
-            color: folderColorCustom ? folderColorInput : undefined
-          }
-        : prev
-      ); // trigger refresh
-    setFolderDetails({
-      ...folderDetails,
-      color: folderColorCustom ? folderColorInput : null
-    });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to save folder";
-      setStatus({ type: "error", message });
+    if (!switchingToDifferentItem) {
+      return;
     }
-  };
-
-  const handleSaveDocument = async () => {
-    if (selected?.type !== "document" || !documentDetails) return;
-    try {
-      await saveDocument(
-        selected.path,
-        documentDetails.content,
-        documentDetails.instructions,
-        { completed: documentDetails.completed }
-      );
-      setStatus({ type: "success", message: "Document saved" });
-      await refreshTree();
-      setSelected((prev) =>
-        prev ? { ...prev } : prev
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to save document";
-      setStatus({ type: "error", message });
-    }
+    setDocumentDetails(null);
+    setFolderDetails(null);
   };
 
   const handleGenerateForDocument = async () => {
@@ -929,36 +1767,12 @@ function App() {
     }
   };
 
-  const handleToggleCompleted = async (checked: boolean) => {
+  const handleToggleCompleted = (checked: boolean) => {
     if (selected?.type !== "document" || !documentDetails) return;
-    const previous = documentDetails.completed;
     setDocumentDetails({
       ...documentDetails,
       completed: checked
     });
-    try {
-      await saveDocument(
-        selected.path,
-        documentDetails.content,
-        documentDetails.instructions,
-        { completed: checked }
-      );
-      await refreshTree();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to update completion status";
-      setStatus({ type: "error", message });
-      setDocumentDetails((prev) =>
-        prev
-          ? {
-              ...prev,
-              completed: previous
-            }
-          : prev
-      );
-    }
   };
 
   const promptForName = (label: string) => {
@@ -1271,7 +2085,9 @@ function App() {
       const response = await generateVariants({
         path: selected.path,
         text: source,
-        mode,
+        mode: (mode === "summarize" || mode === "punchUp" || mode === "sensory")
+          ? "rephrase"
+          : mode,
         apiKey: userApiKey || undefined
       });
       setVariantModal((prev) =>
@@ -1420,63 +2236,154 @@ function App() {
 
       <main className="main">
         <div className="main-header">
-          <div>
+          <div className="main-header-summary">
             <strong>Workspace</strong>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "#475467" }}>
               Instructions are aggregated from folders, sub-folders, and the
               selected document.
             </p>
           </div>
-          <div className="main-header-actions">
-            <div className="toolbar panel-toggle-toolbar">
+          <div className="main-header-recording">
+            <div className="main-header-recording-header">
+              <span className="main-header-recording-label">Record Audio</span>
+              {audioStatusText ? (
+                <span className={audioStatusClass}>{audioStatusText}</span>
+              ) : null}
+            </div>
+            <div className="audio-controls compact">
               <button
                 type="button"
-                aria-pressed={instructionsVisible}
-                className={clsx(!instructionsVisible && "toggle-off")}
-                onClick={() => setInstructionsVisible((prev) => !prev)}
+                onClick={() => void startRecording()}
+                disabled={!canStartRecording}
+                aria-label="Start recording"
               >
-                Instructions
+                <IconRecord className="icon" />
+                <span className="sr-only">
+                  {isRecordingAudio ? "Recording…" : "Record"}
+                </span>
               </button>
               <button
                 type="button"
-                aria-pressed={documentVisible}
-                className={clsx(!documentVisible && "toggle-off")}
-                onClick={() => setDocumentVisible((prev) => !prev)}
+                onClick={stopRecording}
+                disabled={!isRecordingAudio}
+                aria-label="Stop recording"
               >
-                Text Editor
+                <IconStop className="icon" />
+                <span className="sr-only">Stop</span>
               </button>
               <button
                 type="button"
-                aria-pressed={inlineEditorVisible}
-                className={clsx(!inlineEditorVisible && "toggle-off")}
-                onClick={() => setInlineEditorVisible((prev) => !prev)}
+                onClick={handlePlayAudio}
+                disabled={!hasAudio || isRecordingAudio}
+                aria-label="Play audio"
               >
-                Inline Editor
+                <IconPlay className="icon" />
+                <span className="sr-only">Play</span>
               </button>
               <button
                 type="button"
-                aria-pressed={chatVisible}
-                className={clsx(!chatVisible && "toggle-off")}
-                onClick={() => setChatVisible((prev) => !prev)}
+                onClick={handlePauseAudio}
+                disabled={!hasAudio}
+                aria-label="Pause audio"
               >
-                Generate with ChatGPT
+                <IconPause className="icon" />
+                <span className="sr-only">Pause</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRewindAudio}
+                disabled={!hasAudio}
+                aria-label="Rewind audio"
+              >
+                <IconRewind className="icon" />
+                <span className="sr-only">Rewind</span>
               </button>
             </div>
-            <div className="toolbar">
-              <button
-                type="button"
-                onClick={() => setShowAggregated(true)}
-              >
-                View Aggregated
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen((prev) => !prev)}
-              >
-                {isSettingsOpen ? "Close Settings" : "Settings"}
-              </button>
-            </div>
+            {audioUrl ? (
+              <a className="audio-download" href={audioUrl} download>
+                Download current recording
+              </a>
+            ) : null}
+            {audioError ? <p className="audio-error">{audioError}</p> : null}
+            <audio
+              ref={audioPlayerRef}
+              src={audioUrl ?? undefined}
+              preload="metadata"
+              style={{ display: "none" }}
+            />
           </div>
+          <div className="main-header-actions">
+              <div className="toolbar panel-toggle-toolbar">
+                <button
+                  type="button"
+                  aria-pressed={instructionsVisible}
+                  className={clsx(!instructionsVisible && "toggle-off")}
+                  onClick={() => setInstructionsVisible((prev) => !prev)}
+                  aria-label={`${instructionsVisible ? "Hide" : "Show"} instructions`}
+                >
+                  <IconDocument className="icon" />
+                  <span className="sr-only">Instructions</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={documentVisible}
+                  className={clsx(!documentVisible && "toggle-off")}
+                  onClick={() => setDocumentVisible((prev) => !prev)}
+                  aria-label={`${documentVisible ? "Hide" : "Show"} text editor`}
+                >
+                  <IconTextEditor className="icon" />
+                  <span className="sr-only">Text Editor</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={inlineEditorVisible}
+                  className={clsx(!inlineEditorVisible && "toggle-off")}
+                  onClick={() => setInlineEditorVisible((prev) => !prev)}
+                  aria-label={`${inlineEditorVisible ? "Hide" : "Show"} inline editor`}
+                >
+                  <IconInline className="icon" />
+                  <span className="sr-only">Inline Editor</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={chatVisible}
+                  className={clsx(!chatVisible && "toggle-off")}
+                  onClick={() => setChatVisible((prev) => !prev)}
+                  aria-label={`${chatVisible ? "Hide" : "Show"} ChatGPT panel`}
+                >
+                  <IconChat className="icon" />
+                  <span className="sr-only">Generate with ChatGPT</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={inlineBeforeDocument}
+                  className={clsx(inlineBeforeDocument && "toggle-active")}
+                  onClick={() => setInlineBeforeDocument((prev) => !prev)}
+                  aria-label="Swap text editor and inline editor position"
+                >
+                  <IconSwap className="icon" />
+                  <span className="sr-only">Swap editor layout</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAggregated(true)}
+                  aria-label="View aggregated instructions"
+                >
+                  <IconLayers className="icon" />
+                  <span className="sr-only">View Aggregated</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                  aria-label={isSettingsOpen ? "Close settings" : "Open settings"}
+                >
+                  <IconSettings className="icon" />
+                  <span className="sr-only">
+                    {isSettingsOpen ? "Close Settings" : "Settings"}
+                  </span>
+                </button>
+              </div>
+            </div>
         </div>
 
         {isSettingsOpen ? (
@@ -1521,7 +2428,8 @@ function App() {
               style={{
                 flexBasis: instructionsFlexBasis,
                 flexGrow: 0,
-                flexShrink: 0
+                flexShrink: 0,
+                order: 0
               }}
             >
               <p className="panel-label">Instructions</p>
@@ -1530,25 +2438,13 @@ function App() {
                   {selected?.name ?? "Instructions"} {loadingSelection ? "…" : ""}
                 </h2>
                 <div className="toolbar">
-                  {hasEditableInstructions && (
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={
-                        showFolderPanel
-                          ? handleSaveFolderInstructions
-                          : handleSaveDocument
-                      }
-                      disabled={
-                        loadingSelection ||
-                        (selected?.type === "document"
-                          ? !documentDetails
-                          : !folderDetails)
-                      }
+                  {hasEditableInstructions ? (
+                    <span
+                      className={clsx("autosave-indicator", instructionsAutosaveClass)}
                     >
-                      Save
-                    </button>
-                  )}
+                      {instructionsAutosaveLabel}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="panel-body">
@@ -1606,11 +2502,12 @@ function App() {
             </section>
           )}
 
-          {instructionsVisible && documentVisible && (
+          {instructionsVisible && (documentVisible || inlinePanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer instructions-resizer"
               onMouseDown={() => setDraggingResizer("instructions")}
               role="presentation"
+              style={{ order: 1 }}
             />
           )}
 
@@ -1620,7 +2517,8 @@ function App() {
               style={{
                 flexBasis: documentFlexBasis,
                 flexGrow: 1,
-                flexShrink: 0
+                flexShrink: 0,
+                order: inlineBeforeDocument ? 4 : 2
               }}
             >
               <div className="panel-header">
@@ -1644,7 +2542,7 @@ function App() {
                     />
                   </form>
                 ) : (
-                  <h2>{selected?.name}</h2>
+                  <h2>{selectedName}</h2>
                 )}
                 <div className="toolbar">
                   {documentDetails ? (
@@ -1668,14 +2566,13 @@ function App() {
                   >
                     {isDocGenerating ? "Generating…" : "Generate Draft"}
                   </button>
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={handleSaveDocument}
-                    disabled={loadingSelection || !documentDetails}
-                  >
-                    Save Document
-                  </button>
+                  {documentDetails ? (
+                    <span
+                      className={clsx("autosave-indicator", documentAutosaveClass)}
+                    >
+                      {documentAutosaveLabel}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="panel-body">
@@ -1702,7 +2599,8 @@ function App() {
               style={{
                 flexBasis: documentFlexBasis,
                 flexGrow: 1,
-                flexShrink: 0
+                flexShrink: 0,
+                order: inlineBeforeDocument ? 4 : 2
               }}
             >
               <div className="panel-header">
@@ -1724,6 +2622,7 @@ function App() {
               className="resizer resizer-vertical panel-resizer inline-resizer"
               onMouseDown={() => setDraggingResizer("inline")}
               role="presentation"
+              style={{ order: 3 }}
             />
           )}
 
@@ -1733,7 +2632,8 @@ function App() {
               style={{
                 flexBasis: inlineFlexBasis,
                 flexGrow: 0,
-                flexShrink: 0
+                flexShrink: 0,
+                order: inlineBeforeDocument ? 2 : 4
               }}
               ref={inlinePanelRef}
             >
@@ -1746,16 +2646,6 @@ function App() {
                 >
                   <div className="panel-header">
                     <h2>Inline Editor</h2>
-                    <div className="toolbar">
-                      <button
-                        type="button"
-                        onClick={() => setInlineActionsEnabled((prev) => !prev)}
-                      >
-                        {inlineActionsEnabled
-                          ? "Inline Actions: On"
-                          : "Inline Actions: Off"}
-                      </button>
-                    </div>
                   </div>
                   <div className="panel-body inline-editor-body">
                     {!documentDetails ? (
@@ -1772,23 +2662,54 @@ function App() {
                       </p>
                     ) : (
                       <div className="inline-editor-list">
-                        {paragraphEntries.map((entry) => (
+                        {paragraphEntries.map((entry, index) => (
                           <div className="paragraph-card" key={entry.id}>
-                            <div className="paragraph-card-text">
-                              {entry.text}
-                            </div>
-                            <div className="paragraph-card-actions">
-                              {PARAGRAPH_ACTIONS.map((mode) => (
-                                <button
-                                  type="button"
-                                  key={`${entry.id}-${mode}`}
-                                  onClick={() =>
-                                    void handleParagraphAction(mode, entry.text)
-                                  }
-                                >
-                                  {VARIANT_LABELS[mode]}
-                                </button>
-                              ))}
+                            <div className="paragraph-card-editor">
+                              <textarea
+                                className="paragraph-card-textarea"
+                                defaultValue={entry.text}
+                                onChange={(event) => {
+                                  if (!documentDetails) return;
+                                  const updatedParagraphs = [...paragraphEntries];
+                                  updatedParagraphs[index] = {
+                                    ...entry,
+                                    text: event.target.value
+                                  };
+                                  const merged = updatedParagraphs
+                                    .map((item) => item.text)
+                                    .join("\n\n");
+                                  setDocumentDetails({
+                                    ...documentDetails,
+                                    content: merged
+                                  });
+                                }}
+                                onInput={(event) => {
+                                  const element = event.currentTarget;
+                                  element.style.height = "auto";
+                                  element.style.height = `${element.scrollHeight}px`;
+                                }}
+                              />
+                              <div className="paragraph-card-actions">
+                                {PARAGRAPH_ACTIONS.map((mode) => {
+                                  const IconComponent =
+                                    VARIANT_ICONS[mode] ?? IconDocument;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={`${entry.id}-${mode}`}
+                                      onClick={() =>
+                                        void handleParagraphAction(mode, entry.text)
+                                      }
+                                      aria-label={VARIANT_LABELS[mode]}
+                                    >
+                                      <IconComponent className="icon" size={16} />
+                                      <span className="sr-only">
+                                        {VARIANT_LABELS[mode]}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1867,11 +2788,7 @@ function App() {
             {status.message}
           </div>
         ) : (
-          <div className="status-bar">
-            {loadingSelection
-              ? "Loading selection..."
-              : "Ready to write mindful experiences."}
-          </div>
+          <div className="status-bar">{fallbackStatusMessage}</div>
         )}
       </main>
 

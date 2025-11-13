@@ -23,5 +23,6 @@ export type DocumentDetails = {
   instructions: string;
   aggregatedInstructions: string;
   completed: boolean;
+  audioUrl: string | null;
 };
 
