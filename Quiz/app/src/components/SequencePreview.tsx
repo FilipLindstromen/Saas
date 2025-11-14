@@ -145,8 +145,7 @@ function useAudio() {
     const base = ref.current
     if (!base) return
     const clamp = Math.min(Math.max(vol, 0), 1)
-    const canReuse = base.paused || base.ended
-    const audio = canReuse ? base : (base.cloneNode(true) as HTMLAudioElement)
+    const audio = base.cloneNode(true) as HTMLAudioElement
     audio.volume = clamp
     audio.currentTime = 0
     void audio.play().catch((error) => {

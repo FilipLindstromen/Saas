@@ -201,10 +201,12 @@ export function AudioEditor({
     const restoredWords = previousState.words.map((word, currentIndex) => {
       // originalIndex should be preserved in history state, but if missing, try to find it
       const existingOriginalIndex = (word as any).originalIndex;
+      const existingDeleted = (word as any).deleted || false;
       if (existingOriginalIndex !== undefined) {
         return {
           ...word,
-          originalIndex: existingOriginalIndex
+          originalIndex: existingOriginalIndex,
+          deleted: existingDeleted
         } as any;
       }
       
@@ -219,14 +221,16 @@ export function AudioEditor({
       
       return {
         ...word,
-        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex
+        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex,
+        deleted: existingDeleted
       } as any;
     });
     
+    const nonDeletedRestoredWords = restoredWords.filter((w: any) => !w.deleted);
     const restored: Transcription = {
       ...currentTranscription,
       words: restoredWords,
-      text: previousState.text,
+      text: nonDeletedRestoredWords.map((w: any) => w.word).join(" "),
       segments: previousState.segments
     };
     
@@ -238,10 +242,10 @@ export function AudioEditor({
     
     // CRITICAL: Update audio file to reflect undo
     // Apply audio edits based on restored transcription
-    if (audioBufferRef.current && audioContextRef.current && restored.words.length > 0) {
+    if (audioBufferRef.current && audioContextRef.current && nonDeletedRestoredWords.length > 0) {
       try {
-        // Compute segments for the restored transcription
-        const currentBlocks = restoredWords.map((word, index) => ({
+        // Compute segments for the restored transcription (excluding deleted words)
+        const currentBlocks = nonDeletedRestoredWords.map((word: any, index: number) => ({
           id: `word-${index}-${word.start}-${word.end}`,
           word: word.word.trim(),
           start: word.start,
@@ -295,10 +299,12 @@ export function AudioEditor({
     const restoredWords = nextState.words.map((word, currentIndex) => {
       // originalIndex should be preserved in history state, but if missing, try to find it
       const existingOriginalIndex = (word as any).originalIndex;
+      const existingDeleted = (word as any).deleted || false;
       if (existingOriginalIndex !== undefined) {
         return {
           ...word,
-          originalIndex: existingOriginalIndex
+          originalIndex: existingOriginalIndex,
+          deleted: existingDeleted
         } as any;
       }
       
@@ -313,14 +319,16 @@ export function AudioEditor({
       
       return {
         ...word,
-        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex
+        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex,
+        deleted: existingDeleted
       } as any;
     });
     
+    const nonDeletedRestoredWords = restoredWords.filter((w: any) => !w.deleted);
     const restored: Transcription = {
       ...currentTranscription,
       words: restoredWords,
-      text: nextState.text,
+      text: nonDeletedRestoredWords.map((w: any) => w.word).join(" "),
       segments: nextState.segments
     };
     
@@ -332,10 +340,10 @@ export function AudioEditor({
     
     // CRITICAL: Update audio file to reflect redo
     // Apply audio edits based on restored transcription
-    if (audioBufferRef.current && audioContextRef.current && restored.words.length > 0) {
+    if (audioBufferRef.current && audioContextRef.current && nonDeletedRestoredWords.length > 0) {
       try {
-        // Compute segments for the restored transcription
-        const currentBlocks = restoredWords.map((word, index) => ({
+        // Compute segments for the restored transcription (excluding deleted words)
+        const currentBlocks = nonDeletedRestoredWords.map((word: any, index: number) => ({
           id: `word-${index}-${word.start}-${word.end}`,
           word: word.word.trim(),
           start: word.start,
@@ -426,8 +434,9 @@ export function AudioEditor({
         word: word.word.trim(),
         start: word.start,
         end: word.end,
-        index: originalIndex
-      };
+        index: originalIndex,
+        deleted: (word as any).deleted || false
+      } as WordBlock & { deleted: boolean };
     });
     
     console.log("wordBlocks recomputed:", blocks.length, "blocks:", blocks.map(b => b.word).join(" "));
@@ -709,13 +718,13 @@ export function AudioEditor({
     if (selectedWordIds.size === 0 && selectedPauseIds.size === 0) return;
     if (!currentTranscription) return;
 
-    // SIMPLE APPROACH: Map block IDs to word indices, then filter currentTranscription.words
+    // Map block IDs to word indices
     const blockIdToWordIndex = new Map<string, number>();
     wordBlocks.forEach((block, index) => {
       blockIdToWordIndex.set(block.id, index);
     });
 
-    // Get indices of words to delete
+    // Get indices of words to mark as deleted
     const wordIndicesToDelete = new Set<number>();
     selectedWordIds.forEach(blockId => {
       const wordIndex = blockIdToWordIndex.get(blockId);
@@ -724,39 +733,40 @@ export function AudioEditor({
       }
     });
 
-    // Filter words - only keep words NOT in the delete set
-    const remainingWords = currentTranscription.words.filter((word, index) => {
-      return !wordIndicesToDelete.has(index);
+    // Mark words as deleted instead of removing them
+    const updatedWords = currentTranscription.words.map((word, index) => {
+      if (wordIndicesToDelete.has(index)) {
+        return {
+          ...word,
+          deleted: true,
+          originalIndex: (word as any).originalIndex !== undefined 
+            ? (word as any).originalIndex 
+            : index
+        } as any;
+      }
+      return word;
     });
 
-    // Handle pause compression if pauses were selected
-    if (selectedPauseIds.size > 0) {
-      // This will be handled by pause adjustment separately
-      // For now, just remove the words
-    }
-
-    if (remainingWords.length === 0) {
+    // Check if all words would be deleted
+    const nonDeletedWords = updatedWords.filter((w: any) => !w.deleted);
+    if (nonDeletedWords.length === 0) {
       setTranscriptionError("Cannot delete all words");
       return;
     }
 
-    // Update transcription - preserve originalIndex on all remaining words
+    // Update transcription - keep all words but mark some as deleted
     const updated: Transcription = {
       ...currentTranscription,
-      words: remainingWords.map((word) => ({
-        ...word,
-        originalIndex: (word as any).originalIndex !== undefined 
-          ? (word as any).originalIndex 
-          : currentTranscription.words.indexOf(word)
-      })) as any,
-      text: remainingWords.map(w => w.word).join(" ")
+      words: updatedWords as any,
+      text: nonDeletedWords.map((w: any) => w.word).join(" ")
     };
 
     // Save to history
     const state: TranscriptionState = {
       words: updated.words.map((w) => ({
         ...w,
-        originalIndex: (w as any).originalIndex
+        originalIndex: (w as any).originalIndex,
+        deleted: (w as any).deleted || false
       })) as any,
       text: updated.text,
       segments: updated.segments || [],
@@ -947,7 +957,7 @@ export function AudioEditor({
     setTranscriptionError(null);
 
     try {
-      // SIMPLE APPROACH: Use currentTranscription.words directly - it already has deleted words removed
+      // SIMPLE APPROACH: Use currentTranscription.words directly - exclude deleted words
       if (!currentTranscription || !currentTranscription.words || currentTranscription.words.length === 0) {
         setTranscriptionError("No words to preview");
         setIsPreviewing(false);
@@ -955,7 +965,7 @@ export function AudioEditor({
       }
 
       // Build list of words to play from currentTranscription.words
-      // Only include words that have valid originalIndex and original timestamps
+      // Only include words that have valid originalIndex, original timestamps, and are not deleted
       const wordsToPlay: Array<{
         word: any;
         originalIndex: number;
@@ -964,6 +974,11 @@ export function AudioEditor({
       }> = [];
 
       for (const word of currentTranscription.words) {
+        // Skip deleted words
+        if ((word as any).deleted) {
+          continue;
+        }
+
         const originalIndex = (word as any).originalIndex;
         if (originalIndex === undefined || originalIndex === null) {
           continue; // Skip words without originalIndex
@@ -1324,17 +1339,19 @@ export function AudioEditor({
   const handleSaveEdits = useCallback(async () => {
     if (!currentTranscription) return;
 
-    // CRITICAL: Use currentTranscription.words directly - deleted words are already removed from this array
+    // CRITICAL: Use currentTranscription.words directly - exclude deleted words
+    const nonDeletedWords = currentTranscription.words.filter((w: any) => !w.deleted);
     console.log("Save Edits: currentTranscription.words count", currentTranscription.words.length);
-    console.log("Save Edits: currentTranscription.words text", currentTranscription.words.map(w => w.word).join(" "));
-    console.log("Save Edits: currentTranscription words with originalIndex", currentTranscription.words.map((w, i) => ({
+    console.log("Save Edits: non-deleted words count", nonDeletedWords.length);
+    console.log("Save Edits: currentTranscription.words text", nonDeletedWords.map((w: any) => w.word).join(" "));
+    console.log("Save Edits: currentTranscription words with originalIndex", nonDeletedWords.map((w: any, i: number) => ({
       index: i,
       word: w.word,
       originalIndex: (w as any).originalIndex
     })));
     
-    // Create blocks from currentTranscription.words - this array already excludes deleted words
-    const currentBlocks = currentTranscription.words.map((word, currentIndex) => {
+    // Create blocks from non-deleted words only
+    const currentBlocks = nonDeletedWords.map((word: any, currentIndex: number) => {
       // originalIndex should always be set - it's set on initial load and preserved during edits
       const originalIndex = (word as any).originalIndex !== undefined 
         ? (word as any).originalIndex 
@@ -1662,6 +1679,7 @@ export function AudioEditor({
               const isSelected = selectedWordIds.has(block.id);
               const isRetake = retakeWordIds.has(block.id);
               const isCurrentlyPlaying = currentPlayingWordId === block.id;
+              const isDeleted = (block as any).deleted || false;
               const nextBlock = wordBlocks[index + 1];
               // Find pause after this word
               const pauseAfter = pauses.find(
@@ -1682,9 +1700,10 @@ export function AudioEditor({
                       "audio-editor-word-retake": isRetake,
                       "audio-editor-word-current": isCurrentlyPlaying
                     })}
+                    style={isDeleted ? { opacity: 0.2 } : undefined}
                     onMouseDown={(e) => handleWordMouseDown(block.id, e)}
                     onMouseEnter={() => handleWordMouseEnter(block.id)}
-                    title={`${formatTime(block.start)} - ${formatTime(block.end)}${isRetake ? " (Retake)" : ""}`}
+                    title={`${formatTime(block.start)} - ${formatTime(block.end)}${isRetake ? " (Retake)" : ""}${isDeleted ? " (Deleted)" : ""}`}
                   >
                     {block.word}
                   </button>

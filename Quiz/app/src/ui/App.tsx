@@ -19,6 +19,7 @@ import { LabeledSlider } from '../components/LabeledSlider'
 import { BackgroundRenderer } from '../components/BackgroundRenderer'
 import { SequencePreview } from '../components/SequencePreview'
 import { createTestAudio } from '../utils/testAudio'
+import { TransparentTextarea } from '../components/TransparentTextarea'
 
 export function App() {
   const {
@@ -1286,10 +1287,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
 
                     <div className="space-y-3">
                       <div className="text-sm text-gray-300">CTA Text</div>
-                        <textarea
+                        <TransparentTextarea
                           placeholder="Enter CTA text... (use Shift+Enter for line breaks)"
                         value={currentCTA.text}
-                        onChange={e => applyCTAUpdate(cta => ({ ...cta, text: e.target.value }))}
+                        onChange={value => applyCTAUpdate(cta => ({ ...cta, text: value }))}
                           className="ios-input w-full"
                           rows={3}
                         />
@@ -1579,10 +1580,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                           </button>
                         </div>
 
-                        <textarea
+                        <TransparentTextarea
                           className="ios-input w-full min-h-[80px] resize-y"
                           value={item.text}
-                          onChange={e => updateOverlayItem(item.id, overlay => ({ ...overlay, text: e.target.value }))}
+                          onChange={value => updateOverlayItem(item.id, overlay => ({ ...overlay, text: value }))}
                           placeholder="Enter overlay text... (Shift+Enter for line breaks)"
                         />
 
@@ -1772,10 +1773,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
               {/* Quiz Title */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-300 mb-3">📝 Quiz Title</div>
-                <textarea 
+                <TransparentTextarea 
                   className="ios-input w-full mb-2 min-h-[60px] resize-y" 
                   value={quiz.title} 
-                  onChange={e => updateTitle(e.target.value)} 
+                  onChange={updateTitle} 
                   placeholder="Your Quiz Title&#10;Use Enter for line breaks" 
                   rows={2}
                 />
@@ -1795,10 +1796,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm text-iossub mb-1">💡 Specific Idea/Topic (Optional)</label>
-                    <textarea
+                    <TransparentTextarea
                       className="ios-input w-full min-h-[60px] resize-y"
                       value={idea}
-                      onChange={e => persistIdea(e.target.value)}
+                      onChange={persistIdea}
                       placeholder="Enter a specific idea or topic for your questions (e.g., 'workplace stress', 'social media habits', 'cooking disasters')"
                       rows={2}
                     />
@@ -1978,20 +1979,20 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
           {selectedQuestion && (
                 <div className="ios-card p-4">
                   <div className="text-sm font-medium text-gray-300 mb-3">Edit Question</div>
-                  <textarea 
+                  <TransparentTextarea 
                     className="ios-input w-full mb-3 min-h-[60px] resize-y" 
                     value={selectedQuestion.title} 
-                    onChange={e => updateQuestion({ ...selectedQuestion, title: e.target.value })} 
+                    onChange={value => updateQuestion({ ...selectedQuestion, title: value })} 
                     placeholder="Enter your question&#10;Use Enter for line breaks"
                     rows={2}
                   />
               <div className="space-y-2">
                 {selectedQuestion.answers.map((a: QuizAnswer) => (
                   <div key={a.id} className="flex items-center gap-2">
-                        <textarea 
+                        <TransparentTextarea 
                           className="ios-input flex-1 min-h-[40px] resize-y" 
                           value={a.text} 
-                          onChange={e => handleAnswerTextChange(selectedQuestion, a.id, e.target.value)} 
+                          onChange={value => handleAnswerTextChange(selectedQuestion, a.id, value)} 
                           placeholder="Answer text&#10;Use Enter for line breaks"
                           rows={1}
                         />
@@ -2024,10 +2025,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                       Show Top Text
                     </label>
                     {meme.settings?.showTopText && (
-                      <textarea 
+                      <TransparentTextarea 
                         className="ios-input w-full mb-2 min-h-[60px] resize-y" 
                         value={meme.topText || ''} 
-                        onChange={e => updateTopText(e.target.value)} 
+                        onChange={updateTopText} 
                         placeholder="Enter top text for your meme&#10;Use Enter for line breaks" 
                         rows={2}
                       />
@@ -2043,10 +2044,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                       Show Bottom Text
                     </label>
                     {meme.settings?.showBottomText && (
-                      <textarea 
+                      <TransparentTextarea 
                         className="ios-input w-full mb-2 min-h-[60px] resize-y" 
                         value={meme.bottomText || ''} 
-                        onChange={e => updateBottomText(e.target.value)} 
+                        onChange={updateBottomText} 
                         placeholder="Enter bottom text for your meme&#10;Use Enter for line breaks" 
                         rows={2}
                       />
