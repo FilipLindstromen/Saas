@@ -880,6 +880,8 @@ export function AudioEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedWordIds, selectedPauseIds, handleDeleteSelected, handleUndo, handleRedo]);
 
+  const pauseTimeoutRef = useRef<number | null>(null);
+
   const handleStopPreview = useCallback(() => {
     if (previewSourceRef.current) {
       try {
@@ -890,6 +892,10 @@ export function AudioEditor({
     if (playbackAnimationFrameRef.current) {
       cancelAnimationFrame(playbackAnimationFrameRef.current);
       playbackAnimationFrameRef.current = null;
+    }
+    if (pauseTimeoutRef.current !== null) {
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = null;
     }
     playbackStartTimeRef.current = null;
     playbackBlocksRef.current = [];
@@ -995,157 +1001,168 @@ export function AudioEditor({
 
       const blocksToPlay = wordsToPlay.slice(startIndex);
 
-      // Calculate total duration - sum of word durations + minimal gaps between them
-      const MIN_GAP = 0.01; // 10ms gap between words
-      let totalDuration = 0;
-      const playbackBlocks: Array<{ id: string; start: number; end: number }> = [];
-      let currentPlaybackTime = 0;
+      // Build playback timeline with pauses
+      // Each item is either a word or a pause
+      type PlaybackItem = 
+        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; startTime: number; endTime: number; id: string }
+        | { type: 'pause'; duration: number; startTime: number; endTime: number; id: string };
+      
+      const playbackTimeline: PlaybackItem[] = [];
+      let currentTime = 0;
       
       for (let i = 0; i < blocksToPlay.length; i++) {
         const item = blocksToPlay[i];
         const wordDuration = item.originalEnd - item.originalStart;
-        const blockStartTime = currentPlaybackTime;
-        const blockEndTime = currentPlaybackTime + wordDuration;
+        const wordStartTime = currentTime;
+        const wordEndTime = currentTime + wordDuration;
         
-        // Create ID for tracking
-        const wordId = `word-${i}-${item.originalIndex}`;
-        playbackBlocks.push({
-          id: wordId,
-          start: blockStartTime,
-          end: blockEndTime
+        // Add word to timeline
+        // Find the matching word block to get the correct ID for highlighting
+        const matchingWordBlock = wordBlocks.find(b => b.index === item.originalIndex);
+        const wordId = matchingWordBlock?.id || `word-${i}-${item.originalIndex}`;
+        playbackTimeline.push({
+          type: 'word',
+          wordIndex: i,
+          item,
+          startTime: wordStartTime,
+          endTime: wordEndTime,
+          id: wordId
         });
         
-        totalDuration += wordDuration;
-        currentPlaybackTime = blockEndTime;
+        currentTime = wordEndTime;
         
-        // Add minimal gap between words (except last)
+        // Check for pause after this word (except last)
         if (i < blocksToPlay.length - 1) {
-          totalDuration += MIN_GAP;
-          currentPlaybackTime += MIN_GAP;
+          // Find pause between this word and next in wordBlocks
+          const currentWordBlockIndex = wordBlocks.findIndex(b => b.index === item.originalIndex);
+          const nextItem = blocksToPlay[i + 1];
+          const nextWordBlockIndex = wordBlocks.findIndex(b => b.index === nextItem.originalIndex);
+          
+          if (currentWordBlockIndex >= 0 && nextWordBlockIndex >= 0) {
+            const pause = pauses.find(p => 
+              p.beforeWordIndex === currentWordBlockIndex && 
+              p.afterWordIndex === nextWordBlockIndex
+            );
+            
+            if (pause && pause.duration > pauseThreshold) {
+              // Add pause to timeline
+              const pauseStartTime = currentTime;
+              const pauseEndTime = currentTime + pause.duration;
+              playbackTimeline.push({
+                type: 'pause',
+                duration: pause.duration,
+                startTime: pauseStartTime,
+                endTime: pauseEndTime,
+                id: `pause-${i}`
+              });
+              currentTime = pauseEndTime;
+            } else {
+              // Minimal gap between words
+              currentTime += 0.01; // 10ms
+            }
+          } else {
+            // Minimal gap if we can't find pause
+            currentTime += 0.01;
+          }
         }
       }
       
-      playbackBlocksRef.current = playbackBlocks;
+      // Store timeline for tracking
+      playbackBlocksRef.current = playbackTimeline.map(item => ({
+        id: item.id,
+        start: item.startTime,
+        end: item.endTime
+      }));
       
-      const sampleRate = audioBuffer.sampleRate;
-      const totalSamples = Math.ceil(totalDuration * sampleRate);
+      // Play words and pauses sequentially
+      let currentItemIndex = 0;
       
-      // Create new audio buffer for edited audio
-      const newBuffer = audioContext.createBuffer(
-        audioBuffer.numberOfChannels,
-        totalSamples,
-        sampleRate
-      );
-
-      let offsetSamples = 0;
-      const BOUNDARY_CROSSFADE = Math.max(32, Math.floor(0.001 * sampleRate)); // 1ms crossfade
-
-      // Copy each word segment from original audio buffer
-      for (let i = 0; i < blocksToPlay.length; i++) {
-        const item = blocksToPlay[i];
-        const originalStartSample = Math.floor(item.originalStart * sampleRate);
-        const originalEndSample = Math.floor(item.originalEnd * sampleRate);
-        const originalBlockSamples = originalEndSample - originalStartSample;
-        const targetBlockSamples = originalBlockSamples; // Use same duration as original
-
-        // Copy audio data for each channel
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const originalData = audioBuffer.getChannelData(channel);
-          const newData = newBuffer.getChannelData(channel);
-          
-          // Copy from original audio using original timestamps
-          const maxCopy = Math.min(targetBlockSamples, originalData.length - originalStartSample, newData.length - offsetSamples);
-          
-          // Small crossfade at start if not first word
-          const fadeInSamples = i === 0 ? 0 : Math.min(BOUNDARY_CROSSFADE, maxCopy);
-          if (fadeInSamples > 0 && offsetSamples > 0) {
-            for (let j = 0; j < fadeInSamples; j++) {
-              if (offsetSamples + j < newData.length && originalStartSample + j < originalData.length) {
-                const fade = j / fadeInSamples;
-                const prevValue = newData[offsetSamples + j - 1] || 0;
-                const currentValue = originalData[originalStartSample + j];
-                newData[offsetSamples + j] = prevValue * (1 - fade) + currentValue * fade;
-              }
-            }
-          }
-          
-          // Copy main section
-          for (let j = fadeInSamples; j < maxCopy; j++) {
-            if (offsetSamples + j < newData.length && originalStartSample + j < originalData.length) {
-              newData[offsetSamples + j] = originalData[originalStartSample + j];
-            }
-          }
-        }
-
-        // Move offset forward by word duration
-        offsetSamples += targetBlockSamples;
-        
-        // Add minimal gap between words (except last)
-        if (i < blocksToPlay.length - 1) {
-          const gapSamples = Math.floor(MIN_GAP * sampleRate);
-          offsetSamples += gapSamples;
-        }
-      }
-
-      // Play the new buffer
-      const source = audioContext.createBufferSource();
-      source.buffer = newBuffer;
-      source.connect(audioContext.destination);
-      previewSourceRef.current = source;
-
-      source.onended = () => {
-        handleStopPreview();
-      };
-
-      // Start playback tracking
-      playbackStartTimeRef.current = audioContext.currentTime;
-      
-      // Animation loop to track current playing word
-      const updatePlayingWord = () => {
-        if (!playbackStartTimeRef.current || !audioContextRef.current || !previewSourceRef.current) {
+      const playNextItem = () => {
+        if (currentItemIndex >= playbackTimeline.length) {
+          handleStopPreview();
           return;
         }
         
-        const elapsed = audioContextRef.current.currentTime - playbackStartTimeRef.current;
-        const blocks = playbackBlocksRef.current;
+        const item = playbackTimeline[currentItemIndex];
         
-        // Find the current word based on elapsed time
-        let currentWordId: string | null = null;
-        for (const block of blocks) {
-          if (elapsed >= block.start && elapsed <= block.end) {
-            currentWordId = block.id;
-            break;
+        if (item.type === 'word') {
+          // Play word
+          const wordBuffer = audioContext.createBuffer(
+            audioBuffer.numberOfChannels,
+            Math.ceil((item.item.originalEnd - item.item.originalStart) * audioBuffer.sampleRate),
+            audioBuffer.sampleRate
+          );
+          
+          const originalStartSample = Math.floor(item.item.originalStart * audioBuffer.sampleRate);
+          const originalEndSample = Math.floor(item.item.originalEnd * audioBuffer.sampleRate);
+          const samplesToCopy = originalEndSample - originalStartSample;
+          
+          // Copy word audio
+          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            const originalData = audioBuffer.getChannelData(channel);
+            const newData = wordBuffer.getChannelData(channel);
+            for (let j = 0; j < samplesToCopy && originalStartSample + j < originalData.length; j++) {
+              newData[j] = originalData[originalStartSample + j];
+            }
           }
-        }
-        
-        setCurrentPlayingWordId((prevId) => {
-          // Scroll to current word when it changes
-          if (currentWordId && currentWordId !== prevId && containerRef.current) {
-            const wordElement = containerRef.current.querySelector(`[data-word-id="${currentWordId}"]`) as HTMLElement;
+          
+          const source = audioContext.createBufferSource();
+          source.buffer = wordBuffer;
+          source.connect(audioContext.destination);
+          previewSourceRef.current = source;
+          
+          // Track current word
+          setCurrentPlayingWordId(item.id);
+          
+          // Scroll to word
+          if (containerRef.current) {
+            const wordElement = containerRef.current.querySelector(`[data-word-id="${item.id}"]`) as HTMLElement;
             if (wordElement) {
-              // Use requestAnimationFrame to ensure DOM is updated
               requestAnimationFrame(() => {
                 wordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
               });
             }
           }
-          return currentWordId;
-        });
-        
-        // Continue tracking if still playing
-        if (previewSourceRef.current) {
-          playbackAnimationFrameRef.current = requestAnimationFrame(updatePlayingWord);
+          
+          source.onended = () => {
+            // Move to next item
+            currentItemIndex++;
+            playNextItem();
+          };
+          
+          source.start(0);
+        } else if (item.type === 'pause') {
+          // Pause playback - clear current word highlight
+          setCurrentPlayingWordId(null);
+          
+          // Stop current source if playing
+          if (previewSourceRef.current) {
+            try {
+              previewSourceRef.current.stop();
+            } catch {}
+            previewSourceRef.current = null;
+          }
+          
+          // Wait for pause duration, then continue to next word
+          pauseTimeoutRef.current = window.setTimeout(() => {
+            pauseTimeoutRef.current = null;
+            currentItemIndex++;
+            playNextItem();
+          }, item.duration * 1000);
         }
       };
       
-      source.start(0);
-      playbackAnimationFrameRef.current = requestAnimationFrame(updatePlayingWord);
+      // Start playback tracking
+      playbackStartTimeRef.current = audioContext.currentTime;
+      
+      // Start playing
+      playNextItem();
     } catch (error) {
       console.error("Preview error:", error);
       setTranscriptionError("Failed to preview audio: " + (error instanceof Error ? error.message : "Unknown error"));
       setIsPreviewing(false);
     }
-  }, [currentTranscription, selectedWordIds, isPreviewing, handleStopPreview, originalWordTimestamps]);
+  }, [currentTranscription, selectedWordIds, isPreviewing, handleStopPreview, originalWordTimestamps, wordBlocks, pauses, pauseThreshold]);
 
   const handleAiStudioSound = useCallback(async () => {
     if (!documentPath || !audioUrl) {
