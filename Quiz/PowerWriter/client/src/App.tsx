@@ -2438,84 +2438,6 @@ function App() {
               selected document.
             </p>
           </div>
-          <div className="main-header-recording">
-            <div className="main-header-recording-header">
-              <span className="main-header-recording-label">Record Audio</span>
-              {audioStatusText ? (
-                <span className={audioStatusClass}>{audioStatusText}</span>
-              ) : null}
-            </div>
-            <div className="audio-controls compact">
-              <button
-                type="button"
-                onClick={() => void startRecording()}
-                disabled={!canStartRecording}
-                aria-label="Start recording"
-              >
-                <IconRecord className="icon" />
-                <span className="sr-only">
-                  {isRecordingAudio ? "Recording…" : "Record"}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={stopRecording}
-                disabled={!isRecordingAudio}
-                aria-label="Stop recording"
-              >
-                <IconStop className="icon" />
-                <span className="sr-only">Stop</span>
-              </button>
-              <button
-                type="button"
-                onClick={handlePlayAudio}
-                disabled={!hasAudio || isRecordingAudio}
-                aria-label="Play audio"
-              >
-                <IconPlay className="icon" />
-                <span className="sr-only">Play</span>
-              </button>
-              <button
-                type="button"
-                onClick={handlePauseAudio}
-                disabled={!hasAudio}
-                aria-label="Pause audio"
-              >
-                <IconPause className="icon" />
-                <span className="sr-only">Pause</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleRewindAudio}
-                disabled={!hasAudio}
-                aria-label="Rewind audio"
-              >
-                <IconRewind className="icon" />
-                <span className="sr-only">Rewind</span>
-              </button>
-            </div>
-            {audioUrl ? (
-              <a className="audio-download" href={audioUrl} download>
-                Download current recording
-              </a>
-            ) : null}
-            {audioError ? <p className="audio-error">{audioError}</p> : null}
-            <div className="audio-meta">
-              {isRecordingAudio ? (
-                <span className="audio-timer">{formattedElapsed}</span>
-              ) : (
-                <span className="audio-filename">
-                  {recordingFileName ?? "No recording saved"}
-                </span>
-              )}
-            </div>
-            <audio
-              ref={audioPlayerRef}
-              src={audioUrl ?? undefined}
-              preload="metadata"
-              style={{ display: "none" }}
-            />
-          </div>
           <div className="main-header-actions">
               <div className="toolbar panel-toggle-toolbar">
                 <button
@@ -2544,9 +2466,8 @@ function App() {
                     aria-pressed={audioEditorVisible}
                     className={clsx(!audioEditorVisible && "toggle-off")}
                     onClick={() => setAudioEditorVisible((prev) => !prev)}
-                    disabled={!documentDetails?.audioUrl}
                     aria-label={`${audioEditorVisible ? "Hide" : "Show"} audio editor`}
-                    title={documentDetails?.audioUrl ? "Audio Editor" : "Audio Editor (record audio first)"}
+                    title="Audio Editor - Record, edit, and enhance audio"
                   >
                     <IconAudioEditor className="icon" />
                     <span className="sr-only">Audio Editor</span>
@@ -2729,7 +2650,7 @@ function App() {
             />
           )}
 
-          {audioEditorVisible && documentDetails?.audioUrl ? (
+          {audioEditorVisible && selected?.type === "document" && documentDetails ? (
             <section
               className="audio-editor-panel"
               style={{
@@ -2743,8 +2664,8 @@ function App() {
               <div className="panel-body">
                 <AudioEditor
                   documentPath={documentDetails.path}
-                  audioUrl={documentDetails.audioUrl}
-                  transcription={documentDetails.transcription}
+                  audioUrl={documentDetails.audioUrl ?? null}
+                  transcription={documentDetails.transcription ?? null}
                   documentContent={documentDetails.content}
                   apiKey={userApiKey || undefined}
                   onTranscriptionUpdate={(transcription) => {
@@ -2755,12 +2676,22 @@ function App() {
                       });
                     }
                   }}
+                  isRecordingAudio={isRecordingAudio}
+                  recordingElapsed={recordingElapsed}
+                  recordingFileName={recordingFileName}
+                  onStartRecording={startRecording}
+                  onStopRecording={stopRecording}
+                  onPlayAudio={handlePlayAudio}
+                  onPauseAudio={handlePauseAudio}
+                  onRewindAudio={handleRewindAudio}
+                  canStartRecording={canStartRecording}
+                  hasAudio={hasAudio}
                 />
               </div>
             </section>
           ) : null}
 
-          {audioEditorVisible && documentDetails?.audioUrl && (documentVisible || inlinePanelVisible) && (
+          {audioEditorVisible && selected?.type === "document" && (documentVisible || inlinePanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer audio-editor-resizer"
               onMouseDown={() => setDraggingResizer("audioEditor")}

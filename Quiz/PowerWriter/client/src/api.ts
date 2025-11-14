@@ -281,6 +281,49 @@ export async function editDocumentAudio(
   return handleResponse<{ success: true; audioUrl: string }>(response);
 }
 
+export async function enhanceDocumentAudio(
+  path: string
+): Promise<{ audioUrl: string }> {
+  const response = await fetch("/api/document/audio/enhance", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ path })
+  });
+  return handleResponse<{ success: true; audioUrl: string }>(response);
+}
+
+export async function exportAudioAsMp3(path: string): Promise<void> {
+  const response = await fetch(
+    `/api/document/audio/export-mp3?path=${encodeURIComponent(path)}`
+  );
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: "Failed to export audio" }));
+    throw new Error(errorData.message || errorData.error || "Failed to export audio as MP3");
+  }
+
+  // Get filename from Content-Disposition header or generate one
+  const contentDisposition = response.headers.get("Content-Disposition");
+  let fileName = "audio.mp3";
+  if (contentDisposition) {
+    const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
+    if (fileNameMatch) {
+      fileName = fileNameMatch[1];
+    }
+  }
+
+  // Download the file
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 export async function renameItem(sourcePath: string, targetPath: string) {
   const response = await fetch("/api/rename", {
     method: "POST",

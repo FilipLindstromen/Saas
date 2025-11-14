@@ -1,7 +1,50 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import type { Transcription } from "./types";
-import { transcribeDocumentAudio, editDocumentAudio } from "./api";
+import { transcribeDocumentAudio, editDocumentAudio, enhanceDocumentAudio, exportAudioAsMp3 } from "./api";
+
+// Icon components for recording controls
+type IconProps = React.SVGProps<SVGSVGElement> & { size?: number };
+
+const createIcon = (path: React.ReactNode, viewBox = "0 0 24 24") =>
+  function Icon({ size = 18, ...props }: IconProps) {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox={viewBox}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        {...props}
+      >
+        {path}
+      </svg>
+    );
+  };
+
+const IconRecord = createIcon(
+  <circle cx="12" cy="12" r="6" fill="currentColor" stroke="none" />
+);
+const IconStop = createIcon(<rect x="7" y="7" width="10" height="10" rx="2" />);
+const IconPlay = createIcon(
+  <polygon points="9 6.5 18 12 9 17.5" fill="currentColor" stroke="none" />
+);
+const IconPause = createIcon(
+  <>
+    <rect x="7" y="6" width="3.5" height="12" rx="1.2" />
+    <rect x="13.5" y="6" width="3.5" height="12" rx="1.2" />
+  </>
+);
+const IconRewind = createIcon(
+  <>
+    <polygon points="11 12 19 7 19 17" />
+    <polygon points="5 12 13 7 13 17" />
+  </>
+);
 
 type AudioEditorProps = {
   documentPath: string;
@@ -11,6 +54,17 @@ type AudioEditorProps = {
   apiKey?: string;
   onTranscriptionUpdate?: (transcription: Transcription) => void;
   onPlayFromCursor?: (time: number) => void;
+  // Recording props
+  isRecordingAudio?: boolean;
+  recordingElapsed?: number;
+  recordingFileName?: string | null;
+  onStartRecording?: () => void;
+  onStopRecording?: () => void;
+  onPlayAudio?: () => void;
+  onPauseAudio?: () => void;
+  onRewindAudio?: () => void;
+  canStartRecording?: boolean;
+  hasAudio?: boolean;
 };
 
 type WordBlock = {
@@ -45,7 +99,17 @@ export function AudioEditor({
   documentContent,
   apiKey,
   onTranscriptionUpdate,
-  onPlayFromCursor
+  onPlayFromCursor,
+  isRecordingAudio = false,
+  recordingElapsed = 0,
+  recordingFileName = null,
+  onStartRecording,
+  onStopRecording,
+  onPlayAudio,
+  onPauseAudio,
+  onRewindAudio,
+  canStartRecording = false,
+  hasAudio = false
 }: AudioEditorProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(
@@ -59,18 +123,32 @@ export function AudioEditor({
   const [dragStartId, setDragStartId] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isApplyingEdits, setIsApplyingEdits] = useState(false);
+  const [isApplyingAiSound, setIsApplyingAiSound] = useState(false);
+  const [isExportingMp3, setIsExportingMp3] = useState(false);
   const [history, setHistory] = useState<TranscriptionState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [pauseThreshold, setPauseThreshold] = useState(0.5); // seconds
+  const [currentPlayingWordId, setCurrentPlayingWordId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const playbackStartTimeRef = useRef<number | null>(null);
+  const playbackAnimationFrameRef = useRef<number | null>(null);
+  const playbackBlocksRef = useRef<Array<{ id: string; start: number; end: number }>>([]);
 
   useEffect(() => {
     if (transcription) {
-      setCurrentTranscription(transcription);
+      // Store original indices in the transcription words
+      const transcriptionWithIndices = {
+        ...transcription,
+        words: transcription.words.map((word, index) => ({
+          ...word,
+          originalIndex: index
+        }))
+      };
+      setCurrentTranscription(transcriptionWithIndices as any);
       // Initialize history with the original transcription
       const initialState: TranscriptionState = {
         words: transcription.words || [],
@@ -104,13 +182,49 @@ export function AudioEditor({
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  const handleUndo = useCallback(() => {
-    if (!canUndo || !currentTranscription) return;
+  // Store original word timestamps for audio copying - must be defined before handleUndo/handleRedo
+  const originalWordTimestamps = useMemo(() => {
+    if (!transcription?.words) return new Map<number, { start: number; end: number }>();
+    const map = new Map<number, { start: number; end: number }>();
+    transcription.words.forEach((word, index) => {
+      map.set(index, { start: word.start, end: word.end });
+    });
+    return map;
+  }, [transcription?.words]);
+
+  const handleUndo = useCallback(async () => {
+    if (!canUndo || !currentTranscription || !transcription) return;
     
     const previousState = history[historyIndex - 1];
+    // Restore words and ensure originalIndex is preserved by mapping back to original transcription
+    const restoredWords = previousState.words.map((word, currentIndex) => {
+      // originalIndex should be preserved in history state, but if missing, try to find it
+      const existingOriginalIndex = (word as any).originalIndex;
+      if (existingOriginalIndex !== undefined) {
+        return {
+          ...word,
+          originalIndex: existingOriginalIndex
+        } as any;
+      }
+      
+      // Fallback: Try to find the word in the original transcription
+      const originalWordIndex = transcription.words.findIndex((origWord, origIdx) => {
+        const origWordText = origWord.word.trim().toLowerCase();
+        const currentWordText = word.word.trim().toLowerCase();
+        // Match by word text and approximate timestamp (within 0.5 seconds)
+        return origWordText === currentWordText && 
+               Math.abs(origWord.start - word.start) < 0.5;
+      });
+      
+      return {
+        ...word,
+        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex
+      } as any;
+    });
+    
     const restored: Transcription = {
       ...currentTranscription,
-      words: previousState.words,
+      words: restoredWords,
       text: previousState.text,
       segments: previousState.segments
     };
@@ -120,15 +234,91 @@ export function AudioEditor({
     setSelectedWordIds(new Set());
     setSelectedPauseIds(new Set());
     onTranscriptionUpdate?.(restored);
-  }, [canUndo, historyIndex, history, currentTranscription, onTranscriptionUpdate]);
+    
+    // CRITICAL: Update audio file to reflect undo
+    // Apply audio edits based on restored transcription
+    if (audioBufferRef.current && audioContextRef.current && restored.words.length > 0) {
+      try {
+        // Compute segments for the restored transcription
+        const currentBlocks = restoredWords.map((word, index) => ({
+          id: `word-${index}-${word.start}-${word.end}`,
+          word: word.word.trim(),
+          start: word.start,
+          end: word.end,
+          index: (word as any).originalIndex !== undefined ? (word as any).originalIndex : index
+        }));
+        
+        const segments: Array<{ start: number; end: number }> = [];
+        
+        for (let i = 0; i < currentBlocks.length; i++) {
+          const block = currentBlocks[i];
+          const originalTimestamps = originalWordTimestamps.get(block.index);
+          if (!originalTimestamps) continue;
+          
+          segments.push({
+            start: originalTimestamps.start,
+            end: originalTimestamps.end
+          });
+          
+          if (i < currentBlocks.length - 1) {
+            const nextBlock = currentBlocks[i + 1];
+            const nextOriginalTimestamps = originalWordTimestamps.get(nextBlock.index);
+            if (nextOriginalTimestamps) {
+              const originalGap = nextOriginalTimestamps.start - originalTimestamps.end;
+              if (originalGap > 0) {
+                segments.push({
+                  start: originalTimestamps.end,
+                  end: nextOriginalTimestamps.start
+                });
+              }
+            }
+          }
+        }
+        
+        if (segments.length > 0) {
+          await editDocumentAudio(documentPath, segments);
+          window.location.reload(); // Reload to get updated audio
+        }
+      } catch (error) {
+        console.error("Failed to update audio after undo:", error);
+        setTranscriptionError("Failed to update audio file after undo");
+      }
+    }
+  }, [canUndo, historyIndex, history, currentTranscription, transcription, onTranscriptionUpdate, documentPath, originalWordTimestamps]);
 
-  const handleRedo = useCallback(() => {
-    if (!canRedo || !currentTranscription) return;
+  const handleRedo = useCallback(async () => {
+    if (!canRedo || !currentTranscription || !transcription) return;
     
     const nextState = history[historyIndex + 1];
+    // Restore words and ensure originalIndex is preserved by mapping back to original transcription
+    const restoredWords = nextState.words.map((word, currentIndex) => {
+      // originalIndex should be preserved in history state, but if missing, try to find it
+      const existingOriginalIndex = (word as any).originalIndex;
+      if (existingOriginalIndex !== undefined) {
+        return {
+          ...word,
+          originalIndex: existingOriginalIndex
+        } as any;
+      }
+      
+      // Fallback: Try to find the word in the original transcription
+      const originalWordIndex = transcription.words.findIndex((origWord, origIdx) => {
+        const origWordText = origWord.word.trim().toLowerCase();
+        const currentWordText = word.word.trim().toLowerCase();
+        // Match by word text and approximate timestamp (within 0.5 seconds)
+        return origWordText === currentWordText && 
+               Math.abs(origWord.start - word.start) < 0.5;
+      });
+      
+      return {
+        ...word,
+        originalIndex: originalWordIndex >= 0 ? originalWordIndex : currentIndex
+      } as any;
+    });
+    
     const restored: Transcription = {
       ...currentTranscription,
-      words: nextState.words,
+      words: restoredWords,
       text: nextState.text,
       segments: nextState.segments
     };
@@ -138,7 +328,57 @@ export function AudioEditor({
     setSelectedWordIds(new Set());
     setSelectedPauseIds(new Set());
     onTranscriptionUpdate?.(restored);
-  }, [canRedo, historyIndex, history, currentTranscription, onTranscriptionUpdate]);
+    
+    // CRITICAL: Update audio file to reflect redo
+    // Apply audio edits based on restored transcription
+    if (audioBufferRef.current && audioContextRef.current && restored.words.length > 0) {
+      try {
+        // Compute segments for the restored transcription
+        const currentBlocks = restoredWords.map((word, index) => ({
+          id: `word-${index}-${word.start}-${word.end}`,
+          word: word.word.trim(),
+          start: word.start,
+          end: word.end,
+          index: (word as any).originalIndex !== undefined ? (word as any).originalIndex : index
+        }));
+        
+        const segments: Array<{ start: number; end: number }> = [];
+        
+        for (let i = 0; i < currentBlocks.length; i++) {
+          const block = currentBlocks[i];
+          const originalTimestamps = originalWordTimestamps.get(block.index);
+          if (!originalTimestamps) continue;
+          
+          segments.push({
+            start: originalTimestamps.start,
+            end: originalTimestamps.end
+          });
+          
+          if (i < currentBlocks.length - 1) {
+            const nextBlock = currentBlocks[i + 1];
+            const nextOriginalTimestamps = originalWordTimestamps.get(nextBlock.index);
+            if (nextOriginalTimestamps) {
+              const originalGap = nextOriginalTimestamps.start - originalTimestamps.end;
+              if (originalGap > 0) {
+                segments.push({
+                  start: originalTimestamps.end,
+                  end: nextOriginalTimestamps.start
+                });
+              }
+            }
+          }
+        }
+        
+        if (segments.length > 0) {
+          await editDocumentAudio(documentPath, segments);
+          window.location.reload(); // Reload to get updated audio
+        }
+      } catch (error) {
+        console.error("Failed to update audio after redo:", error);
+        setTranscriptionError("Failed to update audio file after redo");
+      }
+    }
+  }, [canRedo, historyIndex, history, currentTranscription, transcription, onTranscriptionUpdate, documentPath, originalWordTimestamps]);
 
   // Load audio buffer for preview
   useEffect(() => {
@@ -172,13 +412,27 @@ export function AudioEditor({
   const wordBlocks = useMemo<WordBlock[]>(() => {
     if (!currentTranscription?.words) return [];
 
-    return currentTranscription.words.map((word, index) => ({
-      id: `word-${index}-${word.start}-${word.end}`,
-      word: word.word.trim(),
-      start: word.start,
-      end: word.end,
-      index
-    }));
+    // CRITICAL: Always use originalIndex from word object, fallback to index only if not set
+    // This ensures deleted words can be correctly identified in preview/save
+    const blocks = currentTranscription.words.map((word, index) => {
+      // originalIndex should always be set - it's set on initial load and preserved during edits
+      const originalIndex = (word as any).originalIndex !== undefined 
+        ? (word as any).originalIndex 
+        : index; // Fallback if somehow missing
+      
+      return {
+        id: `word-${index}-${word.start}-${word.end}`,
+        word: word.word.trim(),
+        start: word.start,
+        end: word.end,
+        index: originalIndex
+      };
+    });
+    
+    console.log("wordBlocks recomputed:", blocks.length, "blocks:", blocks.map(b => b.word).join(" "));
+    console.log("wordBlocks originalIndices:", blocks.map(b => ({ word: b.word, originalIndex: b.index })));
+    
+    return blocks;
   }, [currentTranscription?.words, currentTranscription?.text]);
 
   // Detect retakes (repeated sequences of words that are close together)
@@ -265,79 +519,75 @@ export function AudioEditor({
   // Determine line breaks based on document content
   const lineBreakIndicesSimple = useMemo<Set<number>>(() => {
     if (!documentContent || !wordBlocks.length) {
+      console.log("Line break detection: No documentContent or wordBlocks", { documentContent: !!documentContent, wordBlocksLength: wordBlocks.length });
       return new Set();
     }
 
     const breaks = new Set<number>();
     const docLines = documentContent.split('\n').filter(line => line.trim().length > 0);
     
+    console.log("Line break detection: docLines count", docLines.length, "wordBlocks count", wordBlocks.length);
+    
     if (docLines.length <= 1) {
+      console.log("Line break detection: Only one line, no breaks");
       return breaks; // No line breaks if document has only one line
     }
     
-    let wordBlockIndex = 0;
+    // Normalize words: remove punctuation and convert to lowercase
+    const normalizeWord = (word: string) => word.toLowerCase().replace(/[.,!?;:—–\-"'()]/g, '').trim();
     
-    for (let lineIdx = 0; lineIdx < docLines.length - 1; lineIdx++) {
-      const line = docLines[lineIdx];
-      const nextLine = docLines[lineIdx + 1];
+    // Build a map of document words to their line numbers
+    const docWordLines: Array<{ word: string; lineIndex: number; wordIndex: number }> = [];
+    docLines.forEach((line, lineIdx) => {
+      const words = line.split(/\s+/).map(normalizeWord).filter(w => w.length > 0);
+      words.forEach((word, wordIdx) => {
+        docWordLines.push({ word, lineIndex: lineIdx, wordIndex: wordIdx });
+      });
+    });
+    
+    if (docWordLines.length === 0) return breaks;
+    
+    // Match transcription words to document words
+    let docWordIndex = 0;
+    let transcriptionWordIndex = 0;
+    
+    while (transcriptionWordIndex < wordBlocks.length && docWordIndex < docWordLines.length) {
+      const transcriptionWord = normalizeWord(wordBlocks[transcriptionWordIndex].word);
+      const docWord = docWordLines[docWordIndex].word;
       
-      const lineWords = line
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(w => {
-          const clean = w.replace(/[.,!?;:—–\-"']/g, '').trim();
-          return clean.length > 0;
-        });
-      
-      const nextLineFirstWord = nextLine
-        .toLowerCase()
-        .split(/\s+/)
-        .find(w => {
-          const clean = w.replace(/[.,!?;:—–\-"']/g, '').trim();
-          return clean.length > 0;
-        });
-      
-      if (!nextLineFirstWord || lineWords.length === 0) continue;
-      
-      // Find where this line's words end in wordBlocks
-      let matchedWords = 0;
-      let lastMatchedIndex = -1;
-      
-      for (let i = wordBlockIndex; i < wordBlocks.length; i++) {
-        const blockWord = wordBlocks[i].word.toLowerCase().replace(/[.,!?;:—–\-"']/g, '').trim();
+      if (transcriptionWord === docWord) {
+        // Words match - check if we're at the end of a line in the document
+        const currentLineIndex = docWordLines[docWordIndex].lineIndex;
+        const isLastWordInLine = docWordIndex === docWordLines.length - 1 || 
+                                 docWordLines[docWordIndex + 1].lineIndex !== currentLineIndex;
         
-        if (matchedWords < lineWords.length) {
-          const expectedWord = lineWords[matchedWords];
-          if (blockWord === expectedWord) {
-            matchedWords++;
-            lastMatchedIndex = i;
-            
-            // Check if we've matched all words in this line
-            if (matchedWords === lineWords.length) {
-              // Check if next word is the start of next line
-              if (i + 1 < wordBlocks.length) {
-                const nextBlockWord = wordBlocks[i + 1].word.toLowerCase().replace(/[.,!?;:—–\-"']/g, '').trim();
-                if (nextBlockWord === nextLineFirstWord) {
-                  breaks.add(i); // Break after this word
-                  wordBlockIndex = i + 1;
-                  break;
-                }
-              }
-            }
-          } else if (matchedWords > 0) {
-            // Partial match failed, reset
-            matchedWords = 0;
-            lastMatchedIndex = -1;
-          }
+        if (isLastWordInLine && transcriptionWordIndex < wordBlocks.length - 1) {
+          // This is the last word of a line in the document, add a break after it
+          breaks.add(transcriptionWordIndex);
+          console.log(`Line break detected at word index ${transcriptionWordIndex} (word: "${wordBlocks[transcriptionWordIndex].word}")`);
         }
-      }
-      
-      // If we found a match but didn't find the next line start, try to continue from last match
-      if (lastMatchedIndex >= 0 && lastMatchedIndex + 1 < wordBlocks.length) {
-        wordBlockIndex = lastMatchedIndex + 1;
+        
+        docWordIndex++;
+        transcriptionWordIndex++;
+      } else {
+        // Words don't match - try to find the transcription word in the document
+        // This handles cases where transcription has extra words or different punctuation
+        const foundInDoc = docWordLines.findIndex((dw, idx) => 
+          idx >= docWordIndex && dw.word === transcriptionWord
+        );
+        
+        if (foundInDoc >= 0) {
+          // Found it later in the document, skip ahead
+          docWordIndex = foundInDoc + 1;
+          transcriptionWordIndex++;
+        } else {
+          // Transcription word not found, skip it
+          transcriptionWordIndex++;
+        }
       }
     }
     
+    console.log("Line break detection: Final breaks", Array.from(breaks));
     return breaks;
   }, [documentContent, wordBlocks]);
 
@@ -456,82 +706,71 @@ export function AudioEditor({
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedWordIds.size === 0 && selectedPauseIds.size === 0) return;
+    if (!currentTranscription) return;
 
-    let newWords = [...wordBlocks];
-    
-    // Delete selected words
-    if (selectedWordIds.size > 0) {
-      newWords = newWords.filter((block) => !selectedWordIds.has(block.id));
-    }
+    // SIMPLE APPROACH: Map block IDs to word indices, then filter currentTranscription.words
+    const blockIdToWordIndex = new Map<string, number>();
+    wordBlocks.forEach((block, index) => {
+      blockIdToWordIndex.set(block.id, index);
+    });
 
-    // Adjust selected pauses (delete = compress to 0.1s)
-    if (selectedPauseIds.size > 0) {
-      const adjustedWords = [...newWords];
-      
-      // Recalculate pauses based on current wordBlocks (before deletion)
-      // Find which pauses correspond to gaps between remaining words
-      for (let i = 0; i < adjustedWords.length - 1; i++) {
-        const currentWord = adjustedWords[i];
-        const nextWord = adjustedWords[i + 1];
-        const gap = nextWord.start - currentWord.end;
-        
-        // Check if this gap matches a selected pause (by timestamp)
-        const matchingPause = pauses.find(
-          (p) => Math.abs(p.start - currentWord.end) < 0.01 && 
-                 Math.abs(p.end - nextWord.start) < 0.01 &&
-                 selectedPauseIds.has(p.id)
-        );
-        
-        if (matchingPause && gap > pauseThreshold) {
-          // Compress pause to 0.1 seconds
-          const newEnd = currentWord.end + 0.1;
-          const shiftAmount = nextWord.start - newEnd;
-          // Shift all subsequent words
-          for (let j = i + 1; j < adjustedWords.length; j++) {
-            adjustedWords[j] = {
-              ...adjustedWords[j],
-              start: adjustedWords[j].start - shiftAmount,
-              end: adjustedWords[j].end - shiftAmount
-            };
-          }
-        }
+    // Get indices of words to delete
+    const wordIndicesToDelete = new Set<number>();
+    selectedWordIds.forEach(blockId => {
+      const wordIndex = blockIdToWordIndex.get(blockId);
+      if (wordIndex !== undefined) {
+        wordIndicesToDelete.add(wordIndex);
       }
-      newWords = adjustedWords;
+    });
+
+    // Filter words - only keep words NOT in the delete set
+    const remainingWords = currentTranscription.words.filter((word, index) => {
+      return !wordIndicesToDelete.has(index);
+    });
+
+    // Handle pause compression if pauses were selected
+    if (selectedPauseIds.size > 0) {
+      // This will be handled by pause adjustment separately
+      // For now, just remove the words
     }
-    
-    if (newWords.length === 0) {
+
+    if (remainingWords.length === 0) {
       setTranscriptionError("Cannot delete all words");
       return;
     }
 
-    // Update transcription
+    // Update transcription - preserve originalIndex on all remaining words
     const updated: Transcription = {
-      ...currentTranscription!,
-      words: newWords.map((block) => ({
-        word: block.word,
-        start: block.start,
-        end: block.end
-      })),
-      text: newWords.map((block) => block.word).join(" "),
-      segments: currentTranscription?.segments || []
+      ...currentTranscription,
+      words: remainingWords.map((word) => ({
+        ...word,
+        originalIndex: (word as any).originalIndex !== undefined 
+          ? (word as any).originalIndex 
+          : currentTranscription.words.indexOf(word)
+      })) as any,
+      text: remainingWords.map(w => w.word).join(" ")
     };
 
     // Save to history
     const state: TranscriptionState = {
-      words: updated.words,
+      words: updated.words.map((w) => ({
+        ...w,
+        originalIndex: (w as any).originalIndex
+      })) as any,
       text: updated.text,
-      segments: updated.segments,
+      segments: updated.segments || [],
       language: updated.language,
       duration: updated.duration
     };
     saveToHistory(state);
 
+    // Update state
     setCurrentTranscription(updated);
     setSelectedWordIds(new Set());
     setSelectedPauseIds(new Set());
     onTranscriptionUpdate?.(updated);
     setTranscriptionError(null);
-  }, [selectedWordIds, selectedPauseIds, wordBlocks, pauses, currentTranscription, onTranscriptionUpdate, saveToHistory]);
+  }, [selectedWordIds, selectedPauseIds, wordBlocks, currentTranscription, onTranscriptionUpdate, saveToHistory]);
 
   const handleAdjustPause = useCallback((pauseId: string, newDuration: number) => {
     const pause = pauses.find((p) => p.id === pauseId);
@@ -561,18 +800,42 @@ export function AudioEditor({
 
       const updated: Transcription = {
         ...currentTranscription!,
-        words: newWords.map((block) => ({
-          word: block.word,
-          start: block.start,
-          end: block.end
-        })),
+        words: newWords.map((block) => {
+          // Get the original word object from the current transcription
+          // block.index is the original index in the original transcription
+          const originalWord = currentTranscription!.words.find((w, idx) => {
+            const wordOriginalIndex = (w as any).originalIndex !== undefined ? (w as any).originalIndex : idx;
+            return wordOriginalIndex === block.index;
+          });
+          
+          if (!originalWord) {
+            console.error("Pause Adjust: Could not find original word for block:", block);
+            return {
+              word: block.word,
+              start: block.start,
+              end: block.end,
+              originalIndex: block.index
+            } as any;
+          }
+          
+          return {
+            ...originalWord,
+            word: block.word,
+            start: block.start,
+            end: block.end,
+            originalIndex: block.index // Preserve the original index
+          } as any;
+        }),
         text: newWords.map((block) => block.word).join(" "),
         segments: currentTranscription?.segments || []
       };
 
-      // Save to history
+      // Save to history - CRITICAL: Preserve originalIndex in history so undo/redo works correctly
       const state: TranscriptionState = {
-        words: updated.words,
+        words: updated.words.map((w) => ({
+          ...w,
+          originalIndex: (w as any).originalIndex // Explicitly preserve originalIndex
+        })) as any,
         text: updated.text,
         segments: updated.segments,
         language: updated.language,
@@ -624,6 +887,13 @@ export function AudioEditor({
       } catch {}
       previewSourceRef.current = null;
     }
+    if (playbackAnimationFrameRef.current) {
+      cancelAnimationFrame(playbackAnimationFrameRef.current);
+      playbackAnimationFrameRef.current = null;
+    }
+    playbackStartTimeRef.current = null;
+    playbackBlocksRef.current = [];
+    setCurrentPlayingWordId(null);
     setIsPreviewing(false);
   }, []);
 
@@ -634,7 +904,7 @@ export function AudioEditor({
       return;
     }
 
-    if (!audioBufferRef.current || !audioContextRef.current) {
+    if (!audioBufferRef.current || !audioContextRef.current || !currentTranscription) {
       return;
     }
 
@@ -652,43 +922,115 @@ export function AudioEditor({
     setTranscriptionError(null);
 
     try {
-      // Get all visible word blocks (the current wordBlocks already excludes deleted ones)
-      let blocksToPlay = wordBlocks;
-
-      // If words are selected, start from the first selected word and play forward
-      if (selectedWordIds.size > 0) {
-        const firstSelectedIndex = wordBlocks.findIndex((block) => selectedWordIds.has(block.id));
-        if (firstSelectedIndex >= 0) {
-          // Play from the first selected word onwards
-          blocksToPlay = wordBlocks.slice(firstSelectedIndex);
-        }
-      }
-
-      if (blocksToPlay.length === 0) {
-        setTranscriptionError("No audio to preview");
+      // SIMPLE APPROACH: Use currentTranscription.words directly - it already has deleted words removed
+      if (!currentTranscription || !currentTranscription.words || currentTranscription.words.length === 0) {
+        setTranscriptionError("No words to preview");
         setIsPreviewing(false);
         return;
       }
 
-      // Calculate total duration needed including pauses
-      let totalDuration = 0;
-      for (let i = 0; i < blocksToPlay.length; i++) {
-        const block = blocksToPlay[i];
-        totalDuration += (block.end - block.start);
-        // Add pause duration after each word (except the last)
-        if (i < blocksToPlay.length - 1) {
-          const nextBlock = blocksToPlay[i + 1];
-          const gap = nextBlock.start - block.end;
-          if (gap > 0) {
-            totalDuration += gap; // Include the pause duration
+      // Build list of words to play from currentTranscription.words
+      // Only include words that have valid originalIndex and original timestamps
+      const wordsToPlay: Array<{
+        word: any;
+        originalIndex: number;
+        originalStart: number;
+        originalEnd: number;
+      }> = [];
+
+      for (const word of currentTranscription.words) {
+        const originalIndex = (word as any).originalIndex;
+        if (originalIndex === undefined || originalIndex === null) {
+          continue; // Skip words without originalIndex
+        }
+
+        const originalTimestamps = originalWordTimestamps.get(originalIndex);
+        if (!originalTimestamps) {
+          continue; // Skip words without original timestamps
+        }
+
+        // Validate timestamps are within audio buffer
+        const sampleRate = audioBuffer.sampleRate;
+        const originalStartSample = Math.floor(originalTimestamps.start * sampleRate);
+        const originalEndSample = Math.floor(originalTimestamps.end * sampleRate);
+        if (originalStartSample < 0 || originalEndSample > audioBuffer.length || originalEndSample <= originalStartSample) {
+          continue; // Skip invalid timestamps
+        }
+
+        wordsToPlay.push({
+          word,
+          originalIndex,
+          originalStart: originalTimestamps.start,
+          originalEnd: originalTimestamps.end
+        });
+      }
+
+      if (wordsToPlay.length === 0) {
+        setTranscriptionError("No valid words to preview");
+        setIsPreviewing(false);
+        return;
+      }
+
+      // If words are selected, start from first selected word
+      let startIndex = 0;
+      if (selectedWordIds.size > 0) {
+        const blockIdToIndex = new Map<string, number>();
+        wordBlocks.forEach((block, idx) => {
+          blockIdToIndex.set(block.id, idx);
+        });
+
+        const firstSelectedBlockId = Array.from(selectedWordIds)[0];
+        const firstSelectedBlockIndex = blockIdToIndex.get(firstSelectedBlockId);
+        if (firstSelectedBlockIndex !== undefined) {
+          // Find this word in wordsToPlay by matching originalIndex
+          const selectedOriginalIndex = wordBlocks[firstSelectedBlockIndex]?.index;
+          if (selectedOriginalIndex !== undefined) {
+            const foundIndex = wordsToPlay.findIndex(w => w.originalIndex === selectedOriginalIndex);
+            if (foundIndex >= 0) {
+              startIndex = foundIndex;
+            }
           }
         }
       }
+
+      const blocksToPlay = wordsToPlay.slice(startIndex);
+
+      // Calculate total duration - sum of word durations + minimal gaps between them
+      const MIN_GAP = 0.01; // 10ms gap between words
+      let totalDuration = 0;
+      const playbackBlocks: Array<{ id: string; start: number; end: number }> = [];
+      let currentPlaybackTime = 0;
+      
+      for (let i = 0; i < blocksToPlay.length; i++) {
+        const item = blocksToPlay[i];
+        const wordDuration = item.originalEnd - item.originalStart;
+        const blockStartTime = currentPlaybackTime;
+        const blockEndTime = currentPlaybackTime + wordDuration;
+        
+        // Create ID for tracking
+        const wordId = `word-${i}-${item.originalIndex}`;
+        playbackBlocks.push({
+          id: wordId,
+          start: blockStartTime,
+          end: blockEndTime
+        });
+        
+        totalDuration += wordDuration;
+        currentPlaybackTime = blockEndTime;
+        
+        // Add minimal gap between words (except last)
+        if (i < blocksToPlay.length - 1) {
+          totalDuration += MIN_GAP;
+          currentPlaybackTime += MIN_GAP;
+        }
+      }
+      
+      playbackBlocksRef.current = playbackBlocks;
       
       const sampleRate = audioBuffer.sampleRate;
       const totalSamples = Math.ceil(totalDuration * sampleRate);
       
-      // Create a new audio buffer for the edited audio
+      // Create new audio buffer for edited audio
       const newBuffer = audioContext.createBuffer(
         audioBuffer.numberOfChannels,
         totalSamples,
@@ -696,58 +1038,52 @@ export function AudioEditor({
       );
 
       let offsetSamples = 0;
+      const BOUNDARY_CROSSFADE = Math.max(32, Math.floor(0.001 * sampleRate)); // 1ms crossfade
 
-      // Copy each segment in order, including pauses (silence)
+      // Copy each word segment from original audio buffer
       for (let i = 0; i < blocksToPlay.length; i++) {
-        const block = blocksToPlay[i];
-        const startSample = Math.floor(block.start * sampleRate);
-        const endSample = Math.floor(block.end * sampleRate);
-        const blockSamples = endSample - startSample;
+        const item = blocksToPlay[i];
+        const originalStartSample = Math.floor(item.originalStart * sampleRate);
+        const originalEndSample = Math.floor(item.originalEnd * sampleRate);
+        const originalBlockSamples = originalEndSample - originalStartSample;
+        const targetBlockSamples = originalBlockSamples; // Use same duration as original
 
         // Copy audio data for each channel
         for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
           const originalData = audioBuffer.getChannelData(channel);
           const newData = newBuffer.getChannelData(channel);
           
-          // Copy the word segment to the new buffer
-          const maxCopy = Math.min(blockSamples, originalData.length - startSample, newData.length - offsetSamples);
-          for (let j = 0; j < maxCopy; j++) {
-            if (offsetSamples + j < newData.length && startSample + j < originalData.length) {
-              newData[offsetSamples + j] = originalData[startSample + j];
+          // Copy from original audio using original timestamps
+          const maxCopy = Math.min(targetBlockSamples, originalData.length - originalStartSample, newData.length - offsetSamples);
+          
+          // Small crossfade at start if not first word
+          const fadeInSamples = i === 0 ? 0 : Math.min(BOUNDARY_CROSSFADE, maxCopy);
+          if (fadeInSamples > 0 && offsetSamples > 0) {
+            for (let j = 0; j < fadeInSamples; j++) {
+              if (offsetSamples + j < newData.length && originalStartSample + j < originalData.length) {
+                const fade = j / fadeInSamples;
+                const prevValue = newData[offsetSamples + j - 1] || 0;
+                const currentValue = originalData[originalStartSample + j];
+                newData[offsetSamples + j] = prevValue * (1 - fade) + currentValue * fade;
+              }
+            }
+          }
+          
+          // Copy main section
+          for (let j = fadeInSamples; j < maxCopy; j++) {
+            if (offsetSamples + j < newData.length && originalStartSample + j < originalData.length) {
+              newData[offsetSamples + j] = originalData[originalStartSample + j];
             }
           }
         }
 
-        offsetSamples += blockSamples;
-
-        // Add pause (silence) after this word (except the last)
+        // Move offset forward by word duration
+        offsetSamples += targetBlockSamples;
+        
+        // Add minimal gap between words (except last)
         if (i < blocksToPlay.length - 1) {
-          const nextBlock = blocksToPlay[i + 1];
-          const gap = nextBlock.start - block.end;
-          if (gap > 0) {
-            // Copy the pause segment from the original audio to preserve any audio at boundaries
-            // This ensures we don't cut into the next word
-            const pauseStartSample = Math.floor(block.end * sampleRate);
-            const pauseEndSample = Math.floor(nextBlock.start * sampleRate);
-            const pauseSamples = pauseEndSample - pauseStartSample;
-            
-            if (pauseSamples > 0) {
-              // Copy the pause segment from original audio (preserves audio at boundaries)
-              for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-                const originalChannelData = audioBuffer.getChannelData(channel);
-                const newChannelData = newBuffer.getChannelData(channel);
-                
-                const maxCopy = Math.min(pauseSamples, originalChannelData.length - pauseStartSample, newChannelData.length - offsetSamples);
-                for (let j = 0; j < maxCopy; j++) {
-                  if (offsetSamples + j < newChannelData.length && pauseStartSample + j < originalChannelData.length) {
-                    newChannelData[offsetSamples + j] = originalChannelData[pauseStartSample + j];
-                  }
-                }
-              }
-              
-              offsetSamples += pauseSamples;
-            }
-          }
+          const gapSamples = Math.floor(MIN_GAP * sampleRate);
+          offsetSamples += gapSamples;
         }
       }
 
@@ -758,45 +1094,186 @@ export function AudioEditor({
       previewSourceRef.current = source;
 
       source.onended = () => {
-        setIsPreviewing(false);
-        previewSourceRef.current = null;
+        handleStopPreview();
       };
 
+      // Start playback tracking
+      playbackStartTimeRef.current = audioContext.currentTime;
+      
+      // Animation loop to track current playing word
+      const updatePlayingWord = () => {
+        if (!playbackStartTimeRef.current || !audioContextRef.current || !previewSourceRef.current) {
+          return;
+        }
+        
+        const elapsed = audioContextRef.current.currentTime - playbackStartTimeRef.current;
+        const blocks = playbackBlocksRef.current;
+        
+        // Find the current word based on elapsed time
+        let currentWordId: string | null = null;
+        for (const block of blocks) {
+          if (elapsed >= block.start && elapsed <= block.end) {
+            currentWordId = block.id;
+            break;
+          }
+        }
+        
+        setCurrentPlayingWordId((prevId) => {
+          // Scroll to current word when it changes
+          if (currentWordId && currentWordId !== prevId && containerRef.current) {
+            const wordElement = containerRef.current.querySelector(`[data-word-id="${currentWordId}"]`) as HTMLElement;
+            if (wordElement) {
+              // Use requestAnimationFrame to ensure DOM is updated
+              requestAnimationFrame(() => {
+                wordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+            }
+          }
+          return currentWordId;
+        });
+        
+        // Continue tracking if still playing
+        if (previewSourceRef.current) {
+          playbackAnimationFrameRef.current = requestAnimationFrame(updatePlayingWord);
+        }
+      };
+      
       source.start(0);
+      playbackAnimationFrameRef.current = requestAnimationFrame(updatePlayingWord);
     } catch (error) {
       console.error("Preview error:", error);
       setTranscriptionError("Failed to preview audio: " + (error instanceof Error ? error.message : "Unknown error"));
       setIsPreviewing(false);
     }
-  }, [wordBlocks, isPreviewing, handleStopPreview]);
+  }, [currentTranscription, selectedWordIds, isPreviewing, handleStopPreview, originalWordTimestamps]);
+
+  const handleAiStudioSound = useCallback(async () => {
+    if (!documentPath || !audioUrl) {
+      setTranscriptionError("No audio file available");
+      return;
+    }
+
+    setIsApplyingAiSound(true);
+    setTranscriptionError(null);
+
+    try {
+      // Use FFmpeg-based professional audio enhancement
+      console.log("Starting Studio Sound enhancement...");
+      const result = await enhanceDocumentAudio(documentPath);
+      if (result.audioUrl) {
+        // Reload to get the enhanced audio
+        window.location.reload();
+      }
+    } catch (error: any) {
+      console.error("Audio enhancement error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : error?.error || error?.message || "Failed to enhance audio";
+      setTranscriptionError(message);
+    } finally {
+      setIsApplyingAiSound(false);
+    }
+  }, [documentPath, audioUrl]);
+
+  const handleExportMp3 = useCallback(async () => {
+    if (!documentPath || !audioUrl) {
+      setTranscriptionError("No audio file available");
+      return;
+    }
+
+    setIsExportingMp3(true);
+    setTranscriptionError(null);
+
+    try {
+      await exportAudioAsMp3(documentPath);
+    } catch (error: any) {
+      console.error("MP3 export error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : error?.error || error?.message || "Failed to export audio as MP3";
+      setTranscriptionError(message);
+    } finally {
+      setIsExportingMp3(false);
+    }
+  }, [documentPath, audioUrl]);
 
   const handleSaveEdits = useCallback(async () => {
     if (!currentTranscription) return;
 
-    const visibleBlocks = wordBlocks;
+    // CRITICAL: Use currentTranscription.words directly - deleted words are already removed from this array
+    console.log("Save Edits: currentTranscription.words count", currentTranscription.words.length);
+    console.log("Save Edits: currentTranscription.words text", currentTranscription.words.map(w => w.word).join(" "));
+    console.log("Save Edits: currentTranscription words with originalIndex", currentTranscription.words.map((w, i) => ({
+      index: i,
+      word: w.word,
+      originalIndex: (w as any).originalIndex
+    })));
     
-    // Create segments including pauses between words
+    // Create blocks from currentTranscription.words - this array already excludes deleted words
+    const currentBlocks = currentTranscription.words.map((word, currentIndex) => {
+      // originalIndex should always be set - it's set on initial load and preserved during edits
+      const originalIndex = (word as any).originalIndex !== undefined 
+        ? (word as any).originalIndex 
+        : currentIndex; // Fallback if somehow missing
+      return {
+        id: `word-${currentIndex}-${word.start}-${word.end}`,
+        word: word.word.trim(),
+        start: word.start,
+        end: word.end,
+        index: originalIndex // Use original index to map back to original audio
+      };
+    });
+
+    console.log("Save Edits: Processing", currentBlocks.length, "words (deleted words should already be excluded)");
+    console.log("Save Edits: Words to export:", currentBlocks.map(b => b.word).join(" "));
+    
+    // Create segments using ORIGINAL timestamps (for cutting from original audio)
     const segments: Array<{ start: number; end: number }> = [];
     
-    for (let i = 0; i < visibleBlocks.length; i++) {
-      const block = visibleBlocks[i];
+    for (let i = 0; i < currentBlocks.length; i++) {
+      const block = currentBlocks[i];
       
-      // Add the word segment
+      // Get original timestamps for this word
+      const originalTimestamps = originalWordTimestamps.get(block.index);
+      if (!originalTimestamps) {
+        console.warn("Save Edits: Skipping word - could not find original timestamps:", block.index, block.word);
+        continue; // Skip if we can't find original timestamps
+      }
+      
+      console.log(`Save Edits: Adding word "${block.word}" with original timestamps ${originalTimestamps.start}-${originalTimestamps.end}`);
+      
+      // Add the word segment using original timestamps
       segments.push({
-        start: block.start,
-        end: block.end
+        start: originalTimestamps.start,
+        end: originalTimestamps.end
       });
       
       // Add pause segment after this word (except the last)
-      if (i < visibleBlocks.length - 1) {
-        const nextBlock = visibleBlocks[i + 1];
-        const gap = nextBlock.start - block.end;
-        if (gap > 0) {
-          // Include the pause as silence in the output
-          segments.push({
-            start: block.end,
-            end: nextBlock.start
-          });
+      if (i < currentBlocks.length - 1) {
+        const nextBlock = currentBlocks[i + 1];
+        const nextOriginalTimestamps = originalWordTimestamps.get(nextBlock.index);
+        
+        if (nextOriginalTimestamps) {
+          const originalGap = nextOriginalTimestamps.start - originalTimestamps.end;
+          const adjustedGap = nextBlock.start - block.end;
+          
+          if (originalGap > 0 && adjustedGap > 0) {
+            // Use original gap for cutting, but adjusted gap for duration
+            // For now, we'll copy the original pause, and the server can adjust duration
+            segments.push({
+              start: originalTimestamps.end,
+              end: nextOriginalTimestamps.start
+            });
+          } else if (adjustedGap > 0) {
+            // No original gap, but adjusted gap exists - create silence segment
+            // We'll handle this on the server side with the adjusted duration
+            segments.push({
+              start: originalTimestamps.end,
+              end: originalTimestamps.end + adjustedGap
+            });
+          }
         }
       }
     }
@@ -811,7 +1288,6 @@ export function AudioEditor({
 
     try {
       // Apply audio edits on server (requires ffmpeg)
-      // The server should concatenate all segments (words + pauses) to preserve timing
       const result = await editDocumentAudio(documentPath, segments);
       
       if (result.audioUrl) {
@@ -827,13 +1303,19 @@ export function AudioEditor({
     } finally {
       setIsApplyingEdits(false);
     }
-  }, [currentTranscription, wordBlocks, documentPath]);
+  }, [currentTranscription, documentPath, originalWordTimestamps]);
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }, []);
+
+  const formattedRecordingTime = useMemo(() => {
+    const mins = Math.floor(recordingElapsed / 60);
+    const secs = Math.floor(recordingElapsed % 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }, [recordingElapsed]);
 
   const hasTranscription = Boolean(currentTranscription);
   const duration = currentTranscription?.duration || 0;
@@ -845,9 +1327,71 @@ export function AudioEditor({
         <div className="audio-editor-error">{transcriptionError}</div>
       )}
 
-      {!audioUrl && (
+      {/* Recording Panel - Always visible at the top */}
+      <div className="audio-editor-recording-panel">
+        <div className="audio-editor-recording-header">
+          <span className="audio-editor-recording-label">Recording</span>
+          {isRecordingAudio && (
+            <span className="audio-editor-recording-status recording">
+              {formattedRecordingTime}
+            </span>
+          )}
+          {!isRecordingAudio && hasAudio && (
+            <span className="audio-editor-recording-status ready">Ready</span>
+          )}
+        </div>
+        <div className="audio-editor-recording-controls">
+          <button
+            className="audio-editor-icon-button"
+            onClick={() => onStartRecording?.()}
+            disabled={!canStartRecording}
+            title="Start recording (Ctrl/Cmd + R)"
+          >
+            <IconRecord className="audio-editor-icon" />
+          </button>
+          <button
+            className="audio-editor-icon-button"
+            onClick={() => onStopRecording?.()}
+            disabled={!isRecordingAudio}
+            title="Stop recording"
+          >
+            <IconStop className="audio-editor-icon" />
+          </button>
+          <button
+            className="audio-editor-icon-button"
+            onClick={() => onPlayAudio?.()}
+            disabled={!hasAudio || isRecordingAudio}
+            title="Play audio"
+          >
+            <IconPlay className="audio-editor-icon" />
+          </button>
+          <button
+            className="audio-editor-icon-button"
+            onClick={() => onPauseAudio?.()}
+            disabled={!hasAudio}
+            title="Pause audio"
+          >
+            <IconPause className="audio-editor-icon" />
+          </button>
+          <button
+            className="audio-editor-icon-button"
+            onClick={() => onRewindAudio?.()}
+            disabled={!hasAudio}
+            title="Rewind to beginning"
+          >
+            <IconRewind className="audio-editor-icon" />
+          </button>
+        </div>
+        {recordingFileName && !isRecordingAudio && (
+          <div className="audio-editor-recording-filename">
+            {recordingFileName}
+          </div>
+        )}
+      </div>
+
+      {!audioUrl && !isRecordingAudio && (
         <div className="audio-editor-message">
-          No audio file available. Record audio first.
+          Record audio to get started.
         </div>
       )}
 
@@ -866,79 +1410,105 @@ export function AudioEditor({
       {hasTranscription && (
         <>
           <div className="audio-editor-top-actions">
+            <h2 className="audio-editor-title">Audio Editing</h2>
             <div className="audio-editor-controls-bar">
-              <div className="audio-editor-undo-redo">
+              <button
+                className="audio-editor-icon-button"
+                onClick={handleUndo}
+                disabled={!canUndo}
+                title="Undo (Ctrl/Cmd + Z)"
+              >
+                <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7v6h6" />
+                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                </svg>
+              </button>
+              <button
+                className="audio-editor-icon-button"
+                onClick={handleRedo}
+                disabled={!canRedo}
+                title="Redo (Ctrl/Cmd + Shift + Z)"
+              >
+                <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 7v6h-6" />
+                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                </svg>
+              </button>
+              <label className="audio-editor-pause-threshold-inline">
+                Pause threshold:{" "}
+                <input
+                  type="number"
+                  min="0.1"
+                  max="5"
+                  step="0.1"
+                  value={pauseThreshold}
+                  onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
+                  style={{
+                    width: "60px",
+                    padding: "4px 8px",
+                    background: "var(--field-bg)",
+                    border: "1px solid var(--field-border)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary)"
+                  }}
+                />
+                s
+              </label>
+              <div className="audio-editor-actions">
                 <button
-                  className="audio-editor-button"
-                  onClick={handleUndo}
-                  disabled={!canUndo}
-                  title="Undo (Ctrl/Cmd + Z)"
+                  className="audio-editor-icon-button"
+                  onClick={isPreviewing ? handleStopPreview : handlePreview}
+                  disabled={wordBlocks.length === 0}
+                  title={isPreviewing ? "Stop preview" : "Preview edited audio"}
                 >
-                  ↶ Undo
+                  {isPreviewing ? <IconPause className="audio-editor-icon" /> : <IconPlay className="audio-editor-icon" />}
+                </button>
+                <button
+                  className="audio-editor-icon-button"
+                  onClick={handleTranscribe}
+                  disabled={isTranscribing || !audioUrl}
+                  title="Reset all edits and re-transcribe from original audio"
+                >
+                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                    <path d="M21 3v5h-5" />
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                    <path d="M3 21v-5h5" />
+                  </svg>
                 </button>
                 <button
                   className="audio-editor-button"
-                  onClick={handleRedo}
-                  disabled={!canRedo}
-                  title="Redo (Ctrl/Cmd + Shift + Z)"
+                  onClick={handleSaveEdits}
+                  disabled={isApplyingEdits}
+                  title="Save audio edits to file"
                 >
-                  ↷ Redo
+                  {isApplyingEdits ? "Saving..." : "Save Edits"}
+                </button>
+                <button
+                  className="audio-editor-icon-button"
+                  onClick={handleAiStudioSound}
+                  disabled={isApplyingAiSound || !audioUrl}
+                  title="Professional audio enhancement: noise reduction, EQ, compression, and normalization"
+                >
+                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20" />
+                    <path d="M2 12h20" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+                <button
+                  className="audio-editor-icon-button"
+                  onClick={handleExportMp3}
+                  disabled={isExportingMp3 || !audioUrl}
+                  title="Export audio as MP3 file"
+                >
+                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
                 </button>
               </div>
-              <div className="audio-editor-pause-threshold">
-                <label>
-                  Pause threshold:{" "}
-                  <input
-                    type="number"
-                    min="0.1"
-                    max="5"
-                    step="0.1"
-                    value={pauseThreshold}
-                    onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
-                    style={{
-                      width: "60px",
-                      padding: "4px 8px",
-                      background: "var(--field-bg)",
-                      border: "1px solid var(--field-border)",
-                      borderRadius: "4px",
-                      color: "var(--text-primary)"
-                    }}
-                  />
-                  s
-                </label>
-              </div>
-            </div>
-
-            <div className="audio-editor-actions">
-              <button
-                className="audio-editor-button"
-                onClick={handleDeleteSelected}
-                disabled={selectedWordIds.size === 0 && selectedPauseIds.size === 0}
-              >
-                Delete Selected ({selectedWordIds.size + selectedPauseIds.size})
-              </button>
-              <button
-                className="audio-editor-button"
-                onClick={isPreviewing ? handleStopPreview : handlePreview}
-                disabled={wordBlocks.length === 0}
-              >
-                {isPreviewing ? "⏸ Stop Preview" : "▶ Preview"}
-              </button>
-              <button
-                className="audio-editor-button"
-                onClick={handleTranscribe}
-                disabled={isTranscribing || !audioUrl}
-                title="Reset all edits and re-transcribe from original audio"
-              >
-                {isTranscribing ? "Re-transcribing..." : "↺ Reset & Re-transcribe"}
-              </button>
-              <button
-                className="audio-editor-button"
-                onClick={handleSaveEdits}
-                disabled={isApplyingEdits}
-              >
-                {isApplyingEdits ? "Applying edits..." : "Save Edits"}
-              </button>
             </div>
           </div>
 
@@ -950,23 +1520,26 @@ export function AudioEditor({
             {wordBlocks.map((block, index) => {
               const isSelected = selectedWordIds.has(block.id);
               const isRetake = retakeWordIds.has(block.id);
+              const isCurrentlyPlaying = currentPlayingWordId === block.id;
               const nextBlock = wordBlocks[index + 1];
               // Find pause after this word
               const pauseAfter = pauses.find(
                 (p) => p.beforeWordIndex === index
               ) || null;
               const isPauseSelected = pauseAfter && selectedPauseIds.has(pauseAfter.id);
-              // Line break for long pauses OR document line breaks
-              const shouldBreakLine = (pauseAfter && pauseAfter.duration >= 1.0) || 
-                                     (index < wordBlocks.length - 1 && lineBreakIndicesSimple.has(index));
+              // Line break for document line breaks (always) OR long pauses
+              const shouldBreakLine = (index < wordBlocks.length - 1 && lineBreakIndicesSimple.has(index)) ||
+                                     (pauseAfter && pauseAfter.duration >= 1.0);
 
               return (
                 <React.Fragment key={block.id}>
                   <button
                     type="button"
+                    data-word-id={block.id}
                     className={clsx("audio-editor-word-block", {
                       "audio-editor-word-selected": isSelected,
-                      "audio-editor-word-retake": isRetake
+                      "audio-editor-word-retake": isRetake,
+                      "audio-editor-word-current": isCurrentlyPlaying
                     })}
                     onMouseDown={(e) => handleWordMouseDown(block.id, e)}
                     onMouseEnter={() => handleWordMouseEnter(block.id)}
@@ -975,61 +1548,59 @@ export function AudioEditor({
                     {block.word}
                   </button>
                   {pauseAfter && (
-                    <>
-                      <div
-                        className={clsx("audio-editor-pause-block", {
-                          "audio-editor-pause-selected": isPauseSelected
-                        })}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (e.shiftKey || e.metaKey || e.ctrlKey) {
-                            setSelectedPauseIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(pauseAfter.id)) {
-                                next.delete(pauseAfter.id);
-                              } else {
-                                next.add(pauseAfter.id);
-                              }
-                              return next;
-                            });
-                          } else {
-                            setSelectedPauseIds(new Set([pauseAfter.id]));
-                            setSelectedWordIds(new Set());
-                          }
-                        }}
-                        title={`Pause: ${pauseAfter.duration.toFixed(2)}s (${formatTime(pauseAfter.start)} - ${formatTime(pauseAfter.end)})`}
-                      >
-                        <span className="audio-editor-pause-duration">
-                          {pauseAfter.duration.toFixed(2)}s
-                        </span>
-                        <div className="audio-editor-pause-controls">
-                          <button
-                            type="button"
-                            className="audio-editor-pause-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAdjustPause(pauseAfter.id, pauseAfter.duration - 0.1);
-                            }}
-                            title="Shorten pause by 0.1s"
-                          >
-                            −
-                          </button>
-                          <button
-                            type="button"
-                            className="audio-editor-pause-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAdjustPause(pauseAfter.id, pauseAfter.duration + 0.1);
-                            }}
-                            title="Lengthen pause by 0.1s"
-                          >
-                            +
-                          </button>
-                        </div>
+                    <div
+                      className={clsx("audio-editor-pause-block", {
+                        "audio-editor-pause-selected": isPauseSelected
+                      })}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                          setSelectedPauseIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(pauseAfter.id)) {
+                              next.delete(pauseAfter.id);
+                            } else {
+                              next.add(pauseAfter.id);
+                            }
+                            return next;
+                          });
+                        } else {
+                          setSelectedPauseIds(new Set([pauseAfter.id]));
+                          setSelectedWordIds(new Set());
+                        }
+                      }}
+                      title={`Pause: ${pauseAfter.duration.toFixed(2)}s (${formatTime(pauseAfter.start)} - ${formatTime(pauseAfter.end)})`}
+                    >
+                      <span className="audio-editor-pause-duration">
+                        {pauseAfter.duration.toFixed(2)}s
+                      </span>
+                      <div className="audio-editor-pause-controls">
+                        <button
+                          type="button"
+                          className="audio-editor-pause-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAdjustPause(pauseAfter.id, pauseAfter.duration - 0.1);
+                          }}
+                          title="Shorten pause by 0.1s"
+                        >
+                          −
+                        </button>
+                        <button
+                          type="button"
+                          className="audio-editor-pause-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAdjustPause(pauseAfter.id, pauseAfter.duration + 0.1);
+                          }}
+                          title="Lengthen pause by 0.1s"
+                        >
+                          +
+                        </button>
                       </div>
-                      {shouldBreakLine && <br className="audio-editor-line-break" />}
-                    </>
+                    </div>
                   )}
+                  {shouldBreakLine && <div className="audio-editor-line-break" />}
                 </React.Fragment>
               );
             })}
