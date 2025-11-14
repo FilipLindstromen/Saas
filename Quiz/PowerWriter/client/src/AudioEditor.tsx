@@ -1040,27 +1040,34 @@ export function AudioEditor({
         // Use original audio timestamps for playback (to avoid cutting)
         const originalStart = item.originalStart;
         const originalEnd = item.originalEnd;
-        const wordDuration = originalEnd - originalStart;
         
         // Use adjusted timestamps from wordBlocks for timeline positioning
         const adjustedStart = matchingWordBlock.start;
         const adjustedEnd = matchingWordBlock.end;
         
+        // Check if this word comes after a pause - if so, we'll start earlier to avoid cutting
+        const prevItem = i > 0 ? blocksToPlay[i - 1] : null;
+        const prevWordBlock = prevItem ? wordBlocks.find(b => b.index === prevItem.originalIndex) : null;
+        const comesAfterPause = prevWordBlock ? (adjustedStart - prevWordBlock.end > pauseThreshold) : false;
+        
+        // Calculate word duration - will be extended if we start earlier
+        const earlyStartOffset = comesAfterPause ? 0.15 : 0.05; // 150ms after pause, 50ms normally
+        const adjustedOriginalStart = Math.max(0, originalStart - earlyStartOffset);
+        const wordDuration = originalEnd - adjustedOriginalStart;
+        
         // Calculate the actual gap before this word (if it's after a pause adjustment)
         let gapBeforeWord = 0;
-        if (i > 0) {
-          const prevItem = blocksToPlay[i - 1];
-          const prevWordBlock = wordBlocks.find(b => b.index === prevItem.originalIndex);
-          if (prevWordBlock) {
-            // The gap is the difference between adjusted timestamps
-            const adjustedGap = adjustedStart - prevWordBlock.end;
-            if (adjustedGap > 0) {
-              gapBeforeWord = adjustedGap;
-            }
+        if (i > 0 && prevWordBlock) {
+          // The gap is the difference between adjusted timestamps
+          const adjustedGap = adjustedStart - prevWordBlock.end;
+          if (adjustedGap > 0) {
+            gapBeforeWord = adjustedGap;
           }
         }
         
-        const wordStartTime = currentTime + gapBeforeWord;
+        // Timeline position: Start playback slightly earlier if coming after pause
+        // This ensures the early audio plays at the right time
+        const wordStartTime = currentTime + gapBeforeWord - earlyStartOffset;
         const wordEndTime = wordStartTime + wordDuration;
         
         const wordId = matchingWordBlock.id;
@@ -1143,26 +1150,38 @@ export function AudioEditor({
         const item = playbackTimeline[currentItemIndex];
         
         if (item.type === 'word') {
-          // Play word using original timestamps to avoid cutting
-          const wordDuration = item.originalEnd - item.originalStart;
+          // Check if this word comes after a pause - if so, start slightly earlier to avoid cutting
+          const previousItem = currentItemIndex > 0 ? playbackTimeline[currentItemIndex - 1] : null;
+          const comesAfterPause = previousItem?.type === 'pause';
+          
+          // Start 150ms earlier if coming after a pause to ensure full word is audible
+          // 50ms earlier normally for safety margin
+          const earlyStartOffset = comesAfterPause ? 0.15 : 0.05;
+          const adjustedOriginalStart = Math.max(0, item.originalStart - earlyStartOffset);
+          const wordDuration = item.originalEnd - adjustedOriginalStart;
+          
           const wordBuffer = audioContext.createBuffer(
             audioBuffer.numberOfChannels,
             Math.ceil(wordDuration * audioBuffer.sampleRate),
             audioBuffer.sampleRate
           );
           
-          const originalStartSample = Math.floor(item.originalStart * audioBuffer.sampleRate);
+          const originalStartSample = Math.floor(adjustedOriginalStart * audioBuffer.sampleRate);
           const originalEndSample = Math.floor(item.originalEnd * audioBuffer.sampleRate);
           const samplesToCopy = originalEndSample - originalStartSample;
           
-          // Copy word audio from original buffer (using original timestamps)
+          // Copy word audio from original buffer, starting from earlier position
+          // This ensures we capture the full beginning of the word
           for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
             const originalData = audioBuffer.getChannelData(channel);
             const newData = wordBuffer.getChannelData(channel);
             const maxSamples = Math.min(samplesToCopy, newData.length, originalData.length - originalStartSample);
+            
+            // Copy audio samples starting from the earlier position
             for (let j = 0; j < maxSamples; j++) {
-              if (originalStartSample + j < originalData.length) {
-                newData[j] = originalData[originalStartSample + j];
+              const sourceIndex = originalStartSample + j;
+              if (sourceIndex >= 0 && sourceIndex < originalData.length && j < newData.length) {
+                newData[j] = originalData[sourceIndex];
               }
             }
           }
@@ -1184,6 +1203,9 @@ export function AudioEditor({
               });
             }
           }
+          
+          // Calculate actual play duration (may be longer if we started earlier)
+          const actualPlayDuration = wordBuffer.duration;
           
           source.onended = () => {
             // Check if preview was stopped before continuing (use ref for reliable check)
@@ -1630,12 +1652,12 @@ export function AudioEditor({
 
       {hasTranscription && (
         <>
-
-          <div 
-            ref={containerRef}
-            className="audio-editor-words-container"
-            onMouseUp={handleWordMouseUp}
-          >
+          <div className="audio-editor-words-wrapper">
+            <div 
+              ref={containerRef}
+              className="audio-editor-words-container"
+              onMouseUp={handleWordMouseUp}
+            >
             {wordBlocks.map((block, index) => {
               const isSelected = selectedWordIds.has(block.id);
               const isRetake = retakeWordIds.has(block.id);
@@ -1723,6 +1745,7 @@ export function AudioEditor({
                 </React.Fragment>
               );
             })}
+            </div>
           </div>
 
           <audio ref={audioRef} src={audioUrl || undefined} style={{ display: "none" }} />
