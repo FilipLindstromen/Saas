@@ -581,6 +581,7 @@ function TreeNodeItem({
           <button
             type="button"
             aria-label="Move up"
+            title="Move up"
             onClick={(event) => {
               event.stopPropagation();
               onReorder(
@@ -598,6 +599,7 @@ function TreeNodeItem({
           <button
             type="button"
             aria-label="Move down"
+            title="Move down"
             onClick={(event) => {
               event.stopPropagation();
               onReorder(
@@ -615,6 +617,7 @@ function TreeNodeItem({
           <button
             type="button"
             aria-label="Rename"
+            title="Rename"
             onClick={(event) => {
               event.stopPropagation();
               onRename({
@@ -629,6 +632,7 @@ function TreeNodeItem({
           <button
             type="button"
             aria-label="Delete"
+            title="Delete"
             onClick={(event) => {
               event.stopPropagation();
               onDelete({
@@ -668,7 +672,7 @@ function TreeNodeItem({
   );
 }
 
-function App() {
+export default function App() {
   console.info("[PowerWriter] bundle version 2025-02-20-1");
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -2399,10 +2403,20 @@ function App() {
             Meditation workspace
           </p>
           <div className="toolbar" style={{ marginTop: 12 }}>
-            <button type="button" onClick={handleCreateFolder}>
+            <button 
+              type="button" 
+              onClick={handleCreateFolder}
+              title="Create new folder"
+              aria-label="Create new folder"
+            >
               + Folder
             </button>
-            <button type="button" onClick={handleCreateDocument}>
+            <button 
+              type="button" 
+              onClick={handleCreateDocument}
+              title="Create new document"
+              aria-label="Create new document"
+            >
               + Document
             </button>
           </div>
@@ -2446,6 +2460,7 @@ function App() {
                   className={clsx(!instructionsVisible && "toggle-off")}
                   onClick={() => setInstructionsVisible((prev) => !prev)}
                   aria-label={`${instructionsVisible ? "Hide" : "Show"} instructions`}
+                  title={`${instructionsVisible ? "Hide" : "Show"} Instructions Panel`}
                 >
                   <IconDocument className="icon" />
                   <span className="sr-only">Instructions</span>
@@ -2456,6 +2471,7 @@ function App() {
                   className={clsx(!documentVisible && "toggle-off")}
                   onClick={() => setDocumentVisible((prev) => !prev)}
                   aria-label={`${documentVisible ? "Hide" : "Show"} text editor`}
+                  title={`${documentVisible ? "Hide" : "Show"} Text Editor Panel`}
                 >
                   <IconTextEditor className="icon" />
                   <span className="sr-only">Text Editor</span>
@@ -2467,7 +2483,7 @@ function App() {
                     className={clsx(!audioEditorVisible && "toggle-off")}
                     onClick={() => setAudioEditorVisible((prev) => !prev)}
                     aria-label={`${audioEditorVisible ? "Hide" : "Show"} audio editor`}
-                    title="Audio Editor - Record, edit, and enhance audio"
+                    title={`${audioEditorVisible ? "Hide" : "Show"} Audio Editor - Record, edit, and enhance audio`}
                   >
                     <IconAudioEditor className="icon" />
                     <span className="sr-only">Audio Editor</span>
@@ -2479,6 +2495,7 @@ function App() {
                   className={clsx(!inlineEditorVisible && "toggle-off")}
                   onClick={() => setInlineEditorVisible((prev) => !prev)}
                   aria-label={`${inlineEditorVisible ? "Hide" : "Show"} inline editor`}
+                  title={`${inlineEditorVisible ? "Hide" : "Show"} Inline Editor Panel`}
                 >
                   <IconInline className="icon" />
                   <span className="sr-only">Inline Editor</span>
@@ -2489,6 +2506,7 @@ function App() {
                   className={clsx(!chatVisible && "toggle-off")}
                   onClick={() => setChatVisible((prev) => !prev)}
                   aria-label={`${chatVisible ? "Hide" : "Show"} ChatGPT panel`}
+                  title={`${chatVisible ? "Hide" : "Show"} ChatGPT Panel`}
                 >
                   <IconChat className="icon" />
                   <span className="sr-only">Generate with ChatGPT</span>
@@ -2499,6 +2517,7 @@ function App() {
                   className={clsx(inlineBeforeDocument && "toggle-active")}
                   onClick={() => setInlineBeforeDocument((prev) => !prev)}
                   aria-label="Swap text editor and inline editor position"
+                  title="Swap Text Editor and Inline Editor Position"
                 >
                   <IconSwap className="icon" />
                   <span className="sr-only">Swap editor layout</span>
@@ -2507,6 +2526,7 @@ function App() {
                   type="button"
                   onClick={() => setShowAggregated(true)}
                   aria-label="View aggregated instructions"
+                  title="View Aggregated Instructions"
                 >
                   <IconLayers className="icon" />
                   <span className="sr-only">View Aggregated</span>
@@ -2515,6 +2535,7 @@ function App() {
                   type="button"
                   onClick={() => setIsSettingsOpen((prev) => !prev)}
                   aria-label={isSettingsOpen ? "Close settings" : "Open settings"}
+                  title={isSettingsOpen ? "Close Settings" : "Open Settings"}
                 >
                   <IconSettings className="icon" />
                   <span className="sr-only">
@@ -2890,6 +2911,7 @@ function App() {
                                         void handleParagraphAction(mode, entry.text)
                                       }
                                       aria-label={VARIANT_LABELS[mode]}
+                                      title={VARIANT_LABELS[mode]}
                                     >
                                       <IconComponent className="icon" size={16} />
                                       <span className="sr-only">
@@ -3096,6 +3118,4 @@ function App() {
     </div>
   );
 }
-
-export default App;
 

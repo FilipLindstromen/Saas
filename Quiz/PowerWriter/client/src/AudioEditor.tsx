@@ -122,6 +122,7 @@ export function AudioEditor({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartId, setDragStartId] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const isPreviewingRef = useRef(false); // Ref to track preview state for callbacks
   const [isApplyingEdits, setIsApplyingEdits] = useState(false);
   const [isApplyingAiSound, setIsApplyingAiSound] = useState(false);
   const [isExportingMp3, setIsExportingMp3] = useState(false);
@@ -883,24 +884,41 @@ export function AudioEditor({
   const pauseTimeoutRef = useRef<number | null>(null);
 
   const handleStopPreview = useCallback(() => {
+    console.log("Stopping preview...");
+    
+    // Set preview flag to false immediately (using ref for immediate access in callbacks)
+    isPreviewingRef.current = false;
+    
+    // Stop audio source immediately
     if (previewSourceRef.current) {
       try {
         previewSourceRef.current.stop();
-      } catch {}
+        previewSourceRef.current.disconnect();
+      } catch (error) {
+        console.warn("Error stopping audio source:", error);
+      }
       previewSourceRef.current = null;
     }
+    
+    // Clear animation frame
     if (playbackAnimationFrameRef.current) {
       cancelAnimationFrame(playbackAnimationFrameRef.current);
       playbackAnimationFrameRef.current = null;
     }
+    
+    // Clear pause timeout
     if (pauseTimeoutRef.current !== null) {
       clearTimeout(pauseTimeoutRef.current);
       pauseTimeoutRef.current = null;
     }
+    
+    // Reset playback state
     playbackStartTimeRef.current = null;
     playbackBlocksRef.current = [];
     setCurrentPlayingWordId(null);
     setIsPreviewing(false);
+    
+    console.log("Preview stopped");
   }, []);
 
   const handlePreview = useCallback(async () => {
@@ -924,6 +942,7 @@ export function AudioEditor({
       } catch {}
     }
 
+    isPreviewingRef.current = true;
     setIsPreviewing(true);
     setTranscriptionError(null);
 
@@ -1003,8 +1022,9 @@ export function AudioEditor({
 
       // Build playback timeline with pauses
       // Each item is either a word or a pause
+      // Use wordBlocks to get current adjusted timestamps, but original audio for playback
       type PlaybackItem = 
-        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; startTime: number; endTime: number; id: string }
+        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; originalStart: number; originalEnd: number; adjustedStart: number; adjustedEnd: number; startTime: number; endTime: number; id: string }
         | { type: 'pause'; duration: number; startTime: number; endTime: number; id: string };
       
       const playbackTimeline: PlaybackItem[] = [];
@@ -1012,18 +1032,46 @@ export function AudioEditor({
       
       for (let i = 0; i < blocksToPlay.length; i++) {
         const item = blocksToPlay[i];
-        const wordDuration = item.originalEnd - item.originalStart;
-        const wordStartTime = currentTime;
-        const wordEndTime = currentTime + wordDuration;
         
-        // Add word to timeline
-        // Find the matching word block to get the correct ID for highlighting
+        // Find the matching word block to get adjusted timestamps
         const matchingWordBlock = wordBlocks.find(b => b.index === item.originalIndex);
-        const wordId = matchingWordBlock?.id || `word-${i}-${item.originalIndex}`;
+        if (!matchingWordBlock) continue;
+        
+        // Use original audio timestamps for playback (to avoid cutting)
+        const originalStart = item.originalStart;
+        const originalEnd = item.originalEnd;
+        const wordDuration = originalEnd - originalStart;
+        
+        // Use adjusted timestamps from wordBlocks for timeline positioning
+        const adjustedStart = matchingWordBlock.start;
+        const adjustedEnd = matchingWordBlock.end;
+        
+        // Calculate the actual gap before this word (if it's after a pause adjustment)
+        let gapBeforeWord = 0;
+        if (i > 0) {
+          const prevItem = blocksToPlay[i - 1];
+          const prevWordBlock = wordBlocks.find(b => b.index === prevItem.originalIndex);
+          if (prevWordBlock) {
+            // The gap is the difference between adjusted timestamps
+            const adjustedGap = adjustedStart - prevWordBlock.end;
+            if (adjustedGap > 0) {
+              gapBeforeWord = adjustedGap;
+            }
+          }
+        }
+        
+        const wordStartTime = currentTime + gapBeforeWord;
+        const wordEndTime = wordStartTime + wordDuration;
+        
+        const wordId = matchingWordBlock.id;
         playbackTimeline.push({
           type: 'word',
           wordIndex: i,
           item,
+          originalStart,
+          originalEnd,
+          adjustedStart,
+          adjustedEnd,
           startTime: wordStartTime,
           endTime: wordEndTime,
           id: wordId
@@ -1033,35 +1081,35 @@ export function AudioEditor({
         
         // Check for pause after this word (except last)
         if (i < blocksToPlay.length - 1) {
-          // Find pause between this word and next in wordBlocks
-          const currentWordBlockIndex = wordBlocks.findIndex(b => b.index === item.originalIndex);
           const nextItem = blocksToPlay[i + 1];
-          const nextWordBlockIndex = wordBlocks.findIndex(b => b.index === nextItem.originalIndex);
+          const nextWordBlock = wordBlocks.find(b => b.index === nextItem.originalIndex);
           
-          if (currentWordBlockIndex >= 0 && nextWordBlockIndex >= 0) {
-            const pause = pauses.find(p => 
-              p.beforeWordIndex === currentWordBlockIndex && 
-              p.afterWordIndex === nextWordBlockIndex
-            );
+          if (nextWordBlock) {
+            // Calculate actual gap from adjusted word positions
+            const actualGap = nextWordBlock.start - matchingWordBlock.end;
             
-            if (pause && pause.duration > pauseThreshold) {
-              // Add pause to timeline
+            if (actualGap > pauseThreshold) {
+              // Add pause to timeline using the actual adjusted gap
               const pauseStartTime = currentTime;
-              const pauseEndTime = currentTime + pause.duration;
+              const pauseEndTime = currentTime + actualGap;
+              console.log(`Adding pause to timeline: ${actualGap.toFixed(3)}s between word ${i} and ${i + 1}`);
               playbackTimeline.push({
                 type: 'pause',
-                duration: pause.duration,
+                duration: actualGap,
                 startTime: pauseStartTime,
                 endTime: pauseEndTime,
                 id: `pause-${i}`
               });
               currentTime = pauseEndTime;
+            } else if (actualGap > 0.01) {
+              // Small gap - add minimal pause (not added to timeline, just advance time)
+              currentTime += Math.max(0.01, actualGap);
             } else {
-              // Minimal gap between words
-              currentTime += 0.01; // 10ms
+              // No gap - minimal spacing
+              currentTime += 0.01;
             }
           } else {
-            // Minimal gap if we can't find pause
+            // Minimal gap if we can't find next word
             currentTime += 0.01;
           }
         }
@@ -1074,10 +1122,19 @@ export function AudioEditor({
         end: item.endTime
       }));
       
+      console.log(`Playback timeline created with ${playbackTimeline.length} items:`, 
+        playbackTimeline.map(item => item.type === 'pause' ? `pause(${item.duration.toFixed(2)}s)` : 'word'));
+      
       // Play words and pauses sequentially
       let currentItemIndex = 0;
       
       const playNextItem = () => {
+        // Check if preview was stopped (use ref for reliable check)
+        if (!isPreviewingRef.current) {
+          console.log("Preview stopped, aborting playback");
+          return;
+        }
+        
         if (currentItemIndex >= playbackTimeline.length) {
           handleStopPreview();
           return;
@@ -1086,23 +1143,27 @@ export function AudioEditor({
         const item = playbackTimeline[currentItemIndex];
         
         if (item.type === 'word') {
-          // Play word
+          // Play word using original timestamps to avoid cutting
+          const wordDuration = item.originalEnd - item.originalStart;
           const wordBuffer = audioContext.createBuffer(
             audioBuffer.numberOfChannels,
-            Math.ceil((item.item.originalEnd - item.item.originalStart) * audioBuffer.sampleRate),
+            Math.ceil(wordDuration * audioBuffer.sampleRate),
             audioBuffer.sampleRate
           );
           
-          const originalStartSample = Math.floor(item.item.originalStart * audioBuffer.sampleRate);
-          const originalEndSample = Math.floor(item.item.originalEnd * audioBuffer.sampleRate);
+          const originalStartSample = Math.floor(item.originalStart * audioBuffer.sampleRate);
+          const originalEndSample = Math.floor(item.originalEnd * audioBuffer.sampleRate);
           const samplesToCopy = originalEndSample - originalStartSample;
           
-          // Copy word audio
+          // Copy word audio from original buffer (using original timestamps)
           for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
             const originalData = audioBuffer.getChannelData(channel);
             const newData = wordBuffer.getChannelData(channel);
-            for (let j = 0; j < samplesToCopy && originalStartSample + j < originalData.length; j++) {
-              newData[j] = originalData[originalStartSample + j];
+            const maxSamples = Math.min(samplesToCopy, newData.length, originalData.length - originalStartSample);
+            for (let j = 0; j < maxSamples; j++) {
+              if (originalStartSample + j < originalData.length) {
+                newData[j] = originalData[originalStartSample + j];
+              }
             }
           }
           
@@ -1125,9 +1186,21 @@ export function AudioEditor({
           }
           
           source.onended = () => {
+            // Check if preview was stopped before continuing (use ref for reliable check)
+            if (!isPreviewingRef.current) {
+              return;
+            }
+            
+            // Clear current word highlight when word ends
+            setCurrentPlayingWordId(null);
             // Move to next item
             currentItemIndex++;
-            playNextItem();
+            // Use setTimeout to ensure smooth transition
+            setTimeout(() => {
+              if (isPreviewingRef.current) {
+                playNextItem();
+              }
+            }, 10);
           };
           
           source.start(0);
@@ -1144,11 +1217,21 @@ export function AudioEditor({
           }
           
           // Wait for pause duration, then continue to next word
+          const pauseDurationMs = Math.max(50, Math.round(item.duration * 1000)); // Minimum 50ms, round to avoid precision issues
+          console.log(`Playing pause: ${pauseDurationMs}ms (${item.duration.toFixed(3)}s)`);
           pauseTimeoutRef.current = window.setTimeout(() => {
-            pauseTimeoutRef.current = null;
-            currentItemIndex++;
-            playNextItem();
-          }, item.duration * 1000);
+            // Check if preview was stopped before continuing (use ref for reliable check)
+            if (!isPreviewingRef.current) {
+              console.log("Preview stopped during pause");
+              return;
+            }
+            
+            if (pauseTimeoutRef.current !== null) {
+              pauseTimeoutRef.current = null;
+              currentItemIndex++;
+              playNextItem();
+            }
+          }, pauseDurationMs);
         }
       };
       
@@ -1339,70 +1422,203 @@ export function AudioEditor({
 
   return (
     <div className="audio-editor">
-
       {transcriptionError && (
         <div className="audio-editor-error">{transcriptionError}</div>
       )}
 
-      {/* Recording Panel - Always visible at the top */}
-      <div className="audio-editor-recording-panel">
-        <div className="audio-editor-recording-header">
-          <span className="audio-editor-recording-label">Recording</span>
-          {isRecordingAudio && (
-            <span className="audio-editor-recording-status recording">
-              {formattedRecordingTime}
-            </span>
-          )}
-          {!isRecordingAudio && hasAudio && (
-            <span className="audio-editor-recording-status ready">Ready</span>
-          )}
-        </div>
-        <div className="audio-editor-recording-controls">
-          <button
-            className="audio-editor-icon-button"
-            onClick={() => onStartRecording?.()}
-            disabled={!canStartRecording}
-            title="Start recording (Ctrl/Cmd + R)"
-          >
-            <IconRecord className="audio-editor-icon" />
-          </button>
-          <button
-            className="audio-editor-icon-button"
-            onClick={() => onStopRecording?.()}
-            disabled={!isRecordingAudio}
-            title="Stop recording"
-          >
-            <IconStop className="audio-editor-icon" />
-          </button>
-          <button
-            className="audio-editor-icon-button"
-            onClick={() => onPlayAudio?.()}
-            disabled={!hasAudio || isRecordingAudio}
-            title="Play audio"
-          >
-            <IconPlay className="audio-editor-icon" />
-          </button>
-          <button
-            className="audio-editor-icon-button"
-            onClick={() => onPauseAudio?.()}
-            disabled={!hasAudio}
-            title="Pause audio"
-          >
-            <IconPause className="audio-editor-icon" />
-          </button>
-          <button
-            className="audio-editor-icon-button"
-            onClick={() => onRewindAudio?.()}
-            disabled={!hasAudio}
-            title="Rewind to beginning"
-          >
-            <IconRewind className="audio-editor-icon" />
-          </button>
-        </div>
-        {recordingFileName && !isRecordingAudio && (
-          <div className="audio-editor-recording-filename">
-            {recordingFileName}
+      {/* Unified Controls Panel - Recording at top, Editing at bottom */}
+      <div className="audio-editor-unified-panel">
+        {/* Recording Section - Top */}
+        <div className="audio-editor-recording-section">
+          <div className="audio-editor-recording-header">
+            <span className="audio-editor-recording-label">Recording</span>
+            {isRecordingAudio && (
+              <span className="audio-editor-recording-status recording">
+                {formattedRecordingTime}
+              </span>
+            )}
+            {!isRecordingAudio && hasAudio && (
+              <span className="audio-editor-recording-status ready">Ready</span>
+            )}
           </div>
+          <div className="audio-editor-recording-controls">
+            <button
+              className="audio-editor-icon-button"
+              onClick={() => onStartRecording?.()}
+              disabled={!canStartRecording}
+              title="Start recording (Ctrl/Cmd + R)"
+            >
+              <IconRecord className="audio-editor-icon" />
+            </button>
+            <button
+              className="audio-editor-icon-button"
+              onClick={() => onStopRecording?.()}
+              disabled={!isRecordingAudio}
+              title="Stop recording"
+            >
+              <IconStop className="audio-editor-icon" />
+            </button>
+            <button
+              className="audio-editor-icon-button"
+              onClick={() => onPlayAudio?.()}
+              disabled={!hasAudio || isRecordingAudio}
+              title="Play audio"
+            >
+              <IconPlay className="audio-editor-icon" />
+            </button>
+            <button
+              className="audio-editor-icon-button"
+              onClick={() => onPauseAudio?.()}
+              disabled={!hasAudio}
+              title="Pause audio"
+            >
+              <IconPause className="audio-editor-icon" />
+            </button>
+            <button
+              className="audio-editor-icon-button"
+              onClick={() => onRewindAudio?.()}
+              disabled={!hasAudio}
+              title="Rewind to beginning"
+            >
+              <IconRewind className="audio-editor-icon" />
+            </button>
+          </div>
+          {recordingFileName && !isRecordingAudio && (
+            <div className="audio-editor-recording-filename">
+              {recordingFileName}
+            </div>
+          )}
+        </div>
+
+        {/* Editing Section - Bottom */}
+        {(hasTranscription || audioUrl) && (
+          <>
+            <div className="audio-editor-section-divider" />
+            <div className="audio-editor-editing-section">
+              <h2 className="audio-editor-title">Audio Editing</h2>
+              {!hasTranscription && audioUrl && (
+                <div className="audio-editor-message-inline">
+                  <button
+                    className="audio-editor-button"
+                    onClick={handleTranscribe}
+                    disabled={isTranscribing}
+                  >
+                    {isTranscribing ? "Transcribing..." : "Transcribe Audio"}
+                  </button>
+                </div>
+              )}
+              {hasTranscription && (
+                <div className="audio-editor-controls-grid">
+                  {/* First row of icons */}
+                  <div className="audio-editor-controls-row">
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleUndo}
+                      disabled={!canUndo}
+                      title="Undo (Ctrl/Cmd + Z)"
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 7v6h6" />
+                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                      </svg>
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleRedo}
+                      disabled={!canRedo}
+                      title="Redo (Ctrl/Cmd + Shift + Z)"
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 7v6h-6" />
+                        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                      </svg>
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={isPreviewing ? handleStopPreview : handlePreview}
+                      disabled={wordBlocks.length === 0}
+                      title={isPreviewing ? "Stop preview" : "Preview edited audio"}
+                    >
+                      {isPreviewing ? <IconPause className="audio-editor-icon" /> : <IconPlay className="audio-editor-icon" />}
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleTranscribe}
+                      disabled={isTranscribing || !audioUrl}
+                      title="Reset all edits and re-transcribe from original audio"
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                        <path d="M21 3v5h-5" />
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                        <path d="M3 21v-5h5" />
+                      </svg>
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleSaveEdits}
+                      disabled={isApplyingEdits}
+                      title={isApplyingEdits ? "Saving..." : "Save audio edits to file"}
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Second row of icons */}
+                  <div className="audio-editor-controls-row">
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleAiStudioSound}
+                      disabled={isApplyingAiSound || !audioUrl}
+                      title="Professional audio enhancement: noise reduction, EQ, compression, and normalization"
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2v20" />
+                        <path d="M2 12h20" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={handleExportMp3}
+                      disabled={isExportingMp3 || !audioUrl}
+                      title="Export audio as MP3 file"
+                    >
+                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    </button>
+                    <label className="audio-editor-pause-threshold-inline">
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginRight: "8px" }}>Pause threshold:</span>
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="5"
+                        step="0.1"
+                        value={pauseThreshold}
+                        onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
+                        style={{
+                          width: "60px",
+                          padding: "4px 8px",
+                          background: "var(--field-bg)",
+                          border: "1px solid var(--field-border)",
+                          borderRadius: "4px",
+                          color: "var(--text-primary)"
+                        }}
+                      />
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginLeft: "4px" }}>s</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -1412,122 +1628,8 @@ export function AudioEditor({
         </div>
       )}
 
-      {audioUrl && !hasTranscription && (
-        <div className="audio-editor-message">
-          <button
-            className="audio-editor-button"
-            onClick={handleTranscribe}
-            disabled={isTranscribing}
-          >
-            {isTranscribing ? "Transcribing..." : "Transcribe Audio"}
-          </button>
-        </div>
-      )}
-
       {hasTranscription && (
         <>
-          <div className="audio-editor-top-actions">
-            <h2 className="audio-editor-title">Audio Editing</h2>
-            <div className="audio-editor-controls-bar">
-              <button
-                className="audio-editor-icon-button"
-                onClick={handleUndo}
-                disabled={!canUndo}
-                title="Undo (Ctrl/Cmd + Z)"
-              >
-                <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7v6h6" />
-                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-                </svg>
-              </button>
-              <button
-                className="audio-editor-icon-button"
-                onClick={handleRedo}
-                disabled={!canRedo}
-                title="Redo (Ctrl/Cmd + Shift + Z)"
-              >
-                <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 7v6h-6" />
-                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-                </svg>
-              </button>
-              <label className="audio-editor-pause-threshold-inline">
-                Pause threshold:{" "}
-                <input
-                  type="number"
-                  min="0.1"
-                  max="5"
-                  step="0.1"
-                  value={pauseThreshold}
-                  onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
-                  style={{
-                    width: "60px",
-                    padding: "4px 8px",
-                    background: "var(--field-bg)",
-                    border: "1px solid var(--field-border)",
-                    borderRadius: "4px",
-                    color: "var(--text-primary)"
-                  }}
-                />
-                s
-              </label>
-              <div className="audio-editor-actions">
-                <button
-                  className="audio-editor-icon-button"
-                  onClick={isPreviewing ? handleStopPreview : handlePreview}
-                  disabled={wordBlocks.length === 0}
-                  title={isPreviewing ? "Stop preview" : "Preview edited audio"}
-                >
-                  {isPreviewing ? <IconPause className="audio-editor-icon" /> : <IconPlay className="audio-editor-icon" />}
-                </button>
-                <button
-                  className="audio-editor-icon-button"
-                  onClick={handleTranscribe}
-                  disabled={isTranscribing || !audioUrl}
-                  title="Reset all edits and re-transcribe from original audio"
-                >
-                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                    <path d="M21 3v5h-5" />
-                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                    <path d="M3 21v-5h5" />
-                  </svg>
-                </button>
-                <button
-                  className="audio-editor-button"
-                  onClick={handleSaveEdits}
-                  disabled={isApplyingEdits}
-                  title="Save audio edits to file"
-                >
-                  {isApplyingEdits ? "Saving..." : "Save Edits"}
-                </button>
-                <button
-                  className="audio-editor-icon-button"
-                  onClick={handleAiStudioSound}
-                  disabled={isApplyingAiSound || !audioUrl}
-                  title="Professional audio enhancement: noise reduction, EQ, compression, and normalization"
-                >
-                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20" />
-                    <path d="M2 12h20" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
-                <button
-                  className="audio-editor-icon-button"
-                  onClick={handleExportMp3}
-                  disabled={isExportingMp3 || !audioUrl}
-                  title="Export audio as MP3 file"
-                >
-                  <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
 
           <div 
             ref={containerRef}

@@ -283,20 +283,45 @@
   flex-shrink: 0;
 }
 
-.audio-editor-title {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Recording Panel */
-.audio-editor-recording-panel {
-  padding: 16px;
+/* Unified Audio Editor Panel */
+.audio-editor-unified-panel {
+  padding: 20px;
   background: var(--bg-panel-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Recording Section - Top */
+.audio-editor-recording-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Editing Section - Bottom */
+.audio-editor-editing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Divider between sections */
+.audio-editor-section-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 16px 0;
+  flex-shrink: 0;
+}
+
+.audio-editor-message-inline {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
 }
 
 .audio-editor-recording-header {
@@ -383,11 +408,24 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 12px;
+  gap: 12px;
+  padding: 12px 16px;
   background: var(--bg-panel-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
+}
+
+.audio-editor-controls-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.audio-editor-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .audio-editor-undo-redo {
@@ -809,6 +847,7 @@
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+  margin-left: auto;
 }
 
 .app {
@@ -827,18 +866,23 @@
   min-width: 200px;
   max-width: 420px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+  gap: 0;
 }
 
 .sidebar-header {
   padding: 20px 20px 16px;
   border-bottom: 1px solid var(--border-subtle);
   backdrop-filter: var(--blur-light);
+  gap: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .resizer {
   background: rgba(104, 111, 146, 0.28);
   flex: 0 0 auto;
   transition: background 0.2s ease;
+  position: relative;
 }
 
 .resizer-vertical {
@@ -848,6 +892,10 @@
 
 .resizer:hover {
   background: rgba(134, 141, 176, 0.55);
+}
+
+.resizer:active {
+  background: rgba(134, 141, 176, 0.75);
 }
 
 .sidebar-resizer {
@@ -937,6 +985,7 @@
   margin-left: auto;
   opacity: 0;
   transition: opacity 0.2s ease;
+  align-items: center;
 }
 
 .tree-item:hover .tree-actions,
@@ -1032,19 +1081,20 @@
 .panel-toggle-toolbar {
   flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .audio-panel {
   margin-top: 16px;
-  padding: 16px;
-  border-radius: 16px;
+  padding: 28px;
+  border-radius: 22px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-panel-elevated);
+  background: var(--bg-panel);
   backdrop-filter: var(--blur-light);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: var(--panel-shadow-md);
+  box-shadow: var(--panel-shadow-lg);
 }
 
 .audio-panel-header {
@@ -1063,6 +1113,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .audio-controls.compact {
@@ -1193,7 +1244,8 @@
 
 .instructions-panel,
 .document-panel,
-.inline-panel {
+.inline-panel,
+.audio-editor-panel {
   display: flex;
   flex-direction: column;
   padding: 28px;
@@ -1205,6 +1257,7 @@
   box-shadow: var(--panel-shadow-lg);
   min-height: 0;
   backdrop-filter: var(--blur-light);
+  gap: 12px;
 }
 
 .inline-panel {
@@ -1275,7 +1328,7 @@
 }
 
 .panel-label {
-  margin: 0 0 8px;
+  margin: 0 0 0;
   font-weight: 600;
   font-size: 13px;
   color: var(--text-muted);
@@ -1505,8 +1558,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   color: var(--text-primary);
+  gap: 12px;
 }
 
 .panel-header h2 {
@@ -1521,6 +1575,7 @@
   gap: 12px;
   overflow: visible;
   min-height: 0;
+  margin-top: 0;
 }
 
 .panel-body textarea {
@@ -1570,6 +1625,7 @@
 .toolbar {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .autosave-indicator {
