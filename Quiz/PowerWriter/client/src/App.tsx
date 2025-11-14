@@ -23,6 +23,7 @@ import {
   deleteFolder,
   uploadDocumentAudio
 } from "./api";
+import { AudioEditor } from "./AudioEditor";
 
 type Selection =
   | {
@@ -73,7 +74,13 @@ const LS_KEYS = {
   instructionsWidth: "powerwriter.instructionsWidth",
   inlineWidth: "powerwriter.inlineWidth",
   inlineEditorHeight: "powerwriter.inlineEditorHeight",
-  inlineOrder: "powerwriter.inlineOrder"
+  inlineOrder: "powerwriter.inlineOrder",
+  audioEditorWidth: "powerwriter.audioEditorWidth",
+  instructionsVisible: "powerwriter.instructionsVisible",
+  documentVisible: "powerwriter.documentVisible",
+  inlineEditorVisible: "powerwriter.inlineEditorVisible",
+  chatVisible: "powerwriter.chatVisible",
+  audioEditorVisible: "powerwriter.audioEditorVisible"
 } as const;
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
@@ -232,6 +239,17 @@ const IconSensory = createIcon(
     <path d="M6 14.5 5 15" />
     <path d="m18 15-1-.5" />
     <path d="m7 9.5-1-.5" />
+  </>
+);
+const IconAudioEditor = createIcon(
+  <>
+    <path d="M2 10v4" />
+    <path d="M6 6v12" />
+    <path d="M10 4v16" />
+    <path d="M14 8v8" />
+    <path d="M18 10v4" />
+    <path d="M4 18h16" />
+    <path d="M6 18v-8" />
   </>
 );
 
@@ -662,7 +680,7 @@ function App() {
   );
   const [inlineRatio, setInlineRatio] = useState(initialRatiosRef.current.inline);
   const [draggingResizer, setDraggingResizer] = useState<
-    "sidebar" | "instructions" | "inline" | "inlineHeight" | null
+    "sidebar" | "instructions" | "inline" | "inlineHeight" | "audioEditor" | null
   >(null);
   const [inlineBeforeDocument, setInlineBeforeDocument] =
     useState(getInitialInlineOrder);
@@ -698,10 +716,38 @@ function App() {
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [instructionsVisible, setInstructionsVisible] = useState(true);
-  const [documentVisible, setDocumentVisible] = useState(true);
-  const [inlineEditorVisible, setInlineEditorVisible] = useState(true);
-  const [chatVisible, setChatVisible] = useState(false);
+  const [instructionsVisible, setInstructionsVisible] = useState(() => {
+    const stored = window.localStorage.getItem(LS_KEYS.instructionsVisible);
+    return stored !== null ? stored === "true" : true;
+  });
+  const [documentVisible, setDocumentVisible] = useState(() => {
+    const stored = window.localStorage.getItem(LS_KEYS.documentVisible);
+    return stored !== null ? stored === "true" : true;
+  });
+  const [inlineEditorVisible, setInlineEditorVisible] = useState(() => {
+    const stored = window.localStorage.getItem(LS_KEYS.inlineEditorVisible);
+    return stored !== null ? stored === "true" : true;
+  });
+  const [chatVisible, setChatVisible] = useState(() => {
+    const stored = window.localStorage.getItem(LS_KEYS.chatVisible);
+    return stored !== null ? stored === "true" : false;
+  });
+  const [audioEditorVisible, setAudioEditorVisible] = useState(() => {
+    const stored = window.localStorage.getItem(LS_KEYS.audioEditorVisible);
+    return stored !== null ? stored === "true" : false;
+  });
+  const [audioEditorRatio, setAudioEditorRatio] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = parseFloat(
+        window.localStorage.getItem(LS_KEYS.audioEditorWidth) ?? ""
+      );
+      if (Number.isFinite(stored)) {
+        return clamp(stored, 0.18, 0.7);
+      }
+    }
+    return 0.32;
+  });
+  const audioEditorRef = useRef<HTMLDivElement | null>(null);
   const [inlineEditorRatio, setInlineEditorRatio] = useState(
     getInitialInlineEditorRatio
   );
@@ -1276,6 +1322,32 @@ function App() {
     }
   }, [selected, tree]);
 
+  // Save panel visibility states to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_KEYS.instructionsVisible, String(instructionsVisible));
+  }, [instructionsVisible]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_KEYS.documentVisible, String(documentVisible));
+  }, [documentVisible]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_KEYS.inlineEditorVisible, String(inlineEditorVisible));
+  }, [inlineEditorVisible]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_KEYS.chatVisible, String(chatVisible));
+  }, [chatVisible]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_KEYS.audioEditorVisible, String(audioEditorVisible));
+  }, [audioEditorVisible]);
+
   useEffect(() => {
     if (selected?.type === "document") {
       setDocumentNameInput(selected.name);
@@ -1396,15 +1468,20 @@ function App() {
     : currentDocumentDirty || currentFolderDirty
     ? "Unsaved changes will auto-save shortly."
     : "Ready to write mindful experiences.";
+  const audioEditorShare = audioEditorVisible ? audioEditorRatio : 0;
   const instructionsShare = instructionsVisible ? instructionsRatio : 0;
   const inlineShare = inlinePanelVisible ? inlineRatio : 0;
   const baseDocumentShare = documentVisible
-    ? Math.max(MIN_DOCUMENT_RATIO, 1 - instructionsShare - inlineShare)
+    ? Math.max(MIN_DOCUMENT_RATIO, 1 - audioEditorShare - instructionsShare - inlineShare)
     : 0;
   const totalShare =
+    (audioEditorVisible ? audioEditorShare : 0) +
     (instructionsVisible ? instructionsShare : 0) +
       (documentVisible ? baseDocumentShare : 0) +
       (inlinePanelVisible ? inlineShare : 0) || 1;
+  const audioEditorFlexBasis = audioEditorVisible
+    ? `${(audioEditorShare / totalShare) * 100}%`
+    : undefined;
   const instructionsFlexBasis = instructionsVisible
     ? `${(instructionsShare / totalShare) * 100}%`
     : undefined;
@@ -1532,7 +1609,8 @@ function App() {
       }
       if (
         (draggingResizer === "instructions" ||
-          draggingResizer === "inline") &&
+          draggingResizer === "inline" ||
+          draggingResizer === "audioEditor") &&
         mainContentRef.current
       ) {
         const rect = mainContentRef.current.getBoundingClientRect();
@@ -1545,7 +1623,7 @@ function App() {
         if (draggingResizer === "instructions") {
           const maxInstructions = Math.max(
             MIN_INSTRUCTIONS_RATIO,
-            1 - inlineRatio - MIN_DOCUMENT_RATIO
+            1 - audioEditorRatio - inlineRatio - MIN_DOCUMENT_RATIO
           );
           const desired =
             offset / width < 0
@@ -1555,6 +1633,17 @@ function App() {
           const [inst, inl] = normalizeRatios(clamped, inlineRatio);
           setInstructionsRatio(inst);
           setInlineRatio(inl);
+        } else if (draggingResizer === "audioEditor") {
+          const desiredAudio =
+            offset / width < 0
+              ? 0.18
+              : offset / width;
+          const maxAudio = Math.max(
+            0.18,
+            1 - instructionsRatio - inlineRatio - MIN_DOCUMENT_RATIO
+          );
+          const clamped = clamp(desiredAudio, 0.18, maxAudio);
+          setAudioEditorRatio(clamped);
         } else if (draggingResizer === "inline") {
           const desiredInline =
             offset / width > 1
@@ -1562,7 +1651,7 @@ function App() {
               : 1 - offset / width;
           const maxInline = Math.max(
             MIN_INLINE_RATIO,
-            1 - instructionsRatio - MIN_DOCUMENT_RATIO
+            1 - instructionsRatio - audioEditorRatio - MIN_DOCUMENT_RATIO
           );
           const clamped = clamp(desiredInline, MIN_INLINE_RATIO, maxInline);
           const [inst, inl] = normalizeRatios(instructionsRatio, clamped);
@@ -1615,9 +1704,18 @@ function App() {
     draggingResizer,
     instructionsRatio,
     inlineRatio,
+    audioEditorRatio,
     inlineEditorVisible,
     chatVisible
   ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.audioEditorWidth,
+      audioEditorRatio.toFixed(4)
+    );
+  }, [audioEditorRatio]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2440,6 +2538,20 @@ function App() {
                   <IconTextEditor className="icon" />
                   <span className="sr-only">Text Editor</span>
                 </button>
+                {selected?.type === "document" && (
+                  <button
+                    type="button"
+                    aria-pressed={audioEditorVisible}
+                    className={clsx(!audioEditorVisible && "toggle-off")}
+                    onClick={() => setAudioEditorVisible((prev) => !prev)}
+                    disabled={!documentDetails?.audioUrl}
+                    aria-label={`${audioEditorVisible ? "Hide" : "Show"} audio editor`}
+                    title={documentDetails?.audioUrl ? "Audio Editor" : "Audio Editor (record audio first)"}
+                  >
+                    <IconAudioEditor className="icon" />
+                    <span className="sr-only">Audio Editor</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-pressed={inlineEditorVisible}
@@ -2608,12 +2720,52 @@ function App() {
             </section>
           )}
 
-          {instructionsVisible && (documentVisible || inlinePanelVisible) && (
+          {instructionsVisible && (documentVisible || audioEditorVisible || inlinePanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer instructions-resizer"
               onMouseDown={() => setDraggingResizer("instructions")}
               role="presentation"
               style={{ order: 1 }}
+            />
+          )}
+
+          {audioEditorVisible && documentDetails?.audioUrl ? (
+            <section
+              className="audio-editor-panel"
+              style={{
+                flexBasis: audioEditorFlexBasis,
+                flexGrow: 0,
+                flexShrink: 0,
+                order: 2
+              }}
+            >
+              <p className="panel-label">Audio Editor</p>
+              <div className="panel-body">
+                <AudioEditor
+                  documentPath={documentDetails.path}
+                  audioUrl={documentDetails.audioUrl}
+                  transcription={documentDetails.transcription}
+                  documentContent={documentDetails.content}
+                  apiKey={userApiKey || undefined}
+                  onTranscriptionUpdate={(transcription) => {
+                    if (documentDetails) {
+                      setDocumentDetails({
+                        ...documentDetails,
+                        transcription
+                      });
+                    }
+                  }}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {audioEditorVisible && documentDetails?.audioUrl && (documentVisible || inlinePanelVisible) && (
+            <div
+              className="resizer resizer-vertical panel-resizer audio-editor-resizer"
+              onMouseDown={() => setDraggingResizer("audioEditor")}
+              role="presentation"
+              style={{ order: 3 }}
             />
           )}
 
