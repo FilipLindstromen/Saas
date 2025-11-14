@@ -181,6 +181,51 @@ export function AudioEditor({
     }));
   }, [currentTranscription?.words, currentTranscription?.text]);
 
+  // Detect retakes (repeated sequences of words that are close together)
+  const retakeWordIds = useMemo<Set<string>>(() => {
+    const retakes = new Set<string>();
+    if (wordBlocks.length < 8) return retakes; // Need at least 4 words * 2 sequences = 8 words
+
+    const MAX_DISTANCE = 15; // Maximum words apart to consider as retake
+
+    // Only check sequences of length 4 or more (greater than 3)
+    for (let sequenceLength = 4; sequenceLength <= 7; sequenceLength++) {
+      for (let i = 0; i < wordBlocks.length - sequenceLength * 2 + 1; i++) {
+        // Get the first sequence
+        const firstSequence = wordBlocks
+          .slice(i, i + sequenceLength)
+          .map(block => block.word.toLowerCase().trim());
+        
+        // Check if sequence has valid words
+        if (firstSequence.some(word => word.length === 0)) continue;
+        
+        // Look for the same sequence starting later, but only within MAX_DISTANCE words
+        const searchStart = i + sequenceLength;
+        const searchEnd = Math.min(i + MAX_DISTANCE, wordBlocks.length - sequenceLength);
+        
+        for (let j = searchStart; j <= searchEnd; j++) {
+          const secondSequence = wordBlocks
+            .slice(j, j + sequenceLength)
+            .map(block => block.word.toLowerCase().trim());
+          
+          // Check if sequences match
+          if (firstSequence.join(" ") === secondSequence.join(" ")) {
+            // Mark all words in both sequences as retakes
+            for (let k = 0; k < sequenceLength; k++) {
+              retakes.add(wordBlocks[i + k].id);
+              retakes.add(wordBlocks[j + k].id);
+            }
+            
+            // Skip ahead after finding a match to avoid redundant checks
+            break;
+          }
+        }
+      }
+    }
+
+    return retakes;
+  }, [wordBlocks]);
+
   // Detect pauses (gaps between words longer than threshold)
   // Store original word blocks to preserve pause relationships even after edits
   const originalWordBlocks = useMemo(() => {
@@ -904,6 +949,7 @@ export function AudioEditor({
           >
             {wordBlocks.map((block, index) => {
               const isSelected = selectedWordIds.has(block.id);
+              const isRetake = retakeWordIds.has(block.id);
               const nextBlock = wordBlocks[index + 1];
               // Find pause after this word
               const pauseAfter = pauses.find(
@@ -919,11 +965,12 @@ export function AudioEditor({
                   <button
                     type="button"
                     className={clsx("audio-editor-word-block", {
-                      "audio-editor-word-selected": isSelected
+                      "audio-editor-word-selected": isSelected,
+                      "audio-editor-word-retake": isRetake
                     })}
                     onMouseDown={(e) => handleWordMouseDown(block.id, e)}
                     onMouseEnter={() => handleWordMouseEnter(block.id)}
-                    title={`${formatTime(block.start)} - ${formatTime(block.end)}`}
+                    title={`${formatTime(block.start)} - ${formatTime(block.end)}${isRetake ? " (Retake)" : ""}`}
                   >
                     {block.word}
                   </button>
