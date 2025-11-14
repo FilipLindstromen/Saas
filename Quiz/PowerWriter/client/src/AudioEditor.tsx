@@ -1035,41 +1035,46 @@ export function AudioEditor({
 
       const blocksToPlay = wordsToPlay.slice(startIndex);
 
-      // NEW APPROACH: Play original audio between non-deleted words
-      // Skip deleted words entirely - jump directly from one non-deleted word to the next
-      type PlaybackItem = 
-        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; originalStart: number; originalEnd: number; startTime: number; endTime: number; id: string }
-        | { type: 'pause'; duration: number; startTime: number; endTime: number; id: string };
+      // NEW APPROACH: Group consecutive non-deleted words into continuous segments
+      // Play each segment as continuous audio (no clicking between words)
+      // Skip deleted words by jumping from one segment to the next
+      type PlaybackSegment = {
+        type: 'segment';
+        words: Array<{ item: typeof wordsToPlay[0]; wordBlock: WordBlock; originalStart: number; originalEnd: number }>;
+        segmentStart: number; // Original audio start time
+        segmentEnd: number;   // Original audio end time
+        playbackStartTime: number; // When to start playing this segment
+        playbackEndTime: number;   // When this segment ends in playback
+        id: string; // Segment ID for tracking
+        startTime: number; // Alias for playbackStartTime
+        endTime: number;   // Alias for playbackEndTime
+      };
+      
+      type PlaybackItem = PlaybackSegment | { type: 'pause'; duration: number; startTime: number; endTime: number; id: string };
       
       const playbackTimeline: PlaybackItem[] = [];
-      let currentTime = 0;
+      let currentPlaybackTime = 0;
       
-      // Group words into consecutive sequences (no deleted words between them)
-      // and identify gaps where deleted words exist
+      // Group words into continuous segments (no deleted words between consecutive words)
+      const segments: PlaybackSegment[] = [];
+      let currentSegment: typeof segments[0]['words'] = [];
+      
       for (let i = 0; i < blocksToPlay.length; i++) {
         const item = blocksToPlay[i];
         const prevItem = i > 0 ? blocksToPlay[i - 1] : null;
         
-        // Find the matching word block to get the word ID for highlighting
+        // Find the matching word block
         const matchingWordBlock = wordBlocks.find(b => b.index === item.originalIndex);
         if (!matchingWordBlock) continue;
         
-        const wordId = matchingWordBlock.id;
-        const originalStart = item.originalStart;
-        const originalEnd = item.originalEnd;
-        
         // Check if there are deleted words between this word and the previous word
-        // by checking if they are consecutive in the original transcription
         let hasDeletedWordsBetween = false;
         if (prevItem) {
-          // Find all words in the original transcription between prevItem and current item
           const prevOriginalIndex = prevItem.originalIndex;
           const currentOriginalIndex = item.originalIndex;
           
-          // Check if there are any words in the original transcription between these indices
-          // that are marked as deleted in the current transcription
           if (currentOriginalIndex > prevOriginalIndex + 1) {
-            // There are words between them - check if any are deleted
+            // Check if any words between are deleted
             for (let checkIdx = prevOriginalIndex + 1; checkIdx < currentOriginalIndex; checkIdx++) {
               const checkWord = currentTranscription.words.find((w: any, idx: number) => {
                 const wOriginalIndex = (w as any).originalIndex !== undefined ? (w as any).originalIndex : idx;
@@ -1083,100 +1088,95 @@ export function AudioEditor({
           }
         }
         
-        // If there are deleted words between, we skip them and jump directly
-        // Otherwise, we play with the original gap between words
         if (hasDeletedWordsBetween) {
-          // Skip deleted words - jump directly to this word
-          // No pause, just continue from where previous word ended
-          const wordDuration = originalEnd - originalStart;
-          const wordStartTime = currentTime;
-          const wordEndTime = wordStartTime + wordDuration;
-          
-          playbackTimeline.push({
-            type: 'word',
-            wordIndex: i,
-            item,
-            originalStart,
-            originalEnd,
-            startTime: wordStartTime,
-            endTime: wordEndTime,
-            id: wordId
-          });
-          
-          currentTime = wordEndTime;
-        } else {
-          // No deleted words between - play with original timing
-          // Calculate gap from original audio
-          let gapBeforeWord = 0;
-          if (prevItem) {
-            const originalGap = originalStart - prevItem.originalEnd;
-            if (originalGap > 0) {
-              gapBeforeWord = originalGap;
-            }
+          // End current segment and start a new one
+          if (currentSegment.length > 0) {
+            const segmentStart = currentSegment[0].originalStart;
+            const segmentEnd = currentSegment[currentSegment.length - 1].originalEnd;
+            segments.push({
+              type: 'segment',
+              words: [...currentSegment],
+              segmentStart,
+              segmentEnd,
+              playbackStartTime: 0, // Will be set later
+              playbackEndTime: 0,   // Will be set later
+              id: `segment-${segments.length}`,
+              startTime: 0, // Will be set later
+              endTime: 0    // Will be set later
+            });
+            currentSegment = [];
           }
+        }
+        
+        // Add word to current segment
+        currentSegment.push({
+          item,
+          wordBlock: matchingWordBlock,
+          originalStart: item.originalStart,
+          originalEnd: item.originalEnd
+        });
+      }
+      
+      // Add final segment if any
+      if (currentSegment.length > 0) {
+        const segmentStart = currentSegment[0].originalStart;
+        const segmentEnd = currentSegment[currentSegment.length - 1].originalEnd;
+        segments.push({
+          type: 'segment',
+          words: [...currentSegment],
+          segmentStart,
+          segmentEnd,
+          playbackStartTime: 0,
+          playbackEndTime: 0,
+          id: `segment-${segments.length}`,
+          startTime: 0,
+          endTime: 0
+        });
+      }
+      
+      // Build playback timeline with segments
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const segmentDuration = segment.segmentEnd - segment.segmentStart;
+        
+        segment.playbackStartTime = currentPlaybackTime;
+        segment.playbackEndTime = currentPlaybackTime + segmentDuration;
+        segment.startTime = segment.playbackStartTime;
+        segment.endTime = segment.playbackEndTime;
+        
+        playbackTimeline.push(segment);
+        currentPlaybackTime = segment.playbackEndTime;
+        
+        // Check if there's a pause after this segment (before next segment)
+        if (i < segments.length - 1) {
+          const nextSegment = segments[i + 1];
+          // Check if there are deleted words between segments
+          const lastWordInSegment = segment.words[segment.words.length - 1];
+          const firstWordInNextSegment = nextSegment.words[0];
           
-          const wordDuration = originalEnd - originalStart;
-          const wordStartTime = currentTime + gapBeforeWord;
-          const wordEndTime = wordStartTime + wordDuration;
+          const lastOriginalIndex = lastWordInSegment.item.originalIndex;
+          const firstOriginalIndex = firstWordInNextSegment.item.originalIndex;
           
-          playbackTimeline.push({
-            type: 'word',
-            wordIndex: i,
-            item,
-            originalStart,
-            originalEnd,
-            startTime: wordStartTime,
-            endTime: wordEndTime,
-            id: wordId
-          });
-          
-          currentTime = wordEndTime;
-          
-          // Add pause if there's a natural pause in the original audio before next word
-          if (i < blocksToPlay.length - 1) {
-            const nextItem = blocksToPlay[i + 1];
-            const nextOriginalStart = nextItem.originalStart;
-            const originalGapToNext = nextOriginalStart - originalEnd;
-            
-            // Check if there are deleted words between this and next
-            const nextHasDeletedBetween = (() => {
-              const currentOriginalIndex = item.originalIndex;
-              const nextOriginalIndex = nextItem.originalIndex;
-              if (nextOriginalIndex > currentOriginalIndex + 1) {
-                for (let checkIdx = currentOriginalIndex + 1; checkIdx < nextOriginalIndex; checkIdx++) {
-                  const checkWord = currentTranscription.words.find((w: any, idx: number) => {
-                    const wOriginalIndex = (w as any).originalIndex !== undefined ? (w as any).originalIndex : idx;
-                    return wOriginalIndex === checkIdx;
-                  });
-                  if (checkWord && (checkWord as any).deleted) {
-                    return true;
-                  }
-                }
-              }
-              return false;
-            })();
-            
-            if (!nextHasDeletedBetween && originalGapToNext > pauseThreshold) {
-              // Natural pause in original audio - add it to timeline
-              const pauseStartTime = currentTime;
-              const pauseEndTime = currentTime + originalGapToNext;
+          // If they're not consecutive, there are deleted words - no pause, just jump
+          // If they are consecutive or close, check original gap
+          if (firstOriginalIndex === lastOriginalIndex + 1) {
+            // Consecutive words - check original gap
+            const originalGap = firstWordInNextSegment.originalStart - lastWordInSegment.originalEnd;
+            if (originalGap > pauseThreshold) {
+              // Natural pause in original audio
               playbackTimeline.push({
                 type: 'pause',
-                duration: originalGapToNext,
-                startTime: pauseStartTime,
-                endTime: pauseEndTime,
-                id: `pause-${i}`
+                duration: originalGap,
+                startTime: currentPlaybackTime,
+                endTime: currentPlaybackTime + originalGap,
+                id: `pause-after-segment-${i}`
               });
-              currentTime = pauseEndTime;
-            } else if (!nextHasDeletedBetween && originalGapToNext > 0.01) {
-              // Small gap - minimal spacing
-              currentTime += originalGapToNext;
-            } else if (!nextHasDeletedBetween) {
-              // No gap - minimal spacing
-              currentTime += 0.01;
+              currentPlaybackTime += originalGap;
+            } else if (originalGap > 0.01) {
+              currentPlaybackTime += originalGap;
             }
-            // If nextHasDeletedBetween is true, we'll skip the gap when we process the next word
           }
+          // If not consecutive, we skip the gap (deleted words) - no pause added
         }
       }
       
@@ -1188,7 +1188,7 @@ export function AudioEditor({
       }));
       
       console.log(`Playback timeline created with ${playbackTimeline.length} items:`, 
-        playbackTimeline.map(item => item.type === 'pause' ? `pause(${item.duration.toFixed(2)}s)` : 'word'));
+        playbackTimeline.map(item => item.type === 'pause' ? `pause(${item.duration.toFixed(2)}s)` : `segment(${(item.segmentEnd - item.segmentStart).toFixed(2)}s, ${item.words.length} words)`));
       
       // Play words and pauses sequentially
       let currentItemIndex = 0;
@@ -1207,29 +1207,29 @@ export function AudioEditor({
         
         const item = playbackTimeline[currentItemIndex];
         
-        if (item.type === 'word') {
-          // Play word using original audio timestamps
-          const wordDuration = item.originalEnd - item.originalStart;
+        if (item.type === 'segment') {
+          // Play continuous audio segment (from first word start to last word end)
+          const segmentDuration = item.segmentEnd - item.segmentStart;
           
-          const wordBuffer = audioContext.createBuffer(
+          const segmentBuffer = audioContext.createBuffer(
             audioBuffer.numberOfChannels,
-            Math.ceil(wordDuration * audioBuffer.sampleRate),
+            Math.ceil(segmentDuration * audioBuffer.sampleRate),
             audioBuffer.sampleRate
           );
           
-          const originalStartSample = Math.floor(item.originalStart * audioBuffer.sampleRate);
-          const originalEndSample = Math.floor(item.originalEnd * audioBuffer.sampleRate);
-          const samplesToCopy = originalEndSample - originalStartSample;
+          const segmentStartSample = Math.floor(item.segmentStart * audioBuffer.sampleRate);
+          const segmentEndSample = Math.floor(item.segmentEnd * audioBuffer.sampleRate);
+          const samplesToCopy = segmentEndSample - segmentStartSample;
           
-          // Copy word audio from original buffer using original timestamps
+          // Copy continuous audio segment from original buffer
           for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
             const originalData = audioBuffer.getChannelData(channel);
-            const newData = wordBuffer.getChannelData(channel);
-            const maxSamples = Math.min(samplesToCopy, newData.length, originalData.length - originalStartSample);
+            const newData = segmentBuffer.getChannelData(channel);
+            const maxSamples = Math.min(samplesToCopy, newData.length, originalData.length - segmentStartSample);
             
-            // Copy audio samples from original position
+            // Copy continuous audio samples
             for (let j = 0; j < maxSamples; j++) {
-              const sourceIndex = originalStartSample + j;
+              const sourceIndex = segmentStartSample + j;
               if (sourceIndex >= 0 && sourceIndex < originalData.length && j < newData.length) {
                 newData[j] = originalData[sourceIndex];
               }
@@ -1237,33 +1237,65 @@ export function AudioEditor({
           }
           
           const source = audioContext.createBufferSource();
-          source.buffer = wordBuffer;
+          source.buffer = segmentBuffer;
           source.connect(audioContext.destination);
           previewSourceRef.current = source;
           
-          // Track current word
-          setCurrentPlayingWordId(item.id);
+          // Track words in this segment as they play
+          let segmentStartTime = audioContext.currentTime;
+          const segmentPlaybackDuration = segmentBuffer.duration;
           
-          // Scroll to word
-          if (containerRef.current) {
-            const wordElement = containerRef.current.querySelector(`[data-word-id="${item.id}"]`) as HTMLElement;
-            if (wordElement) {
+          // Update word highlighting during segment playback
+          const updateWordHighlight = () => {
+            if (!isPreviewingRef.current) return;
+            
+            const elapsed = audioContext.currentTime - segmentStartTime;
+            if (elapsed < 0 || elapsed > segmentPlaybackDuration) {
+              setCurrentPlayingWordId(null);
+              return;
+            }
+            
+            // Find which word should be highlighted based on elapsed time
+            let currentWordId: string | null = null;
+            
+            for (const wordData of item.words) {
+              const wordDuration = wordData.originalEnd - wordData.originalStart;
+              const wordStartInSegment = wordData.originalStart - item.segmentStart;
+              
+              if (elapsed >= wordStartInSegment && elapsed < wordStartInSegment + wordDuration) {
+                currentWordId = wordData.wordBlock.id;
+                break;
+              }
+            }
+            
+            setCurrentPlayingWordId(currentWordId);
+            
+            // Continue updating
+            if (isPreviewingRef.current) {
+              requestAnimationFrame(updateWordHighlight);
+            }
+          };
+          
+          // Start word highlighting updates
+          updateWordHighlight();
+          
+          // Scroll to first word in segment
+          if (containerRef.current && item.words.length > 0) {
+            const firstWordElement = containerRef.current.querySelector(`[data-word-id="${item.words[0].wordBlock.id}"]`) as HTMLElement;
+            if (firstWordElement) {
               requestAnimationFrame(() => {
-                wordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstWordElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
               });
             }
           }
           
-          // Calculate actual play duration
-          const actualPlayDuration = wordBuffer.duration;
-          
           source.onended = () => {
-            // Check if preview was stopped before continuing (use ref for reliable check)
+            // Check if preview was stopped before continuing
             if (!isPreviewingRef.current) {
               return;
             }
             
-            // Clear current word highlight when word ends
+            // Clear word highlight when segment ends
             setCurrentPlayingWordId(null);
             // Move to next item
             currentItemIndex++;
