@@ -1035,104 +1035,147 @@ export function AudioEditor({
 
       const blocksToPlay = wordsToPlay.slice(startIndex);
 
-      // Build playback timeline with pauses
-      // Each item is either a word or a pause
-      // Use wordBlocks to get current adjusted timestamps, but original audio for playback
+      // NEW APPROACH: Play original audio between non-deleted words
+      // Skip deleted words entirely - jump directly from one non-deleted word to the next
       type PlaybackItem = 
-        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; originalStart: number; originalEnd: number; adjustedStart: number; adjustedEnd: number; startTime: number; endTime: number; id: string }
+        | { type: 'word'; wordIndex: number; item: typeof wordsToPlay[0]; originalStart: number; originalEnd: number; startTime: number; endTime: number; id: string }
         | { type: 'pause'; duration: number; startTime: number; endTime: number; id: string };
       
       const playbackTimeline: PlaybackItem[] = [];
       let currentTime = 0;
       
+      // Group words into consecutive sequences (no deleted words between them)
+      // and identify gaps where deleted words exist
       for (let i = 0; i < blocksToPlay.length; i++) {
         const item = blocksToPlay[i];
+        const prevItem = i > 0 ? blocksToPlay[i - 1] : null;
         
-        // Find the matching word block to get adjusted timestamps
+        // Find the matching word block to get the word ID for highlighting
         const matchingWordBlock = wordBlocks.find(b => b.index === item.originalIndex);
         if (!matchingWordBlock) continue;
         
-        // Use original audio timestamps for playback (to avoid cutting)
+        const wordId = matchingWordBlock.id;
         const originalStart = item.originalStart;
         const originalEnd = item.originalEnd;
         
-        // Use adjusted timestamps from wordBlocks for timeline positioning
-        const adjustedStart = matchingWordBlock.start;
-        const adjustedEnd = matchingWordBlock.end;
-        
-        // Check if this word comes after a pause - if so, we'll start earlier to avoid cutting
-        const prevItem = i > 0 ? blocksToPlay[i - 1] : null;
-        const prevWordBlock = prevItem ? wordBlocks.find(b => b.index === prevItem.originalIndex) : null;
-        const comesAfterPause = prevWordBlock ? (adjustedStart - prevWordBlock.end > pauseThreshold) : false;
-        
-        // Calculate word duration - will be extended if we start earlier
-        const earlyStartOffset = comesAfterPause ? 0.15 : 0.05; // 150ms after pause, 50ms normally
-        const adjustedOriginalStart = Math.max(0, originalStart - earlyStartOffset);
-        const wordDuration = originalEnd - adjustedOriginalStart;
-        
-        // Calculate the actual gap before this word (if it's after a pause adjustment)
-        let gapBeforeWord = 0;
-        if (i > 0 && prevWordBlock) {
-          // The gap is the difference between adjusted timestamps
-          const adjustedGap = adjustedStart - prevWordBlock.end;
-          if (adjustedGap > 0) {
-            gapBeforeWord = adjustedGap;
+        // Check if there are deleted words between this word and the previous word
+        // by checking if they are consecutive in the original transcription
+        let hasDeletedWordsBetween = false;
+        if (prevItem) {
+          // Find all words in the original transcription between prevItem and current item
+          const prevOriginalIndex = prevItem.originalIndex;
+          const currentOriginalIndex = item.originalIndex;
+          
+          // Check if there are any words in the original transcription between these indices
+          // that are marked as deleted in the current transcription
+          if (currentOriginalIndex > prevOriginalIndex + 1) {
+            // There are words between them - check if any are deleted
+            for (let checkIdx = prevOriginalIndex + 1; checkIdx < currentOriginalIndex; checkIdx++) {
+              const checkWord = currentTranscription.words.find((w: any, idx: number) => {
+                const wOriginalIndex = (w as any).originalIndex !== undefined ? (w as any).originalIndex : idx;
+                return wOriginalIndex === checkIdx;
+              });
+              if (checkWord && (checkWord as any).deleted) {
+                hasDeletedWordsBetween = true;
+                break;
+              }
+            }
           }
         }
         
-        // Timeline position: Start playback slightly earlier if coming after pause
-        // This ensures the early audio plays at the right time
-        const wordStartTime = currentTime + gapBeforeWord - earlyStartOffset;
-        const wordEndTime = wordStartTime + wordDuration;
-        
-        const wordId = matchingWordBlock.id;
-        playbackTimeline.push({
-          type: 'word',
-          wordIndex: i,
-          item,
-          originalStart,
-          originalEnd,
-          adjustedStart,
-          adjustedEnd,
-          startTime: wordStartTime,
-          endTime: wordEndTime,
-          id: wordId
-        });
-        
-        currentTime = wordEndTime;
-        
-        // Check for pause after this word (except last)
-        if (i < blocksToPlay.length - 1) {
-          const nextItem = blocksToPlay[i + 1];
-          const nextWordBlock = wordBlocks.find(b => b.index === nextItem.originalIndex);
+        // If there are deleted words between, we skip them and jump directly
+        // Otherwise, we play with the original gap between words
+        if (hasDeletedWordsBetween) {
+          // Skip deleted words - jump directly to this word
+          // No pause, just continue from where previous word ended
+          const wordDuration = originalEnd - originalStart;
+          const wordStartTime = currentTime;
+          const wordEndTime = wordStartTime + wordDuration;
           
-          if (nextWordBlock) {
-            // Calculate actual gap from adjusted word positions
-            const actualGap = nextWordBlock.start - matchingWordBlock.end;
+          playbackTimeline.push({
+            type: 'word',
+            wordIndex: i,
+            item,
+            originalStart,
+            originalEnd,
+            startTime: wordStartTime,
+            endTime: wordEndTime,
+            id: wordId
+          });
+          
+          currentTime = wordEndTime;
+        } else {
+          // No deleted words between - play with original timing
+          // Calculate gap from original audio
+          let gapBeforeWord = 0;
+          if (prevItem) {
+            const originalGap = originalStart - prevItem.originalEnd;
+            if (originalGap > 0) {
+              gapBeforeWord = originalGap;
+            }
+          }
+          
+          const wordDuration = originalEnd - originalStart;
+          const wordStartTime = currentTime + gapBeforeWord;
+          const wordEndTime = wordStartTime + wordDuration;
+          
+          playbackTimeline.push({
+            type: 'word',
+            wordIndex: i,
+            item,
+            originalStart,
+            originalEnd,
+            startTime: wordStartTime,
+            endTime: wordEndTime,
+            id: wordId
+          });
+          
+          currentTime = wordEndTime;
+          
+          // Add pause if there's a natural pause in the original audio before next word
+          if (i < blocksToPlay.length - 1) {
+            const nextItem = blocksToPlay[i + 1];
+            const nextOriginalStart = nextItem.originalStart;
+            const originalGapToNext = nextOriginalStart - originalEnd;
             
-            if (actualGap > pauseThreshold) {
-              // Add pause to timeline using the actual adjusted gap
+            // Check if there are deleted words between this and next
+            const nextHasDeletedBetween = (() => {
+              const currentOriginalIndex = item.originalIndex;
+              const nextOriginalIndex = nextItem.originalIndex;
+              if (nextOriginalIndex > currentOriginalIndex + 1) {
+                for (let checkIdx = currentOriginalIndex + 1; checkIdx < nextOriginalIndex; checkIdx++) {
+                  const checkWord = currentTranscription.words.find((w: any, idx: number) => {
+                    const wOriginalIndex = (w as any).originalIndex !== undefined ? (w as any).originalIndex : idx;
+                    return wOriginalIndex === checkIdx;
+                  });
+                  if (checkWord && (checkWord as any).deleted) {
+                    return true;
+                  }
+                }
+              }
+              return false;
+            })();
+            
+            if (!nextHasDeletedBetween && originalGapToNext > pauseThreshold) {
+              // Natural pause in original audio - add it to timeline
               const pauseStartTime = currentTime;
-              const pauseEndTime = currentTime + actualGap;
-              console.log(`Adding pause to timeline: ${actualGap.toFixed(3)}s between word ${i} and ${i + 1}`);
+              const pauseEndTime = currentTime + originalGapToNext;
               playbackTimeline.push({
                 type: 'pause',
-                duration: actualGap,
+                duration: originalGapToNext,
                 startTime: pauseStartTime,
                 endTime: pauseEndTime,
                 id: `pause-${i}`
               });
               currentTime = pauseEndTime;
-            } else if (actualGap > 0.01) {
-              // Small gap - add minimal pause (not added to timeline, just advance time)
-              currentTime += Math.max(0.01, actualGap);
-            } else {
+            } else if (!nextHasDeletedBetween && originalGapToNext > 0.01) {
+              // Small gap - minimal spacing
+              currentTime += originalGapToNext;
+            } else if (!nextHasDeletedBetween) {
               // No gap - minimal spacing
               currentTime += 0.01;
             }
-          } else {
-            // Minimal gap if we can't find next word
-            currentTime += 0.01;
+            // If nextHasDeletedBetween is true, we'll skip the gap when we process the next word
           }
         }
       }
@@ -1165,15 +1208,8 @@ export function AudioEditor({
         const item = playbackTimeline[currentItemIndex];
         
         if (item.type === 'word') {
-          // Check if this word comes after a pause - if so, start slightly earlier to avoid cutting
-          const previousItem = currentItemIndex > 0 ? playbackTimeline[currentItemIndex - 1] : null;
-          const comesAfterPause = previousItem?.type === 'pause';
-          
-          // Start 150ms earlier if coming after a pause to ensure full word is audible
-          // 50ms earlier normally for safety margin
-          const earlyStartOffset = comesAfterPause ? 0.15 : 0.05;
-          const adjustedOriginalStart = Math.max(0, item.originalStart - earlyStartOffset);
-          const wordDuration = item.originalEnd - adjustedOriginalStart;
+          // Play word using original audio timestamps
+          const wordDuration = item.originalEnd - item.originalStart;
           
           const wordBuffer = audioContext.createBuffer(
             audioBuffer.numberOfChannels,
@@ -1181,18 +1217,17 @@ export function AudioEditor({
             audioBuffer.sampleRate
           );
           
-          const originalStartSample = Math.floor(adjustedOriginalStart * audioBuffer.sampleRate);
+          const originalStartSample = Math.floor(item.originalStart * audioBuffer.sampleRate);
           const originalEndSample = Math.floor(item.originalEnd * audioBuffer.sampleRate);
           const samplesToCopy = originalEndSample - originalStartSample;
           
-          // Copy word audio from original buffer, starting from earlier position
-          // This ensures we capture the full beginning of the word
+          // Copy word audio from original buffer using original timestamps
           for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
             const originalData = audioBuffer.getChannelData(channel);
             const newData = wordBuffer.getChannelData(channel);
             const maxSamples = Math.min(samplesToCopy, newData.length, originalData.length - originalStartSample);
             
-            // Copy audio samples starting from the earlier position
+            // Copy audio samples from original position
             for (let j = 0; j < maxSamples; j++) {
               const sourceIndex = originalStartSample + j;
               if (sourceIndex >= 0 && sourceIndex < originalData.length && j < newData.length) {
@@ -1219,7 +1254,7 @@ export function AudioEditor({
             }
           }
           
-          // Calculate actual play duration (may be longer if we started earlier)
+          // Calculate actual play duration
           const actualPlayDuration = wordBuffer.duration;
           
           source.onended = () => {
