@@ -345,6 +345,28 @@
   border-color: var(--accent-indigo);
 }
 
+.audio-editor-word-retake {
+  background: rgba(255, 152, 0, 0.2) !important;
+  border-color: rgba(255, 152, 0, 0.5) !important;
+  color: #ff9800;
+}
+
+.audio-editor-word-retake:hover {
+  background: rgba(255, 152, 0, 0.3) !important;
+  border-color: rgba(255, 152, 0, 0.7) !important;
+}
+
+.audio-editor-word-retake.audio-editor-word-selected {
+  background: #ff9800 !important;
+  border-color: #ff9800 !important;
+  color: white;
+}
+
+.audio-editor-word-retake.audio-editor-word-selected:hover {
+  background: #f57c00 !important;
+  border-color: #f57c00 !important;
+}
+
 .audio-editor-pause-block {
   display: inline-flex;
   flex-direction: column;
