@@ -46,6 +46,7 @@ const FOLDER_COLOR_FILE = "_color.txt";
 const DOCUMENT_META_SUFFIX = ".meta.json";
 const AUDIO_SUFFIX = ".webm";
 const AUDIO_DIRECTORY_NAME = "_audio";
+const TRANSCRIPTION_SUFFIX = ".transcription.json";
 
 const AUDIO_MIME_EXTENSIONS = new Map(
   Object.entries({
@@ -239,6 +240,33 @@ async function writeDocumentMeta(documentAbsolutePath, meta) {
       null,
       2
     ),
+    "utf8"
+  );
+}
+
+function getTranscriptionPath(documentAbsolutePath) {
+  return documentAbsolutePath + TRANSCRIPTION_SUFFIX;
+}
+
+async function readTranscription(documentAbsolutePath) {
+  try {
+    const filePath = getTranscriptionPath(documentAbsolutePath);
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function writeTranscription(documentAbsolutePath, transcription) {
+  const filePath = getTranscriptionPath(documentAbsolutePath);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(
+    filePath,
+    JSON.stringify(transcription, null, 2),
     "utf8"
   );
 }
@@ -587,12 +615,14 @@ app.get("/api/document", async (req, res) => {
       return res.status(400).send("Path is not a file");
     }
 
-    const [content, instructions, aggregated, meta] = await Promise.all([
-      readTextIfExists(documentPath),
-      getDocumentInstructions(relative),
-      gatherAggregatedInstructions(relative, "document"),
-      readDocumentMeta(documentPath)
-    ]);
+    const [content, instructions, aggregated, meta, transcription] =
+      await Promise.all([
+        readTextIfExists(documentPath),
+        getDocumentInstructions(relative),
+        gatherAggregatedInstructions(relative, "document"),
+        readDocumentMeta(documentPath),
+        readTranscription(documentPath)
+      ]);
 
     let audioUrl = null;
     if (meta.audioFileName) {
@@ -619,7 +649,8 @@ app.get("/api/document", async (req, res) => {
       aggregatedInstructions: aggregated,
       completed: Boolean(meta.completed),
       audioUrl,
-      audioFileName: meta.audioFileName ?? null
+      audioFileName: meta.audioFileName ?? null,
+      transcription: transcription || null
     });
   } catch (error) {
     res.status(500).send(
@@ -739,6 +770,166 @@ app.post(
     }
   }
 );
+
+app.post("/api/document/transcribe", async (req, res) => {
+  try {
+    const { path: relative } = req.body;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a file");
+    }
+
+    const meta = await readDocumentMeta(documentPath);
+    if (!meta.audioFileName) {
+      return res.status(400).send("No audio file found for this document");
+    }
+
+    const audioPath = getDocumentAudioAbsolutePath(
+      documentPath,
+      meta.audioFileName
+    );
+    const audioBuffer = await fs.readFile(audioPath);
+
+    const headerKey = req.headers["x-openai-key"];
+    const providedKey =
+      typeof headerKey === "string"
+        ? headerKey.trim()
+        : Array.isArray(headerKey)
+        ? headerKey[0]?.trim()
+        : "";
+    const effectiveKey = providedKey || envApiKey;
+
+    if (!effectiveKey) {
+      return res
+        .status(400)
+        .send(
+          "OpenAI API key is not configured. Add one in settings or set OPENAI_API_KEY."
+        );
+    }
+
+    const client = new OpenAI({ apiKey: effectiveKey });
+
+    console.info("[Transcription] Starting transcription", {
+      documentPath,
+      audioSize: audioBuffer.length
+    });
+
+    const file = new File([audioBuffer], meta.audioFileName, {
+      type: "audio/webm"
+    });
+
+    const transcription = await client.audio.transcriptions.create({
+      file: file,
+      model: "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["word"]
+    });
+
+    console.info("[Transcription] Transcription complete", {
+      documentPath,
+      wordCount: transcription.words?.length || 0
+    });
+
+    const transcriptionData = {
+      text: transcription.text,
+      language: transcription.language,
+      duration: transcription.duration,
+      words: transcription.words || [],
+      segments: transcription.segments || []
+    };
+
+    await writeTranscription(documentPath, transcriptionData);
+
+    res.json({
+      success: true,
+      transcription: transcriptionData
+    });
+  } catch (error) {
+    console.error("[Transcription] Failed to transcribe", {
+      error,
+      stack: error?.stack
+    });
+    res.status(500).send(
+      error instanceof Error ? error.message : "Unable to transcribe audio"
+    );
+  }
+});
+
+app.post("/api/document/audio/edit", async (req, res) => {
+  try {
+    const { path: relative, segments } = req.body;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+    if (!Array.isArray(segments) || segments.length === 0) {
+      return res.status(400).send("Invalid or empty segments array");
+    }
+
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a file");
+    }
+
+    const meta = await readDocumentMeta(documentPath);
+    if (!meta.audioFileName) {
+      return res.status(400).send("No audio file found for this document");
+    }
+
+    const audioPath = getDocumentAudioAbsolutePath(
+      documentPath,
+      meta.audioFileName
+    );
+    
+    console.info("[Audio Edit] Starting audio edit", {
+      documentPath,
+      segmentsCount: segments.length,
+      segments
+    });
+
+    // Note: This requires ffmpeg to be installed
+    // For now, we'll return an error explaining this requirement
+    // TODO: Implement ffmpeg-based audio cutting
+    
+    // Validate segments
+    for (const segment of segments) {
+      if (
+        typeof segment.start !== "number" ||
+        typeof segment.end !== "number" ||
+        segment.start < 0 ||
+        segment.end <= segment.start
+      ) {
+        return res.status(400).send("Invalid segment format");
+      }
+    }
+
+    // Placeholder: In a full implementation, you would:
+    // 1. Use fluent-ffmpeg or similar to cut audio segments
+    // 2. Concatenate the segments in order
+    // 3. Save as a new audio file (e.g., original_filename_edited.webm)
+    // 4. Update the document metadata with the new filename
+    // 5. Optionally keep the original file
+    
+    // For now, return an error indicating ffmpeg is needed
+    res.status(501).send(
+      "Audio editing requires ffmpeg to be installed on the server. " +
+      "Please install ffmpeg and update this endpoint to use fluent-ffmpeg or similar library."
+    );
+  } catch (error) {
+    console.error("[Audio Edit] Failed to edit audio", {
+      error,
+      stack: error?.stack
+    });
+    res.status(500).send(
+      error instanceof Error ? error.message : "Unable to edit audio"
+    );
+  }
+});
 
 app.post("/api/document/create", async (req, res) => {
   try {

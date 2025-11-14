@@ -1,7 +1,8 @@
 import type {
   DocumentDetails,
   FolderDetails,
-  TreeNode
+  TreeNode,
+  Transcription
 } from "./types";
 
 const baseHeaders = {
@@ -246,6 +247,38 @@ export async function uploadDocumentAudio(
     audioFileName: string;
   }>(response);
   return { audioUrl: result.audioUrl, audioFileName: result.audioFileName };
+}
+
+export async function transcribeDocumentAudio(
+  path: string,
+  apiKey?: string
+): Promise<{ transcription: Transcription }> {
+  const response = await fetch("/api/document/transcribe", {
+    method: "POST",
+    headers: buildHeaders(
+      apiKey
+        ? {
+            "x-openai-key": apiKey
+          }
+        : undefined
+    ),
+    body: JSON.stringify({ path })
+  });
+  return handleResponse<{ success: true; transcription: Transcription }>(
+    response
+  );
+}
+
+export async function editDocumentAudio(
+  path: string,
+  segments: Array<{ start: number; end: number }>
+): Promise<{ audioUrl: string }> {
+  const response = await fetch("/api/document/audio/edit", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ path, segments })
+  });
+  return handleResponse<{ success: true; audioUrl: string }>(response);
 }
 
 export async function renameItem(sourcePath: string, targetPath: string) {
