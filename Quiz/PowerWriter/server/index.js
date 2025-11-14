@@ -27,6 +27,10 @@ import path from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
 import OpenAI from "openai";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -771,6 +775,130 @@ app.post(
   }
 );
 
+app.post(
+  "/api/document/audio/upload-enhanced",
+  upload.single("audio"),
+  async (req, res) => {
+    try {
+      console.info("[Audio Enhance Upload] Request received", {
+        body: req.body,
+        hasFile: !!req.file,
+        fileSize: req.file?.size,
+        fileMimetype: req.file?.mimetype,
+        fileFieldname: req.file?.fieldname
+      });
+      
+      const relative = req.body?.path;
+      console.info("[Audio Enhance Upload] Extracted path", { relative, bodyKeys: Object.keys(req.body || {}) });
+      
+      if (!relative || typeof relative !== "string") {
+        console.warn("[Audio Enhance Upload] Missing or invalid document path", {
+          relative,
+          body: req.body
+        });
+        return res.status(400).json({ error: "Missing document path", received: req.body });
+      }
+      
+      if (!req.file) {
+        console.warn("[Audio Enhance Upload] No file attached to upload request", {
+          relative,
+          body: req.body
+        });
+        return res.status(400).json({ error: "Missing audio file" });
+      }
+      
+      const documentPath = resolveMeditationPath(relative);
+      console.info("[Audio Enhance Upload] Resolved document path", { relative, documentPath });
+      
+      let stat;
+      try {
+        stat = await fs.stat(documentPath);
+      } catch (statError) {
+        console.error("[Audio Enhance Upload] Failed to stat document", {
+          relative,
+          documentPath,
+          error: statError
+        });
+        return res.status(404).json({ error: "Document not found", path: relative });
+      }
+      
+      if (!stat.isFile()) {
+        console.warn("[Audio Enhance Upload] Target path is not a file", { relative, documentPath });
+        return res.status(400).json({ error: "Path is not a file" });
+      }
+      
+      console.info("[Audio Enhance Upload] Saving enhanced audio", {
+        documentPath,
+        bytes: req.file.size
+      });
+      
+      // Save as enhanced version
+      const meta = await readDocumentMeta(documentPath);
+      if (!meta.audioFileName) {
+        return res.status(400).json({ error: "No original audio file found for this document" });
+      }
+      
+      // Get audio directory
+      const audioDirectory = path.join(
+        path.dirname(documentPath),
+        AUDIO_DIRECTORY_NAME
+      );
+      await fs.mkdir(audioDirectory, { recursive: true });
+      
+      // Build enhanced filename
+      const audioExt = path.extname(meta.audioFileName);
+      const audioBasename = path.basename(meta.audioFileName, audioExt);
+      const enhancedAudioFileName = `${audioBasename}_enhanced${audioExt}`;
+      const absoluteTarget = path.join(audioDirectory, enhancedAudioFileName);
+      
+      // Save the enhanced audio file
+      await fs.writeFile(absoluteTarget, req.file.buffer);
+      
+      // Get file stats for version
+      const stats = await fs.stat(absoluteTarget);
+      const version = Math.floor(stats.mtimeMs).toString(36);
+      
+      // Update metadata to use enhanced audio
+      const newMeta = {
+        ...meta,
+        audioFileName: enhancedAudioFileName
+      };
+      await writeDocumentMeta(documentPath, newMeta);
+      
+      console.info("[Audio Enhance Upload] Saved enhanced audio", {
+        relative,
+        fileName: enhancedAudioFileName,
+        version
+      });
+      
+      res.json({
+        success: true,
+        audioUrl: `/api/document/audio?path=${encodeURIComponent(
+          toPosix(relative)
+        )}&file=${encodeURIComponent(enhancedAudioFileName)}&v=${version}`,
+        audioFileName: enhancedAudioFileName
+      });
+    } catch (error) {
+      console.error("[Audio Enhance Upload] Failed to save enhanced audio", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+        code: error?.code,
+        body: req.body,
+        hasFile: !!req.file
+      });
+      res.status(500).json({
+        error: "Failed to save enhanced audio",
+        message: error instanceof Error ? error.message : "Unable to save audio",
+        details: process.env.NODE_ENV === "development" ? {
+          stack: error instanceof Error ? error.stack : undefined,
+          name: error instanceof Error ? error.name : undefined
+        } : undefined
+      });
+    }
+  }
+);
+
 app.post("/api/document/transcribe", async (req, res) => {
   try {
     const { path: relative } = req.body;
@@ -908,26 +1036,306 @@ app.post("/api/document/audio/edit", async (req, res) => {
       }
     }
 
-    // Placeholder: In a full implementation, you would:
-    // 1. Use fluent-ffmpeg or similar to cut audio segments
-    // 2. Concatenate the segments in order
-    // 3. Save as a new audio file (e.g., original_filename_edited.webm)
-    // 4. Update the document metadata with the new filename
-    // 5. Optionally keep the original file
-    
-    // For now, return an error indicating ffmpeg is needed
-    res.status(501).send(
-      "Audio editing requires ffmpeg to be installed on the server. " +
-      "Please install ffmpeg and update this endpoint to use fluent-ffmpeg or similar library."
-    );
-  } catch (error) {
-    console.error("[Audio Edit] Failed to edit audio", {
-      error,
-      stack: error?.stack
+    // TODO: Implement ffmpeg-based audio editing
+    // For now, return error indicating this feature requires ffmpeg
+    return res.status(501).json({
+      error: "Audio editing requires ffmpeg to be installed on the server",
+      message:
+        "This feature is not yet implemented. Please install ffmpeg and implement audio cutting/concatenation."
     });
-    res.status(500).send(
-      error instanceof Error ? error.message : "Unable to edit audio"
+  } catch (error) {
+    console.error("[Audio Edit] Error:", error);
+    res.status(500).json({
+      error: "Failed to edit audio",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// AI Studio Sound - Professional audio enhancement using FFmpeg
+app.post("/api/document/audio/enhance", async (req, res) => {
+  try {
+    const { path: relative } = req.body;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a file");
+    }
+
+    const meta = await readDocumentMeta(documentPath);
+    if (!meta.audioFileName) {
+      return res.status(400).send("No audio file found for this document");
+    }
+
+    const audioPath = getDocumentAudioAbsolutePath(
+      documentPath,
+      meta.audioFileName
     );
+    
+    console.info("[Audio Enhance] Starting professional audio enhancement", {
+      documentPath,
+      audioPath
+    });
+
+    // Check if audio file exists
+    if (!fsSync.existsSync(audioPath)) {
+      return res.status(404).json({
+        error: "Audio file not found",
+        message: `Audio file does not exist: ${audioPath}`
+      });
+    }
+
+    // Check if ffmpeg is available
+    try {
+      await execAsync("ffmpeg -version", { timeout: 5000 });
+    } catch (ffmpegCheckError) {
+      console.error("[Audio Enhance] FFmpeg not found:", ffmpegCheckError);
+      return res.status(501).json({
+        error: "FFmpeg not found",
+        message: "FFmpeg is required for audio enhancement. Please install ffmpeg and ensure it's available in your system PATH. " +
+                 "Visit https://ffmpeg.org/download.html for installation instructions."
+      });
+    }
+
+    // Create enhanced audio filename
+    const audioExt = path.extname(meta.audioFileName);
+    const audioBasename = path.basename(meta.audioFileName, audioExt);
+    const enhancedAudioFileName = `${audioBasename}_enhanced${audioExt}`;
+    const audioDir = path.dirname(audioPath);
+    const enhancedAudioPath = path.join(audioDir, enhancedAudioFileName);
+
+    try {
+      // Professional audio enhancement chain using FFmpeg
+      // This creates studio-quality audio with:
+      // 1. High-pass filter (80Hz) - Removes low-frequency rumble and noise
+      // 2. Low-pass filter (18kHz) - Removes high-frequency hiss
+      // 3. Adaptive noise reduction (anlmdn) - Removes background noise while preserving speech
+      // 4. Dynamic range compression (acompressor) - Smooths out volume variations
+      // 5. EQ adjustments (aecho) - Subtle reverb removal and clarity enhancement
+      // 6. Normalization (loudnorm) - Broadcast-standard loudness normalization (EBU R128)
+      // 7. Limiter (alimiter) - Prevents clipping and ensures professional levels
+      
+      // Professional audio enhancement chain
+      // Using a simpler but effective approach with proven filters
+      const ffmpegCommand = `ffmpeg -i "${audioPath}" ` +
+        `-af "` +
+        // High-pass filter: Remove low-frequency rumble below 80Hz
+        `highpass=f=80,` +
+        // Low-pass filter: Remove high-frequency hiss above 18kHz
+        `lowpass=f=18000,` +
+        // Adaptive Non-Local Means Denoise - removes background noise while preserving speech
+        `anlmdn=s=0.0003:r=0.00001,` +
+        // Dynamic range compressor - smooths volume variations for consistent levels
+        `acompressor=threshold=-24dB:ratio=4:attack=5:release=50,` +
+        // Subtle EQ: boost presence frequencies (2-4kHz) for clarity
+        `equalizer=f=2000:width_type=h:width=1000:g=2,` +
+        // Reduce low-frequency mud (around 300Hz)
+        `equalizer=f=300:width_type=h:width=200:g=-1.5,` +
+        // Reduce harsh high frequencies (around 5kHz)
+        `equalizer=f=5000:width_type=h:width=2000:g=-1,` +
+        // Normalize audio levels to -16 LUFS (broadcast standard)
+        `loudnorm=I=-16:TP=-1.5:LRA=11,` +
+        // Limiter to prevent clipping and ensure professional levels (95% output)
+        `alimiter=level_in=1:level_out=0.95:limit=0.9:attack=5:release=50" ` +
+        `-c:a libopus -b:a 192k -ar 48000 ` +
+        `"${enhancedAudioPath}" -y`;
+      
+      console.info("[Audio Enhance] Running FFmpeg enhancement");
+      
+      const { stdout, stderr } = await execAsync(ffmpegCommand, {
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        timeout: 600000 // 10 minute timeout for complex processing
+      });
+      
+      // FFmpeg writes progress to stderr, so we only log actual errors
+      if (stderr && (stderr.includes("Error") || stderr.includes("error"))) {
+        console.error("[Audio Enhance] FFmpeg error:", stderr);
+        throw new Error(`FFmpeg processing failed: ${stderr.split('\n').filter(line => line.includes('Error')).join('; ')}`);
+      }
+      
+      // Check if enhanced file was created
+      if (!fsSync.existsSync(enhancedAudioPath)) {
+        throw new Error("Enhanced audio file was not created after processing");
+      }
+
+      // Update document metadata to use enhanced audio
+      const newMeta = {
+        ...meta,
+        audioFileName: enhancedAudioFileName
+      };
+      await writeDocumentMeta(documentPath, newMeta);
+
+      const stats = await fs.stat(enhancedAudioPath);
+      const version = Math.floor(stats.mtimeMs).toString(36);
+
+      console.info("[Audio Enhance] Audio enhancement complete", {
+        enhancedAudioPath,
+        enhancedAudioFileName,
+        fileSize: stats.size
+      });
+
+      res.json({
+        success: true,
+        audioUrl: `/api/document/audio?path=${encodeURIComponent(
+          toPosix(relative)
+        )}&file=${encodeURIComponent(enhancedAudioFileName)}&v=${version}`
+      });
+    } catch (enhanceError) {
+      console.error("[Audio Enhance] Processing error:", enhanceError);
+      
+      // Check if enhanced file exists (partial file might have been created)
+      if (fsSync.existsSync(enhancedAudioPath)) {
+        try {
+          await fs.unlink(enhancedAudioPath);
+        } catch {}
+      }
+      
+      // Return user-friendly error
+      const errorMessage = enhanceError instanceof Error ? enhanceError.message : String(enhanceError);
+      return res.status(500).json({
+        error: "Audio enhancement failed",
+        message: `Failed to enhance audio: ${errorMessage}`
+      });
+    }
+  } catch (error) {
+    console.error("[Audio Enhance] Error:", error);
+    res.status(500).json({
+      error: "Failed to enhance audio",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+app.get("/api/document/audio/export-mp3", async (req, res) => {
+  try {
+    const { path: relative } = req.query;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a file");
+    }
+
+    const meta = await readDocumentMeta(documentPath);
+    if (!meta.audioFileName) {
+      return res.status(404).json({ error: "No audio file found for this document" });
+    }
+
+    const audioPath = getDocumentAudioAbsolutePath(
+      documentPath,
+      meta.audioFileName
+    );
+
+    if (!fsSync.existsSync(audioPath)) {
+      return res.status(404).json({ error: "Audio file not found" });
+    }
+
+    console.info("[Export MP3] Starting MP3 export", {
+      documentPath,
+      audioPath
+    });
+
+    // Check if ffmpeg is available
+    try {
+      await execAsync("ffmpeg -version", { timeout: 5000 });
+    } catch (ffmpegCheckError) {
+      console.error("[Export MP3] FFmpeg not found:", ffmpegCheckError);
+      return res.status(501).json({
+        error: "FFmpeg not found",
+        message: "FFmpeg is required for MP3 export. Please install ffmpeg and ensure it's available in your system PATH."
+      });
+    }
+
+    // Create temporary output path for MP3
+    const audioExt = path.extname(meta.audioFileName);
+    const audioBasename = path.basename(meta.audioFileName, audioExt);
+    const tempDir = path.join(path.dirname(audioPath), "temp");
+    await fs.mkdir(tempDir, { recursive: true });
+    const tempMp3Path = path.join(tempDir, `${audioBasename}_export.mp3`);
+
+    try {
+      // Convert audio to MP3 using FFmpeg
+      // Use high quality settings: 192k bitrate, high quality encoding
+      const ffmpegCommand = `ffmpeg -i "${audioPath}" -codec:a libmp3lame -b:a 192k -q:a 0 "${tempMp3Path}" -y`;
+      
+      console.info("[Export MP3] Running ffmpeg conversion");
+      
+      const { stdout, stderr } = await execAsync(ffmpegCommand, {
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        timeout: 300000 // 5 minute timeout
+      });
+
+      // FFmpeg writes progress to stderr, so we only log errors
+      if (stderr && stderr.includes("Error")) {
+        console.error("[Export MP3] FFmpeg error:", stderr);
+        throw new Error(`FFmpeg conversion failed: ${stderr}`);
+      }
+
+      // Check if MP3 file was created
+      if (!fsSync.existsSync(tempMp3Path)) {
+        throw new Error("MP3 file was not created after conversion");
+      }
+
+      // Get file stats for proper headers
+      const stats = await fs.stat(tempMp3Path);
+      const fileName = `${path.basename(documentPath, path.extname(documentPath))}.mp3`;
+
+      // Set headers for file download
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("Content-Length", stats.size);
+
+      // Send the file
+      const fileStream = fsSync.createReadStream(tempMp3Path);
+      fileStream.pipe(res);
+
+      // Clean up temp file after sending
+      fileStream.on("end", async () => {
+        try {
+          await fs.unlink(tempMp3Path);
+          // Remove temp directory if empty
+          const tempFiles = await fs.readdir(tempDir);
+          if (tempFiles.length === 0) {
+            await fs.rmdir(tempDir);
+          }
+        } catch (cleanupError) {
+          console.error("[Export MP3] Cleanup error:", cleanupError);
+        }
+      });
+
+      console.info("[Export MP3] MP3 export complete", {
+        fileName,
+        size: stats.size
+      });
+    } catch (convertError) {
+      console.error("[Export MP3] Conversion error:", convertError);
+      
+      // Clean up temp file if it exists
+      if (fsSync.existsSync(tempMp3Path)) {
+        try {
+          await fs.unlink(tempMp3Path);
+        } catch {}
+      }
+
+      const errorMessage = convertError instanceof Error ? convertError.message : String(convertError);
+      return res.status(500).json({
+        error: "MP3 export failed",
+        message: `Failed to convert audio to MP3: ${errorMessage}`
+      });
+    }
+  } catch (error) {
+    console.error("[Export MP3] Error:", error);
+    res.status(500).json({
+      error: "Failed to export audio as MP3",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 });
 
