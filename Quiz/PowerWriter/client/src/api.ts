@@ -222,10 +222,12 @@ export async function generateVariants(params: {
 
 export async function uploadDocumentAudio(
   path: string,
-  file: Blob
-): Promise<{ audioUrl: string; audioFileName: string }> {
+  file: Blob,
+  append: boolean = true
+): Promise<{ audioUrl: string; audioFileName: string; recordingId?: string; recording?: any }> {
   const formData = new FormData();
   formData.append("path", path);
+  formData.append("append", String(append));
   const extension =
     file.type === "audio/mpeg"
       ? "mp3"
@@ -235,6 +237,8 @@ export async function uploadDocumentAudio(
       ? "ogg"
       : file.type === "audio/mp4"
       ? "m4a"
+      : file.type.startsWith("video/")
+      ? "webm"
       : "webm";
   formData.append("audio", file, `recording.${extension}`);
   const response = await fetch("/api/document/audio", {
@@ -245,8 +249,15 @@ export async function uploadDocumentAudio(
     success: true;
     audioUrl: string;
     audioFileName: string;
+    recordingId?: string;
+    recording?: any;
   }>(response);
-  return { audioUrl: result.audioUrl, audioFileName: result.audioFileName };
+  return { 
+    audioUrl: result.audioUrl, 
+    audioFileName: result.audioFileName,
+    recordingId: result.recordingId,
+    recording: result.recording
+  };
 }
 
 export async function saveDocumentTranscription(
