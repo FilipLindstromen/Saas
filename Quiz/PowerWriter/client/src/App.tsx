@@ -252,6 +252,32 @@ const IconAudioEditor = createIcon(
     <path d="M6 18v-8" />
   </>
 );
+const IconMic = createIcon(
+  <>
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8" y1="23" x2="16" y2="23" />
+  </>
+);
+const IconVideo = createIcon(
+  <>
+    <polygon points="23 7 16 12 23 17 23 7" />
+    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+  </>
+);
+const IconEye = createIcon(
+  <>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </>
+);
+const IconEyeOff = createIcon(
+  <>
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </>
+);
 
 const VARIANT_ICONS: Partial<Record<VariantMode, (props: IconProps) => JSX.Element>> = {
   simplify: IconSimplify,
@@ -679,6 +705,67 @@ export default function App() {
   const [selected, setSelected] = useState<Selection | null>(null);
   const initialRatiosRef = useRef(getInitialRatios());
   const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
+  const [sidebarVisible, setSidebarVisible] = useState(() => {
+    const stored = window.localStorage.getItem("powerwriter.sidebarVisible");
+    return stored !== null ? stored === "true" : true;
+  });
+  const [currentMode, setCurrentMode] = useState<"planning" | "recording" | "editing">(() => {
+    const stored = window.localStorage.getItem("powerwriter.currentMode");
+    return (stored as "planning" | "recording" | "editing") || "planning";
+  });
+  const [recordingType, setRecordingType] = useState<"audio" | "audio+video">("audio");
+  const [videoAspectRatio, setVideoAspectRatio] = useState<"16:9" | "9:16">("16:9");
+  const [isRecordingSettingsOpen, setIsRecordingSettingsOpen] = useState(false);
+  const [selectedRecordingId, setSelectedRecordingId] = useState<string | null>(null);
+  const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>("default");
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string>("default");
+  
+  // Save mode to localStorage when it changes
+  useEffect(() => {
+    window.localStorage.setItem("powerwriter.currentMode", currentMode);
+  }, [currentMode]);
+  
+  // Save sidebar visibility to localStorage when it changes
+  useEffect(() => {
+    window.localStorage.setItem("powerwriter.sidebarVisible", String(sidebarVisible));
+  }, [sidebarVisible]);
+
+  // Load audio/video devices
+  useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          // Request permission first to get device labels
+          try {
+            await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          } catch (e) {
+            // Permission denied, but we can still enumerate devices (without labels)
+          }
+          
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(device => device.kind === "audioinput");
+          const videoInputs = devices.filter(device => device.kind === "videoinput");
+          setAudioDevices(audioInputs);
+          setVideoDevices(videoInputs);
+        }
+      } catch (error) {
+        console.error("Failed to enumerate devices:", error);
+      }
+    };
+    loadDevices();
+    
+    // Reload devices when they change
+    const handleDeviceChange = () => {
+      loadDevices();
+    };
+    navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange);
+    return () => {
+      navigator.mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
+    };
+  }, []);
   const [instructionsRatio, setInstructionsRatio] = useState(
     initialRatiosRef.current.instructions
   );
@@ -761,7 +848,11 @@ export default function App() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const videoChunksRef = useRef<Blob[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const shouldDiscardRecordingRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -871,9 +962,20 @@ export default function App() {
         audioStreamRef.current.getTracks().forEach((track) => track.stop());
         audioStreamRef.current = null;
       }
+      if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach((track) => track.stop());
+        videoStreamRef.current = null;
+      }
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = null;
+      }
       if (localAudioUrlRef.current) {
         URL.revokeObjectURL(localAudioUrlRef.current);
         localAudioUrlRef.current = null;
+      }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+        setVideoUrl(null);
       }
       clearRecordingTimer();
     };
@@ -883,6 +985,7 @@ export default function App() {
     if (selected?.type !== "document") {
       clearRecordingTimer();
       setAudioUrl(null);
+      setVideoUrl(null);
       setAudioError(null);
       setRecordingFileName(null);
       if (localAudioUrlRef.current) {
@@ -891,9 +994,26 @@ export default function App() {
       }
       return;
     }
-    const remoteUrl = documentDetails?.audioUrl ?? null;
-    setAudioUrl(remoteUrl);
-    setRecordingFileName(documentDetails?.audioFileName ?? null);
+    // Load recordings array or fall back to legacy single audio/video
+    const recordings = documentDetails?.recordings || [];
+    let remoteUrl: string | null = null;
+    if (recordings.length > 0) {
+      // Use selected recording or latest
+      const recordingToUse = selectedRecordingId 
+        ? recordings.find(r => r.id === selectedRecordingId) || recordings[recordings.length - 1]
+        : recordings[recordings.length - 1];
+      remoteUrl = recordingToUse.audioUrl;
+      setAudioUrl(recordingToUse.audioUrl);
+      setVideoUrl(recordingToUse.videoUrl || null);
+      setRecordingFileName(recordingToUse.audioFileName);
+    } else {
+      // Legacy support
+      remoteUrl = documentDetails?.audioUrl ?? null;
+      const remoteVideoUrl = documentDetails?.videoUrl ?? null;
+      setAudioUrl(remoteUrl);
+      setVideoUrl(remoteVideoUrl);
+      setRecordingFileName(documentDetails?.audioFileName ?? null);
+    }
     if (remoteUrl && localAudioUrlRef.current) {
       URL.revokeObjectURL(localAudioUrlRef.current);
       localAudioUrlRef.current = null;
@@ -902,6 +1022,9 @@ export default function App() {
     selected?.type,
     selected?.path,
     documentDetails?.audioUrl,
+    documentDetails?.videoUrl,
+    documentDetails?.recordings,
+    selectedRecordingId,
     documentDetails?.audioFileName,
     clearRecordingTimer
   ]);
@@ -927,6 +1050,13 @@ export default function App() {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach((track) => track.stop());
       audioStreamRef.current = null;
+    }
+    if (videoStreamRef.current) {
+      videoStreamRef.current.getTracks().forEach((track) => track.stop());
+      videoStreamRef.current = null;
+    }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
     }
   };
 
@@ -957,27 +1087,50 @@ export default function App() {
           mimeType: blob.type,
           optimisticFileName
         });
-        const result = await uploadDocumentAudio(pathForUpload, blob);
+        // Always append new recordings
+        const hasExistingRecordings = documentDetails?.recordings && documentDetails.recordings.length > 0;
+        const result = await uploadDocumentAudio(pathForUpload, blob, true);
         if (!isMountedRef.current) return;
-        console.log("[Recorder] upload success", result.audioUrl);
+        console.log("[Recorder] upload success", result.audioUrl, result.recording);
         if (previewUrl && localAudioUrlRef.current === previewUrl) {
           URL.revokeObjectURL(previewUrl);
           localAudioUrlRef.current = null;
         }
-        setAudioUrl(result.audioUrl);
+        
+        // Update recordings array
+        const existingRecordings = documentDetails?.recordings || [];
+        const newRecording = result.recording || {
+          id: result.recordingId || `rec_${Date.now()}`,
+          audioUrl: result.audioUrl,
+          audioFileName: result.audioFileName,
+          type: recordingType,
+          createdAt: Date.now(),
+          ...(recordingType === "audio+video" ? { videoUrl: result.audioUrl, videoFileName: result.audioFileName } : {})
+        };
+        
+        const updatedRecordings = [...existingRecordings, newRecording];
+        
+        if (recordingType === "audio+video") {
+          setVideoUrl(result.audioUrl);
+          setAudioUrl(result.audioUrl);
+        } else {
+          setAudioUrl(result.audioUrl);
+        }
         setRecordingFileName(result.audioFileName);
         setDocumentDetails((prev) =>
           prev
             ? {
                 ...prev,
-                audioUrl: result.audioUrl,
-                audioFileName: result.audioFileName
+                audioUrl: result.audioUrl, // Latest for backward compatibility
+                audioFileName: result.audioFileName,
+                ...(recordingType === "audio+video" ? { videoUrl: result.audioUrl } : {}),
+                recordings: updatedRecordings
               }
             : prev
         );
         setStatus({
           type: "success",
-          message: "Audio recording saved to this document"
+          message: `${recordingType === "audio+video" ? "Video" : "Audio"} recording added to this document`
         });
       } catch (error) {
         console.error("[Recorder] upload error", error);
@@ -1014,16 +1167,42 @@ export default function App() {
       typeof navigator.mediaDevices.getUserMedia !== "function" ||
       typeof window.MediaRecorder === "undefined"
     ) {
-      setAudioError("Audio recording is not supported in this browser.");
+      setAudioError("Recording is not supported in this browser.");
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const constraints: MediaStreamConstraints = { 
+        audio: selectedAudioDeviceId === "default" 
+          ? true 
+          : { deviceId: { exact: selectedAudioDeviceId } },
+        video: recordingType === "audio+video" ? {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          facingMode: "user",
+          ...(selectedVideoDeviceId !== "default" ? { deviceId: { exact: selectedVideoDeviceId } } : {})
+        } : false
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       audioStreamRef.current = stream;
-      const recorder = new MediaRecorder(stream);
+      if (recordingType === "audio+video") {
+        videoStreamRef.current = stream;
+      }
+      
+      // Set up video preview if recording video
+      if (recordingType === "audio+video" && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play().catch(console.error);
+      }
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: recordingType === "audio+video" 
+          ? (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4")
+          : (MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4")
+      });
       mediaRecorderRef.current = recorder;
       shouldDiscardRecordingRef.current = false;
       audioChunksRef.current = [];
+      videoChunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           console.log(
@@ -1031,7 +1210,11 @@ export default function App() {
             event.data.size,
             event.data.type
           );
-          audioChunksRef.current.push(event.data);
+          if (recordingType === "audio+video") {
+            videoChunksRef.current.push(event.data);
+          } else {
+            audioChunksRef.current.push(event.data);
+          }
         } else {
           console.log("[Recorder] ondataavailable zero-size chunk");
         }
@@ -1054,12 +1237,19 @@ export default function App() {
         const discard = shouldDiscardRecordingRef.current;
         shouldDiscardRecordingRef.current = false;
         stopMediaStream();
-        const chunks = audioChunksRef.current.slice();
-        audioChunksRef.current = [];
+        const chunks = recordingType === "audio+video" 
+          ? videoChunksRef.current.slice() 
+          : audioChunksRef.current.slice();
+        if (recordingType === "audio+video") {
+          videoChunksRef.current = [];
+        } else {
+          audioChunksRef.current = [];
+        }
         console.log("[Recorder] onstop details", {
           discard,
           chunkCount: chunks.length,
-          isMounted: isMountedRef.current
+          isMounted: isMountedRef.current,
+          recordingType
         });
         if (!isMountedRef.current) {
           console.warn("[Recorder] upload skipped: component unmounted");
@@ -1067,10 +1257,16 @@ export default function App() {
         }
         setIsRecordingAudio(false);
         clearRecordingTimer();
+        
+        // Clear video preview
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = null;
+        }
+        
         if (discard || chunks.length === 0) {
           if (!discard && chunks.length === 0) {
             setAudioError(
-              "No audio data was captured. Please try recording again."
+              `No ${recordingType === "audio+video" ? "video" : "audio"} data was captured. Please try recording again.`
             );
             console.warn("[Recorder] upload skipped: empty chunks");
           }
@@ -1078,19 +1274,36 @@ export default function App() {
         }
         const blob = new Blob(chunks, { type: recorder.mimeType });
         console.log(
-          "[Recorder] Captured audio blob",
+          "[Recorder] Captured blob",
           blob.size,
-          recorder.mimeType
+          recorder.mimeType,
+          recordingType
         );
-        if (localAudioUrlRef.current) {
-          URL.revokeObjectURL(localAudioUrlRef.current);
-          localAudioUrlRef.current = null;
+        if (recordingType === "audio+video") {
+          if (videoUrl) {
+            URL.revokeObjectURL(videoUrl);
+          }
+          const previewUrl = URL.createObjectURL(blob);
+          setVideoUrl(previewUrl);
+          // Also extract audio for audioUrl
+          if (localAudioUrlRef.current) {
+            URL.revokeObjectURL(localAudioUrlRef.current);
+            localAudioUrlRef.current = null;
+          }
+          // For now, use the same blob for audio (will be separated on server)
+          localAudioUrlRef.current = previewUrl;
+          setAudioUrl(previewUrl);
+        } else {
+          if (localAudioUrlRef.current) {
+            URL.revokeObjectURL(localAudioUrlRef.current);
+            localAudioUrlRef.current = null;
+          }
+          const previewUrl = URL.createObjectURL(blob);
+          localAudioUrlRef.current = previewUrl;
+          setAudioUrl(previewUrl);
         }
-        const previewUrl = URL.createObjectURL(blob);
-        localAudioUrlRef.current = previewUrl;
-        setAudioUrl(previewUrl);
         console.log("[Recorder] calling uploadRecording");
-        uploadRecording(blob, previewUrl)
+        uploadRecording(blob, recordingType === "audio+video" ? videoUrl || "" : localAudioUrlRef.current || "")
           .then(() => {
             console.log("[Recorder] upload promise resolved");
           })
@@ -1128,7 +1341,10 @@ export default function App() {
     isRecordingAudio,
     isUploadingAudio,
     selected?.type,
-    uploadRecording
+    uploadRecording,
+    recordingType,
+    selectedAudioDeviceId,
+    selectedVideoDeviceId
   ]);
 
   const stopRecording = useCallback(() => {
@@ -2396,7 +2612,168 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar" style={{ width: sidebarWidth }}>
+      {/* Mode Tabs */}
+      <div className="mode-tabs">
+        {/* Menu Toggle Button */}
+        <button
+          className="menu-toggle-button"
+          onClick={() => setSidebarVisible(!sidebarVisible)}
+          title={sidebarVisible ? "Hide menu" : "Show menu"}
+          aria-label={sidebarVisible ? "Hide menu" : "Show menu"}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {sidebarVisible ? (
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            ) : (
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
+            <button
+              className={clsx("mode-tab", { active: currentMode === "planning" })}
+              onClick={() => setCurrentMode("planning")}
+            >
+              Creative Studio
+            </button>
+        <button
+          className={clsx("mode-tab", { active: currentMode === "recording" })}
+          onClick={() => setCurrentMode("recording")}
+        >
+          Recording Studio
+        </button>
+        <button
+          className={clsx("mode-tab", { active: currentMode === "editing" })}
+          onClick={() => setCurrentMode("editing")}
+        >
+          Edit Studio
+        </button>
+        
+        {/* Panel Toggle Buttons */}
+        <div className="panel-toggle-buttons">
+          {currentMode === "planning" && (
+            <>
+              <button
+                type="button"
+                aria-pressed={instructionsVisible}
+                className={clsx("panel-toggle-btn", !instructionsVisible && "toggle-off")}
+                onClick={() => setInstructionsVisible((prev) => !prev)}
+                title={`${instructionsVisible ? "Hide" : "Show"} Instructions Panel`}
+              >
+                <IconDocument className="icon" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={documentVisible}
+                className={clsx("panel-toggle-btn", !documentVisible && "toggle-off")}
+                onClick={() => setDocumentVisible((prev) => !prev)}
+                title={`${documentVisible ? "Hide" : "Show"} Text Editor Panel`}
+              >
+                <IconTextEditor className="icon" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={inlineEditorVisible}
+                className={clsx("panel-toggle-btn", !inlineEditorVisible && "toggle-off")}
+                onClick={() => setInlineEditorVisible((prev) => !prev)}
+                title={`${inlineEditorVisible ? "Hide" : "Show"} Inline Editor Panel`}
+              >
+                <IconInline className="icon" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={chatVisible}
+                className={clsx("panel-toggle-btn", !chatVisible && "toggle-off")}
+                onClick={() => setChatVisible((prev) => !prev)}
+                title={`${chatVisible ? "Hide" : "Show"} ChatGPT Panel`}
+              >
+                <IconChat className="icon" />
+              </button>
+                  <div className="action-buttons-separator" />
+                  <button
+                type="button"
+                className="panel-toggle-btn"
+                onClick={() => setShowAggregated(true)}
+                aria-label="View aggregated instructions"
+                title="View Aggregated Instructions"
+              >
+                <IconLayers className="icon" />
+              </button>
+              <button
+                type="button"
+                className={clsx("panel-toggle-btn", isSettingsOpen && "toggle-active")}
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
+                aria-label={isSettingsOpen ? "Close settings" : "Open settings"}
+                title={isSettingsOpen ? "Close Settings" : "Open Settings"}
+              >
+                <IconSettings className="icon" />
+              </button>
+            </>
+          )}
+          {currentMode === "recording" && (
+            <>
+              <button
+                type="button"
+                aria-pressed={documentVisible}
+                className={clsx("panel-toggle-btn", !documentVisible && "toggle-off")}
+                onClick={() => setDocumentVisible((prev) => !prev)}
+                title={`${documentVisible ? "Hide" : "Show"} Text Editor Panel`}
+              >
+                <IconTextEditor className="icon" />
+              </button>
+              {selected?.type === "document" && (
+                <button
+                  type="button"
+                  aria-pressed={audioEditorVisible}
+                  className={clsx("panel-toggle-btn", !audioEditorVisible && "toggle-off")}
+                  onClick={() => setAudioEditorVisible((prev) => !prev)}
+                  title={`${audioEditorVisible ? "Hide" : "Show"} Audio/Video Recording Panel`}
+                >
+                  <IconAudioEditor className="icon" />
+                </button>
+              )}
+            </>
+          )}
+          {currentMode === "editing" && (
+            <>
+              {selected?.type === "document" && (
+                <>
+                  <button
+                    type="button"
+                    aria-pressed={audioEditorVisible}
+                    className={clsx("panel-toggle-btn", !audioEditorVisible && "toggle-off")}
+                    onClick={() => setAudioEditorVisible((prev) => !prev)}
+                    title={`${audioEditorVisible ? "Hide" : "Show"} Audio Editor Panel`}
+                  >
+                    <IconAudioEditor className="icon" />
+                  </button>
+                  {(videoUrl || documentDetails?.videoUrl) && (
+                    <div className="video-aspect-ratio-selector">
+                      <button
+                        type="button"
+                        className={clsx("aspect-ratio-btn", videoAspectRatio === "16:9" && "active")}
+                        onClick={() => setVideoAspectRatio("16:9")}
+                        title="16:9 aspect ratio"
+                      >
+                        16:9
+                      </button>
+                      <button
+                        type="button"
+                        className={clsx("aspect-ratio-btn", videoAspectRatio === "9:16" && "active")}
+                        onClick={() => setVideoAspectRatio("9:16")}
+                        title="9:16 aspect ratio"
+                      >
+                        9:16
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      
+      <aside className="sidebar" style={{ width: sidebarWidth, display: sidebarVisible ? "block" : "none" }}>
         <div className="sidebar-header">
           <h1>PowerWriter</h1>
           <p style={{ margin: "4px 0 0", color: "#475467", fontSize: 13 }}>
@@ -2444,107 +2821,87 @@ export default function App() {
       />
 
       <main className="main">
-        <div className="main-header">
-          <div className="main-header-summary">
-            <strong>Workspace</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#475467" }}>
-              Instructions are aggregated from folders, sub-folders, and the
-              selected document.
-            </p>
-          </div>
-          <div className="main-header-actions">
-              <div className="toolbar panel-toggle-toolbar">
+        {/* Recording Settings Dialog */}
+        {isRecordingSettingsOpen ? (
+          <div className="settings-overlay" onClick={() => setIsRecordingSettingsOpen(false)}>
+            <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="settings-dialog-header">
+                <h2>Setup</h2>
                 <button
                   type="button"
-                  aria-pressed={instructionsVisible}
-                  className={clsx(!instructionsVisible && "toggle-off")}
-                  onClick={() => setInstructionsVisible((prev) => !prev)}
-                  aria-label={`${instructionsVisible ? "Hide" : "Show"} instructions`}
-                  title={`${instructionsVisible ? "Hide" : "Show"} Instructions Panel`}
+                  onClick={() => setIsRecordingSettingsOpen(false)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    fontSize: "24px",
+                    padding: "0",
+                    width: "32px",
+                    height: "32px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
                 >
-                  <IconDocument className="icon" />
-                  <span className="sr-only">Instructions</span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={documentVisible}
-                  className={clsx(!documentVisible && "toggle-off")}
-                  onClick={() => setDocumentVisible((prev) => !prev)}
-                  aria-label={`${documentVisible ? "Hide" : "Show"} text editor`}
-                  title={`${documentVisible ? "Hide" : "Show"} Text Editor Panel`}
-                >
-                  <IconTextEditor className="icon" />
-                  <span className="sr-only">Text Editor</span>
-                </button>
-                {selected?.type === "document" && (
-                  <button
-                    type="button"
-                    aria-pressed={audioEditorVisible}
-                    className={clsx(!audioEditorVisible && "toggle-off")}
-                    onClick={() => setAudioEditorVisible((prev) => !prev)}
-                    aria-label={`${audioEditorVisible ? "Hide" : "Show"} audio editor`}
-                    title={`${audioEditorVisible ? "Hide" : "Show"} Audio Editor - Record, edit, and enhance audio`}
-                  >
-                    <IconAudioEditor className="icon" />
-                    <span className="sr-only">Audio Editor</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  aria-pressed={inlineEditorVisible}
-                  className={clsx(!inlineEditorVisible && "toggle-off")}
-                  onClick={() => setInlineEditorVisible((prev) => !prev)}
-                  aria-label={`${inlineEditorVisible ? "Hide" : "Show"} inline editor`}
-                  title={`${inlineEditorVisible ? "Hide" : "Show"} Inline Editor Panel`}
-                >
-                  <IconInline className="icon" />
-                  <span className="sr-only">Inline Editor</span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={chatVisible}
-                  className={clsx(!chatVisible && "toggle-off")}
-                  onClick={() => setChatVisible((prev) => !prev)}
-                  aria-label={`${chatVisible ? "Hide" : "Show"} ChatGPT panel`}
-                  title={`${chatVisible ? "Hide" : "Show"} ChatGPT Panel`}
-                >
-                  <IconChat className="icon" />
-                  <span className="sr-only">Generate with ChatGPT</span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={inlineBeforeDocument}
-                  className={clsx(inlineBeforeDocument && "toggle-active")}
-                  onClick={() => setInlineBeforeDocument((prev) => !prev)}
-                  aria-label="Swap text editor and inline editor position"
-                  title="Swap Text Editor and Inline Editor Position"
-                >
-                  <IconSwap className="icon" />
-                  <span className="sr-only">Swap editor layout</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAggregated(true)}
-                  aria-label="View aggregated instructions"
-                  title="View Aggregated Instructions"
-                >
-                  <IconLayers className="icon" />
-                  <span className="sr-only">View Aggregated</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen((prev) => !prev)}
-                  aria-label={isSettingsOpen ? "Close settings" : "Open settings"}
-                  title={isSettingsOpen ? "Close Settings" : "Open Settings"}
-                >
-                  <IconSettings className="icon" />
-                  <span className="sr-only">
-                    {isSettingsOpen ? "Close Settings" : "Settings"}
-                  </span>
+                  ×
                 </button>
               </div>
+              <div className="settings-dialog-content">
+                <div className="settings-row">
+                  <label htmlFor="audio-device">Microphone</label>
+                  <select
+                    id="audio-device"
+                    value={selectedAudioDeviceId}
+                    onChange={(e) => setSelectedAudioDeviceId(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      background: "var(--field-bg)",
+                      border: "1px solid var(--field-border)",
+                      borderRadius: "4px",
+                      color: "var(--text-primary)",
+                      fontSize: "14px"
+                    }}
+                  >
+                    <option value="default">Default - Microphone</option>
+                    {audioDevices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {recordingType === "audio+video" && (
+                  <div className="settings-row">
+                    <label htmlFor="video-device">Camera</label>
+                    <select
+                      id="video-device"
+                      value={selectedVideoDeviceId}
+                      onChange={(e) => setSelectedVideoDeviceId(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        background: "var(--field-bg)",
+                        border: "1px solid var(--field-border)",
+                        borderRadius: "4px",
+                        color: "var(--text-primary)",
+                        fontSize: "14px"
+                      }}
+                    >
+                      <option value="default">Default - Camera</option>
+                      {videoDevices.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
-        </div>
+          </div>
+        ) : null}
 
         {isSettingsOpen ? (
           <div className="settings-panel">
@@ -2582,7 +2939,8 @@ export default function App() {
         ) : null}
 
         <div className="main-content" ref={mainContentRef}>
-          {instructionsVisible && (
+          {/* Creative Studio Mode */}
+          {currentMode === "planning" && instructionsVisible && (
             <section
               className="instructions-panel"
               style={{
@@ -2662,7 +3020,7 @@ export default function App() {
             </section>
           )}
 
-          {instructionsVisible && (documentVisible || audioEditorVisible || inlinePanelVisible) && (
+          {currentMode === "planning" && instructionsVisible && (documentVisible || inlinePanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer instructions-resizer"
               onMouseDown={() => setDraggingResizer("instructions")}
@@ -2671,7 +3029,8 @@ export default function App() {
             />
           )}
 
-          {audioEditorVisible && selected?.type === "document" && documentDetails ? (
+          {/* Edit Studio - Audio/Video Editor */}
+          {(currentMode === "editing" && audioEditorVisible && selected?.type === "document" && documentDetails) ? (
             <section
               className="audio-editor-panel"
               style={{
@@ -2681,7 +3040,67 @@ export default function App() {
                 order: 2
               }}
             >
-              <p className="panel-label">Audio Editor</p>
+              <div className="panel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <p className="panel-label" style={{ margin: 0 }}>Audio Editor</p>
+                {documentDetails?.recordings && documentDetails.recordings.length > 0 && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <select
+                      value={selectedRecordingId || ""}
+                      onChange={(e) => setSelectedRecordingId(e.target.value || null)}
+                      style={{
+                        padding: "4px 8px",
+                        background: "var(--field-bg)",
+                        border: "1px solid var(--field-border)",
+                        borderRadius: "4px",
+                        color: "var(--text-primary)",
+                        fontSize: "12px"
+                      }}
+                    >
+                      <option value="">All Recordings</option>
+                      {documentDetails.recordings.map((recording) => (
+                        <option key={recording.id} value={recording.id}>
+                          Recording {new Date(recording.createdAt).toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedRecordingId && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedRecordingId || !documentDetails) return;
+                          const recording = documentDetails.recordings?.find(r => r.id === selectedRecordingId);
+                          if (!recording) return;
+                          if (confirm(`Delete this recording?`)) {
+                            // TODO: Call API to delete recording
+                            const updatedRecordings = documentDetails.recordings?.filter(r => r.id !== selectedRecordingId) || [];
+                            const updatedDetails = {
+                              ...documentDetails,
+                              recordings: updatedRecordings
+                            };
+                            setDocumentDetails(updatedDetails);
+                            setSelectedRecordingId(null);
+                            // Save document
+                            const snapshot = toDocumentSnapshot(updatedDetails);
+                            void performDocumentSave(documentDetails.path, snapshot);
+                          }
+                        }}
+                        style={{
+                          padding: "4px 8px",
+                          background: "var(--error-bg, #fee2e2)",
+                          border: "1px solid var(--error-border, #fca5a5)",
+                          borderRadius: "4px",
+                          color: "var(--error-text, #dc2626)",
+                          cursor: "pointer",
+                          fontSize: "12px"
+                        }}
+                        title="Delete selected recording"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="panel-body">
                 <AudioEditor
                   documentPath={documentDetails.path}
@@ -2714,10 +3133,191 @@ export default function App() {
                   onRewindAudio={handleRewindAudio}
                   canStartRecording={canStartRecording}
                   hasAudio={hasAudio}
+                  recordings={documentDetails.recordings}
+                  selectedRecordingId={selectedRecordingId}
+                  onSelectRecording={setSelectedRecordingId}
+                  onDeleteRecording={async (recordingId) => {
+                    if (!documentDetails) return;
+                    const updatedRecordings = documentDetails.recordings?.filter(r => r.id !== recordingId) || [];
+                    const updatedDetails = {
+                      ...documentDetails,
+                      recordings: updatedRecordings
+                    };
+                    setDocumentDetails(updatedDetails);
+                    if (selectedRecordingId === recordingId) {
+                      setSelectedRecordingId(null);
+                    }
+                    // Save document
+                    const snapshot = toDocumentSnapshot(updatedDetails);
+                    void performDocumentSave(documentDetails.path, snapshot);
+                  }}
                 />
               </div>
             </section>
           ) : null}
+
+          {/* Resizer between Audio Editor and Video Panel in Edit Studio */}
+          {currentMode === "editing" && audioEditorVisible && (videoUrl || documentDetails?.videoUrl) && (
+            <div
+              className="resizer resizer-vertical panel-resizer audio-editor-resizer"
+              onMouseDown={() => setDraggingResizer("audioEditor")}
+              role="presentation"
+              style={{ order: 3 }}
+            />
+          )}
+
+          {/* Edit Studio - Video Preview (Right Panel) */}
+          {currentMode === "editing" && (videoUrl || documentDetails?.videoUrl) && (
+            <section
+              className="video-preview-panel"
+              style={{
+                flexBasis: "40%",
+                flexGrow: 0,
+                flexShrink: 0,
+                order: 4,
+                minWidth: 300
+              }}
+            >
+              <p className="panel-label">Video Preview</p>
+              <div className="panel-body" style={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+                <div 
+                  className="video-preview-container"
+                  style={{
+                    aspectRatio: videoAspectRatio === "16:9" ? "16/9" : "9/16",
+                    width: "100%",
+                    backgroundColor: "#000",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                    overflow: "hidden"
+                  }}
+                >
+                  <video
+                    ref={videoPreviewRef}
+                    src={videoUrl || documentDetails?.videoUrl || undefined}
+                    controls
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain"
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Recording Studio - Unified Recording & Preview Panel (Right) */}
+          {currentMode === "recording" && audioEditorVisible && selected?.type === "document" && documentDetails ? (
+            <section
+              className="audio-editor-panel"
+              style={{
+                flexBasis: "45%",
+                flexGrow: 0,
+                flexShrink: 0,
+                order: 2,
+                minWidth: 400
+              }}
+            >
+              <div className="panel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <p className="panel-label" style={{ margin: 0 }}>Recording</p>
+                <button
+                  type="button"
+                  onClick={() => setIsRecordingSettingsOpen(true)}
+                  title="Recording Settings"
+                  style={{
+                    padding: "4px 8px",
+                    background: "transparent",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary)",
+                    cursor: "pointer"
+                  }}
+                >
+                  <IconSettings className="icon" />
+                </button>
+              </div>
+              <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: "16px", height: "100%" }}>
+                {/* Preview Section */}
+                {(audioUrl || videoUrl || documentDetails?.audioUrl || documentDetails?.videoUrl) && (
+                  <div style={{ flexShrink: 0 }}>
+                    <p className="panel-label" style={{ marginBottom: "8px", fontSize: "12px", fontWeight: 600 }}>Preview</p>
+                    {recordingType === "audio+video" && (videoUrl || documentDetails?.videoUrl) ? (
+                      <div 
+                        className="video-preview-container"
+                        style={{
+                          aspectRatio: "16/9",
+                          width: "100%",
+                          backgroundColor: "#000",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          position: "relative",
+                          overflow: "hidden",
+                          borderRadius: "8px"
+                        }}
+                      >
+                        <video
+                          ref={videoPreviewRef}
+                          src={videoUrl || documentDetails?.videoUrl || undefined}
+                          controls
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain"
+                          }}
+                        />
+                      </div>
+                    ) : (audioUrl || documentDetails?.audioUrl) ? (
+                      <div 
+                        className="audio-preview-container"
+                        style={{
+                          width: "100%",
+                          padding: "16px",
+                          background: "var(--bg-panel)",
+                          borderRadius: "8px",
+                          border: "1px solid var(--border-subtle)"
+                        }}
+                      >
+                        <audio
+                          ref={audioPlayerRef}
+                          src={audioUrl || documentDetails?.audioUrl || undefined}
+                          controls
+                          style={{
+                            width: "100%"
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                
+                {/* Recording & Audio Editing Section */}
+                <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+                  <AudioEditor
+                    documentPath={documentDetails.path}
+                    audioUrl={documentDetails.audioUrl ?? null}
+                    transcription={null}
+                    documentContent={documentDetails.content}
+                    apiKey={userApiKey || undefined}
+                    onTranscriptionUpdate={undefined}
+                    isRecordingAudio={isRecordingAudio}
+                    recordingElapsed={recordingElapsed}
+                    recordingFileName={recordingFileName}
+                    onStartRecording={startRecording}
+                    onStopRecording={stopRecording}
+                    onPlayAudio={handlePlayAudio}
+                    onPauseAudio={handlePauseAudio}
+                    onRewindAudio={handleRewindAudio}
+                    canStartRecording={canStartRecording}
+                    hasAudio={hasAudio}
+                  />
+                </div>
+              </div>
+            </section>
+          ) : null}
+
 
           {audioEditorVisible && selected?.type === "document" && (documentVisible || inlinePanelVisible) && (
             <div
@@ -2728,7 +3328,8 @@ export default function App() {
             />
           )}
 
-          {documentVisible && showDocumentPanel ? (
+          {/* Creative Studio & Recording Studio - Document Editor */}
+          {((currentMode === "planning" || currentMode === "recording") && documentVisible && showDocumentPanel) ? (
             <section
               className="document-panel"
               style={{
@@ -2854,11 +3455,12 @@ export default function App() {
               }}
               ref={inlinePanelRef}
             >
-              {inlineEditorVisible && (
+              {/* Creative Studio - Inline Editor (full width now that chat is separate) */}
+              {currentMode === "planning" && inlineEditorVisible && (
                 <div
                   className="inline-panel-section inline-editor-section"
                   style={{
-                    flexBasis: `${inlineEditorRatio * 100}%`
+                    flexBasis: "100%"
                   }}
                 >
                   <div className="panel-header">
@@ -2945,53 +3547,67 @@ export default function App() {
                 />
               )}
 
-              {chatVisible && (
-                <div
-                  className="inline-panel-section inline-chat-section"
-                  style={{
-                    flexBasis: `${
-                      (inlineEditorVisible ? 1 - inlineEditorRatio : 1) * 100
-                    }%`
-                  }}
-                >
-                  <div className="panel-header">
-                    <h2>Generate with ChatGPT</h2>
-                    <div className="toolbar">
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={handleGenerate}
-                        disabled={isGenerating || !chatPrompt.trim()}
-                      >
-                        {isGenerating ? "Generating…" : "Send"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="panel-body inline-chat-body">
-                    <textarea
-                      value={chatPrompt}
-                      onChange={(event) => setChatPrompt(event.target.value)}
-                      placeholder="Ask ChatGPT for ideas, revisions, or expansions..."
-                    />
-                    <div className="chat-responses">
-                      {chatResponses.length === 0 ? (
-                        <p style={{ color: "#667085", margin: 0 }}>
-                          Responses will appear here.
-                        </p>
-                      ) : (
-                        chatResponses.map((item) => (
-                          <article
-                            key={item.id}
-                            style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
-                          >
-                            {item.message}
-                          </article>
-                        ))
-                      )}
-                    </div>
-                  </div>
+            </section>
+          )}
+
+          {/* Resizer between Inline Panel and Chat Panel in Creative Studio */}
+          {currentMode === "planning" && inlinePanelVisible && chatVisible && (
+            <div
+              className="resizer resizer-vertical panel-resizer inline-resizer"
+              onMouseDown={() => setDraggingResizer("inline")}
+              role="presentation"
+              style={{ order: 5 }}
+            />
+          )}
+
+          {/* Creative Studio - ChatGPT Panel (Right Vertical Panel) */}
+          {currentMode === "planning" && chatVisible && (
+            <section
+              className="chat-panel"
+              style={{
+                flexBasis: "35%",
+                flexGrow: 0,
+                flexShrink: 0,
+                order: 6,
+                minWidth: 300
+              }}
+            >
+              <div className="panel-header">
+                <h2>Generate with ChatGPT</h2>
+                <div className="toolbar">
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !chatPrompt.trim()}
+                  >
+                    {isGenerating ? "Generating…" : "Send"}
+                  </button>
                 </div>
-              )}
+              </div>
+              <div className="panel-body inline-chat-body">
+                <textarea
+                  value={chatPrompt}
+                  onChange={(event) => setChatPrompt(event.target.value)}
+                  placeholder="Ask ChatGPT for ideas, revisions, or expansions..."
+                />
+                <div className="chat-responses">
+                  {chatResponses.length === 0 ? (
+                    <p style={{ color: "#667085", margin: 0 }}>
+                      Responses will appear here.
+                    </p>
+                  ) : (
+                    chatResponses.map((item) => (
+                      <article
+                        key={item.id}
+                        style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
+                      >
+                        {item.message}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </div>
             </section>
           )}
         </div>

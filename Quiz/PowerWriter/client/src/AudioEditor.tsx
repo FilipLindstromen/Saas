@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import type { Transcription } from "./types";
-import { transcribeDocumentAudio, editDocumentAudio, enhanceDocumentAudio, exportAudioAsMp3 } from "./api";
+import { transcribeDocumentAudio, editDocumentAudio, enhanceDocumentAudio, exportAudioAsMp3, saveDocumentTranscription } from "./api";
 
 // Icon components for recording controls
 type IconProps = React.SVGProps<SVGSVGElement> & { size?: number };
@@ -65,6 +65,11 @@ type AudioEditorProps = {
   onRewindAudio?: () => void;
   canStartRecording?: boolean;
   hasAudio?: boolean;
+  // Multiple recordings support
+  recordings?: Array<{ id: string; audioUrl: string; videoUrl?: string | null; type: "audio" | "audio+video"; createdAt: number; transcription?: Transcription | null; color?: string }>;
+  selectedRecordingId?: string | null;
+  onSelectRecording?: (recordingId: string | null) => void;
+  onDeleteRecording?: (recordingId: string) => void;
 };
 
 type WordBlock = {
@@ -73,6 +78,7 @@ type WordBlock = {
   start: number;
   end: number;
   index: number;
+  recordingId?: string;
 };
 
 type TranscriptionState = {
@@ -110,7 +116,11 @@ export function AudioEditor({
   onPauseAudio,
   onRewindAudio,
   canStartRecording = false,
-  hasAudio = false
+  hasAudio = false,
+  recordings,
+  selectedRecordingId,
+  onSelectRecording,
+  onDeleteRecording
 }: AudioEditorProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(
@@ -433,6 +443,27 @@ export function AudioEditor({
     };
   }, [audioUrl]);
 
+  // Generate colors for recordings
+  const recordingColors = useMemo(() => {
+    if (!recordings || recordings.length === 0) return new Map<string, string>();
+    const colors = [
+      "rgba(59, 130, 246, 0.2)", // blue
+      "rgba(16, 185, 129, 0.2)", // green
+      "rgba(245, 158, 11, 0.2)", // amber
+      "rgba(239, 68, 68, 0.2)", // red
+      "rgba(139, 92, 246, 0.2)", // purple
+      "rgba(236, 72, 153, 0.2)", // pink
+      "rgba(14, 165, 233, 0.2)", // sky
+      "rgba(34, 197, 94, 0.2)", // emerald
+    ];
+    const colorMap = new Map<string, string>();
+    recordings.forEach((recording, index) => {
+      const color = recording.color || colors[index % colors.length];
+      colorMap.set(recording.id, color);
+    });
+    return colorMap;
+  }, [recordings]);
+
   const wordBlocks = useMemo<WordBlock[]>(() => {
     if (!currentTranscription?.words) return [];
 
@@ -450,8 +481,9 @@ export function AudioEditor({
         start: word.start,
         end: word.end,
         index: originalIndex,
-        deleted: (word as any).deleted || false
-      } as WordBlock & { deleted: boolean };
+        deleted: (word as any).deleted || false,
+        recordingId: word.recordingId
+      } as WordBlock & { deleted: boolean; recordingId?: string };
     });
     
     console.log("wordBlocks recomputed:", blocks.length, "blocks:", blocks.map(b => b.word).join(" "));
@@ -627,17 +659,26 @@ export function AudioEditor({
 
     try {
       const result = await transcribeDocumentAudio(documentPath, apiKey);
-      setCurrentTranscription(result.transcription);
-      onTranscriptionUpdate?.(result.transcription);
+      // Add recordingId to each word if we have a selected recording
+      const transcriptionWithRecordingId = selectedRecordingId ? {
+        ...result.transcription,
+        words: result.transcription.words.map(word => ({
+          ...word,
+          recordingId: selectedRecordingId
+        }))
+      } : result.transcription;
+      
+      setCurrentTranscription(transcriptionWithRecordingId);
+      onTranscriptionUpdate?.(transcriptionWithRecordingId);
       setSelectedWordIds(new Set());
       setSelectedPauseIds(new Set());
       // Reset history
       const initialState: TranscriptionState = {
-        words: result.transcription.words || [],
-        text: result.transcription.text,
-        segments: result.transcription.segments || [],
-        language: result.transcription.language,
-        duration: result.transcription.duration
+        words: transcriptionWithRecordingId.words || [],
+        text: transcriptionWithRecordingId.text,
+        segments: transcriptionWithRecordingId.segments || [],
+        language: transcriptionWithRecordingId.language,
+        duration: transcriptionWithRecordingId.duration
       };
       setHistory([initialState]);
       setHistoryIndex(0);
@@ -650,7 +691,7 @@ export function AudioEditor({
     } finally {
       setIsTranscribing(false);
     }
-  }, [documentPath, audioUrl, apiKey, onTranscriptionUpdate]);
+  }, [documentPath, audioUrl, apiKey, onTranscriptionUpdate, selectedRecordingId]);
 
   const handleWordMouseDown = useCallback(
     (wordId: string, event: React.MouseEvent) => {
@@ -729,7 +770,7 @@ export function AudioEditor({
     };
   }, [dragStartId]);
 
-  const handleDeleteSelected = useCallback(() => {
+  const handleDeleteSelected = useCallback(async () => {
     if (selectedWordIds.size === 0 && selectedPauseIds.size === 0) return;
     if (!currentTranscription) return;
 
@@ -837,6 +878,15 @@ export function AudioEditor({
     
     // Auto-save transcription with deleted flags
     onTranscriptionUpdate?.(updated);
+    
+    // Save transcription to server
+    try {
+      await saveDocumentTranscription(documentPath, updated);
+    } catch (error) {
+      console.error("Failed to save transcription:", error);
+      setTranscriptionError("Failed to save transcription changes");
+    }
+    
     setTranscriptionError(null);
   }, [selectedWordIds, selectedPauseIds, wordBlocks, currentTranscription, onTranscriptionUpdate, saveToHistory, deletedPauseIds, documentPath]);
 
@@ -1801,7 +1851,12 @@ export function AudioEditor({
                       "audio-editor-word-current": isCurrentlyPlaying,
                       "audio-editor-word-deleted": isDeleted
                     })}
-                    style={isDeleted ? { opacity: 0.2 } : undefined}
+                    style={{
+                      ...(isDeleted ? { opacity: 0.2 } : {}),
+                      ...(block.recordingId && recordingColors.has(block.recordingId) && !isDeleted
+                        ? { backgroundColor: recordingColors.get(block.recordingId) }
+                        : {})
+                    }}
                     onMouseDown={(e) => handleWordMouseDown(block.id, e)}
                     onMouseEnter={() => handleWordMouseEnter(block.id)}
                     title={`${formatTime(block.start)} - ${formatTime(block.end)}${isRetake ? " (Retake)" : ""}${isDeleted ? " (Deleted)" : ""}`}

@@ -210,11 +210,12 @@ async function readDocumentMeta(documentAbsolutePath) {
     return {
       completed: Boolean(meta?.completed),
       audioFileName:
-        typeof meta?.audioFileName === "string" ? meta.audioFileName : null
+        typeof meta?.audioFileName === "string" ? meta.audioFileName : null,
+      recordings: Array.isArray(meta?.recordings) ? meta.recordings : null
     };
   } catch (error) {
     if (error.code === "ENOENT") {
-      return { completed: false, audioFileName: null };
+      return { completed: false, audioFileName: null, recordings: null };
     }
     throw error;
   }
@@ -231,6 +232,9 @@ async function writeDocumentMeta(documentAbsolutePath, meta) {
   if (Object.prototype.hasOwnProperty.call(meta, "audioFileName")) {
     next.audioFileName =
       typeof meta.audioFileName === "string" ? meta.audioFileName : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(meta, "recordings")) {
+    next.recordings = Array.isArray(meta.recordings) ? meta.recordings : null;
   }
   console.info("[Audio] writeDocumentMeta", {
     documentAbsolutePath,
@@ -342,7 +346,7 @@ function sanitizeAudioBaseName(name) {
   return stripped || "recording";
 }
 
-function buildAudioFileName(documentAbsolutePath, extensionWithDot) {
+async function buildAudioFileName(documentAbsolutePath, extensionWithDot, append = false) {
   const baseDocumentName = path.basename(
     documentAbsolutePath,
     path.extname(documentAbsolutePath)
@@ -351,19 +355,44 @@ function buildAudioFileName(documentAbsolutePath, extensionWithDot) {
   const ext = extensionWithDot.startsWith(".")
     ? extensionWithDot
     : `.${extensionWithDot}`;
+  
+  if (append) {
+    // Find the next available number
+    const audioDirectory = path.join(
+      path.dirname(documentAbsolutePath),
+      AUDIO_DIRECTORY_NAME
+    );
+    let counter = 1;
+    let fileName;
+    do {
+      fileName = `${safeBase}_${counter}${ext}`;
+      const filePath = path.join(audioDirectory, fileName);
+      try {
+        await fs.access(filePath);
+        counter++;
+      } catch {
+        break; // File doesn't exist, use this name
+      }
+    } while (true);
+    return fileName;
+  }
+  
   return `${safeBase}${ext}`;
 }
 
-async function saveDocumentAudioFile(documentAbsolutePath, file) {
+async function saveDocumentAudioFile(documentAbsolutePath, file, append = false) {
   console.info("[Audio] saveDocumentAudioFile:start", {
     documentAbsolutePath,
     mimeType: file.mimetype,
-    size: file.size
+    size: file.size,
+    append
   });
   const meta = await readDocumentMeta(documentAbsolutePath);
-  await removeExistingAudio(documentAbsolutePath, meta);
+  if (!append) {
+    await removeExistingAudio(documentAbsolutePath, meta);
+  }
   const extension = inferAudioExtension(file);
-  const fileName = buildAudioFileName(documentAbsolutePath, extension);
+  const fileName = await buildAudioFileName(documentAbsolutePath, extension, append);
   const audioDirectory = path.join(
     path.dirname(documentAbsolutePath),
     AUDIO_DIRECTORY_NAME
@@ -371,16 +400,48 @@ async function saveDocumentAudioFile(documentAbsolutePath, file) {
   await fs.mkdir(audioDirectory, { recursive: true });
   const absoluteTarget = path.join(audioDirectory, fileName);
   await fs.writeFile(absoluteTarget, file.buffer);
-  await writeDocumentMeta(documentAbsolutePath, { audioFileName: fileName });
+  
+  // Update recordings array in meta
+  const existingRecordings = meta?.recordings || [];
+  const recordingId = `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const stats = await fs.stat(absoluteTarget);
+  const version = Math.floor(stats.mtimeMs).toString(36);
+  const audioUrl = `/api/document/audio?path=${encodeURIComponent(toPosix(path.relative(meditationDir, documentAbsolutePath)))}&file=${encodeURIComponent(fileName)}&v=${version}`;
+  
+  const newRecording = {
+    id: recordingId,
+    audioUrl: audioUrl,
+    audioFileName: fileName,
+    type: file.mimetype.startsWith("video/") ? "audio+video" : "audio",
+    createdAt: Date.now()
+  };
+  
+  // If it's a video file, also save video info
+  if (file.mimetype.startsWith("video/")) {
+    newRecording.videoUrl = audioUrl; // Same URL for now
+    newRecording.videoFileName = fileName;
+  }
+  
+  const updatedRecordings = [...existingRecordings, newRecording];
+  
+  // For backward compatibility, also set the latest as the main audioUrl
+  await writeDocumentMeta(documentAbsolutePath, { 
+    audioFileName: fileName,
+    recordings: updatedRecordings
+  });
+  
   console.info("[Audio] saveDocumentAudioFile:complete", {
     absoluteTarget,
     fileName,
-    mtimeMs: stats.mtimeMs
+    mtimeMs: stats.mtimeMs,
+    recordingId
   });
   return {
     fileName,
-    version: Math.floor(stats.mtimeMs).toString(36)
+    version,
+    recordingId,
+    audioUrl,
+    recording: newRecording
   };
 }
 
@@ -654,6 +715,7 @@ app.get("/api/document", async (req, res) => {
       completed: Boolean(meta.completed),
       audioUrl,
       audioFileName: meta.audioFileName ?? null,
+      recordings: meta.recordings || null,
       transcription: transcription || null
     });
   } catch (error) {
@@ -721,11 +783,13 @@ app.post(
   upload.single("audio"),
   async (req, res) => {
     try {
-      const { path: relative } = req.body ?? {};
+      const { path: relative, append } = req.body ?? {};
+      const shouldAppend = append === "true" || append === true;
       console.info("[Audio] Incoming upload", {
         relative,
         mimeType: req.file?.mimetype,
-        size: req.file?.size
+        size: req.file?.size,
+        append: shouldAppend
       });
       if (typeof relative !== "string") {
         console.warn("[Audio] Missing document path in request body");
@@ -745,23 +809,26 @@ app.post(
       }
       console.info("[Audio] Saving recording", {
         documentPath,
-        bytes: req.file.size
+        bytes: req.file.size,
+        append: shouldAppend
       });
-      const { fileName, version } = await saveDocumentAudioFile(
+      const { fileName, version, recordingId, audioUrl, recording } = await saveDocumentAudioFile(
         documentPath,
-        req.file
+        req.file,
+        shouldAppend
       );
       console.info("[Audio] Saved recording", {
         relative,
         fileName,
-        version
+        version,
+        recordingId
       });
       res.json({
         success: true,
-        audioUrl: `/api/document/audio?path=${encodeURIComponent(
-          toPosix(relative)
-        )}&v=${version}`,
-        audioFileName: fileName
+        audioUrl: audioUrl,
+        audioFileName: fileName,
+        recordingId,
+        recording
       });
     } catch (error) {
       console.error("[Audio] Failed to save recording", {

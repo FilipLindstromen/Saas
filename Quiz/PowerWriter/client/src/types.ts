@@ -20,6 +20,7 @@ export type WordTimestamp = {
   word: string;
   start: number;
   end: number;
+  recordingId?: string; // ID of the recording this word came from
 };
 
 export type SegmentTimestamp = {
@@ -43,6 +44,18 @@ export type Transcription = {
   segments: SegmentTimestamp[];
 };
 
+export type Recording = {
+  id: string;
+  audioUrl: string;
+  videoUrl?: string | null;
+  audioFileName: string;
+  videoFileName?: string | null;
+  type: "audio" | "audio+video";
+  createdAt: number;
+  transcription?: Transcription | null;
+  color?: string; // Color for word backgrounds from this recording
+};
+
 export type DocumentDetails = {
   path: string;
   name: string;
@@ -50,8 +63,10 @@ export type DocumentDetails = {
   instructions: string;
   aggregatedInstructions: string;
   completed: boolean;
-  audioUrl: string | null;
-  audioFileName: string | null;
+  audioUrl: string | null; // Legacy - for backward compatibility
+  audioFileName: string | null; // Legacy
+  videoUrl?: string | null; // Legacy
+  recordings?: Recording[]; // New: array of recordings
   transcription: Transcription | null;
 };
 
