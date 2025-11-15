@@ -249,6 +249,18 @@ export async function uploadDocumentAudio(
   return { audioUrl: result.audioUrl, audioFileName: result.audioFileName };
 }
 
+export async function saveDocumentTranscription(
+  path: string,
+  transcription: Transcription
+): Promise<{ success: true }> {
+  const response = await fetch("/api/document/transcription", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ path, transcription })
+  });
+  return handleResponse<{ success: true }>(response);
+}
+
 export async function transcribeDocumentAudio(
   path: string,
   apiKey?: string
