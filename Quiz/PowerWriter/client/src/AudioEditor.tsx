@@ -90,6 +90,7 @@ type Pause = {
   duration: number;
   beforeWordIndex: number;
   afterWordIndex: number;
+  deleted?: boolean;
 };
 
 export function AudioEditor({
@@ -119,6 +120,7 @@ export function AudioEditor({
     useState<Transcription | null>(transcription);
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(new Set());
   const [selectedPauseIds, setSelectedPauseIds] = useState<Set<string>>(new Set());
+  const [deletedPauseIds, setDeletedPauseIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartId, setDragStartId] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -141,15 +143,28 @@ export function AudioEditor({
 
   useEffect(() => {
     if (transcription) {
-      // Store original indices in the transcription words
+      // Restore deleted state from transcription words
       const transcriptionWithIndices = {
         ...transcription,
         words: transcription.words.map((word, index) => ({
           ...word,
-          originalIndex: index
+          originalIndex: (word as any).originalIndex !== undefined ? (word as any).originalIndex : index,
+          deleted: (word as any).deleted || false
         }))
       };
       setCurrentTranscription(transcriptionWithIndices as any);
+      
+      // Restore deleted pause IDs from localStorage
+      try {
+        const savedDeletedPauses = localStorage.getItem(`deletedPauses_${documentPath}`);
+        if (savedDeletedPauses) {
+          const pauseIds = JSON.parse(savedDeletedPauses) as string[];
+          setDeletedPauseIds(new Set(pauseIds));
+        }
+      } catch (e) {
+        console.warn("Failed to load deleted pause IDs:", e);
+      }
+      
       // Initialize history with the original transcription
       const initialState: TranscriptionState = {
         words: transcription.words || [],
@@ -163,7 +178,7 @@ export function AudioEditor({
       setSelectedWordIds(new Set());
       setSelectedPauseIds(new Set());
     }
-  }, [transcription]);
+  }, [transcription, documentPath]);
 
   // Save state to history when transcription changes
   const saveToHistory = useCallback((state: TranscriptionState) => {
@@ -718,31 +733,51 @@ export function AudioEditor({
     if (selectedWordIds.size === 0 && selectedPauseIds.size === 0) return;
     if (!currentTranscription) return;
 
-    // Map block IDs to word indices
+    // Toggle deletion for words
     const blockIdToWordIndex = new Map<string, number>();
     wordBlocks.forEach((block, index) => {
       blockIdToWordIndex.set(block.id, index);
     });
 
-    // Get indices of words to mark as deleted
-    const wordIndicesToDelete = new Set<number>();
+    // Check which selected words are already deleted
+    const selectedWordIndices = new Set<number>();
+    const selectedWordsAlreadyDeleted = new Set<string>();
     selectedWordIds.forEach(blockId => {
       const wordIndex = blockIdToWordIndex.get(blockId);
       if (wordIndex !== undefined) {
-        wordIndicesToDelete.add(wordIndex);
+        selectedWordIndices.add(wordIndex);
+        const word = currentTranscription.words[wordIndex];
+        if (word && (word as any).deleted) {
+          selectedWordsAlreadyDeleted.add(blockId);
+        }
       }
     });
 
-    // Mark words as deleted instead of removing them
+    // Toggle deletion for words - if already deleted, restore them
     const updatedWords = currentTranscription.words.map((word, index) => {
-      if (wordIndicesToDelete.has(index)) {
-        return {
-          ...word,
-          deleted: true,
-          originalIndex: (word as any).originalIndex !== undefined 
-            ? (word as any).originalIndex 
-            : index
-        } as any;
+      if (selectedWordIndices.has(index)) {
+        const blockId = wordBlocks[index]?.id;
+        const isAlreadyDeleted = blockId && selectedWordsAlreadyDeleted.has(blockId);
+        
+        if (isAlreadyDeleted) {
+          // Restore word
+          const { deleted, ...rest } = word as any;
+          return {
+            ...rest,
+            originalIndex: (word as any).originalIndex !== undefined 
+              ? (word as any).originalIndex 
+              : index
+          } as any;
+        } else {
+          // Delete word
+          return {
+            ...word,
+            deleted: true,
+            originalIndex: (word as any).originalIndex !== undefined 
+              ? (word as any).originalIndex 
+              : index
+          } as any;
+        }
       }
       return word;
     });
@@ -753,6 +788,18 @@ export function AudioEditor({
       setTranscriptionError("Cannot delete all words");
       return;
     }
+
+    // Toggle deletion for pauses
+    const updatedDeletedPauseIds = new Set(deletedPauseIds);
+    selectedPauseIds.forEach(pauseId => {
+      if (updatedDeletedPauseIds.has(pauseId)) {
+        // Restore pause
+        updatedDeletedPauseIds.delete(pauseId);
+      } else {
+        // Delete pause
+        updatedDeletedPauseIds.add(pauseId);
+      }
+    });
 
     // Update transcription - keep all words but mark some as deleted
     const updated: Transcription = {
@@ -777,11 +824,21 @@ export function AudioEditor({
 
     // Update state
     setCurrentTranscription(updated);
+    setDeletedPauseIds(updatedDeletedPauseIds);
     setSelectedWordIds(new Set());
     setSelectedPauseIds(new Set());
+    
+    // Save deleted pause IDs to localStorage
+    try {
+      localStorage.setItem(`deletedPauses_${documentPath}`, JSON.stringify(Array.from(updatedDeletedPauseIds)));
+    } catch (e) {
+      console.warn("Failed to save deleted pause IDs:", e);
+    }
+    
+    // Auto-save transcription with deleted flags
     onTranscriptionUpdate?.(updated);
     setTranscriptionError(null);
-  }, [selectedWordIds, selectedPauseIds, wordBlocks, currentTranscription, onTranscriptionUpdate, saveToHistory]);
+  }, [selectedWordIds, selectedPauseIds, wordBlocks, currentTranscription, onTranscriptionUpdate, saveToHistory, deletedPauseIds, documentPath]);
 
   const handleAdjustPause = useCallback((pauseId: string, newDuration: number) => {
     const pause = pauses.find((p) => p.id === pauseId);
@@ -862,18 +919,6 @@ export function AudioEditor({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo (Ctrl/Cmd + Z)
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
-      // Redo (Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y)
-      if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === "z") || e.key === "y")) {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
       // Delete or Backspace key
       if ((e.key === "Delete" || e.key === "Backspace") && (selectedWordIds.size > 0 || selectedPauseIds.size > 0)) {
         e.preventDefault();
@@ -889,7 +934,7 @@ export function AudioEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedWordIds, selectedPauseIds, handleDeleteSelected, handleUndo, handleRedo]);
+  }, [selectedWordIds, selectedPauseIds, handleDeleteSelected]);
 
   const pauseTimeoutRef = useRef<number | null>(null);
 
@@ -1162,8 +1207,16 @@ export function AudioEditor({
           if (firstOriginalIndex === lastOriginalIndex + 1) {
             // Consecutive words - check original gap
             const originalGap = firstWordInNextSegment.originalStart - lastWordInSegment.originalEnd;
-            if (originalGap > pauseThreshold) {
-              // Natural pause in original audio
+            
+            // Check if there's a pause between these words and if it's deleted
+            const lastWordBlockIndex = wordBlocks.findIndex(b => b.index === lastOriginalIndex);
+            const pauseBetween = pauses.find(p => 
+              p.beforeWordIndex === lastWordBlockIndex &&
+              !deletedPauseIds.has(p.id)
+            );
+            
+            if (originalGap > pauseThreshold && pauseBetween) {
+              // Natural pause in original audio and it's not deleted
               playbackTimeline.push({
                 type: 'pause',
                 duration: originalGap,
@@ -1172,7 +1225,8 @@ export function AudioEditor({
                 id: `pause-after-segment-${i}`
               });
               currentPlaybackTime += originalGap;
-            } else if (originalGap > 0.01) {
+            } else if (originalGap > 0.01 && !pauseBetween) {
+              // Small gap without a pause (or pause is deleted)
               currentPlaybackTime += originalGap;
             }
           }
@@ -1349,7 +1403,7 @@ export function AudioEditor({
       setTranscriptionError("Failed to preview audio: " + (error instanceof Error ? error.message : "Unknown error"));
       setIsPreviewing(false);
     }
-  }, [currentTranscription, selectedWordIds, isPreviewing, handleStopPreview, originalWordTimestamps, wordBlocks, pauses, pauseThreshold]);
+  }, [currentTranscription, selectedWordIds, isPreviewing, handleStopPreview, originalWordTimestamps, wordBlocks, pauses, pauseThreshold, deletedPauseIds]);
 
   const handleAiStudioSound = useCallback(async () => {
     if (!documentPath || !audioUrl) {
@@ -1619,28 +1673,6 @@ export function AudioEditor({
                   <div className="audio-editor-controls-row">
                     <button
                       className="audio-editor-icon-button"
-                      onClick={handleUndo}
-                      disabled={!canUndo}
-                      title="Undo (Ctrl/Cmd + Z)"
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 7v6h6" />
-                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-                      </svg>
-                    </button>
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={handleRedo}
-                      disabled={!canRedo}
-                      title="Redo (Ctrl/Cmd + Shift + Z)"
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 7v6h-6" />
-                        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-                      </svg>
-                    </button>
-                    <button
-                      className="audio-editor-icon-button"
                       onClick={isPreviewing ? handleStopPreview : handlePreview}
                       disabled={wordBlocks.length === 0}
                       title={isPreviewing ? "Stop preview" : "Preview edited audio"}
@@ -1753,6 +1785,7 @@ export function AudioEditor({
                 (p) => p.beforeWordIndex === index
               ) || null;
               const isPauseSelected = pauseAfter && selectedPauseIds.has(pauseAfter.id);
+              const isPauseDeleted = pauseAfter && deletedPauseIds.has(pauseAfter.id);
               // Line break for document line breaks (always) OR long pauses
               const shouldBreakLine = (index < wordBlocks.length - 1 && lineBreakIndicesSimple.has(index)) ||
                                      (pauseAfter && pauseAfter.duration >= 1.0);
@@ -1765,7 +1798,8 @@ export function AudioEditor({
                     className={clsx("audio-editor-word-block", {
                       "audio-editor-word-selected": isSelected,
                       "audio-editor-word-retake": isRetake,
-                      "audio-editor-word-current": isCurrentlyPlaying
+                      "audio-editor-word-current": isCurrentlyPlaying,
+                      "audio-editor-word-deleted": isDeleted
                     })}
                     style={isDeleted ? { opacity: 0.2 } : undefined}
                     onMouseDown={(e) => handleWordMouseDown(block.id, e)}
@@ -1779,6 +1813,7 @@ export function AudioEditor({
                       className={clsx("audio-editor-pause-block", {
                         "audio-editor-pause-selected": isPauseSelected
                       })}
+                      style={isPauseDeleted ? { opacity: 0.2 } : undefined}
                       onClick={(e) => {
                         e.preventDefault();
                         if (e.shiftKey || e.metaKey || e.ctrlKey) {
@@ -1796,7 +1831,7 @@ export function AudioEditor({
                           setSelectedWordIds(new Set());
                         }
                       }}
-                      title={`Pause: ${pauseAfter.duration.toFixed(2)}s (${formatTime(pauseAfter.start)} - ${formatTime(pauseAfter.end)})`}
+                      title={`Pause: ${pauseAfter.duration.toFixed(2)}s (${formatTime(pauseAfter.start)} - ${formatTime(pauseAfter.end)})${isPauseDeleted ? " (Deleted)" : ""}`}
                     >
                       <span className="audio-editor-pause-duration">
                         {pauseAfter.duration.toFixed(2)}s

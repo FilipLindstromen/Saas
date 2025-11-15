@@ -899,6 +899,28 @@ app.post(
   }
 );
 
+app.post("/api/document/transcription", async (req, res) => {
+  try {
+    const { path: relative, transcription } = req.body;
+    if (typeof relative !== "string") {
+      return res.status(400).send("Missing document path");
+    }
+    if (!transcription) {
+      return res.status(400).send("Missing transcription");
+    }
+    const documentPath = resolveMeditationPath(relative);
+    await writeTranscription(documentPath, transcription);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Transcription] Failed to save transcription", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    res.status(500).send(
+      error instanceof Error ? error.message : "Unable to save transcription"
+    );
+  }
+});
+
 app.post("/api/document/transcribe", async (req, res) => {
   try {
     const { path: relative } = req.body;

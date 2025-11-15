@@ -2691,10 +2691,17 @@ export default function App() {
                   apiKey={userApiKey || undefined}
                   onTranscriptionUpdate={(transcription) => {
                     if (documentDetails) {
-                      setDocumentDetails({
+                      const updatedDetails = {
                         ...documentDetails,
                         transcription
-                      });
+                      };
+                      setDocumentDetails(updatedDetails);
+                      // Auto-save document when transcription is updated
+                      if (selected?.type === "document" && selected.path === documentDetails.path) {
+                        const snapshot = toDocumentSnapshot(updatedDetails);
+                        // Trigger save
+                        void performDocumentSave(documentDetails.path, snapshot);
+                      }
                     }
                   }}
                   isRecordingAudio={isRecordingAudio}
