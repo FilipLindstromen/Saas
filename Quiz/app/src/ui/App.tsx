@@ -20,6 +20,7 @@ import { BackgroundRenderer } from '../components/BackgroundRenderer'
 import { SequencePreview } from '../components/SequencePreview'
 import { createTestAudio } from '../utils/testAudio'
 import { TransparentTextarea } from '../components/TransparentTextarea'
+import { generateVoiceOverFromOpenAI } from '../services/voiceApi'
 
 export function App() {
   const {
@@ -66,6 +67,9 @@ export function App() {
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false)
   const [openaiApiKey, setOpenaiApiKey] = useState(() => localStorage.getItem('openaiApiKey') || '')
   const [showAIModal, setShowAIModal] = useState(false)
+  const [isGeneratingVoiceOvers, setIsGeneratingVoiceOvers] = useState(false)
+  const [voiceOverStatus, setVoiceOverStatus] = useState<string | null>(null)
+  const [selectedVoice, setSelectedVoice] = useState<string>(() => localStorage.getItem('selectedVoice') || 'alloy')
 
   // Meme AI state
   const [showMemeAIModal, setShowMemeAIModal] = useState(false)
@@ -127,6 +131,15 @@ export function App() {
     { value: 'left', label: 'Left' },
     { value: 'center', label: 'Center' },
     { value: 'right', label: 'Right' }
+  ], [])
+
+  const voiceOptions = useMemo<{ value: string; label: string }[]>(() => [
+    { value: 'alloy', label: 'Alloy (Neutral)' },
+    { value: 'echo', label: 'Echo (Male)' },
+    { value: 'fable', label: 'Fable (British)' },
+    { value: 'onyx', label: 'Onyx (Deep Male)' },
+    { value: 'nova', label: 'Nova (Female)' },
+    { value: 'shimmer', label: 'Shimmer (Soft Female)' }
   ], [])
 
   const defaultOverlaySettings = useMemo<OverlaySettings>(() => ({
@@ -728,6 +741,53 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
       alert(`Error generating questions: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsGeneratingQuestion(false)
+    }
+  }
+
+  const generateVoiceOversForQuestions = async () => {
+    if (!quiz.questions.length) {
+      alert('Add at least one question before generating voice overs.')
+      return
+    }
+    if (!openaiApiKey.trim()) {
+      alert('Please enter your OpenAI API key first.')
+      return
+    }
+
+    setIsGeneratingVoiceOvers(true)
+    setVoiceOverStatus('Starting voice-over generation...')
+
+    try {
+      for (let i = 0; i < quiz.questions.length; i++) {
+        const question = quiz.questions[i]
+        const title = question.title?.trim()
+        if (!title) {
+          continue
+        }
+        setVoiceOverStatus(`Generating voice-over ${i + 1} of ${quiz.questions.length}...`)
+        const result = await generateVoiceOverFromOpenAI(openaiApiKey, title, {
+          voice: selectedVoice,
+          format: 'mp3'
+        })
+        updateQuestion({
+          ...question,
+          voiceOver: {
+            url: result.dataUrl,
+            format: result.format,
+            voice: result.voice,
+            createdAt: Date.now()
+          }
+        })
+      }
+      setVoiceOverStatus('Voice-overs generated successfully! 🎙️')
+      setTimeout(() => setVoiceOverStatus(null), 4000)
+    } catch (error) {
+      console.error('Failed to generate voice overs:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error generating voice overs'
+      setVoiceOverStatus(message)
+      alert(message)
+    } finally {
+      setIsGeneratingVoiceOvers(false)
     }
   }
 
@@ -2014,6 +2074,48 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   </div>
                 </div>
 
+                {/* Voice Selection and Generate Button */}
+                {quiz.questions.length > 0 && (
+                  <div className="mb-3 p-3 bg-gray-100/10 rounded-lg">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-xs text-iossub mb-1">Voice</label>
+                        <select
+                          className="ios-input w-full text-sm"
+                          value={selectedVoice}
+                          onChange={(e) => {
+                            const voice = e.target.value
+                            setSelectedVoice(voice)
+                            try {
+                              localStorage.setItem('selectedVoice', voice)
+                            } catch {}
+                          }}
+                          disabled={isGeneratingVoiceOvers}
+                        >
+                          {voiceOptions.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          className="ios-card px-3 py-2 disabled:opacity-50 text-sm"
+                          onClick={generateVoiceOversForQuestions}
+                          disabled={isGeneratingVoiceOvers || quiz.questions.length === 0}
+                        >
+                          {isGeneratingVoiceOvers ? '🔄 Generating…' : '🎙 Generate Voiceovers'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {voiceOverStatus && (
+                  <div className="text-xs text-iossub mt-2">{voiceOverStatus}</div>
+                )}
+
                 <div className="space-y-2">
                   {quiz.questions.map(q => {
                     const isSelected = selectedQuestionId === q.id
@@ -2052,6 +2154,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                             <div className="text-sm">{q.title}</div>
                             <div className="flex items-center gap-2 text-xs text-iossub">
                               <span>{q.type}</span>
+                              {q.voiceOver?.url && <span title="Voice-over ready">🎙</span>}
                               <button
                                 className="text-red-400 hover:text-red-200"
                                 onClick={e => {

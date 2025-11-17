@@ -148,13 +148,16 @@ export class CanvasRecorder {
       const assets = await this.preloadAssets(quiz, onStatus)
       const timeline = computeQuizTimeline(quiz)
       const sfxEvents = this.computeSfxEvents(quiz, timeline)
+      const voiceOverEvents = this.computeVoiceOverEvents(quiz, timeline)
       const appearVolumeSetting = this.clampVolume(quiz.settings?.sfx?.appearVolume)
       const correctVolumeSetting = this.clampVolume(quiz.settings?.sfx?.correctVolume)
       const shouldAttachMusic = includeMusic && Boolean(assets.musicEl)
       const shouldIncludeSfx = sfxEvents.length > 0 && (appearVolumeSetting > 0 || correctVolumeSetting > 0)
-      const wantsAudioTrack = shouldAttachMusic || shouldIncludeSfx
+      const shouldIncludeVoiceOver = voiceOverEvents.length > 0
+      const wantsAudioTrack = shouldAttachMusic || shouldIncludeSfx || shouldIncludeVoiceOver
       const frameIntervalMs = 1000 / frameRate
       const pendingSfxEvents = shouldIncludeSfx ? [...sfxEvents] : []
+      const pendingVoiceEvents: Array<{ time: number; buffer: AudioBuffer }> = []
 
       // Create media stream from canvas and optionally add audio
       const videoStream = canvas.captureStream(frameRate)
@@ -166,9 +169,11 @@ export class CanvasRecorder {
       let musicGain: GainNode | null = null
       let appearGain: GainNode | null = null
       let correctGain: GainNode | null = null
+      let voiceGain: GainNode | null = null
       let appearBuffer: AudioBuffer | null = null
       let correctBuffer: AudioBuffer | null = null
       const sfxSources: AudioBufferSourceNode[] = []
+      const voiceSources: AudioBufferSourceNode[] = []
       let musicStartTimeout: number | null = null
 
       const cleanupCallbacks: Array<() => void> = []
@@ -221,6 +226,18 @@ export class CanvasRecorder {
             // ignore
           }
         })
+        voiceSources.forEach(source => {
+          try {
+            source.stop(0)
+          } catch {
+            // ignore
+          }
+          try {
+            source.disconnect()
+          } catch {
+            // ignore
+          }
+        })
 
         if (musicSource) {
           try {
@@ -249,6 +266,13 @@ export class CanvasRecorder {
         if (correctGain) {
           try {
             correctGain.disconnect()
+          } catch {
+            // ignore
+          }
+        }
+        if (voiceGain) {
+          try {
+            voiceGain.disconnect()
           } catch {
             // ignore
           }
@@ -299,7 +323,10 @@ export class CanvasRecorder {
         }
       }
 
-      let triggerSfxForFrame: ((frameTime: number) => void) | undefined
+      let triggerAudioEventsForFrame: ((frameTime: number) => void) | undefined
+      let triggerSfx: ((type: 'appear' | 'correct') => void) | undefined
+      let sfxIndex = 0
+      let voiceIndex = 0
 
       if (audioContext && audioDest && shouldIncludeSfx) {
         appearGain = audioContext.createGain()
@@ -320,7 +347,7 @@ export class CanvasRecorder {
         appearBuffer = loadedAppear
         correctBuffer = loadedCorrect
 
-        const triggerSfx = (type: 'appear' | 'correct') => {
+        triggerSfx = (type: 'appear' | 'correct') => {
           if (!audioContext) return
           const buffer = type === 'appear' ? appearBuffer : correctBuffer
           const gainNode = type === 'appear' ? appearGain : correctGain
@@ -337,14 +364,59 @@ export class CanvasRecorder {
           }
         }
 
-        let sfxIndex = 0
-        triggerSfxForFrame = (frameTime: number) => {
+      }
+
+      if (audioContext && audioDest && shouldIncludeVoiceOver) {
+        try {
+          voiceGain = audioContext.createGain()
+          voiceGain.gain.value = 1
+          voiceGain.connect(audioDest)
+          voiceGain.connect(audioContext.destination)
+
+          const decodedVoices = await Promise.all(
+            voiceOverEvents.map(async event => {
+              const buffer = await this.loadAudioBuffer(audioContext!, event.url)
+              return buffer ? { time: event.time, buffer } : null
+            })
+          )
+
+          decodedVoices.forEach(item => {
+            if (item) {
+              pendingVoiceEvents.push(item)
+            }
+          })
+        } catch (error) {
+          console.warn('Failed to prepare voice-over audio:', error)
+        }
+      }
+
+      if (audioContext && (shouldIncludeSfx || shouldIncludeVoiceOver)) {
+        triggerAudioEventsForFrame = (frameTime: number) => {
           if (!audioContext) return
           const lookahead = 1
-          while (sfxIndex < pendingSfxEvents.length && pendingSfxEvents[sfxIndex].time <= frameTime + lookahead) {
-            const event = pendingSfxEvents[sfxIndex]
-            triggerSfx(event.type)
-            sfxIndex++
+          if (shouldIncludeSfx && triggerSfx) {
+            while (sfxIndex < pendingSfxEvents.length && pendingSfxEvents[sfxIndex].time <= frameTime + lookahead) {
+              const event = pendingSfxEvents[sfxIndex]
+              triggerSfx(event.type)
+              sfxIndex++
+            }
+          }
+
+          if (shouldIncludeVoiceOver && voiceGain) {
+            while (voiceIndex < pendingVoiceEvents.length && pendingVoiceEvents[voiceIndex].time <= frameTime + lookahead) {
+              const event = pendingVoiceEvents[voiceIndex]
+              try {
+                const source = audioContext.createBufferSource()
+                source.buffer = event.buffer
+                source.connect(voiceGain)
+                const startAt = audioContext.currentTime + 0.01
+                source.start(startAt)
+                voiceSources.push(source)
+              } catch (error) {
+                console.warn('Failed to trigger voice-over playback:', error)
+              }
+              voiceIndex++
+            }
           }
         }
       }
@@ -438,7 +510,7 @@ export class CanvasRecorder {
               }
             }, 1000)
           },
-          triggerSfxForFrame
+          triggerAudioEventsForFrame
         )
 
         // Start background video/music playback aligned to render loop
@@ -1863,6 +1935,31 @@ export class CanvasRecorder {
     })
 
     events.sort((a, b) => a.time - b.time)
+    return events
+  }
+
+  private static computeVoiceOverEvents(
+    quiz: any,
+    timeline: ReturnType<typeof computeQuizTimeline>
+  ): Array<{ time: number; url: string }> {
+    const events: Array<{ time: number; url: string }> = []
+    const settings = quiz?.settings ?? {}
+    if (settings.animationType && settings.animationType !== 'quiz') {
+      return events
+    }
+
+    const titleDuration = timeline.showTitle ? timeline.titleDuration : 0
+    const questions = Array.isArray(quiz?.questions) ? quiz.questions : []
+
+    timeline.questionTimings.forEach((timing, index) => {
+      const question = questions[index]
+      if (!question?.voiceOver?.url) return
+      events.push({
+        time: titleDuration + timing.start,
+        url: question.voiceOver.url
+      })
+    })
+
     return events
   }
 
