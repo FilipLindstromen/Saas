@@ -71,6 +71,8 @@ type AudioEditorProps = {
   selectedRecordingId?: string | null;
   onSelectRecording?: (recordingId: string | null) => void;
   onDeleteRecording?: (recordingId: string) => void;
+  audioPlayerRef?: React.RefObject<HTMLAudioElement>;
+  hideUnifiedPlayer?: boolean;
 };
 
 type WordBlock = {
@@ -121,7 +123,9 @@ export function AudioEditor({
   recordings,
   selectedRecordingId,
   onSelectRecording,
-  onDeleteRecording
+  onDeleteRecording,
+  audioPlayerRef: externalAudioPlayerRef,
+  hideUnifiedPlayer = false
 }: AudioEditorProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(
@@ -444,6 +448,42 @@ export function AudioEditor({
       }
     };
   }, [audioUrl]);
+
+  // Sync timeline with external audio player (from App.tsx) or internal audioRef
+  useEffect(() => {
+    const audioElement = externalAudioPlayerRef?.current || audioRef.current;
+    if (!audioElement || !hasAudio || !audioUrl) return;
+
+    const updateTime = () => {
+      if (audioElement && !audioElement.paused) {
+        setTimelineCurrentTime(audioElement.currentTime);
+      }
+    };
+
+    const handleTimeUpdate = () => updateTime();
+    const handlePlay = () => updateTime();
+    const handlePause = () => updateTime();
+    const handleEnded = () => {
+      setTimelineCurrentTime(0);
+    };
+
+    audioElement.addEventListener('timeupdate', handleTimeUpdate);
+    audioElement.addEventListener('play', handlePlay);
+    audioElement.addEventListener('pause', handlePause);
+    audioElement.addEventListener('ended', handleEnded);
+
+    // Initial time
+    if (audioElement) {
+      setTimelineCurrentTime(audioElement.currentTime);
+    }
+
+    return () => {
+      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+      audioElement.removeEventListener('play', handlePlay);
+      audioElement.removeEventListener('pause', handlePause);
+      audioElement.removeEventListener('ended', handleEnded);
+    };
+  }, [audioUrl, hasAudio, externalAudioPlayerRef]);
 
   // Generate colors for recordings
   const recordingColors = useMemo(() => {
@@ -995,6 +1035,11 @@ export function AudioEditor({
     
     // Set preview flag to false immediately (using ref for immediate access in callbacks)
     isPreviewingRef.current = false;
+    // Notify listeners (e.g., captions panel) that preview stopped
+    try {
+      const evt = new CustomEvent("audioeditor:stop");
+      window.dispatchEvent(evt);
+    } catch {}
     
     // Stop audio source immediately
     if (previewSourceRef.current) {
@@ -1369,6 +1414,8 @@ export function AudioEditor({
             
             // Find which word should be highlighted based on elapsed time
             let currentWordId: string | null = null;
+          let currentWordIndex: number | null = null;
+          let currentWordText: string | null = null;
             
             for (const wordData of item.words) {
               const wordDuration = wordData.originalEnd - wordData.originalStart;
@@ -1376,11 +1423,26 @@ export function AudioEditor({
               
               if (elapsed >= wordStartInSegment && elapsed < wordStartInSegment + wordDuration) {
                 currentWordId = wordData.wordBlock.id;
+              currentWordIndex = wordData.wordBlock.index;
+              currentWordText = wordData.wordBlock.word;
                 break;
               }
             }
             
             setCurrentPlayingWordId(currentWordId);
+          // Dispatch a custom event so outer UI (video/captions panel) can highlight captions
+          if (currentWordId && currentWordIndex !== null) {
+            try {
+              const evt = new CustomEvent("audioeditor:word", {
+                detail: {
+                  id: currentWordId,
+                  index: currentWordIndex,
+                  text: currentWordText
+                }
+              });
+              window.dispatchEvent(evt);
+            } catch {}
+          }
             
             // Continue updating
             if (isPreviewingRef.current) {
@@ -1409,6 +1471,10 @@ export function AudioEditor({
             
             // Clear word highlight when segment ends
             setCurrentPlayingWordId(null);
+            try {
+              const evt = new CustomEvent("audioeditor:word", { detail: { id: null, index: -1, text: "" } });
+              window.dispatchEvent(evt);
+            } catch {}
             // Move to next item
             currentItemIndex++;
             // Use setTimeout to ensure smooth transition
@@ -1644,37 +1710,94 @@ export function AudioEditor({
         <div className="audio-editor-error">{transcriptionError}</div>
       )}
 
-      {/* Unified Controls Panel - Recording at top, Editing at bottom */}
-      <div className="audio-editor-unified-panel">
-        {/* Recording Section - Top (only show if recording props are provided) */}
-        {onStartRecording && (
-        <div className="audio-editor-recording-section">
-          <div className="audio-editor-recording-header">
+      {/* Unified Timeline and Controls Panel */}
+      {onStartRecording && !hideUnifiedPlayer && (
+        <div className="audio-editor-unified-player">
+          {/* Header with Take selector and Delete button */}
+          <div className="audio-editor-player-header">
             <span className="audio-editor-recording-label">Recording</span>
-            {/* Takes selector */}
-            {recordings && recordings.length > 0 && (
-              <select
-                value={selectedRecordingId || ""}
-                onChange={(e) => onSelectRecording?.(e.target.value || null)}
-                title="Select take"
-                style={{ marginLeft: 8, padding: "2px 6px", background: "var(--field-bg)", border: "1px solid var(--field-border)", borderRadius: 4, color: "var(--text-primary)", fontSize: 12 }}
-              >
-                <option value="">All Takes</option>
-                {recordings.map((r, i) => (
-                  <option key={r.id} value={r.id}>{`Take ${i + 1}`}</option>
-                ))}
-              </select>
-            )}
-            {isRecordingAudio && (
-              <span className="audio-editor-recording-status recording">
-                {formattedRecordingTime}
-              </span>
-            )}
-            {!isRecordingAudio && hasAudio && (
-              <span className="audio-editor-recording-status ready">Ready</span>
-            )}
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {/* Takes selector */}
+              {recordings && recordings.length > 0 && (
+                <>
+                  <select
+                    value={selectedRecordingId || ""}
+                    onChange={(e) => onSelectRecording?.(e.target.value || null)}
+                    title="Select take"
+                    className="audio-editor-take-selector"
+                  >
+                    <option value="">All Takes</option>
+                    {recordings.map((r, i) => (
+                      <option key={r.id} value={r.id}>{`Take ${i + 1}`}</option>
+                    ))}
+                  </select>
+                  {selectedRecordingId && onDeleteRecording && (
+                    <button
+                      type="button"
+                      className="audio-editor-delete-take-button"
+                      onClick={async () => {
+                        if (!selectedRecordingId) return;
+                        if (confirm("Delete this take?")) {
+                          onDeleteRecording(selectedRecordingId);
+                        }
+                      }}
+                      title="Delete selected take"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )}
+              {isRecordingAudio && (
+                <span className="audio-editor-recording-status recording">
+                  {formattedRecordingTime}
+                </span>
+              )}
+              {!isRecordingAudio && hasAudio && (
+                <span className="audio-editor-recording-status ready">Ready</span>
+              )}
+            </div>
           </div>
-          <div className="audio-editor-recording-controls">
+
+          {/* Timeline */}
+          {hasAudio && duration > 0 && (
+            <div className="audio-editor-timeline-wrapper">
+              <div 
+                className="audio-editor-timeline"
+                onClick={(e) => {
+                  const audioElement = externalAudioPlayerRef?.current || audioRef.current;
+                  if (!audioElement || !duration) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const percentage = Math.max(0, Math.min(1, x / rect.width));
+                  const newTime = percentage * duration;
+                  audioElement.currentTime = newTime;
+                  setTimelineCurrentTime(newTime);
+                }}
+              >
+                <div 
+                  className="audio-editor-timeline-progress"
+                  style={{ width: `${duration > 0 ? (timelineCurrentTime / duration) * 100 : 0}%` }}
+                />
+                <div 
+                  className="audio-editor-timeline-playhead"
+                  style={{ left: `${duration > 0 ? (timelineCurrentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="audio-editor-timeline-time">
+                <span>{formatTime(timelineCurrentTime)}</span>
+                <span style={{ color: "var(--text-secondary)" }}> / {formatTime(duration)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Playback Controls */}
+          <div className="audio-editor-player-controls">
             <button
               className="audio-editor-icon-button"
               onClick={() => onStartRecording?.()}
@@ -1716,6 +1839,7 @@ export function AudioEditor({
               <IconRewind className="audio-editor-icon" />
             </button>
           </div>
+
           {recordingFileName && !isRecordingAudio && (
             <div className="audio-editor-recording-filename">
               {recordingFileName}
@@ -1724,115 +1848,114 @@ export function AudioEditor({
         </div>
         )}
 
-        {/* Editing Section - Bottom */}
-        {(hasTranscription || audioUrl) && (
-          <>
-            <div className="audio-editor-section-divider" />
-            <div className="audio-editor-editing-section">
-              <h2 className="audio-editor-title">Audio Editing</h2>
-              {!hasTranscription && audioUrl && (
-                <div className="audio-editor-message-inline">
+      {/* Editing Section - Bottom */}
+      {(hasTranscription || audioUrl) && (
+        <div className="audio-editor-unified-panel">
+          <div className="audio-editor-section-divider" />
+          <div className="audio-editor-editing-section">
+            <h2 className="audio-editor-title">Audio Editing</h2>
+            {!hasTranscription && audioUrl && (
+              <div className="audio-editor-message-inline">
+                <button
+                  className="audio-editor-button"
+                  onClick={handleTranscribe}
+                  disabled={isTranscribing}
+                >
+                  {isTranscribing ? "Transcribing..." : "Transcribe Audio"}
+                </button>
+              </div>
+            )}
+            {hasTranscription && (
+              <div className="audio-editor-controls-grid">
+                {/* First row of icons */}
+                <div className="audio-editor-controls-row">
                   <button
-                    className="audio-editor-button"
-                    onClick={handleTranscribe}
-                    disabled={isTranscribing}
+                    className="audio-editor-icon-button"
+                    onClick={isPreviewing ? handleStopPreview : handlePreview}
+                    disabled={wordBlocks.length === 0}
+                    title={isPreviewing ? "Stop preview" : "Preview edited audio"}
                   >
-                    {isTranscribing ? "Transcribing..." : "Transcribe Audio"}
+                    {isPreviewing ? <IconPause className="audio-editor-icon" /> : <IconPlay className="audio-editor-icon" />}
+                  </button>
+                  <button
+                    className="audio-editor-icon-button"
+                    onClick={handleTranscribe}
+                    disabled={isTranscribing || !audioUrl}
+                    title="Reset all edits and re-transcribe from original audio"
+                  >
+                    <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                      <path d="M21 3v5h-5" />
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                      <path d="M3 21v-5h5" />
+                    </svg>
+                  </button>
+                  <button
+                    className="audio-editor-icon-button"
+                    onClick={handleSaveEdits}
+                    disabled={isApplyingEdits}
+                    title={isApplyingEdits ? "Saving..." : "Save audio edits to file"}
+                  >
+                    <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                      <polyline points="17 21 17 13 7 13 7 21" />
+                      <polyline points="7 3 7 8 15 8" />
+                    </svg>
                   </button>
                 </div>
-              )}
-              {hasTranscription && (
-                <div className="audio-editor-controls-grid">
-                  {/* First row of icons */}
-                  <div className="audio-editor-controls-row">
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={isPreviewing ? handleStopPreview : handlePreview}
-                      disabled={wordBlocks.length === 0}
-                      title={isPreviewing ? "Stop preview" : "Preview edited audio"}
-                    >
-                      {isPreviewing ? <IconPause className="audio-editor-icon" /> : <IconPlay className="audio-editor-icon" />}
-                    </button>
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={handleTranscribe}
-                      disabled={isTranscribing || !audioUrl}
-                      title="Reset all edits and re-transcribe from original audio"
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                        <path d="M21 3v5h-5" />
-                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                        <path d="M3 21v-5h5" />
-                      </svg>
-                    </button>
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={handleSaveEdits}
-                      disabled={isApplyingEdits}
-                      title={isApplyingEdits ? "Saving..." : "Save audio edits to file"}
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                        <polyline points="17 21 17 13 7 13 7 21" />
-                        <polyline points="7 3 7 8 15 8" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {/* Second row of icons */}
-                  <div className="audio-editor-controls-row">
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={handleAiStudioSound}
-                      disabled={isApplyingAiSound || !audioUrl}
-                      title="Professional audio enhancement: noise reduction, EQ, compression, and normalization"
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2v20" />
-                        <path d="M2 12h20" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    </button>
-                    <button
-                      className="audio-editor-icon-button"
-                      onClick={handleExportMp3}
-                      disabled={isExportingMp3 || !audioUrl}
-                      title="Export audio as MP3 file"
-                    >
-                      <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                    </button>
-                    <label className="audio-editor-pause-threshold-inline">
-                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginRight: "8px" }}>Pause threshold:</span>
-                      <input
-                        type="number"
-                        min="0.1"
-                        max="5"
-                        step="0.1"
-                        value={pauseThreshold}
-                        onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
-                        style={{
-                          width: "60px",
-                          padding: "4px 8px",
-                          background: "var(--field-bg)",
-                          border: "1px solid var(--field-border)",
-                          borderRadius: "4px",
-                          color: "var(--text-primary)"
-                        }}
-                      />
-                      <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginLeft: "4px" }}>s</span>
-                    </label>
-                  </div>
+                
+                {/* Second row of icons */}
+                <div className="audio-editor-controls-row">
+                  <button
+                    className="audio-editor-icon-button"
+                    onClick={handleAiStudioSound}
+                    disabled={isApplyingAiSound || !audioUrl}
+                    title="Professional audio enhancement: noise reduction, EQ, compression, and normalization"
+                  >
+                    <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2v20" />
+                      <path d="M2 12h20" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    className="audio-editor-icon-button"
+                    onClick={handleExportMp3}
+                    disabled={isExportingMp3 || !audioUrl}
+                    title="Export audio as MP3 file"
+                  >
+                    <svg className="audio-editor-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  </button>
+                  <label className="audio-editor-pause-threshold-inline">
+                    <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginRight: "8px" }}>Pause threshold:</span>
+                    <input
+                      type="number"
+                      min="0.1"
+                      max="5"
+                      step="0.1"
+                      value={pauseThreshold}
+                      onChange={(e) => setPauseThreshold(parseFloat(e.target.value) || 0.5)}
+                      style={{
+                        width: "60px",
+                        padding: "4px 8px",
+                        background: "var(--field-bg)",
+                        border: "1px solid var(--field-border)",
+                        borderRadius: "4px",
+                        color: "var(--text-primary)"
+                      }}
+                    />
+                    <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginLeft: "4px" }}>s</span>
+                  </label>
                 </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {!audioUrl && !isRecordingAudio && (
         <div className="audio-editor-message">
@@ -1948,7 +2071,11 @@ export function AudioEditor({
             </div>
           </div>
 
-          <audio ref={audioRef} src={audioUrl || undefined} style={{ display: "none" }} />
+          <audio 
+            ref={audioRef} 
+            src={audioUrl || undefined} 
+            style={{ display: "none" }}
+          />
         </>
       )}
     </div>

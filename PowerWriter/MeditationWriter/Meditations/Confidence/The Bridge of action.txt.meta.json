@@ -1,0 +1,20 @@
+{
+  "completed": false,
+  "audioFileName": "The Bridge of action_2.webm",
+  "recordings": [
+    {
+      "id": "rec_1763303058754_sgl3bbxxd",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FThe%20Bridge%20of%20action.txt&file=The%20Bridge%20of%20action_1.webm&v=mi1t43sx",
+      "audioFileName": "The Bridge of action_1.webm",
+      "type": "audio",
+      "createdAt": 1763303058754
+    },
+    {
+      "id": "rec_1763303068746_snzfktrdd",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FThe%20Bridge%20of%20action.txt&file=The%20Bridge%20of%20action_2.webm&v=mi1t4big",
+      "audioFileName": "The Bridge of action_2.webm",
+      "type": "audio",
+      "createdAt": 1763303068746
+    }
+  ]
+}

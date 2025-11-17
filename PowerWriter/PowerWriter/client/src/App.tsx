@@ -24,6 +24,7 @@ import {
   uploadDocumentAudio
 } from "./api";
 import { AudioEditor } from "./AudioEditor";
+import type { Transcription } from "./types";
 
 type Selection =
   | {
@@ -276,6 +277,14 @@ const IconEyeOff = createIcon(
   <>
     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
     <line x1="1" y1="1" x2="23" y2="23" />
+  </>
+);
+const IconTrash = createIcon(
+  <>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <line x1="10" y1="11" x2="10" y2="17" />
+    <line x1="14" y1="11" x2="14" y2="17" />
   </>
 );
 
@@ -864,6 +873,200 @@ export default function App() {
     }
     return 0.32;
   });
+
+  // Captions state for Edit Studio when no video is available
+  const [captionCurrentIndex, setCaptionCurrentIndex] = useState<number | null>(null);
+  useEffect(() => {
+    const onWord = (e: any) => {
+      const idx = e?.detail?.index;
+      if (typeof idx === "number") {
+        setCaptionCurrentIndex(idx >= 0 ? idx : null);
+      }
+    };
+    const onStop = () => setCaptionCurrentIndex(null);
+    window.addEventListener("audioeditor:word", onWord);
+    window.addEventListener("audioeditor:stop", onStop);
+    return () => {
+      window.removeEventListener("audioeditor:word", onWord);
+      window.removeEventListener("audioeditor:stop", onStop);
+    };
+  }, []);
+
+  function CaptionsPanel({ transcription }: { transcription: Transcription | null }) {
+    const words = transcription?.words || [];
+    const [currentWordIndex, setCurrentWordIndex] = useState<number | null>(null);
+    
+    // Listen for word playback events from AudioEditor
+    useEffect(() => {
+      const handleWordEvent = (e: any) => {
+        const index = e?.detail?.index;
+        if (typeof index === "number" && index >= 0) {
+          setCurrentWordIndex(index);
+        } else {
+          setCurrentWordIndex(null);
+        }
+      };
+      const handleStopEvent = () => {
+        setCurrentWordIndex(null);
+      };
+      
+      window.addEventListener("audioeditor:word", handleWordEvent);
+      window.addEventListener("audioeditor:stop", handleStopEvent);
+      
+      return () => {
+        window.removeEventListener("audioeditor:word", handleWordEvent);
+        window.removeEventListener("audioeditor:stop", handleStopEvent);
+      };
+    }, []);
+    
+    // Group words into sentences for better caption display
+    const captionLines = useMemo(() => {
+      if (words.length === 0) return [];
+      
+      const lines: Array<{ words: typeof words; startIndex: number; endIndex: number }> = [];
+      let currentLine: typeof words = [];
+      let lineStartIndex = 0;
+      
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        currentLine.push(word);
+        
+        // Break line after punctuation or every ~8-10 words
+        const wordText = word.word.trim();
+        const isPunctuation = /[.!?]$/.test(wordText);
+        const shouldBreak = isPunctuation || currentLine.length >= 10;
+        
+        if (shouldBreak || i === words.length - 1) {
+          lines.push({
+            words: [...currentLine],
+            startIndex: lineStartIndex,
+            endIndex: i
+          });
+          currentLine = [];
+          lineStartIndex = i + 1;
+        }
+      }
+      
+      return lines;
+    }, [words]);
+    
+    // Find which line is currently playing
+    const currentLineIndex = useMemo(() => {
+      if (currentWordIndex === null) return null;
+      return captionLines.findIndex(
+        line => currentWordIndex >= line.startIndex && currentWordIndex <= line.endIndex
+      );
+    }, [currentWordIndex, captionLines]);
+    
+    if (words.length === 0) {
+      return (
+        <div 
+          style={{ 
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-secondary)",
+            fontSize: 14
+          }}
+        >
+          No transcription available.
+        </div>
+      );
+    }
+    
+    return (
+      <div 
+        style={{ 
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Animated Captions Overlay */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            maxWidth: "80%",
+            textAlign: "center",
+            zIndex: 10
+          }}
+        >
+          {captionLines.map((line, lineIdx) => {
+            const isActive = currentLineIndex === lineIdx;
+            // Show current line and adjacent lines, or show all if not playing
+            const isVisible = currentLineIndex === null 
+              ? true 
+              : Math.abs((currentLineIndex ?? -1) - lineIdx) <= 1;
+            
+            if (!isVisible) return null;
+            
+            return (
+              <div
+                key={`line-${lineIdx}`}
+                style={{
+                  marginBottom: lineIdx < captionLines.length - 1 ? "12px" : 0,
+                  opacity: isActive ? 1 : (currentLineIndex !== null ? 0.3 : 0.6),
+                  transform: isActive ? "scale(1)" : "scale(0.95)",
+                  transition: "opacity 300ms ease, transform 300ms ease"
+                }}
+              >
+                <div
+                  style={{
+                    display: "inline-block",
+                    padding: "12px 24px",
+                    background: isActive ? "rgba(0, 0, 0, 0.85)" : "rgba(0, 0, 0, 0.6)",
+                    borderRadius: "8px",
+                    backdropFilter: "blur(8px)",
+                    border: isActive ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.15)",
+                    boxShadow: isActive ? "0 4px 16px rgba(0, 0, 0, 0.5)" : "0 2px 8px rgba(0, 0, 0, 0.3)"
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(20px, 3vw, 36px)",
+                      fontWeight: isActive ? 600 : 400,
+                      color: "#ffffff",
+                      lineHeight: 1.4,
+                      textShadow: "0 2px 8px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8)",
+                      letterSpacing: "0.5px"
+                    }}
+                  >
+                    {line.words.map((word, wordIdx) => {
+                      const wordOriginalIndex = (word as any).originalIndex ?? (line.startIndex + wordIdx);
+                      const isWordActive = isActive && currentWordIndex === wordOriginalIndex;
+                      
+                      return (
+                        <span
+                          key={`word-${lineIdx}-${wordIdx}`}
+                          style={{
+                            color: isWordActive ? "#60a5fa" : "#ffffff",
+                            fontWeight: isWordActive ? 700 : (isActive ? 600 : 400),
+                            transition: "color 150ms ease, font-weight 150ms ease",
+                            marginRight: "4px"
+                          }}
+                        >
+                          {word.word}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   const audioEditorRef = useRef<HTMLDivElement | null>(null);
   const [inlineEditorRatio, setInlineEditorRatio] = useState(
     getInitialInlineEditorRatio
@@ -879,6 +1082,7 @@ export default function App() {
   const videoChunksRef = useRef<Blob[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const editStudioVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const shouldDiscardRecordingRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -887,6 +1091,9 @@ export default function App() {
   const recordingStartRef = useRef<number | null>(null);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingFileName, setRecordingFileName] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const formattedElapsed = useMemo(() => {
     const minutes = Math.floor(recordingElapsed / 60)
       .toString()
@@ -1060,8 +1267,125 @@ export default function App() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       audioPlayerRef.current.load();
+      setAudioCurrentTime(0);
+      setAudioDuration(0);
     }
   }, [audioUrl]);
+
+  // Track audio duration and current time
+  useEffect(() => {
+    const audioElement = audioPlayerRef.current;
+    if (!audioElement || !audioUrl) return;
+
+    const updateTime = () => {
+      const currentTime = audioElement.currentTime;
+      setAudioCurrentTime(currentTime);
+      // Sync video with audio
+      if (videoPreviewRef.current && (videoUrl || documentDetails?.videoUrl)) {
+        const videoElement = videoPreviewRef.current;
+        if (videoElement.src && Math.abs(videoElement.currentTime - currentTime) > 0.1) {
+          videoElement.currentTime = currentTime;
+        }
+      }
+    };
+
+    const updateDuration = () => {
+      setAudioDuration(audioElement.duration || 0);
+    };
+
+    const handlePlay = () => {
+      updateTime();
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      updateTime();
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      setAudioCurrentTime(0);
+      setIsPlaying(false);
+      // Also stop video if it exists
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.pause();
+        videoPreviewRef.current.currentTime = 0;
+      }
+    };
+
+    audioElement.addEventListener('timeupdate', updateTime);
+    audioElement.addEventListener('loadedmetadata', updateDuration);
+    audioElement.addEventListener('durationchange', updateDuration);
+    audioElement.addEventListener('play', handlePlay);
+    audioElement.addEventListener('pause', handlePause);
+    audioElement.addEventListener('ended', handleEnded);
+
+    // Initial values
+    updateDuration();
+    updateTime();
+
+    return () => {
+      audioElement.removeEventListener('timeupdate', updateTime);
+      audioElement.removeEventListener('loadedmetadata', updateDuration);
+      audioElement.removeEventListener('durationchange', updateDuration);
+      audioElement.removeEventListener('play', handlePlay);
+      audioElement.removeEventListener('pause', handlePause);
+      audioElement.removeEventListener('ended', handleEnded);
+    };
+  }, [audioUrl, videoUrl, documentDetails?.videoUrl]);
+
+  // Handle video URL changes and ensure video loads properly (including when take is selected)
+  // This effect specifically handles Recording Studio mode
+  useEffect(() => {
+    // Only handle video loading in Recording Studio mode
+    if (currentMode !== "recording") return;
+    
+    const videoElement = videoPreviewRef.current;
+    if (!videoElement) {
+      console.log("Recording Studio: Video element not found in ref");
+      return;
+    }
+    
+    const videoSrc = videoUrl || documentDetails?.videoUrl;
+    
+    // If we're not recording and have a video URL, ensure video is set up
+    if (!isRecordingAudio && videoSrc && recordingType === "audio+video") {
+      // Always clear srcObject first to ensure recorded video can play
+      if (videoElement.srcObject) {
+        console.log("Recording Studio: Clearing srcObject");
+        videoElement.srcObject = null;
+        videoElement.pause();
+      }
+      
+      // Get the full URL (handle both relative and absolute URLs)
+      const currentSrc = videoElement.src || videoElement.getAttribute('src') || '';
+      const srcToSet = videoSrc.startsWith('http') || videoSrc.startsWith('/') || videoSrc.startsWith('blob:')
+        ? videoSrc
+        : `/${videoSrc}`;
+      
+      // Always reload when src changes (e.g., when a different take is selected)
+      if (currentSrc !== srcToSet) {
+        console.log("Recording Studio: Setting video src and loading", {
+          currentSrc,
+          srcToSet,
+          selectedRecordingId,
+          videoElementVisible: videoElement.offsetParent !== null
+        });
+        videoElement.src = srcToSet;
+        videoElement.load();
+      } else {
+        console.log("Recording Studio: Video src unchanged, but ensuring it's loaded", {
+          src: srcToSet,
+          readyState: videoElement.readyState,
+          selectedRecordingId
+        });
+        // Even if src is the same, ensure video is loaded
+        if (videoElement.readyState < 2) {
+          videoElement.load();
+        }
+      }
+    }
+  }, [videoUrl, documentDetails?.videoUrl, isRecordingAudio, recordingType, selectedRecordingId, currentMode]);
 
   useEffect(() => {
     if (!isRecordingAudio) return;
@@ -1214,8 +1538,8 @@ export default function App() {
         videoStreamRef.current = stream;
       }
       
-      // Set up video preview if recording video and preview is enabled
-      if (recordingType === "audio+video" && showVideoPreview && videoPreviewRef.current) {
+      // Set up video preview if recording video
+      if (recordingType === "audio+video" && videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = stream;
         videoPreviewRef.current.play().catch(console.error);
       }
@@ -1263,6 +1587,15 @@ export default function App() {
         const discard = shouldDiscardRecordingRef.current;
         shouldDiscardRecordingRef.current = false;
         stopMediaStream();
+        
+        // Explicitly clear video preview srcObject and pause to ensure recorded video can load
+        if (videoPreviewRef.current && recordingType === "audio+video") {
+          videoPreviewRef.current.srcObject = null;
+          videoPreviewRef.current.pause();
+          videoPreviewRef.current.currentTime = 0;
+          console.log("[Recorder] Cleared video preview srcObject after recording stop");
+        }
+        
         const chunks = recordingType === "audio+video" 
           ? videoChunksRef.current.slice() 
           : audioChunksRef.current.slice();
@@ -1283,11 +1616,6 @@ export default function App() {
         }
         setIsRecordingAudio(false);
         clearRecordingTimer();
-        
-        // Clear video preview
-        if (videoPreviewRef.current) {
-          videoPreviewRef.current.srcObject = null;
-        }
         
         if (discard || chunks.length === 0) {
           if (!discard && chunks.length === 0) {
@@ -1319,6 +1647,19 @@ export default function App() {
           // For now, use the same blob for audio (will be separated on server)
           localAudioUrlRef.current = previewUrl;
           setAudioUrl(previewUrl);
+          
+          // Set the video element src to the preview URL after a short delay
+          // to ensure the element is ready and srcObject is cleared
+          setTimeout(() => {
+            if (videoPreviewRef.current && !videoPreviewRef.current.srcObject) {
+              const videoElement = videoPreviewRef.current;
+              if (videoElement.src !== previewUrl) {
+                videoElement.src = previewUrl;
+                videoElement.load();
+                console.log("[Recorder] Set video element src to preview URL", previewUrl);
+              }
+            }
+          }, 50);
         } else {
           if (localAudioUrlRef.current) {
             URL.revokeObjectURL(localAudioUrlRef.current);
@@ -1425,20 +1766,70 @@ export default function App() {
       .play()
       .then(() => {
         setAudioError(null);
+        setIsPlaying(true);
+        // Also play video if it exists
+        const audioEl = audioPlayerRef.current;
+        if (videoPreviewRef.current && audioEl && (videoUrl || documentDetails?.videoUrl) && recordingType === "audio+video") {
+          const videoElement = videoPreviewRef.current;
+          
+          // Clear srcObject if it exists (from live preview)
+          if (videoElement.srcObject) {
+            videoElement.srcObject = null;
+          }
+          
+          // Ensure src is set
+          const videoSrc = videoUrl || documentDetails?.videoUrl;
+          if (videoSrc && !videoElement.src && !videoElement.getAttribute('src')) {
+            videoElement.src = videoSrc;
+            videoElement.load();
+          }
+          
+          // Wait for video to be ready, then play
+          const tryPlayVideo = () => {
+            if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA or better
+              videoElement.currentTime = audioEl.currentTime;
+              videoElement.play().catch((err) => {
+                console.error("Error playing video:", err);
+              });
+            } else {
+              videoElement.addEventListener('loadeddata', () => {
+                videoElement.currentTime = audioEl.currentTime;
+                videoElement.play().catch((err) => {
+                  console.error("Error playing video:", err);
+                });
+              }, { once: true });
+              videoElement.load();
+            }
+          };
+          
+          tryPlayVideo();
+        }
       })
       .catch(() => {
         setAudioError("Unable to play audio. Try downloading instead.");
+        setIsPlaying(false);
       });
-  }, []);
+  }, [videoUrl, documentDetails?.videoUrl]);
 
   const handlePauseAudio = useCallback(() => {
     audioPlayerRef.current?.pause();
+    setIsPlaying(false);
+    // Also pause video if it exists
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.pause();
+    }
   }, []);
 
   const handleRewindAudio = useCallback(() => {
     if (!audioPlayerRef.current) return;
     audioPlayerRef.current.pause();
     audioPlayerRef.current.currentTime = 0;
+    setIsPlaying(false);
+    // Also rewind video if it exists
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.pause();
+      videoPreviewRef.current.currentTime = 0;
+    }
   }, []);
 
   const previousDocumentPathRef = useRef<string | null>(null);
@@ -3097,7 +3488,6 @@ export default function App() {
                           const recording = documentDetails.recordings?.find(r => r.id === selectedRecordingId);
                           if (!recording) return;
                           if (confirm(`Delete this recording?`)) {
-                            // TODO: Call API to delete recording
                             const updatedRecordings = documentDetails.recordings?.filter(r => r.id !== selectedRecordingId) || [];
                             const updatedDetails = {
                               ...documentDetails,
@@ -3117,11 +3507,15 @@ export default function App() {
                           borderRadius: "4px",
                           color: "var(--error-text, #dc2626)",
                           cursor: "pointer",
-                          fontSize: "12px"
+                          fontSize: "12px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
                         }}
                         title="Delete selected recording"
                       >
-                        Delete
+                        <IconTrash size={14} />
+                        <span>Delete</span>
                       </button>
                     )}
                   </div>
@@ -3167,13 +3561,14 @@ export default function App() {
                     const snapshot = toDocumentSnapshot(updatedDetails);
                     void performDocumentSave(documentDetails.path, snapshot);
                   }}
+                  audioPlayerRef={audioPlayerRef}
                 />
               </div>
             </section>
           ) : null}
 
-          {/* Resizer between Audio Editor and Video Panel in Edit Studio */}
-          {currentMode === "editing" && audioEditorVisible && (videoUrl || documentDetails?.videoUrl) && (
+          {/* Resizer between Audio Editor and Video/Captions Panel in Edit Studio */}
+          {currentMode === "editing" && audioEditorVisible && (
             <div
               className="resizer resizer-vertical panel-resizer audio-editor-resizer"
               onMouseDown={() => setDraggingResizer("audioEditor")}
@@ -3182,8 +3577,8 @@ export default function App() {
             />
           )}
 
-          {/* Edit Studio - Video Preview (Right Panel) */}
-          {currentMode === "editing" && (videoUrl || documentDetails?.videoUrl) && (
+          {/* Edit Studio - Video or Captions (Right Panel) */}
+          {currentMode === "editing" && (
             <section
               className="video-preview-panel"
               style={{
@@ -3209,16 +3604,47 @@ export default function App() {
                     overflow: "hidden"
                   }}
                 >
-                  <video
-                    ref={videoPreviewRef}
-                    src={videoUrl || documentDetails?.videoUrl || undefined}
-                    controls
+                  {/* Video element - only show if video exists */}
+                  {(videoUrl || documentDetails?.videoUrl) && (
+                    <video
+                      ref={editStudioVideoRef}
+                      key={`edit-studio-video-${selectedRecordingId || 'none'}-${videoUrl || documentDetails?.videoUrl || 'none'}`}
+                      src={videoUrl || documentDetails?.videoUrl || undefined}
+                      controls
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 1
+                      }}
+                      onLoadedData={() => {
+                        console.log("Edit Studio: Video loaded successfully", {
+                          src: videoUrl || documentDetails?.videoUrl,
+                          selectedRecordingId
+                        });
+                      }}
+                      onError={(e) => {
+                        console.error("Edit Studio: Video playback error:", e, {
+                          src: videoUrl || documentDetails?.videoUrl,
+                          selectedRecordingId
+                        });
+                      }}
+                    />
+                  )}
+                  
+                  {/* Captions overlay - always shown, on top of video if video exists */}
+                  <div
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain"
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 2,
+                      pointerEvents: "none"
                     }}
-                  />
+                  >
+                    <CaptionsPanel transcription={documentDetails?.transcription || null} />
+                  </div>
                 </div>
               </div>
             </section>
@@ -3261,17 +3687,6 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  {recordingType === "audio+video" && (
-                    <button
-                      type="button"
-                      className={clsx("panel-toggle-btn", showVideoPreview && "toggle-active")}
-                      onClick={() => setShowVideoPreview((prev) => !prev)}
-                      title={showVideoPreview ? "Hide video preview" : "Show video preview"}
-                      style={{ width: "32px", height: "32px" }}
-                    >
-                      {showVideoPreview ? <IconEye className="icon" /> : <IconEyeOff className="icon" />}
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => setIsRecordingSettingsOpen(true)}
@@ -3290,14 +3705,15 @@ export default function App() {
                 </div>
               </div>
               <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: "16px", height: "100%" }}>
-                {/* Live Video Preview While Recording */}
-                {recordingType === "audio+video" && showVideoPreview && isRecordingAudio && videoStreamRef.current && (
+                {/* Video Preview - Always shown when in video mode, or audio-only preview */}
+                {(recordingType === "audio+video" || (recordingType === "audio" && hasAudio)) && (
                   <div style={{ flexShrink: 0 }}>
-                    <p className="panel-label" style={{ marginBottom: "8px", fontSize: "12px", fontWeight: 600 }}>Live Preview</p>
+                    <p className="panel-label" style={{ marginBottom: "8px", fontSize: "12px", fontWeight: 600 }}>Preview</p>
                     <div 
                       className="video-preview-container"
                       style={{
-                        aspectRatio: "16/9",
+                        aspectRatio: recordingType === "audio+video" ? "16/9" : "auto",
+                        minHeight: recordingType === "audio" ? "120px" : "auto",
                         width: "100%",
                         backgroundColor: "#000",
                         display: "flex",
@@ -3308,75 +3724,289 @@ export default function App() {
                         borderRadius: "8px"
                       }}
                     >
-                      <video
-                        ref={videoPreviewRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain"
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-                {/* Preview Section */}
-                {(audioUrl || videoUrl || documentDetails?.audioUrl || documentDetails?.videoUrl) && (
-                  <div style={{ flexShrink: 0 }}>
-                    <p className="panel-label" style={{ marginBottom: "8px", fontSize: "12px", fontWeight: 600 }}>Preview</p>
-                    {recordingType === "audio+video" && (videoUrl || documentDetails?.videoUrl) ? (
-                      <div 
-                        className="video-preview-container"
-                        style={{
-                          aspectRatio: "16/9",
-                          width: "100%",
-                          backgroundColor: "#000",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          position: "relative",
-                          overflow: "hidden",
-                          borderRadius: "8px"
-                        }}
-                      >
+                      {isRecordingAudio && videoStreamRef.current && recordingType === "audio+video" ? (
                         <video
                           ref={videoPreviewRef}
-                          src={videoUrl || documentDetails?.videoUrl || undefined}
-                          controls
+                          autoPlay
+                          muted
+                          playsInline
                           style={{
                             width: "100%",
                             height: "100%",
                             objectFit: "contain"
                           }}
                         />
-                      </div>
-                    ) : (audioUrl || documentDetails?.audioUrl) ? (
-                      <div 
-                        className="audio-preview-container"
-                        style={{
-                          width: "100%",
-                          padding: "16px",
-                          background: "var(--bg-panel)",
-                          borderRadius: "8px",
-                          border: "1px solid var(--border-subtle)"
-                        }}
-                      >
-                        <audio
-                          ref={audioPlayerRef}
-                          src={audioUrl || documentDetails?.audioUrl || undefined}
-                          controls
+                      ) : (videoUrl || documentDetails?.videoUrl) && recordingType === "audio+video" ? (
+                        <video
+                          ref={(el) => {
+                            if (el) {
+                              videoPreviewRef.current = el;
+                              // Clear srcObject immediately if it exists
+                              if (el.srcObject) {
+                                el.srcObject = null;
+                                el.pause();
+                              }
+                              // Set src immediately
+                              const videoSrc = videoUrl || documentDetails?.videoUrl;
+                              if (videoSrc && !isRecordingAudio) {
+                                const srcToSet = videoSrc.startsWith('http') || videoSrc.startsWith('/') || videoSrc.startsWith('blob:')
+                                  ? videoSrc
+                                  : `/${videoSrc}`;
+                                if (el.src !== srcToSet) {
+                                  el.src = srcToSet;
+                                  el.load();
+                                  console.log("Recording Studio: Video ref callback - Setting src", srcToSet);
+                                }
+                              }
+                            }
+                          }}
+                          key={`recording-studio-video-${selectedRecordingId || 'none'}-${videoUrl || documentDetails?.videoUrl || 'none'}`}
                           style={{
-                            width: "100%"
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            display: "block"
+                          }}
+                          onTimeUpdate={() => {
+                            // Sync video with audio player
+                            if (audioPlayerRef.current && videoPreviewRef.current && !isRecordingAudio) {
+                              const audioTime = audioPlayerRef.current.currentTime;
+                              const videoTime = videoPreviewRef.current.currentTime;
+                              if (Math.abs(audioTime - videoTime) > 0.1) {
+                                videoPreviewRef.current.currentTime = audioTime;
+                              }
+                            }
+                          }}
+                          onLoadedData={() => {
+                            console.log("Recording Studio: Video loaded successfully", {
+                              src: videoPreviewRef.current?.src,
+                              readyState: videoPreviewRef.current?.readyState,
+                              selectedRecordingId,
+                              videoUrl: videoUrl || documentDetails?.videoUrl,
+                              videoVisible: videoPreviewRef.current?.offsetParent !== null
+                            });
+                          }}
+                          onCanPlay={() => {
+                            console.log("Recording Studio: Video can play", {
+                              src: videoPreviewRef.current?.src,
+                              readyState: videoPreviewRef.current?.readyState,
+                              videoVisible: videoPreviewRef.current?.offsetParent !== null
+                            });
+                          }}
+                          onError={(e) => {
+                            console.error("Recording Studio: Video playback error:", e, {
+                              src: videoUrl || documentDetails?.videoUrl,
+                              videoElementSrc: videoPreviewRef.current?.src,
+                              videoElementSrcObject: !!videoPreviewRef.current?.srcObject,
+                              error: videoPreviewRef.current?.error,
+                              selectedRecordingId,
+                              videoElement: videoPreviewRef.current,
+                              videoVisible: videoPreviewRef.current?.offsetParent !== null
+                            });
                           }}
                         />
-                      </div>
-                    ) : null}
+                      ) : recordingType === "audio" && hasAudio ? (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "100%",
+                          height: "100%",
+                          color: "var(--text-primary)",
+                          fontSize: "16px",
+                          fontWeight: 500
+                        }}>
+                          {isPlaying ? "Playing Audio" : "Audio Ready"}
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "100%",
+                          height: "100%",
+                          color: "var(--text-muted)",
+                          fontSize: "14px"
+                        }}>
+                          No video available
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
+
+                {/* Unified Recording & Playback Control Panel */}
+                <div className="audio-editor-unified-player" style={{ flexShrink: 0 }}>
+                  {/* Header with Take selector */}
+                  <div className="audio-editor-player-header">
+                    <span className="audio-editor-recording-label">Recording</span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {/* Takes selector */}
+                      {documentDetails.recordings && documentDetails.recordings.length > 0 && (
+                        <>
+                          <select
+                            value={selectedRecordingId || ""}
+                            onChange={(e) => setSelectedRecordingId(e.target.value || null)}
+                            title="Select take"
+                            className="audio-editor-take-selector"
+                          >
+                            <option value="">All Takes</option>
+                            {documentDetails.recordings.map((r, i) => (
+                              <option key={r.id} value={r.id}>{`Take ${i + 1}`}</option>
+                            ))}
+                          </select>
+                          {selectedRecordingId && (
+                            <button
+                              type="button"
+                              className="audio-editor-delete-take-button"
+                              onClick={async () => {
+                                if (!selectedRecordingId || !documentDetails) return;
+                                if (confirm("Delete this take?")) {
+                                  const updatedRecordings = documentDetails.recordings?.filter(r => r.id !== selectedRecordingId) || [];
+                                  const updatedDetails = {
+                                    ...documentDetails,
+                                    recordings: updatedRecordings
+                                  };
+                                  setDocumentDetails(updatedDetails);
+                                  setSelectedRecordingId(null);
+                                  const snapshot = toDocumentSnapshot(updatedDetails);
+                                  void performDocumentSave(documentDetails.path, snapshot);
+                                }
+                              }}
+                              title="Delete selected take"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
+                              </svg>
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {isRecordingAudio && (
+                        <span className="audio-editor-recording-status recording">
+                          {formattedElapsed}
+                        </span>
+                      )}
+                      {!isRecordingAudio && hasAudio && (
+                        <span className="audio-editor-recording-status ready">Ready</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timeline */}
+                  {hasAudio && (
+                    <div className="audio-editor-timeline-wrapper">
+                      <div 
+                        className="audio-editor-timeline"
+                        onClick={(e) => {
+                          if (!audioPlayerRef.current || !audioDuration) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = e.clientX - rect.left;
+                          const percentage = Math.max(0, Math.min(1, x / rect.width));
+                          const newTime = percentage * audioDuration;
+                          if (audioPlayerRef.current) {
+                            audioPlayerRef.current.currentTime = newTime;
+                            setAudioCurrentTime(newTime);
+                            // Also seek video if it exists
+                            if (videoPreviewRef.current && (videoUrl || documentDetails?.videoUrl)) {
+                              videoPreviewRef.current.currentTime = newTime;
+                            }
+                          }
+                        }}
+                      >
+                        <div 
+                          className="audio-editor-timeline-progress"
+                          style={{ width: `${audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0}%` }}
+                        />
+                        <div 
+                          className="audio-editor-timeline-playhead"
+                          style={{ left: `${audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0}%` }}
+                        />
+                        {audioDuration === 0 && (
+                          <div style={{
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--text-muted)",
+                            fontSize: "12px"
+                          }}>
+                            Loading...
+                          </div>
+                        )}
+                      </div>
+                      <div className="audio-editor-timeline-time">
+                        <span>{(() => {
+                          const mins = Math.floor(audioCurrentTime / 60);
+                          const secs = Math.floor(audioCurrentTime % 60);
+                          return `${mins}:${secs.toString().padStart(2, "0")}`;
+                        })()}</span>
+                        <span style={{ color: "var(--text-secondary)" }}> / {audioDuration > 0 ? (() => {
+                          const mins = Math.floor(audioDuration / 60);
+                          const secs = Math.floor(audioDuration % 60);
+                          return `${mins}:${secs.toString().padStart(2, "0")}`;
+                        })() : "--:--"}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Playback Controls */}
+                  <div className="audio-editor-player-controls">
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={() => startRecording()}
+                      disabled={!canStartRecording}
+                      title="Start recording (Ctrl/Cmd + R)"
+                    >
+                      <IconRecord className="audio-editor-icon" />
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={() => stopRecording()}
+                      disabled={!isRecordingAudio}
+                      title="Stop recording"
+                    >
+                      <IconStop className="audio-editor-icon" />
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={() => handlePlayAudio()}
+                      disabled={!hasAudio || isRecordingAudio}
+                      title="Play audio"
+                    >
+                      <IconPlay className="audio-editor-icon" />
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={() => handlePauseAudio()}
+                      disabled={!hasAudio}
+                      title="Pause audio"
+                    >
+                      <IconPause className="audio-editor-icon" />
+                    </button>
+                    <button
+                      className="audio-editor-icon-button"
+                      onClick={() => handleRewindAudio()}
+                      disabled={!hasAudio}
+                      title="Rewind to beginning"
+                    >
+                      <IconRewind className="audio-editor-icon" />
+                    </button>
+                  </div>
+
+                  {recordingFileName && !isRecordingAudio && (
+                    <div className="audio-editor-recording-filename">
+                      {recordingFileName}
+                    </div>
+                  )}
+                </div>
+
                 
-                {/* Recording & Audio Editing Section */}
+                {/* Audio Editing Section */}
                 <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
                   <AudioEditor
                     documentPath={documentDetails.path}
@@ -3398,8 +4028,39 @@ export default function App() {
                     recordings={documentDetails.recordings}
                     selectedRecordingId={selectedRecordingId}
                     onSelectRecording={setSelectedRecordingId}
+                    onDeleteRecording={async (recordingId) => {
+                      if (!documentDetails) return;
+                      const updatedRecordings = documentDetails.recordings?.filter(r => r.id !== recordingId) || [];
+                      const updatedDetails = {
+                        ...documentDetails,
+                        recordings: updatedRecordings
+                      };
+                      setDocumentDetails(updatedDetails);
+                      if (selectedRecordingId === recordingId) {
+                        setSelectedRecordingId(null);
+                      }
+                      // Save document
+                      const snapshot = toDocumentSnapshot(updatedDetails);
+                      void performDocumentSave(documentDetails.path, snapshot);
+                    }}
+                    audioPlayerRef={audioPlayerRef}
+                    hideUnifiedPlayer={true}
                   />
                 </div>
+                
+                {/* Hidden audio element for duration tracking and playback */}
+                {hasAudio && (
+                  <audio
+                    ref={audioPlayerRef}
+                    src={audioUrl || documentDetails?.audioUrl || undefined}
+                    style={{ display: "none" }}
+                    onLoadedMetadata={() => {
+                      if (audioPlayerRef.current) {
+                        setAudioDuration(audioPlayerRef.current.duration || 0);
+                      }
+                    }}
+                  />
+                )}
               </div>
             </section>
           ) : null}

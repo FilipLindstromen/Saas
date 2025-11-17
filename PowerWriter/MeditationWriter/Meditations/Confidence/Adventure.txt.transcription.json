@@ -1,0 +1,85 @@
+{
+  "text": "Does this work? I wonder. Does it work?",
+  "language": "english",
+  "duration": 8.579999923706055,
+  "words": [
+    {
+      "word": "Does",
+      "start": 2.4000000953674316,
+      "end": 3.119999885559082,
+      "originalIndex": 0,
+      "deleted": false
+    },
+    {
+      "word": "this",
+      "start": 3.119999885559082,
+      "end": 3.5799999237060547,
+      "originalIndex": 1,
+      "deleted": false
+    },
+    {
+      "word": "work?",
+      "start": 3.5799999237060547,
+      "end": 4.159999847412109,
+      "originalIndex": 2,
+      "deleted": false
+    },
+    {
+      "word": "I",
+      "start": 4.599999904632568,
+      "end": 4.840000152587891,
+      "originalIndex": 3,
+      "deleted": false
+    },
+    {
+      "word": "wonder.",
+      "start": 4.840000152587891,
+      "end": 5.079999923706055,
+      "originalIndex": 4,
+      "deleted": false
+    },
+    {
+      "word": "Does",
+      "start": 5.480000019073486,
+      "end": 5.760000228881836,
+      "originalIndex": 5,
+      "deleted": true
+    },
+    {
+      "word": "it",
+      "start": 5.760000228881836,
+      "end": 6.099999904632568,
+      "originalIndex": 6,
+      "deleted": true
+    },
+    {
+      "word": "work?",
+      "start": 6.099999904632568,
+      "end": 6.980000019073486,
+      "originalIndex": 7,
+      "deleted": true
+    },
+    {
+      "word": "Does",
+      "start": 7.21999979019165,
+      "end": 7.579999923706055,
+      "originalIndex": 8,
+      "deleted": false
+    },
+    {
+      "word": "it",
+      "start": 7.579999923706055,
+      "end": 7.78000020980835,
+      "originalIndex": 9,
+      "deleted": false
+    },
+    {
+      "word": "work?",
+      "start": 7.78000020980835,
+      "end": 8.420000076293945,
+      "originalIndex": 10,
+      "deleted": false
+    }
+  ],
+  "segments": []
+}

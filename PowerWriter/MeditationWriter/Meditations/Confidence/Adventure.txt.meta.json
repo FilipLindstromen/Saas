@@ -1,0 +1,55 @@
+{
+  "completed": false,
+  "audioFileName": "Adventure_7.webm",
+  "recordings": [
+    {
+      "id": "rec_1763302715268_p8i3p3nmb",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_1.webm&v=mi1swqrn",
+      "audioFileName": "Adventure_1.webm",
+      "type": "audio",
+      "createdAt": 1763302715271
+    },
+    {
+      "id": "rec_1763302948957_j94d9ex8z",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_2.webm&v=mi1t1r31",
+      "audioFileName": "Adventure_2.webm",
+      "type": "audio",
+      "createdAt": 1763302948959
+    },
+    {
+      "id": "rec_1763303042640_hidm3hz0v",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_3.webm&v=mi1t3rdb",
+      "audioFileName": "Adventure_3.webm",
+      "type": "audio",
+      "createdAt": 1763303042640
+    },
+    {
+      "id": "rec_1763303135979_6pobwexkt",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_4.webm&v=mi1t5re1",
+      "audioFileName": "Adventure_4.webm",
+      "type": "audio",
+      "createdAt": 1763303135980
+    },
+    {
+      "id": "rec_1763325398264_91w139e36",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_5.webm&v=mi26ex2q",
+      "audioFileName": "Adventure_5.webm",
+      "type": "audio",
+      "createdAt": 1763325398281
+    },
+    {
+      "id": "rec_1763363330781_q981orq24",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_6.webm&v=mi2szxz2",
+      "audioFileName": "Adventure_6.webm",
+      "type": "audio",
+      "createdAt": 1763363330783
+    },
+    {
+      "id": "rec_1763364293200_dd1aufr8k",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_7.webm&v=mi2tkklr",
+      "audioFileName": "Adventure_7.webm",
+      "type": "audio",
+      "createdAt": 1763364293211
+    }
+  ]
+}

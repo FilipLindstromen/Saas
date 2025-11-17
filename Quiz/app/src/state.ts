@@ -160,6 +160,35 @@ export function useQuizState(initial?: Partial<QuizData>) {
     setQuiz(q => ({ ...q, questions: q.questions.filter(qq => qq.id !== id) }))
   }
 
+  function reorderQuestions(sourceId: string, targetId: string | null, position: 'before' | 'after' = 'before') {
+    if (targetId === sourceId) return
+
+    setQuiz(q => {
+      const questions = [...q.questions]
+      const sourceIndex = questions.findIndex(qq => qq.id === sourceId)
+
+      if (sourceIndex === -1) return q
+
+      const [movedQuestion] = questions.splice(sourceIndex, 1)
+
+      if (!targetId) {
+        questions.push(movedQuestion)
+        return { ...q, questions }
+      }
+
+      const targetIndex = questions.findIndex(qq => qq.id === targetId)
+      if (targetIndex === -1) {
+        questions.push(movedQuestion)
+        return { ...q, questions }
+      }
+
+      const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex
+      questions.splice(insertIndex, 0, movedQuestion)
+
+      return { ...q, questions }
+    })
+  }
+
   function updateSettings(mutator: (s: QuizSettings) => QuizSettings) {
     setQuiz(q => ({ ...q, settings: mutator(q.settings!) }))
   }
@@ -210,6 +239,7 @@ export function useQuizState(initial?: Partial<QuizData>) {
     addQuestion,
     updateQuestion,
     removeQuestion,
+    reorderQuestions,
     toJsonString,
     loadFromJsonString,
     setQuiz,
