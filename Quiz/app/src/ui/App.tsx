@@ -32,6 +32,7 @@ export function App() {
     removeQuestion,
     toJsonString,
     loadFromJsonString,
+    reorderQuestions,
   } = useQuizState()
 
   const {
@@ -45,6 +46,8 @@ export function App() {
   } = useMemeState()
 
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(quiz.questions[0]?.id ?? null)
+  const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null)
+  const [dragOverInfo, setDragOverInfo] = useState<{ targetId: string | null; position: 'before' | 'after' } | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playVersion, setPlayVersion] = useState(0)
@@ -239,6 +242,57 @@ export function App() {
   })
 
   const selectedQuestion = useMemo(() => quiz.questions.find(q => q.id === selectedQuestionId) ?? null, [quiz, selectedQuestionId])
+
+  const handleQuestionDragStart = (event: React.DragEvent<HTMLDivElement>, questionId: string) => {
+    event.dataTransfer.setData('text/plain', questionId)
+    event.dataTransfer.effectAllowed = 'move'
+    setDraggedQuestionId(questionId)
+    setDragOverInfo(null)
+  }
+
+  const handleQuestionDragOver = (event: React.DragEvent<HTMLDivElement>, questionId: string) => {
+    if (!draggedQuestionId || draggedQuestionId === questionId) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const isBefore = event.clientY < rect.top + rect.height / 2
+    const position = isBefore ? 'before' : 'after'
+
+    setDragOverInfo(prev => {
+      if (prev?.targetId === questionId && prev.position === position) return prev
+      return { targetId: questionId, position }
+    })
+  }
+
+  const handleQuestionDrop = (event: React.DragEvent<HTMLDivElement>, questionId: string) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!draggedQuestionId || draggedQuestionId === questionId) {
+      setDraggedQuestionId(null)
+      setDragOverInfo(null)
+      return
+    }
+
+    const position =
+      dragOverInfo?.targetId === questionId ? dragOverInfo.position : 'before'
+    reorderQuestions(draggedQuestionId, questionId, position)
+    setDraggedQuestionId(null)
+    setDragOverInfo(null)
+  }
+
+  const handleQuestionDragEnd = () => {
+    setDraggedQuestionId(null)
+    setDragOverInfo(null)
+  }
+
+  const handleQuestionListDropToEnd = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!draggedQuestionId) return
+    event.preventDefault()
+    reorderQuestions(draggedQuestionId, null, 'after')
+    setDraggedQuestionId(null)
+    setDragOverInfo(null)
+  }
 
 
   // Persistence functions
@@ -1289,8 +1343,8 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                       <div className="text-sm text-gray-300">CTA Text</div>
                         <TransparentTextarea
                           placeholder="Enter CTA text... (use Shift+Enter for line breaks)"
-                        value={currentCTA.text}
-                        onChange={value => applyCTAUpdate(cta => ({ ...cta, text: value }))}
+                          value={currentCTA.text ?? ''}
+                          onChange={value => applyCTAUpdate(cta => ({ ...cta, text: value }))}
                           className="ios-input w-full"
                           rows={3}
                         />
@@ -1961,17 +2015,75 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                 </div>
 
                 <div className="space-y-2">
-            {quiz.questions.map(q => (
-              <div key={q.id} data-question-item className={`p-3 rounded-xl border ${selectedQuestionId === q.id ? 'border-white/30' : 'border-iosborder'} cursor-pointer`} onClick={() => setSelectedQuestionId(q.id)}>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm">{q.title}</div>
-                  <div className="flex items-center gap-2">
-                          <span className="text-xs text-iossub">{q.type}</span>
-                    <button className="text-red-400 text-xs" onClick={(e) => { e.stopPropagation(); removeQuestion(q.id) }}>Delete</button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                  {quiz.questions.map(q => {
+                    const isSelected = selectedQuestionId === q.id
+                    const isDropTarget = dragOverInfo?.targetId === q.id
+                    const isDragging = draggedQuestionId === q.id
+                    const dropPosition = dragOverInfo?.position
+
+                    return (
+                      <div
+                        key={q.id}
+                        className="relative"
+                        onDragOver={event => handleQuestionDragOver(event, q.id)}
+                        onDrop={event => handleQuestionDrop(event, q.id)}
+                      >
+                        {isDropTarget && dropPosition === 'before' && (
+                          <div className="absolute -top-1 left-0 right-0 h-1 rounded-full bg-blue-400 pointer-events-none" />
+                        )}
+                        {isDropTarget && dropPosition === 'after' && (
+                          <div className="absolute -bottom-1 left-0 right-0 h-1 rounded-full bg-blue-400 pointer-events-none" />
+                        )}
+                        <div
+                          data-question-item
+                          draggable
+                          onDragStart={event => handleQuestionDragStart(event, q.id)}
+                          onDragEnd={handleQuestionDragEnd}
+                          onClick={() => setSelectedQuestionId(q.id)}
+                          className={`p-3 rounded-xl border cursor-grab select-none ${
+                            isDropTarget
+                              ? 'border-blue-400 ring-2 ring-blue-400/30'
+                              : isSelected
+                                ? 'border-white/30'
+                                : 'border-iosborder'
+                          } ${isDragging ? 'opacity-60' : ''}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-sm">{q.title}</div>
+                            <div className="flex items-center gap-2 text-xs text-iossub">
+                              <span>{q.type}</span>
+                              <button
+                                className="text-red-400 hover:text-red-200"
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  removeQuestion(q.id)
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {draggedQuestionId && (
+                    <div
+                      className={`rounded-lg border-2 border-dashed px-3 py-2 text-center text-xs transition ${
+                        dragOverInfo?.targetId === null
+                          ? 'border-blue-400 text-blue-300 bg-blue-400/10'
+                          : 'border-iosborder/70 text-iossub'
+                      }`}
+                      onDragOver={event => {
+                        if (!draggedQuestionId) return
+                        event.preventDefault()
+                        setDragOverInfo({ targetId: null, position: 'after' })
+                      }}
+                      onDrop={handleQuestionListDropToEnd}
+                    >
+                      Drop here to move to the end
+                    </div>
+                  )}
                 </div>
           </div>
 
