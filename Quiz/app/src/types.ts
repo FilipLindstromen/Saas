@@ -8,10 +8,18 @@ export interface QuizAnswer {
 
 export type QuestionType = 'boolean' | 'multiple'
 
+export interface QuestionVoiceOver {
+  url: string
+  format?: 'mp3' | 'wav' | 'aac'
+  voice?: string
+  createdAt?: number
+}
+
 export interface QuizQuestionBase {
   id: string
   title: string
   type: QuestionType
+  voiceOver?: QuestionVoiceOver
 }
 
 export interface BooleanQuestion extends QuizQuestionBase {

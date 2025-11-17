@@ -294,6 +294,7 @@ function TitleScreen({
 export function SequencePreview({ quiz, onFinished, isRecording = false, recordingTime = 0, playSignal }: SequencePreviewProps) {
   const settings = quiz.settings!
   const { musicRef, appearRef, correctRef, appearUrl, correctUrl, playAppear, playCorrect } = useAudio()
+  const voiceOverRef = useRef<HTMLAudioElement | null>(null)
   const musicStartedRef = useRef(false)
   const [stage, setStage] = useState<'title' | 'question' | 'cta'>('title')
   const [qIndex, setQIndex] = useState(0)
@@ -333,6 +334,54 @@ export function SequencePreview({ quiz, onFinished, isRecording = false, recordi
       return Math.max(max, start + inMs + holdMs + outMs)
     }, 0)
   }, [overlayEnabled, overlayItems])
+
+  const stopVoiceOver = React.useCallback(() => {
+    const current = voiceOverRef.current
+    if (current) {
+      try {
+        current.pause()
+        current.currentTime = 0
+      } catch {
+        // ignore
+      }
+    }
+    voiceOverRef.current = null
+  }, [])
+
+  React.useEffect(() => stopVoiceOver, [stopVoiceOver])
+
+  React.useEffect(() => {
+    if (isRecording || settings.animationType === 'overlay' || settings.animationType === 'meme') {
+      stopVoiceOver()
+      return
+    }
+    if (stage !== 'question') {
+      stopVoiceOver()
+      return
+    }
+    const question = quiz.questions[qIndex]
+    if (!question?.voiceOver?.url) {
+      stopVoiceOver()
+      return
+    }
+
+    const audio = new Audio(question.voiceOver.url)
+    audio.preload = 'auto'
+    audio.volume = 1
+    voiceOverRef.current = audio
+    audio.play().catch(error => {
+      if (error instanceof Error && error.name === 'NotAllowedError') return
+      console.warn('Voice-over playback failed:', error)
+    })
+
+    return () => {
+      try {
+        audio.pause()
+      } catch {
+        // ignore
+      }
+    }
+  }, [quiz.questions, qIndex, stage, stopVoiceOver, settings.animationType, isRecording])
 
   const applyMusicOffset = React.useCallback((media?: HTMLMediaElement | null) => {
     if (!media) return
