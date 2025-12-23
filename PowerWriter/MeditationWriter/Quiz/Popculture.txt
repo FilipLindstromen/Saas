@@ -1,0 +1,26 @@
+Here are 20 updated trivia questions about pop culture formatted as requested:
+
+| Statement | Chr | Answer | Country | Game mode | Category | Tags | Unit | Possible Duplicate |
+|-----------|-----|--------|---------|-----------|----------|------|------|---------------------|
+| How many albums has the band The Beatles released? | | 13 | United Kingdom | Amount | PopCulture | Music | albums | |
+| In which year did the first episode of "Friends" air? | | 1994 | United States | Age | PopCulture | TV | year | |
+| How many films are in the Marvel Cinematic Universe as of 2023? | | 32 | United States | Amount | PopCulture | Movies | films | |
+| What year did the iconic video game "Pac-Man" first release? | | 1980 | Japan | Age | PopCulture | Gaming | year | |
+| How many seasons did the TV series "Breaking Bad" have? | | 5 | United States | Amount | PopCulture | TV | seasons | |
+| How many Oscars did the film "Titanic" win at the 1998 Academy Awards? | | 11 | United States | Amount | PopCulture | Movies | Oscars | |
+| In what year did the first "Harry Potter" book get published? | | 1997 | United Kingdom | Age | PopCulture | Books | year | |
+| How many characters are there in the original "Super Mario Bros." game? | | 4 | Japan | Amount | PopCulture | Gaming | characters | |
+| What is the total number of seasons "The Simpsons" has aired as of 2023? | | 34 | United States | Amount | PopCulture | TV | seasons | |
+| How many copies did Michael Jackson's "Thriller" sell worldwide? | | 66 | United States | Amount | PopCulture | Music | million | |
+| What year did the iconic film "The Matrix" first premiere? | | 1999 | United States | Age | PopCulture | Movies | year | |
+| How many total episodes are in the original "Game of Thrones" series? | | 73 | United States | Amount | PopCulture | TV | episodes | |
+| How many times has the song "Bohemian Rhapsody" reached number one on the UK Singles Chart? | | 2 | United Kingdom | Amount | PopCulture | Music | times | |
+| In what year was the first episode of "The Office" (US) released? | | 2005 | United States | Age | PopCulture | TV | year | |
+| How many films are in the "Fast & Furious" franchise as of 2023? | | 10 | United States | Amount | PopCulture | Movies | films | |
+| How many years did the original "Star Wars" trilogy span from release of the first to the last film? | | 6 | United States | Age | PopCulture | Movies | years | |
+| What is the total number of "Friends" cast members who received a star on the Hollywood Walk of Fame? | | 6 | United States | Amount | PopCulture | TV | stars | |
+| How many years did the "SpongeBob SquarePants" series celebrate since its premiere in 1999? | | 24 | United States | Age | PopCulture | TV | years | |
+| How many singles did Whitney Houston have reach number one on the Billboard Hot 100? | | 11 | United States | Amount | PopCulture | Music | singles | |
+| What year did the animated film "Frozen" premiere? | | 2013 | United States | Age | PopCulture | Movies | year | |
+
+Feel free to use these trivia questions for your quiz or game!

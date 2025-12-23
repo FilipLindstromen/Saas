@@ -1,0 +1,25 @@
+Here are 20 sports trivia questions formatted as requested:
+
+Statement	Chr	Answer	Country	Game mode	Category	Tags	Unit						Possible Duplicate
+The number of players on a standard rugby union team.		15	United Kingdom	Amount	Sports		Rugby players						
+The year when the first FIFA World Cup was held.		1930	Uruguay	Age	Sports		FIFA World Cup	year					
+The total number of Grand Slam titles won by Serena Williams as of 2023.		23	United States	Amount	Sports		Tennis titles						
+The number of minutes in a standard soccer match (excluding stoppage time).		90	Global	Amount	Sports		Soccer match minutes						
+The year the Olympics were first held in modern times.		1896	Greece	Age	Sports		Modern Olympics	year					
+The number of players on a basketball team during a game.		5	United States	Amount	Sports		Basketball players						
+The total number of gold medals won by Michael Phelps in Olympic history.		23	United States	Amount	Sports		Olympic medals						
+The number of rounds in a standard boxing match for championship bouts.		12	Global	Amount	Sports		Boxing rounds						
+The year when the first Super Bowl was played.		1967	United States	Age	Sports		American Football	year					
+The total number of teams in the National Hockey League (NHL) as of 2023.		32	Canada/United States	Amount	Sports		Hockey teams						
+The number of players on a standard American football team on the field at one time.		11	United States	Amount	Sports		Football players						
+The year the first Tour de France took place.		1903	France	Age	Sports		Cycling	year					
+The total number of titles won by the Boston Celtics in the NBA as of 2023.		17	United States	Amount	Sports		Basketball titles						
+The number of countries that participated in the first Rugby World Cup in 1987.		16	Global	Amount	Sports		Rugby World Cup						
+The year when the first Women's World Cup in soccer was held.		1991	Global	Age	Sports		FIFA Women's World Cup	year					
+The total number of FIFA World Cup tournaments held as of 2022.		21	Global	Amount	Sports		FIFA World Cup						
+The year that Usain Bolt set the world record for the 100 meter dash.		2009	Jamaica	Age	Sports		Sprinting	year					
+The number of players in a standard ice hockey game per team.		6	Canada/United States	Amount	Sports		Hockey players						
+The year when the first professional baseball league was established (National League).		1876	United States	Age	Sports		Baseball	year					
+The total number of Olympic Games that have been canceled since the inception of the modern Olympics.		3	Global	Amount	Sports		Olympic Games canceled	 
+
+Feel free to adjust any details that you may need!
