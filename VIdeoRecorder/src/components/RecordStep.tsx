@@ -33,17 +33,17 @@ export default function RecordStep({
   const cameraRecorderRef = useRef<MediaRecorder | null>(null)
   const microphoneRecorderRef = useRef<MediaRecorder | null>(null)
   const screenRecorderRef = useRef<MediaRecorder | null>(null)
-  
+
   // Separate chunks for each layer
   const cameraChunksRef = useRef<Blob[]>([])
   const microphoneChunksRef = useRef<Blob[]>([])
   const screenChunksRef = useRef<Blob[]>([])
-  
+
   // Individual streams
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const microphoneStreamRef = useRef<MediaStream | null>(null)
   const screenStreamRef = useRef<MediaStream | null>(null)
-  
+
   // Legacy support
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
@@ -111,7 +111,7 @@ export default function RecordStep({
     const hasCamera = cameraStreamRef.current && cameraStreamRef.current.getVideoTracks().length > 0
     const hasMicrophone = microphoneStreamRef.current && microphoneStreamRef.current.getAudioTracks().length > 0
     const hasScreen = screenStreamRef.current && screenStreamRef.current.getVideoTracks().length > 0
-    
+
     if (!hasCamera && !hasMicrophone && !hasScreen) {
       alert('Please enable at least one input device (camera, microphone, or screen)')
       return
@@ -128,28 +128,28 @@ export default function RecordStep({
       const hasCamera = cameraStreamRef.current && cameraStreamRef.current.getVideoTracks().length > 0
       const hasMicrophone = microphoneStreamRef.current && microphoneStreamRef.current.getAudioTracks().length > 0
       const hasScreen = screenStreamRef.current && screenStreamRef.current.getVideoTracks().length > 0
-      
+
       console.log('Starting separate layer recording:', {
         hasCamera,
         hasMicrophone,
         hasScreen
       })
-      
+
       recordingStartTimeRef.current = Date.now()
-      
+
       // Determine mime types for each layer
-      const videoMimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
-        ? 'video/webm;codecs=vp9' 
-        : MediaRecorder.isTypeSupported('video/webm') 
-        ? 'video/webm' 
-        : 'video/mp4'
-      
+      const videoMimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+          ? 'video/webm'
+          : 'video/mp4'
+
       const audioMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/ogg'
-      
+          ? 'audio/webm'
+          : 'audio/ogg'
+
       // Record camera separately
       if (hasCamera && cameraStreamRef.current) {
         cameraChunksRef.current = []
@@ -157,18 +157,18 @@ export default function RecordStep({
           mimeType: videoMimeType,
           videoBitsPerSecond: 2500000
         })
-        
+
         cameraRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             cameraChunksRef.current.push(event.data)
           }
         }
-        
+
         cameraRecorder.start(250)
         cameraRecorderRef.current = cameraRecorder
         console.log('Camera recorder started')
       }
-      
+
       // Record microphone separately
       if (hasMicrophone && microphoneStreamRef.current) {
         microphoneChunksRef.current = []
@@ -176,18 +176,18 @@ export default function RecordStep({
           mimeType: audioMimeType,
           audioBitsPerSecond: 128000
         })
-        
+
         microphoneRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             microphoneChunksRef.current.push(event.data)
           }
         }
-        
+
         microphoneRecorder.start(250)
         microphoneRecorderRef.current = microphoneRecorder
         console.log('Microphone recorder started')
       }
-      
+
       // Record screen separately
       if (hasScreen && screenStreamRef.current) {
         screenChunksRef.current = []
@@ -195,34 +195,34 @@ export default function RecordStep({
           mimeType: videoMimeType,
           videoBitsPerSecond: 2500000
         })
-        
+
         screenRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             screenChunksRef.current.push(event.data)
           }
         }
-        
+
         screenRecorder.start(250)
         screenRecorderRef.current = screenRecorder
         console.log('Screen recorder started')
       }
-      
+
       // Track which recorders have stopped
       const stoppedRecorders = {
         camera: !cameraRecorderRef.current,
         microphone: !microphoneRecorderRef.current,
         screen: !screenRecorderRef.current
       }
-      
+
       // Set up stop handler
       const handleStop = async () => {
         // Wait a bit for all recorders to finish collecting data
         await new Promise(resolve => setTimeout(resolve, 500))
-        
+
         const duration = (Date.now() - recordingStartTimeRef.current) / 1000
-        
+
         // Create blobs for each layer
-        const cameraBlob = cameraChunksRef.current.length > 0 
+        const cameraBlob = cameraChunksRef.current.length > 0
           ? new Blob(cameraChunksRef.current, { type: videoMimeType })
           : undefined
         const microphoneBlob = microphoneChunksRef.current.length > 0
@@ -231,14 +231,14 @@ export default function RecordStep({
         const screenBlob = screenChunksRef.current.length > 0
           ? new Blob(screenChunksRef.current, { type: videoMimeType })
           : undefined
-        
+
         console.log('Recording stopped. Layers:', {
           camera: cameraBlob?.size || 0,
           microphone: microphoneBlob?.size || 0,
           screen: screenBlob?.size || 0,
           duration
         })
-        
+
         const newTake: RecordingTake = {
           id: Date.now().toString(),
           cameraBlob,
@@ -251,7 +251,7 @@ export default function RecordStep({
           hasMicrophone: !!microphoneBlob,
           hasScreen: !!screenBlob,
         }
-        
+
         const updatedScenes = scenes.map((scene) => {
           if (scene.id === selectedSceneId) {
             const updatedRecordings = [...scene.recordings, newTake]
@@ -266,9 +266,9 @@ export default function RecordStep({
           }
           return scene
         })
-        
+
         onScenesChange(updatedScenes)
-        
+
         // Save recordings to project folder if project exists
         if (projectManager.hasProject()) {
           try {
@@ -285,21 +285,21 @@ export default function RecordStep({
             console.error('Error saving recordings to project:', error)
           }
         }
-        
+
         onEditedChange(true)
         setRecordingTime(0)
         if (timerRef.current) {
           clearInterval(timerRef.current)
         }
       }
-      
+
       // Check if all recorders have stopped
       const checkAllStopped = () => {
         if (stoppedRecorders.camera && stoppedRecorders.microphone && stoppedRecorders.screen) {
           handleStop()
         }
       }
-      
+
       // Set up onstop handlers for all recorders
       if (cameraRecorderRef.current) {
         cameraRecorderRef.current.onstop = () => {
@@ -307,24 +307,24 @@ export default function RecordStep({
           checkAllStopped()
         }
       }
-      
+
       if (microphoneRecorderRef.current) {
         microphoneRecorderRef.current.onstop = () => {
           stoppedRecorders.microphone = true
           checkAllStopped()
         }
       }
-      
+
       if (screenRecorderRef.current) {
         screenRecorderRef.current.onstop = () => {
           stoppedRecorders.screen = true
           checkAllStopped()
         }
       }
-      
+
       // If no recorders were started, call handler immediately
       checkAllStopped()
-      
+
       setIsRecording(true)
       setIsPaused(false)
 
@@ -381,10 +381,10 @@ export default function RecordStep({
     if (screenRecorderRef.current && screenRecorderRef.current.state !== 'inactive') {
       screenRecorderRef.current.stop()
     }
-    
+
     setIsRecording(false)
     setIsPaused(false)
-    
+
     // The stop handler will be called automatically when all recorders stop
   }
 
@@ -487,7 +487,7 @@ export default function RecordStep({
 
   return (
     <div className="flex h-full">
-      <DevicePanel 
+      <DevicePanel
         onStreamChange={setMediaStream}
         onCameraStreamChange={(stream) => {
           cameraStreamRef.current = stream
@@ -510,17 +510,15 @@ export default function RecordStep({
               <div
                 key={scene.id}
                 onClick={() => setSelectedSceneId(scene.id)}
-                className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                  isSelected
-                    ? 'bg-gray-800 border-2 border-blue-500'
-                    : 'bg-gray-900 border-2 border-transparent hover:bg-gray-800'
-                }`}
+                className={`p-4 rounded-lg cursor-pointer transition-colors ${isSelected
+                  ? 'bg-zinc-900 border-2 border-white'
+                  : 'bg-black border-2 border-transparent hover:bg-zinc-900'
+                  }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      status === 'green' ? 'bg-green-500' : 'bg-orange-500'
-                    }`}
+                    className={`w-2 h-2 rounded-full ${status === 'green' ? 'bg-white' : 'bg-zinc-600'
+                      }`}
                   />
                   <span className="text-gray-400 text-sm">Scene {index + 1}</span>
                 </div>
@@ -629,23 +627,21 @@ export default function RecordStep({
                       <div
                         key={take.id}
                         onClick={(e) => e.stopPropagation()}
-                        className={`flex items-center gap-3 p-2 rounded ${
-                          take.selected
-                            ? 'bg-blue-900/30 border border-blue-500'
-                            : 'bg-gray-800 hover:bg-gray-750'
-                        }`}
+                        className={`flex items-center gap-3 p-2 rounded ${take.selected
+                            ? 'bg-zinc-800 border border-zinc-500'
+                            : 'bg-zinc-900 hover:bg-zinc-800'
+                          }`}
                       >
                         <button
                           onClick={() => handleSelectTake(scene.id, take.id)}
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                            take.selected
-                              ? 'bg-blue-500 border-blue-500'
-                              : 'border-gray-500'
-                          }`}
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center ${take.selected
+                              ? 'bg-white border-white'
+                              : 'border-zinc-500'
+                            }`}
                         >
                           {take.selected && (
                             <svg
-                              className="w-3 h-3 text-white"
+                              className="w-3 h-3 text-black"
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >

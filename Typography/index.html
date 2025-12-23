@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typography Animation Creator</title>
+    <meta name="description"
+        content="Create stunning typography animation videos with word cloud layouts, camera movements, and professional export capabilities.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800;900&family=Montserrat:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 class="app-title">
+                <span class="title-icon">🎬</span>
+                Typography Animation Creator
+            </h1>
+            <p class="app-subtitle">Create stunning 9:16 typography videos with cinematic camera movements</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Preview Section -->
+            <section class="preview-section">
+                <div class="canvas-container">
+                    <canvas id="previewCanvas" width="1080" height="1920"></canvas>
+                    <div class="canvas-overlay" id="canvasOverlay">
+                        <div class="overlay-content">
+                            <div class="overlay-icon">✨</div>
+                            <h2>Enter your text to begin</h2>
+                            <p>Your animation will appear here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playback & Layout Controls -->
+                <div class="playback-controls">
+                    <div class="layout-tools">
+                        <button class="tool-btn" id="showLayoutBtn" title="Show Full Layout">
+                            <span class="btn-icon">👁️</span>
+                            Show Full Layout
+                        </button>
+                        <button class="tool-btn" id="newLayoutBtn" title="Regenerate Layout">
+                            <span class="btn-icon">🎲</span>
+                            New Layout
+                        </button>
+                    </div>
+
+                    <div class="playback-buttons">
+                        <button class="control-btn" id="playBtn" title="Play">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                        </button>
+                        <button class="control-btn" id="pauseBtn" title="Pause" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                        </button>
+                        <button class="control-btn" id="resetBtn" title="Reset">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+                </div>
+            </section>
+
+            <!-- Controls Panel -->
+            <aside class="controls-panel">
+                <div class="panel-scroll">
+                    <!-- Text Input -->
+                    <div class="control-group">
+                        <label for="textInput" class="control-label">
+                            <span class="label-icon">📝</span>
+                            Your Text
+                        </label>
+                        <textarea id="textInput" class="text-input"
+                            placeholder="Enter your text here... Each word will be animated individually."
+                            rows="6">DESIGN TYPOGRAPHY CREATIVE FONT GRAPHIC STYLE MODERN BOLD ELEGANT MINIMAL ART VISUAL LAYOUT COMPOSITION BRANDING LETTERS WORDS AESTHETIC</textarea>
+                    </div>
+
+                    <!-- Font Selection -->
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span class="label-icon">🔤</span>
+                            Fonts (Select 1-3)
+                        </label>
+                        <div class="font-selector">
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Inter" checked>
+                                <span class="font-preview" style="font-family: 'Inter', sans-serif;">Inter</span>
+                            </label>
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Outfit">
+                                <span class="font-preview" style="font-family: 'Outfit', sans-serif;">Outfit</span>
+                            </label>
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Roboto Mono">
+                                <span class="font-preview" style="font-family: 'Roboto Mono', monospace;">Roboto
+                                    Mono</span>
+                            </label>
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Playfair Display">
+                                <span class="font-preview" style="font-family: 'Playfair Display', serif;">Playfair
+                                    Display</span>
+                            </label>
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Montserrat">
+                                <span class="font-preview"
+                                    style="font-family: 'Montserrat', sans-serif;">Montserrat</span>
+                            </label>
+                            <label class="font-option">
+                                <input type="checkbox" name="font" value="Poppins" checked>
+                                <span class="font-preview" style="font-family: 'Poppins', sans-serif;">Poppins</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Size Range -->
+                    <div class="control-group">
+                        <label class="control-label">
+                            <span class="label-icon">📏</span>
+                            Font Size Range
+                        </label>
+                        <div class="range-inputs">
+                            <div class="range-input-group">
+                                <label for="minSize">Min</label>
+                                <input type="number" id="minSize" value="30" min="10" max="200">
+                                <span class="unit">px</span>
+                            </div>
+                            <div class="range-input-group">
+                                <label for="maxSize">Max</label>
+                                <input type="number" id="maxSize" value="120" min="20" max="300">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Animation Speed -->
+                    <div class="control-group">
+                        <label for="animSpeed" class="control-label">
+                            <span class="label-icon">⚡</span>
+                            Animation Speed
+                            <span class="value-display" id="speedValue">1.0x</span>
+                        </label>
+                        <input type="range" id="animSpeed" class="slider" min="0.3" max="3" step="0.1" value="1">
+                    </div>
+
+                    <!-- Camera Distance -->
+                    <div class="control-group">
+                        <label for="cameraDistance" class="control-label">
+                            <span class="label-icon">📷</span>
+                            Camera Distance
+                            <span class="value-display" id="distanceValue">Medium</span>
+                        </label>
+                        <input type="range" id="cameraDistance" class="slider" min="1" max="3" step="0.1" value="1.8">
+                    </div>
+
+                    <!-- Zoom Out Finale -->
+                    <div class="control-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="zoomOutFinale" checked>
+                            <span class="checkbox-custom"></span>
+                            <span class="label-text">
+                                <span class="label-icon">🎯</span>
+                                Zoom Out Finale
+                            </span>
+                        </label>
+                        <p class="help-text">Show all words at the end</p>
+                    </div>
+
+                    <!-- Background Color -->
+                    <div class="control-group">
+                        <label for="bgColor" class="control-label">
+                            <span class="label-icon">🎨</span>
+                            Background Color
+                        </label>
+                        <div class="color-input-group">
+                            <input type="color" id="bgColor" value="#1a1a2e">
+                            <input type="text" id="bgColorText" value="#1a1a2e" class="color-text">
+                        </div>
+                    </div>
+
+                    <!-- Text Color -->
+                    <div class="control-group">
+                        <label for="textColor" class="control-label">
+                            <span class="label-icon">✏️</span>
+                            Text Color
+                        </label>
+                        <div class="color-input-group">
+                            <input type="color" id="textColor" value="#ffffff">
+                            <input type="text" id="textColorText" value="#ffffff" class="color-text">
+                        </div>
+                    </div>
+
+                    <!-- Music Upload -->
+                    <div class="control-group">
+                        <label for="musicUpload" class="control-label">
+                            <span class="label-icon">🎵</span>
+                            Background Music
+                        </label>
+                        <div class="file-upload">
+                            <input type="file" id="musicUpload" accept="audio/*" hidden>
+                            <button class="upload-btn" id="uploadBtn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                Choose Audio File
+                            </button>
+                            <span class="file-name" id="fileName">No file selected</span>
+                        </div>
+                        <div class="audio-controls" id="audioControls" style="display: none;">
+                            <button class="audio-btn" id="audioPlayBtn">▶️</button>
+                            <button class="audio-btn" id="audioPauseBtn">⏸️</button>
+                            <input type="range" id="volumeSlider" class="slider" min="0" max="100" value="70">
+                            <span class="volume-label" id="volumeLabel">70%</span>
+                        </div>
+                    </div>
+
+                    <!-- Export Buttons -->
+                    <div class="control-group export-section">
+                        <label class="control-label">
+                            <span class="label-icon">💾</span>
+                            Export Video
+                        </label>
+                        <div class="export-buttons">
+                            <button class="export-btn export-webm" id="exportWebM">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export WebM
+                            </button>
+                            <button class="export-btn export-mp4" id="exportMP4">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export MP4
+                            </button>
+                        </div>
+                        <div class="export-progress" id="exportProgress" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="exportProgressFill"></div>
+                            </div>
+                            <p class="progress-text" id="exportProgressText">Preparing export...</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Audio Element -->
+    <audio id="audioPlayer" style="display: none;"></audio>
+
+    <!-- Scripts -->
+    <script src="wordCloud.js"></script>
+    <script src="animationEngine.js"></script>
+    <script src="cameraController.js"></script>
+    <script src="renderer.js"></script>
+    <script src="audioManager.js"></script>
+    <script src="videoExporter.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

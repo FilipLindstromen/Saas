@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Scene, RecordingTake } from '../App'
 import { projectManager } from '../utils/projectManager'
 import { transcribeAudio, WordTimestamp } from '../utils/transcription'
@@ -8,6 +8,7 @@ import { exportDaVinciResolveTimeline } from '../utils/davinciExport'
 import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
 import { analyzeWaveform } from '../utils/waveformAnalyzer'
 import SettingsPanel from './SettingsPanel'
+import { TimelineAudioClip } from './TimelineAudioClip'
 
 interface EditStepProps {
   scenes: Scene[]
@@ -30,48 +31,61 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   // Get all selected takes from all scenes, arranged sequentially
   const [sceneTakes, setSceneTakes] = useState<SceneTake[]>([])
   const [selectedSceneIndex, setSelectedSceneIndex] = useState<number>(0)
-  
+
   // Current scene being edited
   const currentSceneTake = sceneTakes[selectedSceneIndex]
   const selectedSceneId = currentSceneTake?.sceneId || ''
   const selectedTake = currentSceneTake?.take || null
-  
-  // Video playback
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
+
+  // Video playback - multiple video elements for canvas holders
+  const videoRef = useRef<HTMLVideoElement>(null) // Main video (camera)
+  const screenVideoRef = useRef<HTMLVideoElement>(null) // Screen video
+  const audioRef = useRef<HTMLAudioElement>(null) // Audio
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [totalDuration, setTotalDuration] = useState(0) // Total duration of all scenes
   const [playbackRate, setPlaybackRate] = useState(1)
-  
+
   // Sidebar
   const [activeTab, setActiveTab] = useState<SidebarTab>('captions')
   const [showSettings, setShowSettings] = useState(false)
-  
+
   // Transcription (per scene)
   const [transcripts, setTranscripts] = useState<Map<string, { words: WordTimestamp[]; text: string }>>(new Map())
   const [selectedText, setSelectedText] = useState<{ start: number; end: number; sceneId: string } | null>(null)
   const [isTranscribing, setIsTranscribing] = useState<Map<string, boolean>>(new Map())
-  
+
   // Deleted words (strikethrough) - per scene, stored as Set of word indices
   const [deletedWords, setDeletedWords] = useState<Map<string, Set<number>>>(new Map())
   
+  // Selected words (per scene) - for deletion and correction
+  const [selectedWordIndices, setSelectedWordIndices] = useState<Map<string, Set<number>>>(new Map())
+  
+  // Word corrections (per scene, word index -> corrected text)
+  const [wordCorrections, setWordCorrections] = useState<Map<string, Map<number, string>>>(new Map())
+  
+  // State for correction dialog
+  const [correctionDialog, setCorrectionDialog] = useState<{ sceneId: string; wordIndex: number; currentWord: string } | null>(null)
+  
+  // Track if C key is being held
+  const isCPressedRef = useRef(false)
+
   // Cuts (per scene, stored with sceneId)
   const [cuts, setCuts] = useState<Map<string, VideoCut[]>>(new Map())
-  
+
   // Layout (global)
   const [layout, setLayout] = useState<Layout>({ type: 'camera-only' })
   const [savedLayouts, setSavedLayouts] = useState<Layout[]>([])
-  
+
   // Export selection
   const [selectedScenesForExport, setSelectedScenesForExport] = useState<Set<string>>(new Set())
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
-  
+
   // Clip selection and properties
   const [selectedClip, setSelectedClip] = useState<{ sceneId: string; takeId: string; layer: 'camera' | 'microphone' | 'screen' } | null>(null)
-  
+
   interface ClipProperties {
     // Audio properties
     enhanceVoice: boolean
@@ -85,9 +99,9 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     saturation: number // -100 to 100
     exposure: number // -100 to 100
   }
-  
+
   const [clipProperties, setClipProperties] = useState<Map<string, ClipProperties>>(new Map())
-  
+
   // Audio settings (global)
   const [audioSettings, setAudioSettings] = useState({
     noiseReduction: false,
@@ -98,7 +112,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     removeBackgroundNoise: false,
     audioQuality: 'best' as 'fast' | 'balanced' | 'best',
   })
-  
+
   // Visual settings (global)
   const [visualSettings, setVisualSettings] = useState({
     lutEnabled: false,
@@ -109,34 +123,65 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       midtones: 0,
       highlights: 0,
     },
+    backgroundColor: '#000000', // Background color for gaps/empty canvas
   })
-  
+
+  // Canvas settings (format, resolution, backgrounds, transitions)
+  const [canvasSettings, setCanvasSettings] = useState({
+    format: '16:9' as '16:9' | '9:16' | '1:1',
+    resolution: {
+      width: 1920,
+      height: 1080,
+    },
+    workAreaBackgroundColor: '#1a1a1a', // Background color for work area
+    videoBackgroundColor: '#000000', // Background color for video (used in export)
+    transitionDuration: 0.5, // Duration of position transitions between clips (in seconds)
+  })
+
+  // Calculate canvas dimensions based on format and resolution
+  const canvasDimensions = useMemo(() => {
+    const { format, resolution } = canvasSettings
+    let width = resolution.width
+    let height = resolution.height
+
+    // Adjust height based on format to maintain aspect ratio
+    if (format === '16:9') {
+      height = Math.round(width / (16 / 9))
+    } else if (format === '9:16') {
+      height = Math.round(width / (9 / 16))
+    } else if (format === '1:1') {
+      height = width
+    }
+
+    return { width, height, aspectRatio: width / height }
+  }, [canvasSettings.format, canvasSettings.resolution.width, canvasSettings.resolution.height])
+
   // Media blobs (for current scene)
   const [cameraBlob, setCameraBlob] = useState<Blob | null>(null)
   const [microphoneBlob, setMicrophoneBlob] = useState<Blob | null>(null)
   const [screenBlob, setScreenBlob] = useState<Blob | null>(null)
-  
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const lutCanvasRef = useRef<HTMLCanvasElement>(null)
   const [canvasZoom, setCanvasZoom] = useState(1)
-  
+
   // Video size (maintains aspect ratio)
   const [videoSize, setVideoSize] = useState({ width: 100, height: 100 }) // Percentage of container
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null)
-  
+
   // LUT data
   const [lutData, setLutData] = useState<number[][][] | null>(null)
-  
+
   // Video thumbnails for timeline
   const [videoThumbnails, setVideoThumbnails] = useState<Map<string, string>>(new Map())
-  
+
   // Waveform data for timeline (key: sceneId_takeId)
   const [waveforms, setWaveforms] = useState<Map<string, number[]>>(new Map())
-  
+
   // Caption styles and settings
   type CaptionStyleId = 'none' | 'style1' | 'style2' | 'style3' | 'style4' | 'style5' | 'style6' | 'style7' | 'style8' | 'style9' | 'style10'
-  
+
   interface CaptionStyle {
     id: CaptionStyleId
     name: string
@@ -149,7 +194,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     fontWeight: string | number
     textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
   }
-  
+
   const captionStyles: CaptionStyle[] = [
     { id: 'none', name: 'No Captions', backgroundColor: 'transparent', textColor: '#ffffff', padding: '0', borderRadius: '0', fontWeight: 400 },
     { id: 'style1', name: 'Classic', backgroundColor: 'rgba(0, 0, 0, 0.75)', textColor: '#ffffff', padding: '8px 16px', borderRadius: '4px', fontWeight: 400 },
@@ -163,13 +208,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     { id: 'style9', name: 'Uppercase Bold', backgroundColor: 'rgba(0, 0, 0, 0.8)', textColor: '#ffffff', padding: '10px 18px', borderRadius: '6px', fontWeight: 700, textTransform: 'uppercase' },
     { id: 'style10', name: 'Soft Pink', backgroundColor: 'rgba(236, 64, 122, 0.9)', textColor: '#ffffff', padding: '9px 17px', borderRadius: '14px', fontWeight: 500, boxShadow: '0 2px 10px rgba(236, 64, 122, 0.3)' },
   ]
-  
+
   const [selectedCaptionStyle, setSelectedCaptionStyle] = useState<CaptionStyleId>('style1')
   const [captionFont, setCaptionFont] = useState<string>('Inter')
   const [captionSize, setCaptionSize] = useState<number>(16)
+  const [captionMaxWords, setCaptionMaxWords] = useState<number>(5) // Maximum words to show at once
   // Track which word indices have which style (per scene)
   const [captionWordStyles, setCaptionWordStyles] = useState<Map<string, Map<number, CaptionStyleId>>>(new Map())
-  
+
   const availableFonts = [
     { name: 'Inter', value: 'Inter, sans-serif' },
     { name: 'Roboto', value: 'Roboto, sans-serif' },
@@ -181,25 +227,29 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     { name: 'Raleway', value: 'Raleway, sans-serif' },
     { name: 'Ubuntu', value: 'Ubuntu, sans-serif' },
   ]
-  
+
   // Resizable transcript panel
   const [transcriptWidth, setTranscriptWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
   const transcriptResizeRef = useRef<HTMLDivElement>(null)
-  
+
   // Resizable timeline
   const [timelineHeight, setTimelineHeight] = useState(192) // 48 * 4 = 192px (h-48)
   const [isResizingTimeline, setIsResizingTimeline] = useState(false)
-  
-  // Timeline zoom (pixels per second)
-  const [timelineZoom, setTimelineZoom] = useState(50) // Default: 50px per second
+
+  // Ref for tracking playback state across scene switches
+  const wasPlayingRef = useRef(false)
+
+  // Timeline View Settings
+  const [timelineTrackHeight, setTimelineTrackHeight] = useState(80) // Default height px
+  const [timelineZoom, setTimelineZoom] = useState(50) // pixels per second
   const minZoom = 10 // 10px per second (zoomed out)
   const maxZoom = 200 // 200px per second (zoomed in)
-  
+
   // Timeline tools
   type TimelineTool = 'select' | 'cut'
   const [timelineTool, setTimelineTool] = useState<TimelineTool>('select')
-  
+
   // Timeline clips structure - proper clip-based editing like DaVinci Resolve
   interface TimelineClip {
     id: string
@@ -215,39 +265,235 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     // Original source duration (for limiting trims)
     sourceDuration: number // Full duration of source media
   }
-  
+
+  // Canvas video holder - represents a video clip on the canvas
+  interface CanvasVideoHolder {
+    id: string
+    clipId: string // Reference to timeline clip
+    layer: 'camera' | 'microphone' | 'screen'
+    // Position and size on canvas (0-1 normalized coordinates)
+    x: number // 0 = left edge, 1 = right edge
+    y: number // 0 = top edge, 1 = bottom edge
+    width: number // Width as fraction of canvas (0-1)
+    height: number // Height as fraction of canvas (0-1)
+    // Rotation (future)
+    rotation: number // Degrees
+    // Z-index for layering
+    zIndex: number
+  }
+
+  // Clip holder on canvas - position and size for rendering
+  interface ClipHolder {
+    clipId: string // Links to TimelineClip.id
+    x: number // Position X (0-1, relative to canvas width)
+    y: number // Position Y (0-1, relative to canvas height)
+    width: number // Width (0-1, relative to canvas width)
+    height: number // Height (0-1, relative to canvas height)
+  }
+
   const [timelineClips, setTimelineClips] = useState<TimelineClip[]>([])
   const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set())
+  
+  // Canvas video holders - video clips positioned on canvas
+  const [canvasHolders, setCanvasHolders] = useState<CanvasVideoHolder[]>([])
+  
+  // Holder transitions - track animated transitions between positions
+  const transitioningHoldersRef = useRef<Map<string, {
+    startPos: { x: number; y: number; width: number; height: number }
+    endPos: { x: number; y: number; width: number; height: number }
+    startTime: number
+    duration: number
+  }>>(new Map())
+  
+  // Fade-out transitions - track previous holders that should fade out
+  const fadingOutHoldersRef = useRef<Map<string, {
+    holder: CanvasVideoHolder
+    startTime: number
+    duration: number
+  }>>(new Map())
+  
+  // Selected holder for editing
+  const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null)
+  
+  // Dragging state for moving holders
+  const [draggingHolderId, setDraggingHolderId] = useState<string | null>(null)
+  const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [dragStartHolder, setDragStartHolder] = useState<CanvasVideoHolder | null>(null)
+  
+  // Resizing state for resizing holders
+  const [resizingHolderId, setResizingHolderId] = useState<string | null>(null)
+  const [resizeCorner, setResizeCorner] = useState<'nw' | 'ne' | 'sw' | 'se' | null>(null)
+  const [resizeStartPos, setResizeStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [resizeStartHolder, setResizeStartHolder] = useState<CanvasVideoHolder | null>(null)
+  
+  // Timeline clip dragging state (different from canvas holder dragging)
   const [draggingClipId, setDraggingClipId] = useState<string | null>(null)
   const [draggingOffset, setDraggingOffset] = useState<number>(0)
   const [trimmingClipId, setTrimmingClipId] = useState<string | null>(null)
   const [trimmingEdge, setTrimmingEdge] = useState<'in' | 'out' | null>(null)
   const [trimmingStartPos, setTrimmingStartPos] = useState<number>(0)
-  
+
+  // Undo/Redo History
+  interface EditStateSnapshot {
+    timelineClips: TimelineClip[]
+    clipProperties: Map<string, ClipProperties>
+    deletedWords: Map<string, Set<number>>
+    cuts: Map<string, VideoCut[]>
+    layout: Layout
+    audioSettings: typeof audioSettings
+    visualSettings: typeof visualSettings
+    canvasSettings: typeof canvasSettings
+    selectedCaptionStyle: CaptionStyleId
+    captionFont: string
+    captionSize: number
+    captionMaxWords: number
+  }
+
+  const [history, setHistory] = useState<EditStateSnapshot[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const maxHistorySize = 50
+
+  // Helper to create a deep copy of state for history
+  const createSnapshot = useCallback((): EditStateSnapshot => {
+    return {
+      timelineClips: JSON.parse(JSON.stringify(timelineClips)),
+      clipProperties: new Map(Array.from(clipProperties.entries()).map(([k, v]) => [k, { ...v }])),
+      deletedWords: new Map(Array.from(deletedWords.entries()).map(([k, v]) => [k, new Set(v)])),
+      cuts: new Map(Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])),
+      layout: JSON.parse(JSON.stringify(layout)),
+      audioSettings: { ...audioSettings },
+      visualSettings: {
+        ...visualSettings,
+        colorGrading: { ...visualSettings.colorGrading },
+      },
+      canvasSettings: {
+        ...canvasSettings,
+        resolution: { ...canvasSettings.resolution },
+      },
+      selectedCaptionStyle,
+      captionFont,
+      captionSize,
+      captionMaxWords,
+    }
+  }, [timelineClips, clipProperties, deletedWords, cuts, layout, audioSettings, visualSettings, canvasSettings, selectedCaptionStyle, captionFont, captionSize, captionMaxWords])
+
+  // Save current state to history
+  const saveToHistory = useCallback(() => {
+    const snapshot = createSnapshot()
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1)
+      newHistory.push(snapshot)
+      // Limit history size
+      if (newHistory.length > maxHistorySize) {
+        newHistory.shift()
+        return newHistory
+      }
+      return newHistory
+    })
+    setHistoryIndex(prev => Math.min(prev + 1, maxHistorySize - 1))
+  }, [createSnapshot, historyIndex])
+
+  // Restore state from snapshot
+  const restoreFromSnapshot = useCallback((snapshot: EditStateSnapshot) => {
+    setTimelineClips(snapshot.timelineClips)
+    setClipProperties(snapshot.clipProperties)
+    setDeletedWords(snapshot.deletedWords)
+    setCuts(snapshot.cuts)
+    setLayout(snapshot.layout)
+    setAudioSettings(snapshot.audioSettings)
+    setVisualSettings(snapshot.visualSettings)
+    setCanvasSettings(snapshot.canvasSettings)
+    setSelectedCaptionStyle(snapshot.selectedCaptionStyle)
+    setCaptionFont(snapshot.captionFont)
+    setCaptionSize(snapshot.captionSize)
+    setCaptionMaxWords(snapshot.captionMaxWords)
+  }, [])
+
+  // Undo function
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      restoreFromSnapshot(history[newIndex])
+    }
+  }, [historyIndex, history, restoreFromSnapshot])
+
+  // Redo function
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      restoreFromSnapshot(history[newIndex])
+    }
+  }, [historyIndex, history, restoreFromSnapshot])
+
+  // Check if undo/redo is available
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
+  // Initialize history with current state
+  useEffect(() => {
+    if (history.length === 0 && timelineClips.length > 0) {
+      const initialSnapshot = createSnapshot()
+      setHistory([initialSnapshot])
+      setHistoryIndex(0)
+    }
+  }, [timelineClips.length]) // Initialize when clips are loaded
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z or Cmd+Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        if (canUndo) {
+          handleUndo()
+        }
+      }
+      // Ctrl+Shift+Z or Cmd+Shift+Z or Ctrl+Y for redo
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault()
+        if (canRedo) {
+          handleRedo()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [canUndo, canRedo, handleUndo, handleRedo])
+
   // Build scene takes from all scenes with selected takes
   useEffect(() => {
     const takes: SceneTake[] = []
     let currentStartTime = 0
-    
+
     scenes.forEach((scene, index) => {
       const selectedTake = scene.recordings.find(r => r.selected)
-      if (selectedTake && selectedTake.duration > 0) {
+      // Check if duration is valid (finite and > 0)
+      const validDuration = selectedTake?.duration && Number.isFinite(selectedTake.duration) && selectedTake.duration > 0
+      if (selectedTake && validDuration) {
+        const safeDuration = selectedTake.duration
         takes.push({
           sceneId: scene.id,
           sceneIndex: index,
           take: selectedTake,
           startTime: currentStartTime,
-          endTime: currentStartTime + selectedTake.duration,
+          endTime: currentStartTime + safeDuration,
           trimmedStart: 0,
           trimmedEnd: 0,
         })
-        currentStartTime += selectedTake.duration
+        currentStartTime += safeDuration
       }
     })
-    
+
     setSceneTakes(takes)
-    setTotalDuration(Math.max(currentStartTime, 1)) // Ensure at least 1 second for timeline display
-    
+    // Ensure totalDuration is always finite
+    const safeDuration = Number.isFinite(currentStartTime) && currentStartTime > 0 ? currentStartTime : 1
+    setTotalDuration(safeDuration)
+
     // Select first scene if available, or adjust index if current selection is invalid
     if (takes.length > 0) {
       if (selectedSceneIndex >= takes.length || selectedSceneIndex < 0) {
@@ -256,7 +502,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     } else {
       setSelectedSceneIndex(0)
     }
-    
+
     // Analyze waveforms for all microphone recordings
     takes.forEach((sceneTake) => {
       if (sceneTake.take.hasMicrophone) {
@@ -282,16 +528,28 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
     })
   }, [scenes])
-  
+
   // Build timeline clips from scene takes - proper clip-based system
   useEffect(() => {
     const clips: TimelineClip[] = []
     let currentTimelinePos = 0
-    
+
     sceneTakes.forEach((sceneTake) => {
-      const sourceDuration = sceneTake.take.duration
-      
+      // Ensure duration is valid
+      const rawDuration = sceneTake.take.duration
+      const sourceDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 0
+
+      if (sourceDuration <= 0) {
+        console.warn(`Invalid duration for scene ${sceneTake.sceneId}, take ${sceneTake.take.id}: ${rawDuration}`)
+        return // Skip this scene take if duration is invalid
+      }
+
       // Create separate clips for each layer
+      // timelineEnd must always equal timelineStart + (sourceOut - sourceIn) for accuracy
+      const sourceIn = 0
+      const sourceOut = sourceDuration // Initially, clip uses full source
+      const trimmedDuration = sourceOut - sourceIn // Actual clip duration on timeline
+      
       if (sceneTake.take.hasCamera) {
         clips.push({
           id: `${sceneTake.sceneId}_${sceneTake.take.id}_camera`,
@@ -299,13 +557,13 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           takeId: sceneTake.take.id,
           layer: 'camera',
           timelineStart: currentTimelinePos,
-          timelineEnd: currentTimelinePos + sourceDuration,
-          sourceIn: 0,
-          sourceOut: sourceDuration,
-          sourceDuration: sourceDuration,
+          timelineEnd: currentTimelinePos + trimmedDuration, // Must match trimmed duration exactly
+          sourceIn: sourceIn,
+          sourceOut: sourceOut,
+          sourceDuration: sourceDuration // Store full source duration for reference
         })
       }
-      
+
       if (sceneTake.take.hasMicrophone) {
         clips.push({
           id: `${sceneTake.sceneId}_${sceneTake.take.id}_microphone`,
@@ -313,13 +571,13 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           takeId: sceneTake.take.id,
           layer: 'microphone',
           timelineStart: currentTimelinePos,
-          timelineEnd: currentTimelinePos + sourceDuration,
-          sourceIn: 0,
-          sourceOut: sourceDuration,
-          sourceDuration: sourceDuration,
+          timelineEnd: currentTimelinePos + trimmedDuration,
+          sourceIn: sourceIn,
+          sourceOut: sourceOut,
+          sourceDuration: sourceDuration
         })
       }
-      
+
       if (sceneTake.take.hasScreen) {
         clips.push({
           id: `${sceneTake.sceneId}_${sceneTake.take.id}_screen`,
@@ -327,24 +585,137 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           takeId: sceneTake.take.id,
           layer: 'screen',
           timelineStart: currentTimelinePos,
-          timelineEnd: currentTimelinePos + sourceDuration,
-          sourceIn: 0,
-          sourceOut: sourceDuration,
-          sourceDuration: sourceDuration,
+          timelineEnd: currentTimelinePos + trimmedDuration,
+          sourceIn: sourceIn,
+          sourceOut: sourceOut,
+          sourceDuration: sourceDuration
         })
       }
-      
-      // Move timeline position forward for next scene
-      currentTimelinePos += sourceDuration
+
+      // Move timeline position forward for next scene based on trimmed duration
+      currentTimelinePos += trimmedDuration
     })
-    
+
     setTimelineClips(clips)
-    
-    // Update total duration
+
+    // Initialize canvas holders from timeline clips
+    setCanvasHolders(prev => {
+      const holders: CanvasVideoHolder[] = []
+      const existingHoldersMap = new Map(prev.map(h => [h.clipId, h]))
+      
+      clips.forEach(clip => {
+        if (clip.layer === 'camera' || clip.layer === 'screen') {
+          // Check if holder already exists for this clip
+          const existingHolder = existingHoldersMap.get(clip.id)
+          if (existingHolder) {
+            // Keep existing holder with its position/size
+            holders.push(existingHolder)
+          } else {
+            // Create new holder with default position
+            // Camera: full canvas
+            // Screen: smaller, positioned
+            const defaultX = clip.layer === 'camera' ? 0 : 0.5
+            const defaultY = clip.layer === 'camera' ? 0 : 0.5
+            const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
+            const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
+            
+            holders.push({
+              id: `holder_${clip.id}`,
+              clipId: clip.id,
+              layer: clip.layer,
+              x: defaultX,
+              y: defaultY,
+              width: defaultWidth,
+              height: defaultHeight,
+              rotation: 0,
+              zIndex: clip.layer === 'camera' ? 1 : 2, // Screen on top
+            })
+          }
+        }
+      })
+      
+      // Remove holders for clips that no longer exist
+      const validClipIds = new Set(clips.map(c => c.id))
+      return holders.filter(h => validClipIds.has(h.clipId))
+    })
+
+    // Update total duration - ensure it's always finite
     const maxEnd = clips.length > 0 ? Math.max(...clips.map(c => c.timelineEnd)) : 0
-    setTotalDuration(Math.max(maxEnd, 1))
+    const safeMaxEnd = Number.isFinite(maxEnd) && maxEnd > 0 ? maxEnd : 1
+    setTotalDuration(safeMaxEnd)
   }, [sceneTakes])
-  
+
+  // Sync canvas holders when timeline clips change (e.g., after cuts/splits)
+  useEffect(() => {
+    setCanvasHolders(prev => {
+      const holders: CanvasVideoHolder[] = []
+      const existingHoldersMap = new Map(prev.map(h => [h.clipId, h]))
+      
+      // Build a map of original clip IDs to holders (for finding parents of split clips)
+      const originalHoldersMap = new Map<string, CanvasVideoHolder>()
+      prev.forEach(holder => {
+        // Store by the base clip ID (before suffixes like _before, _after, _part1, etc.)
+        const baseId = holder.clipId.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
+        if (!originalHoldersMap.has(baseId)) {
+          originalHoldersMap.set(baseId, holder)
+        }
+      })
+      
+      timelineClips.forEach(clip => {
+        if (clip.layer === 'camera' || clip.layer === 'screen') {
+          // Check if holder already exists for this clip
+          const existingHolder = existingHoldersMap.get(clip.id)
+          if (existingHolder) {
+            // Keep existing holder with its position/size
+            holders.push(existingHolder)
+          } else {
+            // Try to find original holder by matching scene/take/layer
+            // Look for holder from original clip (before it was split)
+            let sourceHolder: CanvasVideoHolder | undefined = undefined
+            
+            // First try to find by base ID pattern
+            const baseId = clip.id.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
+            const baseHolder = originalHoldersMap.get(baseId)
+            if (baseHolder && baseHolder.layer === clip.layer) {
+              sourceHolder = baseHolder
+            } else {
+              // If no base holder found, look for any holder with same scene/take/layer
+              const matchingHolder = prev.find(h => {
+                const hClip = timelineClips.find(c => c.id === h.clipId)
+                return hClip && hClip.sceneId === clip.sceneId && hClip.takeId === clip.takeId && h.layer === clip.layer
+              })
+              if (matchingHolder) {
+                sourceHolder = matchingHolder
+              }
+            }
+            
+            // Use source holder's properties if found, otherwise use defaults
+            const defaultX = clip.layer === 'camera' ? 0 : 0.5
+            const defaultY = clip.layer === 'camera' ? 0 : 0.5
+            const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
+            const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
+            
+            holders.push({
+              id: `holder_${clip.id}`,
+              clipId: clip.id,
+              layer: clip.layer,
+              x: sourceHolder?.x ?? defaultX,
+              y: sourceHolder?.y ?? defaultY,
+              width: sourceHolder?.width ?? defaultWidth,
+              height: sourceHolder?.height ?? defaultHeight,
+              rotation: sourceHolder?.rotation ?? 0,
+              zIndex: sourceHolder?.zIndex ?? (clip.layer === 'camera' ? 1 : 2),
+            })
+          }
+        }
+      })
+      
+      // Remove holders for clips that no longer exist
+      const validClipIds = new Set(timelineClips.map(c => c.id))
+      return holders.filter(h => validClipIds.has(h.clipId))
+    })
+  }, [timelineClips])
+
   // Ensure selectedSceneIndex is always valid
   useEffect(() => {
     if (sceneTakes.length > 0) {
@@ -355,7 +726,46 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       setSelectedSceneIndex(0)
     }
   }, [sceneTakes, selectedSceneIndex])
-  
+
+  // Handle keyboard events for word selection (Delete key) and C key tracking
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'c' || e.key === 'C') {
+        isCPressedRef.current = true
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Delete selected words
+        const selectedWords = selectedWordIndices
+        if (selectedWords.size > 0) {
+          setDeletedWords(prev => {
+            const updated = new Map(prev)
+            selectedWords.forEach((indices, sceneId) => {
+              const sceneDeleted = updated.get(sceneId) || new Set<number>()
+              const newDeleted = new Set(sceneDeleted)
+              indices.forEach(index => newDeleted.add(index))
+              updated.set(sceneId, newDeleted)
+            })
+            return updated
+          })
+          // Clear selection after deletion
+          setSelectedWordIndices(new Map())
+        }
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'c' || e.key === 'C') {
+        isCPressedRef.current = false
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [selectedWordIndices])
+
   // Handle transcript panel resize
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -363,11 +773,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       const newWidth = window.innerWidth - e.clientX
       setTranscriptWidth(Math.max(200, Math.min(800, newWidth)))
     }
-    
+
     const handleMouseUp = () => {
       setIsResizing(false)
     }
-    
+
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
@@ -377,7 +787,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
     }
   }, [isResizing])
-  
+
   // Handle timeline resize
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -385,11 +795,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       const newHeight = window.innerHeight - e.clientY
       setTimelineHeight(Math.max(100, Math.min(600, newHeight)))
     }
-    
+
     const handleMouseUp = () => {
       setIsResizingTimeline(false)
     }
-    
+
     if (isResizingTimeline) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
@@ -399,7 +809,129 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
     }
   }, [isResizingTimeline])
-  
+
+  // Handle canvas holder dragging (moving)
+  useEffect(() => {
+    if (!draggingHolderId || !dragStartPos || !dragStartHolder) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement
+      if (!canvasContainer) return
+
+      const rect = canvasContainer.getBoundingClientRect()
+      const deltaX = (e.clientX - dragStartPos.x) / rect.width
+      const deltaY = (e.clientY - dragStartPos.y) / rect.height
+
+      setCanvasHolders(prev => prev.map(holder => {
+        if (holder.id !== draggingHolderId) return holder
+
+        let newX = dragStartHolder.x + deltaX
+        let newY = dragStartHolder.y + deltaY
+
+        // Constrain to canvas bounds
+        newX = Math.max(0, Math.min(1 - holder.width, newX))
+        newY = Math.max(0, Math.min(1 - holder.height, newY))
+
+        return {
+          ...holder,
+          x: newX,
+          y: newY,
+        }
+      }))
+    }
+
+    const handleMouseUp = () => {
+      setDraggingHolderId(null)
+      setDragStartPos(null)
+      setDragStartHolder(null)
+      saveToHistory()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingHolderId, dragStartPos, dragStartHolder, saveToHistory])
+
+  // Handle canvas holder resizing (corner handles)
+  useEffect(() => {
+    if (!resizingHolderId || !resizeCorner || !resizeStartPos || !resizeStartHolder) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement
+      if (!canvasContainer) return
+
+      const rect = canvasContainer.getBoundingClientRect()
+      const deltaX = (e.clientX - resizeStartPos.x) / rect.width
+      const deltaY = (e.clientY - resizeStartPos.y) / rect.height
+
+      setCanvasHolders(prev => prev.map(holder => {
+        if (holder.id !== resizingHolderId) return holder
+
+        let newX = resizeStartHolder.x
+        let newY = resizeStartHolder.y
+        let newWidth = resizeStartHolder.width
+        let newHeight = resizeStartHolder.height
+
+        // Resize based on corner
+        if (resizeCorner === 'nw') {
+          // Top-left: adjust x, y, width, height
+          newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
+          newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
+          newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
+          newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
+        } else if (resizeCorner === 'ne') {
+          // Top-right: adjust y, width, height
+          newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
+          newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
+          newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
+        } else if (resizeCorner === 'sw') {
+          // Bottom-left: adjust x, width, height
+          newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
+          newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
+          newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
+        } else if (resizeCorner === 'se') {
+          // Bottom-right: adjust width, height
+          newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
+          newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
+        }
+
+        // Ensure holder stays within canvas bounds
+        if (newX + newWidth > 1) {
+          newWidth = 1 - newX
+        }
+        if (newY + newHeight > 1) {
+          newHeight = 1 - newY
+        }
+
+        return {
+          ...holder,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        }
+      }))
+    }
+
+    const handleMouseUp = () => {
+      setResizingHolderId(null)
+      setResizeCorner(null)
+      setResizeStartPos(null)
+      setResizeStartHolder(null)
+      saveToHistory()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, saveToHistory])
+
   // Load selected take's recordings
   useEffect(() => {
     const loadTakeRecordings = async () => {
@@ -409,11 +941,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         setScreenBlob(null)
         return
       }
-      
+
       try {
         const scene = scenes.find(s => s.id === selectedSceneId)
         if (!scene) return
-        
+
         // Try to load camera layer (check both hasCamera flag and file existence)
         if (selectedTake.hasCamera !== false) {
           try {
@@ -438,7 +970,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         } else {
           setCameraBlob(null)
         }
-        
+
         // Try to load microphone layer
         if (selectedTake.hasMicrophone !== false) {
           try {
@@ -447,7 +979,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               `${selectedTake.id}_microphone`
             )
             setMicrophoneBlob(micBlob)
-            
+
             // Analyze waveform for timeline visualization
             const waveformKey = `${selectedSceneId}_${selectedTake.id}`
             if (!waveforms.has(waveformKey) && micBlob) {
@@ -464,7 +996,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         } else {
           setMicrophoneBlob(null)
         }
-        
+
         // Try to load screen layer
         if (selectedTake.hasScreen !== false) {
           try {
@@ -483,288 +1015,923 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         console.error('Error loading recordings:', error)
       }
     }
-    
+
     loadTakeRecordings()
   }, [selectedTake, selectedSceneId, scenes])
-  
+
   // Convert timeline time to actual video time using clip-based system
   const timelineToVideoTime = useCallback((absoluteTime: number): { clip: TimelineClip | null; videoTime: number; sceneId: string; takeId: string } | null => {
     const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
-    
+
     // Find which clip this time belongs to (prioritize camera, then microphone, then screen)
-    const cameraClip = timelineClips.find(c => 
-      c.layer === 'camera' && 
-      clampedTime >= c.timelineStart && 
-      clampedTime < c.timelineEnd
+    // Use < for end boundary (exclusive) - at exactly timelineEnd, we're past the clip
+    const cameraClip = timelineClips.find(c =>
+      c.layer === 'camera' &&
+      clampedTime >= c.timelineStart &&
+      clampedTime < c.timelineEnd // Exclusive end
     )
-    
-    const clip = cameraClip || timelineClips.find(c => 
-      clampedTime >= c.timelineStart && 
-      clampedTime < c.timelineEnd
+
+    const clip = cameraClip || timelineClips.find(c =>
+      clampedTime >= c.timelineStart &&
+      clampedTime < c.timelineEnd // Exclusive end
     )
-    
+
     if (!clip) return null
-    
+
     // Calculate relative time within the timeline clip
     const relativeTimelineTime = clampedTime - clip.timelineStart
     const clipDuration = clip.timelineEnd - clip.timelineStart
+    
+    // Handle edge case where clip duration is 0 or very small
+    if (clipDuration <= 0.001) {
+      return {
+        clip,
+        videoTime: clip.sourceIn,
+        sceneId: clip.sceneId,
+        takeId: clip.takeId
+      }
+    }
+    
     const sourceDuration = clip.sourceOut - clip.sourceIn
-    
+
     // Map timeline position to source video time
-    // If clip is 10 seconds on timeline and source is 5-15 seconds, map proportionally
-    const sourceTime = clip.sourceIn + (relativeTimelineTime / clipDuration) * sourceDuration
-    
-    return { 
-      clip, 
+    // Clamp to ensure we never exceed sourceOut
+    const sourceTime = clip.sourceIn + Math.min(1, relativeTimelineTime / clipDuration) * sourceDuration
+
+    return {
+      clip,
       videoTime: Math.max(clip.sourceIn, Math.min(clip.sourceOut, sourceTime)),
       sceneId: clip.sceneId,
       takeId: clip.takeId
     }
   }, [timelineClips, totalDuration])
-  
-  // Set up video and audio playback (separate elements, synced)
+
+  // Function to draw video frame to canvas with LUT
+  const drawFrame = useCallback(() => {
+    const canvas = lutCanvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: false })
+    if (!ctx) return
+
+    // If we have canvas holders, don't draw video to canvas - let holders handle rendering
+    // Only use canvas for captions/LUT overlays if needed
+    if (canvasHolders.length > 0) {
+      // Set canvas to match canvas dimensions for caption rendering
+      const container = document.querySelector('[data-canvas-container]') as HTMLElement
+      if (container) {
+        const rect = container.getBoundingClientRect()
+        if (canvas.width !== rect.width || canvas.height !== rect.height) {
+          canvas.width = rect.width
+          canvas.height = rect.height
+        }
+      } else {
+        // Fallback to canvas settings resolution
+        if (canvas.width === 0 || canvas.height === 0) {
+          canvas.width = canvasDimensions.width
+          canvas.height = canvasDimensions.height
+        }
+      }
+      
+      // Clear canvas (transparent - video is rendered by holders)
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
+      // Only draw captions if enabled (video rendering is handled by holders)
+      const timelineResult = timelineToVideoTime(currentTime)
+      if (selectedCaptionStyle !== 'none' && timelineResult && timelineResult.clip) {
+        const sceneTranscript = transcripts.get(timelineResult.sceneId)
+        if (sceneTranscript) {
+          // Calculate the timeline time relative to the scene start
+          const sceneTake = sceneTakes.find(st => st.sceneId === timelineResult.sceneId)
+          if (sceneTake) {
+            // Get words that should be visible at current time
+            const sceneRelativeTime = currentTime - sceneTake.startTime
+            const visibleWords = sceneTranscript.words.filter(w => {
+              const wordStart = w.start - sceneTake.startTime
+              const wordEnd = w.end - sceneTake.startTime
+              return sceneRelativeTime >= wordStart && sceneRelativeTime <= wordEnd
+            })
+
+            if (visibleWords.length > 0) {
+              const style = captionStyles.find(s => s.id === selectedCaptionStyle) || captionStyles[0]
+              const wordsToShow = visibleWords.slice(0, captionMaxWords)
+              const text = wordsToShow.map(w => w.word).join(' ')
+              const fontSize = Math.max(12, Math.min(200, (canvas.height / 1080) * captionSize))
+              const fontFamily = captionFont
+              
+              ctx.save()
+              ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'bottom'
+              
+              const x = canvas.width / 2
+              const y = canvas.height - (canvas.height * 0.1)
+              
+              const metrics = ctx.measureText(text)
+              const textWidth = metrics.width
+              const textHeight = fontSize
+              const padding = parseFloat(style.padding) || 8
+              const borderRadius = parseFloat(style.borderRadius) || 4
+              
+              const bgX = x - textWidth / 2 - padding
+              const bgY = y - textHeight - padding
+              const bgWidth = textWidth + (padding * 2)
+              const bgHeight = textHeight + (padding * 2)
+              
+              // Draw rounded rectangle background
+              ctx.beginPath()
+              ctx.roundRect(bgX, bgY, bgWidth, bgHeight, borderRadius)
+              ctx.fillStyle = style.backgroundColor
+              ctx.fill()
+              
+              if (style.border) {
+                ctx.strokeStyle = style.border.split(' ')[2] || '#ffffff'
+                ctx.lineWidth = parseFloat(style.border.split(' ')[0]) || 2
+                ctx.stroke()
+              }
+              
+              // Draw text
+              ctx.fillStyle = style.textColor
+              ctx.fillText(text, x, y)
+              
+              ctx.restore()
+            }
+          }
+        }
+      }
+      return
+    }
+
+    // OLD BEHAVIOR: Draw video to canvas when no holders (legacy mode)
+    const video = videoRef.current
+    const timelineResult = timelineToVideoTime(currentTime)
+    const isInGap = !timelineResult || !timelineResult.clip
+
+    // If we're in a gap, show background color
+    if (isInGap) {
+      // Set canvas to a reasonable default size if not set
+      if (canvas.width === 0 || canvas.height === 0) {
+        canvas.width = 1920
+        canvas.height = 1080
+      }
+      ctx.fillStyle = canvasSettings.videoBackgroundColor
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      return
+    }
+
+    // If no video or video not ready or seeking, don't draw (will preserve last frame)
+    if (!video || video.readyState < 2 || isSeekingRef.current || video.videoWidth === 0 || video.videoHeight === 0) {
+      return
+    }
+
+    // Keep canvas at native video resolution for quality
+    // Only resize if dimensions actually changed to avoid flicker
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+    }
+
+    // Draw video frame - only if video has valid dimensions
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      try {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    // Apply LUT if enabled
+    if (visualSettings.lutEnabled && lutData && visualSettings.lutIntensity > 0) {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const processedData = applyLUTToImageData(imageData, lutData, visualSettings.lutIntensity)
+      ctx.putImageData(processedData, 0, 0)
+    }
+
+        // Draw captions on canvas if enabled
+        if (selectedCaptionStyle !== 'none' && timelineResult && timelineResult.clip) {
+          const sceneTranscript = transcripts.get(timelineResult.sceneId)
+          if (sceneTranscript) {
+            // Calculate the timeline time relative to the scene start
+            const sceneTake = sceneTakes.find(st => st.sceneId === timelineResult.sceneId)
+            if (sceneTake) {
+              // Get words that should be visible at current time
+              // Adjust currentTime to be relative to scene start
+              const sceneRelativeTime = currentTime - sceneTake.startTime
+              const visibleWords = sceneTranscript.words.filter(w => {
+                // Check if word is in the visible time range
+                const wordStart = w.start - sceneTake.startTime
+                const wordEnd = w.end - sceneTake.startTime
+                return sceneRelativeTime >= wordStart && sceneRelativeTime <= wordEnd
+              })
+
+              if (visibleWords.length > 0) {
+                const style = captionStyles.find(s => s.id === selectedCaptionStyle) || captionStyles[0]
+                
+                // Limit words to max words setting
+                const wordsToShow = visibleWords.slice(0, captionMaxWords)
+                
+                // Prepare text to render
+                const text = wordsToShow.map(w => w.word).join(' ')
+                
+                // Calculate font size based on canvas height (scale proportionally)
+                const fontSize = Math.max(12, Math.min(200, (canvas.height / 1080) * captionSize))
+                const fontFamily = captionFont
+                
+                // Set up text rendering
+                ctx.save()
+                ctx.font = `${style.fontWeight} ${fontSize}px ${fontFamily}`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'bottom'
+                
+                // Calculate text position (bottom center)
+                const x = canvas.width / 2
+                const y = canvas.height - (canvas.height * 0.1) // 10% from bottom
+                
+                // Measure text for background
+                const metrics = ctx.measureText(text)
+                const textWidth = metrics.width
+                const textHeight = fontSize
+                
+                // Draw background
+                const padding = parseFloat(style.padding) || 8
+                const borderRadius = parseFloat(style.borderRadius) || 4
+                
+                // Draw rounded rectangle background
+                const bgX = x - textWidth / 2 - padding
+                const bgY = y - textHeight - padding
+                const bgW = textWidth + padding * 2
+                const bgH = textHeight + padding * 2
+                
+                ctx.beginPath()
+                if (ctx.roundRect) {
+                  ctx.roundRect(bgX, bgY, bgW, bgH, borderRadius)
+                } else {
+                  // Fallback for browsers without roundRect
+                  const r = borderRadius
+                  ctx.moveTo(bgX + r, bgY)
+                  ctx.lineTo(bgX + bgW - r, bgY)
+                  ctx.quadraticCurveTo(bgX + bgW, bgY, bgX + bgW, bgY + r)
+                  ctx.lineTo(bgX + bgW, bgY + bgH - r)
+                  ctx.quadraticCurveTo(bgX + bgW, bgY + bgH, bgX + bgW - r, bgY + bgH)
+                  ctx.lineTo(bgX + r, bgY + bgH)
+                  ctx.quadraticCurveTo(bgX, bgY + bgH, bgX, bgY + bgH - r)
+                  ctx.lineTo(bgX, bgY + r)
+                  ctx.quadraticCurveTo(bgX, bgY, bgX + r, bgY)
+                  ctx.closePath()
+                }
+                
+                // Apply background color
+                if (style.backgroundColor && style.backgroundColor !== 'transparent') {
+                  if (style.backgroundColor.startsWith('linear-gradient')) {
+                    // For gradients, use a solid color fallback
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'
+                  } else {
+                    ctx.fillStyle = style.backgroundColor
+                  }
+                  ctx.fill()
+                }
+                
+                // Draw border if specified
+                if (style.border) {
+                  ctx.strokeStyle = style.border.split(' ')[2] || '#ffffff'
+                  ctx.lineWidth = parseFloat(style.border.split(' ')[0]) || 2
+                  ctx.stroke()
+                }
+                
+                // Draw text
+                ctx.fillStyle = style.textColor || '#ffffff'
+                if (style.textTransform === 'uppercase') {
+                  ctx.fillText(text.toUpperCase(), x, y)
+                } else if (style.textTransform === 'lowercase') {
+                  ctx.fillText(text.toLowerCase(), x, y)
+                } else if (style.textTransform === 'capitalize') {
+                  ctx.fillText(text.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' '), x, y)
+                } else {
+                  ctx.fillText(text, x, y)
+                }
+                
+                ctx.restore()
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // If drawing fails, show background
+        ctx.fillStyle = canvasSettings.videoBackgroundColor
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+    } else {
+      // Video not ready, show background
+      ctx.fillStyle = canvasSettings.videoBackgroundColor
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
+  }, [visualSettings.lutEnabled, visualSettings.lutIntensity, lutData, timelineToVideoTime, currentTime, canvasSettings.videoBackgroundColor, selectedCaptionStyle, captionStyles, captionFont, captionSize, captionMaxWords, transcripts, sceneTakes])
+
+  // Sync audio with video
+  const syncAudio = useCallback(() => {
+    const video = videoRef.current
+    const audio = audioRef.current
+    if (audio && video) {
+      if (Math.abs(audio.currentTime - video.currentTime) > 0.1) {
+        audio.currentTime = video.currentTime
+      }
+    }
+  }, [])
+
+  // Ref for tracking the precise clip we are currently playing
+  // This disambiguates instances where multiple clips might use the same source time
+  const playingClipIdRef = useRef<string | null>(null)
+
+  // Ensure playingClipIdRef is valid
+  useEffect(() => {
+    if (!playingClipIdRef.current) return
+    const exists = timelineClips.some(c => c.id === playingClipIdRef.current)
+    if (!exists) playingClipIdRef.current = null
+  }, [timelineClips])
+
+  // Set up video and audio playback
   useEffect(() => {
     const video = videoRef.current
     const audio = audioRef.current
-    const canvas = lutCanvasRef.current
-    if (!video || !canvas) return
-    
-    const setupPlayback = async () => {
-      // Clean up previous sources
-      if (video.srcObject) {
-        const stream = video.srcObject as MediaStream
-        stream.getTracks().forEach(track => track.stop())
-        video.srcObject = null
-      }
-      if (video.src) {
-        URL.revokeObjectURL(video.src)
-        video.src = ''
-      }
-      if (audio && audio.src) {
-        URL.revokeObjectURL(audio.src)
-        audio.src = ''
-      }
-      
-      // Set video source
-      if (cameraBlob) {
+    if (!video) return
+
+    // Track if we were playing before scene switch
+
+    // Current blob references to check against existing src
+    // This simple check prevents reloading if the blob hasn't changed
+    const currentVideoSrc = video.getAttribute('data-blob-id')
+    const currentAudioSrc = audio?.getAttribute('data-blob-id')
+
+    // Determine target blob IDs - separate for camera and screen
+    const targetCameraId = cameraBlob ? 'camera' + cameraBlob.size : ''
+    const targetScreenId = screenBlob ? 'screen' + screenBlob.size : ''
+    const targetAudioId = microphoneBlob ? 'mic' + microphoneBlob.size : ''
+
+    const setupSources = () => {
+      // Set camera video source if changed
+      if (cameraBlob && currentVideoSrc !== targetCameraId) {
+        if (video.src) URL.revokeObjectURL(video.src)
         video.src = URL.createObjectURL(cameraBlob)
-        video.muted = true // Mute video to avoid double audio if it has audio
-      } else if (screenBlob) {
-        video.src = URL.createObjectURL(screenBlob)
+        video.setAttribute('data-blob-id', targetCameraId)
         video.muted = true
+
+        if (wasPlayingRef.current) {
+          video.play().catch(e => console.error("Auto-resume failed", e))
+        }
+      } else if (!cameraBlob && currentVideoSrc && currentVideoSrc.startsWith('camera')) {
+        video.src = ''
+        video.removeAttribute('data-blob-id')
       }
       
-      // Set audio source (from microphone)
-      if (audio && microphoneBlob) {
-        audio.src = URL.createObjectURL(microphoneBlob)
-      }
-      
-      // Sync audio with video
-      const syncAudio = () => {
-        if (audio && video) {
-          audio.currentTime = video.currentTime
-        }
-      }
-      
-      // Function to draw video frame to canvas with LUT
-      const drawFrame = () => {
-        if (!video || !canvas || video.readyState < 2) return
+      // Set screen video source if changed
+      if (screenBlob && screenVideoRef.current) {
+        const screenVideo = screenVideoRef.current
+        const currentScreenSrc = screenVideo.getAttribute('data-blob-id')
         
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        
-        // Keep canvas at native video resolution for quality
-        // CSS will handle the scaling based on videoSize
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
-        }
-        
-        // Draw video frame
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
-        // Apply LUT if enabled
-        if (visualSettings.lutEnabled && lutData && visualSettings.lutIntensity > 0) {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-          const processedData = applyLUTToImageData(imageData, lutData, visualSettings.lutIntensity)
-          ctx.putImageData(processedData, 0, 0)
-        }
-      }
-      
-      video.onloadedmetadata = () => {
-        if (audio && microphoneBlob) {
-          audio.load()
-        }
-        // Set initial size based on video dimensions
-        if (video.videoWidth > 0 && video.videoHeight > 0) {
-          const aspectRatio = video.videoWidth / video.videoHeight
-          setVideoAspectRatio(aspectRatio)
-          // Set initial size to 80% of container, maintaining aspect ratio
-          setVideoSize({ width: 80, height: 80 })
-        }
-        drawFrame()
-      }
-      
-      video.ontimeupdate = () => {
-        // Sync audio to video
-        if (audio && Math.abs(audio.currentTime - video.currentTime) > 0.1) {
-          audio.currentTime = video.currentTime
-        }
-        
-        // Draw frame with LUT
-        drawFrame()
-        
-        // Convert video time back to timeline time using clip system
-        const videoTime = video.currentTime
-        
-        // Find the current clip based on selected scene/take
-        if (selectedTake && selectedSceneId) {
-          // Find clips for this scene/take
-          const currentClips = timelineClips.filter(c => 
-            c.sceneId === selectedSceneId && c.takeId === selectedTake.id
-          )
+        if (currentScreenSrc !== targetScreenId) {
+          if (screenVideo.src) URL.revokeObjectURL(screenVideo.src)
+          screenVideo.src = URL.createObjectURL(screenBlob)
+          screenVideo.setAttribute('data-blob-id', targetScreenId)
+          screenVideo.muted = true
           
-          // Find which clip's source range contains this video time
-          const currentClip = currentClips.find(c => 
-            videoTime >= c.sourceIn && videoTime < c.sourceOut
-          )
-          
-          if (currentClip) {
-            // Map source video time to timeline time
-            const sourceDuration = currentClip.sourceOut - currentClip.sourceIn
-            const clipDuration = currentClip.timelineEnd - currentClip.timelineStart
-            const relativeSourceTime = videoTime - currentClip.sourceIn
-            const relativeTimelineTime = (relativeSourceTime / sourceDuration) * clipDuration
-            const absoluteTime = currentClip.timelineStart + relativeTimelineTime
-            
-            setCurrentTime(Math.max(currentClip.timelineStart, Math.min(currentClip.timelineEnd, absoluteTime)))
-            
-            // Check if we've reached the end of this clip
-            if (videoTime >= currentClip.sourceOut - 0.05) {
-              // Find next clip in timeline
-              const nextClip = timelineClips
-                .filter(c => c.timelineStart > currentClip.timelineEnd)
-                .sort((a, b) => a.timelineStart - b.timelineStart)[0]
-              
-              if (nextClip) {
-                // Move to next clip
-                const nextSceneIndex = sceneTakes.findIndex(st => 
-                  st.sceneId === nextClip.sceneId && st.take.id === nextClip.takeId
-                )
-                if (nextSceneIndex >= 0) {
-                  setSelectedSceneIndex(nextSceneIndex)
-                  setTimeout(() => {
-                    const v = videoRef.current
-                    const a = audioRef.current
-                    if (v && v.readyState >= 2) {
-                      v.currentTime = nextClip.sourceIn
-                      if (a && a.readyState >= 2) {
-                        a.currentTime = nextClip.sourceIn
-                      }
-                    }
-                  }, 100)
-                }
-              } else {
-                // No more clips, stop playback
-                video.pause()
-                if (audio) audio.pause()
-                setIsPlaying(false)
+          if (wasPlayingRef.current) {
+            screenVideo.play().catch(e => console.error("Auto-resume failed", e))
+          }
+        }
+      } else if (!screenBlob && screenVideoRef.current) {
+        const screenVideo = screenVideoRef.current
+        const currentScreenSrc = screenVideo.getAttribute('data-blob-id')
+        if (currentScreenSrc && currentScreenSrc.startsWith('screen')) {
+          if (screenVideo.src) URL.revokeObjectURL(screenVideo.src)
+          screenVideo.src = ''
+          screenVideo.removeAttribute('data-blob-id')
+        }
+      }
+
+      // Set audio source if changed
+      if (audio) {
+        if (microphoneBlob && currentAudioSrc !== targetAudioId) {
+          if (audio.src) URL.revokeObjectURL(audio.src)
+          audio.src = URL.createObjectURL(microphoneBlob)
+          audio.setAttribute('data-blob-id', targetAudioId)
+        } else if (!microphoneBlob && currentAudioSrc) {
+          audio.src = ''
+          audio.removeAttribute('data-blob-id')
+        }
+      }
+    }
+
+    setupSources()
+
+    video.onloadedmetadata = () => {
+      if (audio && microphoneBlob) audio.load()
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setVideoAspectRatio(video.videoWidth / video.videoHeight)
+        setVideoSize({ width: 80, height: 80 })
+      }
+
+      // Check for duration mismatch and update clips to match actual video duration
+      const currentTake = sceneTakes.find(st => st.sceneId === selectedSceneId && st.take.id === selectedTake?.id)
+      // Only update if video.duration is valid (finite and positive)
+      const validVideoDuration = video.duration && Number.isFinite(video.duration) && video.duration > 0
+      if (currentTake && validVideoDuration && Math.abs(currentTake.take.duration - video.duration) > 0.1) {
+        console.log(`Correcting duration mismatch: stored=${currentTake.take.duration}, actual=${video.duration}`)
+
+        // Update sceneTakes with correct duration
+        const newSceneTakes = sceneTakes.map(st => {
+          if (st.sceneId === selectedSceneId && st.take.id === selectedTake?.id) {
+            return {
+              ...st,
+              take: {
+                ...st.take,
+                duration: video.duration
               }
             }
-          } else {
-            // Video time doesn't match any clip, try to find the right clip
-            const result = timelineToVideoTime(currentTime)
-            if (result && (result.sceneId !== selectedSceneId || result.takeId !== selectedTake.id)) {
-              const nextSceneIndex = sceneTakes.findIndex(st => 
-                st.sceneId === result.sceneId && st.take.id === result.takeId
-              )
-              if (nextSceneIndex >= 0) {
-                setSelectedSceneIndex(nextSceneIndex)
-                setTimeout(() => {
-                  const v = videoRef.current
-                  const a = audioRef.current
-                  if (v && v.readyState >= 2) {
-                    v.currentTime = result.videoTime
-                    if (a && a.readyState >= 2) {
-                      a.currentTime = result.videoTime
+          }
+          return st
+        })
+        setSceneTakes(newSceneTakes)
+
+        // Update timeline clips to ensure sourceOut never exceeds actual video duration
+        setTimelineClips(prev => prev.map(clip => {
+          if (clip.sceneId === selectedSceneId && clip.takeId === selectedTake?.id) {
+            const actualDuration = video.duration
+            // Clamp sourceOut to actual duration
+            const clampedSourceOut = Math.min(clip.sourceOut, actualDuration)
+            // Ensure sourceIn doesn't exceed sourceOut
+            const clampedSourceIn = Math.min(clip.sourceIn, clampedSourceOut - 0.1)
+            // Recalculate timelineEnd based on actual trimmed clip duration
+            // timelineEnd must always equal timelineStart + (sourceOut - sourceIn)
+            const trimmedDuration = clampedSourceOut - clampedSourceIn
+            const newTimelineEnd = clip.timelineStart + trimmedDuration
+            
+            return {
+              ...clip,
+              sourceIn: clampedSourceIn,
+              sourceOut: clampedSourceOut,
+              sourceDuration: actualDuration,
+              timelineEnd: newTimelineEnd
+            }
+          }
+          return clip
+        }))
+      }
+
+      drawFrame()
+    }
+
+    video.ontimeupdate = () => {
+      syncAudio()
+      // Don't call drawFrame here - the timeline renderLoop handles drawing
+    }
+
+    // Playback Loop logic moved to top level effect
+
+    video.onplay = () => {
+      setIsPlaying(true)
+      if (audio) {
+        audio.currentTime = video.currentTime
+        audio.play().catch(e => console.error(e))
+      }
+      // Don't start a separate draw loop - the timeline renderLoop handles drawing
+    }
+
+    video.onpause = () => {
+      // Don't stop timeline playback if user manually paused - let timeline control it
+      // Only stop if we're not in timeline-driven mode
+      if (!isPlaying) {
+      if (audio) audio.pause()
+      }
+    }
+
+    video.onended = () => {
+      // Don't stop timeline playback when video element ends
+      // The timeline loop will handle transitions between clips
+      // Only pause audio if timeline is also stopped
+      if (!isPlaying && audio) {
+        audio.pause()
+      }
+    }
+
+    video.onseeked = () => {
+      syncAudio()
+      // Don't call drawFrame here - the timeline renderLoop handles drawing
+    }
+
+    // Cleanup function
+    return () => {
+      // convert to a "cleanup only if component unmounts" ? 
+      // Current behavior: if blob changes, we revoke previous URL via setupSources check
+      // We don't want to revoke everything on every render.
+    }
+  }, [cameraBlob, microphoneBlob, screenBlob, currentSceneTake, selectedSceneId, selectedTake, drawFrame, syncAudio, timelineClips, sceneTakes, selectedSceneIndex])
+
+  // Timeline playhead tracking
+  const timelineTimeRef = useRef(currentTime)
+  useEffect(() => {
+    if (!isPlaying) {
+      timelineTimeRef.current = currentTime
+    }
+  }, [currentTime, isPlaying])
+
+  // Recalculate total duration whenever timeline clips change
+  useEffect(() => {
+    if (timelineClips.length === 0) {
+      setTotalDuration(1)
+      return
+    }
+    const maxEnd = Math.max(...timelineClips.map(c => c.timelineEnd), 0)
+    const safeDuration = Number.isFinite(maxEnd) && maxEnd > 0 ? maxEnd : 1
+    setTotalDuration(safeDuration)
+  }, [timelineClips])
+
+  // Handle seek - must be defined before playback loop
+  const handleSeek = useCallback((absoluteTime: number, immediate: boolean = false) => {
+    // Update timeline position immediately for smooth scrubbing
+    const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
+    setCurrentTime(clampedTime)
+    timelineTimeRef.current = clampedTime
+
+    const result = timelineToVideoTime(clampedTime)
+    if (!result) {
+      // If time is beyond all clips, pause and stay at current position
+      const video = videoRef.current
+      const audio = audioRef.current
+      if (video && !video.paused) {
+        video.pause()
+      }
+      if (audio && !audio.paused) {
+        audio.pause()
+      }
+      setIsPlaying(false)
+      return
+    }
+
+    const { videoTime, sceneId, takeId } = result
+
+    // Switch to this scene/take if not already selected
+    const sceneIndex = sceneTakes.findIndex(st =>
+      st.sceneId === sceneId && st.take.id === takeId
+    )
+
+    const needsSceneSwitch = sceneIndex >= 0 && sceneIndex !== selectedSceneIndex
+
+    if (needsSceneSwitch) {
+      setSelectedSceneIndex(sceneIndex)
+    }
+
+    // Seek video/audio - use requestAnimationFrame for immediate updates during scrubbing
+    const seekToTime = () => {
+      const video = videoRef.current
+      const audio = audioRef.current
+
+      if (video) {
+        if (video.readyState >= 2) {
+          isSeekingRef.current = true
+          video.currentTime = videoTime
+          // Reset seeking flag after seek completes
+          const onSeeked = () => {
+            isSeekingRef.current = false
+            video.removeEventListener('seeked', onSeeked)
+          }
+          video.addEventListener('seeked', onSeeked, { once: true })
+        } else {
+          // Wait for video to be ready
+          const onCanPlay = () => {
+            if (video) {
+              isSeekingRef.current = true
+              video.currentTime = videoTime
+              // Reset seeking flag after seek completes
+              const onSeeked = () => {
+                isSeekingRef.current = false
+                video.removeEventListener('seeked', onSeeked)
+              }
+              video.addEventListener('seeked', onSeeked, { once: true })
+              video.removeEventListener('canplay', onCanPlay)
+            }
+          }
+          video.addEventListener('canplay', onCanPlay)
+        }
+      }
+
+      if (audio) {
+        if (audio.readyState >= 2) {
+          audio.currentTime = videoTime
+        } else {
+          // Wait for audio to be ready
+          const onCanPlay = () => {
+            if (audio) {
+              audio.currentTime = videoTime
+              audio.removeEventListener('canplay', onCanPlay)
+            }
+          }
+          audio.addEventListener('canplay', onCanPlay)
+        }
+      }
+    }
+
+    if (immediate) {
+      seekToTime()
+    } else {
+      requestAnimationFrame(seekToTime)
+    }
+  }, [totalDuration, timelineToVideoTime, sceneTakes, selectedSceneIndex, drawFrame])
+
+  // Convert video time back to timeline time (inverse of timelineToVideoTime)
+  const videoTimeToTimeline = useCallback((videoTime: number, clip: TimelineClip): number => {
+    const sourceDuration = clip.sourceOut - clip.sourceIn
+    if (sourceDuration <= 0.001) return clip.timelineStart
+    
+    // Calculate relative position within the source clip (0 to 1)
+    const relativeSourceTime = (videoTime - clip.sourceIn) / sourceDuration
+    const clipDuration = clip.timelineEnd - clip.timelineStart
+    
+    // Map back to timeline position
+    return clip.timelineStart + (relativeSourceTime * clipDuration)
+  }, [])
+
+  // Playback Loop - timeline-driven with continuous advancement
+  const currentClipRef = useRef<TimelineClip | null>(null)
+  const isSeekingRef = useRef(false)
+  const lastFrameTimeRef = useRef<number>(performance.now())
+  
+  useEffect(() => {
+    let animationFrameId: number
+
+    const renderLoop = () => {
+      if (!isPlaying) {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId)
+        }
+        return
+      }
+
+      const now = performance.now()
+      const deltaTime = (now - lastFrameTimeRef.current) / 1000 // Convert to seconds
+      lastFrameTimeRef.current = now
+
+      const video = videoRef.current
+      const audio = audioRef.current
+
+      // Continuously advance timeline - this is the source of truth
+      const currentTimelineTime = timelineTimeRef.current
+      const newTimelineTime = Math.min(currentTimelineTime + deltaTime, totalDuration)
+      timelineTimeRef.current = newTimelineTime
+      setCurrentTime(newTimelineTime)
+
+      // Stop at end
+      if (newTimelineTime >= totalDuration - 0.01) {
+        setIsPlaying(false)
+        if (video) video.pause()
+        if (audio) audio.pause()
+        if (screenVideoRef.current) screenVideoRef.current.pause()
+        setCurrentTime(totalDuration)
+        drawFrame()
+        return
+      }
+
+      // Find which clip should be playing at this timeline position
+      const timelineResult = timelineToVideoTime(timelineTimeRef.current)
+
+      if (timelineResult && timelineResult.clip) {
+        const { clip, videoTime, sceneId, takeId } = timelineResult
+
+        // Check if we've switched clips
+        const clipChanged = currentClipRef.current?.id !== clip.id
+
+        if (clipChanged) {
+          // Switch to new clip - seek ONCE and let it play
+          const previousClip = currentClipRef.current
+          currentClipRef.current = clip
+          
+          // Animate holder transitions if positions differ
+          if (previousClip && canvasSettings.transitionDuration > 0) {
+            const previousHolder = canvasHolders.find(h => h.clipId === previousClip.id && h.layer === previousClip.layer)
+            const newHolder = canvasHolders.find(h => h.clipId === clip.id && h.layer === clip.layer)
+            
+            if (previousHolder && newHolder) {
+              const hasPositionChange = previousHolder.x !== newHolder.x || previousHolder.y !== newHolder.y || 
+                                       previousHolder.width !== newHolder.width || previousHolder.height !== newHolder.height
+              
+              if (hasPositionChange) {
+                // Start position transition animation for new holder
+                transitioningHoldersRef.current.set(newHolder.id, {
+                  startPos: { x: previousHolder.x, y: previousHolder.y, width: previousHolder.width, height: previousHolder.height },
+                  endPos: { x: newHolder.x, y: newHolder.y, width: newHolder.width, height: newHolder.height },
+                  startTime: performance.now(),
+                  duration: canvasSettings.transitionDuration * 1000 // Convert to ms
+                })
+              }
+              
+              // Start fade-out animation for previous holder (always fade if there's a clip change)
+              const transitionStartTime = performance.now()
+              fadingOutHoldersRef.current.set(previousHolder.id, {
+                holder: { ...previousHolder }, // Copy to preserve position at transition start
+                startTime: transitionStartTime,
+                duration: canvasSettings.transitionDuration * 1000
+              })
+            }
+          }
+          
+          // Find the scene take for this clip
+          const sceneTake = sceneTakes.find((st: SceneTake) => 
+            st.sceneId === sceneId && st.take.id === takeId
+          )
+          
+          if (sceneTake) {
+            const sceneIndex = sceneTakes.findIndex((st: SceneTake) => 
+              st.sceneId === sceneId && st.take.id === takeId
+            )
+            
+            // Switch scene if needed
+            if (sceneIndex >= 0 && sceneIndex !== selectedSceneIndex) {
+              setSelectedSceneIndex(sceneIndex)
+              // Wait for scene to load before seeking
+              const seekWhenReady = () => {
+                const v = videoRef.current
+                const a = audioRef.current
+                if (v && v.readyState >= 2) {
+                  isSeekingRef.current = true
+                  v.currentTime = videoTime
+                  if (a && a.readyState >= 2) {
+                    a.currentTime = videoTime
+                  }
+                  // Also handle screen video if this is a screen clip
+                  if (clip.layer === 'screen' && screenVideoRef.current) {
+                    const screenVideo = screenVideoRef.current
+                    if (screenVideo.readyState >= 2) {
+                      screenVideo.currentTime = videoTime
+                      if (screenVideo.paused && isPlaying) {
+                        screenVideo.play().catch(console.error)
+                      }
                     }
                   }
-                }, 100)
+                  const onSeeked = () => {
+                    isSeekingRef.current = false
+                    v.removeEventListener('seeked', onSeeked)
+                    // Start playing after seek completes
+                    if (isPlaying && v.paused) {
+                      v.play().catch(console.error)
+                    }
+                    if (isPlaying && a && a.paused) {
+                      a.play().catch(console.error)
+                    }
+                  }
+                  v.addEventListener('seeked', onSeeked, { once: true })
+                  v.removeEventListener('canplay', seekWhenReady)
+                }
+              }
+              const v = videoRef.current
+              if (v && v.readyState >= 2) {
+                seekWhenReady()
+              } else if (v) {
+                v.addEventListener('canplay', seekWhenReady, { once: true })
+              }
+            } else {
+              // Same scene, different clip - seek ONCE to correct position
+              if (video && video.readyState >= 2 && !isSeekingRef.current) {
+                isSeekingRef.current = true
+                video.currentTime = videoTime
+                if (audio && audio.readyState >= 2) {
+                  audio.currentTime = videoTime
+                }
+                // Also handle screen video if this is a screen clip
+                if (clip.layer === 'screen' && screenVideoRef.current) {
+                  const screenVideo = screenVideoRef.current
+                  if (screenVideo.readyState >= 2) {
+                    screenVideo.currentTime = videoTime
+                    if (screenVideo.paused && isPlaying) {
+                      screenVideo.play().catch(console.error)
+                    }
+                  }
+                }
+                const onSeeked = () => {
+                  isSeekingRef.current = false
+                  video.removeEventListener('seeked', onSeeked)
+                  // Start playing after seek completes
+                  if (isPlaying && video.paused) {
+                    video.play().catch(console.error)
+                  }
+                  if (isPlaying && audio && audio.paused) {
+                    audio.play().catch(console.error)
+                  }
+                }
+                video.addEventListener('seeked', onSeeked, { once: true })
               }
             }
           }
         } else {
-          // No selected take, just use video time directly (fallback)
-          setCurrentTime(videoTime)
-        }
-      }
-      
-      video.onplay = () => {
-        setIsPlaying(true)
-        if (audio) {
-          // Sync audio to video time
-          audio.currentTime = video.currentTime
-          audio.play().catch(err => console.error('Error playing audio:', err))
-        }
-        // Start drawing frames
-        const drawLoop = () => {
-          if (video && !video.paused && !video.ended) {
-            drawFrame()
-            requestAnimationFrame(drawLoop)
+          // Same clip - just ensure video is playing, don't constantly sync
+          // Let the video play naturally without interference
+
+          // Keep video/audio playing - only start if paused
+          if (clip.layer === 'camera' && video && video.readyState >= 2 && !isSeekingRef.current) {
+            if (video.paused && isPlaying) {
+              video.play().catch(console.error)
+            }
+          }
+          if (clip.layer === 'screen' && screenVideoRef.current && !isSeekingRef.current) {
+            const screenVideo = screenVideoRef.current
+            if (screenVideo.readyState >= 2) {
+              if (screenVideo.paused && isPlaying) {
+                screenVideo.play().catch(console.error)
+              }
+            }
+          }
+          if (audio && audio.readyState >= 2 && !isSeekingRef.current) {
+            if (audio.paused && isPlaying) {
+              // Sync audio to the appropriate video source
+              const sourceVideo = clip.layer === 'screen' && screenVideoRef.current ? screenVideoRef.current : video
+              if (sourceVideo && sourceVideo.readyState >= 2 && !sourceVideo.paused) {
+                audio.currentTime = sourceVideo.currentTime
+              }
+              audio.play().catch(console.error)
+            }
           }
         }
-        drawLoop()
-        
-        // Ensure we start from the correct position accounting for trims
-        // Note: timelineToVideoTime is defined below, so we'll handle this in ontimeupdate instead
+      } else {
+        // In a gap: pause media and show background
+        // Timeline continues advancing automatically above
+        currentClipRef.current = null
+        if (video && !video.paused) video.pause()
+        if (audio && !audio.paused) audio.pause()
       }
+
+      // Update holder transitions
+      const transitionNow = performance.now()
+      const transitioningHolders = transitioningHoldersRef.current
+      const fadingOutHolders = fadingOutHoldersRef.current
       
-      video.onpause = () => {
-        setIsPlaying(false)
-        if (audio) {
-          audio.pause()
+      // Clean up completed fade-outs
+      fadingOutHolders.forEach((fadeOut, holderId) => {
+        const elapsed = transitionNow - fadeOut.startTime
+        if (elapsed >= fadeOut.duration) {
+          fadingOutHolders.delete(holderId)
         }
-      }
+      })
       
-      video.onended = () => {
-        // When video ends, check if we should continue to next scene
-        // (This is handled in ontimeupdate when reaching trimmed end)
-        setIsPlaying(false)
-        if (audio) {
-          audio.pause()
-        }
+      if (transitioningHolders.size > 0) {
+        setCanvasHolders(prev => prev.map(holder => {
+          const transition = transitioningHolders.get(holder.id)
+          if (!transition) return holder
+          
+          const elapsed = transitionNow - transition.startTime
+          const progress = Math.min(1, elapsed / transition.duration)
+          
+          // Easing function (ease-in-out)
+          const eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2
+          
+          if (progress >= 1) {
+            // Transition complete
+            transitioningHolders.delete(holder.id)
+            return {
+              ...holder,
+              x: transition.endPos.x,
+              y: transition.endPos.y,
+              width: transition.endPos.width,
+              height: transition.endPos.height,
+            }
+          }
+          
+          // Interpolate position
+          return {
+            ...holder,
+            x: transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased,
+            y: transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased,
+            width: transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased,
+            height: transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased,
+          }
+        }))
       }
-      
-      video.onseeked = () => {
-        syncAudio()
-        drawFrame()
-      }
+
+      // Always draw frame
+      drawFrame()
+
+      animationFrameId = requestAnimationFrame(renderLoop)
     }
-    
-    setupPlayback()
-    
+
+    if (isPlaying) {
+      lastFrameTimeRef.current = performance.now()
+      // Initialize clip tracking
+      const initialResult = timelineToVideoTime(timelineTimeRef.current)
+      currentClipRef.current = initialResult?.clip || null
+      renderLoop()
+    } else {
+      currentClipRef.current = null
+    }
+
     return () => {
-      if (video.srcObject) {
-        const stream = video.srcObject as MediaStream
-        stream.getTracks().forEach(track => track.stop())
-        video.srcObject = null
-      }
-      if (video.src) {
-        URL.revokeObjectURL(video.src)
-      }
-      if (audio && audio.src) {
-        URL.revokeObjectURL(audio.src)
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [cameraBlob, microphoneBlob, screenBlob, currentSceneTake, visualSettings.lutEnabled, visualSettings.lutIntensity, lutData, cuts, timelineToVideoTime, currentTime, sceneTakes, selectedSceneIndex])
-  
+  }, [isPlaying, selectedSceneIndex, sceneTakes, timelineClips, totalDuration, drawFrame, timelineToVideoTime])
+
   // Load transcriptions from project when sceneTakes change
   useEffect(() => {
     const loadTranscriptions = async () => {
       if (!projectManager.hasProject() || sceneTakes.length === 0) return
-      
+
       const newTranscripts = new Map(transcripts)
-      
+
       for (const sceneTake of sceneTakes) {
         try {
           const transcription = await projectManager.loadTranscription(
@@ -778,7 +1945,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               start: w.start + sceneTake.startTime,
               end: w.end + sceneTake.startTime,
             }))
-            
+
             newTranscripts.set(sceneTake.sceneId, {
               words: adjustedWords,
               text: transcription.text,
@@ -788,20 +1955,20 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           console.error('Error loading transcription:', error)
         }
       }
-      
+
       if (newTranscripts.size > 0) {
         setTranscripts(newTranscripts)
       }
     }
-    
+
     loadTranscriptions()
   }, [sceneTakes])
-  
+
   // Transcription
   const handleTranscribe = async (sceneId: string, takeId: string) => {
     const sceneTake = sceneTakes.find(st => st.sceneId === sceneId)
     if (!sceneTake) return
-    
+
     // Load the microphone blob for this scene
     let micBlob: Blob | null = null
     try {
@@ -811,23 +1978,23 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       alert('No microphone recording available for this scene')
       return
     }
-    
+
     if (!micBlob) {
       alert('No microphone recording available for this scene')
       return
     }
-    
+
     const apiKey = localStorage.getItem('openai_api_key')
     if (!apiKey) {
       alert('OpenAI API key not found. Please set it in Settings.')
       setShowSettings(true)
       return
     }
-    
+
     setIsTranscribing(new Map(isTranscribing.set(sceneId, true)))
     try {
       const result = await transcribeAudio(micBlob, apiKey)
-      
+
       // Save transcription to project folder (with original timestamps, not adjusted)
       if (projectManager.hasProject()) {
         try {
@@ -843,14 +2010,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           console.error('Error saving transcription:', error)
         }
       }
-      
+
       // Adjust timestamps to be relative to scene start in timeline
       const adjustedWords = result.words.map(w => ({
         ...w,
         start: w.start + sceneTake.startTime,
         end: w.end + sceneTake.startTime,
       }))
-      
+
       setTranscripts(new Map(transcripts.set(sceneId, {
         words: adjustedWords,
         text: result.text,
@@ -862,47 +2029,47 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       setIsTranscribing(new Map(isTranscribing.set(sceneId, false)))
     }
   }
-  
+
   // Get current scene's transcript
   const currentTranscript = selectedSceneId ? transcripts.get(selectedSceneId) : null
-  
+
   // Handle text selection in transcript
   const handleTranscriptSelection = (sceneId: string) => {
     const sceneTranscript = transcripts.get(sceneId)
     if (!sceneTranscript) return
-    
+
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) {
       setSelectedText(null)
       return
     }
-    
+
     const range = selection.getRangeAt(0)
     const selectedTextStr = range.toString().trim()
     if (!selectedTextStr) {
       setSelectedText(null)
       return
     }
-    
+
     // Find word timestamps for selected text
-    const words = sceneTranscript.words.filter(w => 
+    const words = sceneTranscript.words.filter(w =>
       selectedTextStr.toLowerCase().includes(w.word.toLowerCase()) ||
       w.word.toLowerCase().includes(selectedTextStr.toLowerCase())
     )
-    
+
     if (words.length > 0) {
       const start = Math.min(...words.map(w => w.start))
       const end = Math.max(...words.map(w => w.end))
       setSelectedText({ start, end, sceneId })
     }
   }
-  
+
   // Handle word click to select single word
   const handleWordClick = (word: WordTimestamp, sceneId: string, wordIndex?: number) => {
     setSelectedText({ start: word.start, end: word.end, sceneId })
     // Clear text selection
     window.getSelection()?.removeAllRanges()
-    
+
     // Apply caption style if a style is selected and wordIndex is provided
     if (wordIndex !== undefined && selectedCaptionStyle !== 'none') {
       setCaptionWordStyles(prev => {
@@ -915,12 +2082,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       })
     }
   }
-  
-  // Get caption style for a word
+
+  // Get caption style for a word - now uses global selectedCaptionStyle for all words
   const getCaptionStyleForWord = (sceneId: string, wordIndex: number): CaptionStyleId => {
-    return captionWordStyles.get(sceneId)?.get(wordIndex) || 'none'
+    return selectedCaptionStyle
   }
-  
+
   // Create cut from selected text
   // Remove a segment from a sceneTake (splits into 2 clips and removes the middle segment)
   const handleRemoveSegment = useCallback((sceneTake: SceneTake, segmentStart: number, segmentEnd: number) => {
@@ -928,16 +2095,16 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     const relativeStart = segmentStart - sceneTake.startTime
     const relativeEnd = segmentEnd - sceneTake.startTime
     const sceneDuration = sceneTake.endTime - sceneTake.startTime
-    
+
     // Don't remove if too close to edges or invalid
     if (relativeStart <= 0.1 || relativeEnd >= sceneDuration - 0.1 || relativeStart >= relativeEnd) {
       return
     }
-    
+
     // Calculate video times (accounting for trims)
     const videoStartTime = sceneTake.trimmedStart + relativeStart
     const videoEndTime = sceneTake.trimmedStart + relativeEnd
-    
+
     // Create first part: from start to segment start
     const firstPart: SceneTake = {
       ...sceneTake,
@@ -946,7 +2113,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       trimmedStart: sceneTake.trimmedStart,
       trimmedEnd: sceneTake.take.duration - videoStartTime,
     }
-    
+
     // Create second part: from segment end to end
     const segmentDuration = segmentEnd - segmentStart
     const secondPart: SceneTake = {
@@ -956,17 +2123,17 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       trimmedStart: videoEndTime,
       trimmedEnd: sceneTake.trimmedEnd,
     }
-    
+
     // Update sceneTakes: replace the original with the two parts
     setSceneTakes(prev => {
       const newTakes: SceneTake[] = []
-      
+
       prev.forEach(st => {
         // Check if this is the sceneTake we're modifying
-        if (st.sceneId === sceneTake.sceneId && 
-            st.take.id === sceneTake.take.id &&
-            Math.abs(st.startTime - sceneTake.startTime) < 0.01 &&
-            Math.abs(st.endTime - sceneTake.endTime) < 0.01) {
+        if (st.sceneId === sceneTake.sceneId &&
+          st.take.id === sceneTake.take.id &&
+          Math.abs(st.startTime - sceneTake.startTime) < 0.01 &&
+          Math.abs(st.endTime - sceneTake.endTime) < 0.01) {
           // Replace with the two parts
           newTakes.push(firstPart)
           newTakes.push(secondPart)
@@ -982,21 +2149,21 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           newTakes.push(st)
         }
       })
-      
+
       // Recalculate total duration (reduced by segment duration)
       const maxEnd = Math.max(...newTakes.map(st => st.endTime), 0)
       setTotalDuration(Math.max(maxEnd, 1))
-      
+
       return newTakes
     })
   }, [])
-  
+
   const handleCreateCut = useCallback(() => {
     if (!selectedText) return
-    
+
     const sceneTake = sceneTakes.find(st => st.sceneId === selectedText.sceneId)
     if (!sceneTake) return
-    
+
     // Find words that overlap with the selected text
     const sceneTranscript = transcripts.get(selectedText.sceneId)
     if (sceneTranscript) {
@@ -1007,7 +2174,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           deletedIndices.add(index)
         }
       })
-      
+
       // Mark words as deleted for strikethrough
       setDeletedWords(prev => {
         const newMap = new Map(prev)
@@ -1017,47 +2184,150 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         return newMap
       })
     }
-    
-    // Remove the segment corresponding to the selected word
+
+    // Calculate cut times in timeline coordinates
+    const cutStartTime = selectedText.start
+    const cutEndTime = selectedText.end
+    const cutDuration = cutEndTime - cutStartTime
+
+    // Update timeline clips - split clips that overlap with the cut and remove the middle part
+    setTimelineClips(prev => {
+      const updated: TimelineClip[] = []
+      const clipsToProcess = [...prev]
+
+      clipsToProcess.forEach(clip => {
+        // Only process clips from the same scene
+        if (clip.sceneId !== selectedText.sceneId) {
+          updated.push(clip)
+          return
+        }
+
+        // Check if clip overlaps with the cut
+        const clipOverlapsCut = 
+          (clip.timelineStart < cutEndTime && clip.timelineEnd > cutStartTime)
+
+        if (!clipOverlapsCut) {
+          // Clip doesn't overlap - just shift it if it's after the cut
+          if (clip.timelineStart >= cutEndTime) {
+            updated.push({
+              ...clip,
+              timelineStart: clip.timelineStart - cutDuration,
+              timelineEnd: clip.timelineEnd - cutDuration,
+            })
+          } else {
+            updated.push(clip)
+          }
+          return
+        }
+
+        // Clip overlaps with cut - need to split it
+        // Case 1: Cut is entirely within the clip
+        if (cutStartTime > clip.timelineStart && cutEndTime < clip.timelineEnd) {
+          // Calculate source times for the cut points
+          const clipDuration = clip.timelineEnd - clip.timelineStart
+          const sourceDuration = clip.sourceOut - clip.sourceIn
+          
+          // Relative position of cut start within clip
+          const relativeCutStart = cutStartTime - clip.timelineStart
+          const relativeCutEnd = cutEndTime - clip.timelineStart
+          
+          // Source time at cut start
+          const sourceCutStart = clip.sourceIn + (relativeCutStart / clipDuration) * sourceDuration
+          // Source time at cut end
+          const sourceCutEnd = clip.sourceIn + (relativeCutEnd / clipDuration) * sourceDuration
+
+          // First part: from clip start to cut start
+          const firstPart: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_before_${Date.now()}`,
+            timelineEnd: cutStartTime,
+            sourceOut: sourceCutStart,
+          }
+
+          // Second part: from cut end to clip end (shifted back by cut duration)
+          const secondPart: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_after_${Date.now()}`,
+            timelineStart: cutStartTime, // Shifted back
+            timelineEnd: clip.timelineEnd - cutDuration,
+            sourceIn: sourceCutEnd,
+          }
+
+          updated.push(firstPart)
+          updated.push(secondPart)
+        }
+        // Case 2: Cut starts before clip but ends within clip
+        else if (cutStartTime <= clip.timelineStart && cutEndTime > clip.timelineStart && cutEndTime < clip.timelineEnd) {
+          const clipDuration = clip.timelineEnd - clip.timelineStart
+          const sourceDuration = clip.sourceOut - clip.sourceIn
+          const relativeCutEnd = cutEndTime - clip.timelineStart
+          const sourceCutEnd = clip.sourceIn + (relativeCutEnd / clipDuration) * sourceDuration
+
+          // Only keep the part after the cut
+          const remainingPart: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_after_${Date.now()}`,
+            timelineStart: cutStartTime, // Shifted to cut start
+            timelineEnd: clip.timelineEnd - cutDuration,
+            sourceIn: sourceCutEnd,
+          }
+
+          updated.push(remainingPart)
+        }
+        // Case 3: Cut starts within clip but ends after clip
+        else if (cutStartTime > clip.timelineStart && cutStartTime < clip.timelineEnd && cutEndTime >= clip.timelineEnd) {
+          const clipDuration = clip.timelineEnd - clip.timelineStart
+          const sourceDuration = clip.sourceOut - clip.sourceIn
+          const relativeCutStart = cutStartTime - clip.timelineStart
+          const sourceCutStart = clip.sourceIn + (relativeCutStart / clipDuration) * sourceDuration
+
+          // Only keep the part before the cut
+          const remainingPart: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_before_${Date.now()}`,
+            timelineEnd: cutStartTime,
+            sourceOut: sourceCutStart,
+          }
+
+          updated.push(remainingPart)
+        }
+        // Case 4: Cut entirely contains the clip - remove it completely
+        else if (cutStartTime <= clip.timelineStart && cutEndTime >= clip.timelineEnd) {
+          // Don't add this clip - it's completely removed
+        }
+      })
+
+      return updated
+    })
+
+    // Remove the segment corresponding to the selected word (updates sceneTakes)
     handleRemoveSegment(sceneTake, selectedText.start, selectedText.end)
-    
+
     // Also create a cut for visualization/strikethrough
     const sceneRelativeStart = selectedText.start - sceneTake.startTime
     const sceneRelativeEnd = selectedText.end - sceneTake.startTime
-    
+
     const newCut: VideoCut = {
       id: Date.now().toString(),
       start: sceneRelativeStart,
       end: sceneRelativeEnd,
     }
-    
+
     setCuts(prevCuts => {
       const sceneCuts = prevCuts.get(selectedText.sceneId) || []
       return new Map(prevCuts.set(selectedText.sceneId, [...sceneCuts, newCut]))
     })
     setSelectedText(null)
-    
+
     // Clear selection
     window.getSelection()?.removeAllRanges()
-  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts])
-  
-  // Handle keyboard delete key to create cuts from selected words
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedText) {
-          e.preventDefault()
-          handleCreateCut()
-        }
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [selectedText, handleCreateCut])
-  
+
+    // Save to history after cut is created
+    setTimeout(() => saveToHistory(), 0)
+  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts, timelineClips, saveToHistory])
+
+
+
   // Delete cut
   const handleDeleteCut = (cutId: string, sceneId: string) => {
     const sceneCuts = cuts.get(sceneId) || []
@@ -1065,236 +2335,307 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     updatedCuts.set(sceneId, sceneCuts.filter(c => c.id !== cutId))
     setCuts(updatedCuts)
   }
-  
+
   // ========== NEW CLIP-BASED EDITING FUNCTIONS ==========
-  
-  // Cut clip - split at timeline position
+
+  // Cut clip - split at timeline position (Linked)
   const handleCutClip = useCallback((clipId: string, cutTime: number) => {
-    const clip = timelineClips.find(c => c.id === clipId)
-    if (!clip) return
-    
-    // Calculate relative position within clip
-    const relativeTime = cutTime - clip.timelineStart
-    const clipDuration = clip.timelineEnd - clip.timelineStart
-    
-    // Don't cut if too close to edges
-    if (relativeTime <= 0.1 || relativeTime >= clipDuration - 0.1) return
-    
-    // Calculate source time at cut point
-    const sourceTimeAtCut = clip.sourceIn + (relativeTime / clipDuration) * (clip.sourceOut - clip.sourceIn)
-    
-    // Create two new clips
-    const clip1: TimelineClip = {
-      ...clip,
-      id: `${clip.id}_part1_${Date.now()}`,
-      timelineEnd: cutTime,
-      sourceOut: sourceTimeAtCut,
-    }
-    
-    const clip2: TimelineClip = {
-      ...clip,
-      id: `${clip.id}_part2_${Date.now()}`,
-      timelineStart: cutTime,
-      sourceIn: sourceTimeAtCut,
-    }
-    
-    // Replace original clip with two new clips
+    const mainClip = timelineClips.find(c => c.id === clipId)
+    if (!mainClip) return
+
+    // Find all linked clips
+    const linkedClips = timelineClips.filter(c =>
+      c.sceneId === mainClip.sceneId && c.takeId === mainClip.takeId &&
+      cutTime > c.timelineStart && cutTime < c.timelineEnd
+    )
+
+    if (linkedClips.length === 0) return
+
     setTimelineClips(prev => {
-      const filtered = prev.filter(c => c.id !== clipId)
-      const updated = [...filtered, clip1, clip2].sort((a, b) => a.timelineStart - b.timelineStart)
-      
-      // Update total duration
-      const maxEnd = updated.length > 0 ? Math.max(...updated.map(c => c.timelineEnd)) : 0
-      setTotalDuration(Math.max(maxEnd, 1))
-      
-      return updated
+      let updated = [...prev]
+
+      linkedClips.forEach(clip => {
+        // Calculate relative position within click
+        const relativeTime = cutTime - clip.timelineStart
+        const clipDuration = clip.timelineEnd - clip.timelineStart
+
+        // Calculate source time at cut point
+        const sourceTimeAtCut = clip.sourceIn + (relativeTime / clipDuration) * (clip.sourceOut - clip.sourceIn)
+
+        const clip1: TimelineClip = {
+          ...clip,
+          id: `${clip.id}_part1_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          timelineEnd: cutTime,
+          sourceOut: sourceTimeAtCut,
+        }
+
+        const clip2: TimelineClip = {
+          ...clip,
+          id: `${clip.id}_part2_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          timelineStart: cutTime,
+          sourceIn: sourceTimeAtCut,
+        }
+
+        updated = updated.filter(c => c.id !== clip.id)
+        updated.push(clip1, clip2)
+      })
+
+      return updated.sort((a, b) => a.timelineStart - b.timelineStart)
     })
+
+    // Recalculate duration after state update (in separate effect or just reuse Logic? 
+    // Simplified: relying on useEffect [timelineClips] if it exists, or update explicitly next render
+    // But let's check: setTotalDuration is usually updated here.
+    // We can do it in the setter above or Effect.
   }, [timelineClips])
-  
-  // Move clip - drag horizontally (optimized for smooth dragging)
+
+  // Move clip - drag horizontally (Linked)
   const handleStartMoveClip = useCallback((clipId: string, mouseX: number) => {
-    const clip = timelineClips.find(c => c.id === clipId)
-    if (!clip) return
-    
+    const mainClip = timelineClips.find(c => c.id === clipId)
+    if (!mainClip) return
+
     setDraggingClipId(clipId)
     const timelineContainer = document.querySelector('[data-timeline-container]') as HTMLElement
     if (!timelineContainer) return
-    
+
     const containerRect = timelineContainer.getBoundingClientRect()
-    const initialX = mouseX - containerRect.left
-    const initialTime = initialX / timelineZoom
-    const offset = initialTime - clip.timelineStart
-    setDraggingOffset(offset)
-    
+    const initialMouseX = mouseX - containerRect.left
+    const initialMouseTime = initialMouseX / timelineZoom
+
+    // Calculate the offset from the drag start to the clip start
+    // This ensures we keep the mouse relative to the clip start
+    const dragOffset = initialMouseTime - mainClip.timelineStart
+    setDraggingOffset(dragOffset)
+
     // Set up smooth dragging
     const handleMouseMove = (e: MouseEvent) => {
       const rect = timelineContainer.getBoundingClientRect()
       const x = e.clientX - rect.left
-      const time = Math.max(0, x / timelineZoom - offset)
-      const clipDuration = clip.timelineEnd - clip.timelineStart
-      const newTimelineEnd = time + clipDuration
-      
-      // Update immediately for smooth dragging
+      const currentMouseTime = x / timelineZoom
+
+      // Calculate new start time based on mouse position and original offset
+      const newStartTime = Math.max(0, currentMouseTime - dragOffset)
+
       setTimelineClips(prev => {
-        const updated = prev.map(c => {
-          if (c.id === clipId) {
+        // Find the current state of the main clip
+        const currentMainClip = prev.find(c => c.id === clipId)
+        if (!currentMainClip) return prev
+
+        return prev.map(c => {
+          // Check for linked clips (Same Scene/Take AND Same Timeline Position)
+          // Use current state for comparison
+          const isLinked = c.sceneId === currentMainClip.sceneId &&
+            c.takeId === currentMainClip.takeId &&
+            Math.abs(c.timelineStart - currentMainClip.timelineStart) < 0.1 &&
+            Math.abs(c.timelineEnd - currentMainClip.timelineEnd) < 0.1
+
+          if (isLinked) {
+            const clipDuration = c.timelineEnd - c.timelineStart
             return {
               ...c,
-              timelineStart: time,
-              timelineEnd: newTimelineEnd,
+              timelineStart: newStartTime,
+              timelineEnd: newStartTime + clipDuration
             }
           }
           return c
         })
-        
-        // Update total duration
-        const maxEnd = updated.length > 0 ? Math.max(...updated.map(c => c.timelineEnd)) : 0
-        setTotalDuration(Math.max(maxEnd, 1))
-        
-        return updated
       })
+
+      // Update total duration (simplified)
+      // setTotalDuration(...) - handled in effect usually or we accept slight delay
     }
-    
+
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
       setDraggingClipId(null)
       setDraggingOffset(0)
+      // Save to history after drag completes
+      setTimeout(() => saveToHistory(), 0)
     }
-    
+
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
   }, [timelineClips, timelineZoom])
-  
-  // Trim clip - drag edges to adjust in/out points (optimized for smooth trimming)
+
+  // Trim clip - drag edges (Linked)
   const handleStartTrimClip = useCallback((clipId: string, edge: 'in' | 'out', mouseX: number) => {
-    const clip = timelineClips.find(c => c.id === clipId)
-    if (!clip) return
-    
+    const mainClip = timelineClips.find(c => c.id === clipId)
+    if (!mainClip) return
+
     setTrimmingClipId(clipId)
     setTrimmingEdge(edge)
-    
+
     const timelineContainer = document.querySelector('[data-timeline-container]') as HTMLElement
     if (!timelineContainer) return
-    
-    const clipDuration = clip.timelineEnd - clip.timelineStart
-    const sourceDuration = clip.sourceOut - clip.sourceIn
-    
+    const containerRect = timelineContainer.getBoundingClientRect()
+
+    // Calculate initial offset from the edge to the mouse
+    const initialMouseX = mouseX - containerRect.left
+    const initialMouseTime = initialMouseX / timelineZoom
+    const initialEdgeTime = edge === 'in' ? mainClip.timelineStart : mainClip.timelineEnd
+    const headerOffset = initialMouseTime - initialEdgeTime
+
     // Set up smooth trimming
     const handleMouseMove = (e: MouseEvent) => {
       const rect = timelineContainer.getBoundingClientRect()
       const x = e.clientX - rect.left
-      const newTime = Math.max(0, Math.min(totalDuration, x / timelineZoom))
-      
-      if (edge === 'in') {
-        // Trimming start (left edge)
-        const newTimelineStart = Math.max(0, Math.min(newTime, clip.timelineEnd - 0.1))
-        const trimAmount = clip.timelineStart - newTimelineStart
-        const sourceTrimAmount = (trimAmount / clipDuration) * sourceDuration
-        const newSourceIn = Math.max(0, Math.min(clip.sourceOut - 0.1, clip.sourceIn - sourceTrimAmount))
-        
-        if (newSourceIn < 0 || newSourceIn >= clip.sourceOut) return
-        
-        setTimelineClips(prev => prev.map(c => {
-          if (c.id === clipId) {
-            return {
-              ...c,
-              timelineStart: newTimelineStart,
-              sourceIn: newSourceIn,
-            }
-          }
-          return c
-        }))
-      } else {
-        // Trimming end (right edge)
-        const newTimelineEnd = Math.max(clip.timelineStart + 0.1, newTime)
-        const trimAmount = newTimelineEnd - clip.timelineEnd
-        const sourceTrimAmount = (trimAmount / clipDuration) * sourceDuration
-        const newSourceOut = Math.min(clip.sourceDuration, Math.max(clip.sourceIn + 0.1, clip.sourceOut + sourceTrimAmount))
-        
-        if (newSourceOut > clip.sourceDuration || newSourceOut <= clip.sourceIn) return
-        
-        setTimelineClips(prev => {
-          const updated = prev.map(c => {
-            if (c.id === clipId) {
+      const currentMouseTime = x / timelineZoom
+
+      // Calculate total delta from initial click
+      const totalDelta = currentMouseTime - initialMouseTime
+
+      setTimelineClips(prev => {
+        // Find the current state of the main clip
+        const currentMainClip = prev.find(c => c.id === clipId)
+        if (!currentMainClip) return prev
+
+        return prev.map(c => {
+          // Check for linked clips - use current state for comparison
+          const isLinked = c.sceneId === currentMainClip.sceneId &&
+            c.takeId === currentMainClip.takeId &&
+            Math.abs(c.timelineStart - currentMainClip.timelineStart) < 0.1 &&
+            Math.abs(c.timelineEnd - currentMainClip.timelineEnd) < 0.1
+
+          if (isLinked) {
+            const maxDuration = c.sourceDuration || 10000
+
+            if (edge === 'in') {
+              // Changing Start
+              // New Start = Current Start + Total Delta (use current state, not initial)
+              // But clamped by: 0 <= NewStart <= CurrentEnd - 0.1
+              let newTimelineStart = currentMainClip.timelineStart + totalDelta
+              newTimelineStart = Math.max(0, Math.min(newTimelineStart, currentMainClip.timelineEnd - 0.1))
+
+              // Calculate effective delta (might be clamped)
+              const effectiveDelta = newTimelineStart - currentMainClip.timelineStart
+
+              // New Source In = Current Source In + effective delta
+              let newSourceIn = currentMainClip.sourceIn + effectiveDelta
+
+              // Clamp Source In to be >= 0 and < sourceOut
+              if (newSourceIn < 0) {
+                newSourceIn = 0
+                newTimelineStart = currentMainClip.timelineStart - currentMainClip.sourceIn // The time corresponding to source 0
+              }
+              if (newSourceIn >= currentMainClip.sourceOut) {
+                newSourceIn = Math.max(0, currentMainClip.sourceOut - 0.1)
+                newTimelineStart = currentMainClip.timelineStart + (currentMainClip.sourceIn - newSourceIn)
+              }
+
+              // Recalculate timelineEnd based on actual clip duration
+              const clipDuration = currentMainClip.sourceOut - newSourceIn
+              const newTimelineEnd = newTimelineStart + clipDuration
+
+              return {
+                ...c,
+                timelineStart: newTimelineStart,
+                timelineEnd: newTimelineEnd,
+                sourceIn: newSourceIn,
+              }
+            } else {
+              // Changing End
+              // New End = Current End + Total Delta (use current state, not initial)
+              // Clamped by: Start + 0.1 <= New End <= Total Duration (optional)
+              let newTimelineEnd = currentMainClip.timelineEnd + totalDelta
+              newTimelineEnd = Math.max(currentMainClip.timelineStart + 0.1, newTimelineEnd)
+
+              // Calculate effective delta
+              const effectiveDelta = newTimelineEnd - currentMainClip.timelineEnd
+
+              // New Source Out = Current Source Out + effective delta
+              let newSourceOut = currentMainClip.sourceOut + effectiveDelta
+
+              // Clamp Source Out <= Max Duration (sourceDuration)
+              if (newSourceOut > maxDuration) {
+                newSourceOut = maxDuration
+                // Recalculate timelineEnd based on actual clip duration
+                const clipDuration = newSourceOut - currentMainClip.sourceIn
+                newTimelineEnd = currentMainClip.timelineStart + clipDuration
+              } else {
+                // Recalculate timelineEnd based on actual clip duration
+                const clipDuration = newSourceOut - currentMainClip.sourceIn
+                newTimelineEnd = currentMainClip.timelineStart + clipDuration
+              }
+
               return {
                 ...c,
                 timelineEnd: newTimelineEnd,
-                sourceOut: newSourceOut,
+                sourceOut: newSourceOut
+                // Start remains same
               }
             }
-            return c
-          })
-          
-          // Update total duration
-          const maxEnd = updated.length > 0 ? Math.max(...updated.map(c => c.timelineEnd)) : 0
-          setTotalDuration(Math.max(maxEnd, 1))
-          
-          return updated
+          }
+          return c
         })
-      }
+      })
     }
-    
+
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
       setTrimmingClipId(null)
       setTrimmingEdge(null)
       setTrimmingStartPos(0)
+      // Save to history after trim completes
+      setTimeout(() => saveToHistory(), 0)
     }
-    
+
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-    
-    const rect = timelineContainer.getBoundingClientRect()
-    const clickX = mouseX - rect.left
-    const clickTime = clickX / timelineZoom
-    setTrimmingStartPos(clickTime)
+
+    // Initial state for UI feedback if needed
+    // const rect = timelineContainer.getBoundingClientRect()
+    // const clickX = mouseX - rect.left
+    // const clickTime = clickX / timelineZoom
+    // setTrimmingStartPos(clickTime)
   }, [timelineClips, timelineZoom, totalDuration])
-  
-  // Handle clip click - select or cut
+
+  // Handle clip click - select linked clips
   const handleClipClick = useCallback((clipId: string, clickTime: number) => {
     if (timelineTool === 'cut') {
       handleCutClip(clipId, clickTime)
     } else {
-      // Select tool - toggle selection
-      setSelectedClipIds(prev => {
-        const newSet = new Set(prev)
-        if (newSet.has(clipId)) {
-          newSet.delete(clipId)
-        } else {
-          newSet.add(clipId)
-        }
-        return newSet
-      })
-      
-      const clip = timelineClips.find(c => c.id === clipId)
-      if (clip) {
+      // Select tool - deselect all others and select only the clicked clip (and linked clips)
+      const clickedClip = timelineClips.find(c => c.id === clipId)
+
+        if (clickedClip) {
+          // Select only vertically linked clips (same scene/take AND same position)
+          const linked = timelineClips.filter(c =>
+            c.sceneId === clickedClip.sceneId &&
+            c.takeId === clickedClip.takeId &&
+            Math.abs(c.timelineStart - clickedClip.timelineStart) < 0.1 &&
+            Math.abs(c.timelineEnd - clickedClip.timelineEnd) < 0.1
+          )
+
+        // Deselect all clips, then select only the linked ones
+        setSelectedClipIds(new Set(linked.map(lc => lc.id)))
+
         setSelectedClip({
-          sceneId: clip.sceneId,
-          takeId: clip.takeId,
-          layer: clip.layer,
+          sceneId: clickedClip.sceneId,
+          takeId: clickedClip.takeId,
+          layer: clickedClip.layer,
         })
         setActiveTab('clip')
       }
     }
   }, [timelineTool, timelineClips, handleCutClip])
-  
-  
+
+
   // Split a sceneTake at a given absolute time point
   const handleSplitSceneTake = useCallback((sceneTake: SceneTake, splitTime: number) => {
     // Calculate relative time within the sceneTake
     const relativeTime = splitTime - sceneTake.startTime
     const sceneDuration = sceneTake.endTime - sceneTake.startTime
-    
+
     // Don't split if too close to edges
     if (relativeTime <= 0.1 || relativeTime >= sceneDuration - 0.1) {
       return
     }
-    
+
     // Calculate the split point in the original video time (accounting for trims)
     const videoSplitTime = sceneTake.trimmedStart + relativeTime
-    
+
     // Create first part: from start to split point
     const firstPart: SceneTake = {
       ...sceneTake,
@@ -1303,7 +2644,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       trimmedStart: sceneTake.trimmedStart,
       trimmedEnd: sceneTake.take.duration - videoSplitTime,
     }
-    
+
     // Create second part: from split point to end (starts right after first part)
     const secondPart: SceneTake = {
       ...sceneTake,
@@ -1312,18 +2653,18 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       trimmedStart: videoSplitTime,
       trimmedEnd: sceneTake.trimmedEnd,
     }
-    
+
     // Update sceneTakes: replace the original with the two parts
     setSceneTakes(prev => {
       const newTakes: SceneTake[] = []
-      
+
       prev.forEach(st => {
         // Check if this is the sceneTake we're splitting
         // We need to match by sceneId, take.id, and time range
-        if (st.sceneId === sceneTake.sceneId && 
-            st.take.id === sceneTake.take.id &&
-            Math.abs(st.startTime - sceneTake.startTime) < 0.01 &&
-            Math.abs(st.endTime - sceneTake.endTime) < 0.01) {
+        if (st.sceneId === sceneTake.sceneId &&
+          st.take.id === sceneTake.take.id &&
+          Math.abs(st.startTime - sceneTake.startTime) < 0.01 &&
+          Math.abs(st.endTime - sceneTake.endTime) < 0.01) {
           // Replace this sceneTake with the two parts
           newTakes.push(firstPart)
           newTakes.push(secondPart)
@@ -1332,33 +2673,56 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           newTakes.push(st)
         }
       })
-      
+
       // Recalculate total duration (should remain the same since we're not removing time)
       const maxEnd = Math.max(...newTakes.map(st => st.endTime), 0)
       setTotalDuration(Math.max(maxEnd, 1))
-      
+
       return newTakes
     })
   }, [])
-  
+
   // OLD FUNCTION - REPLACED BY NEW CLIP-BASED SYSTEM ABOVE
-  
+
   const handleDeleteSelectedClips = () => {
     setTimelineClips(prev => prev.filter(c => !selectedClipIds.has(c.id)))
     setSelectedClipIds(new Set())
     setSelectedClip(null)
   }
-  
+
+  // Handle keyboard delete key to create cuts from selected words OR delete selected clips
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // If text is selected in transcript, prioritize that
+        if (selectedText) {
+          e.preventDefault()
+          handleCreateCut()
+        }
+        // Otherwise if clips are selected, delete them
+        else if (selectedClipIds.size > 0) {
+          e.preventDefault()
+          handleDeleteSelectedClips()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [selectedText, selectedClipIds, handleCreateCut, handleDeleteSelectedClips])
+
   // OLD TRIMMING STATE - REMOVED (now using clip-based trimming with trimmingClipId)
-  
+
   // OLD TRIMMING FUNCTIONS - REMOVED (now using handleStartTrimClip which handles all trimming internally)
   // OLD TRIMMING FUNCTIONS REMOVED - Now using clip-based trimming system
-  
+
   // Video controls
   const handlePlayPause = () => {
     const video = videoRef.current
     const audio = audioRef.current
-    
+
     // Ensure we have a valid scene loaded
     if (!currentSceneTake) {
       if (sceneTakes.length > 0) {
@@ -1378,12 +2742,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
       return
     }
-    
+
     if (!video || video.readyState < 2) {
       console.warn('Video not ready for playback')
       return
     }
-    
+
     if (isPlaying) {
       video.pause()
       if (audio) audio.pause()
@@ -1393,7 +2757,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       const result = timelineToVideoTime(currentTime)
       if (result) {
         const { videoTime, sceneId, takeId } = result
-        const sceneIndex = sceneTakes.findIndex(st => 
+        const sceneIndex = sceneTakes.findIndex(st =>
           st.sceneId === sceneId && st.take.id === takeId
         )
         if (sceneIndex >= 0 && sceneIndex !== selectedSceneIndex) {
@@ -1430,142 +2794,69 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
     }
   }
-  
-  const handleSeek = (absoluteTime: number, immediate: boolean = false) => {
-    // Update timeline position immediately for smooth scrubbing
-    const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
-    setCurrentTime(clampedTime)
-    
-    const result = timelineToVideoTime(clampedTime)
-    if (!result) {
-      // If time is beyond all clips, pause and stay at current position
-      const video = videoRef.current
-      const audio = audioRef.current
-      if (video && !video.paused) {
-        video.pause()
-      }
-      if (audio && !audio.paused) {
-        audio.pause()
-      }
-      setIsPlaying(false)
-      return
-    }
-    
-    const { videoTime, sceneId, takeId } = result
-    
-    // Switch to this scene/take if not already selected
-    const sceneIndex = sceneTakes.findIndex(st => 
-      st.sceneId === sceneId && st.take.id === takeId
-    )
-    
-    const needsSceneSwitch = sceneIndex >= 0 && sceneIndex !== selectedSceneIndex
-    
-    if (needsSceneSwitch) {
-      setSelectedSceneIndex(sceneIndex)
-    }
-    
-    // Seek video/audio - use requestAnimationFrame for immediate updates during scrubbing
-    const seekToTime = () => {
-      const video = videoRef.current
-      const audio = audioRef.current
-      
-      if (video) {
-        if (video.readyState >= 2) {
-          video.currentTime = videoTime
-        } else {
-          // Wait for video to be ready
-          const onCanPlay = () => {
-            if (video) {
-              video.currentTime = videoTime
-              video.removeEventListener('canplay', onCanPlay)
-            }
-          }
-          video.addEventListener('canplay', onCanPlay)
-        }
-      }
-      
-      if (audio) {
-        if (audio.readyState >= 2) {
-          audio.currentTime = videoTime
-        } else {
-          // Wait for audio to be ready
-          const onCanPlay = () => {
-            if (audio) {
-              audio.currentTime = videoTime
-              audio.removeEventListener('canplay', onCanPlay)
-            }
-          }
-          audio.addEventListener('canplay', onCanPlay)
-        }
-      }
-    }
-    
-    if (immediate || !needsSceneSwitch) {
-      // Immediate seek if no scene switch needed or if immediate flag is set
-      requestAnimationFrame(seekToTime)
-    } else {
-      // Wait a bit for scene to load if switching scenes
-      setTimeout(seekToTime, 100)
-    }
-  }
-  
-  
+
+
+
   const formatTime = (seconds: number) => {
+    // Handle invalid values
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return '00:00.0'
+    }
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     const ms = Math.floor((seconds % 1) * 10)
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`
   }
-  
+
   // Layout management
   const handleLayoutChange = (newLayout: Layout) => {
     setLayout(newLayout)
   }
-  
+
   const handleSaveLayout = () => {
     if (layout.type === 'custom' && layout.name) {
       setSavedLayouts([...savedLayouts, layout])
     }
   }
-  
+
   // Export
   const handleExport = async () => {
     if (sceneTakes.length === 0) {
       alert('No scenes with selected takes')
       return
     }
-    
+
     // Determine which scenes to export
     const scenesToExport = selectedScenesForExport.size > 0
       ? sceneTakes.filter(st => selectedScenesForExport.has(st.sceneId))
       : sceneTakes // Export all if none selected
-    
+
     if (scenesToExport.length === 0) {
       alert('Please select at least one scene to export')
       return
     }
-    
+
     setIsExporting(true)
     setExportProgress('Initializing FFmpeg...')
-    
+
     try {
       // Process each scene: load, trim based on timeline clips, apply cuts, combine layers
       const processedSceneBlobs: Blob[] = []
-      
+
       for (let i = 0; i < scenesToExport.length; i++) {
         const sceneTake = scenesToExport[i]
         setExportProgress(`Processing scene ${i + 1} of ${scenesToExport.length}...`)
-        
+
         // Get timeline clips for this scene
         const sceneClips = timelineClips.filter(
           clip => clip.sceneId === sceneTake.sceneId
         )
-        
+
         // Load and process each layer
         let sceneCameraBlob: Blob | null = null
         let sceneMicrophoneBlob: Blob | null = null
         let sceneScreenBlob: Blob | null = null
-        
+
         // Load and trim camera
         if (sceneTake.take.hasCamera) {
           const cameraClip = sceneClips.find(c => c.layer === 'camera')
@@ -1585,7 +2876,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             }
           }
         }
-        
+
         // Load and trim microphone
         if (sceneTake.take.hasMicrophone) {
           const micClip = sceneClips.find(c => c.layer === 'microphone')
@@ -1605,7 +2896,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             }
           }
         }
-        
+
         // Load and trim screen
         if (sceneTake.take.hasScreen) {
           const screenClip = sceneClips.find(c => c.layer === 'screen')
@@ -1625,15 +2916,27 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             }
           }
         }
-        
+
         if (!sceneCameraBlob && !sceneScreenBlob) {
           console.warn(`No video to export for scene ${sceneTake.sceneId}`)
           continue
         }
-        
+
         // Get cuts for this scene (adjusted to trimmed timeline)
         const sceneCuts = cuts.get(sceneTake.sceneId) || []
-        
+
+        // Collect Audio Props for this scene
+        const getSceneLayerProps = (layer: 'camera' | 'microphone' | 'screen') => {
+          const key = `${sceneTake.sceneId}_${sceneTake.take.id}_${layer}`
+          return clipProperties.get(key)
+        }
+
+        const audioProps = {
+          camera: getSceneLayerProps('camera'),
+          microphone: getSceneLayerProps('microphone'),
+          screen: getSceneLayerProps('screen')
+        }
+
         // Combine layers with layout
         setExportProgress(`Combining layers for scene ${i + 1}...`)
         const combinedBlob = await combineLayersWithLayout(
@@ -1641,18 +2944,19 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           sceneMicrophoneBlob,
           sceneScreenBlob,
           layout,
-          sceneCuts
+          sceneCuts,
+          audioProps
         )
-        
+
         processedSceneBlobs.push(combinedBlob)
       }
-      
+
       if (processedSceneBlobs.length === 0) {
         alert('No video to export')
         setIsExporting(false)
         return
       }
-      
+
       // Concatenate all scenes if multiple
       setExportProgress('Concatenating scenes...')
       let finalBlob: Blob
@@ -1661,7 +2965,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       } else {
         finalBlob = await concatVideos(processedSceneBlobs)
       }
-      
+
       // Download video
       setExportProgress('Finalizing export...')
       const url = URL.createObjectURL(finalBlob)
@@ -1670,7 +2974,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       a.download = `export_${Date.now()}.mp4`
       a.click()
       URL.revokeObjectURL(url)
-      
+
       setShowExportDialog(false)
       setIsExporting(false)
       setExportProgress('')
@@ -1681,24 +2985,24 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       setExportProgress('')
     }
   }
-  
+
   // Export DaVinci Resolve timeline
   const handleExportDaVinci = () => {
     if (sceneTakes.length === 0) {
       alert('No scenes with selected takes')
       return
     }
-    
+
     // Determine which scenes to export
     const scenesToExport = selectedScenesForExport.size > 0
       ? sceneTakes.filter(st => selectedScenesForExport.has(st.sceneId))
       : sceneTakes // Export all if none selected
-    
+
     if (scenesToExport.length === 0) {
       alert('Please select at least one scene to export')
       return
     }
-    
+
     // Calculate new timeline with only selected scenes
     let newStartTime = 0
     const adjustedSceneTakes = scenesToExport.map(st => {
@@ -1711,7 +3015,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       return adjusted
     })
     const exportDuration = newStartTime
-    
+
     // Combine transcripts from selected scenes
     const allWords: WordTimestamp[] = []
     adjustedSceneTakes.forEach(st => {
@@ -1727,11 +3031,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         allWords.push(...adjustedWords)
       }
     })
-    
+
     // For now, export first scene's files (in full implementation, would export all selected scenes)
     const firstScene = scenesToExport[0]
-    const cameraFile = firstScene.take.hasCamera 
-      ? `${firstScene.sceneId}_${firstScene.take.id}_camera.webm` 
+    const cameraFile = firstScene.take.hasCamera
+      ? `${firstScene.sceneId}_${firstScene.take.id}_camera.webm`
       : null
     const microphoneFile = firstScene.take.hasMicrophone
       ? `${firstScene.sceneId}_${firstScene.take.id}_microphone.webm`
@@ -1739,14 +3043,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     const screenFile = firstScene.take.hasScreen
       ? `${firstScene.sceneId}_${firstScene.take.id}_screen.webm`
       : null
-    
+
     // Combine cuts from selected scenes, adjusted to new timeline
     const allCuts: VideoCut[] = []
     adjustedSceneTakes.forEach(st => {
       const sceneCuts = cuts.get(st.sceneId) || []
       const originalSceneTake = sceneTakes.find(ost => ost.sceneId === st.sceneId)!
       const timeOffset = st.startTime - originalSceneTake.startTime
-      
+
       sceneCuts.forEach(cut => {
         allCuts.push({
           ...cut,
@@ -1755,7 +3059,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         })
       })
     })
-    
+
     const xml = exportDaVinciResolveTimeline(
       cameraFile,
       microphoneFile,
@@ -1765,7 +3069,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       allWords,
       exportDuration
     )
-    
+
     // Download XML
     const blob = new Blob([xml], { type: 'application/xml' })
     const url = URL.createObjectURL(blob)
@@ -1774,10 +3078,10 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     a.download = `timeline_${Date.now()}.fcpxml`
     a.click()
     URL.revokeObjectURL(url)
-    
+
     setShowExportDialog(false)
   }
-  
+
   // Toggle scene selection for export
   const toggleSceneSelection = (sceneId: string) => {
     const newSelection = new Set(selectedScenesForExport)
@@ -1788,21 +3092,21 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     }
     setSelectedScenesForExport(newSelection)
   }
-  
+
   // Select all scenes
   const selectAllScenes = () => {
     setSelectedScenesForExport(new Set(sceneTakes.map(st => st.sceneId)))
   }
-  
+
   // Deselect all scenes
   const deselectAllScenes = () => {
     setSelectedScenesForExport(new Set())
   }
-  
+
   return (
     <div className="h-full flex flex-col bg-black text-white">
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      
+
       {/* Export Dialog */}
       {showExportDialog && (
         <>
@@ -1816,7 +3120,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               <p className="text-sm text-gray-400 mb-4">
                 Select which scenes to export. If none are selected, all scenes will be exported.
               </p>
-              
+
               <div className="mb-4 flex gap-2">
                 <button
                   onClick={selectAllScenes}
@@ -1831,31 +3135,29 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   Deselect All
                 </button>
               </div>
-              
+
               <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
                 {sceneTakes.map((sceneTake) => {
                   const scene = scenes.find(s => s.id === sceneTake.sceneId)
                   const isSelected = selectedScenesForExport.has(sceneTake.sceneId)
                   const sceneCuts = cuts.get(sceneTake.sceneId) || []
-                  
+
                   return (
                     <div
                       key={sceneTake.sceneId}
-                      className={`p-3 rounded border cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue-900/30 border-blue-500'
-                          : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                      }`}
+                      className={`p-3 rounded border cursor-pointer ${isSelected
+                        ? 'bg-blue-900/30 border-blue-500'
+                        : 'bg-gray-800 border-gray-700 hover:border-gray-600'
+                        }`}
                       onClick={() => toggleSceneSelection(sceneTake.sceneId)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              isSelected
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-gray-500'
-                            }`}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
+                              ? 'bg-blue-500 border-blue-500'
+                              : 'border-gray-500'
+                              }`}
                           >
                             {isSelected && (
                               <svg
@@ -1888,7 +3190,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   )
                 })}
               </div>
-              
+
               {isExporting ? (
                 <div className="mt-4">
                   <div className="flex items-center gap-3 mb-2">
@@ -1900,7 +3202,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   </div>
                 </div>
               ) : null}
-              
+
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => !isExporting && setShowExportDialog(false)}
@@ -1930,7 +3232,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
           </div>
         </>
       )}
-      
+
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}
         <div className="w-16 bg-gray-900 border-r border-gray-700 flex flex-col items-center py-4 space-y-4">
@@ -1989,9 +3291,9 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             </svg>
           </button>
         </div>
-        
-          {/* Sidebar Content */}
-        <div className="w-64 bg-gray-900 border-r border-gray-700 overflow-y-auto">
+
+        {/* Sidebar Content */}
+        <div className="w-64 bg-gray-900 border-r border-gray-700 overflow-y-auto flex-shrink-0" style={{ height: '100%' }}>
           {activeTab === 'clip' && selectedClip && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">
@@ -1999,9 +3301,52 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                 {selectedClip.layer === 'microphone' && 'MICROPHONE'}
                 {selectedClip.layer === 'screen' && 'SCREEN'}
               </h3>
-              
+
               {selectedClip.layer === 'microphone' && (
                 <div className="space-y-4">
+                  {/* Apply to All Button */}
+                  <div className="flex justify-end pb-2 border-b border-gray-800">
+                    <button
+                      onClick={() => {
+                        if (!selectedClip) return
+                        const sourceKey = `${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`
+                        const sourceProps = clipProperties.get(sourceKey)
+                        if (!sourceProps) return
+
+                        if (!confirm('Apply these audio settings to all microphone clips?')) return
+
+                        const newMap = new Map(clipProperties)
+                        timelineClips.forEach(clip => {
+                          if (clip.layer === 'microphone') {
+                            const targetKey = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
+                            const existing = newMap.get(targetKey) || {
+                              enhanceVoice: false,
+                              volume: 0,
+                              removeNoise: false,
+                              noiseRemovalLevel: 93,
+                              audioQuality: 'best' as const,
+                              brightness: 0,
+                              contrast: 0,
+                              saturation: 0,
+                              exposure: 0,
+                            }
+                            newMap.set(targetKey, {
+                              ...existing,
+                              enhanceVoice: sourceProps.enhanceVoice,
+                              volume: sourceProps.volume,
+                              removeNoise: sourceProps.removeNoise,
+                              noiseRemovalLevel: sourceProps.noiseRemovalLevel,
+                              audioQuality: sourceProps.audioQuality
+                            })
+                          }
+                        })
+                        setClipProperties(newMap)
+                      }}
+                      className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition-colors border border-blue-500/30"
+                    >
+                      Apply to all clips
+                    </button>
+                  </div>
                   {/* Enhance Voice */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2025,19 +3370,17 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                             enhanceVoice: !current.enhanceVoice,
                           })))
                         }}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          (clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'bg-green-500' : 'bg-gray-600'
-                        }`}
+                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'bg-green-500' : 'bg-gray-600'
+                          }`}
                       >
                         <div
-                          className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                            (clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'translate-x-6' : 'translate-x-0.5'
-                          }`}
+                          className={`w-5 h-5 bg-white rounded-full transition-transform ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'translate-x-6' : 'translate-x-0.5'
+                            }`}
                         />
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Volume */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2072,7 +3415,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       className="w-full"
                     />
                   </div>
-                  
+
                   {/* Remove Noise */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2096,14 +3439,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                             removeNoise: !current.removeNoise,
                           })))
                         }}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          (clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'bg-green-500' : 'bg-gray-600'
-                        }`}
+                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'bg-green-500' : 'bg-gray-600'
+                          }`}
                       >
                         <div
-                          className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                            (clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'translate-x-6' : 'translate-x-0.5'
-                          }`}
+                          className={`w-5 h-5 bg-white rounded-full transition-transform ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'translate-x-6' : 'translate-x-0.5'
+                            }`}
                         />
                       </button>
                     </div>
@@ -2143,7 +3484,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Quality */}
                   <div>
                     <label className="text-xs text-gray-300 mb-2 block">Quality</label>
@@ -2181,9 +3522,54 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   </div>
                 </div>
               )}
-              
+
               {(selectedClip.layer === 'camera' || selectedClip.layer === 'screen') && (
                 <div className="space-y-4">
+                  {/* Apply to All Button */}
+                  <div className="flex justify-end pb-2 border-b border-gray-800">
+                    <button
+                      onClick={() => {
+                        if (!selectedClip) return
+                        const sourceKey = `${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`
+                        const sourceProps = clipProperties.get(sourceKey)
+                        if (!sourceProps) return
+
+                        const layerType = selectedClip.layer === 'camera' ? 'camera' : 'screen'
+                        if (!confirm(`Apply these ${layerType} settings to all ${layerType} clips?`)) return
+
+                        const newMap = new Map(clipProperties)
+                        timelineClips.forEach(clip => {
+                          if (clip.layer === layerType) {
+                            const targetKey = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
+                            const existing = newMap.get(targetKey) || {
+                              enhanceVoice: false,
+                              volume: 0,
+                              removeNoise: false,
+                              noiseRemovalLevel: 93,
+                              audioQuality: 'best' as const,
+                              brightness: 0,
+                              contrast: 0,
+                              saturation: 0,
+                              exposure: 0,
+                            }
+                            newMap.set(targetKey, {
+                              ...existing,
+                              brightness: sourceProps.brightness,
+                              contrast: sourceProps.contrast,
+                              saturation: sourceProps.saturation,
+                              exposure: sourceProps.exposure,
+                            })
+                          }
+                        })
+                        setClipProperties(newMap)
+                        // Save to history after applying to all clips
+                        setTimeout(() => saveToHistory(), 0)
+                      }}
+                      className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition-colors border border-blue-500/30"
+                    >
+                      Apply to all clips
+                    </button>
+                  </div>
                   {/* Brightness */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2218,7 +3604,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       className="w-full"
                     />
                   </div>
-                  
+
                   {/* Contrast */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2253,7 +3639,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       className="w-full"
                     />
                   </div>
-                  
+
                   {/* Saturation */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2288,7 +3674,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       className="w-full"
                     />
                   </div>
-                  
+
                   {/* Exposure */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -2327,11 +3713,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               )}
             </div>
           )}
-          
+
           {activeTab === 'captions' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">CAPTIONS</h3>
-              
+
               {/* Font Selection */}
               <div className="mb-4">
                 <label className="text-xs text-gray-300 mb-2 block">Font Family</label>
@@ -2348,38 +3734,54 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   ))}
                 </select>
               </div>
-              
+
               {/* Font Size */}
               <div className="mb-4">
                 <label className="text-xs text-gray-300 mb-2 block">Font Size: {captionSize}px</label>
                 <input
                   type="range"
                   min="12"
-                  max="48"
+                  max="200"
                   value={captionSize}
                   onChange={(e) => setCaptionSize(parseInt(e.target.value))}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   <span>12px</span>
-                  <span>48px</span>
+                  <span>200px</span>
                 </div>
               </div>
-              
+
+              {/* Max Words */}
+              <div className="mb-4">
+                <label className="text-xs text-gray-300 mb-2 block">Max Words: {captionMaxWords}</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={captionMaxWords}
+                  onChange={(e) => setCaptionMaxWords(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>1</span>
+                  <span>20</span>
+                </div>
+              </div>
+
               {/* Caption Styles */}
               <div className="mb-4">
                 <label className="text-xs text-gray-300 mb-2 block">Caption Styles</label>
-                <p className="text-xs text-gray-400 mb-3">Click a word in the transcript to apply the selected style</p>
+                <p className="text-xs text-gray-400 mb-3">Selected style will be applied to all captions</p>
                 <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                   {captionStyles.map((style) => (
                     <button
                       key={style.id}
                       onClick={() => setSelectedCaptionStyle(style.id)}
-                      className={`px-3 py-2 rounded text-xs text-center transition-all ${
-                        selectedCaptionStyle === style.id 
-                          ? 'ring-2 ring-blue-500' 
-                          : 'bg-gray-800 hover:bg-gray-700'
-                      }`}
+                      className={`px-3 py-2 rounded text-xs text-center transition-all ${selectedCaptionStyle === style.id
+                        ? 'ring-2 ring-blue-500'
+                        : 'bg-gray-800 hover:bg-gray-700'
+                        }`}
                       style={style.id !== 'none' ? {
                         background: style.backgroundColor,
                         color: style.textColor,
@@ -2399,7 +3801,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   ))}
                 </div>
               </div>
-              
+
               {/* Style Preview */}
               <div className="mt-4 pt-4 border-t border-gray-700">
                 <label className="text-xs text-gray-300 mb-2 block">Preview</label>
@@ -2425,48 +3827,43 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               </div>
             </div>
           )}
-          
+
           {activeTab === 'layout' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">LAYOUT</h3>
               <div className="space-y-2">
                 <button
                   onClick={() => handleLayoutChange({ type: 'side-by-side' })}
-                  className={`w-full px-3 py-2 rounded text-left text-xs ${
-                    layout.type === 'side-by-side' ? 'bg-blue-600' : 'bg-gray-800'
-                  }`}
+                  className={`w-full px-3 py-2 rounded text-left text-xs ${layout.type === 'side-by-side' ? 'bg-blue-600' : 'bg-gray-800'
+                    }`}
                 >
                   Side-by-side
                 </button>
                 <button
                   onClick={() => handleLayoutChange({ type: 'picture-in-picture' })}
-                  className={`w-full px-3 py-2 rounded text-left text-xs ${
-                    layout.type === 'picture-in-picture' ? 'bg-blue-600' : 'bg-gray-800'
-                  }`}
+                  className={`w-full px-3 py-2 rounded text-left text-xs ${layout.type === 'picture-in-picture' ? 'bg-blue-600' : 'bg-gray-800'
+                    }`}
                 >
                   Picture-in-picture
                 </button>
                 <button
                   onClick={() => handleLayoutChange({ type: 'screen-only' })}
-                  className={`w-full px-3 py-2 rounded text-left text-xs ${
-                    layout.type === 'screen-only' ? 'bg-blue-600' : 'bg-gray-800'
-                  }`}
+                  className={`w-full px-3 py-2 rounded text-left text-xs ${layout.type === 'screen-only' ? 'bg-blue-600' : 'bg-gray-800'
+                    }`}
                 >
                   Screen only
                 </button>
                 <button
                   onClick={() => handleLayoutChange({ type: 'camera-only' })}
-                  className={`w-full px-3 py-2 rounded text-left text-xs ${
-                    layout.type === 'camera-only' ? 'bg-blue-600' : 'bg-gray-800'
-                  }`}
+                  className={`w-full px-3 py-2 rounded text-left text-xs ${layout.type === 'camera-only' ? 'bg-blue-600' : 'bg-gray-800'
+                    }`}
                 >
                   Camera only
                 </button>
                 <button
                   onClick={() => handleLayoutChange({ type: 'custom', name: 'Custom' })}
-                  className={`w-full px-3 py-2 rounded text-left text-xs ${
-                    layout.type === 'custom' ? 'bg-blue-600' : 'bg-gray-800'
-                  }`}
+                  className={`w-full px-3 py-2 rounded text-left text-xs ${layout.type === 'custom' ? 'bg-blue-600' : 'bg-gray-800'
+                    }`}
                 >
                   Custom
                 </button>
@@ -2504,11 +3901,128 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               )}
             </div>
           )}
-          
+
           {activeTab === 'canvas' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">CANVAS</h3>
               <div className="space-y-4">
+                {/* Format Selection */}
+                <div>
+                  <label className="text-xs text-gray-300 mb-2 block">Video Format</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => {
+                        const aspectRatio = 16 / 9
+                        const height = Math.round(canvasSettings.resolution.width / aspectRatio)
+                        setCanvasSettings({
+                          ...canvasSettings,
+                          format: '16:9',
+                          resolution: { width: canvasSettings.resolution.width, height }
+                        })
+                      }}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    >
+                      16:9
+                    </button>
+                    <button
+                      onClick={() => {
+                        const aspectRatio = 9 / 16
+                        const height = Math.round(canvasSettings.resolution.width / aspectRatio)
+                        setCanvasSettings({
+                          ...canvasSettings,
+                          format: '9:16',
+                          resolution: { width: canvasSettings.resolution.width, height }
+                        })
+                      }}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    >
+                      9:16
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCanvasSettings({
+                          ...canvasSettings,
+                          format: '1:1',
+                          resolution: { width: canvasSettings.resolution.width, height: canvasSettings.resolution.width }
+                        })
+                      }}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    >
+                      1:1
+                    </button>
+                </div>
+                </div>
+
+                {/* Resolution */}
+                <div>
+                  <label className="text-xs text-gray-300 mb-2 block">Resolution</label>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Width: {canvasSettings.resolution.width}px</label>
+                  <input
+                    type="range"
+                        min="480"
+                        max="3840"
+                        step="8"
+                        value={canvasSettings.resolution.width}
+                    onChange={(e) => {
+                      const newWidth = parseInt(e.target.value)
+                          const aspectRatio = canvasSettings.format === '16:9' ? 16 / 9 : canvasSettings.format === '9:16' ? 9 / 16 : 1
+                          const newHeight = Math.round(newWidth / aspectRatio)
+                          setCanvasSettings({
+                            ...canvasSettings,
+                            resolution: { width: newWidth, height: newHeight }
+                          })
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Height: {canvasSettings.resolution.height}px</label>
+                  <input
+                    type="range"
+                        min="480"
+                        max="3840"
+                        step="8"
+                        value={canvasSettings.resolution.height}
+                    onChange={(e) => {
+                      const newHeight = parseInt(e.target.value)
+                          const aspectRatio = canvasSettings.format === '16:9' ? 16 / 9 : canvasSettings.format === '9:16' ? 9 / 16 : 1
+                          const newWidth = Math.round(newHeight * aspectRatio)
+                          setCanvasSettings({
+                            ...canvasSettings,
+                            resolution: { width: newWidth, height: newHeight }
+                          })
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                  </div>
+                </div>
+
+                {/* Background Colors */}
+                <div>
+                  <label className="text-xs text-gray-300 mb-2 block">Work Area Background</label>
+                  <input
+                    type="color"
+                    value={canvasSettings.workAreaBackgroundColor}
+                    onChange={(e) => setCanvasSettings({ ...canvasSettings, workAreaBackgroundColor: e.target.value })}
+                    className="w-full h-10 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-300 mb-2 block">Video Background</label>
+                  <input
+                    type="color"
+                    value={canvasSettings.videoBackgroundColor}
+                    onChange={(e) => setCanvasSettings({ ...canvasSettings, videoBackgroundColor: e.target.value })}
+                    className="w-full h-10 rounded cursor-pointer"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Used in exported video</p>
+                </div>
+
+                {/* Zoom */}
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">Zoom</label>
                   <input
@@ -2522,59 +4036,32 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   />
                   <span className="text-xs text-gray-400">{Math.round(canvasZoom * 100)}%</span>
                 </div>
+
+                {/* Transition Duration */}
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Video Size (Width)</label>
+                  <label className="text-xs text-gray-400 mb-1 block">
+                    Transition Duration: {canvasSettings.transitionDuration.toFixed(2)}s
+                  </label>
                   <input
                     type="range"
-                    min="20"
-                    max="100"
-                    step="1"
-                    value={videoSize.width}
-                    onChange={(e) => {
-                      const newWidth = parseInt(e.target.value)
-                      // Maintain aspect ratio - calculate height from width
-                      if (videoAspectRatio) {
-                        const containerHeight = lutCanvasRef.current?.parentElement?.clientHeight || 100
-                        const newHeight = (newWidth / videoAspectRatio) * (100 / (lutCanvasRef.current?.parentElement?.clientWidth || 100)) * 100
-                        setVideoSize({ width: newWidth, height: Math.min(100, newHeight) })
-                      } else {
-                        setVideoSize(prev => ({ ...prev, width: newWidth }))
-                      }
-                    }}
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={canvasSettings.transitionDuration}
+                    onChange={(e) => setCanvasSettings({ 
+                      ...canvasSettings, 
+                      transitionDuration: parseFloat(e.target.value) 
+                    })}
                     className="w-full"
                   />
-                  <span className="text-xs text-gray-400">{videoSize.width}%</span>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Video Size (Height)</label>
-                  <input
-                    type="range"
-                    min="20"
-                    max="100"
-                    step="1"
-                    value={videoSize.height}
-                    onChange={(e) => {
-                      const newHeight = parseInt(e.target.value)
-                      // Maintain aspect ratio - calculate width from height
-                      if (videoAspectRatio) {
-                        const containerWidth = lutCanvasRef.current?.parentElement?.clientWidth || 100
-                        const newWidth = (newHeight * videoAspectRatio) * (100 / (lutCanvasRef.current?.parentElement?.clientHeight || 100)) * 100
-                        setVideoSize({ width: Math.min(100, newWidth), height: newHeight })
-                      } else {
-                        setVideoSize(prev => ({ ...prev, height: newHeight }))
-                      }
-                    }}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-400">{videoSize.height}%</span>
-                </div>
-                <div className="text-xs text-gray-500 italic">
-                  Aspect ratio is maintained automatically
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duration for animated transitions between clip positions
+                  </p>
                 </div>
               </div>
             </div>
           )}
-          
+
           {activeTab === 'audio' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">AUDIO SETTINGS</h3>
@@ -2585,14 +4072,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     <label className="text-xs text-gray-300">Noise Reduction</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, noiseReduction: !audioSettings.noiseReduction })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        audioSettings.noiseReduction ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.noiseReduction ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          audioSettings.noiseReduction ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${audioSettings.noiseReduction ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
@@ -2611,83 +4096,75 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Enhance Voice */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-gray-300">Enhance Voice</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, enhanceVoice: !audioSettings.enhanceVoice })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        audioSettings.enhanceVoice ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.enhanceVoice ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          audioSettings.enhanceVoice ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${audioSettings.enhanceVoice ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Normalize Audio */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-gray-300">Normalize Audio</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, normalizeAudio: !audioSettings.normalizeAudio })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        audioSettings.normalizeAudio ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.normalizeAudio ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          audioSettings.normalizeAudio ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${audioSettings.normalizeAudio ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Remove Echo */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-gray-300">Remove Echo</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, removeEcho: !audioSettings.removeEcho })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        audioSettings.removeEcho ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeEcho ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          audioSettings.removeEcho ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${audioSettings.removeEcho ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Remove Background Noise */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-gray-300">Remove Background Noise</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, removeBackgroundNoise: !audioSettings.removeBackgroundNoise })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        audioSettings.removeBackgroundNoise ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeBackgroundNoise ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          audioSettings.removeBackgroundNoise ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${audioSettings.removeBackgroundNoise ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Audio Quality */}
                 <div>
                   <label className="text-xs text-gray-300 mb-2 block">Audio Quality</label>
@@ -2704,7 +4181,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               </div>
             </div>
           )}
-          
+
           {activeTab === 'visual' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">VISUAL SETTINGS</h3>
@@ -2715,14 +4192,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     <label className="text-xs text-gray-300">LUT (Look-Up Table)</label>
                     <button
                       onClick={() => setVisualSettings({ ...visualSettings, lutEnabled: !visualSettings.lutEnabled })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        visualSettings.lutEnabled ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${visualSettings.lutEnabled ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                          visualSettings.lutEnabled ? 'translate-x-6' : 'translate-x-0.5'
-                        }`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${visualSettings.lutEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                          }`}
                       />
                     </button>
                   </div>
@@ -2773,7 +4248,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Color Grading */}
                 <div>
                   <label className="text-xs text-gray-300 mb-2 block">Color Grading</label>
@@ -2829,181 +4304,175 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             </div>
           )}
         </div>
-        
+
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Video Player */}
-          <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+          {/* Canvas Preview Area */}
+          <div className="flex-1 flex min-h-0 overflow-hidden" style={{ backgroundColor: canvasSettings.workAreaBackgroundColor }}>
             <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0 overflow-hidden">
-              <div className="relative bg-black rounded overflow-hidden max-w-full max-h-full flex items-center justify-center" style={{ transform: `scale(${canvasZoom})` }}>
-                {/* Hidden video element for source */}
-                <video
-                  ref={videoRef}
-                  className="hidden"
-                />
-                {/* Canvas for LUT processing */}
-                <canvas
-                  ref={lutCanvasRef}
-                  className="max-w-full max-h-full"
-                  style={{ 
-                    width: `${videoSize.width}%`,
-                    height: videoAspectRatio ? 'auto' : `${videoSize.height}%`,
-                    maxWidth: '100%', 
-                    maxHeight: '100%',
-                    objectFit: 'contain',
-                    filter: (() => {
-                      // Apply clip-specific color adjustments
-                      const clipProps = selectedClip ? clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`) : null
-                      const brightness = (clipProps?.brightness || 0) + (visualSettings.colorGrading.midtones || 0)
-                      const contrast = clipProps?.contrast || 0
-                      const saturation = clipProps?.saturation || 0
-                      const exposure = clipProps?.exposure || 0
-                      
-                      // Apply global visual settings
-                      const shadows = visualSettings.colorGrading.shadows
-                      const highlights = visualSettings.colorGrading.highlights
-                      
-                      // Convert adjustments to CSS filter values
-                      const brightnessValue = 1 + (brightness / 100) + (exposure / 100) + ((shadows + highlights) / 200)
-                      const contrastValue = 1 + (contrast / 100)
-                      const saturationValue = 1 + (saturation / 100)
-                      
-                      // Build filter string
-                      return `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
-                    })()
+              {/* Canvas Container with aspect ratio and masking */}
+              <div 
+                data-canvas-container
+                className="relative"
+                style={{
+                  aspectRatio: `${canvasDimensions.width} / ${canvasDimensions.height}`,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: '100%',
+                  height: 'auto',
+                  transform: `scale(${canvasZoom})`,
+                  transformOrigin: 'center',
+                }}
+              >
+                {/* Canvas bounds - content outside is masked */}
+                <div
+                  className="relative w-full h-full overflow-hidden"
+                  style={{
+                    backgroundColor: canvasSettings.videoBackgroundColor,
+                    clipPath: 'inset(0)',
                   }}
-                />
-                {/* Hidden audio element for microphone playback */}
-                <audio
-                  ref={audioRef}
-                  style={{ display: 'none' }}
-                />
-                {currentTranscript && currentTranscript.words.length > 0 && (
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                    {currentTranscript.words
-                      .filter(w => w.start <= currentTime && w.end >= currentTime)
-                      .map((w, idx) => {
-                        const wordIndex = currentTranscript.words.findIndex(word => word === w)
-                        const styleId = getCaptionStyleForWord(selectedSceneId, wordIndex)
-                        const style = captionStyles.find(s => s.id === styleId) || captionStyles[0]
-                        
-                        // For words with no style, use default transparent background
-                        const displayStyle: React.CSSProperties = styleId === 'none' 
-                          ? {
-                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                              color: '#ffffff',
-                              padding: '8px 16px',
-                              borderRadius: '4px',
-                              fontSize: `${captionSize}px`,
-                              fontFamily: captionFont,
-                              fontWeight: 400,
+                >
+                  {/* Video Holders - render in z-index order */}
+                  {canvasHolders
+                    .sort((a, b) => a.zIndex - b.zIndex)
+                    .map(holder => {
+                      const clip = timelineClips.find(c => c.id === holder.clipId)
+                      if (!clip) return null
+                      
+                      const isSelected = selectedHolderId === holder.id
+                      const timelineResult = timelineToVideoTime(currentTime)
+                      const isActive = timelineResult?.clip?.id === clip.id && timelineResult.clip.layer === holder.layer
+                      
+                      return (
+                        <div
+                          key={holder.id}
+                          className={`absolute ${isSelected ? 'ring-2 ring-blue-500' : 'ring-1 ring-gray-700/50'} hover:ring-blue-400/50`}
+                          style={{
+                            left: `${holder.x * 100}%`,
+                            top: `${holder.y * 100}%`,
+                            width: `${holder.width * 100}%`,
+                            height: `${holder.height * 100}%`,
+                            transform: `rotate(${holder.rotation}deg)`,
+                            transformOrigin: 'center',
+                            cursor: isSelected && !resizingHolderId ? 'move' : 'pointer',
+                            overflow: 'hidden',
+                            backgroundColor: !isActive ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
+                          }}
+                          onMouseDown={(e) => {
+                            // Only start drag if clicking on the holder itself (not on resize handles)
+                            const target = e.target as HTMLElement
+                            const isResizeHandle = target.closest('.resize-handle') !== null
+                            if (!resizingHolderId && !isResizeHandle) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedHolderId(holder.id)
+                              setDraggingHolderId(holder.id)
+                              setDragStartPos({ x: e.clientX, y: e.clientY })
+                              setDragStartHolder({ ...holder })
                             }
-                          : {
-                              background: style.backgroundColor,
-                              color: style.textColor,
-                              padding: style.padding,
-                              borderRadius: style.borderRadius,
-                              border: style.border || 'none',
-                              boxShadow: style.boxShadow || 'none',
-                              fontWeight: style.fontWeight,
-                              textTransform: style.textTransform || 'none',
-                              fontSize: `${captionSize}px`,
-                              fontFamily: captionFont,
-                              display: 'inline-block',
-                              margin: '0 2px',
+                          }}
+                          onClick={(e) => {
+                            // Select on click if not dragging
+                            if (!draggingHolderId && !resizingHolderId) {
+                              e.stopPropagation()
+                              setSelectedHolderId(holder.id)
                             }
-                        
-                        return (
-                          <span key={idx} style={displayStyle}>
-                            {w.word}
-                          </span>
-                        )
-                      })}
-                  </div>
-                )}
-              </div>
-              
-              {/* Playback Controls */}
-              <div className="w-full max-w-4xl mt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => handleSeek(0)}
-                    className="p-2 hover:bg-gray-800 rounded"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleSeek(Math.max(0, currentTime - 0.1))}
-                    className="p-2 hover:bg-gray-800 rounded"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={handlePlayPause}
-                    className="p-2 hover:bg-gray-800 rounded"
-                  >
-                    {isPlaying ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleSeek(Math.min(totalDuration, currentTime + 0.1))}
-                    className="p-2 hover:bg-gray-800 rounded"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleSeek(totalDuration)}
-                    className="p-2 hover:bg-gray-800 rounded"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  <select
-                    value={playbackRate}
-                    onChange={(e) => {
-                      const rate = parseFloat(e.target.value)
-                      setPlaybackRate(rate)
-                      if (videoRef.current) {
-                        videoRef.current.playbackRate = rate
-                      }
-                      if (audioRef.current) {
-                        audioRef.current.playbackRate = rate
-                      }
-                    }}
-                    className="ml-4 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="0.25">0.25X</option>
-                    <option value="0.5">0.5X</option>
-                    <option value="0.75">0.75X</option>
-                    <option value="1">1X</option>
-                    <option value="1.25">1.25X</option>
-                    <option value="1.5">1.5X</option>
-                    <option value="2">2X</option>
-                  </select>
-                  <span className="ml-4 text-sm">
-                    {formatTime(currentTime)} / {formatTime(totalDuration)}
-                  </span>
+                          }}
+                        >
+                          {/* Video element for this holder */}
+                          {isActive && (
+                            <video
+                              ref={holder.layer === 'camera' ? videoRef : (holder.layer === 'screen' ? screenVideoRef : null)}
+                              className="w-full h-full object-cover pointer-events-none"
+                              style={{
+                                display: isActive ? 'block' : 'none',
+                              }}
+                              muted={holder.layer !== 'microphone'}
+                              playsInline
+                            />
+                          )}
+                          
+                          {/* Placeholder when no video - always show border for visibility */}
+                          {!isActive && (
+                            <div className="w-full h-full bg-gray-800/50 border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 text-xs pointer-events-none">
+                              {holder.layer}
+                            </div>
+                          )}
+                          
+                          {/* Selection border overlay - visible when selected */}
+                          {isSelected && (
+                            <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none z-20" />
+                          )}
+                          
+                          {/* Resize handles (corners) - only show when selected */}
+                          {isSelected && (
+                            <>
+                              {/* Top-left */}
+                              <div
+                                className="resize-handle absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nwse-resize z-10 hover:bg-blue-400"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
+                                  setResizingHolderId(holder.id)
+                                  setResizeCorner('nw')
+                                  setResizeStartPos({ x: e.clientX, y: e.clientY })
+                                  setResizeStartHolder({ ...holder })
+                                }}
+                              />
+                              {/* Top-right */}
+                              <div
+                                className="resize-handle absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-nesw-resize z-10 hover:bg-blue-400"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
+                                  setResizingHolderId(holder.id)
+                                  setResizeCorner('ne')
+                                  setResizeStartPos({ x: e.clientX, y: e.clientY })
+                                  setResizeStartHolder({ ...holder })
+                                }}
+                              />
+                              {/* Bottom-left */}
+                              <div
+                                className="resize-handle absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nesw-resize z-10 hover:bg-blue-400"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
+                                  setResizingHolderId(holder.id)
+                                  setResizeCorner('sw')
+                                  setResizeStartPos({ x: e.clientX, y: e.clientY })
+                                  setResizeStartHolder({ ...holder })
+                                }}
+                              />
+                              {/* Bottom-right */}
+                              <div
+                                className="resize-handle absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-nwse-resize z-10 hover:bg-blue-400"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
+                                  setResizingHolderId(holder.id)
+                                  setResizeCorner('se')
+                                  setResizeStartPos({ x: e.clientX, y: e.clientY })
+                                  setResizeStartHolder({ ...holder })
+                                }}
+                              />
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  
+                  {/* Main canvas for rendering (LUT, captions, etc.) - overlays on top */}
+                  <canvas
+                    ref={lutCanvasRef}
+                    className="absolute inset-0 w-full h-full pointer-events-none"
+                  />
                 </div>
               </div>
+              
+              {/* Hidden video elements for sources */}
+              <video ref={videoRef} className="hidden" />
+              <video ref={screenVideoRef} className="hidden" />
+              <audio ref={audioRef} style={{ display: 'none' }} />
             </div>
-            
+
             {/* Right Panel - Transcript */}
-            <div 
+            <div
               className="bg-gray-900 border-l border-gray-700 flex flex-col relative"
               style={{ width: `${transcriptWidth}px` }}
             >
@@ -3026,7 +4495,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     Settings
                   </button>
                 </div>
-                
+
                 {/* Show all scenes with their transcripts - group by unique sceneId */}
                 {Array.from(new Set(sceneTakes.map(st => st.sceneId))).map((sceneId) => {
                   const scene = scenes.find(s => s.id === sceneId)
@@ -3034,14 +4503,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   if (!sceneTake) return null
                   const sceneTranscript = transcripts.get(sceneId)
                   const isTranscribingScene = isTranscribing.get(sceneId) || false
-                  
+
                   return (
                     <div key={sceneId} className="mb-6">
                       <h4 className="text-sm font-semibold mb-2">
                         SCENE {sceneTake.sceneIndex + 1}
                         {scene?.title && `: ${scene.title}`}
                       </h4>
-                      
+
                       {!sceneTranscript ? (
                         <div className="border-2 border-dashed border-gray-700 rounded p-4 text-center">
                           {isTranscribingScene ? (
@@ -3049,8 +4518,8 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                           ) : (
                             <>
                               <div className="text-sm text-gray-400 mb-2">
-                                {sceneTake.take.hasMicrophone 
-                                  ? 'Not transcribed yet.' 
+                                {sceneTake.take.hasMicrophone
+                                  ? 'Not transcribed yet.'
                                   : 'This scene has no transcript'}
                               </div>
                               {sceneTake.take.hasMicrophone && (
@@ -3066,57 +4535,59 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                           )}
                         </div>
                       ) : (
-                        <div
-                          className="text-sm leading-relaxed select-text"
-                          onMouseUp={() => handleTranscriptSelection(sceneId)}
-                          onKeyUp={() => handleTranscriptSelection(sceneId)}
-                        >
+                        <div className="text-sm leading-relaxed select-text text-gray-200">
                           {sceneTranscript.words.map((word, index) => {
-                            const isSelected = selectedText && 
-                              selectedText.sceneId === sceneId &&
-                              word.start >= selectedText.start && 
-                              word.end <= selectedText.end
                             const isDeleted = deletedWords.get(sceneId)?.has(index) || false
+                            const isSelected = selectedWordIndices.get(sceneId)?.has(index) || false
+                            const correctedText = wordCorrections.get(sceneId)?.get(index)
+                            const displayText = correctedText || word.word
+                            
                             // Also check if word overlaps with any cut
                             const sceneCuts = cuts.get(sceneId) || []
                             const wordOverlapsCut = sceneCuts.some(cut => {
                               const cutStart = cut.start + sceneTake.startTime
                               const cutEnd = cut.end + sceneTake.startTime
-                              return (word.start >= cutStart && word.start < cutEnd) || 
-                                     (word.end > cutStart && word.end <= cutEnd) ||
-                                     (word.start <= cutStart && word.end >= cutEnd)
+                              return (word.start >= cutStart && word.start < cutEnd) ||
+                                (word.end > cutStart && word.end <= cutEnd) ||
+                                (word.start <= cutStart && word.end >= cutEnd)
                             })
                             const showStrikethrough = isDeleted || wordOverlapsCut
-                            
-                            // Get caption style for this word
-                            const styleId = getCaptionStyleForWord(sceneId, index)
-                            const style = captionStyles.find(s => s.id === styleId) || captionStyles[0]
-                            
-                            const wordStyle: React.CSSProperties = styleId !== 'none' ? {
-                              background: style.backgroundColor,
-                              color: style.textColor,
-                              padding: style.padding,
-                              borderRadius: style.borderRadius,
-                              border: style.border || 'none',
-                              boxShadow: style.boxShadow || 'none',
-                              fontWeight: style.fontWeight,
-                              textTransform: style.textTransform || 'none',
-                              fontSize: `${captionSize}px`,
-                              fontFamily: captionFont,
-                              display: 'inline-block',
-                              margin: '2px',
-                            } : {}
-                            
+
                             return (
                               <span
                                 key={index}
-                                onClick={() => handleWordClick(word, sceneTake.sceneId, index)}
-                                className={`cursor-pointer px-1 rounded transition-all ${
-                                  isSelected ? 'ring-2 ring-blue-500' : showStrikethrough ? 'line-through text-red-400' : 'hover:opacity-80'
+                                onClick={(e) => {
+                                  if (isCPressedRef.current) {
+                                    // C key is held - show correction dialog
+                                    e.preventDefault()
+                                    setCorrectionDialog({ sceneId, wordIndex: index, currentWord: displayText })
+                                  } else {
+                                    // Regular click - toggle selection
+                                    setSelectedWordIndices(prev => {
+                                      const sceneSelected = prev.get(sceneId) || new Set<number>()
+                                      const newSelected = new Set(sceneSelected)
+                                      if (newSelected.has(index)) {
+                                        newSelected.delete(index)
+                                      } else {
+                                        newSelected.add(index)
+                                      }
+                                      const updated = new Map(prev)
+                                      if (newSelected.size > 0) {
+                                        updated.set(sceneId, newSelected)
+                                      } else {
+                                        updated.delete(sceneId)
+                                      }
+                                      return updated
+                                    })
+                                  }
+                                }}
+                                className={`px-1 rounded transition-all cursor-pointer ${
+                                  showStrikethrough ? 'line-through text-red-400' : ''
+                                } ${
+                                  isSelected ? 'bg-blue-600/30 text-blue-200' : 'hover:bg-gray-700/50'
                                 }`}
-                                style={wordStyle}
                               >
-                                {word.word}{' '}
+                                {displayText}{' '}
                               </span>
                             )
                           })}
@@ -3125,7 +4596,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     </div>
                   )
                 })}
-                
+
                 {sceneTakes.length === 0 && (
                   <div className="text-center text-gray-400 py-8">
                     No scenes with recordings. Record a scene first.
@@ -3134,659 +4605,350 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               </div>
             </div>
           </div>
-          
-          {/* Timeline */}
+
+          {/* Timeline Section - Resizable */}
           <div 
-            className="bg-gray-900 border-t border-gray-700 flex flex-col flex-shrink-0 relative"
-            style={{ height: `${timelineHeight}px` }}
+            className="relative border-t border-gray-800 bg-[#050505] flex flex-col shrink-0 min-w-0 overflow-hidden"
+            style={{ height: `${timelineHeight}px`, width: '100%' }}
           >
-            {/* Resize handle */}
+            {/* Resize Handle */}
             <div
               onMouseDown={() => setIsResizingTimeline(true)}
-              className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 z-20"
+              className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 z-50 transition-colors"
               style={{ cursor: 'row-resize' }}
             />
-            <div className="flex-1 overflow-x-auto p-4">
-              <div 
-                className="relative" 
-                data-timeline-container 
-                style={{ 
-                  width: `${totalDuration * timelineZoom}px`,
-                  minWidth: `${totalDuration * timelineZoom}px`,
-                  cursor: timelineTool === 'cut' ? 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23000\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M14.121 3.293a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z\'/%3E%3Cpath d=\'M14.121 14.121a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z\'/%3E%3Cpath d=\'M9 12h6\'/%3E%3C/svg%3E") 12 12, crosshair' : 'default'
-                }}
-                onMouseDown={(e) => {
-                  // Only handle scrubbing if not clicking on clips or other interactive elements
-                  if ((e.target as HTMLElement).closest('[data-clip-id]') || 
-                      (e.target as HTMLElement).closest('.trim-handle')) {
-                    return
-                  }
-                  
-                  e.preventDefault()
-                  const timelineContainer = e.currentTarget
-                  
-                  // Pause video/audio if playing
-                  if (videoRef.current && !videoRef.current.paused) {
-                    videoRef.current.pause()
-                  }
-                  if (audioRef.current && !audioRef.current.paused) {
-                    audioRef.current.pause()
-                  }
-                  setIsPlaying(false)
-                  
-                  const handleMouseMove = (moveEvent: MouseEvent) => {
-                    const rect = timelineContainer.getBoundingClientRect()
-                    const x = moveEvent.clientX - rect.left
-                    const time = Math.max(0, Math.min(totalDuration, x / timelineZoom))
-                    
-                    // Immediate update for smooth scrubbing
-                    handleSeek(time, true)
-                  }
-                  
-                  const handleMouseUp = () => {
-                    document.removeEventListener('mousemove', handleMouseMove)
-                    document.removeEventListener('mouseup', handleMouseUp)
-                  }
-                  
-                  document.addEventListener('mousemove', handleMouseMove, { passive: true })
-                  document.addEventListener('mouseup', handleMouseUp)
-                  
-                  // Handle initial click
-                  const rect = timelineContainer.getBoundingClientRect()
-                  const x = e.clientX - rect.left
-                  const time = Math.max(0, Math.min(totalDuration, x / timelineZoom))
-                  handleSeek(time, true)
-                }}
-                onClick={(e) => {
-                  // Only handle click-to-scrub if not clicking on clips
-                  if ((e.target as HTMLElement).closest('[data-clip-id]') || 
-                      (e.target as HTMLElement).closest('.trim-handle')) {
-                    return
-                  }
-                  
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  const x = e.clientX - rect.left
-                  const time = Math.max(0, Math.min(totalDuration, x / timelineZoom))
-                  handleSeek(time, true)
-                }}
-              >
-                {/* Time markers - every 20 seconds */}
-                <div className="absolute top-0 left-0 right-0 h-8 border-b border-gray-700">
-                  {Array.from({ length: Math.ceil(totalDuration / 20) + 1 }).map((_, i) => {
-                    const time = i * 20
-                    if (time > totalDuration) return null
-                    return (
-                      <div
-                        key={i}
-                        className="absolute border-l border-gray-600"
-                        style={{ left: `${time * timelineZoom}px` }}
-                      >
-                        <span className="text-xs text-gray-400 ml-1">{formatTime(time)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                
-                {/* Scene markers/headlines - positioned above tracks */}
-                <div className="absolute top-8 left-0 right-0 h-6 flex items-center z-25">
-                  {Array.from(new Set(sceneTakes.map(st => st.sceneId))).map((sceneId) => {
-                    const scene = scenes.find(s => s.id === sceneId)
-                    // Find the first clip of this scene (earliest startTime)
-                    const firstClip = sceneTakes
-                      .filter(st => st.sceneId === sceneId)
-                      .sort((a, b) => a.startTime - b.startTime)[0]
-                    if (!firstClip) return null
-                    
-                    return (
-                      <div
-                        key={`scene-marker-${sceneId}`}
-                        className="absolute flex items-center"
-                        style={{ left: `${firstClip.startTime * timelineZoom}px` }}
-                      >
-                        <span className="text-xs text-white font-medium">
-                          • SCENE {firstClip.sceneIndex + 1}
-                          {scene?.title && `: ${scene.title}`}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                
-                {/* Playhead - gray line with teardrop marker at top */}
-                <div
-                  className="absolute top-0 bottom-0 z-30 pointer-events-none"
-                  style={{ left: `${currentTime * timelineZoom}px` }}
+
+          {/* Top Controls Bar - Centered Timecode & Transport */}
+            <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0A0A0A] shrink-0 min-w-0">
+            {/* Left Tools */}
+            <div className="flex gap-2 w-1/3 min-w-0">
+              <div className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-800">
+                <button
+                  onClick={() => setTimelineTool('select')}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'select' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title="Select Tool (V)"
                 >
-                  {/* Circular marker at top */}
-                  <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 w-3 h-3 rounded-full bg-gray-400 border border-gray-300" />
-                  {/* Vertical line */}
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-px h-full bg-white" />
-                </div>
-                
-                {/* Tracks - Separate horizontal tracks for each layer type */}
-                <div className="mt-14 space-y-3">
-                  {timelineClips.length === 0 ? (
-                    <div className="text-center text-gray-400 py-8">
-                      No clips on timeline. Record a scene first.
-                    </div>
-                  ) : (
-                    <>
-                      {/* Camera Track - All camera clips */}
-                      {timelineClips.some(c => c.layer === 'camera') && (
-                        <div className="relative h-20 bg-transparent">
-                          <div className="absolute left-2 top-2 text-xs text-gray-400 z-10">
-                            Camera
-                          </div>
-                          <div className="absolute inset-0 flex items-center pl-20">
-                            {timelineClips
-                              .filter(clip => clip.layer === 'camera')
-                              .map((clip) => {
-                                const isSelected = selectedClipIds.has(clip.id)
-                                const isDragging = draggingClipId === clip.id
-                                const isTrimming = trimmingClipId === clip.id
-                                const clipDuration = clip.timelineEnd - clip.timelineStart
-                                
-                                return (
-                                  <div
-                                    key={clip.id}
-                                    data-clip-id={clip.id}
-                                    className={`absolute h-full bg-blue-600 rounded-lg transition-all cursor-move ${
-                                      isSelected ? 'ring-2 ring-blue-400' : ''
-                                    } ${isDragging ? 'opacity-75' : ''}`}
-                                    style={{
-                                      left: `${clip.timelineStart * timelineZoom}px`,
-                                      width: `${clipDuration * timelineZoom}px`,
-                                    }}
-                                    onMouseDown={(e) => {
-                                      if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.trim-handle')) {
-                                        return // Let trim handles handle their own events
-                                      }
-                                      e.stopPropagation()
-                                      if (timelineTool === 'select') {
-                                        handleStartMoveClip(clip.id, e.clientX)
-                                      }
-                                    }}
-                                    onClick={(e) => {
-                                      if ((e.target as HTMLElement).closest('.trim-handle')) return
-                                      const rect = e.currentTarget.getBoundingClientRect()
-                                      const timelineContainer = e.currentTarget.closest('[data-timeline-container]') as HTMLElement
-                                      if (!timelineContainer) return
-                                      const containerRect = timelineContainer.getBoundingClientRect()
-                                      const clickX = e.clientX - containerRect.left
-                                      const clickTime = clickX / timelineZoom
-                                      handleClipClick(clip.id, clickTime)
-                                    }}
-                                  >
-                                    {/* Left trim handle */}
-                                    <div
-                                      className={`trim-handle absolute left-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'in' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'in', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-3 h-4 border-l-2 border-t-2 border-b-2 border-white rounded-l" />
-                                        <div className="w-1 h-1 bg-white rounded-full ml-0.5" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Right trim handle */}
-                                    <div
-                                      className={`trim-handle absolute right-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'out' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'out', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-1 h-1 bg-white rounded-full mr-0.5" />
-                                        <div className="w-3 h-4 border-r-2 border-t-2 border-b-2 border-white rounded-r" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Video thumbnail */}
-                                    {videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_camera`) && (
-                                      <img
-                                        src={videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_camera`)}
-                                        alt="Video thumbnail"
-                                        className="absolute inset-0 w-full h-full object-cover rounded opacity-80"
-                                      />
-                                    )}
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Microphone Track - All microphone clips */}
-                      {timelineClips.some(c => c.layer === 'microphone') && (
-                        <div className="relative h-24 bg-transparent">
-                          <div className="absolute left-2 top-2 text-xs text-gray-400 z-10">
-                            Microphone
-                          </div>
-                          <div className="absolute inset-0 flex flex-col pl-20">
-                            {/* Audio waveform area - all clips on same layer */}
-                            {timelineClips
-                              .filter(clip => clip.layer === 'microphone')
-                              .map((clip) => {
-                                const isSelected = selectedClipIds.has(clip.id)
-                                const isDragging = draggingClipId === clip.id
-                                const isTrimming = trimmingClipId === clip.id
-                                const clipDuration = clip.timelineEnd - clip.timelineStart
-                                const sceneTranscript = transcripts.get(clip.sceneId)
-                                
-                                return (
-                                  <div
-                                    key={clip.id}
-                                    data-clip-id={clip.id}
-                                    className={`absolute h-full bg-blue-600 rounded-lg transition-all cursor-move ${
-                                      isSelected ? 'ring-2 ring-blue-400' : ''
-                                    } ${isDragging ? 'opacity-75' : ''}`}
-                                    style={{
-                                      left: `${clip.timelineStart * timelineZoom}px`,
-                                      width: `${clipDuration * timelineZoom}px`,
-                                    }}
-                                    onMouseDown={(e) => {
-                                      if ((e.target as HTMLElement).closest('.trim-handle')) return
-                                      e.stopPropagation()
-                                      if (timelineTool === 'select') {
-                                        handleStartMoveClip(clip.id, e.clientX)
-                                      }
-                                    }}
-                                    onClick={(e) => {
-                                      if ((e.target as HTMLElement).closest('.trim-handle')) return
-                                      const timelineContainer = e.currentTarget.closest('[data-timeline-container]') as HTMLElement
-                                      if (!timelineContainer) return
-                                      const containerRect = timelineContainer.getBoundingClientRect()
-                                      const clickX = e.clientX - containerRect.left
-                                      const clickTime = clickX / timelineZoom
-                                      handleClipClick(clip.id, clickTime)
-                                    }}
-                                  >
-                                    {/* Left trim handle */}
-                                    <div
-                                      className={`trim-handle absolute left-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'in' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'in', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-3 h-4 border-l-2 border-t-2 border-b-2 border-white rounded-l" />
-                                        <div className="w-1 h-1 bg-white rounded-full ml-0.5" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Right trim handle */}
-                                    <div
-                                      className={`trim-handle absolute right-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'out' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'out', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-1 h-1 bg-white rounded-full mr-0.5" />
-                                        <div className="w-3 h-4 border-r-2 border-t-2 border-b-2 border-white rounded-r" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Waveform visualization */}
-                                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                                      {(() => {
-                                        const waveformKey = `${clip.sceneId}_${clip.takeId}`
-                                        const waveformData = waveforms.get(waveformKey)
-                                        
-                                        if (!waveformData || waveformData.length === 0) {
-                                          return (
-                                            <div className="w-full h-8 flex items-center justify-center">
-                                              <div className="w-full h-px bg-gray-600" />
-                                            </div>
-                                          )
-                                        }
-                                        
-                                        const clipWidth = clipDuration * timelineZoom
-                                        const clipHeight = 32
-                                        const centerY = clipHeight / 2
-                                        
-                                        // Sample waveform - map source in/out to waveform data
-                                        const sourceDuration = clip.sourceOut - clip.sourceIn
-                                        const sourceStartRatio = clip.sourceIn / clip.sourceDuration
-                                        const sourceEndRatio = clip.sourceOut / clip.sourceDuration
-                                        const waveformStart = Math.floor(waveformData.length * sourceStartRatio)
-                                        const waveformEnd = Math.floor(waveformData.length * sourceEndRatio)
-                                        const relevantWaveform = waveformData.slice(waveformStart, waveformEnd)
-                                        
-                                        const samples = Math.max(50, Math.min(relevantWaveform.length, Math.floor(clipWidth / 2)))
-                                        const step = relevantWaveform.length / samples
-                                        
-                                        let pathData = `M 0 ${centerY}`
-                                        const points: Array<{ x: number; y: number }> = []
-                                        
-                                        for (let i = 0; i < samples; i++) {
-                                          const index = Math.floor(i * step)
-                                          const amplitude = relevantWaveform[index] || 0
-                                          const x = (i / samples) * clipWidth
-                                          const normalizedAmp = Math.max(0, Math.min(1, amplitude * 3))
-                                          const y = centerY - (normalizedAmp * (clipHeight * 0.4))
-                                          points.push({ x, y })
-                                        }
-                                        
-                                        for (let i = 0; i < points.length; i++) {
-                                          if (i === 0) {
-                                            pathData += ` L ${points[i].x} ${points[i].y}`
-                                          } else {
-                                            const prevPoint = points[i - 1]
-                                            const currentPoint = points[i]
-                                            const controlX = (prevPoint.x + currentPoint.x) / 2
-                                            pathData += ` Q ${controlX} ${prevPoint.y} ${currentPoint.x} ${currentPoint.y}`
-                                          }
-                                        }
-                                        
-                                        const bottomPath = points.map(p => ({ x: p.x, y: centerY + (centerY - p.y) }))
-                                        for (let i = bottomPath.length - 1; i >= 0; i--) {
-                                          if (i === bottomPath.length - 1) {
-                                            pathData += ` L ${bottomPath[i].x} ${bottomPath[i].y}`
-                                          } else {
-                                            const nextPoint = bottomPath[i + 1]
-                                            const currentPoint = bottomPath[i]
-                                            const controlX = (nextPoint.x + currentPoint.x) / 2
-                                            pathData += ` Q ${controlX} ${nextPoint.y} ${currentPoint.x} ${currentPoint.y}`
-                                          }
-                                        }
-                                        
-                                        pathData += ` Z`
-                                        
-                                        return (
-                                          <svg
-                                            width={clipWidth}
-                                            height={clipHeight}
-                                            className="absolute"
-                                            style={{ left: 0, top: 0 }}
-                                          >
-                                            <line
-                                              x1={0}
-                                              y1={centerY}
-                                              x2={clipWidth}
-                                              y2={centerY}
-                                              stroke="rgba(156, 163, 175, 0.3)"
-                                              strokeWidth={1}
-                                            />
-                                            <path
-                                              d={pathData}
-                                              fill="rgb(96, 165, 250)"
-                                              fillOpacity={0.7}
-                                              stroke="rgb(96, 165, 250)"
-                                              strokeWidth={0.5}
-                                            />
-                                          </svg>
-                                        )
-                                      })()}
-                                    </div>
-                                    
-                                    {/* Circular thumbnail at start */}
-                                    {cameraBlob && (
-                                      <div className="absolute left-1 top-1 w-6 h-6 rounded-full overflow-hidden border border-white/30 z-10 bg-gray-700">
-                                        {videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_camera`) ? (
-                                          <img
-                                            src={videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_camera`) || ''}
-                                            alt="Thumbnail"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                              e.currentTarget.style.display = 'none'
-                                            }}
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-center text-white text-xs">
-                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                                            </svg>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Transcript text overlay */}
-                                    {sceneTranscript && (
-                                      <div className="absolute bottom-0 left-0 right-0 h-6 flex items-center pl-8 pr-2 overflow-hidden">
-                                        <span className="text-xs text-white font-medium truncate">
-                                          {sceneTranscript.words
-                                            .filter(word => {
-                                              // Map timeline time to source time
-                                              const wordTimelineStart = clip.timelineStart + ((word.start - clip.sourceIn) / (clip.sourceOut - clip.sourceIn)) * clipDuration
-                                              const wordTimelineEnd = clip.timelineStart + ((word.end - clip.sourceIn) / (clip.sourceOut - clip.sourceIn)) * clipDuration
-                                              return wordTimelineStart >= clip.timelineStart && wordTimelineEnd <= clip.timelineEnd
-                                            })
-                                            .map(word => word.word)
-                                            .join(' ')}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Screen Track - All screen clips */}
-                      {timelineClips.some(c => c.layer === 'screen') && (
-                        <div className="relative h-20 bg-transparent">
-                          <div className="absolute left-2 top-2 text-xs text-gray-400 z-10">
-                            Screen
-                          </div>
-                          <div className="absolute inset-0 flex items-center pl-20">
-                            {timelineClips
-                              .filter(clip => clip.layer === 'screen')
-                              .map((clip) => {
-                                const isSelected = selectedClipIds.has(clip.id)
-                                const isDragging = draggingClipId === clip.id
-                                const isTrimming = trimmingClipId === clip.id
-                                const clipDuration = clip.timelineEnd - clip.timelineStart
-                                
-                                return (
-                                  <div
-                                    key={clip.id}
-                                    data-clip-id={clip.id}
-                                    className={`absolute h-full bg-blue-600 rounded-lg transition-all cursor-move ${
-                                      isSelected ? 'ring-2 ring-blue-400' : ''
-                                    } ${isDragging ? 'opacity-75' : ''}`}
-                                    style={{
-                                      left: `${clip.timelineStart * timelineZoom}px`,
-                                      width: `${clipDuration * timelineZoom}px`,
-                                    }}
-                                    onMouseDown={(e) => {
-                                      if ((e.target as HTMLElement).closest('.trim-handle')) return
-                                      e.stopPropagation()
-                                      if (timelineTool === 'select') {
-                                        handleStartMoveClip(clip.id, e.clientX)
-                                      }
-                                    }}
-                                    onClick={(e) => {
-                                      if ((e.target as HTMLElement).closest('.trim-handle')) return
-                                      const timelineContainer = e.currentTarget.closest('[data-timeline-container]') as HTMLElement
-                                      if (!timelineContainer) return
-                                      const containerRect = timelineContainer.getBoundingClientRect()
-                                      const clickX = e.clientX - containerRect.left
-                                      const clickTime = clickX / timelineZoom
-                                      handleClipClick(clip.id, clickTime)
-                                    }}
-                                  >
-                                    {/* Left trim handle */}
-                                    <div
-                                      className={`trim-handle absolute left-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'in' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'in', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-3 h-4 border-l-2 border-t-2 border-b-2 border-white rounded-l" />
-                                        <div className="w-1 h-1 bg-white rounded-full ml-0.5" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Right trim handle */}
-                                    <div
-                                      className={`trim-handle absolute right-0 top-0 bottom-0 w-2 bg-green-500 z-30 cursor-ew-resize ${
-                                        isTrimming && trimmingEdge === 'out' ? 'bg-green-400 w-3' : 'hover:bg-green-400'
-                                      }`}
-                                      onMouseDown={(e) => {
-                                        e.stopPropagation()
-                                        handleStartTrimClip(clip.id, 'out', e.clientX)
-                                      }}
-                                    >
-                                      <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 flex items-center">
-                                        <div className="w-1 h-1 bg-white rounded-full mr-0.5" />
-                                        <div className="w-3 h-4 border-r-2 border-t-2 border-b-2 border-white rounded-r" />
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Screen thumbnail */}
-                                    {videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_screen`) && (
-                                      <img
-                                        src={videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_screen`)}
-                                        alt="Screen thumbnail"
-                                        className="absolute inset-0 w-full h-full object-cover rounded opacity-80"
-                                      />
-                                    )}
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Layout Track - Orange bar extending across entire timeline */}
-                      <div className="relative h-12 bg-transparent">
-                        <div className="absolute left-2 top-2 text-xs text-gray-400 z-10">
-                          Layout
-                        </div>
-                        <div className="absolute inset-0 flex items-center pl-20">
-                          <div 
-                            className="absolute h-full bg-orange-500 rounded"
-                            style={{
-                              left: '0px',
-                              width: `${totalDuration * timelineZoom}px`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Timeline controls */}
-            <div className="px-4 py-2 border-t border-gray-700 flex items-center justify-between">
-              <div className="flex gap-2 items-center">
-                {/* Timeline tool selector */}
-                <div className="flex gap-1 bg-gray-800 rounded p-1">
-                  <button
-                    onClick={() => setTimelineTool('select')}
-                    className={`px-2 py-1 rounded text-xs ${
-                      timelineTool === 'select' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                    }`}
-                    title="Select Tool"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setTimelineTool('cut')}
-                    className={`px-2 py-1 rounded text-xs ${
-                      timelineTool === 'cut' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                    }`}
-                    title="Cut Tool"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 3.293a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6" />
-                    </svg>
-                  </button>
-                </div>
-                
-                {/* Delete selected clips button */}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
+                </button>
+                <button
+                  onClick={() => setTimelineTool('cut')}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'cut' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  title="Cut Tool (C)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 3.293a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6" /></svg>
+                </button>
                 {selectedClipIds.size > 0 && (
                   <button
                     onClick={handleDeleteSelectedClips}
-                    className="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs"
-                    title="Delete Selected Clips"
+                    className="p-2 text-red-500 hover:bg-gray-800 rounded-md transition-colors"
+                    title="Delete Selected (Del)"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 )}
               </div>
-              
-              {/* Timeline zoom controls */}
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => setTimelineZoom(Math.max(minZoom, timelineZoom - 10))}
-                  className="p-1 hover:bg-gray-800 rounded"
-                  title="Zoom Out"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                  </svg>
-                </button>
-                <input
-                  type="range"
-                  min={minZoom}
-                  max={maxZoom}
-                  value={timelineZoom}
-                  onChange={(e) => setTimelineZoom(parseInt(e.target.value))}
-                  className="w-24"
-                />
-                <button
-                  onClick={() => setTimelineZoom(Math.min(maxZoom, timelineZoom + 10))}
-                  className="p-1 hover:bg-gray-800 rounded"
-                  title="Zoom In"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-                  </svg>
-                </button>
+            </div>
+
+            {/* Center Transport & Timecode */}
+            <div className="flex flex-col items-center justify-center w-1/3 min-w-0 flex-shrink-0">
+              <div className="font-mono text-xs text-gray-400 mb-1 tracking-wider">
+                <span className="text-white font-semibold">{formatTime(currentTime)}</span>
+                <span className="opacity-50 mx-1">/</span>
+                <span>{formatTime(totalDuration)}</span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowExportDialog(true)}
-                  className="px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
-                >
-                  Export
+              <div className="flex items-center gap-4">
+                <button className="text-gray-400 hover:text-white" onClick={() => handleSeek(0)}>
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" /></svg>
                 </button>
                 <button
-                  onClick={() => {
-                    if (selectedScenesForExport.size === 0) {
-                      selectAllScenes()
-                    }
-                    handleExportDaVinci()
-                  }}
-                  className="px-4 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm"
+                  className="w-8 h-8 flex items-center justify-center bg-white text-black rounded-full hover:bg-gray-200 transition-colors"
+                  onClick={handlePlayPause}
                 >
-                  Export DaVinci Timeline
+                  {isPlaying ? (
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                  ) : (
+                    <svg className="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  )}
+                </button>
+                <button className="text-gray-400 hover:text-white" onClick={() => handleSeek(totalDuration)}>
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
                 </button>
               </div>
             </div>
+
+            {/* Right Actions */}
+            <div className="flex items-center justify-end gap-3 w-1/3 min-w-0 flex-shrink-0">
+              <div className="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">
+                <button onClick={() => setTimelineZoom(Math.max(minZoom, timelineZoom - 10))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg></button>
+                <input type="range" min={minZoom} max={maxZoom} value={timelineZoom} onChange={(e) => setTimelineZoom(parseInt(e.target.value))} className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+                <button onClick={() => setTimelineZoom(Math.min(maxZoom, timelineZoom + 10))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
+              </div>
+              <div className="h-4 w-px bg-gray-800 mx-1"></div>
+              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
+                Export
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline Scroll Container */}
+          <div
+              className="flex-1 overflow-x-auto overflow-y-hidden bg-[#050505] relative custom-scrollbar select-none min-w-0"
+            data-timeline-container
+              style={{ paddingBottom: '20px', width: '100%' }}
+          >
+            {/* Timeline Header (Time Scale) - Fixed Top Area specifically for scrubbing */}
+            <div
+              className="sticky top-0 z-30 h-10 border-b border-gray-800 bg-[#0A0A0A] cursor-pointer w-full min-w-full"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const headerElement = e.currentTarget
+                const rect = headerElement.getBoundingClientRect()
+                const x = e.clientX - rect.left + headerElement.scrollLeft
+                const time = x / timelineZoom
+                handleSeek(time, true)
+
+                const handleMouseMove = (mv: MouseEvent) => {
+                  // Update rect in case of scroll/resize during drag (optional but safer)
+                  // const currentRect = headerElement.getBoundingClientRect() 
+                  // actually rect relative to viewport shouldn't change if container is sticky top, 
+                  // but if page scrolls it might. Let's trust initial rect for now or update it.
+                  // Simpler: Just rely on cached rect + current scrollLeft
+                  const newX = mv.clientX - rect.left + headerElement.scrollLeft
+                  handleSeek(newX / timelineZoom, true)
+                }
+                const handleMouseUp = () => {
+                  window.removeEventListener('mousemove', handleMouseMove)
+                  window.removeEventListener('mouseup', handleMouseUp)
+                }
+                window.addEventListener('mousemove', handleMouseMove)
+                window.addEventListener('mouseup', handleMouseUp)
+              }}
+              style={{ minWidth: `${Math.max(window.innerWidth, (Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom + 200)}px` }}
+            >
+              {/* Time Markers */}
+              {Array.from({ length: Math.ceil(Number.isFinite(totalDuration) ? totalDuration : 0) + 1 }).map((_, i) => (
+                <div key={i} className="absolute bottom-0 h-4 border-l border-gray-700" style={{ left: `${i * timelineZoom}px` }}>
+                  <span className="absolute bottom-full left-1 text-[10px] text-gray-500 font-mono mb-1 pointer-events-none">
+                    {formatTime(i)}
+                  </span>
+                  {/* Sub-markers */}
+                  {[0.25, 0.5, 0.75].map(sub => (
+                    <div key={sub} className="absolute bottom-0 h-2 border-l border-gray-800" style={{ left: `${sub * timelineZoom}px` }} />
+                  ))}
+                </div>
+              ))}
+
+              {/* Playhead Handle (In Header) */}
+              <div
+                className="absolute top-1 z-40 transform -translate-x-1/2 pointer-events-none transition-transform duration-75"
+                style={{ left: `${currentTime * timelineZoom}px` }}
+              >
+                <svg width="18" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+                  <path d="M12 24L0 12C0 5.37258 5.37258 0 12 0C18.6274 0 24 5.37258 24 12L12 24Z" fill="#9CA3AF" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Tracks Container */}
+            <div
+              className="relative p-4 space-y-4 min-w-full"
+              style={{ minWidth: `${Math.max(window.innerWidth, (Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom + 200)}px` }}
+            >
+              {/* Playhead Line (Extends through tracks) */}
+              <div
+                className="absolute top-0 bottom-0 w-px bg-gray-500/50 z-20 pointer-events-none"
+                style={{ left: `${currentTime * timelineZoom}px` }}
+              />
+
+              {/* Scene Labels Row (Optional, helpful context) */}
+              <div className="h-6 relative w-full">
+                {sceneTakes.map((st, idx) => (
+                  <div
+                    key={st.sceneId}
+                    className="absolute top-0 text-xs font-semibold text-gray-500 flex items-center"
+                    style={{ left: `${st.startTime * timelineZoom}px` }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-gray-600 mr-2" />
+                    SCENE {idx + 1}
+                  </div>
+                ))}
+              </div>
+
+
+              {/* TRACK 1: CAMERA & SCREEN (Visuals) */}
+              {(timelineClips.some(c => c.layer === 'camera' || c.layer === 'screen')) && (
+                <div className="relative w-full" style={{ height: `${timelineTrackHeight}px` }}>
+                  {/* Track Background/Gutter */}
+                  <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl" />
+
+                  {timelineClips
+                    .filter(c => c.layer === 'camera' || c.layer === 'screen')
+                    .map(clip => {
+                      const isSelected = selectedClipIds.has(clip.id)
+                      const clipDuration = clip.timelineEnd - clip.timelineStart
+                      const isDragging = draggingClipId === clip.id
+                      const isTrimming = trimmingClipId === clip.id
+
+                      return (
+                        <div
+                          key={clip.id}
+                          data-clip-id={clip.id}
+                          className={`absolute top-0 bottom-0 bg-[#3b82f6] rounded-2xl overflow-hidden border transition-all cursor-move group
+                                       ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-[#3b82f6]'}
+                                       ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
+                                       ${isTrimming ? 'z-30' : ''}
+                                    `}
+                          style={{
+                            left: `${clip.timelineStart * timelineZoom}px`,
+                            width: `${Math.max(2, clipDuration * timelineZoom)}px`, // Min width to be visible
+                          }}
+                          onMouseDown={(e) => {
+                            if ((e.target as HTMLElement).closest('.trim-handle')) return
+                            e.stopPropagation()
+                            if (timelineTool === 'select') handleStartMoveClip(clip.id, e.clientX)
+                            else if (timelineTool === 'cut') handleCutClip(clip.id, (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom)
+                          }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('.trim-handle')) return
+                            const clickTime = (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom
+                            handleClipClick(clip.id, clickTime)
+                          }}
+                        >
+                          {/* Thumbnails */}
+                          <div className="absolute inset-0 flex overflow-hidden opacity-50 pointer-events-none select-none">
+                            {/* Repeating thumbnails could go here, simplified to one for now */}
+                            {videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_${clip.layer}`) && (
+                              <img
+                                src={videoThumbnails.get(`${clip.sceneId}_${clip.takeId}_${clip.layer}`)}
+                                className="h-full w-auto object-cover max-w-none"
+                                alt=""
+                              />
+                            )}
+                          </div>
+
+                          {/* Clip Info */}
+                          <div className="absolute left-3 top-2 right-3 flex justify-between items-start z-10 pointer-events-none">
+                            <span className="text-xs font-semibold text-white drop-shadow-md truncate">
+                              {clip.layer === 'camera' ? 'Camera' : 'Screen'}
+                            </span>
+                          </div>
+
+                          {/* Trim Handles (Visible on hover/select) */}
+                          <div
+                            className={`trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                      ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                            onMouseDown={(e) => { e.stopPropagation(); handleStartTrimClip(clip.id, 'in', e.clientX) }}
+                          >
+                            <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                          </div>
+                          <div
+                            className={`trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                      ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                            onMouseDown={(e) => { e.stopPropagation(); handleStartTrimClip(clip.id, 'out', e.clientX) }}
+                          >
+                            <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+
+              {/* TRACK 2: MICROPHONE (Audio) */}
+              {(timelineClips.some(c => c.layer === 'microphone')) && (
+                <div className="relative w-full" style={{ height: `${timelineTrackHeight}px` }}> {/* Dynamic Height */}
+                  <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl" />
+
+                  {timelineClips
+                    .filter(c => c.layer === 'microphone')
+                    .map(clip => {
+                      const isSelected = selectedClipIds.has(clip.id)
+                      const clipDuration = clip.timelineEnd - clip.timelineStart
+                      const isDragging = draggingClipId === clip.id
+                      const isTrimming = trimmingClipId === clip.id
+
+                      return (
+                        <div
+                          key={clip.id}
+                          className={`absolute top-0 bottom-0 bg-zinc-800 rounded-2xl overflow-hidden border transition-all cursor-move group
+                                       ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-zinc-700'}
+                                       ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
+                                       ${isTrimming ? 'z-30' : ''}
+                                    `}
+                          style={{
+                            left: `${clip.timelineStart * timelineZoom}px`,
+                            width: `${Math.max(2, clipDuration * timelineZoom)}px`,
+                          }}
+                          onMouseDown={(e) => {
+                            if ((e.target as HTMLElement).closest('.trim-handle')) return
+                            e.stopPropagation()
+                            if (timelineTool === 'select') handleStartMoveClip(clip.id, e.clientX)
+                            else if (timelineTool === 'cut') handleCutClip(clip.id, (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom)
+                          }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('.trim-handle')) return
+                            const clickTime = (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom
+                            handleClipClick(clip.id, clickTime)
+                          }}
+                        >
+                          <TimelineAudioClip
+                            sceneId={clip.sceneId}
+                            takeId={clip.takeId}
+                            startOffset={clip.sourceIn}
+                            duration={clip.sourceOut - clip.sourceIn} // Use pure source duration
+                            width={clipDuration * timelineZoom}
+                            height={timelineTrackHeight}
+                            color="#a1a1aa"
+                          />
+
+                          {/* Trim Handles */}
+                          <div
+                            className={`trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                      ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                            onMouseDown={(e) => { e.stopPropagation(); handleStartTrimClip(clip.id, 'in', e.clientX) }}
+                          >
+                            <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                          </div>
+                          <div
+                            className={`trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                      ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                            onMouseDown={(e) => { e.stopPropagation(); handleStartTrimClip(clip.id, 'out', e.clientX) }}
+                          >
+                            <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+
+              {/* Spacer for aesthetics */}
+              <div className="h-4" />
+
+              {/* TRACK 3: LAYOUT (Orange, Bottom Fixed-ish visual) */}
+              <div className="relative h-16 w-full mt-auto">
+                <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed opacity-50" />
+
+                {/* Single continuous block for Layout (or multiple if we supported layout changes per clip, but currently global-ish) */}
+                <div
+                  className="absolute top-0 bottom-0 bg-[#f97316] rounded-2xl border border-[#fb923c] flex items-center px-4"
+                  style={{
+                    left: '0px',
+                    width: `${(Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom}px`,
+                  }}
+                >
+                  <svg className="w-5 h-5 text-white mr-2 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v9a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h6a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
+                  <span className="text-sm font-bold text-white tracking-wide">Output Layout</span>
+                </div>
+              </div>
+
+            </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
+
   )
 }
