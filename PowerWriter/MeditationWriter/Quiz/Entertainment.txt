@@ -1,0 +1,25 @@
+Sure! Here are 20 science trivia questions about animals, formatted as requested:
+
+Statement	Chr	Answer	Country	Game mode	Category	Tags	Unit						Possible Duplicate  
+The average lifespan of a blue whale is approximately how many years?		80	Worldwide	Age	Science	Marine Biology	years						
+The number of hearts an octopus has.		3	Worldwide	Amount	Science	Marine Biology	count						
+The average number of hours a lion sleeps in a day.		20	Worldwide	Amount	Science	Zoology	hours						
+The total number of bones in an adult giraffe's neck.		7	Worldwide	Amount	Science	Zoology	count						
+The average number of eggs a female queen ant can lay in a day.		1500	Worldwide	Amount	Science	Myrmecology	eggs						
+The number of limbs an octopus has.		8	Worldwide	Amount	Science	Marine Biology	limbs						
+The average number of teeth in an adult dog.		42	Worldwide	Amount	Science	Zoology	count						
+The number of different vocalizations a domestic cat can make.		100	Worldwide	Amount	Science	Zoology	sounds						
+The maximum number of miles a grey wolf can travel in a day while hunting.		30	USA	Distance	Science	Zoology	miles						
+The average number of days it takes for a butterfly to emerge from its chrysalis.		10	Worldwide	Amount	Science	Entomology	days						
+The number of species of penguins that exist in the world.		18	Worldwide	Amount	Science	Ornithology	species						
+The average number of hours a sloth sleeps per day.		20	Worldwide	Amount	Science	Zoology	hours						
+The average number of times a hummingbird flaps its wings per minute.		1200	Worldwide	Amount	Science	Ornithology	flaps						
+The number of vertebrae in a typical snake's body.		200	Worldwide	Amount	Science	Zoology	count						
+The average lifespan of a tortoise can exceed how many years?		150	Worldwide	Age	Science	Zoology	years						
+The average number of species of frogs in the world.		7000	Worldwide	Amount	Science	Herpetology	species						
+The number of hours a manatee can hold its breath underwater.		20	USA	Amount	Science	Marine Biology	hours						
+The average number of legs on an insect.		6	Worldwide	Amount	Science	Entomology	legs						
+The number of species of bats found worldwide.		1400	Worldwide	Amount	Science	Zoology	species						
+The average number of offspring a female elephant can have in her lifetime.		4	Worldwide	Amount	Science	Zoology	count						
+
+Feel free to ask for more questions or modifications!

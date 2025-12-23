@@ -1,6 +1,6 @@
 {
   "completed": false,
-  "audioFileName": "Adventure_7.webm",
+  "audioFileName": "Adventure_8.webm",
   "recordings": [
     {
       "id": "rec_1763302715268_p8i3p3nmb",
@@ -50,6 +50,13 @@
       "audioFileName": "Adventure_7.webm",
       "type": "audio",
       "createdAt": 1763364293211
+    },
+    {
+      "id": "rec_1763450926141_e5niob50o",
+      "audioUrl": "/api/document/audio?path=Meditations%2FConfidence%2FAdventure.txt&file=Adventure_8.webm&v=mi495f0d",
+      "audioFileName": "Adventure_8.webm",
+      "type": "audio",
+      "createdAt": 1763450926142
     }
   ]
 }

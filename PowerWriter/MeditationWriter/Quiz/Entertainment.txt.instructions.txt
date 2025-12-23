@@ -1,0 +1,5 @@
+Write 20 scíence questions about animals.
+
+Use this format:
+Statement	Chr	Answer	Country	Game mode	Category	Tags	Unit						Possible Duplicate
+Apples, average number of days from seed to harvest.		1460.00	USA	Amount	Science	Agriculture	day						
