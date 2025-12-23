@@ -1,4 +1,6 @@
 import { Scene } from '../App'
+import { WordTimestamp } from './transcription'
+import { VideoCut } from './videoProcessing'
 
 export interface ProjectData {
   id: string
@@ -8,12 +10,97 @@ export interface ProjectData {
   updatedAt: number
 }
 
+export interface TranscriptionData {
+  text: string
+  words: WordTimestamp[]
+}
+
 export interface ProjectHandle {
   directoryHandle: FileSystemDirectoryHandle
   data: ProjectData
 }
 
+// Edit data that needs to be saved
+export interface TimelineClip {
+  id: string
+  sceneId: string
+  takeId: string
+  layer: 'camera' | 'microphone' | 'screen'
+  timelineStart: number
+  timelineEnd: number
+  sourceIn: number
+  sourceOut: number
+  sourceDuration: number
+}
+
+export interface ClipProperties {
+  enhanceVoice: boolean
+  volume: number
+  removeNoise: boolean
+  noiseRemovalLevel: number
+  audioQuality: 'fast' | 'balanced' | 'best'
+  brightness: number
+  contrast: number
+  saturation: number
+  exposure: number
+}
+
+export interface AudioSettings {
+  noiseReduction: boolean
+  noiseReductionLevel: number
+  enhanceVoice: boolean
+  normalizeAudio: boolean
+  removeEcho: boolean
+  removeBackgroundNoise: boolean
+  audioQuality: 'fast' | 'balanced' | 'best'
+}
+
+export interface VisualSettings {
+  lutEnabled: boolean
+  lutFile: string | null // filename only
+  lutIntensity: number
+  backgroundColor: string
+  colorGrading: {
+    shadows: number
+    midtones: number
+    highlights: number
+  }
+}
+
+export interface EditData {
+  // Transcription edits
+  deletedWords: Record<string, number[]> // sceneId -> array of word indices
+  
+  // Timeline clips (split, deleted, trimmed, moved)
+  timelineClips: TimelineClip[]
+  
+  // Clip properties (color, audio settings per clip)
+  clipProperties: Record<string, ClipProperties> // key: "sceneId_takeId_layer" -> properties
+  
+  // Global audio settings
+  audioSettings: AudioSettings
+  
+  // Global visual settings
+  visualSettings: VisualSettings
+  
+  // Cuts (per scene)
+  cuts: Record<string, VideoCut[]> // sceneId -> cuts
+  
+  // Layout
+  layout: { type: string; [key: string]: any }
+  
+  // Caption word styles
+  captionWordStyles: Record<string, Record<number, string>> // sceneId -> wordIndex -> styleId
+  
+  // Caption settings
+  captionFont?: string
+  captionSize?: number
+  captionMaxWords?: number
+  selectedCaptionStyle?: string
+}
+
 class ProjectManager {
+  // ... existing logic ...
   private currentProject: ProjectHandle | null = null
   private readonly LAST_PROJECT_KEY = 'lastProjectHandle'
 
@@ -147,6 +234,18 @@ class ProjectManager {
       // Create recordings subfolder
       const recordingsHandle = await directoryHandle.getDirectoryHandle(
         'recordings',
+        { create: true }
+      )
+
+      // Create transcriptions subfolder
+      await directoryHandle.getDirectoryHandle(
+        'transcriptions',
+        { create: true }
+      )
+
+      // Create edits subfolder
+      await directoryHandle.getDirectoryHandle(
+        'edits',
         { create: true }
       )
 
@@ -295,6 +394,41 @@ class ProjectManager {
     }
   }
 
+  async saveTranscription(sceneId: string, takeId: string, data: TranscriptionData): Promise<void> {
+    if (!this.currentProject) return
+
+    try {
+      const transcriptionsHandle = await this.currentProject.directoryHandle.getDirectoryHandle(
+        'transcriptions',
+        { create: true }
+      )
+      const fileName = `${sceneId}_${takeId}.json`
+      const fileHandle = await transcriptionsHandle.getFileHandle(fileName, { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(JSON.stringify(data, null, 2))
+      await writable.close()
+    } catch (e) {
+      console.error("Error saving transcription", e)
+    }
+  }
+
+  async loadTranscription(sceneId: string, takeId: string): Promise<TranscriptionData | null> {
+    if (!this.currentProject) return null
+    try {
+      const transcriptionsHandle = await this.currentProject.directoryHandle.getDirectoryHandle(
+        'transcriptions',
+        { create: false }
+      )
+      const fileName = `${sceneId}_${takeId}.json`
+      const fileHandle = await transcriptionsHandle.getFileHandle(fileName)
+      const file = await fileHandle.getFile()
+      const text = await file.text()
+      return JSON.parse(text) as TranscriptionData
+    } catch (e) {
+      return null
+    }
+  }
+
   async deleteProject(): Promise<void> {
     if (!this.currentProject) {
       return
@@ -304,7 +438,7 @@ class ProjectManager {
     // We can only remove files. The user would need to delete the folder manually.
     // For now, we'll just clear the current project reference.
     this.currentProject = null
-    
+
     // Clear last project from storage
     await this.clearLastProject()
   }
@@ -323,7 +457,7 @@ class ProjectManager {
     // For now, we'll use a simple download approach
     const dataStr = JSON.stringify(projectData, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    
+
     // Download project.json
     const url = URL.createObjectURL(dataBlob)
     const a = document.createElement('a')
@@ -340,7 +474,43 @@ class ProjectManager {
     const text = await file.text()
     return JSON.parse(text)
   }
+
+  async saveEditData(editData: EditData): Promise<void> {
+    if (!this.currentProject) {
+      throw new Error('No project loaded')
+    }
+
+    try {
+      const editsHandle = await this.currentProject.directoryHandle.getDirectoryHandle(
+        'edits',
+        { create: true }
+      )
+      const fileHandle = await editsHandle.getFileHandle('editData.json', { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(JSON.stringify(editData, null, 2))
+      await writable.close()
+    } catch (e) {
+      console.error('Error saving edit data', e)
+      throw e
+    }
+  }
+
+  async loadEditData(): Promise<EditData | null> {
+    if (!this.currentProject) return null
+
+    try {
+      const editsHandle = await this.currentProject.directoryHandle.getDirectoryHandle(
+        'edits',
+        { create: false }
+      )
+      const fileHandle = await editsHandle.getFileHandle('editData.json')
+      const file = await fileHandle.getFile()
+      const text = await file.text()
+      return JSON.parse(text) as EditData
+    } catch (e) {
+      return null
+    }
+  }
 }
 
 export const projectManager = new ProjectManager()
-

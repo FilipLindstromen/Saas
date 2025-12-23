@@ -69,7 +69,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         <div className="p-4 border-t border-gray-700">
           <button
             onClick={handleSave}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+            className="w-full bg-white hover:bg-zinc-200 text-black py-2 rounded"
           >
             Save Settings
           </button>

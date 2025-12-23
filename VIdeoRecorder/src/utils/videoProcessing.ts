@@ -1,4 +1,4 @@
-import { applyCuts, combineVideos, trimVideo, concatVideos } from './ffmpeg'
+import { applyCuts, combineVideos, trimVideo, concatVideos, AudioProperties } from './ffmpeg'
 
 export { concatVideos } from './ffmpeg'
 
@@ -13,6 +13,24 @@ export interface Layout {
   name?: string
   cameraPosition?: { x: number; y: number; width: number; height: number }
   screenPosition?: { x: number; y: number; width: number; height: number }
+}
+
+export interface CaptionData {
+  words: Array<{
+    text: string
+    start: number // in seconds, relative to scene start
+    end: number // in seconds, relative to scene start
+  }>
+  style: {
+    fontFamily: string
+    fontSize: number
+    backgroundColor: string
+    textColor: string
+    padding: number
+    borderRadius: number
+    fontWeight: string | number
+    textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+  }
 }
 
 /**
@@ -32,7 +50,7 @@ export async function applyCutsToVideo(
 
   // Convert VideoCut[] to { start, end }[] format
   const cutSegments = cuts.map(cut => ({ start: cut.start, end: cut.end }))
-  
+
   try {
     return await applyCuts(videoBlob, cutSegments)
   } catch (error) {
@@ -49,7 +67,13 @@ export async function combineLayersWithLayout(
   microphoneBlob: Blob | null,
   screenBlob: Blob | null,
   layout: Layout,
-  cuts: VideoCut[]
+  cuts: VideoCut[],
+  audioProps?: {
+    camera?: AudioProperties
+    microphone?: AudioProperties
+    screen?: AudioProperties
+  },
+  captionData?: CaptionData
 ): Promise<Blob> {
   try {
     // Apply cuts to each input if cuts exist
@@ -72,7 +96,12 @@ export async function combineLayersWithLayout(
       processedCameraBlob,
       processedMicrophoneBlob,
       processedScreenBlob,
-      layout
+      layout,
+      'output.mp4',
+      1920,
+      1080,
+      audioProps,
+      captionData
     )
 
     return outputBlob

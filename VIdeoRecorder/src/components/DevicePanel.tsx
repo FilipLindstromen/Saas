@@ -13,8 +13,8 @@ interface DevicePanelProps {
   onScreenStreamChange?: (stream: MediaStream | null) => void
 }
 
-export default function DevicePanel({ 
-  onStreamChange, 
+export default function DevicePanel({
+  onStreamChange,
   onCameraStreamChange,
   onMicrophoneStreamChange,
   onScreenStreamChange
@@ -58,7 +58,7 @@ export default function DevicePanel({
       }
 
       const devices = await navigator.mediaDevices.enumerateDevices()
-      
+
       const videoDevices = devices
         .filter((d) => d.kind === 'videoinput')
         .map((d) => ({
@@ -66,7 +66,7 @@ export default function DevicePanel({
           label: d.label || `Camera ${d.deviceId.slice(0, 8)}`,
           kind: d.kind as MediaDeviceKind,
         }))
-      
+
       const audioDevices = devices
         .filter((d) => d.kind === 'audioinput')
         .map((d) => ({
@@ -77,11 +77,11 @@ export default function DevicePanel({
 
       setCameras(videoDevices)
       setMicrophones(audioDevices)
-      
+
       // Restore last selected devices from localStorage
       const lastCamera = localStorage.getItem('lastSelectedCamera')
       const lastMic = localStorage.getItem('lastSelectedMicrophone')
-      
+
       if (videoDevices.length > 0) {
         if (lastCamera && videoDevices.find(d => d.deviceId === lastCamera)) {
           setSelectedCamera(lastCamera)
@@ -89,7 +89,7 @@ export default function DevicePanel({
           setSelectedCamera(videoDevices[0].deviceId)
         }
       }
-      
+
       if (audioDevices.length > 0) {
         if (lastMic && audioDevices.find(d => d.deviceId === lastMic)) {
           setSelectedMic(lastMic)
@@ -127,7 +127,7 @@ export default function DevicePanel({
   // ============================================
   const manageCamera = async (enabled: boolean, deviceId?: string) => {
     const targetDeviceId = deviceId || selectedCamera
-    
+
     if (enabled && targetDeviceId) {
       try {
         // Stop old camera stream ONLY
@@ -135,14 +135,14 @@ export default function DevicePanel({
           cameraStreamRef.current.getVideoTracks().forEach(track => track.stop())
           cameraStreamRef.current = null
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
         // Request camera stream - VIDEO ONLY, NO AUDIO
         let stream: MediaStream
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
+            video: {
               deviceId: { exact: targetDeviceId },
               width: { ideal: 1920 },
               height: { ideal: 1080 }
@@ -151,7 +151,7 @@ export default function DevicePanel({
           })
         } catch (exactError) {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
+            video: {
               deviceId: targetDeviceId,
               width: { ideal: 1920 },
               height: { ideal: 1080 }
@@ -159,7 +159,7 @@ export default function DevicePanel({
             audio: false,
           })
         }
-        
+
         // Verify we got ONLY video tracks
         const videoTracks = stream.getVideoTracks()
         const audioTracks = stream.getAudioTracks()
@@ -167,9 +167,9 @@ export default function DevicePanel({
           console.warn('Warning: Camera stream contains audio tracks! Stopping them.')
           audioTracks.forEach(track => track.stop())
         }
-        
+
         cameraStreamRef.current = stream
-        
+
         // Update preview
         if (cameraVideoRef.current) {
           cameraVideoRef.current.srcObject = stream
@@ -181,12 +181,12 @@ export default function DevicePanel({
             }
           }
         }
-        
+
         // Notify parent
         if (onCameraStreamChange) {
           onCameraStreamChange(stream)
         }
-        
+
         console.log('Camera enabled:', targetDeviceId)
       } catch (error) {
         console.error('Error accessing camera:', error)
@@ -231,7 +231,7 @@ export default function DevicePanel({
   // ============================================
   const manageMicrophone = async (enabled: boolean, deviceId?: string) => {
     const targetDeviceId = deviceId || selectedMic
-    
+
     if (enabled && targetDeviceId) {
       try {
         // Stop old microphone stream ONLY
@@ -239,7 +239,7 @@ export default function DevicePanel({
           micStreamRef.current.getAudioTracks().forEach(track => track.stop())
           micStreamRef.current = null
         }
-        
+
         if (audioContextRef.current) {
           audioContextRef.current.close()
           audioContextRef.current = null
@@ -247,15 +247,15 @@ export default function DevicePanel({
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
         // Request microphone stream - AUDIO ONLY, NO VIDEO
         const audioStream = await navigator.mediaDevices.getUserMedia({
           video: false, // NEVER request video from microphone
           audio: { deviceId: targetDeviceId },
         })
-        
+
         // Verify we got ONLY audio tracks
         const videoTracks = audioStream.getVideoTracks()
         const audioTracks = audioStream.getAudioTracks()
@@ -263,62 +263,62 @@ export default function DevicePanel({
           console.warn('Warning: Microphone stream contains video tracks! Stopping them.')
           videoTracks.forEach(track => track.stop())
         }
-        
+
         micStreamRef.current = audioStream
-        
+
         // Update device list if label doesn't match
         const actualDeviceId = audioTracks[0]?.getSettings().deviceId
         const actualLabel = audioTracks[0]?.label
         if (actualDeviceId && actualLabel) {
-          setMicrophones(prev => prev.map(mic => 
-            mic.deviceId === actualDeviceId 
+          setMicrophones(prev => prev.map(mic =>
+            mic.deviceId === actualDeviceId
               ? { ...mic, label: actualLabel }
               : mic
           ))
         }
-        
+
         // Notify parent
         if (onMicrophoneStreamChange) {
           onMicrophoneStreamChange(audioStream)
         }
-        
+
         // Setup audio visualization
         const audioContext = new AudioContext()
         if (audioContext.state === 'suspended') {
           await audioContext.resume()
         }
-        
+
         const analyser = audioContext.createAnalyser()
         analyser.fftSize = 2048
         analyser.smoothingTimeConstant = 0.0
         analyser.minDecibels = -100
         analyser.maxDecibels = 0
-        
+
         const source = audioContext.createMediaStreamSource(audioStream)
         source.connect(analyser)
-        
+
         audioContextRef.current = audioContext
         analyserRef.current = analyser
-        
+
         const drawWaveform = () => {
           if (!analyserRef.current || !canvasRef.current) {
             return
           }
-          
+
           const canvas = canvasRef.current
           const ctx = canvas.getContext('2d')
           if (!ctx) return
-          
+
           const bufferLength = analyserRef.current.frequencyBinCount
           const timeDataArray = new Uint8Array(bufferLength)
           const freqDataArray = new Uint8Array(bufferLength)
-          
+
           analyserRef.current.getByteTimeDomainData(timeDataArray)
           analyserRef.current.getByteFrequencyData(freqDataArray)
-          
+
           ctx.fillStyle = 'rgb(0, 0, 0)'
           ctx.fillRect(0, 0, canvas.width, canvas.height)
-          
+
           // Draw frequency bars
           const barWidth = (canvas.width / bufferLength) * 2.5
           let x = 0
@@ -326,14 +326,14 @@ export default function DevicePanel({
             const normalizedValue = freqDataArray[i] / 255
             const barHeight = Math.max(1, normalizedValue * canvas.height * 0.8)
             const intensity = Math.min(255, freqDataArray[i] + 30)
-            ctx.fillStyle = `rgb(${intensity}, ${Math.floor(intensity * 0.3)}, ${Math.floor(intensity * 0.1)})`
+            ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`
             ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight)
             x += barWidth + 1
           }
-          
+
           // Draw waveform line
           ctx.lineWidth = 2
-          ctx.strokeStyle = 'rgb(100, 200, 255)'
+          ctx.strokeStyle = 'rgb(200, 200, 200)'
           ctx.beginPath()
           const sliceWidth = canvas.width / bufferLength
           x = 0
@@ -349,10 +349,10 @@ export default function DevicePanel({
           }
           ctx.lineTo(canvas.width, canvas.height / 2)
           ctx.stroke()
-          
+
           animationFrameRef.current = requestAnimationFrame(drawWaveform)
         }
-        
+
         if (canvasRef.current) {
           const ctx = canvasRef.current.getContext('2d')
           if (ctx) {
@@ -361,7 +361,7 @@ export default function DevicePanel({
           }
           drawWaveform()
         }
-        
+
         console.log('Microphone enabled:', targetDeviceId)
       } catch (error) {
         console.error('Error accessing microphone:', error)
@@ -421,9 +421,9 @@ export default function DevicePanel({
           video: true,
           audio: false,
         })
-        
+
         screenStreamRef.current = stream
-        
+
         if (screenVideoRef.current) {
           screenVideoRef.current.srcObject = stream
           const track = stream.getVideoTracks()[0]
@@ -432,17 +432,17 @@ export default function DevicePanel({
             setScreenResolution(`${settings.width}x${settings.height}`)
           }
         }
-        
+
         if (onScreenStreamChange) {
           onScreenStreamChange(stream)
         }
-        
+
         // Stop screen share when user stops it
         stream.getVideoTracks()[0].onended = () => {
           setScreenEnabled(false)
           manageScreen(false)
         }
-        
+
         console.log('Screen sharing enabled')
       } catch (error) {
         console.error('Error accessing screen:', error)
@@ -525,14 +525,12 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Camera</span>
           <button
             onClick={() => handleCameraToggle(!cameraEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${
-              cameraEnabled ? 'bg-green-500' : 'bg-gray-600'
-            }`}
+            className={`w-12 h-6 rounded-full transition-colors ${cameraEnabled ? 'bg-white' : 'bg-zinc-800'
+              }`}
           >
             <div
-              className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                cameraEnabled ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
+              className={`w-5 h-5 rounded-full transition-transform ${cameraEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+                }`}
             />
           </button>
         </div>
@@ -570,14 +568,12 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Microphone</span>
           <button
             onClick={() => handleMicToggle(!micEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${
-              micEnabled ? 'bg-green-500' : 'bg-gray-600'
-            }`}
+            className={`w-12 h-6 rounded-full transition-colors ${micEnabled ? 'bg-white' : 'bg-zinc-800'
+              }`}
           >
             <div
-              className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                micEnabled ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
+              className={`w-5 h-5 rounded-full transition-transform ${micEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+                }`}
             />
           </button>
         </div>
@@ -611,14 +607,12 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Screen</span>
           <button
             onClick={() => handleScreenToggle(!screenEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${
-              screenEnabled ? 'bg-green-500' : 'bg-gray-600'
-            }`}
+            className={`w-12 h-6 rounded-full transition-colors ${screenEnabled ? 'bg-white' : 'bg-zinc-800'
+              }`}
           >
             <div
-              className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                screenEnabled ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
+              className={`w-5 h-5 rounded-full transition-transform ${screenEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+                }`}
             />
           </button>
         </div>
@@ -645,14 +639,12 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">System Sound</span>
           <button
             onClick={() => setSystemSoundEnabled(!systemSoundEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${
-              systemSoundEnabled ? 'bg-green-500' : 'bg-gray-600'
-            }`}
+            className={`w-12 h-6 rounded-full transition-colors ${systemSoundEnabled ? 'bg-white' : 'bg-zinc-800'
+              }`}
           >
             <div
-              className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                systemSoundEnabled ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
+              className={`w-5 h-5 rounded-full transition-transform ${systemSoundEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+                }`}
             />
           </button>
         </div>

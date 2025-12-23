@@ -27,7 +27,7 @@ export async function getFFmpeg(): Promise<FFmpeg> {
 
   try {
     ffmpegInstance = new FFmpeg()
-    
+
     // Set up logging
     ffmpegInstance.on('log', ({ message }) => {
       console.log('FFmpeg:', message)
@@ -63,9 +63,13 @@ async function writeFile(ffmpeg: FFmpeg, filename: string, blob: Blob): Promise<
 async function readFile(ffmpeg: FFmpeg, filename: string): Promise<Blob> {
   const data = await ffmpeg.readFile(filename)
   if (data instanceof Uint8Array) {
-    return new Blob([data])
+    return new Blob([data as any])
   }
-  return data as Blob
+  // Handle string case (unlikely for binary files but possible for text)
+  if (typeof data === 'string') {
+    return new Blob([data], { type: 'text/plain' })
+  }
+  return data as unknown as Blob
 }
 
 /**
@@ -74,16 +78,16 @@ async function readFile(ffmpeg: FFmpeg, filename: string): Promise<Blob> {
 export async function getVideoDuration(blob: Blob): Promise<number> {
   const ffmpeg = await getFFmpeg()
   const inputFile = 'input.mp4'
-  
+
   try {
     await writeFile(ffmpeg, inputFile, blob)
-    
+
     // Run ffprobe to get duration
     await ffmpeg.exec([
       '-i', inputFile,
       '-hide_banner'
     ])
-    
+
     // FFmpeg outputs duration to stderr, we'll use a different approach
     // Actually, let's just use the HTML5 video element for duration
     return new Promise((resolve) => {
@@ -118,17 +122,17 @@ export async function applyCuts(
 
   const ffmpeg = await getFFmpeg()
   const inputFile = 'input_cut.mp4'
-  
+
   try {
     // Write input file
     await writeFile(ffmpeg, inputFile, inputBlob)
-    
+
     // Get video duration
     const duration = await getVideoDuration(inputBlob)
-    
+
     // Sort cuts by start time
     const sortedCuts = [...cuts].sort((a, b) => a.start - b.start)
-    
+
     // Create segments (parts to keep)
     const segments: Array<{ start: number; end: number }> = []
     let currentStart = 0
@@ -170,7 +174,7 @@ export async function applyCuts(
         const segment = segments[i]
         const segmentFile = `segment_${i}.mp4`
         segmentFiles.push(segmentFile)
-        
+
         await ffmpeg.exec([
           '-i', inputFile,
           '-ss', segment.start.toFixed(3),
@@ -180,11 +184,11 @@ export async function applyCuts(
           segmentFile
         ])
       }
-      
+
       // Create concat file list
       const concatList = segmentFiles.map(f => `file '${f}'`).join('\n')
       await ffmpeg.writeFile('concat_list.txt', concatList)
-      
+
       // Concatenate segments
       await ffmpeg.exec([
         '-f', 'concat',
@@ -193,7 +197,7 @@ export async function applyCuts(
         '-c', 'copy',
         outputFilename
       ])
-      
+
       // Cleanup segment files
       for (const file of segmentFiles) {
         try {
@@ -208,10 +212,10 @@ export async function applyCuts(
         // Ignore cleanup errors
       }
     }
-    
+
     // Read output
     const outputBlob = await readFile(ffmpeg, outputFilename)
-    
+
     // Cleanup
     try {
       await ffmpeg.deleteFile(outputFilename)
@@ -219,7 +223,7 @@ export async function applyCuts(
     } catch (e) {
       // Ignore cleanup errors
     }
-    
+
     return outputBlob
   } catch (error) {
     console.error('Error applying cuts:', error)
@@ -238,12 +242,12 @@ export async function trimVideo(
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg()
   const inputFile = 'input_trim.mp4'
-  
+
   try {
     await writeFile(ffmpeg, inputFile, inputBlob)
-    
+
     const duration = end - start
-    
+
     await ffmpeg.exec([
       '-i', inputFile,
       '-ss', start.toFixed(3),
@@ -252,9 +256,9 @@ export async function trimVideo(
       '-avoid_negative_ts', 'make_zero',
       outputFilename
     ])
-    
+
     const outputBlob = await readFile(ffmpeg, outputFilename)
-    
+
     // Cleanup
     try {
       await ffmpeg.deleteFile(outputFilename)
@@ -262,7 +266,7 @@ export async function trimVideo(
     } catch (e) {
       // Ignore cleanup errors
     }
-    
+
     return outputBlob
   } catch (error) {
     console.error('Error trimming video:', error)
@@ -270,60 +274,98 @@ export async function trimVideo(
   }
 }
 
+
+export interface AudioProperties {
+  volume: number // in dB
+  enhanceVoice: boolean
+  removeNoise: boolean
+  noiseRemovalLevel: number
+  audioQuality: 'fast' | 'balanced' | 'best'
+}
+
+export interface Layout {
+  type: 'side-by-side' | 'picture-in-picture' | 'screen-only' | 'camera-only' | 'custom'
+  cameraPosition?: { x: number; y: number; width: number; height: number }
+  screenPosition?: { x: number; y: number; width: number; height: number }
+  outputFilename?: string
+  outputWidth?: number
+  outputHeight?: number
+}
+
 /**
- * Combine video layers with layout
+ * Combine video and audio blobs into a single video file with specific layout
  */
+export interface CaptionData {
+  words: Array<{
+    text: string
+    start: number
+    end: number
+  }>
+  style: {
+    fontFamily: string
+    fontSize: number
+    backgroundColor: string
+    textColor: string
+    padding: number
+    borderRadius: number
+    fontWeight: string | number
+    textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+  }
+}
+
 export async function combineVideos(
   cameraBlob: Blob | null,
   microphoneBlob: Blob | null,
   screenBlob: Blob | null,
-  layout: {
-    type: 'side-by-side' | 'picture-in-picture' | 'screen-only' | 'camera-only' | 'custom'
-    cameraPosition?: { x: number; y: number; width: number; height: number }
-    screenPosition?: { x: number; y: number; width: number; height: number }
-  },
+  layout: Layout,
   outputFilename: string = 'output.mp4',
   outputWidth: number = 1920,
-  outputHeight: number = 1080
+  outputHeight: number = 1080,
+  audioProps?: {
+    camera?: AudioProperties
+    microphone?: AudioProperties
+    screen?: AudioProperties
+  },
+  captionData?: CaptionData
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg()
-  
+
   try {
     const inputs: string[] = []
     const inputLabels: string[] = []
-    
+
     // Write input files and collect labels
     if (cameraBlob) {
       await writeFile(ffmpeg, 'camera.mp4', cameraBlob)
       inputs.push('-i', 'camera.mp4')
       inputLabels.push('camera')
     }
-    
+
     if (screenBlob) {
       await writeFile(ffmpeg, 'screen.mp4', screenBlob)
       inputs.push('-i', 'screen.mp4')
       inputLabels.push('screen')
     }
-    
+
     if (microphoneBlob) {
       await writeFile(ffmpeg, 'microphone.mp4', microphoneBlob)
       inputs.push('-i', 'microphone.mp4')
       inputLabels.push('microphone')
     }
-    
+
     if (inputs.length === 0) {
       throw new Error('No video or audio inputs provided')
     }
-    
+
     // Determine which inputs we have
     const hasCamera = cameraBlob !== null
     const hasScreen = screenBlob !== null
     const hasMicrophone = microphoneBlob !== null
-    
+
     // Build filter complex based on layout
     let filterComplex = ''
     let videoOutput = ''
-    
+
     if (layout.type === 'camera-only' && hasCamera) {
       // Camera only
       filterComplex = `[0:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0]`
@@ -339,7 +381,7 @@ export async function combineVideos(
       const cameraScaleH = outputHeight
       const screenScaleW = Math.floor(outputWidth / 2)
       const screenScaleH = outputHeight
-      
+
       filterComplex = `[0:v]scale=${cameraScaleW}:${cameraScaleH}:force_original_aspect_ratio=decrease,pad=${cameraScaleW}:${cameraScaleH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[cam];[1:v]scale=${screenScaleW}:${screenScaleH}:force_original_aspect_ratio=decrease,pad=${screenScaleW}:${screenScaleH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[scr];[cam][scr]hstack=inputs=2,format=yuv420p[v0]`
       videoOutput = '[v0]'
     } else if (layout.type === 'picture-in-picture' && hasCamera && hasScreen) {
@@ -348,7 +390,7 @@ export async function combineVideos(
       const pipHeight = Math.floor(outputHeight * 0.3)
       const pipX = outputWidth - pipWidth - 20
       const pipY = 20
-      
+
       filterComplex = `[1:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[bg];[0:v]scale=${pipWidth}:${pipHeight}:force_original_aspect_ratio=decrease,pad=${pipWidth}:${pipHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[pip];[bg][pip]overlay=${pipX}:${pipY},format=yuv420p[v0]`
       videoOutput = '[v0]'
     } else if (layout.type === 'custom' && layout.cameraPosition && layout.screenPosition) {
@@ -357,12 +399,12 @@ export async function combineVideos(
       const camY = Math.floor(layout.cameraPosition.y * outputHeight / 100)
       const camW = Math.floor(layout.cameraPosition.width * outputWidth / 100)
       const camH = Math.floor(layout.cameraPosition.height * outputHeight / 100)
-      
+
       const scrX = Math.floor(layout.screenPosition.x * outputWidth / 100)
       const scrY = Math.floor(layout.screenPosition.y * outputHeight / 100)
       const scrW = Math.floor(layout.screenPosition.width * outputWidth / 100)
       const scrH = Math.floor(layout.screenPosition.height * outputHeight / 100)
-      
+
       if (hasCamera && hasScreen) {
         // Create black background, overlay screen, then camera
         filterComplex = `color=black:size=${outputWidth}x${outputHeight}:duration=1[bg];[1:v]scale=${scrW}:${scrH}:force_original_aspect_ratio=decrease,pad=${scrW}:${scrH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[scr];[0:v]scale=${camW}:${camH}:force_original_aspect_ratio=decrease,pad=${camW}:${camH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[cam];[bg][scr]overlay=${scrX}:${scrY}[tmp];[tmp][cam]overlay=${camX}:${camY},format=yuv420p[v0]`
@@ -382,37 +424,70 @@ export async function combineVideos(
       filterComplex = `[0:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0]`
       videoOutput = '[v0]'
     }
-    
+
     // Handle audio - microphone is always last input
     let audioInput = ''
     let audioFilter = ''
     let audioOutput = ''
-    
+
     if (hasMicrophone) {
       // Microphone is always the last input
       const micIndex = inputs.length / 2 - 1  // inputs array has pairs of ['-i', 'filename']
       audioInput = `[${micIndex}:a]`
-      audioFilter = audioInput
+
+      // Apply filters if props exist
+      const props = audioProps?.microphone
+      let filters: string[] = []
+
+      if (props) {
+        // Volume
+        if (props.volume !== 0) {
+          filters.push(`volume=${props.volume}dB`)
+        }
+
+        // Enhance Voice (Simple EQ for speech presence)
+        if (props.enhanceVoice) {
+          filters.push('treble=g=5:f=4000', 'bass=g=2:f=100')
+        }
+
+        // Remove Noise (Basic High/Low pass for now to be safe)
+        if (props.removeNoise) {
+          // Using less aggressive bandpass to remove rumble and hiss while keeping voice clarity
+          filters.push('highpass=f=100', 'lowpass=f=8000')
+        }
+      }
+
+      if (filters.length > 0) {
+        audioFilter = `${audioInput}${filters.join(',')}[a0]`
+      } else {
+        audioFilter = `${audioInput}[a0]`
+      }
+
       audioOutput = '[a0]'
     }
-    
+
     // Build full filter complex
     let fullFilter = filterComplex
     if (audioOutput) {
       fullFilter += `;${audioFilter}${audioOutput}`
     }
-    
+
     // Build FFmpeg command
     const ffmpegArgs: string[] = [
       ...inputs,
       '-filter_complex', fullFilter,
       '-map', videoOutput,
     ]
-    
+
     if (audioOutput) {
       ffmpegArgs.push('-map', audioOutput)
     }
-    
+
+    // Determine audio bitrate based on quality setting
+    let audioBitrate = '192k'
+    if (audioProps?.microphone?.audioQuality === 'fast') audioBitrate = '128k'
+    else if (audioProps?.microphone?.audioQuality === 'best') audioBitrate = '320k'
+
     ffmpegArgs.push(
       '-c:v', 'libx264',
       '-preset', 'medium',
@@ -420,21 +495,21 @@ export async function combineVideos(
       '-pix_fmt', 'yuv420p',
       '-shortest'
     )
-    
+
     if (audioOutput) {
       ffmpegArgs.push(
         '-c:a', 'aac',
-        '-b:a', '192k',
+        '-b:a', audioBitrate,
         '-ar', '48000'
       )
     }
-    
+
     ffmpegArgs.push(outputFilename)
-    
+
     await ffmpeg.exec(ffmpegArgs)
-    
+
     const outputBlob = await readFile(ffmpeg, outputFilename)
-    
+
     // Cleanup
     try {
       await ffmpeg.deleteFile(outputFilename)
@@ -444,7 +519,7 @@ export async function combineVideos(
     } catch (e) {
       // Ignore cleanup errors
     }
-    
+
     return outputBlob
   } catch (error) {
     console.error('Error combining videos:', error)
@@ -462,13 +537,13 @@ export async function concatVideos(
   if (videoBlobs.length === 0) {
     throw new Error('No videos to concatenate')
   }
-  
+
   if (videoBlobs.length === 1) {
     return videoBlobs[0]
   }
-  
+
   const ffmpeg = await getFFmpeg()
-  
+
   try {
     // Write all input files
     const inputFiles: string[] = []
@@ -477,11 +552,11 @@ export async function concatVideos(
       await writeFile(ffmpeg, filename, videoBlobs[i])
       inputFiles.push(filename)
     }
-    
+
     // Create concat file list
     const concatList = inputFiles.map(f => `file '${f}'`).join('\n')
     await ffmpeg.writeFile('concat_list.txt', concatList)
-    
+
     // Concatenate
     await ffmpeg.exec([
       '-f', 'concat',
@@ -490,9 +565,9 @@ export async function concatVideos(
       '-c', 'copy',
       outputFilename
     ])
-    
+
     const outputBlob = await readFile(ffmpeg, outputFilename)
-    
+
     // Cleanup
     try {
       await ffmpeg.deleteFile(outputFilename)
@@ -503,7 +578,7 @@ export async function concatVideos(
     } catch (e) {
       // Ignore cleanup errors
     }
-    
+
     return outputBlob
   } catch (error) {
     console.error('Error concatenating videos:', error)

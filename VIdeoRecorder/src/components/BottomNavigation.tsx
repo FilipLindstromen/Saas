@@ -71,17 +71,16 @@ export default function BottomNavigation({
   ]
 
   return (
-    <div className="bg-gray-800 h-16 flex items-center justify-between px-6 border-t border-gray-700">
+    <div className="bg-gray-800 h-16 flex items-center justify-center px-6 border-t border-gray-700 relative">
       <div className="flex items-center gap-4">
         {steps.map((step, index) => (
           <div key={step.id} className="flex items-center gap-2">
             <button
               onClick={() => onStepChange(step.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
-                currentStep === step.id
+              className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${currentStep === step.id
                   ? 'bg-white text-black'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               {step.icon}
               <span>{step.label}</span>
@@ -104,22 +103,25 @@ export default function BottomNavigation({
           </div>
         ))}
       </div>
-      {currentStep === 'script' && (
-        <button
-          onClick={() => onStepChange('record')}
-          className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
-        >
-          Continue to Recording &gt;
-        </button>
-      )}
-      {currentStep === 'record' && (
-        <button
-          onClick={() => onStepChange('edit')}
-          className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
-        >
-          Continue to Editing &gt;
-        </button>
-      )}
+
+      <div className="absolute right-6">
+        {currentStep === 'script' && (
+          <button
+            onClick={() => onStepChange('record')}
+            className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
+          >
+            Continue to Recording &gt;
+          </button>
+        )}
+        {currentStep === 'record' && (
+          <button
+            onClick={() => onStepChange('edit')}
+            className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
+          >
+            Continue to Editing &gt;
+          </button>
+        )}
+      </div>
     </div>
   )
 }
