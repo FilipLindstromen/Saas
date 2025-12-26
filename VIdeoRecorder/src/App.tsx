@@ -265,12 +265,10 @@ function App() {
         onDeleteProject={handleDeleteProject}
         onSaveProject={handleSaveProject}
         hasProject={hasProject}
-      />
-      <div className="flex-1 overflow-auto">{renderStep()}</div>
-      <BottomNavigation
         currentStep={currentStep}
         onStepChange={setCurrentStep}
       />
+      <div className="flex-1 overflow-auto">{renderStep()}</div>
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+type Step = 'script' | 'record' | 'edit'
+
 interface TopBarProps {
   title: string
   onTitleChange: (title: string) => void
@@ -9,6 +11,8 @@ interface TopBarProps {
   onDeleteProject?: () => void
   onSaveProject?: () => void
   hasProject?: boolean
+  currentStep?: Step
+  onStepChange?: (step: Step) => void
 }
 
 export default function TopBar({
@@ -20,6 +24,8 @@ export default function TopBar({
   onDeleteProject,
   onSaveProject,
   hasProject = false,
+  currentStep,
+  onStepChange,
 }: TopBarProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -132,32 +138,100 @@ export default function TopBar({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-2 flex-1">
-        {isEditing ? (
-          <input
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            className="bg-transparent border-none outline-none text-white flex-1"
-            autoFocus
-          />
-        ) : (
-          <>
-            <span
-              className="cursor-pointer hover:text-gray-300"
-              onClick={() => setIsEditing(true)}
-            >
-              {title}
-            </span>
-            {isEdited && (
-              <>
-                <span className="text-gray-500">|</span>
-                <span className="text-gray-400">Edited</span>
-              </>
-            )}
-          </>
+      <div className="flex items-center gap-2 flex-1 justify-center">
+        {/* Navigation Buttons - Script, Record, Edit */}
+        {currentStep && onStepChange && (
+          <div className="flex items-center gap-4">
+            {[
+              {
+                id: 'script' as Step,
+                label: 'Script',
+                icon: (
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                ),
+              },
+              {
+                id: 'record' as Step,
+                label: 'Record',
+                icon: (
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                    />
+                  </svg>
+                ),
+              },
+              {
+                id: 'edit' as Step,
+                label: 'Edit',
+                icon: (
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"
+                    />
+                  </svg>
+                ),
+              },
+            ].map((step, index) => (
+              <div key={step.id} className="flex items-center gap-2">
+                <button
+                  onClick={() => onStepChange(step.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
+                    currentStep === step.id
+                      ? 'bg-white text-black'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {step.icon}
+                  <span>{step.label}</span>
+                </button>
+                {index < 2 && (
+                  <svg
+                    className="w-4 h-4 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
       <div className="flex items-center gap-2">
