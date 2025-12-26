@@ -210,6 +210,114 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [ffmpegReady, setFfmpegReady] = useState(false)
   const [ffmpegError, setFfmpegError] = useState<string | null>(null)
 
+  // Load edit data when project is available
+  useEffect(() => {
+    if (!projectManager.hasProject() || scenes.length === 0) return
+
+    const loadEditData = async () => {
+      try {
+        const editData = await projectManager.loadEditData()
+        if (!editData) return
+
+        // Restore cuts
+        if (editData.cuts) {
+          const cutsMap = new Map<string, VideoCut[]>()
+          Object.entries(editData.cuts).forEach(([sceneId, cutsArray]) => {
+            cutsMap.set(sceneId, cutsArray || [])
+          })
+          setCuts(cutsMap)
+        }
+
+        // Restore layout
+        if (editData.layout) {
+          setLayout(editData.layout as Layout)
+        }
+
+        // Restore layout clips
+        if (editData.layoutClips && Array.isArray(editData.layoutClips)) {
+          setLayoutClips(editData.layoutClips)
+        }
+
+        // Restore layout presets
+        if (editData.layoutPresets && Array.isArray(editData.layoutPresets)) {
+          setLayoutPresets(editData.layoutPresets)
+        }
+
+        // Restore timeline clips
+        if (editData.timelineClips && Array.isArray(editData.timelineClips)) {
+          setTimelineClips(editData.timelineClips)
+        }
+
+        // Restore clip properties
+        if (editData.clipProperties) {
+          const clipPropsMap = new Map<string, ClipProperties>()
+          Object.entries(editData.clipProperties).forEach(([key, props]) => {
+            clipPropsMap.set(key, props as ClipProperties)
+          })
+          setClipProperties(clipPropsMap)
+        }
+
+        // Restore deleted words
+        if (editData.deletedWords) {
+          const deletedWordsMap = new Map<string, Set<number>>()
+          Object.entries(editData.deletedWords).forEach(([sceneId, wordIndices]) => {
+            deletedWordsMap.set(sceneId, new Set(wordIndices || []))
+          })
+          setDeletedWords(deletedWordsMap)
+        }
+
+        // Restore audio settings
+        if (editData.audioSettings) {
+          setAudioSettings(editData.audioSettings)
+        }
+
+        // Restore visual settings
+        if (editData.visualSettings) {
+          setVisualSettings(editData.visualSettings)
+        }
+
+        // Restore canvas settings
+        if (editData.canvasSettings) {
+          setCanvasSettings(editData.canvasSettings)
+        }
+
+        // Restore caption settings
+        if (editData.captionSettings) {
+          setCaptionFont(editData.captionSettings.font || captionFont)
+          setCaptionSize(editData.captionSettings.size ?? captionSize)
+          setCaptionMaxWords(editData.captionSettings.maxWords ?? captionMaxWords)
+          setSelectedCaptionStyle(editData.captionSettings.style || selectedCaptionStyle)
+        }
+
+        // Restore timeline settings
+        if (editData.timelineSettings) {
+          setTimelineZoom(editData.timelineSettings.zoom ?? timelineZoom)
+          setTimelineHeight(editData.timelineSettings.height ?? timelineHeight)
+          setTimelineLayerHeightScale(editData.timelineSettings.layerHeightScale ?? timelineLayerHeightScale)
+        }
+
+        // Restore title settings
+        if (editData.titleSettings) {
+          setTitleSettings(editData.titleSettings)
+        }
+
+        // Restore background music (file name only, user will need to re-upload file)
+        if (editData.backgroundMusic) {
+          setBackgroundMusic(prev => ({
+            ...prev,
+            volume: editData.backgroundMusic?.volume ?? prev.volume,
+          }))
+        }
+
+        console.log('Edit data loaded successfully')
+      } catch (error) {
+        console.error('Error loading edit data:', error)
+      }
+    }
+
+    loadEditData()
+  }, [scenes.length]) // Only load once when scenes are available
+
   // Pre-load FFmpeg when component mounts
   useEffect(() => {
     let cancelled = false
@@ -345,8 +453,34 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const lutCanvasRef = useRef<HTMLCanvasElement>(null)
-  const [canvasZoom, setCanvasZoom] = useState(1)
+  // Load canvas zoom from localStorage
+  const loadCanvasZoom = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('canvasZoom')
+      if (saved) {
+        const parsed = parseFloat(saved)
+        if (!isNaN(parsed) && parsed >= 0.1 && parsed <= 2) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      console.error('Error loading canvas zoom:', e)
+    }
+    return 1 // Default: 100%
+  }, [])
+  
+  const [canvasZoom, setCanvasZoom] = useState(loadCanvasZoom)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Save canvas zoom to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvasZoom', canvasZoom.toString())
+    } catch (e) {
+      console.error('Error saving canvas zoom:', e)
+    }
+  }, [canvasZoom])
+  
   // Load pan position from localStorage
   const loadPanPosition = useCallback(() => {
     try {
@@ -503,10 +637,61 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
   // Timeline View Settings
   const [timelineTrackHeight, setTimelineTrackHeight] = useState(80) // Default height px
-  const [timelineZoom, setTimelineZoom] = useState(50) // pixels per second
-  const [timelineLayerHeightScale, setTimelineLayerHeightScale] = useState(1) // Scale for timeline layer height
+  
+  // Load timeline zoom from localStorage
+  const loadTimelineZoom = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('timelineZoom')
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (!isNaN(parsed) && parsed >= 10 && parsed <= 200) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      console.error('Error loading timeline zoom:', e)
+    }
+    return 50 // Default: 50 pixels per second
+  }, [])
+  
+  // Load timeline layer height scale from localStorage
+  const loadTimelineLayerHeightScale = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('timelineLayerHeightScale')
+      if (saved) {
+        const parsed = parseFloat(saved)
+        if (!isNaN(parsed) && parsed >= 0.1 && parsed <= 3) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      console.error('Error loading timeline layer height scale:', e)
+    }
+    return 1 // Default: 100%
+  }, [])
+  
+  const [timelineZoom, setTimelineZoom] = useState(loadTimelineZoom)
+  const [timelineLayerHeightScale, setTimelineLayerHeightScale] = useState(loadTimelineLayerHeightScale)
   const minZoom = 10 // 10px per second (zoomed out)
   const maxZoom = 200 // 200px per second (zoomed in)
+  
+  // Save timeline zoom to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('timelineZoom', timelineZoom.toString())
+    } catch (e) {
+      console.error('Error saving timeline zoom:', e)
+    }
+  }, [timelineZoom])
+  
+  // Save timeline layer height scale to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('timelineLayerHeightScale', timelineLayerHeightScale.toString())
+    } catch (e) {
+      console.error('Error saving timeline layer height scale:', e)
+    }
+  }, [timelineLayerHeightScale])
 
   // Calculate optimal canvas display size based on available space and aspect ratio
   const canvasDisplaySize = useMemo(() => {
@@ -889,6 +1074,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       clipProperties: Object.fromEntries(
         Array.from(clipProperties.entries()).map(([k, v]) => [k, { ...v }])
       ),
+      cuts: Object.fromEntries(
+        Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])
+      ),
+      layout: JSON.parse(JSON.stringify(layout)),
       layoutClips: layoutClips.map(lc => ({ ...lc })),
       layoutPresets: layoutPresets.map(lp => ({ ...lp })),
       titleSettings: { ...titleSettings },
@@ -918,7 +1107,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         // Note: File blob URL is not serialized - will need to be re-uploaded on load
       },
     }
-  }, [deletedWords, timelineClips, clipProperties, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
+  }, [deletedWords, timelineClips, clipProperties, cuts, layout, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
   
   // Auto-save edit data to project folder when changes occur
   useEffect(() => {
@@ -6052,81 +6241,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   </p>
                 </div>
 
-                {/* Background Music */}
-                <div className="border-t border-gray-700 pt-4">
-                  <label className="text-xs text-gray-300 mb-2 block">Background Music</label>
-                  <div className="space-y-3">
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          // Revoke old URL if exists
-                          if (backgroundMusic.url) {
-                            URL.revokeObjectURL(backgroundMusic.url)
-                          }
-                          const url = URL.createObjectURL(file)
-                          setBackgroundMusic({
-                            file,
-                            url,
-                            volume: backgroundMusic.volume
-                          })
-                          markAsEdited()
-                        }
-                      }}
-                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                    />
-                    {backgroundMusic.file && (
-                      <div className="bg-gray-800 rounded p-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-gray-300 truncate flex-1 mr-2">
-                            {backgroundMusic.file.name}
-                          </span>
-                          <button
-                            onClick={() => {
-                              if (backgroundMusic.url) {
-                                URL.revokeObjectURL(backgroundMusic.url)
-                              }
-                              setBackgroundMusic({
-                                file: null,
-                                url: null,
-                                volume: 50
-                              })
-                              markAsEdited()
-                            }}
-                            className="text-red-400 hover:text-red-300 text-xs px-2"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 mb-1 block">
-                            Volume: {backgroundMusic.volume}%
-                          </label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="1"
-                            value={backgroundMusic.volume}
-                            onChange={(e) => {
-                              setBackgroundMusic({
-                                ...backgroundMusic,
-                                volume: parseInt(e.target.value)
-                              })
-                              markAsEdited()
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Music will automatically fade out 1 second before the video ends
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -6246,6 +6360,82 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     <option value="balanced">Balanced</option>
                     <option value="best">Best</option>
                   </select>
+                </div>
+
+                {/* Background Music */}
+                <div className="border-t border-gray-700 pt-4">
+                  <label className="text-xs text-gray-300 mb-2 block">Background Music</label>
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          // Revoke old URL if exists
+                          if (backgroundMusic.url) {
+                            URL.revokeObjectURL(backgroundMusic.url)
+                          }
+                          const url = URL.createObjectURL(file)
+                          setBackgroundMusic({
+                            file,
+                            url,
+                            volume: backgroundMusic.volume
+                          })
+                          markAsEdited()
+                        }
+                      }}
+                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                    />
+                    {backgroundMusic.file && (
+                      <div className="bg-gray-800 rounded p-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-300 truncate flex-1 mr-2">
+                            {backgroundMusic.file.name}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (backgroundMusic.url) {
+                                URL.revokeObjectURL(backgroundMusic.url)
+                              }
+                              setBackgroundMusic({
+                                file: null,
+                                url: null,
+                                volume: 50
+                              })
+                              markAsEdited()
+                            }}
+                            className="text-red-400 hover:text-red-300 text-xs px-2"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">
+                            Volume: {backgroundMusic.volume}%
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={backgroundMusic.volume}
+                            onChange={(e) => {
+                              setBackgroundMusic({
+                                ...backgroundMusic,
+                                volume: parseInt(e.target.value)
+                              })
+                              markAsEdited()
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Music will automatically fade out 1 second before the video ends
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -6529,6 +6719,25 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         }
                       }
                       
+                      // Get clip properties for filter calculation
+                      const clipKey = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
+                      const props = clipProperties.get(clipKey)
+                      const brightness = props?.brightness ?? 0
+                      const contrast = props?.contrast ?? 0
+                      const saturation = props?.saturation ?? 0
+                      const exposure = props?.exposure ?? 0
+                      
+                      // Build CSS filter string
+                      // Brightness: -100 to 100 maps to 0 to 2.0 (0 = normal, 100 = 2x brighter, -100 = black)
+                      // Combine exposure with brightness (exposure also affects brightness)
+                      const brightnessValue = Math.max(0, 1 + (brightness + exposure) / 100)
+                      // Contrast: -100 to 100 maps to 0 to 2.0 (0 = no contrast, 100 = 2x contrast, -100 = gray)
+                      const contrastValue = Math.max(0, 1 + contrast / 100)
+                      // Saturation: -100 to 100 maps to 0 to 2.0 (0 = grayscale, 100 = 2x saturation, -100 = grayscale)
+                      const saturationValue = Math.max(0, 1 + saturation / 100)
+                      
+                      const filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
+                      
                       return (
                         <div
                           key={holder.id}
@@ -6573,7 +6782,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                               ref={holder.layer === 'camera' ? videoRef : (holder.layer === 'screen' ? screenVideoRef : null)}
                               className="w-full h-full object-cover pointer-events-none"
                               style={{
-                                display: isActive ? 'block' : 'none',
+                                display: 'block',
+                                filter: filterString,
                               }}
                               muted={holder.layer !== 'microphone'}
                               playsInline
