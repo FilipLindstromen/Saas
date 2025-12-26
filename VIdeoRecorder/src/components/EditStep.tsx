@@ -1233,6 +1233,36 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     }
   }, [isResizingTimeline])
 
+  // Handle canvas panning
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning || !panStartPosRef.current || !panStartOffsetRef.current) return
+      
+      const deltaX = e.clientX - panStartPosRef.current.x
+      const deltaY = e.clientY - panStartPosRef.current.y
+      
+      setCanvasPan({
+        x: panStartOffsetRef.current.x + deltaX,
+        y: panStartOffsetRef.current.y + deltaY,
+      })
+    }
+
+    const handleMouseUp = () => {
+      setIsPanning(false)
+      panStartPosRef.current = null
+      panStartOffsetRef.current = null
+    }
+
+    if (isPanning) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isPanning])
+
   // Handle canvas holder dragging (moving)
   useEffect(() => {
     if (!draggingHolderId || !dragStartPos || !dragStartHolder) return
@@ -4809,22 +4839,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
             <div className="p-4 space-y-6 overflow-y-auto h-full">
               <h3 className="text-sm font-semibold mb-4">LAYOUT</h3>
               
-              {/* Current Layout Clip Info */}
-              {(() => {
-                const currentLayoutClip = getCurrentLayoutClip(currentTime)
-                return currentLayoutClip ? (
-                  <div className="bg-gray-800 rounded-lg p-3 mb-4">
-                    <div className="text-xs text-gray-400 mb-1">Current Layout Clip</div>
-                    <div className="text-sm font-semibold text-white">
-                      {currentLayoutClip.name || 'Layout'}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {formatTime(currentLayoutClip.timelineStart)} - {formatTime(currentLayoutClip.timelineEnd)}
-                    </div>
-                  </div>
-                ) : null
-              })()}
-
               {/* Global Title Settings */}
               <div className="border-t border-gray-700 pt-4">
                 <h4 className="text-xs font-semibold mb-3 text-gray-300">Title Settings (Global)</h4>
@@ -5109,18 +5123,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         onClick={() => {
                           const currentLayoutClip = getCurrentLayoutClip(currentTime)
                           const presetHolders = JSON.parse(JSON.stringify(preset.holders))
-                          const presetTitle = preset.title ? JSON.parse(JSON.stringify(preset.title)) : undefined
-                          const presetBackgroundImage = preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : undefined
                           
                           if (currentLayoutClip) {
-                            // Update existing layout clip
+                            // Update existing layout clip - only update holders (position/scale), preserve title and backgroundImage
                             setLayoutClips(prev => prev.map(lc => 
                               lc.id === currentLayoutClip.id 
                                 ? {
                                     ...lc,
                                     holders: presetHolders,
-                                    title: presetTitle,
-                                    backgroundImage: presetBackgroundImage,
+                                    // Preserve existing title and backgroundImage, only update name
                                     name: preset.name
                                   }
                                 : lc
@@ -5154,13 +5165,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                               timelineStart: currentTime,
                               timelineEnd: endTime,
                               holders: presetHolders,
-                              title: presetTitle || {
+                              // Use preset title/backgroundImage only if creating new clip (no existing content to preserve)
+                              title: preset.title ? JSON.parse(JSON.stringify(preset.title)) : {
                                 enabled: true,
                                 text: '',
                                 x: 0.5,
                                 y: 0.1,
                               },
-                              backgroundImage: presetBackgroundImage || {
+                              backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
                                 enabled: true,
                                 url: '',
                               },
