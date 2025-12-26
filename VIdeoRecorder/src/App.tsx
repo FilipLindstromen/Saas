@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import TopBar from './components/TopBar'
 import ScriptStep from './components/ScriptStep'
 import RecordStep from './components/RecordStep'
@@ -57,6 +57,8 @@ function App() {
   const [isEdited, setIsEdited] = useState(false)
   const [projectTitle, setProjectTitle] = useState('Untitled')
   const [hasProject, setHasProject] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const saveEditDataRef = useRef<(() => Promise<void>) | null>(null)
 
   // Restore last project on mount
   useEffect(() => {
@@ -174,6 +176,7 @@ function App() {
     if (!hasProject) return
 
     try {
+      // Save project data (scenes, title, etc.)
       const projectData: ProjectData = {
         id: projectManager.getCurrentProject()?.data.id || Date.now().toString(),
         title: projectTitle,
@@ -186,13 +189,33 @@ function App() {
             duration: take.duration,
             timestamp: take.timestamp,
             selected: take.selected,
+            hasCamera: take.hasCamera || false,
+            hasMicrophone: take.hasMicrophone || false,
+            hasScreen: take.hasScreen || false,
             blob: undefined, // Don't store blob in JSON, it's in the file system
+            cameraBlob: undefined,
+            microphoneBlob: undefined,
+            screenBlob: undefined,
           })),
         })),
         createdAt: projectManager.getCurrentProject()?.data.createdAt || Date.now(),
         updatedAt: Date.now(),
       }
       await projectManager.saveProject(projectData)
+
+      // Save edit data (timeline clips, layout clips, settings, etc.)
+      if (saveEditDataRef.current) {
+        try {
+          await saveEditDataRef.current()
+          console.log('Edit data saved successfully')
+        } catch (error) {
+          console.error('Error saving edit data:', error)
+          // Don't fail the entire save if edit data save fails
+        }
+      } else {
+        console.warn('Edit data save function not available - EditStep may not be mounted')
+      }
+
       setIsEdited(false)
     } catch (error) {
       console.error('Error saving project:', error)
@@ -248,7 +271,17 @@ function App() {
           />
         )
       case 'edit':
-        return <EditStep scenes={scenes} onScenesChange={setScenes} />
+        return (
+          <EditStep
+            scenes={scenes}
+            onScenesChange={setScenes}
+            showExportDialog={showExportDialog}
+            onExportDialogChange={setShowExportDialog}
+            onSaveRequest={(saveFn) => {
+              saveEditDataRef.current = saveFn
+            }}
+          />
+        )
       default:
         return null
     }
@@ -267,6 +300,7 @@ function App() {
         hasProject={hasProject}
         currentStep={currentStep}
         onStepChange={setCurrentStep}
+        onExportClick={() => setShowExportDialog(true)}
       />
       <div className="flex-1 overflow-auto">{renderStep()}</div>
     </div>

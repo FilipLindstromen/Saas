@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Scene, RecordingTake } from '../App'
 import { projectManager } from '../utils/projectManager'
 import { transcribeAudio, WordTimestamp } from '../utils/transcription'
@@ -15,9 +15,72 @@ interface EditStepProps {
   scenes: Scene[]
   onScenesChange?: (scenes: Scene[]) => void
   onEditedChange?: (edited: boolean) => void
+  showExportDialog?: boolean
+  onExportDialogChange?: (show: boolean) => void
+  onSaveRequest?: (saveFn: () => Promise<void>) => void
 }
 
 type SidebarTab = 'canvas' | 'layout' | 'clip' | 'zoom' | 'cursor' | 'captions' | 'audio' | 'visual'
+
+// ContentEditable component for rich text editing
+const TitleEditor = React.forwardRef<HTMLDivElement, {
+  html: string
+  onChange: (html: string) => void
+  onBlur: () => void
+  className?: string
+  placeholder?: string
+}>(({ html, onChange, onBlur, className, placeholder }, ref) => {
+  const innerRef = useRef<HTMLDivElement>(null)
+  const isUpdatingRef = useRef(false)
+
+  // Combine refs
+  useEffect(() => {
+    if (typeof ref === 'function') {
+      ref(innerRef.current)
+    } else if (ref) {
+      (ref as React.MutableRefObject<HTMLDivElement | null>).current = innerRef.current
+    }
+  }, [ref])
+
+  // Sync HTML content when prop changes (but not when user is typing)
+  useEffect(() => {
+    if (!innerRef.current || isUpdatingRef.current) return
+    if (innerRef.current.innerHTML !== html) {
+      innerRef.current.innerHTML = html || ''
+    }
+  }, [html])
+
+  return (
+    <>
+      <div
+        ref={innerRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={(e) => {
+          isUpdatingRef.current = true
+          if (innerRef.current) {
+            onChange(innerRef.current.innerHTML)
+          }
+          setTimeout(() => {
+            isUpdatingRef.current = false
+          }, 0)
+        }}
+        onBlur={onBlur}
+        className={className}
+        style={{ whiteSpace: 'pre-wrap' }}
+        data-placeholder={placeholder}
+      />
+      <style>{`
+        [contenteditable][data-placeholder]:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+        }
+      `}</style>
+    </>
+  )
+})
+TitleEditor.displayName = 'TitleEditor'
 
 interface SceneTake {
   sceneId: string
@@ -29,7 +92,7 @@ interface SceneTake {
   trimmedEnd: number // Amount trimmed from end (in seconds)
 }
 
-export default function EditStep({ scenes, onScenesChange, onEditedChange }: EditStepProps) {
+export default function EditStep({ scenes, onScenesChange, onEditedChange, showExportDialog: externalShowExportDialog, onExportDialogChange, onSaveRequest }: EditStepProps) {
   // Track if there are unsaved edits
   const hasUnsavedEditsRef = useRef(false)
   
@@ -198,7 +261,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
   // Export selection
   const [selectedScenesForExport, setSelectedScenesForExport] = useState<Set<string>>(new Set())
-  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [internalShowExportDialog, setInternalShowExportDialog] = useState(false)
+  const showExportDialog = externalShowExportDialog !== undefined ? externalShowExportDialog : internalShowExportDialog
+  const setShowExportDialog = onExportDialogChange || setInternalShowExportDialog
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4')
@@ -217,7 +282,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     const loadEditData = async () => {
       try {
         const editData = await projectManager.loadEditData()
-        if (!editData) return
+        if (!editData) {
+          console.log('No edit data found to load')
+          return
+        }
+        console.log('Loading edit data:', editData)
 
         // Restore cuts
         if (editData.cuts) {
@@ -316,7 +385,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     }
 
     loadEditData()
-  }, [scenes.length]) // Only load once when scenes are available
+  }, [scenes.length]) // Load when scenes are available (projectManager.hasProject() is checked inside)
 
   // Pre-load FFmpeg when component mounts
   useEffect(() => {
@@ -609,6 +678,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [transcriptWidth, setTranscriptWidth] = useState(loadTranscriptWidth)
   const [isResizing, setIsResizing] = useState(false)
   const transcriptResizeRef = useRef<HTMLDivElement>(null)
+  const titleEditorRef = useRef<HTMLDivElement>(null)
 
   // Resizable timeline
   const [timelineHeight, setTimelineHeight] = useState(loadTimelineHeight)
@@ -787,7 +857,20 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   }, [currentTime, getCurrentLayoutClip])
   
   // Holder transitions - track animated transitions between positions
+  // Key is holder ID, but we also track by clipId_layer for layout clip transitions
   const transitioningHoldersRef = useRef<Map<string, {
+    startPos: { x: number; y: number; width: number; height: number }
+    endPos: { x: number; y: number; width: number; height: number }
+    startRotation?: number
+    endRotation?: number
+    startTime: number
+    duration: number
+    clipId?: string // Store clipId for matching
+    layer?: string // Store layer for matching
+  }>>(new Map())
+  
+  // Track transitions by clipId_layer for layout clip changes
+  const transitioningByClipRef = useRef<Map<string, {
     startPos: { x: number; y: number; width: number; height: number }
     endPos: { x: number; y: number; width: number; height: number }
     startRotation?: number
@@ -806,8 +889,83 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   // Selected holder for editing
   const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null)
 
+  // Expose function to get all edit data for saving
+  const getEditData = useCallback(() => {
+    return {
+      deletedWords: Object.fromEntries(
+        Array.from(deletedWords.entries()).map(([k, v]) => [k, Array.from(v)])
+      ),
+      timelineClips: timelineClips.map(clip => ({
+        ...clip,
+        // Ensure all required fields are included
+      })),
+      clipProperties: Object.fromEntries(
+        Array.from(clipProperties.entries()).map(([k, v]) => [k, { ...v }])
+      ),
+      cuts: Object.fromEntries(
+        Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])
+      ),
+      layout: JSON.parse(JSON.stringify(layout)),
+      layoutClips: layoutClips.map(lc => ({ ...lc })),
+      layoutPresets: layoutPresets.map(lp => ({ ...lp })),
+      titleSettings: { ...titleSettings },
+      canvasSettings: {
+        ...canvasSettings,
+        resolution: { ...canvasSettings.resolution },
+      },
+      audioSettings: { ...audioSettings },
+      visualSettings: {
+        ...visualSettings,
+        colorGrading: { ...visualSettings.colorGrading },
+      },
+      captionSettings: {
+        font: captionFont,
+        size: captionSize,
+        maxWords: captionMaxWords,
+        style: selectedCaptionStyle,
+      },
+      timelineSettings: {
+        zoom: timelineZoom,
+        height: timelineHeight,
+        layerHeightScale: timelineLayerHeightScale || 1,
+      },
+      backgroundMusic: {
+        fileName: backgroundMusic.file?.name || null,
+        volume: backgroundMusic.volume,
+        // Note: File blob URL is not serialized - will need to be re-uploaded on load
+      },
+    }
+  }, [deletedWords, timelineClips, clipProperties, cuts, layout, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
+  
+  // Explicit save function for edit data
+  const saveEditData = useCallback(async () => {
+    if (!projectManager.hasProject()) {
+      console.warn('Cannot save edit data: no project loaded')
+      return
+    }
+    
+    try {
+      const editData = getEditData()
+      console.log('Saving edit data - timelineClips:', editData.timelineClips?.length || 0, 'layoutClips:', editData.layoutClips?.length || 0, 'canvasSettings:', editData.canvasSettings)
+      await projectManager.saveEditData(editData as any)
+      console.log('Edit data saved successfully')
+      markAsSaved()
+    } catch (error) {
+      console.error('Error saving edit data:', error)
+      throw error // Re-throw so caller knows it failed
+    }
+  }, [getEditData, markAsSaved])
+
+  // Expose save function to parent component - update whenever saveEditData changes
+  useEffect(() => {
+    if (onSaveRequest) {
+      onSaveRequest(saveEditData)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveEditData]) // Only depend on saveEditData, not onSaveRequest (it's stable)
+
   // Update holders in the current layout clip
-  const updateHoldersInLayoutClip = useCallback((updatedHolders: CanvasVideoHolder[]) => {
+  const updateHoldersInLayoutClip = useCallback((updatedHolders: CanvasVideoHolder[], skipSave = false) => {
     const currentLayoutClip = getCurrentLayoutClip(currentTime)
     
     // Filter out microphone layer as it's not visual
@@ -820,7 +978,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           ? { ...lc, holders: JSON.parse(JSON.stringify(visualHolders)) }
           : lc
       ))
-      markAsEdited()
+      if (!skipSave) {
+        markAsEdited()
+        // Explicitly save edit data after updating layout clip holders
+        setTimeout(() => {
+          saveEditData()
+        }, 0)
+      }
     } else {
       // Create new layout clip for current time range
       const nextClip = layoutClips.find(lc => lc.timelineStart > currentTime)
@@ -853,9 +1017,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           return { ...lc, timelineEnd: totalDuration }
         })
       })
-      markAsEdited()
+      if (!skipSave) {
+        markAsEdited()
+        // Explicitly save edit data after creating layout clip
+        setTimeout(() => {
+          saveEditData()
+        }, 0)
+      }
     }
-  }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited])
+  }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited, saveEditData])
 
   // Unsplash search function
   const searchUnsplash = useCallback(async (query: string) => {
@@ -1053,61 +1223,21 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
             }
           : lc
       ))
+      // Explicitly save edit data after updating background image
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
       markAsEdited()
       saveToHistory()
+      // Explicitly save edit data after updating background image
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
       setUnsplashModalOpen(false)
       setUnsplashSearchQuery('')
       setUnsplashResults([])
     }
   }, [currentTime, getCurrentLayoutClip, markAsEdited, saveToHistory])
-  
-  // Expose function to get all edit data for saving
-  const getEditData = useCallback(() => {
-    return {
-      deletedWords: Object.fromEntries(
-        Array.from(deletedWords.entries()).map(([k, v]) => [k, Array.from(v)])
-      ),
-      timelineClips: timelineClips.map(clip => ({
-        ...clip,
-        // Ensure all required fields are included
-      })),
-      clipProperties: Object.fromEntries(
-        Array.from(clipProperties.entries()).map(([k, v]) => [k, { ...v }])
-      ),
-      cuts: Object.fromEntries(
-        Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])
-      ),
-      layout: JSON.parse(JSON.stringify(layout)),
-      layoutClips: layoutClips.map(lc => ({ ...lc })),
-      layoutPresets: layoutPresets.map(lp => ({ ...lp })),
-      titleSettings: { ...titleSettings },
-      canvasSettings: {
-        ...canvasSettings,
-        resolution: { ...canvasSettings.resolution },
-      },
-      audioSettings: { ...audioSettings },
-      visualSettings: {
-        ...visualSettings,
-        colorGrading: { ...visualSettings.colorGrading },
-      },
-      captionSettings: {
-        font: captionFont,
-        size: captionSize,
-        maxWords: captionMaxWords,
-        style: selectedCaptionStyle,
-      },
-      timelineSettings: {
-        zoom: timelineZoom,
-        height: timelineHeight,
-        layerHeightScale: timelineLayerHeightScale || 1,
-      },
-      backgroundMusic: {
-        fileName: backgroundMusic.file?.name || null,
-        volume: backgroundMusic.volume,
-        // Note: File blob URL is not serialized - will need to be re-uploaded on load
-      },
-    }
-  }, [deletedWords, timelineClips, clipProperties, cuts, layout, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
   
   // Auto-save edit data to project folder when changes occur
   useEffect(() => {
@@ -1699,7 +1829,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         }
       })
 
-      updateHoldersInLayoutClip(updatedHolders)
+      updateHoldersInLayoutClip(updatedHolders, true) // Skip save during drag
     }
 
     const handleMouseUp = () => {
@@ -1707,6 +1837,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       setDragStartPos(null)
       setDragStartHolder(null)
       saveToHistory()
+      markAsEdited()
+      // Save edit data after drag completes
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -1715,7 +1850,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingHolderId, dragStartPos, dragStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory])
+  }, [draggingHolderId, dragStartPos, dragStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited, saveEditData])
 
   // Handle canvas holder resizing (corner handles)
   useEffect(() => {
@@ -1781,7 +1916,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         }
       })
 
-      updateHoldersInLayoutClip(updatedHolders)
+      updateHoldersInLayoutClip(updatedHolders, true) // Skip save during resize
     }
 
     const handleMouseUp = () => {
@@ -1790,6 +1925,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       setResizeStartPos(null)
       setResizeStartHolder(null)
       saveToHistory()
+      markAsEdited()
+      // Save edit data after resize completes
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -1798,7 +1938,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory])
+  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited, saveEditData])
 
   // Handle title dragging (repositioning)
   useEffect(() => {
@@ -1843,6 +1983,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       setTitleDragStartPos(null)
       setTitleDragStartLayoutClip(null)
       saveToHistory()
+      // Explicitly save edit data after title position change
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -1851,7 +1995,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingTitle, titleDragStartPos, titleDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory])
+  }, [draggingTitle, titleDragStartPos, titleDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory, saveEditData])
 
   // Load selected take's recordings
   useEffect(() => {
@@ -2770,10 +2914,34 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
                   Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
                   Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
-                  Math.abs(prevHolder.rotation - newHolder.rotation) > 0.1
+                  Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1
                 
                 if (hasPositionChange) {
-                  // Find the actual holder in canvasHolders state by clipId and layer
+                  // Store transition by clipId_layer so we can apply it even if holder ID changes
+                  const clipKey = `${clipId}_${layer}`
+                  const existingTransition = transitioningByClipRef.current.get(clipKey)
+                  const transitionStartTime = existingTransition ? existingTransition.startTime : performance.now()
+                  
+                  transitioningByClipRef.current.set(clipKey, {
+                    startPos: { 
+                      x: prevHolder.x, 
+                      y: prevHolder.y, 
+                      width: prevHolder.width, 
+                      height: prevHolder.height 
+                    },
+                    endPos: { 
+                      x: newHolder.x, 
+                      y: newHolder.y, 
+                      width: newHolder.width, 
+                      height: newHolder.height 
+                    },
+                    startRotation: prevHolder.rotation || 0,
+                    endRotation: newHolder.rotation || 0,
+                    startTime: transitionStartTime,
+                    duration: canvasSettings.transitionDuration * 1000
+                  })
+                  
+                  // Also set on actual holder if it exists
                   const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
                   if (actualHolder) {
                     transitioningHoldersRef.current.set(actualHolder.id, {
@@ -2789,16 +2957,52 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         width: newHolder.width, 
                         height: newHolder.height 
                       },
-                      startRotation: prevHolder.rotation,
-                      endRotation: newHolder.rotation,
-                      startTime: performance.now(),
-                      duration: canvasSettings.transitionDuration * 1000
+                      startRotation: prevHolder.rotation || 0,
+                      endRotation: newHolder.rotation || 0,
+                      startTime: transitionStartTime,
+                      duration: canvasSettings.transitionDuration * 1000,
+                      clipId: clipId,
+                      layer: layer
                     })
                   }
                 }
+              } else if (prevHolder && !newHolder) {
+                // Holder exists in previous clip but not in new clip - fade out
+                const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
+                if (actualHolder) {
+                  fadingOutHoldersRef.current.set(actualHolder.id, {
+                    holder: { ...actualHolder },
+                    startTime: performance.now(),
+                    duration: canvasSettings.transitionDuration * 1000
+                  })
+                }
+              } else if (!prevHolder && newHolder) {
+                // Holder appears in new clip - fade in (start from new position with opacity transition)
+                const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
+                if (actualHolder) {
+                  // For fade-in, we'll use the holder's current position but animate opacity
+                  // The position is already correct, so we just need to handle opacity
+                  transitioningHoldersRef.current.set(actualHolder.id, {
+                    startPos: { 
+                      x: newHolder.x, 
+                      y: newHolder.y, 
+                      width: newHolder.width, 
+                      height: newHolder.height 
+                    },
+                    endPos: { 
+                      x: newHolder.x, 
+                      y: newHolder.y, 
+                      width: newHolder.width, 
+                      height: newHolder.height 
+                    },
+                    startRotation: newHolder.rotation || 0,
+                    endRotation: newHolder.rotation || 0,
+                    startTime: performance.now(),
+                    duration: canvasSettings.transitionDuration * 1000,
+                    fadeIn: true // Flag to indicate this is a fade-in
+                  })
+                }
               }
-              // If holder only exists in new clip, it will appear instantly (no transition from nothing)
-              // If holder only exists in previous clip, it will fade out (handled by fadingOutHoldersRef)
             })
           }
           
@@ -3026,6 +3230,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         }
       })
       holdersToDelete.forEach(id => transitioningHolders.delete(id))
+      
+      // Also check transitions tracked by clipId_layer
+      const clipTransitionsToDelete: string[] = []
+      transitioningByClipRef.current.forEach((transition, clipKey) => {
+        const elapsed = transitionNow - transition.startTime
+        if (elapsed < transition.duration) {
+          hasActiveTransitions = true
+        } else {
+          clipTransitionsToDelete.push(clipKey)
+        }
+      })
+      clipTransitionsToDelete.forEach(key => transitioningByClipRef.current.delete(key))
       
       // Clean up completed fade-outs
       const fadeOutsToDelete: string[] = []
@@ -3469,17 +3685,25 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
     // Save to history after cut is created
     setTimeout(() => saveToHistory(), 0)
-  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts, timelineClips, saveToHistory])
+    // Explicitly save edit data after cut is created
+    setTimeout(() => {
+      saveEditData()
+    }, 0)
+  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts, timelineClips, saveToHistory, saveEditData])
 
 
 
   // Delete cut
-  const handleDeleteCut = (cutId: string, sceneId: string) => {
+  const handleDeleteCut = useCallback((cutId: string, sceneId: string) => {
     const sceneCuts = cuts.get(sceneId) || []
     const updatedCuts = new Map(cuts)
     updatedCuts.set(sceneId, sceneCuts.filter(c => c.id !== cutId))
     setCuts(updatedCuts)
-  }
+    // Explicitly save edit data after cut is deleted
+    setTimeout(() => {
+      saveEditData()
+    }, 0)
+  }, [cuts, saveEditData])
 
   // ========== NEW CLIP-BASED EDITING FUNCTIONS ==========
 
@@ -3527,11 +3751,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mouseup', handleMouseUp)
       setDraggingLayoutClipId(null)
       saveToHistory()
+      // Explicitly save edit data after moving completes
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-  }, [layoutClips, timelineZoom, saveToHistory])
+  }, [layoutClips, timelineZoom, saveToHistory, saveEditData])
 
   // Trim layout clip - drag edges
   const handleStartTrimLayoutClip = useCallback((layoutClipId: string, edge: 'in' | 'out', mouseX: number) => {
@@ -3591,11 +3819,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       setTrimmingLayoutClipId(null)
       setTrimmingLayoutEdge(null)
       saveToHistory()
+      // Explicitly save edit data after trimming completes
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-  }, [layoutClips, timelineZoom, saveToHistory])
+  }, [layoutClips, timelineZoom, saveToHistory, saveEditData])
 
   // Split layout clip at timeline position
   const handleSplitLayoutClip = useCallback((cutTime: number) => {
@@ -3627,7 +3859,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     })
     
     saveToHistory()
-  }, [layoutClips, saveToHistory])
+    markAsEdited()
+    // Explicitly save edit data after splitting layout clip
+    setTimeout(() => {
+      saveEditData()
+    }, 0)
+  }, [layoutClips, saveToHistory, saveEditData, markAsEdited])
 
   // Cut clip - split at timeline position
   const handleCutClip = useCallback((clipId: string | null, cutTime: number) => {
@@ -3743,6 +3980,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       }
       
       saveToHistory()
+      markAsEdited()
+      // Explicitly save edit data after cutting clips (including audio)
+      // Use a small delay to ensure all state updates complete
+      setTimeout(() => {
+        saveEditData()
+      }, 100)
       return
     }
 
@@ -3792,8 +4035,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       })
 
       saveToHistory()
+      markAsEdited()
+      // Explicitly save edit data after cutting all clips
+      setTimeout(() => {
+        saveEditData()
+      }, 0)
     }
-  }, [timelineClips, layoutClips, selectedClipIds, selectedLayoutClipIds, handleSplitLayoutClip, saveToHistory])
+  }, [timelineClips, layoutClips, selectedClipIds, selectedLayoutClipIds, handleSplitLayoutClip, saveToHistory, markAsEdited, saveEditData])
 
   // Move clip - drag horizontally (Linked)
   const handleStartMoveClip = useCallback((clipId: string, mouseX: number) => {
@@ -4102,7 +4350,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     setLayoutClips(prev => prev.filter(lc => !selectedLayoutClipIds.has(lc.id)))
     setSelectedLayoutClipIds(new Set())
     saveToHistory()
-  }, [selectedLayoutClipIds, saveToHistory])
+    // Explicitly save edit data after deletion completes
+    setTimeout(() => {
+      saveEditData()
+    }, 0)
+  }, [selectedLayoutClipIds, saveToHistory, saveEditData])
 
   // Handle keyboard delete key to create cuts from selected words OR delete selected clips
   useEffect(() => {
@@ -5151,7 +5403,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
             title="Project Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
           <button
@@ -5160,7 +5413,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
             title="Layout"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v9a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h6a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </button>
           <button
@@ -5473,6 +5726,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         setClipProperties(newMap)
                         // Save to history after applying to all clips
                         setTimeout(() => saveToHistory(), 0)
+                        // Explicitly save edit data after applying to all clips
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition-colors border border-blue-500/30"
                     >
@@ -5510,6 +5767,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                           brightness: parseInt(e.target.value),
                         })))
                       }}
+                      onMouseUp={() => {
+                        // Explicitly save edit data after brightness adjustment completes
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
+                      }}
                       className="w-full"
                     />
                   </div>
@@ -5544,6 +5807,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                           ...current,
                           contrast: parseInt(e.target.value),
                         })))
+                      }}
+                      onMouseUp={() => {
+                        // Explicitly save edit data after contrast adjustment completes
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className="w-full"
                     />
@@ -5580,6 +5849,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                           saturation: parseInt(e.target.value),
                         })))
                       }}
+                      onMouseUp={() => {
+                        // Explicitly save edit data after saturation adjustment completes
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
+                      }}
                       className="w-full"
                     />
                   </div>
@@ -5614,6 +5889,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                           ...current,
                           exposure: parseInt(e.target.value),
                         })))
+                      }}
+                      onMouseUp={() => {
+                        // Explicitly save edit data after exposure adjustment completes
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className="w-full"
                     />
@@ -5821,6 +6102,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                                     : lc
                                 ))
                                 saveToHistory()
+                                // Explicitly save edit data after removing background image
+                                setTimeout(() => {
+                                  saveEditData()
+                                }, 0)
                               }
                             }}
                             className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
@@ -5844,9 +6129,50 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs text-gray-400 mb-1 block">Title Text</label>
-                        <textarea
-                          value={title?.text || ''}
-                          onChange={(e) => {
+                        {/* Formatting Toolbar */}
+                        <div className="flex gap-1 mb-1 p-1 bg-gray-800 border border-gray-700 rounded-t">
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              document.execCommand('bold', false)
+                              titleEditorRef.current?.focus()
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            title="Bold"
+                          >
+                            <strong>B</strong>
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              document.execCommand('italic', false)
+                              titleEditorRef.current?.focus()
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            title="Italic"
+                          >
+                            <em>I</em>
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              document.execCommand('underline', false)
+                              titleEditorRef.current?.focus()
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            title="Underline"
+                          >
+                            <u>U</u>
+                          </button>
+                        </div>
+                        {/* Rich Text Editor */}
+                        <TitleEditor
+                          ref={titleEditorRef}
+                          html={title?.text || ''}
+                          onChange={(htmlContent) => {
                             const currentLayoutClip = getCurrentLayoutClip(currentTime)
                             if (currentLayoutClip) {
                               setLayoutClips(prev => prev.map(lc => 
@@ -5855,7 +6181,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                                       ...lc, 
                                       title: { 
                                         enabled: true,
-                                        text: e.target.value,
+                                        text: htmlContent,
                                         x: lc.title?.x ?? 0.5,
                                         y: lc.title?.y ?? 0.1
                                       } 
@@ -5865,13 +6191,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                               saveToHistory()
                             }
                           }}
-                          placeholder="Enter title text... (supports line breaks)"
-                          rows={3}
-                          className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white resize-y"
+                          onBlur={() => {
+                            setTimeout(() => {
+                              saveEditData()
+                            }, 0)
+                          }}
+                          className="w-full bg-gray-800 border border-gray-700 border-t-0 rounded-b px-2 py-1.5 text-xs text-white min-h-[4rem] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="Enter title text... (supports formatting)"
                         />
                       </div>
                       <div className="text-xs text-gray-400">
-                        Drag the title in the canvas to reposition it
+                        Select text and use formatting buttons for bold, italic, or underline. Drag the title in the canvas to reposition it.
                       </div>
                     </div>
                   )
@@ -6066,6 +6396,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                             })
                             // Canvas holders are now stored in layout clips, so they're automatically updated
                             saveToHistory()
+                            // Explicitly save edit data after creating layout clip from preset
+                            setTimeout(() => {
+                              saveEditData()
+                            }, 0)
                             markAsEdited()
                           }
                         }}
@@ -6104,13 +6438,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                       onClick={() => {
                         const currentWidth = canvasSettings.resolution.width
                         const aspectRatio = 16 / 9
-                        const newHeight = Math.round(currentWidth / aspectRatio)
+                        const calculatedHeight = currentWidth / aspectRatio
+                        const newHeight = Math.round(calculatedHeight / 10) * 10 // Snap to nearest 10
                         setCanvasSettings({
                           ...canvasSettings,
                           format: '16:9',
                           resolution: { width: currentWidth, height: newHeight }
                         })
                         markAsEdited()
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6120,13 +6458,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                       onClick={() => {
                         const currentWidth = canvasSettings.resolution.width
                         const aspectRatio = 9 / 16
-                        const newHeight = Math.round(currentWidth / aspectRatio)
+                        const calculatedHeight = currentWidth / aspectRatio
+                        const newHeight = Math.round(calculatedHeight / 10) * 10 // Snap to nearest 10
                         setCanvasSettings({
                           ...canvasSettings,
                           format: '9:16',
                           resolution: { width: currentWidth, height: newHeight }
                         })
                         markAsEdited()
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6135,12 +6477,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     <button
                       onClick={() => {
                         const currentWidth = canvasSettings.resolution.width
+                        // For 1:1, ensure both dimensions snap to 10s
+                        const snappedWidth = Math.round(currentWidth / 10) * 10
                         setCanvasSettings({
                           ...canvasSettings,
                           format: '1:1',
-                          resolution: { width: currentWidth, height: currentWidth }
+                          resolution: { width: snappedWidth, height: snappedWidth }
                         })
                         markAsEdited()
+                        setTimeout(() => {
+                          saveEditData()
+                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6159,16 +6506,22 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     type="range"
                         min="480"
                         max="3840"
-                        step="8"
+                        step="10"
                         value={canvasSettings.resolution.width}
                     onChange={(e) => {
-                      const newWidth = parseInt(e.target.value)
+                      const rawWidth = parseInt(e.target.value)
+                      const newWidth = Math.round(rawWidth / 10) * 10 // Snap to nearest 10
                           const aspectRatio = canvasSettings.format === '16:9' ? 16 / 9 : canvasSettings.format === '9:16' ? 9 / 16 : 1
-                          const newHeight = Math.round(newWidth / aspectRatio)
+                          const calculatedHeight = newWidth / aspectRatio
+                          const newHeight = Math.round(calculatedHeight / 10) * 10 // Snap to nearest 10
                           setCanvasSettings({
                             ...canvasSettings,
                             resolution: { width: newWidth, height: newHeight }
                           })
+                          markAsEdited()
+                          setTimeout(() => {
+                            saveEditData()
+                          }, 0)
                     }}
                     className="w-full"
                   />
@@ -6179,16 +6532,22 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     type="range"
                         min="480"
                         max="3840"
-                        step="8"
+                        step="10"
                         value={canvasSettings.resolution.height}
                     onChange={(e) => {
-                      const newHeight = parseInt(e.target.value)
+                      const rawHeight = parseInt(e.target.value)
+                      const newHeight = Math.round(rawHeight / 10) * 10 // Snap to nearest 10
                           const aspectRatio = canvasSettings.format === '16:9' ? 16 / 9 : canvasSettings.format === '9:16' ? 9 / 16 : 1
-                          const newWidth = Math.round(newHeight * aspectRatio)
+                          const calculatedWidth = newHeight * aspectRatio
+                          const newWidth = Math.round(calculatedWidth / 10) * 10 // Snap to nearest 10
                           setCanvasSettings({
                             ...canvasSettings,
                             resolution: { width: newWidth, height: newHeight }
                           })
+                          markAsEdited()
+                          setTimeout(() => {
+                            saveEditData()
+                          }, 0)
                     }}
                     className="w-full"
                   />
@@ -6202,7 +6561,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   <input
                     type="color"
                     value={canvasSettings.workAreaBackgroundColor}
-                    onChange={(e) => setCanvasSettings({ ...canvasSettings, workAreaBackgroundColor: e.target.value })}
+                    onChange={(e) => {
+                      setCanvasSettings({ ...canvasSettings, workAreaBackgroundColor: e.target.value })
+                      markAsEdited()
+                      setTimeout(() => {
+                        saveEditData()
+                      }, 0)
+                    }}
                     className="w-full h-10 rounded cursor-pointer"
                   />
                 </div>
@@ -6212,7 +6577,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   <input
                     type="color"
                     value={canvasSettings.videoBackgroundColor}
-                    onChange={(e) => setCanvasSettings({ ...canvasSettings, videoBackgroundColor: e.target.value })}
+                    onChange={(e) => {
+                      setCanvasSettings({ ...canvasSettings, videoBackgroundColor: e.target.value })
+                      markAsEdited()
+                      setTimeout(() => {
+                        saveEditData()
+                      }, 0)
+                    }}
                     className="w-full h-10 rounded cursor-pointer"
                   />
                   <p className="text-xs text-gray-500 mt-1">Used in exported video</p>
@@ -6230,10 +6601,16 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     max="2"
                     step="0.1"
                     value={canvasSettings.transitionDuration}
-                    onChange={(e) => setCanvasSettings({ 
-                      ...canvasSettings, 
-                      transitionDuration: parseFloat(e.target.value) 
-                    })}
+                    onChange={(e) => {
+                      setCanvasSettings({ 
+                        ...canvasSettings, 
+                        transitionDuration: parseFloat(e.target.value) 
+                      })
+                      markAsEdited()
+                      setTimeout(() => {
+                        saveEditData()
+                      }, 0)
+                    }}
                     className="w-full"
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -6670,8 +7047,23 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                       const isActive = currentTime >= clip.timelineStart && currentTime < clip.timelineEnd && 
                                       clip.layer === holder.layer
                       
-                      // Apply transition if active
-                      const transition = transitioningHoldersRef.current.get(holder.id)
+                      // Apply transition if active - check both by holder ID and by clipId_layer
+                      let transition = transitioningHoldersRef.current.get(holder.id)
+                      if (!transition) {
+                        // Try to find transition by clipId_layer (in case holder ID changed)
+                        const clipKey = `${holder.clipId}_${holder.layer}`
+                        const clipTransition = transitioningByClipRef.current.get(clipKey)
+                        if (clipTransition) {
+                          transition = clipTransition
+                          // Also store it on the holder for future lookups
+                          transitioningHoldersRef.current.set(holder.id, {
+                            ...transition,
+                            clipId: holder.clipId,
+                            layer: holder.layer
+                          })
+                        }
+                      }
+                      
                       let displayX = holder.x
                       let displayY = holder.y
                       let displayWidth = holder.width
@@ -6716,6 +7108,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         // Clean up completed transitions
                         if (progress >= 1) {
                           transitioningHoldersRef.current.delete(holder.id)
+                          // Also clean up by clipId_layer
+                          const clipKey = `${holder.clipId}_${holder.layer}`
+                          transitioningByClipRef.current.delete(clipKey)
                         }
                       }
                       
@@ -6887,9 +7282,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                             setTitleDragStartPos({ x: e.clientX, y: e.clientY })
                             setTitleDragStartLayoutClip(currentLayoutClip)
                           }}
-                        >
-                          {title.text}
-                        </div>
+                          dangerouslySetInnerHTML={{ __html: title.text }}
+                        />
                       )
                     }
                     return null
