@@ -602,9 +602,33 @@ export async function combineVideos(
       let filters: string[] = []
 
       if (props) {
+        // Apply volume
         if (props.volume !== 0) filters.push(`volume=${props.volume}dB`)
-        if (props.enhanceVoice) filters.push('treble=g=5:f=4000', 'bass=g=2:f=100')
-        if (props.removeNoise) filters.push('highpass=f=100', 'lowpass=f=8000')
+        
+        // Apply noise reduction
+        if (props.removeNoise || (props as any).noiseReduction) {
+          filters.push('highpass=f=100', 'lowpass=f=8000')
+        }
+        
+        // Apply voice enhancement
+        if (props.enhanceVoice || (props as any).enhanceVoice) {
+          filters.push('treble=g=5:f=4000', 'bass=g=2:f=100')
+        }
+        
+        // Apply echo removal
+        if ((props as any).removeEcho) {
+          filters.push('lowpass=f=8000')
+        }
+        
+        // Apply background noise removal
+        if ((props as any).removeBackgroundNoise) {
+          filters.push('highpass=f=150')
+        }
+        
+        // Apply normalization
+        if ((props as any).normalizeAudio) {
+          filters.push('loudnorm=I=-16:TP=-1.5:LRA=11')
+        }
       }
 
       if (filters.length > 0) {
