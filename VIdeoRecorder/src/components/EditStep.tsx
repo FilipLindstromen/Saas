@@ -96,6 +96,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   // Track if there are unsaved edits
   const hasUnsavedEditsRef = useRef(false)
   const isLoadingEditDataRef = useRef(false)
+  const hasLoadedEditDataRef = useRef(false)
   
   // Mark edits as unsaved
   const markAsEdited = useCallback(() => {
@@ -272,16 +273,66 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [ffmpegReady, setFfmpegReady] = useState(false)
   const [ffmpegError, setFfmpegError] = useState<string | null>(null)
 
-  // Load edit data when project is available
-  useEffect(() => {
-    if (!projectManager.hasProject() || scenes.length === 0) return
+  // Memoize scene IDs to avoid unnecessary re-renders
+  const sceneIds = useMemo(() => scenes.map(s => s.id).join(','), [scenes])
 
-    const loadEditData = async () => {
-      isLoadingEditDataRef.current = true
+  // Load edit data when project is available
+  // Reset the loaded flag when scenes change significantly (new project loaded)
+  useEffect(() => {
+    if (sceneIds) {
+      // Reset loaded flag when scene IDs change (indicates new project)
+      hasLoadedEditDataRef.current = false
+    }
+  }, [sceneIds])
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null
+    let retryTimeoutId: NodeJS.Timeout | null = null
+    
+    // Retry mechanism: check if project is ready, retry if not
+    const attemptLoad = (retryCount = 0) => {
+      // Wait for project to be available and scenes to be loaded
+      if (!projectManager.hasProject()) {
+        // Retry up to 20 times (2 seconds total) if project isn't ready yet
+        if (retryCount < 20) {
+          if (retryCount === 0) {
+            console.log('Waiting for project to be available...')
+          }
+          retryTimeoutId = setTimeout(() => attemptLoad(retryCount + 1), 100)
+        } else {
+          console.warn('Project not available after retries, editData may not load')
+        }
+        return
+      }
+      
+      if (scenes.length === 0) {
+        // Retry if scenes aren't loaded yet
+        if (retryCount < 20) {
+          if (retryCount === 0) {
+            console.log('Waiting for scenes to be loaded...')
+          }
+          retryTimeoutId = setTimeout(() => attemptLoad(retryCount + 1), 100)
+        }
+        return
+      }
+
+      // Don't load if we've already loaded for this set of scenes
+      if (hasLoadedEditDataRef.current) {
+        console.log('EditData already loaded for this project')
+        return
+      }
+
+      console.log('Attempting to load editData, retry count:', retryCount)
+
+      // Add a small delay to ensure project is fully initialized
+      timeoutId = setTimeout(async () => {
+        isLoadingEditDataRef.current = true
       try {
         const editData = await projectManager.loadEditData()
         if (!editData) {
           console.log('No edit data found to load')
+          hasLoadedEditDataRef.current = true // Mark as loaded even if no data
+          isLoadingEditDataRef.current = false
           return
         }
         console.log('Loading edit data:', editData)
@@ -300,9 +351,20 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           setLayout(editData.layout as Layout)
         }
 
-        // Restore layout clips
+        // Restore layout clips (ensure all properties including title animations are preserved)
         if (editData.layoutClips && Array.isArray(editData.layoutClips)) {
-          setLayoutClips(editData.layoutClips)
+          // Deep copy to ensure all nested properties are included
+          const restoredLayoutClips = editData.layoutClips.map(lc => ({
+            ...lc,
+            title: lc.title ? {
+              ...lc.title,
+              animationIn: lc.title.animationIn ?? 'none',
+              animationOut: lc.title.animationOut ?? 'none',
+              animationDuration: lc.title.animationDuration ?? 0.5,
+            } : undefined,
+            backgroundImage: lc.backgroundImage ? { ...lc.backgroundImage } : undefined,
+          }))
+          setLayoutClips(restoredLayoutClips)
         }
 
         // Restore layout presets
@@ -381,18 +443,27 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         }
 
         console.log('Edit data loaded successfully')
+        hasLoadedEditDataRef.current = true
       } catch (error) {
         console.error('Error loading edit data:', error)
+        // Even if there's an error, mark that we attempted to load (no editData exists)
+        hasLoadedEditDataRef.current = true
       } finally {
         // Mark loading as complete after a short delay to allow all state updates to settle
         setTimeout(() => {
           isLoadingEditDataRef.current = false
         }, 100)
       }
+      }, 100) // Small delay to ensure project is fully initialized
     }
 
-    loadEditData()
-  }, [scenes.length]) // Load when scenes are available (projectManager.hasProject() is checked inside)
+    attemptLoad()
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (retryTimeoutId) clearTimeout(retryTimeoutId)
+    }
+  }, [scenes.length, sceneIds]) // Load when scenes are available or scene IDs change
 
   // Pre-load FFmpeg when component mounts
   useEffect(() => {
@@ -913,8 +984,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])
       ),
       layout: JSON.parse(JSON.stringify(layout)),
-      layoutClips: layoutClips.map(lc => ({ ...lc })),
-      layoutPresets: layoutPresets.map(lp => ({ ...lp })),
+      // Include all layout clip properties including title animations (animationIn, animationOut, animationDuration)
+      layoutClips: layoutClips.map(lc => ({
+        ...lc,
+        title: lc.title ? { 
+          ...lc.title,
+          // Ensure all animation properties are included
+          animationIn: lc.title.animationIn ?? 'none',
+          animationOut: lc.title.animationOut ?? 'none',
+          animationDuration: lc.title.animationDuration ?? 0.5,
+        } : undefined,
+        backgroundImage: lc.backgroundImage ? { ...lc.backgroundImage } : undefined,
+      })),
+      layoutPresets: layoutPresets.map(lp => ({
+        ...lp,
+        title: lp.title ? { 
+          ...lp.title,
+          // Ensure all animation properties are included
+          animationIn: lp.title.animationIn ?? 'none',
+          animationOut: lp.title.animationOut ?? 'none',
+          animationDuration: lp.title.animationDuration ?? 0.5,
+        } : undefined,
+        backgroundImage: lp.backgroundImage ? { ...lp.backgroundImage } : undefined,
+      })),
       titleSettings: { ...titleSettings },
       canvasSettings: {
         ...canvasSettings,
@@ -1008,6 +1100,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           x: 0.5,
           y: 0.1,
           textAlign: 'center',
+          animationIn: 'none',
+          animationOut: 'none',
+          animationDuration: 0.5,
         },
         backgroundImage: {
           enabled: true,
@@ -1430,7 +1525,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   }, [scenes])
 
   // Build timeline clips from scene takes - proper clip-based system
+  // Only regenerate if editData hasn't been loaded (to preserve loaded clips)
   useEffect(() => {
+    // Don't regenerate timeline clips if we're currently loading editData or if they've already been loaded
+    if (isLoadingEditDataRef.current || (hasLoadedEditDataRef.current && timelineClips.length > 0)) {
+      return
+    }
+    
     const clips: TimelineClip[] = []
     let currentTimelinePos = 0
 
@@ -1506,7 +1607,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
     // Initialize canvas holders in layout clips from timeline clips
     // This ensures all layout clips have holders for their active clips
-    if (clips.length > 0) {
+    // Only do this if we're regenerating clips (not if they were loaded from editData)
+    if (clips.length > 0 && !hasLoadedEditDataRef.current) {
       setLayoutClips(prev => prev.map(layoutClip => {
         const holders: CanvasVideoHolder[] = []
         const existingHoldersMap = new Map(layoutClip.holders.map(h => [h.clipId, h]))
@@ -1555,11 +1657,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     const maxEnd = clips.length > 0 ? Math.max(...clips.map(c => c.timelineEnd)) : 0
     const safeMaxEnd = Number.isFinite(maxEnd) && maxEnd > 0 ? maxEnd : 1
     setTotalDuration(safeMaxEnd)
-  }, [sceneTakes])
+  }, [sceneTakes, timelineClips.length])
 
   // Sync canvas holders in layout clips when timeline clips change (e.g., after cuts/splits)
+  // Only sync if we're not currently loading editData (to avoid overwriting loaded data)
   useEffect(() => {
-    if (timelineClips.length === 0) return
+    if (timelineClips.length === 0 || isLoadingEditDataRef.current) return
     
     setLayoutClips(prev => prev.map(layoutClip => {
       const holders: CanvasVideoHolder[] = []
@@ -6232,7 +6335,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                           text: lc.title?.text || '',
                                           x: lc.title?.x ?? 0.5,
                                           y: lc.title?.y ?? 0.1,
-                                          textAlign: 'left'
+                                          textAlign: 'left',
+                                          animationIn: lc.title?.animationIn ?? 'none',
+                                          animationOut: lc.title?.animationOut ?? 'none',
+                                          animationDuration: lc.title?.animationDuration ?? 0.5,
                                         } 
                                       }
                                     : lc
@@ -6263,7 +6369,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                           text: lc.title?.text || '',
                                           x: lc.title?.x ?? 0.5,
                                           y: lc.title?.y ?? 0.1,
-                                          textAlign: 'center'
+                                          textAlign: 'center',
+                                          animationIn: lc.title?.animationIn ?? 'none',
+                                          animationOut: lc.title?.animationOut ?? 'none',
+                                          animationDuration: lc.title?.animationDuration ?? 0.5,
                                         } 
                                       }
                                     : lc
@@ -6294,7 +6403,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                           text: lc.title?.text || '',
                                           x: lc.title?.x ?? 0.5,
                                           y: lc.title?.y ?? 0.1,
-                                          textAlign: 'right'
+                                          textAlign: 'right',
+                                          animationIn: lc.title?.animationIn ?? 'none',
+                                          animationOut: lc.title?.animationOut ?? 'none',
+                                          animationDuration: lc.title?.animationDuration ?? 0.5,
                                         } 
                                       }
                                     : lc
@@ -6647,6 +6759,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 x: 0.5,
                                 y: 0.1,
                                 textAlign: 'center',
+                                animationIn: 'none',
+                                animationOut: 'none',
+                                animationDuration: 0.5,
                               },
                               backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
                                 enabled: true,
@@ -7576,13 +7691,116 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       
                       const textAlign = title.textAlign || 'center'
                       const transformX = textAlign === 'left' ? '0' : textAlign === 'right' ? '-100%' : '-50%'
+                      
+                      // Calculate animation state based on timeline position
+                      const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
+                      const animationDuration = title.animationDuration ?? 0.5
+                      const timeInClip = currentTime - currentLayoutClip.timelineStart
+                      const timeFromEnd = currentLayoutClip.timelineEnd - currentTime
+                      
+                      const animationIn = title.animationIn || 'none'
+                      const animationOut = title.animationOut || 'none'
+                      
+                      // Determine if we're in the in/out animation phase
+                      const isInAnimation = animationIn !== 'none' && timeInClip < animationDuration
+                      const isOutAnimation = animationOut !== 'none' && timeFromEnd < animationDuration
+                      
+                      // Calculate animation progress (0 to 1)
+                      const inProgress = isInAnimation ? Math.min(1, timeInClip / animationDuration) : 1
+                      const outProgress = isOutAnimation ? Math.min(1, timeFromEnd / animationDuration) : 1
+                      
+                      // Base transform for text alignment
+                      let translateXValue = transformX
+                      let translateYValue = '0'
+                      let scaleValue = 1
+                      let opacity = 1
+                      
+                      // Apply animation transforms
+                      if (isInAnimation && animationIn !== 'none') {
+                        const progress = inProgress
+                        switch (animationIn) {
+                          case 'fade':
+                            opacity = progress
+                            break
+                          case 'slideUp':
+                            translateYValue = `${100 * (1 - progress)}%`
+                            opacity = progress
+                            break
+                          case 'slideDown':
+                            translateYValue = `${-100 * (1 - progress)}%`
+                            opacity = progress
+                            break
+                          case 'slideLeft':
+                            // Add slide animation to base transform
+                            translateXValue = `calc(${transformX} + ${100 * (1 - progress)}%)`
+                            opacity = progress
+                            break
+                          case 'slideRight':
+                            translateXValue = `calc(${transformX} - ${100 * (1 - progress)}%)`
+                            opacity = progress
+                            break
+                          case 'zoomIn':
+                            scaleValue = 0.3 + 0.7 * progress
+                            opacity = progress
+                            break
+                          case 'zoomOut':
+                            scaleValue = 1.5 - 0.5 * progress
+                            opacity = progress
+                            break
+                        }
+                      } else if (isOutAnimation && animationOut !== 'none') {
+                        const progress = outProgress
+                        switch (animationOut) {
+                          case 'fade':
+                            opacity = progress
+                            break
+                          case 'slideUp':
+                            translateYValue = `${-100 * (1 - progress)}%`
+                            opacity = progress
+                            break
+                          case 'slideDown':
+                            translateYValue = `${100 * (1 - progress)}%`
+                            opacity = progress
+                            break
+                          case 'slideLeft':
+                            translateXValue = `calc(${transformX} - ${100 * (1 - progress)}%)`
+                            opacity = progress
+                            break
+                          case 'slideRight':
+                            translateXValue = `calc(${transformX} + ${100 * (1 - progress)}%)`
+                            opacity = progress
+                            break
+                          case 'zoomIn':
+                            scaleValue = 1 + 0.5 * (1 - progress)
+                            opacity = progress
+                            break
+                          case 'zoomOut':
+                            scaleValue = 1 - 0.7 * (1 - progress)
+                            opacity = progress
+                            break
+                        }
+                      }
+                      
+                      // Combine transforms - use separate translate calls for X and Y to handle calc() properly
+                      const transforms: string[] = []
+                      transforms.push(`translateX(${translateXValue})`)
+                      if (translateYValue !== '0') {
+                        transforms.push(`translateY(${translateYValue})`)
+                      }
+                      if (scaleValue !== 1) {
+                        transforms.push(`scale(${scaleValue})`)
+                      }
+                      const finalTransform = transforms.join(' ')
+                      
                       return (
                         <div
                           className="absolute cursor-move select-none"
                           style={{
                             left: `${title.x * 100}%`,
                             top: `${title.y * 100}%`,
-                            transform: `translate(${transformX}, 0)`,
+                            transform: finalTransform,
+                            opacity: opacity,
+                            transition: isInAnimation || isOutAnimation ? 'none' : 'opacity 0.1s, transform 0.1s',
                             zIndex: 1000, // Title should always be on top of video holders
                             fontFamily: titleSettings.font,
                             fontSize: `${titleSettings.size}px`,
