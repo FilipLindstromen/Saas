@@ -73,7 +73,18 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   // Cuts (per scene, stored with sceneId)
   const [cuts, setCuts] = useState<Map<string, VideoCut[]>>(new Map())
 
-  // Layout (global)
+  // Layout clips - store layout data per timeline segment
+  interface LayoutClip {
+    id: string
+    timelineStart: number // Start position on timeline (in seconds)
+    timelineEnd: number // End position on timeline (in seconds)
+    holders: CanvasVideoHolder[] // Canvas holder positions for this layout
+    name?: string // Optional name for template
+  }
+
+  const [layoutClips, setLayoutClips] = useState<LayoutClip[]>([])
+  
+  // Layout (global) - kept for backward compatibility and default layouts
   const [layout, setLayout] = useState<Layout>({ type: 'camera-only' })
   const [savedLayouts, setSavedLayouts] = useState<Layout[]>([])
 
@@ -237,7 +248,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   const [timelineHeight, setTimelineHeight] = useState(192) // 48 * 4 = 192px (h-48)
   const [isResizingTimeline, setIsResizingTimeline] = useState(false)
 
-  // Ref for tracking playback state across scene switches
+  // Ref for tracking playback state across scene switches and playback loop
   const wasPlayingRef = useRef(false)
 
   // Timeline View Settings
@@ -314,7 +325,56 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   
   // Selected holder for editing
   const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null)
-  
+
+  // Get current layout clip based on timeline time
+  const getCurrentLayoutClip = useCallback((timelineTime: number): LayoutClip | null => {
+    return layoutClips.find(lc => 
+      timelineTime >= lc.timelineStart && timelineTime < lc.timelineEnd
+    ) || null
+  }, [layoutClips])
+
+  // Save current canvas holders to layout clip at current timeline position
+  const saveHoldersToLayoutClip = useCallback(() => {
+    // Use a ref to get the latest currentTime to avoid stale closures
+    const timeToUse = currentTime
+    const currentLayoutClip = getCurrentLayoutClip(timeToUse)
+    
+    // Get current holders (filter out microphone layer as it's not visual)
+    const visualHolders = canvasHolders.filter(h => h.layer !== 'microphone')
+    
+    if (currentLayoutClip) {
+      // Update existing layout clip with current holders
+      setLayoutClips(prev => prev.map(lc => 
+        lc.id === currentLayoutClip.id 
+          ? { ...lc, holders: JSON.parse(JSON.stringify(visualHolders)) }
+          : lc
+      ))
+    } else {
+      // Create new layout clip for current time range
+      // Find the next layout clip to determine end time
+      const nextClip = layoutClips.find(lc => lc.timelineStart > timeToUse)
+      const endTime = nextClip ? nextClip.timelineStart : totalDuration
+      
+      const newLayoutClip: LayoutClip = {
+        id: `layout_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        timelineStart: timeToUse,
+        timelineEnd: endTime,
+        holders: JSON.parse(JSON.stringify(visualHolders))
+      }
+      
+      setLayoutClips(prev => {
+        const updated = [...prev, newLayoutClip].sort((a, b) => a.timelineStart - b.timelineStart)
+        // Adjust end times to prevent gaps
+        return updated.map((lc, idx) => {
+          if (idx < updated.length - 1) {
+            return { ...lc, timelineEnd: updated[idx + 1].timelineStart }
+          }
+          return { ...lc, timelineEnd: totalDuration }
+        })
+      })
+    }
+  }, [currentTime, canvasHolders, getCurrentLayoutClip, layoutClips, totalDuration])
+
   // Dragging state for moving holders
   const [draggingHolderId, setDraggingHolderId] = useState<string | null>(null)
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
@@ -332,6 +392,11 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   const [trimmingClipId, setTrimmingClipId] = useState<string | null>(null)
   const [trimmingEdge, setTrimmingEdge] = useState<'in' | 'out' | null>(null)
   const [trimmingStartPos, setTrimmingStartPos] = useState<number>(0)
+  
+  // Layout clip dragging/trimming state
+  const [draggingLayoutClipId, setDraggingLayoutClipId] = useState<string | null>(null)
+  const [trimmingLayoutClipId, setTrimmingLayoutClipId] = useState<string | null>(null)
+  const [trimmingLayoutEdge, setTrimmingLayoutEdge] = useState<'in' | 'out' | null>(null)
 
   // Undo/Redo History
   interface EditStateSnapshot {
@@ -598,6 +663,12 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
 
     setTimelineClips(clips)
 
+    // Reset currentTime to 0 when clips are first created or rebuilt
+    if (clips.length > 0 && currentTime !== 0 && !isPlaying) {
+      setCurrentTime(0)
+      timelineTimeRef.current = 0
+    }
+
     // Initialize canvas holders from timeline clips
     setCanvasHolders(prev => {
       const holders: CanvasVideoHolder[] = []
@@ -788,12 +859,64 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     }
   }, [isResizing])
 
-  // Handle timeline resize
+  // Recalculate canvas zoom when timeline height or canvas dimensions change
+  const recalculateCanvasZoom = useCallback(() => {
+    // Calculate available canvas area
+    // Available height = window height - timeline height - other UI elements (header, controls, etc.)
+    // Estimate: header ~64px, top controls ~56px, padding ~32px total
+    const estimatedUIHeight = 152
+    const availableHeight = window.innerHeight - timelineHeight - estimatedUIHeight
+    const availableWidth = window.innerWidth - 320 // Sidebar width (256px) + some margin
+    
+    // Calculate zoom to fit canvas in available space
+    // Canvas dimensions are in pixels, but we need to fit it in the available viewport
+    // We'll calculate based on the aspect ratio and available space
+    // Account for padding in the canvas container
+    const containerWidth = availableWidth - 32 // Padding
+    const containerHeight = availableHeight - 32 // Padding
+    
+    // Calculate what size the canvas would naturally be at 100% zoom
+    // Canvas will size to fit container width while maintaining aspect ratio
+    const naturalCanvasWidth = containerWidth
+    const naturalCanvasHeight = naturalCanvasWidth / canvasDimensions.aspectRatio
+    
+    // If natural height exceeds container, base calculation on height instead
+    const finalCanvasWidth = naturalCanvasHeight > containerHeight 
+      ? containerHeight * canvasDimensions.aspectRatio 
+      : naturalCanvasWidth
+    const finalCanvasHeight = finalCanvasWidth / canvasDimensions.aspectRatio
+    
+    // Calculate zoom: compare desired display size to resolution size
+    const widthBasedZoom = finalCanvasWidth / canvasDimensions.width
+    const heightBasedZoom = finalCanvasHeight / canvasDimensions.height
+    
+    // Use the smaller zoom to ensure it fits in both dimensions
+    const newZoom = Math.min(widthBasedZoom, heightBasedZoom, 2) // Cap at 200%
+    setCanvasZoom(Math.max(0.1, newZoom)) // Min zoom 10%
+  }, [timelineHeight, canvasDimensions])
+
+  // Recalculate zoom when timeline height or canvas dimensions change
+  useEffect(() => {
+    recalculateCanvasZoom()
+  }, [recalculateCanvasZoom])
+
+  // Also recalculate zoom on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      recalculateCanvasZoom()
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [recalculateCanvasZoom])
+
+  // Handle timeline resize - adjust canvas zoom instead of cropping
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingTimeline) return
       const newHeight = window.innerHeight - e.clientY
-      setTimelineHeight(Math.max(100, Math.min(600, newHeight)))
+      const clampedHeight = Math.max(100, Math.min(600, newHeight))
+      setTimelineHeight(clampedHeight)
+      // Zoom will be recalculated by the useEffect above
     }
 
     const handleMouseUp = () => {
@@ -808,7 +931,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         document.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [isResizingTimeline])
+  }, [isResizingTimeline, recalculateCanvasZoom])
 
   // Handle canvas holder dragging (moving)
   useEffect(() => {
@@ -844,6 +967,8 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       setDraggingHolderId(null)
       setDragStartPos(null)
       setDragStartHolder(null)
+      // Save holder positions to current layout clip
+      saveHoldersToLayoutClip()
       saveToHistory()
     }
 
@@ -853,7 +978,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingHolderId, dragStartPos, dragStartHolder, saveToHistory])
+  }, [draggingHolderId, dragStartPos, dragStartHolder, saveHoldersToLayoutClip, saveToHistory])
 
   // Handle canvas holder resizing (corner handles)
   useEffect(() => {
@@ -921,6 +1046,8 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       setResizeCorner(null)
       setResizeStartPos(null)
       setResizeStartHolder(null)
+      // Save holder positions to current layout clip
+      saveHoldersToLayoutClip()
       saveToHistory()
     }
 
@@ -930,7 +1057,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, saveToHistory])
+  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, saveHoldersToLayoutClip, saveToHistory])
 
   // Load selected take's recordings
   useEffect(() => {
@@ -1449,28 +1576,38 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         setSceneTakes(newSceneTakes)
 
         // Update timeline clips to ensure sourceOut never exceeds actual video duration
-        setTimelineClips(prev => prev.map(clip => {
-          if (clip.sceneId === selectedSceneId && clip.takeId === selectedTake?.id) {
-            const actualDuration = video.duration
-            // Clamp sourceOut to actual duration
-            const clampedSourceOut = Math.min(clip.sourceOut, actualDuration)
-            // Ensure sourceIn doesn't exceed sourceOut
-            const clampedSourceIn = Math.min(clip.sourceIn, clampedSourceOut - 0.1)
-            // Recalculate timelineEnd based on actual trimmed clip duration
-            // timelineEnd must always equal timelineStart + (sourceOut - sourceIn)
-            const trimmedDuration = clampedSourceOut - clampedSourceIn
-            const newTimelineEnd = clip.timelineStart + trimmedDuration
-            
-            return {
-              ...clip,
-              sourceIn: clampedSourceIn,
-              sourceOut: clampedSourceOut,
-              sourceDuration: actualDuration,
-              timelineEnd: newTimelineEnd
+        // Also update totalDuration based on corrected clips
+        setTimelineClips(prev => {
+          const updatedClips = prev.map(clip => {
+            if (clip.sceneId === selectedSceneId && clip.takeId === selectedTake?.id) {
+              const actualDuration = video.duration
+              // Clamp sourceOut to actual duration
+              const clampedSourceOut = Math.min(clip.sourceOut, actualDuration)
+              // Ensure sourceIn doesn't exceed sourceOut
+              const clampedSourceIn = Math.min(clip.sourceIn, clampedSourceOut - 0.1)
+              // Recalculate timelineEnd based on actual trimmed clip duration
+              // timelineEnd must always equal timelineStart + (sourceOut - sourceIn)
+              const trimmedDuration = clampedSourceOut - clampedSourceIn
+              const newTimelineEnd = clip.timelineStart + trimmedDuration
+              
+              return {
+                ...clip,
+                sourceIn: clampedSourceIn,
+                sourceOut: clampedSourceOut,
+                sourceDuration: actualDuration,
+                timelineEnd: newTimelineEnd
+              }
             }
-          }
-          return clip
-        }))
+            return clip
+          })
+          
+          // Recalculate totalDuration based on updated clips
+          const maxEnd = updatedClips.length > 0 ? Math.max(...updatedClips.map(c => c.timelineEnd)) : 0
+          const safeMaxEnd = Number.isFinite(maxEnd) && maxEnd > 0 ? maxEnd : 1
+          setTotalDuration(safeMaxEnd)
+          
+          return updatedClips
+        })
       }
 
       drawFrame()
@@ -1534,12 +1671,22 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   useEffect(() => {
     if (timelineClips.length === 0) {
       setTotalDuration(1)
+      // Reset to start when no clips
+      if (currentTime > 0) {
+        setCurrentTime(0)
+        timelineTimeRef.current = 0
+      }
       return
     }
     const maxEnd = Math.max(...timelineClips.map(c => c.timelineEnd), 0)
     const safeDuration = Number.isFinite(maxEnd) && maxEnd > 0 ? maxEnd : 1
     setTotalDuration(safeDuration)
-  }, [timelineClips])
+    // Ensure currentTime doesn't exceed totalDuration
+    if (currentTime > safeDuration) {
+      setCurrentTime(0)
+      timelineTimeRef.current = 0
+    }
+  }, [timelineClips, currentTime])
 
   // Handle seek - must be defined before playback loop
   const handleSeek = useCallback((absoluteTime: number, immediate: boolean = false) => {
@@ -1650,6 +1797,8 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
   const currentClipRef = useRef<TimelineClip | null>(null)
   const isSeekingRef = useRef(false)
   const lastFrameTimeRef = useRef<number>(performance.now())
+  const previousLayoutClipIdRef = useRef<string | null>(null)
+  // wasPlayingRef is declared earlier for tracking playback state across scene switches
   
   useEffect(() => {
     let animationFrameId: number
@@ -1663,6 +1812,13 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       }
 
       const now = performance.now()
+      // Use high-resolution time delta for accurate real-time playback
+      // Only reset lastFrameTimeRef when playback starts (transition from paused to playing)
+      if (!wasPlayingRef.current) {
+        lastFrameTimeRef.current = now
+        wasPlayingRef.current = true
+      }
+      
       const deltaTime = (now - lastFrameTimeRef.current) / 1000 // Convert to seconds
       lastFrameTimeRef.current = now
 
@@ -1670,9 +1826,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
       const audio = audioRef.current
 
       // Continuously advance timeline - this is the source of truth
+      // Ensure deltaTime is valid (not negative or too large due to tab switching, etc.)
+      // Increased cap to 200ms to handle occasional frame drops without losing time
+      const validDeltaTime = Math.max(0, Math.min(deltaTime, 0.2)) // Cap at 200ms to handle tab switches
       const currentTimelineTime = timelineTimeRef.current
-      const newTimelineTime = Math.min(currentTimelineTime + deltaTime, totalDuration)
+      // Apply playback rate to deltaTime for accurate real-time advancement
+      const newTimelineTime = Math.min(currentTimelineTime + (validDeltaTime * playbackRate), totalDuration)
       timelineTimeRef.current = newTimelineTime
+      // Always update state every frame for real-time playback (no throttling)
       setCurrentTime(newTimelineTime)
 
       // Stop at end
@@ -1684,6 +1845,103 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         setCurrentTime(totalDuration)
         drawFrame()
         return
+      }
+
+      // Get current layout clip and apply its holders
+      const currentLayoutClip = getCurrentLayoutClip(timelineTimeRef.current)
+      if (currentLayoutClip) {
+        // Check if we've switched layout clips
+        const layoutClipChanged = previousLayoutClipIdRef.current !== currentLayoutClip.id
+        
+        if (layoutClipChanged && previousLayoutClipIdRef.current && canvasSettings.transitionDuration > 0) {
+          // Find previous layout clip
+          const previousLayoutClip = layoutClips.find(lc => lc.id === previousLayoutClipIdRef.current)
+          
+          if (previousLayoutClip) {
+            // Transition holders between layout clips
+            previousLayoutClip.holders.forEach(prevHolder => {
+              const newHolder = currentLayoutClip.holders.find(h => 
+                h.clipId === prevHolder.clipId && h.layer === prevHolder.layer
+              )
+              
+              if (newHolder) {
+                const hasPositionChange = prevHolder.x !== newHolder.x || prevHolder.y !== newHolder.y ||
+                                         prevHolder.width !== newHolder.width || prevHolder.height !== newHolder.height
+                
+                if (hasPositionChange) {
+                  // Find the actual holder in canvasHolders state by clipId and layer (not id)
+                  const actualHolder = canvasHolders.find(h => h.clipId === newHolder.clipId && h.layer === newHolder.layer)
+                  if (actualHolder) {
+                    transitioningHoldersRef.current.set(actualHolder.id, {
+                      startPos: { x: prevHolder.x, y: prevHolder.y, width: prevHolder.width, height: prevHolder.height },
+                      endPos: { x: newHolder.x, y: newHolder.y, width: newHolder.width, height: newHolder.height },
+                      startTime: performance.now(),
+                      duration: canvasSettings.transitionDuration * 1000
+                    })
+                  }
+                }
+              }
+            })
+          }
+          
+          previousLayoutClipIdRef.current = currentLayoutClip.id
+        } else if (layoutClipChanged) {
+          previousLayoutClipIdRef.current = currentLayoutClip.id
+        }
+        
+        // Apply layout clip holders
+        // Merge layout clip holders with active timeline clips to ensure all clips have holders
+        setCanvasHolders(prev => {
+          // Start with holders from current layout clip
+          const mergedHolders = new Map<string, CanvasVideoHolder>()
+          
+          // Add all holders from the layout clip
+          currentLayoutClip.holders.forEach(layoutHolder => {
+            const key = `${layoutHolder.clipId}_${layoutHolder.layer}`
+            // Check if this holder is currently transitioning
+            const existingHolder = prev.find(h => h.clipId === layoutHolder.clipId && h.layer === layoutHolder.layer)
+            if (existingHolder && transitioningHoldersRef.current.has(existingHolder.id)) {
+              // Keep existing holder if it's transitioning
+              mergedHolders.set(key, existingHolder)
+            } else {
+              // Use layout clip holder
+              mergedHolders.set(key, { ...layoutHolder })
+            }
+          })
+          
+          // Also ensure holders exist for all active timeline clips at this time
+          // If a timeline clip doesn't have a holder in the layout clip, use default or existing position
+          const activeClips = timelineClips.filter(c => 
+            timelineTimeRef.current >= c.timelineStart && timelineTimeRef.current < c.timelineEnd &&
+            (c.layer === 'camera' || c.layer === 'screen')
+          )
+          
+          activeClips.forEach(clip => {
+            const key = `${clip.id}_${clip.layer}`
+            if (!mergedHolders.has(key)) {
+              // No holder in layout clip, check if one exists in current state
+              const existingHolder = prev.find(h => h.clipId === clip.id && h.layer === clip.layer)
+              if (existingHolder) {
+                mergedHolders.set(key, existingHolder)
+              } else {
+                // Create default holder
+                mergedHolders.set(key, {
+                  id: `holder_${clip.id}_${clip.layer}`,
+                  clipId: clip.id,
+                  layer: clip.layer,
+                  x: 0,
+                  y: 0,
+                  width: 1,
+                  height: 1,
+                  rotation: 0,
+                  zIndex: 0
+                })
+              }
+            }
+          })
+          
+          return Array.from(mergedHolders.values())
+        })
       }
 
       // Find which clip should be playing at this timeline position
@@ -1817,13 +2075,28 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             }
           }
         } else {
-          // Same clip - just ensure video is playing, don't constantly sync
-          // Let the video play naturally without interference
+          // Same clip - sync video to timeline position periodically to prevent drift
+          // Only sync if there's a significant difference (> 0.1s) to avoid constant seeking
 
           // Keep video/audio playing - only start if paused
           if (clip.layer === 'camera' && video && video.readyState >= 2 && !isSeekingRef.current) {
             if (video.paused && isPlaying) {
               video.play().catch(console.error)
+            } else if (!video.paused && isPlaying) {
+              // Sync video currentTime to timeline position if drift is significant
+              const expectedVideoTime = videoTime
+              const actualVideoTime = video.currentTime
+              const drift = Math.abs(expectedVideoTime - actualVideoTime)
+              // Only sync if drift > 0.1s to avoid constant seeking
+              if (drift > 0.1) {
+                isSeekingRef.current = true
+                video.currentTime = expectedVideoTime
+                const onSeeked = () => {
+                  isSeekingRef.current = false
+                  video.removeEventListener('seeked', onSeeked)
+                }
+                video.addEventListener('seeked', onSeeked, { once: true })
+              }
             }
           }
           if (clip.layer === 'screen' && screenVideoRef.current && !isSeekingRef.current) {
@@ -1831,6 +2104,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             if (screenVideo.readyState >= 2) {
               if (screenVideo.paused && isPlaying) {
                 screenVideo.play().catch(console.error)
+              } else if (!screenVideo.paused && isPlaying) {
+                // Sync screen video to timeline position
+                const expectedVideoTime = videoTime
+                const actualVideoTime = screenVideo.currentTime
+                const drift = Math.abs(expectedVideoTime - actualVideoTime)
+                if (drift > 0.1) {
+                  screenVideo.currentTime = expectedVideoTime
+                }
               }
             }
           }
@@ -1842,6 +2123,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                 audio.currentTime = sourceVideo.currentTime
               }
               audio.play().catch(console.error)
+            } else if (!audio.paused && isPlaying) {
+              // Sync audio to timeline position
+              const expectedAudioTime = videoTime
+              const actualAudioTime = audio.currentTime
+              const drift = Math.abs(expectedAudioTime - actualAudioTime)
+              if (drift > 0.1) {
+                audio.currentTime = expectedAudioTime
+              }
             }
           }
         }
@@ -1909,13 +2198,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     }
 
     if (isPlaying) {
-      lastFrameTimeRef.current = performance.now()
       // Initialize clip tracking
       const initialResult = timelineToVideoTime(timelineTimeRef.current)
       currentClipRef.current = initialResult?.clip || null
-      renderLoop()
+      // Start the loop - lastFrameTimeRef will be reset in renderLoop on first frame
+      animationFrameId = requestAnimationFrame(renderLoop)
     } else {
       currentClipRef.current = null
+      wasPlayingRef.current = false // Reset when paused
     }
 
     return () => {
@@ -1923,7 +2213,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [isPlaying, selectedSceneIndex, sceneTakes, timelineClips, totalDuration, drawFrame, timelineToVideoTime])
+  }, [isPlaying, selectedSceneIndex, sceneTakes, timelineClips, totalDuration, playbackRate, drawFrame, timelineToVideoTime, canvasHolders, canvasSettings.transitionDuration])
 
   // Load transcriptions from project when sceneTakes change
   useEffect(() => {
@@ -2338,8 +2628,157 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
 
   // ========== NEW CLIP-BASED EDITING FUNCTIONS ==========
 
+  // Move layout clip - drag horizontally
+  const handleStartMoveLayoutClip = useCallback((layoutClipId: string, mouseX: number) => {
+    const layoutClip = layoutClips.find(lc => lc.id === layoutClipId)
+    if (!layoutClip) return
+
+    setDraggingLayoutClipId(layoutClipId)
+    const timelineContainer = document.querySelector('[data-timeline-container]') as HTMLElement
+    if (!timelineContainer) return
+
+    const containerRect = timelineContainer.getBoundingClientRect()
+    const initialMouseX = mouseX - containerRect.left
+    const initialMouseTime = initialMouseX / timelineZoom
+
+    // Calculate the offset from the drag start to the clip start
+    const dragOffset = initialMouseTime - layoutClip.timelineStart
+
+    // Set up smooth dragging
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = timelineContainer.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const currentMouseTime = x / timelineZoom
+
+      // Calculate new start time based on mouse position and original offset
+      const newStartTime = Math.max(0, currentMouseTime - dragOffset)
+      const clipDuration = layoutClip.timelineEnd - layoutClip.timelineStart
+      const newEndTime = newStartTime + clipDuration
+
+      setLayoutClips(prev => prev.map(lc => {
+        if (lc.id === layoutClipId) {
+          return {
+            ...lc,
+            timelineStart: newStartTime,
+            timelineEnd: newEndTime
+          }
+        }
+        return lc
+      }))
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      setDraggingLayoutClipId(null)
+      saveToHistory()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove, { passive: true })
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [layoutClips, timelineZoom, saveToHistory])
+
+  // Trim layout clip - drag edges
+  const handleStartTrimLayoutClip = useCallback((layoutClipId: string, edge: 'in' | 'out', mouseX: number) => {
+    const layoutClip = layoutClips.find(lc => lc.id === layoutClipId)
+    if (!layoutClip) return
+
+    setTrimmingLayoutClipId(layoutClipId)
+    setTrimmingLayoutEdge(edge)
+
+    const timelineContainer = document.querySelector('[data-timeline-container]') as HTMLElement
+    if (!timelineContainer) return
+    const containerRect = timelineContainer.getBoundingClientRect()
+
+    // Calculate initial offset from the edge to the mouse
+    const initialMouseX = mouseX - containerRect.left
+    const initialMouseTime = initialMouseX / timelineZoom
+    const initialEdgeTime = edge === 'in' ? layoutClip.timelineStart : layoutClip.timelineEnd
+    const offsetFromEdge = initialMouseTime - initialEdgeTime
+
+    // Set up smooth trimming - edge follows mouse directly
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = timelineContainer.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const currentMouseTime = x / timelineZoom
+
+      setLayoutClips(prev => {
+        const currentClip = prev.find(c => c.id === layoutClipId)
+        if (!currentClip) return prev
+
+        if (edge === 'in') {
+          // Edge follows mouse directly, accounting for initial offset
+          let newTimelineStart = currentMouseTime - offsetFromEdge
+          newTimelineStart = Math.max(0, Math.min(newTimelineStart, currentClip.timelineEnd - 0.1))
+
+          return prev.map(lc => 
+            lc.id === layoutClipId 
+              ? { ...lc, timelineStart: newTimelineStart }
+              : lc
+          )
+        } else {
+          // Edge follows mouse directly, accounting for initial offset
+          let newTimelineEnd = currentMouseTime - offsetFromEdge
+          newTimelineEnd = Math.max(currentClip.timelineStart + 0.1, newTimelineEnd)
+
+          return prev.map(lc => 
+            lc.id === layoutClipId 
+              ? { ...lc, timelineEnd: newTimelineEnd }
+              : lc
+          )
+        }
+      })
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      setTrimmingLayoutClipId(null)
+      setTrimmingLayoutEdge(null)
+      saveToHistory()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove, { passive: true })
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [layoutClips, timelineZoom, saveToHistory])
+
+  // Split layout clip at timeline position
+  const handleSplitLayoutClip = useCallback((cutTime: number) => {
+    const layoutClip = layoutClips.find(lc => 
+      cutTime >= lc.timelineStart && cutTime < lc.timelineEnd
+    )
+    
+    if (!layoutClip) return
+    
+    // Create two new layout clips
+    const firstPart: LayoutClip = {
+      ...layoutClip,
+      id: `${layoutClip.id}_part1_${Date.now()}`,
+      timelineEnd: cutTime,
+      holders: JSON.parse(JSON.stringify(layoutClip.holders))
+    }
+    
+    const secondPart: LayoutClip = {
+      ...layoutClip,
+      id: `${layoutClip.id}_part2_${Date.now()}`,
+      timelineStart: cutTime,
+      holders: JSON.parse(JSON.stringify(layoutClip.holders))
+    }
+    
+    setLayoutClips(prev => {
+      const updated = prev.filter(lc => lc.id !== layoutClip.id)
+      updated.push(firstPart, secondPart)
+      return updated.sort((a, b) => a.timelineStart - b.timelineStart)
+    })
+    
+    saveToHistory()
+  }, [layoutClips, saveToHistory])
+
   // Cut clip - split at timeline position (Linked)
   const handleCutClip = useCallback((clipId: string, cutTime: number) => {
+    // Also split layout clip at the same time
+    handleSplitLayoutClip(cutTime)
+    
     const mainClip = timelineClips.find(c => c.id === clipId)
     if (!mainClip) return
 
@@ -2387,7 +2826,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     // Simplified: relying on useEffect [timelineClips] if it exists, or update explicitly next render
     // But let's check: setTotalDuration is usually updated here.
     // We can do it in the setter above or Effect.
-  }, [timelineClips])
+  }, [timelineClips, handleSplitLayoutClip])
 
   // Move clip - drag horizontally (Linked)
   const handleStartMoveClip = useCallback((clipId: string, mouseX: number) => {
@@ -2808,13 +3247,109 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`
   }
 
+  // Initialize layout clips when timeline clips are created
+  useEffect(() => {
+    if (timelineClips.length > 0 && layoutClips.length === 0) {
+      // Create initial layout clip covering entire timeline
+      const initialLayoutClip: LayoutClip = {
+        id: `layout_initial_${Date.now()}`,
+        timelineStart: 0,
+        timelineEnd: totalDuration || 1,
+        holders: JSON.parse(JSON.stringify(canvasHolders))
+      }
+      setLayoutClips([initialLayoutClip])
+    }
+  }, [timelineClips, totalDuration, canvasHolders, layoutClips.length])
+
   // Layout management
   const handleLayoutChange = (newLayout: Layout) => {
     setLayout(newLayout)
+    
+    // If it's a custom layout with positions, apply to current layout clip
+    if (newLayout.type === 'custom' && (newLayout.cameraPosition || newLayout.screenPosition)) {
+      const currentLayoutClip = getCurrentLayoutClip(currentTime)
+      if (currentLayoutClip) {
+        setLayoutClips(prev => prev.map(lc => {
+          if (lc.id === currentLayoutClip.id) {
+            const updatedHolders = lc.holders.map(holder => {
+              if (holder.layer === 'camera' && newLayout.cameraPosition) {
+                return {
+                  ...holder,
+                  x: newLayout.cameraPosition.x,
+                  y: newLayout.cameraPosition.y,
+                  width: newLayout.cameraPosition.width,
+                  height: newLayout.cameraPosition.height
+                }
+              } else if (holder.layer === 'screen' && newLayout.screenPosition) {
+                return {
+                  ...holder,
+                  x: newLayout.screenPosition.x,
+                  y: newLayout.screenPosition.y,
+                  width: newLayout.screenPosition.width,
+                  height: newLayout.screenPosition.height
+                }
+              }
+              return holder
+            })
+            return { ...lc, holders: updatedHolders }
+          }
+          return lc
+        }))
+        // Also update canvas holders immediately
+        setCanvasHolders(prev => {
+          const updated = prev.map(holder => {
+            if (holder.layer === 'camera' && newLayout.cameraPosition) {
+              return {
+                ...holder,
+                x: newLayout.cameraPosition.x,
+                y: newLayout.cameraPosition.y,
+                width: newLayout.cameraPosition.width,
+                height: newLayout.cameraPosition.height
+              }
+            } else if (holder.layer === 'screen' && newLayout.screenPosition) {
+              return {
+                ...holder,
+                x: newLayout.screenPosition.x,
+                y: newLayout.screenPosition.y,
+                width: newLayout.screenPosition.width,
+                height: newLayout.screenPosition.height
+              }
+            }
+            return holder
+          })
+          return updated
+        })
+      }
+    }
   }
 
   const handleSaveLayout = () => {
-    if (layout.type === 'custom' && layout.name) {
+    const currentLayoutClip = getCurrentLayoutClip(currentTime)
+    if (currentLayoutClip) {
+      const templateLayout: Layout = {
+        type: 'custom',
+        name: currentLayoutClip.name || `Layout ${Date.now()}`,
+        cameraPosition: currentLayoutClip.holders.find(h => h.layer === 'camera') 
+          ? { 
+              x: currentLayoutClip.holders.find(h => h.layer === 'camera')!.x,
+              y: currentLayoutClip.holders.find(h => h.layer === 'camera')!.y,
+              width: currentLayoutClip.holders.find(h => h.layer === 'camera')!.width,
+              height: currentLayoutClip.holders.find(h => h.layer === 'camera')!.height
+            }
+          : undefined,
+        screenPosition: currentLayoutClip.holders.find(h => h.layer === 'screen')
+          ? {
+              x: currentLayoutClip.holders.find(h => h.layer === 'screen')!.x,
+              y: currentLayoutClip.holders.find(h => h.layer === 'screen')!.y,
+              width: currentLayoutClip.holders.find(h => h.layer === 'screen')!.width,
+              height: currentLayoutClip.holders.find(h => h.layer === 'screen')!.height
+            }
+          : undefined
+      }
+      if (templateLayout.name && !savedLayouts.find(l => l.name === templateLayout.name)) {
+        setSavedLayouts([...savedLayouts, templateLayout])
+      }
+    } else if (layout.type === 'custom' && layout.name) {
       setSavedLayouts([...savedLayouts, layout])
     }
   }
@@ -4022,20 +4557,6 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   <p className="text-xs text-gray-500 mt-1">Used in exported video</p>
                 </div>
 
-                {/* Zoom */}
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Zoom</label>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2"
-                    step="0.1"
-                    value={canvasZoom}
-                    onChange={(e) => setCanvasZoom(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-400">{Math.round(canvasZoom * 100)}%</span>
-                </div>
 
                 {/* Transition Duration */}
                 <div>
@@ -4309,21 +4830,27 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {/* Canvas Preview Area */}
           <div className="flex-1 flex min-h-0 overflow-hidden" style={{ backgroundColor: canvasSettings.workAreaBackgroundColor }}>
-            <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0" style={{ overflow: 'hidden' }}>
               {/* Canvas Container with aspect ratio and masking */}
               <div 
-                data-canvas-container
-                className="relative"
+                className="relative flex items-center justify-center"
                 style={{
-                  aspectRatio: `${canvasDimensions.width} / ${canvasDimensions.height}`,
+                  aspectRatio: canvasDimensions.aspectRatio,
                   maxWidth: '100%',
                   maxHeight: '100%',
                   width: '100%',
                   height: 'auto',
-                  transform: `scale(${canvasZoom})`,
-                  transformOrigin: 'center',
+                  flexShrink: 0,
                 }}
               >
+                <div 
+                  data-canvas-container
+                  className="relative w-full h-full"
+                  style={{
+                    transform: `scale(${canvasZoom})`,
+                    transformOrigin: 'center',
+                  }}
+                >
                 {/* Canvas bounds - content outside is masked */}
                 <div
                   className="relative w-full h-full overflow-hidden"
@@ -4340,8 +4867,10 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                       if (!clip) return null
                       
                       const isSelected = selectedHolderId === holder.id
-                      const timelineResult = timelineToVideoTime(currentTime)
-                      const isActive = timelineResult?.clip?.id === clip.id && timelineResult.clip.layer === holder.layer
+                      // Check if this exact clip should be active at the current timeline position
+                      // A clip is active if currentTime is within its timeline bounds
+                      const isActive = currentTime >= clip.timelineStart && currentTime < clip.timelineEnd && 
+                                      clip.layer === holder.layer
                       
                       return (
                         <div
@@ -4462,6 +4991,7 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                     ref={lutCanvasRef}
                     className="absolute inset-0 w-full h-full pointer-events-none"
                   />
+                </div>
                 </div>
               </div>
               
@@ -4679,9 +5209,17 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
             {/* Right Actions */}
             <div className="flex items-center justify-end gap-3 w-1/3 min-w-0 flex-shrink-0">
               <div className="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">
+                <span className="text-xs text-gray-400">Timeline</span>
                 <button onClick={() => setTimelineZoom(Math.max(minZoom, timelineZoom - 10))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg></button>
                 <input type="range" min={minZoom} max={maxZoom} value={timelineZoom} onChange={(e) => setTimelineZoom(parseInt(e.target.value))} className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
                 <button onClick={() => setTimelineZoom(Math.min(maxZoom, timelineZoom + 10))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
+              </div>
+              <div className="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">
+                <span className="text-xs text-gray-400">Canvas</span>
+                <button onClick={() => setCanvasZoom(Math.max(0.1, canvasZoom - 0.1))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg></button>
+                <input type="range" min="0.1" max="2" step="0.1" value={canvasZoom} onChange={(e) => setCanvasZoom(parseFloat(e.target.value))} className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+                <button onClick={() => setCanvasZoom(Math.min(2, canvasZoom + 0.1))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
+                <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(canvasZoom * 100)}%</span>
               </div>
               <div className="h-4 w-px bg-gray-800 mx-1"></div>
               <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
@@ -4704,8 +5242,9 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                 e.stopPropagation()
                 const headerElement = e.currentTarget
                 const rect = headerElement.getBoundingClientRect()
-                const x = e.clientX - rect.left + headerElement.scrollLeft
-                const time = x / timelineZoom
+                // Calculate x position relative to the header's left edge (accounting for scroll)
+                const x = Math.max(0, e.clientX - rect.left + headerElement.scrollLeft)
+                const time = Math.max(0, x / timelineZoom) // Ensure time is never negative
                 handleSeek(time, true)
 
                 const handleMouseMove = (mv: MouseEvent) => {
@@ -4715,7 +5254,8 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
                   // but if page scrolls it might. Let's trust initial rect for now or update it.
                   // Simpler: Just rely on cached rect + current scrollLeft
                   const newX = mv.clientX - rect.left + headerElement.scrollLeft
-                  handleSeek(newX / timelineZoom, true)
+                  const time = Math.max(0, newX / timelineZoom) // Ensure time is never negative
+                  handleSeek(time, true)
                 }
                 const handleMouseUp = () => {
                   window.removeEventListener('mousemove', handleMouseMove)
@@ -4752,8 +5292,14 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
 
             {/* Tracks Container */}
             <div
-              className="relative p-4 space-y-4 min-w-full"
-              style={{ minWidth: `${Math.max(window.innerWidth, (Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom + 200)}px` }}
+              className="relative space-y-4 min-w-full"
+              style={{ 
+                minWidth: `${Math.max(window.innerWidth, (Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom + 200)}px`,
+                paddingTop: '1rem',
+                paddingRight: '1rem',
+                paddingBottom: '1rem',
+                paddingLeft: '0' // No left padding so time 0 aligns with the left edge
+              }}
             >
               {/* Playhead Line (Extends through tracks) */}
               <div
@@ -4930,17 +5476,58 @@ export default function EditStep({ scenes, onScenesChange }: EditStepProps) {
               <div className="relative h-16 w-full mt-auto">
                 <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed opacity-50" />
 
-                {/* Single continuous block for Layout (or multiple if we supported layout changes per clip, but currently global-ish) */}
-                <div
-                  className="absolute top-0 bottom-0 bg-[#f97316] rounded-2xl border border-[#fb923c] flex items-center px-4"
-                  style={{
-                    left: '0px',
-                    width: `${(Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom}px`,
-                  }}
-                >
-                  <svg className="w-5 h-5 text-white mr-2 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v9a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h6a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
-                  <span className="text-sm font-bold text-white tracking-wide">Output Layout</span>
-                </div>
+                {/* Layout clips - individual clips that can be split, moved, and trimmed */}
+                {layoutClips.map(layoutClip => {
+                  const clipDuration = layoutClip.timelineEnd - layoutClip.timelineStart
+                  const isDragging = draggingLayoutClipId === layoutClip.id
+                  const isTrimming = trimmingLayoutClipId === layoutClip.id
+                  
+                  return (
+                    <div
+                      key={layoutClip.id}
+                      data-layout-clip-id={layoutClip.id}
+                      className={`absolute top-0 bottom-0 bg-[#f97316] rounded-2xl border border-[#fb923c] flex items-center px-4 cursor-move group transition-all
+                                 ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
+                                 ${isTrimming ? 'z-30' : ''}
+                                 hover:bg-[#fb923c]`}
+                      style={{
+                        left: `${layoutClip.timelineStart * timelineZoom}px`,
+                        width: `${Math.max(2, clipDuration * timelineZoom)}px`,
+                      }}
+                      onMouseDown={(e) => {
+                        if ((e.target as HTMLElement).closest('.trim-handle')) return
+                        e.stopPropagation()
+                        if (timelineTool === 'select') {
+                          handleStartMoveLayoutClip(layoutClip.id, e.clientX)
+                        } else if (timelineTool === 'cut') {
+                          const cutTime = (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom
+                          handleSplitLayoutClip(cutTime)
+                        }
+                      }}
+                    >
+                      <svg className="w-5 h-5 text-white mr-2 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v9a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h6a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
+                      <span className="text-sm font-bold text-white tracking-wide">
+                        {layoutClip.name || 'Layout'}
+                      </span>
+                      
+                      {/* Trim Handles */}
+                      <div
+                        className={`trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                  opacity-0 group-hover:opacity-100`}
+                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'in', e.clientX) }}
+                      >
+                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                      </div>
+                      <div
+                        className={`trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                  opacity-0 group-hover:opacity-100`}
+                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'out', e.clientX) }}
+                      >
+                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
             </div>
