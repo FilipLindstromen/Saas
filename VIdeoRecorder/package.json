@@ -13,12 +13,14 @@
     "electron:pack": "npm run build && electron-builder --dir"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
