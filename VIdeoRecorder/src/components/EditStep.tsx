@@ -202,6 +202,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4')
+  const [exportMode, setExportMode] = useState<'combined' | 'separate'>('combined')
+  const [exportProgressPercent, setExportProgressPercent] = useState(0)
   
   // FFmpeg loading state
   const [ffmpegLoading, setFfmpegLoading] = useState(false)
@@ -4153,11 +4155,42 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
     setIsExporting(true)
     setExportProgress('Starting export...')
+    setExportProgressPercent(0)
+
+    // Set up FFmpeg log listener for frame progress tracking
+    let currentFrameCount = 0
+    let totalFrames = 0
+    let currentSceneIndex = 0
+    let currentSceneDuration = 0
+    const frameRate = 60 // 60fps as per code
+
+    const logHandler = ({ message }: { message: string }) => {
+      // Parse frame count from FFmpeg log: "frame= 89 fps= 11 q=26.0..."
+      const frameMatch = message.match(/frame=\s*(\d+)/)
+      if (frameMatch) {
+        const frameNum = parseInt(frameMatch[1], 10)
+        currentFrameCount = frameNum
+        
+        // Calculate progress if we have total frames
+        if (totalFrames > 0 && currentSceneDuration > 0) {
+          // Progress for current scene
+          const sceneProgress = Math.min(frameNum / (currentSceneDuration * frameRate), 1)
+          // Overall progress across all scenes
+          const overallProgress = (currentSceneIndex / scenesToExport.length) + (sceneProgress / scenesToExport.length)
+          setExportProgressPercent(Math.min(overallProgress * 100, 99))
+        }
+      }
+    }
+    
+    const ffmpeg = await getFFmpeg()
+    ffmpeg.on('log', logHandler)
 
     // Add timeout to prevent getting stuck
     const exportTimeout = setTimeout(() => {
       setIsExporting(false)
       setExportProgress('')
+      setExportProgressPercent(0)
+      ffmpeg.off('log', logHandler)
       alert('Export is taking longer than expected. Please check the console for errors.')
     }, 300000) // 5 minute timeout
 
@@ -4404,6 +4437,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           }
           
           setExportProgress(`Rendering scene ${i + 1}...`)
+          currentSceneIndex = i
+          currentSceneDuration = videoDuration || sceneTake.take.duration
+          currentFrameCount = 0
+          totalFrames = currentSceneDuration * frameRate
+          
           const combinedBlob = await Promise.race([
             combineLayersWithLayout(
               sceneCameraBlob,
@@ -4423,8 +4461,66 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
               setTimeout(() => reject(new Error('Timeout combining layers (this may take a while for long videos)')), 300000) // 5 minute timeout
             )
           ])
-          processedSceneBlobs.push(combinedBlob)
-          setExportProgress(`✓ Scene ${i + 1} completed`)
+          
+          // If exporting separately, download this scene now
+          if (exportMode === 'separate') {
+            setExportProgress(`Finalizing scene ${i + 1}...`)
+            let sceneBlob = combinedBlob
+            
+            // Convert to requested format if needed
+            if (exportFormat === 'webm') {
+              try {
+                const ffmpegScene = await getFFmpeg()
+                const inputFile = 'input_convert_scene.mp4'
+                const outputFile = 'output_scene.webm'
+                
+                const inputData = await fetchFile(combinedBlob)
+                await ffmpegScene.writeFile(inputFile, inputData)
+                
+                setExportProgress(`Converting scene ${i + 1} to WebM...`)
+                await ffmpegScene.exec([
+                  '-i', inputFile,
+                  '-c:v', 'libvpx-vp9',
+                  '-b:v', '2M',
+                  '-c:a', 'libopus',
+                  '-b:a', '192k',
+                  outputFile
+                ])
+                
+                const outputData = await ffmpegScene.readFile(outputFile)
+                sceneBlob = outputData instanceof Uint8Array 
+                  ? new Blob([outputData as BlobPart], { type: 'video/webm' })
+                  : new Blob([outputData as any], { type: 'video/webm' })
+                
+                try {
+                  await ffmpegScene.deleteFile(inputFile)
+                  await ffmpegScene.deleteFile(outputFile)
+                } catch (e) {
+                  // Ignore cleanup errors
+                }
+              } catch (error) {
+                console.warn(`WebM conversion failed for scene ${i + 1}, using MP4:`, error)
+              }
+            }
+            
+            // Download this scene
+            const scene = scenes.find(s => s.id === sceneTake.sceneId)
+            const sceneName = scene?.title || `Scene ${i + 1}`
+            const finalFormat = exportFormat === 'webm' && sceneBlob.type === 'video/webm' ? 'webm' : 'mp4'
+            const url = URL.createObjectURL(sceneBlob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${sceneName}_${Date.now()}.${finalFormat}`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            
+            setExportProgress(`✓ Scene ${i + 1} exported`)
+          } else {
+            processedSceneBlobs.push(combinedBlob)
+            setExportProgress(`✓ Scene ${i + 1} completed`)
+          }
         } catch (error) {
           console.error(`Error combining layers for scene ${i + 1}:`, error)
           const errorMessage = error instanceof Error ? error.message : String(error)
@@ -4435,15 +4531,31 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
       }
 
+      // If exporting separately, we're done (each scene was already downloaded)
+      if (exportMode === 'separate') {
+        setExportProgressPercent(100)
+        clearTimeout(exportTimeout)
+        ffmpeg.off('log', logHandler)
+        setShowExportDialog(false)
+        setIsExporting(false)
+        setExportProgress('')
+        setExportProgressPercent(0)
+        return
+      }
+
+      // Combined export: concatenate all scenes
       if (processedSceneBlobs.length === 0) {
         alert('No video to export - all scenes failed to process')
         setIsExporting(false)
         setExportProgress('')
+        setExportProgressPercent(0)
+        ffmpeg.off('log', logHandler)
         return
       }
 
       // Concatenate all scenes if multiple
       setExportProgress('Concatenating scenes...')
+      setExportProgressPercent(95)
       let finalBlob: Blob
       try {
         if (processedSceneBlobs.length === 1) {
@@ -4458,12 +4570,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
       // Convert to requested format if needed
       setExportProgress('Finalizing export...')
+      setExportProgressPercent(98)
       let exportBlob = finalBlob
       
       if (exportFormat === 'webm') {
         // Convert MP4 to WebM using FFmpeg
         try {
-          const ffmpeg = await getFFmpeg()
           const inputFile = 'input_convert.mp4'
           const outputFile = 'output.webm'
           
@@ -4502,6 +4614,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       
       // Download video
       setExportProgress('Downloading...')
+      setExportProgressPercent(100)
       const finalFormat = exportFormat === 'webm' && exportBlob.type === 'video/webm' ? 'webm' : 'mp4'
       const url = URL.createObjectURL(exportBlob)
       const a = document.createElement('a')
@@ -4513,15 +4626,23 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       URL.revokeObjectURL(url)
 
       clearTimeout(exportTimeout)
+      ffmpeg.off('log', logHandler)
       setShowExportDialog(false)
       setIsExporting(false)
       setExportProgress('')
+      setExportProgressPercent(0)
     } catch (error) {
       clearTimeout(exportTimeout)
+      try {
+        ffmpeg.off('log', logHandler)
+      } catch (e) {
+        // Ignore if FFmpeg not available or already cleaned up
+      }
       console.error('Export error:', error)
       alert('Export failed: ' + (error as Error).message)
       setIsExporting(false)
       setExportProgress('')
+      setExportProgressPercent(0)
     }
   }
 
@@ -4740,8 +4861,16 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     </span>
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
-                    <div className="bg-gray-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${exportProgressPercent}%` }}
+                    ></div>
                   </div>
+                  {exportProgressPercent > 0 && exportProgressPercent < 100 && (
+                    <div className="text-xs text-gray-400 mt-1 text-right">
+                      {Math.round(exportProgressPercent)}%
+                    </div>
+                  )}
                 </div>
               ) : null}
               {ffmpegError && !isExporting && (
@@ -4768,6 +4897,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     WebM
                   </button>
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-sm text-gray-300 mb-2 block">Export Mode</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setExportMode('combined')}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'combined' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                  >
+                    Combined Video
+                  </button>
+                  <button
+                    onClick={() => setExportMode('separate')}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'separate' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                  >
+                    Separate Videos
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  {exportMode === 'combined' 
+                    ? 'Export all selected scenes as one video file' 
+                    : 'Export each selected scene as a separate video file'}
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 mt-4">
