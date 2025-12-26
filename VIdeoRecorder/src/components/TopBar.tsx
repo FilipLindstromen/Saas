@@ -13,6 +13,7 @@ interface TopBarProps {
   hasProject?: boolean
   currentStep?: Step
   onStepChange?: (step: Step) => void
+  onExportClick?: () => void
 }
 
 export default function TopBar({
@@ -26,6 +27,7 @@ export default function TopBar({
   hasProject = false,
   currentStep,
   onStepChange,
+  onExportClick,
 }: TopBarProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -115,11 +117,7 @@ export default function TopBar({
         {hasProject && (
           <button
             onClick={() => onSaveProject?.()}
-            disabled={!isEdited}
-            className={`flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors ${isEdited
-                ? 'bg-white hover:bg-zinc-200 text-black'
-                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-              }`}
+            className="flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors bg-white hover:bg-zinc-200 text-black"
           >
             <svg
               className="w-4 h-4"
@@ -231,6 +229,43 @@ export default function TopBar({
                 )}
               </div>
             ))}
+            {/* Export Button */}
+            {currentStep === 'edit' && onExportClick && (
+              <>
+                <svg
+                  className="w-4 h-4 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+                <button
+                  onClick={onExportClick}
+                  className="flex items-center gap-2 px-4 py-2 rounded transition-colors text-gray-400 hover:text-white"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span>Export</span>
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
