@@ -95,6 +95,7 @@ interface SceneTake {
 export default function EditStep({ scenes, onScenesChange, onEditedChange, showExportDialog: externalShowExportDialog, onExportDialogChange, onSaveRequest }: EditStepProps) {
   // Track if there are unsaved edits
   const hasUnsavedEditsRef = useRef(false)
+  const isLoadingEditDataRef = useRef(false)
   
   // Mark edits as unsaved
   const markAsEdited = useCallback(() => {
@@ -132,6 +133,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   // Sidebar
   const [activeTab, setActiveTab] = useState<SidebarTab>('captions')
   const [showSettings, setShowSettings] = useState(false)
+  const [layoutSubTab, setLayoutSubTab] = useState<'text-background' | 'presets'>('text-background')
 
   // Transcription (per scene)
   const [transcripts, setTranscripts] = useState<Map<string, { words: WordTimestamp[]; text: string }>>(new Map())
@@ -162,6 +164,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     enabled: boolean
     x: number // Position (0-1, relative to canvas width)
     y: number // Position (0-1, relative to canvas height)
+    textAlign?: 'left' | 'center' | 'right' // Text alignment
+    animationIn?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
+    animationOut?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
+    animationDuration?: number // Duration in seconds (default: 0.5)
   }
 
   interface LayoutBackgroundImage {
@@ -194,6 +200,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [titleSettings, setTitleSettings] = useState({
     font: 'Inter, sans-serif',
     size: 48, // in pixels
+    lineHeight: 1.2, // Line height multiplier
   })
 
   const [layoutClips, setLayoutClips] = useState<LayoutClip[]>([])
@@ -238,26 +245,16 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
   }, [layoutPresets])
 
-  // Load title settings from localStorage
+  // Title settings are now loaded from project editData (see loadEditData useEffect)
+  // and saved as part of the project (see getEditData and saveEditData)
+  
+  // Mark project as edited when title settings change (but not during initial load)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('titleSettings')
-      if (stored) {
-        setTitleSettings(JSON.parse(stored))
-      }
-    } catch (error) {
-      console.error('Error loading title settings:', error)
+    // Only mark as edited if we have a project loaded and we're not currently loading edit data
+    if (projectManager.hasProject() && !isLoadingEditDataRef.current) {
+      markAsEdited()
     }
-  }, [])
-
-  // Save title settings to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('titleSettings', JSON.stringify(titleSettings))
-    } catch (error) {
-      console.error('Error saving title settings:', error)
-    }
-  }, [titleSettings])
+  }, [titleSettings, markAsEdited])
 
   // Export selection
   const [selectedScenesForExport, setSelectedScenesForExport] = useState<Set<string>>(new Set())
@@ -280,6 +277,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     if (!projectManager.hasProject() || scenes.length === 0) return
 
     const loadEditData = async () => {
+      isLoadingEditDataRef.current = true
       try {
         const editData = await projectManager.loadEditData()
         if (!editData) {
@@ -367,7 +365,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
         // Restore title settings
         if (editData.titleSettings) {
-          setTitleSettings(editData.titleSettings)
+          setTitleSettings({
+            font: editData.titleSettings.font || 'Inter, sans-serif',
+            size: editData.titleSettings.size || 48,
+            lineHeight: editData.titleSettings.lineHeight ?? 1.2,
+          })
         }
 
         // Restore background music (file name only, user will need to re-upload file)
@@ -381,6 +383,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         console.log('Edit data loaded successfully')
       } catch (error) {
         console.error('Error loading edit data:', error)
+      } finally {
+        // Mark loading as complete after a short delay to allow all state updates to settle
+        setTimeout(() => {
+          isLoadingEditDataRef.current = false
+        }, 100)
       }
     }
 
@@ -1000,6 +1007,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           text: '',
           x: 0.5,
           y: 0.1,
+          textAlign: 'center',
         },
         backgroundImage: {
           enabled: true,
@@ -5303,7 +5311,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                      className="bg-gray-600 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${exportProgressPercent}%` }}
                     ></div>
                   </div>
@@ -5327,13 +5335,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <div className="flex gap-2">
                   <button
                     onClick={() => setExportFormat('mp4')}
-                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'mp4' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'mp4' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     MP4
                   </button>
                   <button
                     onClick={() => setExportFormat('webm')}
-                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'webm' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'webm' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     WebM
                   </button>
@@ -5345,13 +5353,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <div className="flex gap-2">
                   <button
                     onClick={() => setExportMode('combined')}
-                    className={`px-4 py-2 rounded text-sm ${exportMode === 'combined' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'combined' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     Combined Video
                   </button>
                   <button
                     onClick={() => setExportMode('separate')}
-                    className={`px-4 py-2 rounded text-sm ${exportMode === 'separate' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'separate' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     Separate Videos
                   </button>
@@ -5374,7 +5382,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <button
                   onClick={handleExport}
                   disabled={isExporting || !ffmpegReady || ffmpegLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!ffmpegReady ? (ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? `FFmpeg error: ${ffmpegError}` : 'FFmpeg not ready') : undefined}
                 >
                   {ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? 'FFmpeg Error' : 'Export Video'}
@@ -5399,7 +5407,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         <div className="w-16 bg-gray-900 border-r border-gray-700 flex flex-col items-center py-4 space-y-4">
           <button
             onClick={() => setActiveTab('canvas')}
-            className={`p-2 rounded ${activeTab === 'canvas' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'canvas' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Project Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5409,7 +5417,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('layout')}
-            className={`p-2 rounded ${activeTab === 'layout' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'layout' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Layout"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5418,7 +5426,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('clip')}
-            className={`p-2 rounded ${activeTab === 'clip' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'clip' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Clip"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5427,7 +5435,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('captions')}
-            className={`p-2 rounded ${activeTab === 'captions' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'captions' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Captions"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5436,7 +5444,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('audio')}
-            className={`p-2 rounded ${activeTab === 'audio' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'audio' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Audio Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5445,7 +5453,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('visual')}
-            className={`p-2 rounded ${activeTab === 'visual' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'visual' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Visual Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5504,7 +5512,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })
                         setClipProperties(newMap)
                       }}
-                      className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition-colors border border-blue-500/30"
+                      className="text-xs bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
                     >
                       Apply to all clips
                     </button>
@@ -5731,7 +5739,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           saveEditData()
                         }, 0)
                       }}
-                      className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded transition-colors border border-blue-500/30"
+                      className="text-xs bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
                     >
                       Apply to all clips
                     </button>
@@ -5969,7 +5977,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       key={style.id}
                       onClick={() => setSelectedCaptionStyle(style.id)}
                       className={`px-3 py-2 rounded text-xs text-center transition-all ${selectedCaptionStyle === style.id
-                        ? 'ring-2 ring-blue-500'
+                        ? 'ring-2 ring-gray-500'
                         : 'bg-gray-800 hover:bg-gray-700'
                         }`}
                       style={style.id !== 'none' ? {
@@ -5996,11 +6004,39 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           )}
 
           {activeTab === 'layout' && (
-            <div className="p-4 space-y-6 overflow-y-auto h-full">
-              <h3 className="text-sm font-semibold mb-4">LAYOUT</h3>
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b border-gray-700">
+                <h3 className="text-sm font-semibold mb-3">LAYOUT</h3>
+                {/* Sub-tab buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setLayoutSubTab('text-background')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded transition-colors ${
+                      layoutSubTab === 'text-background'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    Text & Background
+                  </button>
+                  <button
+                    onClick={() => setLayoutSubTab('presets')}
+                    className={`flex-1 px-3 py-1.5 text-xs rounded transition-colors ${
+                      layoutSubTab === 'presets'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    Layout Presets
+                  </button>
+                </div>
+              </div>
               
-              {/* Global Title Settings */}
-              <div className="border-t border-gray-700 pt-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {layoutSubTab === 'text-background' && (
+                  <>
+                    {/* Global Title Settings */}
+                    <div className="pt-4">
                 <h4 className="text-xs font-semibold mb-3 text-gray-300">Title Settings (Global)</h4>
                 <div className="space-y-3">
                   <div>
@@ -6026,6 +6062,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       max="200"
                       value={titleSettings.size}
                       onChange={(e) => setTitleSettings({ ...titleSettings, size: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Line Height: {titleSettings.lineHeight.toFixed(1)}</label>
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="3.0"
+                      step="0.1"
+                      value={titleSettings.lineHeight}
+                      onChange={(e) => setTitleSettings({ ...titleSettings, lineHeight: parseFloat(e.target.value) })}
                       className="w-full"
                     />
                   </div>
@@ -6069,7 +6117,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               reader.readAsDataURL(file)
                             }
                           }}
-                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
                         />
                         <button
                           onClick={() => {
@@ -6168,6 +6216,102 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             <u>U</u>
                           </button>
                         </div>
+                        {/* Text Alignment Buttons */}
+                        <div className="flex gap-1 mb-1 p-1 bg-gray-800 border border-gray-700 border-t-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: 'left'
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className={`px-2 py-1 text-xs rounded text-white ${
+                              title?.textAlign === 'left' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                            }`}
+                            title="Align Left"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: 'center'
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className={`px-2 py-1 text-xs rounded text-white ${
+                              (title?.textAlign === 'center' || !title?.textAlign) ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                            }`}
+                            title="Align Center"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm2 4a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-2 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm2 4a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: 'right'
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className={`px-2 py-1 text-xs rounded text-white ${
+                              title?.textAlign === 'right' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                            }`}
+                            title="Align Right"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm4 4a1 1 0 011-1h8a1 1 0 110 2H8a1 1 0 01-1-1zm-4 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm4 4a1 1 0 011-1h8a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
                         {/* Rich Text Editor */}
                         <TitleEditor
                           ref={titleEditorRef}
@@ -6183,7 +6327,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                         enabled: true,
                                         text: htmlContent,
                                         x: lc.title?.x ?? 0.5,
-                                        y: lc.title?.y ?? 0.1
+                                        y: lc.title?.y ?? 0.1,
+                                        textAlign: lc.title?.textAlign ?? 'center',
+                                        animationIn: lc.title?.animationIn ?? 'none',
+                                        animationOut: lc.title?.animationOut ?? 'none',
+                                        animationDuration: lc.title?.animationDuration ?? 0.5,
                                       } 
                                     }
                                   : lc
@@ -6196,21 +6344,141 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               saveEditData()
                             }, 0)
                           }}
-                          className="w-full bg-gray-800 border border-gray-700 border-t-0 rounded-b px-2 py-1.5 text-xs text-white min-h-[4rem] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full bg-gray-800 border border-gray-700 border-t-0 rounded-b px-2 py-1.5 text-xs text-white min-h-[4rem] focus:outline-none focus:ring-1 focus:ring-gray-500"
                           placeholder="Enter title text... (supports formatting)"
                         />
                       </div>
                       <div className="text-xs text-gray-400">
                         Select text and use formatting buttons for bold, italic, or underline. Drag the title in the canvas to reposition it.
                       </div>
+                      
+                      {/* Animation Settings */}
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">Animation In</label>
+                          <select
+                            value={title?.animationIn || 'none'}
+                            onChange={(e) => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: lc.title?.textAlign ?? 'center',
+                                          animationIn: e.target.value as any,
+                                          animationOut: lc.title?.animationOut ?? 'none',
+                                          animationDuration: lc.title?.animationDuration ?? 0.5,
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs"
+                          >
+                            <option value="none">None</option>
+                            <option value="fade">Fade</option>
+                            <option value="slideUp">Slide Up</option>
+                            <option value="slideDown">Slide Down</option>
+                            <option value="slideLeft">Slide Left</option>
+                            <option value="slideRight">Slide Right</option>
+                            <option value="zoomIn">Zoom In</option>
+                            <option value="zoomOut">Zoom Out</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">Animation Out</label>
+                          <select
+                            value={title?.animationOut || 'none'}
+                            onChange={(e) => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: lc.title?.textAlign ?? 'center',
+                                          animationIn: lc.title?.animationIn ?? 'none',
+                                          animationOut: e.target.value as any,
+                                          animationDuration: lc.title?.animationDuration ?? 0.5,
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs"
+                          >
+                            <option value="none">None</option>
+                            <option value="fade">Fade</option>
+                            <option value="slideUp">Slide Up</option>
+                            <option value="slideDown">Slide Down</option>
+                            <option value="slideLeft">Slide Left</option>
+                            <option value="slideRight">Slide Right</option>
+                            <option value="zoomIn">Zoom In</option>
+                            <option value="zoomOut">Zoom Out</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">Animation Duration: {(title?.animationDuration ?? 0.5).toFixed(1)}s</label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="2.0"
+                            step="0.1"
+                            value={title?.animationDuration ?? 0.5}
+                            onChange={(e) => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        title: { 
+                                          enabled: lc.title?.enabled ?? true,
+                                          text: lc.title?.text || '',
+                                          x: lc.title?.x ?? 0.5,
+                                          y: lc.title?.y ?? 0.1,
+                                          textAlign: lc.title?.textAlign ?? 'center',
+                                          animationIn: lc.title?.animationIn ?? 'none',
+                                          animationOut: lc.title?.animationOut ?? 'none',
+                                          animationDuration: parseFloat(e.target.value),
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )
                 })()}
               </div>
-
-              {/* Save Current Layout as Preset */}
-              <div className="border-t border-gray-700 pt-4">
-                <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
+                  </>
+                )}
+                
+                {layoutSubTab === 'presets' && (
+                  <>
+                    {/* Save Current Layout as Preset */}
+                    <div className="pt-4">
+                      <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
                 <div className="space-y-2">
                   <input
                     type="text"
@@ -6296,13 +6564,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         if (currentLayoutClip.title?.text) {
                           ctx.fillStyle = '#ffffff'
                           ctx.font = `${titleSettings.size}px ${titleSettings.font}`
-                          ctx.textAlign = 'center'
+                          const textAlign = currentLayoutClip.title.textAlign || 'center'
+                          ctx.textAlign = textAlign as CanvasTextAlign
                           ctx.textBaseline = 'top'
                           const x = currentLayoutClip.title.x * tempCanvas.width
                           const y = currentLayoutClip.title.y * tempCanvas.height
                           // Split text by line breaks and draw each line
-                          const lines = currentLayoutClip.title.text.split('\n')
-                          const lineHeight = titleSettings.size * 1.2
+                          const lines = currentLayoutClip.title.text.replace(/<[^>]*>/g, '').split('\n') // Remove HTML tags for canvas rendering
+                          const lineHeight = titleSettings.size * titleSettings.lineHeight
                           lines.forEach((line, index) => {
                             ctx.fillText(line, x, y + (index * lineHeight))
                           })
@@ -6327,17 +6596,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         alert('Error saving layout preset')
                       }
                     }}
-                    className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded text-xs text-white"
+                    className="w-full bg-gray-600 hover:bg-gray-700 py-2 rounded text-xs text-white"
                   >
-                    Save as Preset
-                  </button>
+                      Save as Preset
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Load Layout Presets */}
-              {layoutPresets.length > 0 && (
-                <div className="border-t border-gray-700 pt-4">
-                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Saved Presets</h4>
+                {/* Load Layout Presets */}
+                {layoutPresets.length > 0 && (
+                  <div className="border-t border-gray-700 pt-4">
+                    <h4 className="text-xs font-semibold mb-3 text-gray-300">Saved Presets</h4>
                   <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                     {layoutPresets.map((preset) => (
                     <button
@@ -6377,6 +6646,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 text: '',
                                 x: 0.5,
                                 y: 0.1,
+                                textAlign: 'center',
                               },
                               backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
                                 enabled: true,
@@ -6419,10 +6689,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           ×
                         </button>
                     </button>
-                  ))}
+                    ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -6450,7 +6723,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           saveEditData()
                         }, 0)
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       16:9
                     </button>
@@ -6470,7 +6743,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           saveEditData()
                         }, 0)
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       9:16
                     </button>
@@ -6489,7 +6762,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           saveEditData()
                         }, 0)
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       1:1
                     </button>
@@ -6762,7 +7035,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           markAsEdited()
                         }
                       }}
-                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
                     />
                     {backgroundMusic.file && (
                       <div className="bg-gray-800 rounded p-2">
@@ -6862,7 +7135,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             }
                           }
                         }}
-                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
                       />
                       {visualSettings.lutFile && (
                         <div className="text-xs text-gray-400">
@@ -7034,6 +7307,49 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     return null
                   })()}
                   
+                  {/* Default video rendering when no layout clip is active - fill whole canvas */}
+                  {(() => {
+                    const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                    if (!currentLayoutClip) {
+                      // Find active video clip at current time
+                      const activeClip = timelineClips.find(clip => 
+                        currentTime >= clip.timelineStart && 
+                        currentTime < clip.timelineEnd &&
+                        (clip.layer === 'camera' || clip.layer === 'screen')
+                      )
+                      
+                      if (activeClip) {
+                        const clipKey = `${activeClip.sceneId}_${activeClip.takeId}_${activeClip.layer}`
+                        const props = clipProperties.get(clipKey)
+                        const brightness = props?.brightness ?? 0
+                        const contrast = props?.contrast ?? 0
+                        const saturation = props?.saturation ?? 0
+                        const exposure = props?.exposure ?? 0
+                        
+                        // Build CSS filter string
+                        const brightnessValue = Math.max(0, 1 + (brightness + exposure) / 100)
+                        const contrastValue = Math.max(0, 1 + contrast / 100)
+                        const saturationValue = Math.max(0, 1 + saturation / 100)
+                        const filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
+                        
+                        return (
+                          <video
+                            ref={activeClip.layer === 'camera' ? videoRef : (activeClip.layer === 'screen' ? screenVideoRef : null)}
+                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                            style={{
+                              display: 'block',
+                              filter: filterString,
+                              zIndex: 1,
+                            }}
+                            muted={activeClip.layer !== 'microphone'}
+                            playsInline
+                          />
+                        )
+                      }
+                    }
+                    return null
+                  })()}
+                  
                   {/* Video Holders - render in z-index order */}
                   {canvasHolders
                     .sort((a, b) => a.zIndex - b.zIndex)
@@ -7136,7 +7452,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       return (
                         <div
                           key={holder.id}
-                          className={`absolute ${isSelected ? 'ring-2 ring-blue-500' : 'ring-1 ring-gray-700/50'} hover:ring-blue-400/50`}
+                          className={`absolute ${isSelected ? 'ring-2 ring-gray-500' : 'ring-1 ring-gray-700/50'} hover:ring-gray-400/50`}
                           style={{
                             left: `${displayX * 100}%`,
                             top: `${displayY * 100}%`,
@@ -7194,7 +7510,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           
                           {/* Selection border overlay - visible when selected */}
                           {isSelected && (
-                            <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none z-20" />
+                            <div className="absolute inset-0 border-2 border-gray-500 pointer-events-none z-20" />
                           )}
                           
                           {/* Resize handles (corners) - only show when selected */}
@@ -7202,7 +7518,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             <>
                               {/* Top-left */}
                               <div
-                                className="resize-handle absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nwse-resize z-10 hover:bg-blue-400"
+                                className="resize-handle absolute -top-1 -left-1 w-3 h-3 bg-gray-500 rounded-full cursor-nwse-resize z-10 hover:bg-gray-400"
                                 onMouseDown={(e) => {
                                   e.stopPropagation()
                                   setResizingHolderId(holder.id)
@@ -7213,7 +7529,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               />
                               {/* Top-right */}
                               <div
-                                className="resize-handle absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-nesw-resize z-10 hover:bg-blue-400"
+                                className="resize-handle absolute -top-1 -right-1 w-3 h-3 bg-gray-500 rounded-full cursor-nesw-resize z-10 hover:bg-gray-400"
                                 onMouseDown={(e) => {
                                   e.stopPropagation()
                                   setResizingHolderId(holder.id)
@@ -7224,7 +7540,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               />
                               {/* Bottom-left */}
                               <div
-                                className="resize-handle absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nesw-resize z-10 hover:bg-blue-400"
+                                className="resize-handle absolute -bottom-1 -left-1 w-3 h-3 bg-gray-500 rounded-full cursor-nesw-resize z-10 hover:bg-gray-400"
                                 onMouseDown={(e) => {
                                   e.stopPropagation()
                                   setResizingHolderId(holder.id)
@@ -7235,7 +7551,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               />
                               {/* Bottom-right */}
                               <div
-                                className="resize-handle absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-nwse-resize z-10 hover:bg-blue-400"
+                                className="resize-handle absolute -bottom-1 -right-1 w-3 h-3 bg-gray-500 rounded-full cursor-nwse-resize z-10 hover:bg-gray-400"
                                 onMouseDown={(e) => {
                                   e.stopPropagation()
                                   setResizingHolderId(holder.id)
@@ -7258,20 +7574,23 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       const container = document.querySelector('[data-canvas-container]') as HTMLElement
                       if (!container) return null
                       
+                      const textAlign = title.textAlign || 'center'
+                      const transformX = textAlign === 'left' ? '0' : textAlign === 'right' ? '-100%' : '-50%'
                       return (
                         <div
                           className="absolute cursor-move select-none"
                           style={{
                             left: `${title.x * 100}%`,
                             top: `${title.y * 100}%`,
-                            transform: 'translate(-50%, 0)',
+                            transform: `translate(${transformX}, 0)`,
                             zIndex: 1000, // Title should always be on top of video holders
                             fontFamily: titleSettings.font,
                             fontSize: `${titleSettings.size}px`,
+                            lineHeight: titleSettings.lineHeight,
                             color: '#ffffff',
                             textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
                             whiteSpace: 'pre-wrap', // Support line breaks
-                            textAlign: 'center',
+                            textAlign: textAlign,
                             pointerEvents: 'auto',
                             maxWidth: '90%', // Prevent overflow
                           }}
@@ -7317,7 +7636,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               <div
                 ref={transcriptResizeRef}
                 onMouseDown={() => setIsResizing(true)}
-                className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-10"
+                className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-gray-500 z-10"
                 style={{ cursor: 'col-resize' }}
               />
               <div className="p-4 border-b border-gray-700">
@@ -7327,7 +7646,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <div className="mb-4">
                   <button
                     onClick={() => setShowSettings(true)}
-                    className="text-xs text-blue-400 hover:text-blue-300"
+                    className="text-xs text-gray-400 hover:text-gray-300"
                   >
                     Settings
                   </button>
@@ -7363,7 +7682,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 <button
                                   onClick={() => handleTranscribe(sceneId, sceneTake.take.id)}
                                   disabled={isTranscribingScene}
-                                  className="text-blue-400 hover:text-blue-300 text-sm font-semibold"
+                                  className="text-gray-400 hover:text-gray-300 text-sm font-semibold"
                                 >
                                   Transcribe
                                 </button>
@@ -7421,7 +7740,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 className={`px-1 rounded transition-all cursor-pointer ${
                                   showStrikethrough ? 'line-through text-red-400' : ''
                                 } ${
-                                  isSelected ? 'bg-blue-600/30 text-blue-200' : 'hover:bg-gray-700/50'
+                                  isSelected ? 'bg-gray-600/30 text-gray-200' : 'hover:bg-gray-700/50'
                                 }`}
                               >
                                 {displayText}{' '}
@@ -7455,7 +7774,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             {/* Resize Handle */}
             <div
               onMouseDown={() => setIsResizingTimeline(true)}
-              className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 z-50 transition-colors"
+              className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-gray-500 z-50 transition-colors"
               style={{ cursor: 'row-resize' }}
             />
 
@@ -7466,14 +7785,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               <div className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-800">
                 <button
                   onClick={() => setTimelineTool('select')}
-                  className={`p-2 rounded-md transition-colors ${timelineTool === 'select' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'select' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title="Select Tool (V)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
                 </button>
                 <button
                   onClick={() => setTimelineTool('cut')}
-                  className={`p-2 rounded-md transition-colors ${timelineTool === 'cut' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'cut' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title="Cut Tool (C)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 3.293a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6" /></svg>
@@ -7540,7 +7859,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(timelineLayerHeightScale * 100)}%</span>
               </div>
               <div className="h-4 w-px bg-gray-800 mx-1"></div>
-              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
+              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
                 Export
               </button>
             </div>
@@ -7941,12 +8260,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       }
                     }}
                     placeholder="Search for images (e.g., nature, abstract, gradient)..."
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                   <button
                     onClick={() => searchUnsplash(unsplashSearchQuery)}
                     disabled={unsplashLoading || !unsplashSearchQuery.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
                   >
                     {unsplashLoading ? 'Searching...' : 'Search'}
                   </button>
@@ -7963,13 +8282,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         localStorage.removeItem('unsplash_access_key')
                       }
                     }}
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                   <a
                     href="https://unsplash.com/developers"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap"
+                    className="text-xs text-gray-400 hover:text-gray-300 whitespace-nowrap"
                   >
                     Get API Key
                   </a>

@@ -104,10 +104,11 @@ export interface EditData {
   // Layout presets
   layoutPresets?: any[] // LayoutPreset[] - using any to avoid circular dependency
   
-  // Title settings (global font/size)
+  // Title settings (global font/size/lineHeight)
   titleSettings?: {
     font: string
     size: number
+    lineHeight?: number
   }
   
   // Canvas settings (format, resolution, background colors)
