@@ -97,6 +97,45 @@ export interface EditData {
   captionSize?: number
   captionMaxWords?: number
   selectedCaptionStyle?: string
+  
+  // Layout clips (canvas positions, titles, background images)
+  layoutClips?: any[] // LayoutClip[] - using any to avoid circular dependency
+  
+  // Layout presets
+  layoutPresets?: any[] // LayoutPreset[] - using any to avoid circular dependency
+  
+  // Title settings (global font/size)
+  titleSettings?: {
+    font: string
+    size: number
+  }
+  
+  // Canvas settings (format, resolution, background colors)
+  canvasSettings?: {
+    format: '16:9' | '9:16' | '1:1'
+    resolution: {
+      width: number
+      height: number
+    }
+    workAreaBackgroundColor: string
+    videoBackgroundColor: string
+    transitionDuration: number
+  }
+  
+  // Timeline settings
+  timelineSettings?: {
+    zoom: number
+    height: number
+    layerHeightScale: number
+  }
+  
+  // Caption settings
+  captionSettings?: {
+    font: string
+    size: number
+    maxWords: number
+    style: string
+  }
 }
 
 class ProjectManager {

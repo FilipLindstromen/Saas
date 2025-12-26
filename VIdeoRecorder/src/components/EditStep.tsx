@@ -274,11 +274,35 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const lutCanvasRef = useRef<HTMLCanvasElement>(null)
   const [canvasZoom, setCanvasZoom] = useState(1)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
-  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 })
-  const [isSpacePressed, setIsSpacePressed] = useState(false)
+  // Load pan position from localStorage
+  const loadPanPosition = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('canvasPanPosition')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return { x: parsed.x, y: parsed.y }
+        }
+      }
+    } catch (e) {
+      console.error('Error loading pan position:', e)
+    }
+    return { x: 0, y: 0 }
+  }, [])
+
+  const [canvasPan, setCanvasPan] = useState<{ x: number; y: number }>(loadPanPosition)
   const [isPanning, setIsPanning] = useState(false)
   const panStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const panStartOffsetRef = useRef<{ x: number; y: number } | null>(null)
+
+  // Save pan position to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvasPanPosition', JSON.stringify(canvasPan))
+    } catch (e) {
+      console.error('Error saving pan position:', e)
+    }
+  }, [canvasPan])
 
   // Video size (maintains aspect ratio)
   const [videoSize, setVideoSize] = useState({ width: 100, height: 100 }) // Percentage of container
@@ -343,13 +367,63 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   ]
 
   // Resizable transcript panel
-  const [transcriptWidth, setTranscriptWidth] = useState(320)
+  // Load transcript width from localStorage
+  const loadTranscriptWidth = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('transcriptPanelWidth')
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (!isNaN(parsed) && parsed > 0) {
+          return Math.max(200, Math.min(800, parsed)) // Clamp between 200-800px
+        }
+      }
+    } catch (e) {
+      console.error('Error loading transcript width:', e)
+    }
+    return 320
+  }, [])
+
+  // Load timeline height from localStorage
+  const loadTimelineHeight = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('timelineHeight')
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (!isNaN(parsed) && parsed > 0) {
+          return Math.max(100, Math.min(window.innerHeight * 0.5, parsed)) // Clamp between 100px and 50% of viewport
+        }
+      }
+    } catch (e) {
+      console.error('Error loading timeline height:', e)
+    }
+    return 192
+  }, [])
+
+  const [transcriptWidth, setTranscriptWidth] = useState(loadTranscriptWidth)
   const [isResizing, setIsResizing] = useState(false)
   const transcriptResizeRef = useRef<HTMLDivElement>(null)
 
   // Resizable timeline
-  const [timelineHeight, setTimelineHeight] = useState(192) // 48 * 4 = 192px (h-48)
+  const [timelineHeight, setTimelineHeight] = useState(loadTimelineHeight)
   const [isResizingTimeline, setIsResizingTimeline] = useState(false)
+
+  // Save transcript width to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('transcriptPanelWidth', transcriptWidth.toString())
+    } catch (e) {
+      console.error('Error saving transcript width:', e)
+    }
+  }, [transcriptWidth])
+
+  // Save timeline height to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('timelineHeight', timelineHeight.toString())
+    } catch (e) {
+      console.error('Error saving timeline height:', e)
+    }
+  }, [timelineHeight])
 
   // Ref for tracking playback state across scene switches and playback loop
   const wasPlayingRef = useRef(false)
@@ -372,18 +446,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     const widthBasedHeight = availableWidth / canvasDimensions.aspectRatio
     const heightBasedWidth = availableHeight * canvasDimensions.aspectRatio
     
-    // Choose the constraint that fits better
+    // Choose the constraint that fits better - ensure it's centered
     if (widthBasedHeight <= availableHeight) {
       // Width is the limiting factor
       return {
-        width: availableWidth,
-        height: widthBasedHeight
+        width: Math.min(availableWidth, availableHeight * canvasDimensions.aspectRatio),
+        height: Math.min(widthBasedHeight, availableHeight)
       }
     } else {
       // Height is the limiting factor
       return {
-        width: heightBasedWidth,
-        height: availableHeight
+        width: Math.min(heightBasedWidth, availableWidth),
+        height: Math.min(availableHeight, availableWidth / canvasDimensions.aspectRatio)
       }
     }
   }, [canvasDimensions, timelineHeight])
@@ -645,14 +719,43 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     }
   }, [deletedWords, timelineClips, clipProperties, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale])
   
-  // Expose markAsSaved so parent can call it after saving
+  // Auto-save edit data to project folder when changes occur
   useEffect(() => {
-    // Expose functions to parent via ref or callback
-    if (onEditedChange) {
-      // Store getEditData and markAsSaved in a way parent can access
-      // For now, we'll use a callback pattern
-    }
-  }, [onEditedChange])
+    if (!projectManager.hasProject()) return
+    
+    // Debounce auto-save to avoid too frequent saves
+    const timeoutId = setTimeout(async () => {
+      try {
+        const editData = getEditData()
+        await projectManager.saveEditData(editData as any)
+        markAsSaved()
+      } catch (error) {
+        console.error('Error auto-saving edit data:', error)
+      }
+    }, 1000) // Auto-save after 1 second of no changes
+    
+    return () => clearTimeout(timeoutId)
+  }, [
+    timelineClips,
+    clipProperties,
+    deletedWords,
+    cuts,
+    layoutClips,
+    layoutPresets,
+    titleSettings,
+    canvasSettings,
+    audioSettings,
+    visualSettings,
+    captionFont,
+    captionSize,
+    captionMaxWords,
+    selectedCaptionStyle,
+    timelineZoom,
+    timelineHeight,
+    timelineLayerHeightScale,
+    getEditData,
+    markAsSaved,
+  ])
 
   // Restore state from snapshot
   const restoreFromSnapshot = useCallback((snapshot: EditStateSnapshot) => {
@@ -5005,40 +5108,92 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         key={preset.id}
                         onClick={() => {
                           const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                          const presetHolders = JSON.parse(JSON.stringify(preset.holders))
+                          const presetTitle = preset.title ? JSON.parse(JSON.stringify(preset.title)) : undefined
+                          const presetBackgroundImage = preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : undefined
+                          
                           if (currentLayoutClip) {
+                            // Update existing layout clip
                             setLayoutClips(prev => prev.map(lc => 
                               lc.id === currentLayoutClip.id 
                                 ? {
                                     ...lc,
-                                    holders: JSON.parse(JSON.stringify(preset.holders)),
-                                    title: preset.title ? JSON.parse(JSON.stringify(preset.title)) : undefined,
-                                    backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : undefined,
+                                    holders: presetHolders,
+                                    title: presetTitle,
+                                    backgroundImage: presetBackgroundImage,
                                     name: preset.name
                                   }
                                 : lc
                             ))
+                            // Immediately update canvasHolders to reflect the change
+                            setCanvasHolders(prev => {
+                              // Update existing holders or add new ones from preset
+                              const updatedHolders = [...prev]
+                              presetHolders.forEach((presetHolder: CanvasVideoHolder) => {
+                                const existingIndex = updatedHolders.findIndex(h => h.id === presetHolder.id)
+                                if (existingIndex >= 0) {
+                                  updatedHolders[existingIndex] = { ...presetHolder }
+                                } else {
+                                  updatedHolders.push({ ...presetHolder })
+                                }
+                              })
+                              // Remove holders that are no longer in the preset (but keep microphone layer)
+                              return updatedHolders.filter(h => 
+                                h.layer === 'microphone' || presetHolders.some((ph: CanvasVideoHolder) => ph.id === h.id)
+                              )
+                            })
                             saveToHistory()
+                            markAsEdited()
                           } else {
-                            // Create new layout clip
+                            // Create new layout clip at current timeline position
+                            const nextClip = layoutClips.find(lc => lc.timelineStart > currentTime)
+                            const endTime = nextClip ? nextClip.timelineStart : totalDuration
+                            
                             const newLayoutClip: LayoutClip = {
                               id: `layout_${Date.now()}`,
                               timelineStart: currentTime,
-                              timelineEnd: totalDuration,
-                              holders: JSON.parse(JSON.stringify(preset.holders)),
-                              title: preset.title ? JSON.parse(JSON.stringify(preset.title)) : {
+                              timelineEnd: endTime,
+                              holders: presetHolders,
+                              title: presetTitle || {
                                 enabled: true,
                                 text: '',
                                 x: 0.5,
                                 y: 0.1,
                               },
-                              backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
+                              backgroundImage: presetBackgroundImage || {
                                 enabled: true,
                                 url: '',
                               },
                               name: preset.name
                             }
-                            setLayoutClips(prev => [...prev, newLayoutClip].sort((a, b) => a.timelineStart - b.timelineStart))
+                            setLayoutClips(prev => {
+                              const updated = [...prev, newLayoutClip].sort((a, b) => a.timelineStart - b.timelineStart)
+                              // Adjust end times to prevent gaps
+                              return updated.map((lc, idx) => {
+                                if (idx < updated.length - 1) {
+                                  return { ...lc, timelineEnd: updated[idx + 1].timelineStart }
+                                }
+                                return { ...lc, timelineEnd: totalDuration }
+                              })
+                            })
+                            // Immediately update canvasHolders to reflect the change
+                            setCanvasHolders(prev => {
+                              const updatedHolders = [...prev]
+                              presetHolders.forEach((presetHolder: CanvasVideoHolder) => {
+                                const existingIndex = updatedHolders.findIndex(h => h.id === presetHolder.id)
+                                if (existingIndex >= 0) {
+                                  updatedHolders[existingIndex] = { ...presetHolder }
+                                } else {
+                                  updatedHolders.push({ ...presetHolder })
+                                }
+                              })
+                              // Remove holders that are no longer in the preset (but keep microphone layer)
+                              return updatedHolders.filter(h => 
+                                h.layer === 'microphone' || presetHolders.some((ph: CanvasVideoHolder) => ph.id === h.id)
+                              )
+                            })
                             saveToHistory()
+                            markAsEdited()
                           }
                         }}
                         className="relative bg-gray-800 hover:bg-gray-700 rounded p-2 text-left group"
@@ -5464,11 +5619,23 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           {/* Canvas Preview Area - fills entire space */}
           <div 
             className="absolute inset-0 flex items-center justify-center p-4"
-                  style={{
+            style={{
               backgroundColor: canvasSettings.workAreaBackgroundColor,
+              cursor: isPanning ? 'grabbing' : 'grab',
+            }}
+            onMouseDown={(e) => {
+              // Only pan if clicking on the grey area (not on canvas or other elements)
+              const target = e.target as HTMLElement
+              if (target === e.currentTarget || target.classList.contains('work-area')) {
+                setIsPanning(true)
+                panStartPosRef.current = { x: e.clientX, y: e.clientY }
+                panStartOffsetRef.current = { x: canvasPan.x, y: canvasPan.y }
+                e.preventDefault()
+                e.stopPropagation()
+              }
             }}
           >
-            {/* Canvas Container with strict aspect ratio enforcement */}
+            {/* Canvas Container with strict aspect ratio enforcement - centered */}
             <div 
               ref={canvasContainerRef}
               className="relative flex-shrink-0"
@@ -5476,10 +5643,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 width: `${canvasDisplaySize.width}px`,
                 height: `${canvasDisplaySize.height}px`,
                 aspectRatio: `${canvasDimensions.width} / ${canvasDimensions.height}`,
-                maxWidth: '100%',
-                maxHeight: '100%',
+                maxWidth: 'calc(100% - 32px)',
+                maxHeight: 'calc(100% - 32px)',
                 minWidth: 0,
                 minHeight: 0,
+                margin: 'auto',
+                transform: `translate(${canvasPan.x}px, ${canvasPan.y}px)`,
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out',
               }}
             >
               <div 
@@ -5948,6 +6118,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 <button onClick={() => setCanvasZoom(Math.min(2, canvasZoom + 0.1))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
                 <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(canvasZoom * 100)}%</span>
               </div>
+              <div className="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">
+                <span className="text-xs text-gray-400">Layers</span>
+                <button onClick={() => setTimelineLayerHeightScale(Math.max(0.1, timelineLayerHeightScale - 0.1))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg></button>
+                <input type="range" min="0.1" max="3" step="0.1" value={timelineLayerHeightScale} onChange={(e) => setTimelineLayerHeightScale(parseFloat(e.target.value))} className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer" />
+                <button onClick={() => setTimelineLayerHeightScale(Math.min(3, timelineLayerHeightScale + 0.1))} className="text-gray-400 hover:text-white"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
+                <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(timelineLayerHeightScale * 100)}%</span>
+              </div>
               <div className="h-4 w-px bg-gray-800 mx-1"></div>
               <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
                 Export
@@ -6019,13 +6196,16 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
             {/* Tracks Container */}
             <div
-              className="relative space-y-4 min-w-full"
+              className="relative min-w-full"
               style={{ 
                 minWidth: `${Math.max(window.innerWidth, (Number.isFinite(totalDuration) ? totalDuration : 0) * timelineZoom + 200)}px`,
-                paddingTop: '1rem',
+                paddingTop: `${1 * timelineLayerHeightScale}rem`,
                 paddingRight: '1rem',
-                paddingBottom: '1rem',
-                paddingLeft: '0' // No left padding so time 0 aligns with the left edge
+                paddingBottom: `${1 * timelineLayerHeightScale}rem`,
+                paddingLeft: '0', // No left padding so time 0 aligns with the left edge
+                gap: `${1 * timelineLayerHeightScale}rem`,
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
               {/* Playhead Line (Extends through tracks) */}
@@ -6035,7 +6215,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
               />
 
               {/* Scene Labels Row (Optional, helpful context) */}
-              <div className="h-6 relative w-full">
+              <div className="relative w-full" style={{ height: `${6 * timelineLayerHeightScale * 4}px` }}>
                 {sceneTakes.map((st, idx) => (
                   <div
                     key={st.sceneId}
@@ -6048,10 +6228,111 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 ))}
               </div>
 
+              {/* TRACK 1: LAYOUT (Orange, Top) */}
+              <div className="relative w-full" style={{ height: `${16 * timelineLayerHeightScale * 4}px` }}>
+                <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed opacity-50" />
 
-              {/* TRACK 1: CAMERA & SCREEN (Visuals) */}
+                {/* Layout clips - individual clips that can be split, moved, and trimmed */}
+                {layoutClips.map(layoutClip => {
+                  const clipDuration = layoutClip.timelineEnd - layoutClip.timelineStart
+                  const isDragging = draggingLayoutClipId === layoutClip.id
+                  const isTrimming = trimmingLayoutClipId === layoutClip.id
+                  const isSelected = selectedLayoutClipIds.has(layoutClip.id)
+                  const hasImage = layoutClip.backgroundImage?.enabled && layoutClip.backgroundImage?.url
+                  const hasTitle = layoutClip.title?.enabled && layoutClip.title?.text
+                  
+                  return (
+                    <div
+                      key={layoutClip.id}
+                      data-layout-clip-id={layoutClip.id}
+                      className={`absolute top-0 bottom-0 bg-orange-600 rounded-2xl overflow-hidden border transition-all cursor-move group
+                                   ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-orange-500'}
+                                   ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
+                                   ${isTrimming ? 'z-30' : ''}
+                                `}
+                      style={{
+                        left: `${layoutClip.timelineStart * timelineZoom}px`,
+                        width: `${Math.max(2, clipDuration * timelineZoom)}px`,
+                      }}
+                      onMouseDown={(e) => {
+                        if ((e.target as HTMLElement).closest('.trim-handle')) return
+                        e.stopPropagation()
+                        if (timelineTool === 'select') {
+                          // Start moving if not clicking to select
+                          if (!isSelected) {
+                            handleStartMoveLayoutClip(layoutClip.id, e.clientX)
+                          }
+                        } else if (timelineTool === 'cut') {
+                          const cutTime = (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom
+                          handleSplitLayoutClip(cutTime)
+                        }
+                      }}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('.trim-handle')) return
+                        e.stopPropagation()
+                        // Select/deselect layout clip
+                        setSelectedLayoutClipIds(prev => {
+                          const newSet = new Set(prev)
+                          if (newSet.has(layoutClip.id)) {
+                            newSet.delete(layoutClip.id)
+                          } else {
+                            newSet.clear() // Exclusive selection
+                            newSet.add(layoutClip.id)
+                          }
+                          return newSet
+                        })
+                        // Deselect video clips when selecting layout clip
+                        setSelectedClipIds(new Set())
+                        setSelectedClip(null)
+                      }}
+                    >
+                      {/* Layout Clip Info */}
+                      <div className="absolute left-3 top-2 right-3 flex justify-between items-start z-10 pointer-events-none">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+                          </svg>
+                          <span className="text-xs font-semibold text-white drop-shadow-md truncate">
+                            {layoutClip.name || 'Layout'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {hasImage && (
+                            <svg className="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          {hasTitle && (
+                            <svg className="w-3 h-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Trim Handles */}
+                      <div
+                        className={`trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                  ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'in', e.clientX) }}
+                      >
+                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                      </div>
+                      <div
+                        className={`trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
+                                  ${isSelected ? 'bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'out', e.clientX) }}
+                      >
+                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* TRACK 2: CAMERA & SCREEN (Visuals) */}
               {(timelineClips.some(c => c.layer === 'camera' || c.layer === 'screen')) && (
-                <div className="relative w-full" style={{ height: `${timelineTrackHeight}px` }}>
+                <div className="relative w-full" style={{ height: `${timelineTrackHeight * timelineLayerHeightScale}px` }}>
                   {/* Track Background/Gutter */}
                   <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl" />
 
@@ -6130,7 +6411,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
               {/* TRACK 2: MICROPHONE (Audio) */}
               {(timelineClips.some(c => c.layer === 'microphone')) && (
-                <div className="relative w-full" style={{ height: `${timelineTrackHeight}px` }}> {/* Dynamic Height */}
+                <div className="relative w-full" style={{ height: `${timelineTrackHeight * timelineLayerHeightScale}px` }}> {/* Dynamic Height */}
                   <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl" />
 
                   {timelineClips
@@ -6171,7 +6452,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                             startOffset={clip.sourceIn}
                             duration={clip.sourceOut - clip.sourceIn} // Use pure source duration
                             width={clipDuration * timelineZoom}
-                            height={timelineTrackHeight}
+                            height={timelineTrackHeight * timelineLayerHeightScale}
                             color="#a1a1aa"
                           />
 
@@ -6196,105 +6477,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 </div>
               )}
 
-              {/* Spacer for aesthetics */}
-              <div className="h-4" />
-
-              {/* TRACK 3: LAYOUT (Orange, Bottom Fixed-ish visual) */}
-              <div className="relative h-16 w-full mt-auto">
-                <div className="absolute inset-x-0 h-full bg-gray-900/30 rounded-2xl border border-gray-800 border-dashed opacity-50" />
-
-                {/* Layout clips - individual clips that can be split, moved, and trimmed */}
-                {layoutClips.map(layoutClip => {
-                  const clipDuration = layoutClip.timelineEnd - layoutClip.timelineStart
-                  const isDragging = draggingLayoutClipId === layoutClip.id
-                  const isTrimming = trimmingLayoutClipId === layoutClip.id
-                  const isSelected = selectedLayoutClipIds.has(layoutClip.id)
-                  const hasImage = layoutClip.backgroundImage?.enabled && layoutClip.backgroundImage?.url
-                  const hasTitle = layoutClip.title?.enabled && layoutClip.title?.text
-                  
-                  return (
-                    <div
-                      key={layoutClip.id}
-                      data-layout-clip-id={layoutClip.id}
-                      className={`absolute top-0 bottom-0 bg-[#f97316] rounded-2xl border flex items-center px-4 cursor-move group transition-all
-                                 ${isSelected ? 'border-white ring-2 ring-white z-10' : 'border-[#fb923c]'}
-                                 ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
-                                 ${isTrimming ? 'z-30' : ''}
-                                 hover:bg-[#fb923c]`}
-                  style={{
-                        left: `${layoutClip.timelineStart * timelineZoom}px`,
-                        width: `${Math.max(2, clipDuration * timelineZoom)}px`,
-                      }}
-                      onClick={(e) => {
-                        if ((e.target as HTMLElement).closest('.trim-handle')) return
-                        e.stopPropagation()
-                        if (timelineTool === 'select') {
-                          // Select/deselect layout clip
-                          setSelectedLayoutClipIds(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(layoutClip.id)) {
-                              newSet.delete(layoutClip.id)
-                            } else {
-                              newSet.clear() // Exclusive selection
-                              newSet.add(layoutClip.id)
-                            }
-                            return newSet
-                          })
-                          // Deselect video clips when selecting layout clip
-                          setSelectedClipIds(new Set())
-                          setSelectedClip(null)
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        if ((e.target as HTMLElement).closest('.trim-handle')) return
-                        e.stopPropagation()
-                        if (timelineTool === 'select' && !isSelected) {
-                          // Start moving if not clicking to select
-                          handleStartMoveLayoutClip(layoutClip.id, e.clientX)
-                        } else if (timelineTool === 'cut') {
-                          const cutTime = (e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left) / timelineZoom
-                          handleSplitLayoutClip(cutTime)
-                        }
-                  }}
-                >
-                  <svg className="w-5 h-5 text-white mr-2 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v9a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h6a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" /></svg>
-                      <span className="text-sm font-bold text-white tracking-wide flex-1 truncate">
-                        {layoutClip.name || 'Layout'}
-                      </span>
-                      
-                      {/* Visual indicators for image and title */}
-                      <div className="flex items-center gap-1.5 ml-2">
-                        {hasImage && (
-                          <div className="w-4 h-4 rounded bg-white/20 flex items-center justify-center" title="Has background image">
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                </div>
-                        )}
-                        {hasTitle && (
-                          <div className="w-4 h-4 rounded bg-white/20 flex items-center justify-center" title="Has title">
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10m-7 4h7" /></svg>
-                          </div>
-                        )}
-              </div>
-
-                      {/* Trim Handles */}
-                      <div
-                        className={`trim-handle absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
-                                  opacity-0 group-hover:opacity-100`}
-                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'in', e.clientX) }}
-                      >
-                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
-            </div>
-                      <div
-                        className={`trim-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/20 transition-colors z-20 flex items-center justify-center
-                                  opacity-0 group-hover:opacity-100`}
-                        onMouseDown={(e) => { e.stopPropagation(); handleStartTrimLayoutClip(layoutClip.id, 'out', e.clientX) }}
-                      >
-                        <div className="h-6 w-0.5 bg-white/50 rounded-full" />
-          </div>
-        </div>
-                  )
-                })}
-              </div>
 
             </div>
           </div>
