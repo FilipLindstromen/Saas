@@ -3,7 +3,8 @@ import { Scene, RecordingTake } from '../App'
 import { projectManager } from '../utils/projectManager'
 import { transcribeAudio, WordTimestamp } from '../utils/transcription'
 import { VideoCut, Layout, combineLayersWithLayout, concatVideos } from '../utils/videoProcessing'
-import { trimVideo } from '../utils/ffmpeg'
+import { trimVideo, getFFmpeg } from '../utils/ffmpeg'
+import { fetchFile } from '@ffmpeg/util'
 import { exportDaVinciResolveTimeline } from '../utils/davinciExport'
 import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
 import { analyzeWaveform } from '../utils/waveformAnalyzer'
@@ -135,6 +136,20 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [layoutClips, setLayoutClips] = useState<LayoutClip[]>([])
   const [layoutPresets, setLayoutPresets] = useState<LayoutPreset[]>([])
   
+  // Unsplash search state
+  const [unsplashModalOpen, setUnsplashModalOpen] = useState(false)
+  const [unsplashSearchQuery, setUnsplashSearchQuery] = useState('')
+  const [unsplashResults, setUnsplashResults] = useState<Array<{
+    id: string
+    urls: { regular: string; small: string; thumb: string }
+    description: string | null
+    user: { name: string; username: string }
+  }>>([])
+  const [unsplashLoading, setUnsplashLoading] = useState(false)
+  
+  // State to force re-renders during transitions
+  const [transitionFrame, setTransitionFrame] = useState(0)
+  
   // Layout (global) - kept for backward compatibility and default layouts
   const [layout, setLayout] = useState<Layout>({ type: 'camera-only' })
   const [savedLayouts, setSavedLayouts] = useState<Layout[]>([])
@@ -186,6 +201,51 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
+  const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4')
+  
+  // FFmpeg loading state
+  const [ffmpegLoading, setFfmpegLoading] = useState(false)
+  const [ffmpegReady, setFfmpegReady] = useState(false)
+  const [ffmpegError, setFfmpegError] = useState<string | null>(null)
+
+  // Pre-load FFmpeg when component mounts
+  useEffect(() => {
+    let cancelled = false
+    
+    const loadFFmpeg = async () => {
+      setFfmpegLoading(true)
+      setFfmpegError(null)
+      
+      try {
+        await Promise.race([
+          getFFmpeg(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('FFmpeg initialization timeout (60s)')), 60000)
+          )
+        ])
+        
+        if (!cancelled) {
+          setFfmpegReady(true)
+          setFfmpegLoading(false)
+          console.log('FFmpeg loaded and ready')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          setFfmpegError(errorMessage)
+          setFfmpegLoading(false)
+          setFfmpegReady(false)
+          console.error('Failed to load FFmpeg:', error)
+        }
+      }
+    }
+    
+    loadFFmpeg()
+    
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Clip selection and properties
   const [selectedClip, setSelectedClip] = useState<{ sceneId: string; takeId: string; layer: 'camera' | 'microphone' | 'screen' } | null>(null)
@@ -228,6 +288,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       highlights: 0,
     },
     backgroundColor: '#000000', // Background color for gaps/empty canvas
+  })
+
+  // Background music settings
+  const [backgroundMusic, setBackgroundMusic] = useState<{
+    file: File | null
+    url: string | null
+    volume: number // 0-100
+  }>({
+    file: null,
+    url: null,
+    volume: 50, // Default 50%
   })
 
   // Canvas settings (format, resolution, backgrounds, transitions)
@@ -338,7 +409,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     { id: 'style1', name: 'Classic', backgroundColor: 'rgba(0, 0, 0, 0.75)', textColor: '#ffffff', padding: '8px 16px', borderRadius: '4px', fontWeight: 400 },
     { id: 'style2', name: 'Bold White', backgroundColor: 'rgba(255, 255, 255, 0.95)', textColor: '#000000', padding: '10px 18px', borderRadius: '6px', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' },
     { id: 'style3', name: 'Highlight Yellow', backgroundColor: '#FFEB3B', textColor: '#000000', padding: '8px 14px', borderRadius: '8px', fontWeight: 600 },
-    { id: 'style4', name: 'Neon Blue', backgroundColor: 'rgba(33, 150, 243, 0.9)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '12px', fontWeight: 600, boxShadow: '0 0 20px rgba(33, 150, 243, 0.5)' },
+    { id: 'style4', name: 'Neon Blue', backgroundColor: 'rgba(107, 114, 128, 0.9)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '12px', fontWeight: 600, boxShadow: '0 0 20px rgba(107, 114, 128, 0.5)' },
     { id: 'style5', name: 'Subtle Gray', backgroundColor: 'rgba(66, 66, 66, 0.85)', textColor: '#ffffff', padding: '6px 12px', borderRadius: '2px', fontWeight: 400 },
     { id: 'style6', name: 'Vibrant Red', backgroundColor: '#F44336', textColor: '#ffffff', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, boxShadow: '0 4px 12px rgba(244, 67, 54, 0.4)' },
     { id: 'style7', name: 'Outlined', backgroundColor: 'rgba(0, 0, 0, 0.7)', textColor: '#ffffff', padding: '8px 16px', borderRadius: '4px', border: '2px solid #ffffff', fontWeight: 500 },
@@ -511,13 +582,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set())
   const [selectedLayoutClipIds, setSelectedLayoutClipIds] = useState<Set<string>>(new Set())
   
-  // Canvas video holders - video clips positioned on canvas
-  const [canvasHolders, setCanvasHolders] = useState<CanvasVideoHolder[]>([])
+  // Get current layout clip based on timeline time
+  const getCurrentLayoutClip = useCallback((timelineTime: number): LayoutClip | null => {
+    return layoutClips.find(lc => 
+      timelineTime >= lc.timelineStart && timelineTime < lc.timelineEnd
+    ) || null
+  }, [layoutClips])
+  
+  // Canvas video holders - derived from current layout clip (not stored separately)
+  // Positions and sizes are stored in layout clips, not in holders themselves
+  const canvasHolders = useMemo(() => {
+    const currentLayoutClip = getCurrentLayoutClip(currentTime)
+    if (currentLayoutClip && currentLayoutClip.holders) {
+      return currentLayoutClip.holders
+    }
+    return []
+  }, [currentTime, getCurrentLayoutClip])
   
   // Holder transitions - track animated transitions between positions
   const transitioningHoldersRef = useRef<Map<string, {
     startPos: { x: number; y: number; width: number; height: number }
     endPos: { x: number; y: number; width: number; height: number }
+    startRotation?: number
+    endRotation?: number
     startTime: number
     duration: number
   }>>(new Map())
@@ -532,38 +619,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   // Selected holder for editing
   const [selectedHolderId, setSelectedHolderId] = useState<string | null>(null)
 
-  // Get current layout clip based on timeline time
-  const getCurrentLayoutClip = useCallback((timelineTime: number): LayoutClip | null => {
-    return layoutClips.find(lc => 
-      timelineTime >= lc.timelineStart && timelineTime < lc.timelineEnd
-    ) || null
-  }, [layoutClips])
-
-  // Save current canvas holders to layout clip at current timeline position
-  const saveHoldersToLayoutClip = useCallback(() => {
-    // Use a ref to get the latest currentTime to avoid stale closures
-    const timeToUse = currentTime
-    const currentLayoutClip = getCurrentLayoutClip(timeToUse)
+  // Update holders in the current layout clip
+  const updateHoldersInLayoutClip = useCallback((updatedHolders: CanvasVideoHolder[]) => {
+    const currentLayoutClip = getCurrentLayoutClip(currentTime)
     
-    // Get current holders (filter out microphone layer as it's not visual)
-    const visualHolders = canvasHolders.filter(h => h.layer !== 'microphone')
+    // Filter out microphone layer as it's not visual
+    const visualHolders = updatedHolders.filter(h => h.layer !== 'microphone')
     
     if (currentLayoutClip) {
-      // Update existing layout clip with current holders
+      // Update existing layout clip with new holders
       setLayoutClips(prev => prev.map(lc => 
         lc.id === currentLayoutClip.id 
           ? { ...lc, holders: JSON.parse(JSON.stringify(visualHolders)) }
           : lc
       ))
+      markAsEdited()
     } else {
       // Create new layout clip for current time range
-      // Find the next layout clip to determine end time
-      const nextClip = layoutClips.find(lc => lc.timelineStart > timeToUse)
+      const nextClip = layoutClips.find(lc => lc.timelineStart > currentTime)
       const endTime = nextClip ? nextClip.timelineStart : totalDuration
       
       const newLayoutClip: LayoutClip = {
         id: `layout_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        timelineStart: timeToUse,
+        timelineStart: currentTime,
         timelineEnd: endTime,
         holders: JSON.parse(JSON.stringify(visualHolders)),
         title: {
@@ -588,8 +666,91 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           return { ...lc, timelineEnd: totalDuration }
         })
       })
+      markAsEdited()
     }
-  }, [currentTime, canvasHolders, getCurrentLayoutClip, layoutClips, totalDuration])
+  }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited])
+
+  // Unsplash search function
+  const searchUnsplash = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setUnsplashResults([])
+      return
+    }
+
+    setUnsplashLoading(true)
+    try {
+      // Try to use Unsplash API with access key from localStorage
+      const accessKey = localStorage.getItem('unsplash_access_key')
+      
+      if (accessKey) {
+        // Use official Unsplash API
+        const response = await fetch(
+          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=20&client_id=${accessKey}`
+        )
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.results) {
+            setUnsplashResults(data.results)
+            setUnsplashLoading(false)
+            return
+          }
+        }
+      }
+      
+      // Fallback: Use Unsplash Source API (no auth required, but limited)
+      // Generate multiple variations of the search query for better results
+      const variations = [
+        query,
+        `${query},nature`,
+        `${query},landscape`,
+        `${query},abstract`,
+        `${query},background`,
+        `${query},texture`,
+        `${query},minimal`,
+        `${query},gradient`,
+        `${query},pattern`,
+        `${query},colorful`,
+        `${query},dark`,
+        `${query},light`,
+        `${query},modern`,
+        `${query},vintage`,
+        `${query},professional`,
+        `${query},aesthetic`
+      ]
+      
+      const curatedImages = variations.slice(0, 16).map((variation, index) => ({
+        id: `unsplash-${index}-${Date.now()}`,
+        urls: {
+          regular: `https://source.unsplash.com/1600x900/?${encodeURIComponent(variation)}`,
+          small: `https://source.unsplash.com/800x600/?${encodeURIComponent(variation)}`,
+          thumb: `https://source.unsplash.com/400x300/?${encodeURIComponent(variation)}`
+        },
+        description: variation,
+        user: { name: 'Unsplash', username: 'unsplash' }
+      }))
+      
+      setUnsplashResults(curatedImages)
+    } catch (error) {
+      console.error('Error searching Unsplash:', error)
+      // Fallback to basic images
+      const fallbackImages = [
+        {
+          id: 'fallback-1',
+          urls: {
+            regular: `https://source.unsplash.com/1600x900/?${encodeURIComponent(query)}`,
+            small: `https://source.unsplash.com/800x600/?${encodeURIComponent(query)}`,
+            thumb: `https://source.unsplash.com/400x300/?${encodeURIComponent(query)}`
+          },
+          description: query,
+          user: { name: 'Unsplash', username: 'unsplash' }
+        }
+      ]
+      setUnsplashResults(fallbackImages)
+    } finally {
+      setUnsplashLoading(false)
+    }
+  }, [])
 
   // Dragging state for moving holders
   const [draggingHolderId, setDraggingHolderId] = useState<string | null>(null)
@@ -626,6 +787,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     deletedWords: Map<string, Set<number>>
     cuts: Map<string, VideoCut[]>
     layout: Layout
+    layoutClips: LayoutClip[]
+    layoutPresets: LayoutPreset[]
     audioSettings: typeof audioSettings
     visualSettings: typeof visualSettings
     canvasSettings: typeof canvasSettings
@@ -633,6 +796,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     captionFont: string
     captionSize: number
     captionMaxWords: number
+    backgroundMusic: typeof backgroundMusic
   }
 
   const [history, setHistory] = useState<EditStateSnapshot[]>([])
@@ -647,6 +811,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       deletedWords: new Map(Array.from(deletedWords.entries()).map(([k, v]) => [k, new Set(v)])),
       cuts: new Map(Array.from(cuts.entries()).map(([k, v]) => [k, [...v]])),
       layout: JSON.parse(JSON.stringify(layout)),
+      layoutClips: JSON.parse(JSON.stringify(layoutClips)),
+      layoutPresets: JSON.parse(JSON.stringify(layoutPresets)),
       audioSettings: { ...audioSettings },
       visualSettings: {
         ...visualSettings,
@@ -660,8 +826,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       captionFont,
       captionSize,
       captionMaxWords,
+      backgroundMusic: {
+        file: backgroundMusic.file,
+        url: backgroundMusic.url,
+        volume: backgroundMusic.volume
+      },
     }
-  }, [timelineClips, clipProperties, deletedWords, cuts, layout, audioSettings, visualSettings, canvasSettings, selectedCaptionStyle, captionFont, captionSize, captionMaxWords])
+  }, [timelineClips, clipProperties, deletedWords, cuts, layout, layoutClips, layoutPresets, audioSettings, visualSettings, canvasSettings, selectedCaptionStyle, captionFont, captionSize, captionMaxWords, backgroundMusic])
 
   // Save current state to history
   const saveToHistory = useCallback(() => {
@@ -679,6 +850,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     })
     setHistoryIndex(prev => Math.min(prev + 1, maxHistorySize - 1))
   }, [createSnapshot, historyIndex, markAsEdited])
+
+  // Handle Unsplash image selection
+  const handleSelectUnsplashImage = useCallback((imageUrl: string) => {
+    const currentLayoutClip = getCurrentLayoutClip(currentTime)
+    if (currentLayoutClip) {
+      setLayoutClips(prev => prev.map(lc => 
+        lc.id === currentLayoutClip.id 
+          ? { 
+              ...lc, 
+              backgroundImage: { 
+                enabled: true, 
+                url: imageUrl 
+              } 
+            }
+          : lc
+      ))
+      markAsEdited()
+      saveToHistory()
+      setUnsplashModalOpen(false)
+      setUnsplashSearchQuery('')
+      setUnsplashResults([])
+    }
+  }, [currentTime, getCurrentLayoutClip, markAsEdited, saveToHistory])
   
   // Expose function to get all edit data for saving
   const getEditData = useCallback(() => {
@@ -716,14 +910,19 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         height: timelineHeight,
         layerHeightScale: timelineLayerHeightScale || 1,
       },
+      backgroundMusic: {
+        fileName: backgroundMusic.file?.name || null,
+        volume: backgroundMusic.volume,
+        // Note: File blob URL is not serialized - will need to be re-uploaded on load
+      },
     }
-  }, [deletedWords, timelineClips, clipProperties, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale])
+  }, [deletedWords, timelineClips, clipProperties, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
   
   // Auto-save edit data to project folder when changes occur
   useEffect(() => {
     if (!projectManager.hasProject()) return
     
-    // Debounce auto-save to avoid too frequent saves
+    // Save immediately after each edit (minimal debounce to batch rapid changes)
     const timeoutId = setTimeout(async () => {
       try {
         const editData = getEditData()
@@ -732,7 +931,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       } catch (error) {
         console.error('Error auto-saving edit data:', error)
       }
-    }, 1000) // Auto-save after 1 second of no changes
+    }, 100) // Auto-save after 100ms to batch rapid changes but save quickly
     
     return () => clearTimeout(timeoutId)
   }, [
@@ -753,6 +952,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     timelineZoom,
     timelineHeight,
     timelineLayerHeightScale,
+    backgroundMusic,
     getEditData,
     markAsSaved,
   ])
@@ -764,6 +964,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     setDeletedWords(snapshot.deletedWords)
     setCuts(snapshot.cuts)
     setLayout(snapshot.layout)
+    if (snapshot.layoutClips) {
+      setLayoutClips(snapshot.layoutClips)
+    }
+    if (snapshot.layoutPresets) {
+      setLayoutPresets(snapshot.layoutPresets)
+    }
     setAudioSettings(snapshot.audioSettings)
     setVisualSettings(snapshot.visualSettings)
     setCanvasSettings(snapshot.canvasSettings)
@@ -771,6 +977,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     setCaptionFont(snapshot.captionFont)
     setCaptionSize(snapshot.captionSize)
     setCaptionMaxWords(snapshot.captionMaxWords)
+    setBackgroundMusic(snapshot.backgroundMusic)
   }, [])
 
   // Undo function
@@ -968,22 +1175,26 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       timelineTimeRef.current = 0
     }
 
-    // Initialize canvas holders from timeline clips
-    setCanvasHolders(prev => {
-      const holders: CanvasVideoHolder[] = []
-      const existingHoldersMap = new Map(prev.map(h => [h.clipId, h]))
-      
-      clips.forEach(clip => {
-        if (clip.layer === 'camera' || clip.layer === 'screen') {
-          // Check if holder already exists for this clip
+    // Initialize canvas holders in layout clips from timeline clips
+    // This ensures all layout clips have holders for their active clips
+    if (clips.length > 0) {
+      setLayoutClips(prev => prev.map(layoutClip => {
+        const holders: CanvasVideoHolder[] = []
+        const existingHoldersMap = new Map(layoutClip.holders.map(h => [h.clipId, h]))
+        
+        // Get clips active during this layout clip's time range
+        const activeClips = clips.filter(clip => 
+          clip.timelineStart < layoutClip.timelineEnd && 
+          clip.timelineEnd > layoutClip.timelineStart &&
+          (clip.layer === 'camera' || clip.layer === 'screen')
+        )
+        
+        activeClips.forEach(clip => {
           const existingHolder = existingHoldersMap.get(clip.id)
           if (existingHolder) {
-            // Keep existing holder with its position/size
             holders.push(existingHolder)
           } else {
             // Create new holder with default position
-            // Camera: full canvas
-            // Screen: smaller, positioned
             const defaultX = clip.layer === 'camera' ? 0 : 0.5
             const defaultY = clip.layer === 'camera' ? 0 : 0.5
             const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
@@ -998,16 +1209,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
               width: defaultWidth,
               height: defaultHeight,
               rotation: 0,
-              zIndex: clip.layer === 'camera' ? 1 : 2, // Screen on top
+              zIndex: clip.layer === 'camera' ? 1 : 2,
             })
           }
-        }
-      })
-      
-      // Remove holders for clips that no longer exist
-      const validClipIds = new Set(clips.map(c => c.id))
-      return holders.filter(h => validClipIds.has(h.clipId))
-    })
+        })
+        
+        // Remove holders for clips that no longer exist
+        const validClipIds = new Set(clips.map(c => c.id))
+        const filteredHolders = holders.filter(h => validClipIds.has(h.clipId))
+        
+        return { ...layoutClip, holders: filteredHolders }
+      }))
+    }
 
     // Update total duration - ensure it's always finite
     const maxEnd = clips.length > 0 ? Math.max(...clips.map(c => c.timelineEnd)) : 0
@@ -1015,75 +1228,74 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     setTotalDuration(safeMaxEnd)
   }, [sceneTakes])
 
-  // Sync canvas holders when timeline clips change (e.g., after cuts/splits)
+  // Sync canvas holders in layout clips when timeline clips change (e.g., after cuts/splits)
   useEffect(() => {
-    setCanvasHolders(prev => {
+    if (timelineClips.length === 0) return
+    
+    setLayoutClips(prev => prev.map(layoutClip => {
       const holders: CanvasVideoHolder[] = []
-      const existingHoldersMap = new Map(prev.map(h => [h.clipId, h]))
+      const existingHoldersMap = new Map(layoutClip.holders.map(h => [h.clipId, h]))
       
       // Build a map of original clip IDs to holders (for finding parents of split clips)
       const originalHoldersMap = new Map<string, CanvasVideoHolder>()
-      prev.forEach(holder => {
-        // Store by the base clip ID (before suffixes like _before, _after, _part1, etc.)
+      layoutClip.holders.forEach(holder => {
         const baseId = holder.clipId.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
         if (!originalHoldersMap.has(baseId)) {
           originalHoldersMap.set(baseId, holder)
         }
       })
       
-      timelineClips.forEach(clip => {
-        if (clip.layer === 'camera' || clip.layer === 'screen') {
-          // Check if holder already exists for this clip
-          const existingHolder = existingHoldersMap.get(clip.id)
-          if (existingHolder) {
-            // Keep existing holder with its position/size
-            holders.push(existingHolder)
+      // Get clips active during this layout clip's time range
+      const activeClips = timelineClips.filter(clip => 
+        clip.timelineStart < layoutClip.timelineEnd && 
+        clip.timelineEnd > layoutClip.timelineStart &&
+        (clip.layer === 'camera' || clip.layer === 'screen')
+      )
+      
+      activeClips.forEach(clip => {
+        const existingHolder = existingHoldersMap.get(clip.id)
+        if (existingHolder) {
+          holders.push(existingHolder)
+        } else {
+          // Try to find original holder by matching scene/take/layer
+          let sourceHolder: CanvasVideoHolder | undefined = undefined
+          
+          const baseId = clip.id.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
+          const baseHolder = originalHoldersMap.get(baseId)
+          if (baseHolder && baseHolder.layer === clip.layer) {
+            sourceHolder = baseHolder
           } else {
-            // Try to find original holder by matching scene/take/layer
-            // Look for holder from original clip (before it was split)
-            let sourceHolder: CanvasVideoHolder | undefined = undefined
-            
-            // First try to find by base ID pattern
-            const baseId = clip.id.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
-            const baseHolder = originalHoldersMap.get(baseId)
-            if (baseHolder && baseHolder.layer === clip.layer) {
-              sourceHolder = baseHolder
-            } else {
-              // If no base holder found, look for any holder with same scene/take/layer
-              const matchingHolder = prev.find(h => {
-                const hClip = timelineClips.find(c => c.id === h.clipId)
-                return hClip && hClip.sceneId === clip.sceneId && hClip.takeId === clip.takeId && h.layer === clip.layer
-              })
-              if (matchingHolder) {
-                sourceHolder = matchingHolder
-              }
-            }
-            
-            // Use source holder's properties if found, otherwise use defaults
-            const defaultX = clip.layer === 'camera' ? 0 : 0.5
-            const defaultY = clip.layer === 'camera' ? 0 : 0.5
-            const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
-            const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
-            
-            holders.push({
-              id: `holder_${clip.id}`,
-              clipId: clip.id,
-              layer: clip.layer,
-              x: sourceHolder?.x ?? defaultX,
-              y: sourceHolder?.y ?? defaultY,
-              width: sourceHolder?.width ?? defaultWidth,
-              height: sourceHolder?.height ?? defaultHeight,
-              rotation: sourceHolder?.rotation ?? 0,
-              zIndex: sourceHolder?.zIndex ?? (clip.layer === 'camera' ? 1 : 2),
+            const matchingHolder = layoutClip.holders.find(h => {
+              const hClip = timelineClips.find(c => c.id === h.clipId)
+              return hClip && hClip.sceneId === clip.sceneId && hClip.takeId === clip.takeId && h.layer === clip.layer
             })
+            if (matchingHolder) {
+              sourceHolder = matchingHolder
+            }
           }
+          
+          const defaultX = clip.layer === 'camera' ? 0 : 0.5
+          const defaultY = clip.layer === 'camera' ? 0 : 0.5
+          const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
+          const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
+          
+          holders.push({
+            id: `holder_${clip.id}`,
+            clipId: clip.id,
+            layer: clip.layer,
+            x: sourceHolder?.x ?? defaultX,
+            y: sourceHolder?.y ?? defaultY,
+            width: sourceHolder?.width ?? defaultWidth,
+            height: sourceHolder?.height ?? defaultHeight,
+            rotation: sourceHolder?.rotation ?? 0,
+            zIndex: sourceHolder?.zIndex ?? (clip.layer === 'camera' ? 1 : 2),
+          })
         }
       })
       
-      // Remove holders for clips that no longer exist
       const validClipIds = new Set(timelineClips.map(c => c.id))
-      return holders.filter(h => validClipIds.has(h.clipId))
-    })
+      return { ...layoutClip, holders: holders.filter(h => validClipIds.has(h.clipId)) }
+    }))
   }, [timelineClips])
 
   // Ensure selectedSceneIndex is always valid
@@ -1275,7 +1487,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       const deltaX = (e.clientX - dragStartPos.x) / rect.width
       const deltaY = (e.clientY - dragStartPos.y) / rect.height
 
-      setCanvasHolders(prev => prev.map(holder => {
+      // Update holders in layout clip directly
+      const currentLayoutClip = getCurrentLayoutClip(currentTime)
+      if (!currentLayoutClip) return
+
+      const updatedHolders = currentLayoutClip.holders.map(holder => {
         if (holder.id !== draggingHolderId) return holder
 
         let newX = dragStartHolder.x + deltaX
@@ -1290,15 +1506,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           x: newX,
           y: newY,
         }
-      }))
+      })
+
+      updateHoldersInLayoutClip(updatedHolders)
     }
 
     const handleMouseUp = () => {
       setDraggingHolderId(null)
       setDragStartPos(null)
       setDragStartHolder(null)
-      // Save holder positions to current layout clip
-      saveHoldersToLayoutClip()
       saveToHistory()
     }
 
@@ -1308,7 +1524,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingHolderId, dragStartPos, dragStartHolder, saveHoldersToLayoutClip, saveToHistory])
+  }, [draggingHolderId, dragStartPos, dragStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory])
 
   // Handle canvas holder resizing (corner handles)
   useEffect(() => {
@@ -1322,7 +1538,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       const deltaX = (e.clientX - resizeStartPos.x) / rect.width
       const deltaY = (e.clientY - resizeStartPos.y) / rect.height
 
-      setCanvasHolders(prev => prev.map(holder => {
+      // Update holders in layout clip directly
+      const currentLayoutClip = getCurrentLayoutClip(currentTime)
+      if (!currentLayoutClip) return
+
+      const updatedHolders = currentLayoutClip.holders.map(holder => {
         if (holder.id !== resizingHolderId) return holder
 
         let newX = resizeStartHolder.x
@@ -1368,7 +1588,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           width: newWidth,
           height: newHeight,
         }
-      }))
+      })
+
+      updateHoldersInLayoutClip(updatedHolders)
     }
 
     const handleMouseUp = () => {
@@ -1376,8 +1598,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       setResizeCorner(null)
       setResizeStartPos(null)
       setResizeStartHolder(null)
-      // Save holder positions to current layout clip
-      saveHoldersToLayoutClip()
       saveToHistory()
     }
 
@@ -1387,7 +1607,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, saveHoldersToLayoutClip, saveToHistory])
+  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory])
 
   // Handle title dragging (repositioning)
   useEffect(() => {
@@ -1614,7 +1834,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
         }
       } else {
         // Fallback to canvas settings resolution (maintains aspect ratio)
-        if (canvas.width === 0 || canvas.height === 0) {
+      if (canvas.width === 0 || canvas.height === 0) {
           canvas.width = canvasDimensions.width
           canvas.height = canvasDimensions.height
         }
@@ -2341,28 +2561,53 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           
           if (previousLayoutClip) {
             // Transition holders between layout clips
-            previousLayoutClip.holders.forEach(prevHolder => {
-              const newHolder = currentLayoutClip.holders.find(h => 
-                h.clipId === prevHolder.clipId && h.layer === prevHolder.layer
-              )
+            // Check all holders in both clips for smooth transitions
+            const allHolderKeys = new Set([
+              ...previousLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`),
+              ...currentLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`)
+            ])
+            
+            allHolderKeys.forEach(key => {
+              const [clipId, layer] = key.split('_')
+              const prevHolder = previousLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
+              const newHolder = currentLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
               
-              if (newHolder) {
-                const hasPositionChange = prevHolder.x !== newHolder.x || prevHolder.y !== newHolder.y ||
-                                         prevHolder.width !== newHolder.width || prevHolder.height !== newHolder.height
+              // If holder exists in both clips, check for changes
+              if (prevHolder && newHolder) {
+                const hasPositionChange = 
+                  Math.abs(prevHolder.x - newHolder.x) > 0.001 ||
+                  Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
+                  Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
+                  Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
+                  Math.abs(prevHolder.rotation - newHolder.rotation) > 0.1
                 
                 if (hasPositionChange) {
-                  // Find the actual holder in canvasHolders state by clipId and layer (not id)
-                  const actualHolder = canvasHolders.find(h => h.clipId === newHolder.clipId && h.layer === newHolder.layer)
+                  // Find the actual holder in canvasHolders state by clipId and layer
+                  const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
                   if (actualHolder) {
                     transitioningHoldersRef.current.set(actualHolder.id, {
-                      startPos: { x: prevHolder.x, y: prevHolder.y, width: prevHolder.width, height: prevHolder.height },
-                      endPos: { x: newHolder.x, y: newHolder.y, width: newHolder.width, height: newHolder.height },
+                      startPos: { 
+                        x: prevHolder.x, 
+                        y: prevHolder.y, 
+                        width: prevHolder.width, 
+                        height: prevHolder.height 
+                      },
+                      endPos: { 
+                        x: newHolder.x, 
+                        y: newHolder.y, 
+                        width: newHolder.width, 
+                        height: newHolder.height 
+                      },
+                      startRotation: prevHolder.rotation,
+                      endRotation: newHolder.rotation,
                       startTime: performance.now(),
                       duration: canvasSettings.transitionDuration * 1000
                     })
                   }
                 }
               }
+              // If holder only exists in new clip, it will appear instantly (no transition from nothing)
+              // If holder only exists in previous clip, it will fade out (handled by fadingOutHoldersRef)
             })
           }
           
@@ -2371,59 +2616,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           previousLayoutClipIdRef.current = currentLayoutClip.id
         }
         
-        // Apply layout clip holders
-        // Merge layout clip holders with active timeline clips to ensure all clips have holders
-        setCanvasHolders(prev => {
-          // Start with holders from current layout clip
-          const mergedHolders = new Map<string, CanvasVideoHolder>()
-          
-          // Add all holders from the layout clip
-          currentLayoutClip.holders.forEach(layoutHolder => {
-            const key = `${layoutHolder.clipId}_${layoutHolder.layer}`
-            // Check if this holder is currently transitioning
-            const existingHolder = prev.find(h => h.clipId === layoutHolder.clipId && h.layer === layoutHolder.layer)
-            if (existingHolder && transitioningHoldersRef.current.has(existingHolder.id)) {
-              // Keep existing holder if it's transitioning
-              mergedHolders.set(key, existingHolder)
-            } else {
-              // Use layout clip holder
-              mergedHolders.set(key, { ...layoutHolder })
-            }
-          })
-          
-          // Also ensure holders exist for all active timeline clips at this time
-          // If a timeline clip doesn't have a holder in the layout clip, use default or existing position
-          const activeClips = timelineClips.filter(c => 
-            timelineTimeRef.current >= c.timelineStart && timelineTimeRef.current < c.timelineEnd &&
-            (c.layer === 'camera' || c.layer === 'screen')
-          )
-          
-          activeClips.forEach(clip => {
-            const key = `${clip.id}_${clip.layer}`
-            if (!mergedHolders.has(key)) {
-              // No holder in layout clip, check if one exists in current state
-              const existingHolder = prev.find(h => h.clipId === clip.id && h.layer === clip.layer)
-              if (existingHolder) {
-                mergedHolders.set(key, existingHolder)
-              } else {
-                // Create default holder
-                mergedHolders.set(key, {
-                  id: `holder_${clip.id}_${clip.layer}`,
-                  clipId: clip.id,
-                  layer: clip.layer,
-                  x: 0,
-                  y: 0,
-                  width: 1,
-                  height: 1,
-                  rotation: 0,
-                  zIndex: 0
-                })
-              }
-            }
-          })
-          
-          return Array.from(mergedHolders.values())
-        })
+        // Canvas holders are now derived from layout clips via useMemo
+        // No need to set them here - they're automatically computed from currentLayoutClip.holders
       }
 
       // Find which clip should be playing at this timeline position
@@ -2629,48 +2823,36 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       const transitioningHolders = transitioningHoldersRef.current
       const fadingOutHolders = fadingOutHoldersRef.current
       
+      // Check if any transitions are active and clean up completed ones
+      let hasActiveTransitions = false
+      const holdersToDelete: string[] = []
+      transitioningHolders.forEach((transition, holderId) => {
+        const elapsed = transitionNow - transition.startTime
+        if (elapsed < transition.duration) {
+          hasActiveTransitions = true
+        } else {
+          holdersToDelete.push(holderId)
+        }
+      })
+      holdersToDelete.forEach(id => transitioningHolders.delete(id))
+      
       // Clean up completed fade-outs
+      const fadeOutsToDelete: string[] = []
       fadingOutHolders.forEach((fadeOut, holderId) => {
         const elapsed = transitionNow - fadeOut.startTime
         if (elapsed >= fadeOut.duration) {
-          fadingOutHolders.delete(holderId)
+          fadeOutsToDelete.push(holderId)
+        } else {
+          hasActiveTransitions = true
         }
       })
+      fadeOutsToDelete.forEach(id => fadingOutHolders.delete(id))
       
-      if (transitioningHolders.size > 0) {
-        setCanvasHolders(prev => prev.map(holder => {
-          const transition = transitioningHolders.get(holder.id)
-          if (!transition) return holder
-          
-          const elapsed = transitionNow - transition.startTime
-          const progress = Math.min(1, elapsed / transition.duration)
-          
-          // Easing function (ease-in-out)
-          const eased = progress < 0.5
-            ? 2 * progress * progress
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2
-          
-          if (progress >= 1) {
-            // Transition complete
-            transitioningHolders.delete(holder.id)
-            return {
-              ...holder,
-              x: transition.endPos.x,
-              y: transition.endPos.y,
-              width: transition.endPos.width,
-              height: transition.endPos.height,
-            }
-          }
-          
-          // Interpolate position
-          return {
-            ...holder,
-            x: transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased,
-            y: transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased,
-            width: transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased,
-            height: transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased,
-          }
-        }))
+      // Force re-render if transitions are active (so React updates the display positions)
+      if (hasActiveTransitions) {
+        // Use a counter state to force re-render during transitions
+        // This is more efficient than updating currentTime
+        setTransitionFrame(prev => prev + 1)
       }
 
       // Always draw frame
@@ -3256,15 +3438,26 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
     saveToHistory()
   }, [layoutClips, saveToHistory])
 
-  // Cut clip - split at timeline position (Linked)
-  const handleCutClip = useCallback((clipId: string, cutTime: number) => {
-    // Also split layout clip at the same time
-    handleSplitLayoutClip(cutTime)
-    
+  // Cut clip - split at timeline position
+  const handleCutClip = useCallback((clipId: string | null, cutTime: number) => {
+    // Check if a layout clip is selected
+    if (selectedLayoutClipIds.size > 0) {
+      // Only cut the selected layout clip(s)
+      selectedLayoutClipIds.forEach(layoutClipId => {
+        const layoutClip = layoutClips.find(lc => lc.id === layoutClipId)
+        if (layoutClip && cutTime > layoutClip.timelineStart && cutTime < layoutClip.timelineEnd) {
+          handleSplitLayoutClip(cutTime)
+        }
+      })
+      return
+    }
+
+    // Check if a video clip is selected
+    if (selectedClipIds.size > 0 && clipId) {
     const mainClip = timelineClips.find(c => c.id === clipId)
     if (!mainClip) return
 
-    // Find all linked clips
+      // Find all linked clips (same scene/take) that overlap with the cut time
     const linkedClips = timelineClips.filter(c =>
       c.sceneId === mainClip.sceneId && c.takeId === mainClip.takeId &&
       cutTime > c.timelineStart && cutTime < c.timelineEnd
@@ -3297,18 +3490,119 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           sourceIn: sourceTimeAtCut,
         }
 
-        updated = updated.filter(c => c.id !== clip.id)
-        updated.push(clip1, clip2)
+          // Replace original clip with two new clips
+          const clipIndex = updated.findIndex(c => c.id === clip.id)
+          if (clipIndex >= 0) {
+            updated.splice(clipIndex, 1, clip1, clip2)
+          }
+        })
+
+        return updated.sort((a, b) => {
+          if (a.timelineStart !== b.timelineStart) return a.timelineStart - b.timelineStart
+          // Layer order: camera/screen first, then microphone
+          const layerOrder = { 'camera': 0, 'screen': 1, 'microphone': 2 }
+          return (layerOrder[a.layer] || 0) - (layerOrder[b.layer] || 0)
+        })
       })
 
-      return updated.sort((a, b) => a.timelineStart - b.timelineStart)
-    })
+      // If cutting a video layer (camera or screen), also cut the corresponding audio layer
+      if (mainClip.layer === 'camera' || mainClip.layer === 'screen') {
+        const audioClip = timelineClips.find(c =>
+          c.sceneId === mainClip.sceneId &&
+          c.takeId === mainClip.takeId &&
+          c.layer === 'microphone' &&
+          cutTime > c.timelineStart &&
+          cutTime < c.timelineEnd
+        )
+        
+        if (audioClip) {
+          // Cut the audio clip at the same time
+          setTimelineClips(prev => {
+            let updated = [...prev]
+            const relativeTime = cutTime - audioClip.timelineStart
+            const clipDuration = audioClip.timelineEnd - audioClip.timelineStart
+            const sourceTimeAtCut = audioClip.sourceIn + (relativeTime / clipDuration) * (audioClip.sourceOut - audioClip.sourceIn)
 
-    // Recalculate duration after state update (in separate effect or just reuse Logic? 
-    // Simplified: relying on useEffect [timelineClips] if it exists, or update explicitly next render
-    // But let's check: setTotalDuration is usually updated here.
-    // We can do it in the setter above or Effect.
-  }, [timelineClips, handleSplitLayoutClip])
+            const audioClip1: TimelineClip = {
+              ...audioClip,
+              id: `${audioClip.id}_part1_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              timelineEnd: cutTime,
+              sourceOut: sourceTimeAtCut,
+            }
+
+            const audioClip2: TimelineClip = {
+              ...audioClip,
+              id: `${audioClip.id}_part2_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              timelineStart: cutTime,
+              sourceIn: sourceTimeAtCut,
+            }
+
+            const clipIndex = updated.findIndex(c => c.id === audioClip.id)
+            if (clipIndex >= 0) {
+              updated.splice(clipIndex, 1, audioClip1, audioClip2)
+            }
+
+            return updated.sort((a, b) => {
+              if (a.timelineStart !== b.timelineStart) return a.timelineStart - b.timelineStart
+              const layerOrder = { 'camera': 0, 'screen': 1, 'microphone': 2 }
+              return (layerOrder[a.layer] || 0) - (layerOrder[b.layer] || 0)
+            })
+          })
+        }
+      }
+      
+      saveToHistory()
+      return
+    }
+
+    // No clip selected - cut all layers at the cut time
+    // Cut layout clips
+    handleSplitLayoutClip(cutTime)
+    
+    // Cut all video clips at this time
+    const clipsToCut = timelineClips.filter(c =>
+      cutTime > c.timelineStart && cutTime < c.timelineEnd
+    )
+
+    if (clipsToCut.length > 0) {
+      setTimelineClips(prev => {
+        let updated = [...prev]
+
+        clipsToCut.forEach(clip => {
+          const relativeTime = cutTime - clip.timelineStart
+          const clipDuration = clip.timelineEnd - clip.timelineStart
+          const sourceTimeAtCut = clip.sourceIn + (relativeTime / clipDuration) * (clip.sourceOut - clip.sourceIn)
+
+          const clip1: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_part1_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            timelineEnd: cutTime,
+            sourceOut: sourceTimeAtCut,
+          }
+
+          const clip2: TimelineClip = {
+            ...clip,
+            id: `${clip.id}_part2_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            timelineStart: cutTime,
+            sourceIn: sourceTimeAtCut,
+          }
+
+          const clipIndex = updated.findIndex(c => c.id === clip.id)
+          if (clipIndex >= 0) {
+            updated.splice(clipIndex, 1, clip1, clip2)
+          }
+        })
+
+        return updated.sort((a, b) => {
+          if (a.timelineStart !== b.timelineStart) return a.timelineStart - b.timelineStart
+          const layerOrder = { 'camera': 0, 'screen': 1, 'microphone': 2 }
+          return (layerOrder[a.layer] || 0) - (layerOrder[b.layer] || 0)
+        })
+      })
+
+      saveToHistory()
+    }
+  }, [timelineClips, layoutClips, selectedClipIds, selectedLayoutClipIds, handleSplitLayoutClip, saveToHistory])
 
   // Move clip - drag horizontally (Linked)
   const handleStartMoveClip = useCallback((clipId: string, mouseX: number) => {
@@ -3790,30 +4084,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           }
           return lc
         }))
-        // Also update canvas holders immediately
-        setCanvasHolders(prev => {
-          const updated = prev.map(holder => {
-            if (holder.layer === 'camera' && newLayout.cameraPosition) {
-              return {
-                ...holder,
-                x: newLayout.cameraPosition.x,
-                y: newLayout.cameraPosition.y,
-                width: newLayout.cameraPosition.width,
-                height: newLayout.cameraPosition.height
-              }
-            } else if (holder.layer === 'screen' && newLayout.screenPosition) {
-              return {
-                ...holder,
-                x: newLayout.screenPosition.x,
-                y: newLayout.screenPosition.y,
-                width: newLayout.screenPosition.width,
-                height: newLayout.screenPosition.height
-              }
-            }
-            return holder
-          })
-          return updated
-        })
+        // Canvas holders are now derived from layout clips, so they're automatically updated
       }
     }
   }
@@ -3866,8 +4137,29 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       return
     }
 
+    // Check if FFmpeg is ready
+    if (!ffmpegReady) {
+      if (ffmpegLoading) {
+        alert('FFmpeg is still loading. Please wait...')
+        return
+      } else if (ffmpegError) {
+        alert(`FFmpeg failed to load: ${ffmpegError}. Please refresh the page and try again.`)
+        return
+      } else {
+        alert('FFmpeg is not ready. Please wait a moment and try again.')
+        return
+      }
+    }
+
     setIsExporting(true)
-    setExportProgress('Initializing FFmpeg...')
+    setExportProgress('Starting export...')
+
+    // Add timeout to prevent getting stuck
+    const exportTimeout = setTimeout(() => {
+      setIsExporting(false)
+      setExportProgress('')
+      alert('Export is taking longer than expected. Please check the console for errors.')
+    }, 300000) // 5 minute timeout
 
     try {
       // Process each scene: load, trim based on timeline clips, apply cuts, combine layers
@@ -3875,7 +4167,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
       for (let i = 0; i < scenesToExport.length; i++) {
         const sceneTake = scenesToExport[i]
-        setExportProgress(`Processing scene ${i + 1} of ${scenesToExport.length}...`)
+        setExportProgress(`Loading scene ${i + 1} of ${scenesToExport.length}...`)
 
         // Get timeline clips for this scene
         const sceneClips = timelineClips.filter(
@@ -3889,66 +4181,121 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
         // Load and trim camera
         if (sceneTake.take.hasCamera) {
-          const cameraClip = sceneClips.find(c => c.layer === 'camera')
-          if (cameraClip) {
-            const originalBlob = await projectManager.loadRecording(
-              sceneTake.sceneId,
-              `${sceneTake.take.id}_camera`
-            )
-            if (originalBlob && cameraClip.sourceIn < cameraClip.sourceOut) {
-              sceneCameraBlob = await trimVideo(
-                originalBlob,
-                cameraClip.sourceIn,
-                cameraClip.sourceOut
-              )
-            } else {
-              sceneCameraBlob = originalBlob
+          try {
+            setExportProgress(`Loading camera for scene ${i + 1}...`)
+            const cameraClip = sceneClips.find(c => c.layer === 'camera')
+            if (cameraClip) {
+              const originalBlob = await Promise.race([
+                projectManager.loadRecording(
+                  sceneTake.sceneId,
+                  `${sceneTake.take.id}_camera`
+                ),
+                new Promise<Blob | null>((_, reject) => 
+                  setTimeout(() => reject(new Error('Timeout loading camera recording')), 30000)
+                )
+              ])
+              
+              if (originalBlob && cameraClip.sourceIn < cameraClip.sourceOut) {
+                setExportProgress(`Trimming camera for scene ${i + 1}...`)
+                sceneCameraBlob = await Promise.race([
+                  trimVideo(
+                    originalBlob,
+                    cameraClip.sourceIn,
+                    cameraClip.sourceOut
+                  ),
+                  new Promise<Blob>((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout trimming camera')), 60000)
+                  )
+                ])
+              } else {
+                sceneCameraBlob = originalBlob
+              }
             }
+          } catch (error) {
+            console.error(`Error loading camera for scene ${i + 1}:`, error)
+            setExportProgress(`Warning: Could not load camera for scene ${i + 1}`)
           }
         }
 
         // Load and trim microphone
         if (sceneTake.take.hasMicrophone) {
-          const micClip = sceneClips.find(c => c.layer === 'microphone')
-          if (micClip) {
-            const originalBlob = await projectManager.loadRecording(
-              sceneTake.sceneId,
-              `${sceneTake.take.id}_microphone`
-            )
-            if (originalBlob && micClip.sourceIn < micClip.sourceOut) {
-              sceneMicrophoneBlob = await trimVideo(
-                originalBlob,
-                micClip.sourceIn,
-                micClip.sourceOut
-              )
-            } else {
-              sceneMicrophoneBlob = originalBlob
+          try {
+            setExportProgress(`Loading microphone for scene ${i + 1}...`)
+            const micClip = sceneClips.find(c => c.layer === 'microphone')
+            if (micClip) {
+              const originalBlob = await Promise.race([
+                projectManager.loadRecording(
+                  sceneTake.sceneId,
+                  `${sceneTake.take.id}_microphone`
+                ),
+                new Promise<Blob | null>((_, reject) => 
+                  setTimeout(() => reject(new Error('Timeout loading microphone recording')), 30000)
+                )
+              ])
+              
+              if (originalBlob && micClip.sourceIn < micClip.sourceOut) {
+                setExportProgress(`Trimming microphone for scene ${i + 1}...`)
+                sceneMicrophoneBlob = await Promise.race([
+                  trimVideo(
+                    originalBlob,
+                    micClip.sourceIn,
+                    micClip.sourceOut
+                  ),
+                  new Promise<Blob>((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout trimming microphone')), 60000)
+                  )
+                ])
+              } else {
+                sceneMicrophoneBlob = originalBlob
+              }
             }
+          } catch (error) {
+            console.error(`Error loading microphone for scene ${i + 1}:`, error)
+            setExportProgress(`Warning: Could not load microphone for scene ${i + 1}`)
           }
         }
 
         // Load and trim screen
         if (sceneTake.take.hasScreen) {
-          const screenClip = sceneClips.find(c => c.layer === 'screen')
-          if (screenClip) {
-            const originalBlob = await projectManager.loadRecording(
-              sceneTake.sceneId,
-              `${sceneTake.take.id}_screen`
-            )
-            if (originalBlob && screenClip.sourceIn < screenClip.sourceOut) {
-              sceneScreenBlob = await trimVideo(
-                originalBlob,
-                screenClip.sourceIn,
-                screenClip.sourceOut
-              )
-            } else {
-              sceneScreenBlob = originalBlob
+          try {
+            setExportProgress(`Loading screen for scene ${i + 1}...`)
+            const screenClip = sceneClips.find(c => c.layer === 'screen')
+            if (screenClip) {
+              const originalBlob = await Promise.race([
+                projectManager.loadRecording(
+                  sceneTake.sceneId,
+                  `${sceneTake.take.id}_screen`
+                ),
+                new Promise<Blob | null>((_, reject) => 
+                  setTimeout(() => reject(new Error('Timeout loading screen recording')), 30000)
+                )
+              ])
+              
+              if (originalBlob && screenClip.sourceIn < screenClip.sourceOut) {
+                setExportProgress(`Trimming screen for scene ${i + 1}...`)
+                sceneScreenBlob = await Promise.race([
+                  trimVideo(
+                    originalBlob,
+                    screenClip.sourceIn,
+                    screenClip.sourceOut
+                  ),
+                  new Promise<Blob>((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout trimming screen')), 60000)
+                  )
+                ])
+              } else {
+                sceneScreenBlob = originalBlob
+              }
             }
+          } catch (error) {
+            console.error(`Error loading screen for scene ${i + 1}:`, error)
+            setExportProgress(`Warning: Could not load screen for scene ${i + 1}`)
           }
         }
 
         if (!sceneCameraBlob && !sceneScreenBlob) {
           console.warn(`No video to export for scene ${sceneTake.sceneId}`)
+          setExportProgress(`Skipping scene ${i + 1}: No video available`)
           continue
         }
 
@@ -3967,48 +4314,210 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           screen: getSceneLayerProps('screen')
         }
 
-        // Combine layers with layout
-        setExportProgress(`Combining layers for scene ${i + 1}...`)
-        const combinedBlob = await combineLayersWithLayout(
-          sceneCameraBlob,
-          sceneMicrophoneBlob,
-          sceneScreenBlob,
-          layout,
-          sceneCuts,
-          audioProps
-        )
+        // Get layout clip for this scene's time range
+        const sceneStartTime = sceneTake.startTime
+        const sceneEndTime = sceneTake.endTime
+        const sceneLayoutClip = layoutClips.find(lc => 
+          lc.timelineStart <= sceneStartTime && lc.timelineEnd >= sceneEndTime
+        ) || layoutClips[0] // Fallback to first layout clip
+        
+        // Convert layout clip to layout format for export
+        // Layout positions in combineVideos expect percentages (0-100)
+        const exportLayout: Layout = sceneLayoutClip ? {
+          type: 'custom',
+          cameraPosition: sceneLayoutClip.holders.find(h => h.layer === 'camera') ? {
+            x: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.x * 100,
+            y: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.y * 100,
+            width: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.width * 100,
+            height: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.height * 100,
+          } : undefined,
+          screenPosition: sceneLayoutClip.holders.find(h => h.layer === 'screen') ? {
+            x: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.x * 100,
+            y: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.y * 100,
+            width: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.width * 100,
+            height: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.height * 100,
+          } : undefined,
+        } : (layout.type === 'custom' ? layout : {
+          type: 'camera-only' as const
+        })
 
-        processedSceneBlobs.push(combinedBlob)
+        // Combine layers with layout using canvas settings resolution
+        setExportProgress(`Combining layers for scene ${i + 1}...`)
+        try {
+          // Get video duration for fade-out calculation (with timeout)
+          let videoDuration = 0
+          try {
+            if (sceneCameraBlob) {
+              setExportProgress(`Getting video duration for scene ${i + 1}...`)
+              const video = document.createElement('video')
+              video.preload = 'metadata'
+              const videoUrl = URL.createObjectURL(sceneCameraBlob)
+              video.src = videoUrl
+              
+              await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  URL.revokeObjectURL(videoUrl)
+                  reject(new Error('Timeout loading video metadata'))
+                }, 5000) // 5 second timeout
+                
+                video.onloadedmetadata = () => {
+                  clearTimeout(timeout)
+                  videoDuration = video.duration || 0
+                  URL.revokeObjectURL(videoUrl)
+                  resolve()
+                }
+                video.onerror = () => {
+                  clearTimeout(timeout)
+                  URL.revokeObjectURL(videoUrl)
+                  reject(new Error('Failed to load video metadata'))
+                }
+              })
+            } else if (sceneScreenBlob) {
+              setExportProgress(`Getting video duration for scene ${i + 1}...`)
+              const video = document.createElement('video')
+              video.preload = 'metadata'
+              const videoUrl = URL.createObjectURL(sceneScreenBlob)
+              video.src = videoUrl
+              
+              await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  URL.revokeObjectURL(videoUrl)
+                  reject(new Error('Timeout loading video metadata'))
+                }, 5000) // 5 second timeout
+                
+                video.onloadedmetadata = () => {
+                  clearTimeout(timeout)
+                  videoDuration = video.duration || 0
+                  URL.revokeObjectURL(videoUrl)
+                  resolve()
+                }
+                video.onerror = () => {
+                  clearTimeout(timeout)
+                  URL.revokeObjectURL(videoUrl)
+                  reject(new Error('Failed to load video metadata'))
+                }
+              })
+            }
+          } catch (durationError) {
+            console.warn(`Could not get video duration for scene ${i + 1}, continuing without fade-out:`, durationError)
+            // Continue without duration - fade-out will be skipped
+          }
+          
+          setExportProgress(`Rendering scene ${i + 1}...`)
+          const combinedBlob = await Promise.race([
+            combineLayersWithLayout(
+              sceneCameraBlob,
+              sceneMicrophoneBlob,
+              sceneScreenBlob,
+              exportLayout,
+              sceneCuts,
+              audioProps,
+              undefined, // captionData
+              canvasSettings.resolution.width,
+              canvasSettings.resolution.height,
+              backgroundMusic.file || null,
+              backgroundMusic.volume || 0.5,
+              videoDuration
+            ),
+            new Promise<Blob>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout combining layers (this may take a while for long videos)')), 300000) // 5 minute timeout
+            )
+          ])
+          processedSceneBlobs.push(combinedBlob)
+          setExportProgress(`✓ Scene ${i + 1} completed`)
+        } catch (error) {
+          console.error(`Error combining layers for scene ${i + 1}:`, error)
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          setExportProgress(`✗ Error in scene ${i + 1}: ${errorMessage}`)
+          // Continue with other scenes instead of failing completely
+          continue
+        }
+
       }
 
       if (processedSceneBlobs.length === 0) {
-        alert('No video to export')
+        alert('No video to export - all scenes failed to process')
         setIsExporting(false)
+        setExportProgress('')
         return
       }
 
       // Concatenate all scenes if multiple
       setExportProgress('Concatenating scenes...')
       let finalBlob: Blob
-      if (processedSceneBlobs.length === 1) {
-        finalBlob = processedSceneBlobs[0]
-      } else {
-        finalBlob = await concatVideos(processedSceneBlobs)
+      try {
+        if (processedSceneBlobs.length === 1) {
+          finalBlob = processedSceneBlobs[0]
+        } else {
+          finalBlob = await concatVideos(processedSceneBlobs)
+        }
+      } catch (error) {
+        console.error('Error concatenating scenes:', error)
+        throw new Error('Failed to concatenate scenes: ' + (error as Error).message)
       }
 
-      // Download video
+      // Convert to requested format if needed
       setExportProgress('Finalizing export...')
-      const url = URL.createObjectURL(finalBlob)
+      let exportBlob = finalBlob
+      
+      if (exportFormat === 'webm') {
+        // Convert MP4 to WebM using FFmpeg
+        try {
+          const ffmpeg = await getFFmpeg()
+          const inputFile = 'input_convert.mp4'
+          const outputFile = 'output.webm'
+          
+          // Write input file
+          const inputData = await fetchFile(finalBlob)
+          await ffmpeg.writeFile(inputFile, inputData)
+          
+          setExportProgress('Converting to WebM...')
+          await ffmpeg.exec([
+            '-i', inputFile,
+            '-c:v', 'libvpx-vp9',
+            '-b:v', '2M',
+            '-c:a', 'libopus',
+            '-b:a', '192k',
+            outputFile
+          ])
+          
+          const outputData = await ffmpeg.readFile(outputFile)
+          exportBlob = outputData instanceof Uint8Array 
+            ? new Blob([outputData as BlobPart], { type: 'video/webm' })
+            : new Blob([outputData as any], { type: 'video/webm' })
+          
+          // Cleanup
+          try {
+            await ffmpeg.deleteFile(inputFile)
+            await ffmpeg.deleteFile(outputFile)
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        } catch (error) {
+          console.warn('WebM conversion failed, using MP4:', error)
+          setExportProgress('WebM conversion failed, using MP4 format')
+          // Fallback to MP4 if conversion fails - keep original blob
+        }
+      }
+      
+      // Download video
+      setExportProgress('Downloading...')
+      const finalFormat = exportFormat === 'webm' && exportBlob.type === 'video/webm' ? 'webm' : 'mp4'
+      const url = URL.createObjectURL(exportBlob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `export_${Date.now()}.mp4`
+      a.download = `export_${Date.now()}.${finalFormat}`
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
+      clearTimeout(exportTimeout)
       setShowExportDialog(false)
       setIsExporting(false)
       setExportProgress('')
     } catch (error) {
+      clearTimeout(exportTimeout)
       console.error('Export error:', error)
       alert('Export failed: ' + (error as Error).message)
       setIsExporting(false)
@@ -4134,6 +4643,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
   }
 
   return (
+    <>
     <div className="h-full flex flex-col bg-black text-white">
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
@@ -4176,7 +4686,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                     <div
                       key={sceneTake.sceneId}
                       className={`p-3 rounded border cursor-pointer ${isSelected
-                        ? 'bg-blue-900/30 border-blue-500'
+                        ? 'bg-gray-900/30 border-gray-500'
                         : 'bg-gray-800 border-gray-700 hover:border-gray-600'
                         }`}
                       onClick={() => toggleSceneSelection(sceneTake.sceneId)}
@@ -4185,7 +4695,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
-                              ? 'bg-blue-500 border-blue-500'
+                              ? 'bg-gray-500 border-gray-500'
                               : 'border-gray-500'
                               }`}
                           >
@@ -4221,17 +4731,44 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 })}
               </div>
 
-              {isExporting ? (
+              {(isExporting || ffmpegLoading) ? (
                 <div className="mt-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                    <span className="text-sm text-gray-300">{exportProgress || 'Processing...'}</span>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div>
+                    <span className="text-sm text-gray-300">
+                      {ffmpegLoading && !exportProgress ? 'Loading FFmpeg...' : exportProgress || (isExporting ? 'Processing...' : '')}
+                    </span>
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                    <div className="bg-gray-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
                   </div>
                 </div>
               ) : null}
+              {ffmpegError && !isExporting && (
+                <div className="mt-4 p-3 bg-red-900/30 border border-red-700 rounded">
+                  <span className="text-sm text-red-400">
+                    FFmpeg Error: {ffmpegError}. Please refresh the page and try again.
+                  </span>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="text-sm text-gray-300 mb-2 block">Export Format</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setExportFormat('mp4')}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'mp4' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                  >
+                    MP4
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('webm')}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'webm' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                  >
+                    WebM
+                  </button>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-2 mt-4">
                 <button
@@ -4243,10 +4780,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                 </button>
                 <button
                   onClick={handleExport}
-                  disabled={isExporting}
+                  disabled={isExporting || !ffmpegReady || ffmpegLoading}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!ffmpegReady ? (ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? `FFmpeg error: ${ffmpegError}` : 'FFmpeg not ready') : undefined}
                 >
-                  Export Video
+                  {ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? 'FFmpeg Error' : 'Export Video'}
                 </button>
                 <button
                   onClick={() => {
@@ -4269,7 +4807,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           <button
             onClick={() => setActiveTab('canvas')}
             className={`p-2 rounded ${activeTab === 'canvas' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}
-            title="Canvas"
+            title="Project Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -4880,36 +5418,49 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   const bgImage = currentLayoutClip?.backgroundImage
                   return (
                     <div className="space-y-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            const reader = new FileReader()
-                            reader.onload = (event) => {
-                              const dataUrl = event.target?.result as string
-                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
-                              if (currentLayoutClip) {
-                                setLayoutClips(prev => prev.map(lc => 
-                                  lc.id === currentLayoutClip.id 
-                                    ? { 
-                                        ...lc, 
-                                        backgroundImage: { 
-                                          enabled: true, 
-                                          url: dataUrl 
-                                        } 
-                                      }
-                                    : lc
-                                ))
-                                saveToHistory()
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const reader = new FileReader()
+                              reader.onload = (event) => {
+                                const dataUrl = event.target?.result as string
+                                const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                                if (currentLayoutClip) {
+                                  setLayoutClips(prev => prev.map(lc => 
+                                    lc.id === currentLayoutClip.id 
+                                      ? { 
+                                          ...lc, 
+                                          backgroundImage: { 
+                                            enabled: true, 
+                                            url: dataUrl 
+                                          } 
+                                        }
+                                      : lc
+                                  ))
+                                  saveToHistory()
+                                }
                               }
+                              reader.readAsDataURL(file)
                             }
-                            reader.readAsDataURL(file)
-                          }
-                        }}
-                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                      />
+                          }}
+                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                        />
+                        <button
+                          onClick={() => {
+                            setUnsplashModalOpen(true)
+                            if (unsplashSearchQuery) {
+                              searchUnsplash(unsplashSearchQuery)
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded whitespace-nowrap"
+                        >
+                          Unsplash
+                        </button>
+                      </div>
                       {bgImage?.url && (
                         <div className="relative w-full h-32 bg-gray-900 rounded overflow-hidden">
                           <img src={bgImage.url} alt="Background" className="w-full h-full object-cover" />
@@ -5136,23 +5687,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                                   }
                                 : lc
                             ))
-                            // Immediately update canvasHolders to reflect the change
-                            setCanvasHolders(prev => {
-                              // Update existing holders or add new ones from preset
-                              const updatedHolders = [...prev]
-                              presetHolders.forEach((presetHolder: CanvasVideoHolder) => {
-                                const existingIndex = updatedHolders.findIndex(h => h.id === presetHolder.id)
-                                if (existingIndex >= 0) {
-                                  updatedHolders[existingIndex] = { ...presetHolder }
-                                } else {
-                                  updatedHolders.push({ ...presetHolder })
-                                }
-                              })
-                              // Remove holders that are no longer in the preset (but keep microphone layer)
-                              return updatedHolders.filter(h => 
-                                h.layer === 'microphone' || presetHolders.some((ph: CanvasVideoHolder) => ph.id === h.id)
-                              )
-                            })
+                            // Canvas holders are now stored in layout clips, so they're automatically updated
                             saveToHistory()
                             markAsEdited()
                           } else {
@@ -5188,22 +5723,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                                 return { ...lc, timelineEnd: totalDuration }
                               })
                             })
-                            // Immediately update canvasHolders to reflect the change
-                            setCanvasHolders(prev => {
-                              const updatedHolders = [...prev]
-                              presetHolders.forEach((presetHolder: CanvasVideoHolder) => {
-                                const existingIndex = updatedHolders.findIndex(h => h.id === presetHolder.id)
-                                if (existingIndex >= 0) {
-                                  updatedHolders[existingIndex] = { ...presetHolder }
-                                } else {
-                                  updatedHolders.push({ ...presetHolder })
-                                }
-                              })
-                              // Remove holders that are no longer in the preset (but keep microphone layer)
-                              return updatedHolders.filter(h => 
-                                h.layer === 'microphone' || presetHolders.some((ph: CanvasVideoHolder) => ph.id === h.id)
-                              )
-                            })
+                            // Canvas holders are now stored in layout clips, so they're automatically updated
                             saveToHistory()
                             markAsEdited()
                           }
@@ -5233,7 +5753,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
 
           {activeTab === 'canvas' && (
             <div className="p-4">
-              <h3 className="text-sm font-semibold mb-4">CANVAS</h3>
+              <h3 className="text-sm font-semibold mb-4">PROJECT SETTINGS</h3>
               <div className="space-y-4">
                 {/* Format Selection */}
                 <div>
@@ -5378,6 +5898,82 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                   <p className="text-xs text-gray-500 mt-1">
                     Duration for animated transitions between clip positions
                   </p>
+                </div>
+
+                {/* Background Music */}
+                <div className="border-t border-gray-700 pt-4">
+                  <label className="text-xs text-gray-300 mb-2 block">Background Music</label>
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          // Revoke old URL if exists
+                          if (backgroundMusic.url) {
+                            URL.revokeObjectURL(backgroundMusic.url)
+                          }
+                          const url = URL.createObjectURL(file)
+                          setBackgroundMusic({
+                            file,
+                            url,
+                            volume: backgroundMusic.volume
+                          })
+                          markAsEdited()
+                        }
+                      }}
+                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                    />
+                    {backgroundMusic.file && (
+                      <div className="bg-gray-800 rounded p-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-300 truncate flex-1 mr-2">
+                            {backgroundMusic.file.name}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (backgroundMusic.url) {
+                                URL.revokeObjectURL(backgroundMusic.url)
+                              }
+                              setBackgroundMusic({
+                                file: null,
+                                url: null,
+                                volume: 50
+                              })
+                              markAsEdited()
+                            }}
+                            className="text-red-400 hover:text-red-300 text-xs px-2"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">
+                            Volume: {backgroundMusic.volume}%
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={backgroundMusic.volume}
+                            onChange={(e) => {
+                              setBackgroundMusic({
+                                ...backgroundMusic,
+                                volume: parseInt(e.target.value)
+                              })
+                              markAsEdited()
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Music will automatically fade out 1 second before the video ends
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -5631,7 +6227,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
           {/* Canvas Preview Area - fills entire space */}
           <div 
             className="absolute inset-0 flex items-center justify-center p-4"
-            style={{
+                  style={{
               backgroundColor: canvasSettings.workAreaBackgroundColor,
               cursor: isPanning ? 'grabbing' : 'grab',
             }}
@@ -5732,21 +6328,71 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
                       const isActive = currentTime >= clip.timelineStart && currentTime < clip.timelineEnd && 
                                       clip.layer === holder.layer
                       
+                      // Apply transition if active
+                      const transition = transitioningHoldersRef.current.get(holder.id)
+                      let displayX = holder.x
+                      let displayY = holder.y
+                      let displayWidth = holder.width
+                      let displayHeight = holder.height
+                      let displayRotation = holder.rotation
+                      
+                      if (transition) {
+                        const now = performance.now()
+                        const elapsed = now - transition.startTime
+                        const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
+                        
+                        // Easing function (ease-in-out cubic) for smooth, natural motion
+                        const eased = progress < 0.5
+                          ? 4 * progress * progress * progress
+                          : 1 - Math.pow(-2 * progress + 2, 3) / 2
+                        
+                        // Interpolate position and size
+                        displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
+                        displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
+                        displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
+                        displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
+                        
+                        // Interpolate rotation if provided
+                        if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
+                          // Handle rotation wrapping (e.g., 350° to 10° should go through 0°, not backwards)
+                          let startRot = transition.startRotation
+                          let endRot = transition.endRotation
+                          let diff = endRot - startRot
+                          
+                          // Normalize to shortest path
+                          if (Math.abs(diff) > 180) {
+                            if (diff > 0) {
+                              diff -= 360
+                            } else {
+                              diff += 360
+                            }
+                          }
+                          
+                          displayRotation = startRot + diff * eased
+                        }
+                        
+                        // Clean up completed transitions
+                        if (progress >= 1) {
+                          transitioningHoldersRef.current.delete(holder.id)
+                        }
+                      }
+                      
                       return (
                         <div
                           key={holder.id}
                           className={`absolute ${isSelected ? 'ring-2 ring-blue-500' : 'ring-1 ring-gray-700/50'} hover:ring-blue-400/50`}
                           style={{
-                            left: `${holder.x * 100}%`,
-                            top: `${holder.y * 100}%`,
-                            width: `${holder.width * 100}%`,
-                            height: `${holder.height * 100}%`,
-                            transform: `rotate(${holder.rotation}deg)`,
+                            left: `${displayX * 100}%`,
+                            top: `${displayY * 100}%`,
+                            width: `${displayWidth * 100}%`,
+                            height: `${displayHeight * 100}%`,
+                            transform: `rotate(${displayRotation}deg)`,
                             transformOrigin: 'center',
                             cursor: isSelected && !resizingHolderId ? 'move' : 'pointer',
                             overflow: 'hidden',
                             backgroundColor: !isActive ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
                             zIndex: holder.zIndex || 10, // Video holders use their zIndex property
+                            transition: transition ? 'none' : undefined, // Disable CSS transitions during programmatic transitions
                           }}
                           onMouseDown={(e) => {
                             // Only start drag if clicking on the holder itself (not on resize handles)
@@ -6490,10 +7136,150 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
               )}
 
 
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+
+        {/* Unsplash Search Modal */}
+        {unsplashModalOpen && (
+          <div 
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setUnsplashModalOpen(false)
+                setUnsplashSearchQuery('')
+                setUnsplashResults([])
+              }
+            }}
+          >
+            <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Search Unsplash</h3>
+                <button
+                  onClick={() => {
+                    setUnsplashModalOpen(false)
+                    setUnsplashSearchQuery('')
+                    setUnsplashResults([])
+                  }}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="p-4 border-b border-gray-700">
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={unsplashSearchQuery}
+                    onChange={(e) => setUnsplashSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        searchUnsplash(unsplashSearchQuery)
+                      }
+                    }}
+                    placeholder="Search for images (e.g., nature, abstract, gradient)..."
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => searchUnsplash(unsplashSearchQuery)}
+                    disabled={unsplashLoading || !unsplashSearchQuery.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
+                  >
+                    {unsplashLoading ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="Unsplash API Key (optional)"
+                    defaultValue={localStorage.getItem('unsplash_access_key') || ''}
+                    onChange={(e) => {
+                      if (e.target.value.trim()) {
+                        localStorage.setItem('unsplash_access_key', e.target.value.trim())
+                      } else {
+                        localStorage.removeItem('unsplash_access_key')
+                      }
+                    }}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <a
+                    href="https://unsplash.com/developers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap"
+                  >
+                    Get API Key
+                  </a>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {localStorage.getItem('unsplash_access_key') 
+                    ? '✓ Using official Unsplash API for better results'
+                    : 'Using Unsplash Source API (limited). Add an API key for better search results.'}
+                </p>
+              </div>
+
+              {/* Results Grid */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {unsplashLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-400">Loading images...</div>
+                  </div>
+                ) : unsplashResults.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {unsplashResults.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative group cursor-pointer bg-gray-800 rounded overflow-hidden aspect-square"
+                        onClick={() => handleSelectUnsplashImage(image.urls.regular)}
+                      >
+                        <img
+                          src={image.urls.thumb}
+                          alt={image.description || 'Unsplash image'}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs text-center p-2">
+                            <div className="font-semibold">Click to select</div>
+                            {image.description && (
+                              <div className="text-gray-300 mt-1 truncate">{image.description}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="text-white text-xs truncate">
+                            Photo by {image.user.name}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : unsplashSearchQuery ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-400 text-center">
+                      <p>No results found for "{unsplashSearchQuery}"</p>
+                      <p className="text-xs mt-2">Try a different search term</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-400 text-center">
+                      <p>Enter a search term to find images</p>
+                      <p className="text-xs mt-2">Examples: nature, abstract, gradient, landscape</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+    </>
   )
 }

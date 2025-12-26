@@ -73,7 +73,13 @@ export async function combineLayersWithLayout(
     microphone?: AudioProperties
     screen?: AudioProperties
   },
-  captionData?: CaptionData
+  captionData?: CaptionData,
+  outputWidth: number = 1920,
+  outputHeight: number = 1080,
+  backgroundMusicFile: Blob | null = null,
+  backgroundMusicVolume: number = 0.5,
+  videoDuration: number = 0,
+  onProgress?: (progress: number) => void
 ): Promise<Blob> {
   try {
     // Apply cuts to each input if cuts exist
@@ -98,10 +104,13 @@ export async function combineLayersWithLayout(
       processedScreenBlob,
       layout,
       'output.mp4',
-      1920,
-      1080,
+      outputWidth,
+      outputHeight,
       audioProps,
-      captionData
+      captionData,
+      backgroundMusicFile,
+      backgroundMusicVolume,
+      videoDuration
     )
 
     return outputBlob
