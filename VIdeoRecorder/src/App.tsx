@@ -78,7 +78,7 @@ function App() {
     restoreLastProject()
   }, [])
 
-  // Auto-save project when changes are made
+  // Save project data (scenes, title, etc.)
   const saveProject = useCallback(async (scenesToSave?: Scene[], titleToSave?: string) => {
     if (!hasProject) return
 
@@ -117,15 +117,6 @@ function App() {
       console.error('Error saving project:', error)
     }
   }, [hasProject, projectTitle, scenes])
-
-  useEffect(() => {
-    if (isEdited && hasProject) {
-      const timeoutId = setTimeout(() => {
-        saveProject()
-      }, 1000) // Auto-save after 1 second of no changes
-      return () => clearTimeout(timeoutId)
-    }
-  }, [isEdited, hasProject, saveProject])
 
   const handleCreateProject = async () => {
     try {

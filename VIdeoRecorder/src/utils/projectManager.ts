@@ -43,6 +43,9 @@ export interface ClipProperties {
   contrast: number
   saturation: number
   exposure: number
+  highlights: number
+  midtones: number
+  shadows: number
 }
 
 export interface AudioSettings {
@@ -134,6 +137,7 @@ export interface EditData {
   captionSettings?: {
     font: string
     size: number
+    lineHeight?: number
     maxWords: number
     style: string
   }

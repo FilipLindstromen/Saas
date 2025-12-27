@@ -3,7 +3,8 @@ import { Scene, RecordingTake } from '../App'
 import { projectManager } from '../utils/projectManager'
 import { transcribeAudio, WordTimestamp } from '../utils/transcription'
 import { VideoCut, Layout, combineLayersWithLayout, concatVideos } from '../utils/videoProcessing'
-import { trimVideo, getFFmpeg } from '../utils/ffmpeg'
+import type { TitleData, BackgroundImageData } from '../utils/ffmpeg'
+import { trimVideo, getFFmpeg, encodeFramesToVideo } from '../utils/ffmpeg'
 import { fetchFile } from '@ffmpeg/util'
 import { exportDaVinciResolveTimeline } from '../utils/davinciExport'
 import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
@@ -20,7 +21,7 @@ interface EditStepProps {
   onSaveRequest?: (saveFn: () => Promise<void>) => void
 }
 
-type SidebarTab = 'canvas' | 'layout' | 'clip' | 'zoom' | 'cursor' | 'captions' | 'audio' | 'visual'
+type SidebarTab = 'canvas' | 'layout' | 'presets' | 'fonts' | 'clip' | 'zoom' | 'cursor' | 'captions' | 'audio' | 'visual'
 
 // ContentEditable component for rich text editing
 const TitleEditor = React.forwardRef<HTMLDivElement, {
@@ -134,7 +135,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   // Sidebar
   const [activeTab, setActiveTab] = useState<SidebarTab>('captions')
   const [showSettings, setShowSettings] = useState(false)
-  const [layoutSubTab, setLayoutSubTab] = useState<'text-background' | 'presets'>('text-background')
 
   // Transcription (per scene)
   const [transcripts, setTranscripts] = useState<Map<string, { words: WordTimestamp[]; text: string }>>(new Map())
@@ -358,8 +358,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             ...lc,
             title: lc.title ? {
               ...lc.title,
-              animationIn: lc.title.animationIn ?? 'none',
-              animationOut: lc.title.animationOut ?? 'none',
+              animationIn: lc.title.animationIn ?? 'fade',
+              animationOut: lc.title.animationOut ?? 'fade',
               animationDuration: lc.title.animationDuration ?? 0.5,
             } : undefined,
             backgroundImage: lc.backgroundImage ? { ...lc.backgroundImage } : undefined,
@@ -414,6 +414,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         if (editData.captionSettings) {
           setCaptionFont(editData.captionSettings.font || captionFont)
           setCaptionSize(editData.captionSettings.size ?? captionSize)
+          setCaptionLineHeight(editData.captionSettings.lineHeight ?? captionLineHeight)
           setCaptionMaxWords(editData.captionSettings.maxWords ?? captionMaxWords)
           setSelectedCaptionStyle(editData.captionSettings.style || selectedCaptionStyle)
         }
@@ -704,6 +705,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [selectedCaptionStyle, setSelectedCaptionStyle] = useState<CaptionStyleId>('style1')
   const [captionFont, setCaptionFont] = useState<string>('Inter')
   const [captionSize, setCaptionSize] = useState<number>(16)
+  const [captionLineHeight, setCaptionLineHeight] = useState<number>(1.2) // Line height multiplier for captions
   const [captionMaxWords, setCaptionMaxWords] = useState<number>(5) // Maximum words to show at once
   // Track which word indices have which style (per scene)
   const [captionWordStyles, setCaptionWordStyles] = useState<Map<string, Map<number, CaptionStyleId>>>(new Map())
@@ -936,13 +938,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   
   // Holder transitions - track animated transitions between positions
   // Key is holder ID, but we also track by clipId_layer for layout clip transitions
+  // startTime is now in timeline seconds, not performance.now()
   const transitioningHoldersRef = useRef<Map<string, {
     startPos: { x: number; y: number; width: number; height: number }
     endPos: { x: number; y: number; width: number; height: number }
     startRotation?: number
     endRotation?: number
-    startTime: number
-    duration: number
+    startTime: number // Timeline time in seconds when transition started
+    duration: number // Duration in seconds
     clipId?: string // Store clipId for matching
     layer?: string // Store layer for matching
   }>>(new Map())
@@ -953,8 +956,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     endPos: { x: number; y: number; width: number; height: number }
     startRotation?: number
     endRotation?: number
-    startTime: number
-    duration: number
+    startTime: number // Timeline time in seconds when transition started
+    duration: number // Duration in seconds
   }>>(new Map())
   
   // Fade-out transitions - track previous holders that should fade out
@@ -990,8 +993,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         title: lc.title ? { 
           ...lc.title,
           // Ensure all animation properties are included
-          animationIn: lc.title.animationIn ?? 'none',
-          animationOut: lc.title.animationOut ?? 'none',
+          animationIn: lc.title.animationIn ?? 'fade',
+          animationOut: lc.title.animationOut ?? 'fade',
           animationDuration: lc.title.animationDuration ?? 0.5,
         } : undefined,
         backgroundImage: lc.backgroundImage ? { ...lc.backgroundImage } : undefined,
@@ -1001,8 +1004,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         title: lp.title ? { 
           ...lp.title,
           // Ensure all animation properties are included
-          animationIn: lp.title.animationIn ?? 'none',
-          animationOut: lp.title.animationOut ?? 'none',
+          animationIn: lp.title.animationIn ?? 'fade',
+          animationOut: lp.title.animationOut ?? 'fade',
           animationDuration: lp.title.animationDuration ?? 0.5,
         } : undefined,
         backgroundImage: lp.backgroundImage ? { ...lp.backgroundImage } : undefined,
@@ -1020,6 +1023,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       captionSettings: {
         font: captionFont,
         size: captionSize,
+        lineHeight: captionLineHeight,
         maxWords: captionMaxWords,
         style: selectedCaptionStyle,
       },
@@ -1034,7 +1038,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         // Note: File blob URL is not serialized - will need to be re-uploaded on load
       },
     }
-  }, [deletedWords, timelineClips, clipProperties, cuts, layout, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
+  }, [deletedWords, timelineClips, clipProperties, cuts, layout, layoutClips, layoutPresets, titleSettings, canvasSettings, audioSettings, visualSettings, captionFont, captionSize, captionLineHeight, captionMaxWords, selectedCaptionStyle, timelineZoom, timelineHeight, timelineLayerHeightScale, backgroundMusic])
   
   // Explicit save function for edit data
   const saveEditData = useCallback(async () => {
@@ -1079,10 +1083,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       ))
       if (!skipSave) {
         markAsEdited()
-        // Explicitly save edit data after updating layout clip holders
-        setTimeout(() => {
-          saveEditData()
-        }, 0)
       }
     } else {
       // Create new layout clip for current time range
@@ -1100,8 +1100,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           x: 0.5,
           y: 0.1,
           textAlign: 'center',
-          animationIn: 'none',
-          animationOut: 'none',
+          animationIn: 'fade',
+          animationOut: 'fade',
           animationDuration: 0.5,
         },
         backgroundImage: {
@@ -1122,13 +1122,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       })
       if (!skipSave) {
         markAsEdited()
-        // Explicitly save edit data after creating layout clip
-        setTimeout(() => {
-          saveEditData()
-        }, 0)
       }
     }
-  }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited, saveEditData])
+  }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited])
 
   // Unsplash search function
   const searchUnsplash = useCallback(async (query: string) => {
@@ -1255,6 +1251,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     selectedCaptionStyle: CaptionStyleId
     captionFont: string
     captionSize: number
+    captionLineHeight: number
     captionMaxWords: number
     backgroundMusic: typeof backgroundMusic
   }
@@ -1285,6 +1282,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       selectedCaptionStyle,
       captionFont,
       captionSize,
+      captionLineHeight,
       captionMaxWords,
       backgroundMusic: {
         file: backgroundMusic.file,
@@ -1292,7 +1290,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         volume: backgroundMusic.volume
       },
     }
-  }, [timelineClips, clipProperties, deletedWords, cuts, layout, layoutClips, layoutPresets, audioSettings, visualSettings, canvasSettings, selectedCaptionStyle, captionFont, captionSize, captionMaxWords, backgroundMusic])
+  }, [timelineClips, clipProperties, deletedWords, cuts, layout, layoutClips, layoutPresets, audioSettings, visualSettings, canvasSettings, selectedCaptionStyle, captionFont, captionSize, captionLineHeight, captionMaxWords, backgroundMusic])
 
   // Save current state to history
   const saveToHistory = useCallback(() => {
@@ -1327,59 +1325,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           : lc
       ))
       // Explicitly save edit data after updating background image
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
       markAsEdited()
       saveToHistory()
       // Explicitly save edit data after updating background image
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
       setUnsplashModalOpen(false)
       setUnsplashSearchQuery('')
       setUnsplashResults([])
     }
   }, [currentTime, getCurrentLayoutClip, markAsEdited, saveToHistory])
-  
-  // Auto-save edit data to project folder when changes occur
-  useEffect(() => {
-    if (!projectManager.hasProject()) return
-    
-    // Save immediately after each edit (minimal debounce to batch rapid changes)
-    const timeoutId = setTimeout(async () => {
-      try {
-        const editData = getEditData()
-        await projectManager.saveEditData(editData as any)
-        markAsSaved()
-      } catch (error) {
-        console.error('Error auto-saving edit data:', error)
-      }
-    }, 100) // Auto-save after 100ms to batch rapid changes but save quickly
-    
-    return () => clearTimeout(timeoutId)
-  }, [
-    timelineClips,
-    clipProperties,
-    deletedWords,
-    cuts,
-    layoutClips,
-    layoutPresets,
-    titleSettings,
-    canvasSettings,
-    audioSettings,
-    visualSettings,
-    captionFont,
-    captionSize,
-    captionMaxWords,
-    selectedCaptionStyle,
-    timelineZoom,
-    timelineHeight,
-    timelineLayerHeightScale,
-    backgroundMusic,
-    getEditData,
-    markAsSaved,
-  ])
 
   // Restore state from snapshot
   const restoreFromSnapshot = useCallback((snapshot: EditStateSnapshot) => {
@@ -1400,6 +1353,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     setSelectedCaptionStyle(snapshot.selectedCaptionStyle)
     setCaptionFont(snapshot.captionFont)
     setCaptionSize(snapshot.captionSize)
+    setCaptionLineHeight(snapshot.captionLineHeight)
     setCaptionMaxWords(snapshot.captionMaxWords)
     setBackgroundMusic(snapshot.backgroundMusic)
   }, [])
@@ -1949,10 +1903,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       setDragStartHolder(null)
       saveToHistory()
       markAsEdited()
-      // Save edit data after drag completes
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -1961,7 +1911,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingHolderId, dragStartPos, dragStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited, saveEditData])
+  }, [draggingHolderId, dragStartPos, dragStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited])
 
   // Handle canvas holder resizing (corner handles)
   useEffect(() => {
@@ -2037,10 +1987,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       setResizeStartHolder(null)
       saveToHistory()
       markAsEdited()
-      // Save edit data after resize completes
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -2049,7 +1995,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited, saveEditData])
+  }, [resizingHolderId, resizeCorner, resizeStartPos, resizeStartHolder, currentTime, getCurrentLayoutClip, updateHoldersInLayoutClip, saveToHistory, markAsEdited])
 
   // Handle title dragging (repositioning)
   useEffect(() => {
@@ -2094,10 +2040,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       setTitleDragStartPos(null)
       setTitleDragStartLayoutClip(null)
       saveToHistory()
-      // Explicitly save edit data after title position change
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -2106,7 +2048,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingTitle, titleDragStartPos, titleDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory, saveEditData])
+  }, [draggingTitle, titleDragStartPos, titleDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory])
 
   // Load selected take's recordings
   useEffect(() => {
@@ -3031,7 +2973,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   // Store transition by clipId_layer so we can apply it even if holder ID changes
                   const clipKey = `${clipId}_${layer}`
                   const existingTransition = transitioningByClipRef.current.get(clipKey)
-                  const transitionStartTime = existingTransition ? existingTransition.startTime : performance.now()
+                  // Use timeline time instead of performance.now() for proper export/scrub support
+                  const transitionStartTime = existingTransition ? existingTransition.startTime : timelineTimeRef.current
                   
                   transitioningByClipRef.current.set(clipKey, {
                     startPos: { 
@@ -3048,8 +2991,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     },
                     startRotation: prevHolder.rotation || 0,
                     endRotation: newHolder.rotation || 0,
-                    startTime: transitionStartTime,
-                    duration: canvasSettings.transitionDuration * 1000
+                    startTime: transitionStartTime, // Timeline time in seconds
+                    duration: canvasSettings.transitionDuration // Duration in seconds
                   })
                   
                   // Also set on actual holder if it exists
@@ -3070,8 +3013,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       },
                       startRotation: prevHolder.rotation || 0,
                       endRotation: newHolder.rotation || 0,
-                      startTime: transitionStartTime,
-                      duration: canvasSettings.transitionDuration * 1000,
+                      startTime: transitionStartTime, // Timeline time in seconds
+                      duration: canvasSettings.transitionDuration, // Duration in seconds
                       clipId: clipId,
                       layer: layer
                     })
@@ -3083,8 +3026,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 if (actualHolder) {
                   fadingOutHoldersRef.current.set(actualHolder.id, {
                     holder: { ...actualHolder },
-                    startTime: performance.now(),
-                    duration: canvasSettings.transitionDuration * 1000
+                    startTime: timelineTimeRef.current, // Timeline time in seconds
+                    duration: canvasSettings.transitionDuration // Duration in seconds
                   })
                 }
               } else if (!prevHolder && newHolder) {
@@ -3108,8 +3051,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     },
                     startRotation: newHolder.rotation || 0,
                     endRotation: newHolder.rotation || 0,
-                    startTime: performance.now(),
-                    duration: canvasSettings.transitionDuration * 1000,
+                    startTime: timelineTimeRef.current, // Timeline time in seconds
+                    duration: canvasSettings.transitionDuration, // Duration in seconds
                     fadeIn: true // Flag to indicate this is a fade-in
                   })
                 }
@@ -3154,17 +3097,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 transitioningHoldersRef.current.set(newHolder.id, {
                   startPos: { x: previousHolder.x, y: previousHolder.y, width: previousHolder.width, height: previousHolder.height },
                   endPos: { x: newHolder.x, y: newHolder.y, width: newHolder.width, height: newHolder.height },
-                  startTime: performance.now(),
-                  duration: canvasSettings.transitionDuration * 1000 // Convert to ms
+                  startTime: timelineTimeRef.current, // Timeline time in seconds
+                  duration: canvasSettings.transitionDuration // Duration in seconds
                 })
               }
               
               // Start fade-out animation for previous holder (always fade if there's a clip change)
-              const transitionStartTime = performance.now()
+              const transitionStartTime = timelineTimeRef.current
               fadingOutHoldersRef.current.set(previousHolder.id, {
                 holder: { ...previousHolder }, // Copy to preserve position at transition start
-                startTime: transitionStartTime,
-                duration: canvasSettings.transitionDuration * 1000
+                startTime: transitionStartTime, // Timeline time in seconds
+                duration: canvasSettings.transitionDuration // Duration in seconds
               })
             }
           }
@@ -3796,11 +3739,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
     // Save to history after cut is created
     setTimeout(() => saveToHistory(), 0)
-    // Explicitly save edit data after cut is created
-    setTimeout(() => {
-      saveEditData()
-    }, 0)
-  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts, timelineClips, saveToHistory, saveEditData])
+  }, [selectedText, sceneTakes, handleRemoveSegment, transcripts, timelineClips, saveToHistory])
 
 
 
@@ -3811,10 +3750,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     updatedCuts.set(sceneId, sceneCuts.filter(c => c.id !== cutId))
     setCuts(updatedCuts)
     // Explicitly save edit data after cut is deleted
-    setTimeout(() => {
-      saveEditData()
-    }, 0)
-  }, [cuts, saveEditData])
+  }, [cuts])
 
   // ========== NEW CLIP-BASED EDITING FUNCTIONS ==========
 
@@ -3862,15 +3798,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       document.removeEventListener('mouseup', handleMouseUp)
       setDraggingLayoutClipId(null)
       saveToHistory()
-      // Explicitly save edit data after moving completes
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-  }, [layoutClips, timelineZoom, saveToHistory, saveEditData])
+  }, [layoutClips, timelineZoom, saveToHistory])
 
   // Trim layout clip - drag edges
   const handleStartTrimLayoutClip = useCallback((layoutClipId: string, edge: 'in' | 'out', mouseX: number) => {
@@ -3930,15 +3862,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       setTrimmingLayoutClipId(null)
       setTrimmingLayoutEdge(null)
       saveToHistory()
-      // Explicitly save edit data after trimming completes
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
 
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-  }, [layoutClips, timelineZoom, saveToHistory, saveEditData])
+  }, [layoutClips, timelineZoom, saveToHistory])
 
   // Split layout clip at timeline position
   const handleSplitLayoutClip = useCallback((cutTime: number) => {
@@ -3971,11 +3899,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     
     saveToHistory()
     markAsEdited()
-    // Explicitly save edit data after splitting layout clip
-    setTimeout(() => {
-      saveEditData()
-    }, 0)
-  }, [layoutClips, saveToHistory, saveEditData, markAsEdited])
+  }, [layoutClips, saveToHistory, markAsEdited])
 
   // Cut clip - split at timeline position
   const handleCutClip = useCallback((clipId: string | null, cutTime: number) => {
@@ -4094,9 +4018,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       markAsEdited()
       // Explicitly save edit data after cutting clips (including audio)
       // Use a small delay to ensure all state updates complete
-      setTimeout(() => {
-        saveEditData()
-      }, 100)
       return
     }
 
@@ -4148,11 +4069,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       saveToHistory()
       markAsEdited()
       // Explicitly save edit data after cutting all clips
-      setTimeout(() => {
-        saveEditData()
-      }, 0)
     }
-  }, [timelineClips, layoutClips, selectedClipIds, selectedLayoutClipIds, handleSplitLayoutClip, saveToHistory, markAsEdited, saveEditData])
+  }, [timelineClips, layoutClips, selectedClipIds, selectedLayoutClipIds, handleSplitLayoutClip, saveToHistory, markAsEdited])
 
   // Move clip - drag horizontally (Linked)
   const handleStartMoveClip = useCallback((clipId: string, mouseX: number) => {
@@ -4462,10 +4380,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     setSelectedLayoutClipIds(new Set())
     saveToHistory()
     // Explicitly save edit data after deletion completes
-    setTimeout(() => {
-      saveEditData()
-    }, 0)
-  }, [selectedLayoutClipIds, saveToHistory, saveEditData])
+  }, [selectedLayoutClipIds, saveToHistory])
 
   // Handle keyboard delete key to create cuts from selected words OR delete selected clips
   useEffect(() => {
@@ -4674,6 +4589,360 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
   }
 
+  // Render a frame at a specific time to a canvas (for export)
+  const renderFrameToCanvas = useCallback(async (
+    time: number,
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    videoElements: { camera: HTMLVideoElement | null, screen: HTMLVideoElement | null }
+  ): Promise<void> => {
+    // Set canvas to exact export resolution
+    canvas.width = canvasDimensions.width
+    canvas.height = canvasDimensions.height
+    
+    // Clear canvas
+    ctx.fillStyle = canvasSettings.videoBackgroundColor
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    
+    // Get current layout clip at this time
+    const currentLayoutClip = getCurrentLayoutClip(time)
+    
+    // Draw background image if present
+    if (currentLayoutClip?.backgroundImage?.url) {
+      const bgImg = currentLayoutClip.backgroundImage
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          const bgX = bgImg.x * canvas.width
+          const bgY = bgImg.y * canvas.height
+          const bgW = bgImg.width * canvas.width
+          const bgH = bgImg.height * canvas.height
+          
+          // Calculate fade in/out
+          const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
+          const fadeDuration = Math.min(0.5, clipDuration * 0.1)
+          const timeInClip = time - currentLayoutClip.timelineStart
+          const timeFromEnd = currentLayoutClip.timelineEnd - time
+          let opacity = 1
+          if (timeInClip < fadeDuration) {
+            opacity = timeInClip / fadeDuration
+          } else if (timeFromEnd < fadeDuration) {
+            opacity = timeFromEnd / fadeDuration
+          }
+          
+          ctx.save()
+          ctx.globalAlpha = opacity
+          ctx.drawImage(img, bgX, bgY, bgW, bgH)
+          ctx.restore()
+          resolve()
+        }
+        img.onerror = reject
+        img.src = bgImg.url
+      })
+    }
+    
+    // Get active holders at this time
+    const activeHolders = canvasHolders.filter(holder => {
+      const clip = timelineClips.find(c => c.id === holder.clipId)
+      return clip && time >= clip.timelineStart && time < clip.timelineEnd && clip.layer === holder.layer
+    }).sort((a, b) => a.zIndex - b.zIndex)
+    
+    // Draw each video holder
+    for (const holder of activeHolders) {
+      const clip = timelineClips.find(c => c.id === holder.clipId)
+      if (!clip) continue
+      
+      const video = holder.layer === 'camera' ? videoElements.camera : 
+                    holder.layer === 'screen' ? videoElements.screen : null
+      
+      if (!video || video.readyState < 2) continue
+      
+      // Calculate video time relative to clip start
+      // Since videos are already trimmed, we map timeline time directly to video time
+      // The trimmed video starts at 0, so timeline time in clip = video time
+      const timelineTimeInClip = time - clip.timelineStart
+      const videoTime = timelineTimeInClip
+      
+      if (videoTime < 0 || videoTime >= video.duration) continue
+      
+      // Seek video to correct time (with timeout)
+      const seekPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          video.removeEventListener('seeked', onSeeked)
+          reject(new Error('Video seek timeout'))
+        }, 2000)
+        
+        const onSeeked = () => {
+          clearTimeout(timeout)
+          video.removeEventListener('seeked', onSeeked)
+          resolve()
+        }
+        video.addEventListener('seeked', onSeeked)
+        
+        // If already at correct time, resolve immediately
+        if (Math.abs(video.currentTime - videoTime) < 0.1) {
+          clearTimeout(timeout)
+          video.removeEventListener('seeked', onSeeked)
+          resolve()
+        } else {
+          video.currentTime = videoTime
+        }
+      })
+      
+      try {
+        await seekPromise
+      } catch (error) {
+        console.warn(`Failed to seek video to ${videoTime}s:`, error)
+        continue // Skip this frame if seek fails
+      }
+      
+      // Get clip properties for filters
+      const clipKey = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
+      const props = clipProperties.get(clipKey)
+      const brightness = props?.brightness ?? 0
+      const contrast = props?.contrast ?? 0
+      const saturation = props?.saturation ?? 0
+      const exposure = props?.exposure ?? 0
+      const highlights = props?.highlights ?? 0
+      const midtones = props?.midtones ?? 0
+      const shadows = props?.shadows ?? 0
+      
+      // Calculate position and size
+      const holderX = holder.x * canvas.width
+      const holderY = holder.y * canvas.height
+      const holderW = holder.width * canvas.width
+      const holderH = holder.height * canvas.height
+      
+      // Draw video with rotation
+      ctx.save()
+      ctx.translate(holderX + holderW / 2, holderY + holderH / 2)
+      ctx.rotate((holder.rotation || 0) * Math.PI / 180)
+      
+      // Apply filters using canvas operations
+      // Brightness/Exposure
+      const brightnessValue = 1 + (brightness + exposure) / 100
+      // Contrast
+      const contrastValue = 1 + contrast / 100
+      // Saturation (requires more complex processing)
+      
+      // Draw video frame
+      const videoAspect = video.videoWidth / video.videoHeight
+      const holderAspect = holderW / holderH
+      
+      let drawW = holderW
+      let drawH = holderH
+      let drawX = -holderW / 2
+      let drawY = -holderH / 2
+      
+      if (holderAspect > videoAspect) {
+        // Holder is wider - fit to height (object-cover behavior)
+        drawH = holderH
+        drawW = drawH * videoAspect
+        drawX = -drawW / 2
+      } else {
+        // Holder is taller - fit to width
+        drawW = holderW
+        drawH = drawW / videoAspect
+        drawY = -drawH / 2
+      }
+      
+      // Draw video frame first
+      ctx.drawImage(video, drawX, drawY, drawW, drawH)
+      
+      // Apply color adjustments using imageData manipulation
+      if (brightnessValue !== 1 || contrastValue !== 1 || highlights !== 0 || midtones !== 0 || shadows !== 0 || saturation !== 0) {
+        const imageData = ctx.getImageData(drawX, drawY, drawW, drawH)
+        const data = imageData.data
+        
+        for (let i = 0; i < data.length; i += 4) {
+          let r = data[i]
+          let g = data[i + 1]
+          let b = data[i + 2]
+          
+          // Calculate luminance (0-255)
+          const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+          
+          // Determine which tonal range this pixel belongs to
+          let adjustment = 0
+          if (luminance > 200) {
+            // Highlights (bright areas)
+            adjustment = highlights / 100
+          } else if (luminance > 100) {
+            // Midtones
+            adjustment = midtones / 100
+          } else {
+            // Shadows (dark areas)
+            adjustment = shadows / 100
+          }
+          
+          // Apply brightness/exposure
+          const brightnessAdjust = brightnessValue
+          
+          // Apply adjustments
+          r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
+          g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
+          b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
+          
+          // Apply contrast
+          r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
+          g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
+          b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
+          
+          // Apply saturation
+          if (saturation !== 0) {
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b
+            const satValue = 1 + saturation / 100
+            r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
+            g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
+            b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
+          }
+          
+          data[i] = r
+          data[i + 1] = g
+          data[i + 2] = b
+        }
+        
+        ctx.putImageData(imageData, drawX, drawY)
+      }
+      
+      ctx.restore()
+    }
+    
+    // Draw title if present
+    if (currentLayoutClip?.title?.text) {
+      const title = currentLayoutClip.title
+      const titleX = title.x * canvas.width
+      const titleY = title.y * canvas.height
+      
+      // Calculate animation
+      const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
+      const animationDuration = title.animationDuration ?? 0.5
+      const timeInClip = time - currentLayoutClip.timelineStart
+      const timeFromEnd = currentLayoutClip.timelineEnd - time
+      
+      const animationIn = title.animationIn || 'fade'
+      const animationOut = title.animationOut || 'fade'
+      
+      const isInAnimation = animationIn !== 'none' && timeInClip < animationDuration
+      const isOutAnimation = animationOut !== 'none' && timeFromEnd < animationDuration
+      
+      const easeInOut = (t: number): number => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+      }
+      
+      const rawInProgress = isInAnimation ? Math.min(1, timeInClip / animationDuration) : 1
+      const rawOutProgress = isOutAnimation ? Math.min(1, timeFromEnd / animationDuration) : 1
+      const inProgress = easeInOut(rawInProgress)
+      const outProgress = easeInOut(rawOutProgress)
+      
+      let opacity = 1
+      let translateX = 0
+      let translateY = 0
+      let scale = 1
+      
+      if (isInAnimation && animationIn !== 'none') {
+        const progress = inProgress
+        switch (animationIn) {
+          case 'fade':
+            opacity = progress
+            break
+          case 'slideUp':
+            translateY = 100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideDown':
+            translateY = -100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideLeft':
+            translateX = 100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideRight':
+            translateX = -100 * (1 - progress)
+            opacity = progress
+            break
+          case 'zoomIn':
+            scale = 0.3 + 0.7 * progress
+            opacity = progress
+            break
+          case 'zoomOut':
+            scale = 1.5 - 0.5 * progress
+            opacity = progress
+            break
+        }
+      } else if (isOutAnimation && animationOut !== 'none') {
+        const progress = outProgress
+        switch (animationOut) {
+          case 'fade':
+            opacity = progress
+            break
+          case 'slideUp':
+            translateY = -100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideDown':
+            translateY = 100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideLeft':
+            translateX = -100 * (1 - progress)
+            opacity = progress
+            break
+          case 'slideRight':
+            translateX = 100 * (1 - progress)
+            opacity = progress
+            break
+          case 'zoomIn':
+            scale = 1 + 0.5 * (1 - progress)
+            opacity = progress
+            break
+          case 'zoomOut':
+            scale = 1 - 0.7 * (1 - progress)
+            opacity = progress
+            break
+        }
+      }
+      
+      // Calculate text alignment offset
+      const textAlign = title.textAlign || 'center'
+      let alignOffsetX = 0
+      if (textAlign === 'center') {
+        alignOffsetX = -50 // Percentage
+      } else if (textAlign === 'right') {
+        alignOffsetX = -100
+      }
+      
+      ctx.save()
+      ctx.translate(titleX, titleY)
+      ctx.translate(alignOffsetX * (canvas.width / 100), 0)
+      ctx.translate(translateX * (canvas.width / 100), translateY * (canvas.height / 100))
+      ctx.scale(scale, scale)
+      ctx.globalAlpha = opacity
+      
+      // Draw text
+      const fontSize = titleSettings.size
+      const lineHeight = fontSize * titleSettings.lineHeight
+      ctx.font = `${fontSize}px ${titleSettings.font}`
+      ctx.fillStyle = '#ffffff'
+      ctx.textAlign = textAlign as CanvasTextAlign
+      ctx.textBaseline = 'top'
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+      ctx.shadowBlur = 4
+      ctx.shadowOffsetX = 2
+      ctx.shadowOffsetY = 2
+      
+      const text = title.text.replace(/<[^>]*>/g, '') // Remove HTML tags
+      const lines = text.split('\n').filter(l => l.trim())
+      lines.forEach((line, index) => {
+        ctx.fillText(line, 0, index * lineHeight)
+      })
+      
+      ctx.restore()
+    }
+  }, [canvasDimensions, canvasSettings, getCurrentLayoutClip, canvasHolders, timelineClips, clipProperties, titleSettings])
+
   // Export
   const handleExport = async () => {
     if (sceneTakes.length === 0) {
@@ -4749,6 +5018,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     try {
       // Process each scene: load, trim based on timeline clips, apply cuts, combine layers
       const processedSceneBlobs: Blob[] = []
+      const failedScenes: Array<{ index: number; reason: string }> = []
 
       for (let i = 0; i < scenesToExport.length; i++) {
         const sceneTake = scenesToExport[i]
@@ -4879,8 +5149,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         }
 
         if (!sceneCameraBlob && !sceneScreenBlob) {
-          console.warn(`No video to export for scene ${sceneTake.sceneId}`)
+          const reason = `No video available (camera: ${sceneTake.take.hasCamera ? 'expected' : 'none'}, screen: ${sceneTake.take.hasScreen ? 'expected' : 'none'})`
+          console.warn(`No video to export for scene ${sceneTake.sceneId}:`, reason)
           setExportProgress(`Skipping scene ${i + 1}: No video available`)
+          failedScenes.push({ index: i + 1, reason })
           continue
         }
 
@@ -4908,111 +5180,188 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         
         // Convert layout clip to layout format for export
         // Layout positions in combineVideos expect percentages (0-100)
+        // Holders use normalized coordinates (0-1), so multiply by 100 to get percentages
+        const cameraHolder = sceneLayoutClip?.holders.find(h => h.layer === 'camera')
+        const screenHolder = sceneLayoutClip?.holders.find(h => h.layer === 'screen')
+        
         const exportLayout: Layout = sceneLayoutClip ? {
           type: 'custom',
-          cameraPosition: sceneLayoutClip.holders.find(h => h.layer === 'camera') ? {
-            x: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.x * 100,
-            y: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.y * 100,
-            width: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.width * 100,
-            height: sceneLayoutClip.holders.find(h => h.layer === 'camera')!.height * 100,
+          cameraPosition: cameraHolder ? {
+            x: cameraHolder.x * 100, // Convert 0-1 to 0-100 percentage
+            y: cameraHolder.y * 100,
+            width: cameraHolder.width * 100,
+            height: cameraHolder.height * 100,
+            rotation: cameraHolder.rotation || 0, // Include rotation
           } : undefined,
-          screenPosition: sceneLayoutClip.holders.find(h => h.layer === 'screen') ? {
-            x: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.x * 100,
-            y: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.y * 100,
-            width: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.width * 100,
-            height: sceneLayoutClip.holders.find(h => h.layer === 'screen')!.height * 100,
+          screenPosition: screenHolder ? {
+            x: screenHolder.x * 100, // Convert 0-1 to 0-100 percentage
+            y: screenHolder.y * 100,
+            width: screenHolder.width * 100,
+            height: screenHolder.height * 100,
+            rotation: screenHolder.rotation || 0, // Include rotation
           } : undefined,
         } : (layout.type === 'custom' ? layout : {
           type: 'camera-only' as const
         })
 
-        // Combine layers with layout using canvas settings resolution
-        setExportProgress(`Combining layers for scene ${i + 1}...`)
+        // Prepare title data for export
+        const exportTitleData: TitleData | undefined = sceneLayoutClip?.title?.text ? {
+          text: sceneLayoutClip.title.text.replace(/<[^>]*>/g, ''), // Remove HTML tags
+          x: sceneLayoutClip.title.x,
+          y: sceneLayoutClip.title.y,
+          textAlign: sceneLayoutClip.title.textAlign || 'center',
+          font: titleSettings.font,
+          fontSize: titleSettings.size,
+          lineHeight: titleSettings.lineHeight,
+          animationIn: sceneLayoutClip.title.animationIn,
+          animationOut: sceneLayoutClip.title.animationOut,
+          animationDuration: sceneLayoutClip.title.animationDuration,
+          timelineStart: sceneLayoutClip.timelineStart,
+          timelineEnd: sceneLayoutClip.timelineEnd,
+        } : undefined
+
+        // Prepare background image data for export
+        const exportBackgroundImageData: BackgroundImageData | undefined = sceneLayoutClip?.backgroundImage ? {
+          url: sceneLayoutClip.backgroundImage.url,
+          x: sceneLayoutClip.backgroundImage.x || 0,
+          y: sceneLayoutClip.backgroundImage.y || 0,
+          width: sceneLayoutClip.backgroundImage.width || 1,
+          height: sceneLayoutClip.backgroundImage.height || 1,
+        } : undefined
+
+        // Canvas-based export: render frames exactly as shown
+        setExportProgress(`Rendering scene ${i + 1} using canvas...`)
         try {
-          // Get video duration for fade-out calculation (with timeout)
-          let videoDuration = 0
-          try {
-            if (sceneCameraBlob) {
-              setExportProgress(`Getting video duration for scene ${i + 1}...`)
-              const video = document.createElement('video')
-              video.preload = 'metadata'
-              const videoUrl = URL.createObjectURL(sceneCameraBlob)
-              video.src = videoUrl
-              
-              await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                  URL.revokeObjectURL(videoUrl)
-                  reject(new Error('Timeout loading video metadata'))
-                }, 5000) // 5 second timeout
-                
-                video.onloadedmetadata = () => {
-                  clearTimeout(timeout)
-                  videoDuration = video.duration || 0
-                  URL.revokeObjectURL(videoUrl)
-                  resolve()
-                }
-                video.onerror = () => {
-                  clearTimeout(timeout)
-                  URL.revokeObjectURL(videoUrl)
-                  reject(new Error('Failed to load video metadata'))
-                }
-              })
-            } else if (sceneScreenBlob) {
-              setExportProgress(`Getting video duration for scene ${i + 1}...`)
-              const video = document.createElement('video')
-              video.preload = 'metadata'
-              const videoUrl = URL.createObjectURL(sceneScreenBlob)
-              video.src = videoUrl
-              
-              await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                  URL.revokeObjectURL(videoUrl)
-                  reject(new Error('Timeout loading video metadata'))
-                }, 5000) // 5 second timeout
-                
-                video.onloadedmetadata = () => {
-                  clearTimeout(timeout)
-                  videoDuration = video.duration || 0
-                  URL.revokeObjectURL(videoUrl)
-                  resolve()
-                }
-                video.onerror = () => {
-                  clearTimeout(timeout)
-                  URL.revokeObjectURL(videoUrl)
-                  reject(new Error('Failed to load video metadata'))
-                }
-              })
-            }
-          } catch (durationError) {
-            console.warn(`Could not get video duration for scene ${i + 1}, continuing without fade-out:`, durationError)
-            // Continue without duration - fade-out will be skipped
+          // Create temporary video elements for rendering
+          const tempCameraVideo = sceneCameraBlob ? document.createElement('video') : null
+          const tempScreenVideo = sceneScreenBlob ? document.createElement('video') : null
+          
+          if (tempCameraVideo && sceneCameraBlob) {
+            tempCameraVideo.src = URL.createObjectURL(sceneCameraBlob)
+            tempCameraVideo.muted = true
+            tempCameraVideo.playsInline = true
+            await new Promise<void>((resolve, reject) => {
+              tempCameraVideo.onloadedmetadata = () => resolve()
+              tempCameraVideo.onerror = () => reject(new Error('Failed to load camera video'))
+              tempCameraVideo.load()
+            })
           }
           
-          setExportProgress(`Rendering scene ${i + 1}...`)
-          currentSceneIndex = i
-          currentSceneDuration = videoDuration || sceneTake.take.duration
-          currentFrameCount = 0
-          totalFrames = currentSceneDuration * frameRate
+          if (tempScreenVideo && sceneScreenBlob) {
+            tempScreenVideo.src = URL.createObjectURL(sceneScreenBlob)
+            tempScreenVideo.muted = true
+            tempScreenVideo.playsInline = true
+            await new Promise<void>((resolve, reject) => {
+              tempScreenVideo.onloadedmetadata = () => resolve()
+              tempScreenVideo.onerror = () => reject(new Error('Failed to load screen video'))
+              tempScreenVideo.load()
+            })
+          }
           
+          // Get scene duration
+          const sceneDuration = sceneTake.endTime - sceneTake.startTime
+          const totalFramesForScene = Math.ceil(sceneDuration * frameRate)
+          
+          setExportProgress(`Capturing ${totalFramesForScene} frames for scene ${i + 1}...`)
+          currentSceneIndex = i
+          currentSceneDuration = sceneDuration
+          currentFrameCount = 0
+          totalFrames = totalFramesForScene
+          
+          // Create export canvas
+          const exportCanvas = document.createElement('canvas')
+          exportCanvas.width = canvasDimensions.width
+          exportCanvas.height = canvasDimensions.height
+          const exportCtx = exportCanvas.getContext('2d')
+          if (!exportCtx) {
+            throw new Error('Failed to create canvas context')
+          }
+          
+          // Capture frames
+          const frameBlobs: Blob[] = []
+          const frameInterval = 1 / frameRate
+          
+          for (let frameIndex = 0; frameIndex < totalFramesForScene; frameIndex++) {
+            const frameTime = sceneTake.startTime + (frameIndex * frameInterval)
+            
+            // Update progress
+            currentFrameCount = frameIndex
+            const sceneProgress = frameIndex / totalFramesForScene
+            const overallProgress = (i / scenesToExport.length) + (sceneProgress / scenesToExport.length)
+            setExportProgressPercent(Math.min(overallProgress * 100, 95))
+            setExportProgress(`Rendering frame ${frameIndex + 1}/${totalFramesForScene} for scene ${i + 1}...`)
+            
+            // Render frame to canvas
+            await renderFrameToCanvas(
+              frameTime,
+              exportCanvas,
+              exportCtx,
+              {
+                camera: tempCameraVideo,
+                screen: tempScreenVideo
+              }
+            )
+            
+            // Convert canvas to blob
+            const frameBlob = await new Promise<Blob>((resolve, reject) => {
+              exportCanvas.toBlob((blob) => {
+                if (blob) {
+                  resolve(blob)
+                } else {
+                  reject(new Error('Failed to convert canvas to blob'))
+                }
+              }, 'image/png')
+            })
+            
+            frameBlobs.push(frameBlob)
+          }
+          
+          // Validate that we captured frames
+          if (frameBlobs.length === 0) {
+            throw new Error(`No frames captured for scene ${i + 1}`)
+          }
+          
+          // Cleanup temporary video elements
+          if (tempCameraVideo) {
+            URL.revokeObjectURL(tempCameraVideo.src)
+          }
+          if (tempScreenVideo) {
+            URL.revokeObjectURL(tempScreenVideo.src)
+          }
+          
+          // Combine audio if available
+          let audioBlob: Blob | null = null
+          if (sceneMicrophoneBlob) {
+            // Use microphone audio
+            audioBlob = sceneMicrophoneBlob
+          } else if (sceneCameraBlob) {
+            // Fallback to camera audio if available
+            audioBlob = sceneCameraBlob
+          }
+          
+          // Encode frames to video
+          setExportProgress(`Encoding video for scene ${i + 1}... (${frameBlobs.length} frames)`)
           const combinedBlob = await Promise.race([
-            combineLayersWithLayout(
-              sceneCameraBlob,
-              sceneMicrophoneBlob,
-              sceneScreenBlob,
-              exportLayout,
-              sceneCuts,
-              audioProps,
-              undefined, // captionData
-              canvasSettings.resolution.width,
-              canvasSettings.resolution.height,
-              backgroundMusic.file || null,
-              backgroundMusic.volume || 0.5,
-              videoDuration
+            encodeFramesToVideo(
+              frameBlobs,
+              frameRate,
+              `scene_${i}.mp4`,
+              audioBlob,
+              (progress) => {
+                const sceneProgress = progress / 100
+                const overallProgress = (i / scenesToExport.length) + (sceneProgress / scenesToExport.length)
+                setExportProgressPercent(Math.min(overallProgress * 100, 98))
+              }
             ),
             new Promise<Blob>((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout combining layers (this may take a while for long videos)')), 300000) // 5 minute timeout
+              setTimeout(() => reject(new Error('Timeout encoding video')), 300000) // 5 minute timeout
             )
           ])
+          
+          // Validate the blob before proceeding
+          if (!combinedBlob || combinedBlob.size === 0) {
+            throw new Error(`Encoded video blob is empty or invalid for scene ${i + 1}`)
+          }
           
           // If exporting separately, download this scene now
           if (exportMode === 'separate') {
@@ -5044,6 +5393,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   ? new Blob([outputData as BlobPart], { type: 'video/webm' })
                   : new Blob([outputData as any], { type: 'video/webm' })
                 
+                // Validate converted blob
+                if (!sceneBlob || sceneBlob.size === 0) {
+                  throw new Error('WebM conversion produced empty blob')
+                }
+                
                 try {
                   await ffmpegScene.deleteFile(inputFile)
                   await ffmpegScene.deleteFile(outputFile)
@@ -5052,6 +5406,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 }
               } catch (error) {
                 console.warn(`WebM conversion failed for scene ${i + 1}, using MP4:`, error)
+                // Fallback to MP4 if WebM conversion fails
+                sceneBlob = combinedBlob
               }
             }
             
@@ -5070,15 +5426,66 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             
             setExportProgress(`✓ Scene ${i + 1} exported`)
           } else {
-            processedSceneBlobs.push(combinedBlob)
-            setExportProgress(`✓ Scene ${i + 1} completed`)
+            // Validate blob before adding to processed list
+            if (combinedBlob && combinedBlob.size > 0) {
+              processedSceneBlobs.push(combinedBlob)
+              setExportProgress(`✓ Scene ${i + 1} completed`)
+            } else {
+              throw new Error(`Invalid blob for scene ${i + 1}: size is ${combinedBlob?.size || 0}`)
+            }
           }
         } catch (error) {
           console.error(`Error combining layers for scene ${i + 1}:`, error)
           const errorMessage = error instanceof Error ? error.message : String(error)
-          setExportProgress(`✗ Error in scene ${i + 1}: ${errorMessage}`)
+          
+          // Check if it's an FS error and provide more helpful message
+          let displayMessage = errorMessage
+          if (errorMessage.includes('FS error') || errorMessage.includes('ErrnoError')) {
+            displayMessage = `Filesystem error - may be due to memory constraints. Try exporting fewer scenes at once or reducing video quality.`
+          }
+          
+          setExportProgress(`✗ Error in scene ${i + 1}: ${displayMessage}`)
+          failedScenes.push({ index: i + 1, reason: errorMessage })
+          
+          // Try to clean up FFmpeg filesystem between scenes on error
+          try {
+            const ffmpeg = await getFFmpeg()
+            // List and try to delete common temporary files
+            const tempFiles = [
+              `scene_${i}.mp4`,
+              'frame_list.txt',
+              'audio.mp4',
+              'input_convert_scene.mp4',
+              'output_scene.webm'
+            ]
+            for (const file of tempFiles) {
+              try {
+                await ffmpeg.deleteFile(file)
+              } catch (e) {
+                // Ignore individual cleanup errors
+              }
+            }
+            // Try to clean up frame files (they might have different names)
+            for (let frameIdx = 0; frameIdx < 1000; frameIdx++) {
+              try {
+                const frameFile = `frame_${frameIdx.toString().padStart(6, '0')}.png`
+                await ffmpeg.deleteFile(frameFile)
+              } catch (e) {
+                // Stop when we can't find more files
+                break
+              }
+            }
+          } catch (cleanupError) {
+            console.warn('Error during filesystem cleanup:', cleanupError)
+          }
+          
           // Continue with other scenes instead of failing completely
           continue
+        }
+        
+        // Small delay between scenes to allow filesystem to recover
+        if (i < scenesToExport.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
 
       }
@@ -5097,12 +5504,30 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
       // Combined export: concatenate all scenes
       if (processedSceneBlobs.length === 0) {
-        alert('No video to export - all scenes failed to process')
+        let errorMsg = scenesToExport.length === 1 
+          ? `Scene 1 failed to process.`
+          : `All ${scenesToExport.length} scenes failed to process.`
+        
+        if (failedScenes.length > 0) {
+          const reasons = failedScenes.map(fs => `Scene ${fs.index}: ${fs.reason}`).join('\n')
+          errorMsg += `\n\nReasons:\n${reasons}`
+        }
+        
+        errorMsg += `\n\nPlease check the console for more details.`
+        alert(`No video to export - ${errorMsg}`)
         setIsExporting(false)
         setExportProgress('')
         setExportProgressPercent(0)
         ffmpeg.off('log', logHandler)
         return
+      }
+      
+      // Warn if some scenes failed but at least one succeeded
+      if (failedScenes.length > 0 && processedSceneBlobs.length > 0) {
+        console.warn(`Some scenes failed to process:`, failedScenes)
+        const failedCount = failedScenes.length
+        const successCount = processedSceneBlobs.length
+        setExportProgress(`Warning: ${failedCount} scene(s) failed, but ${successCount} scene(s) will be exported`)
       }
 
       // Concatenate all scenes if multiple
@@ -5528,6 +5953,24 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             </svg>
           </button>
           <button
+            onClick={() => setActiveTab('presets')}
+            className={`p-2 rounded ${activeTab === 'presets' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            title="Layout Presets"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setActiveTab('fonts')}
+            className={`p-2 rounded ${activeTab === 'fonts' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            title="Fonts"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+          <button
             onClick={() => setActiveTab('clip')}
             className={`p-2 rounded ${activeTab === 'clip' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
             title="Clip"
@@ -5679,6 +6122,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -5775,6 +6221,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -5824,6 +6273,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               contrast: 0,
                               saturation: 0,
                               exposure: 0,
+                              highlights: 0,
+                              midtones: 0,
+                              shadows: 0,
                             }
                             newMap.set(targetKey, {
                               ...existing,
@@ -5831,16 +6283,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               contrast: sourceProps.contrast,
                               saturation: sourceProps.saturation,
                               exposure: sourceProps.exposure,
+                              highlights: sourceProps.highlights || 0,
+                              midtones: sourceProps.midtones || 0,
+                              shadows: sourceProps.shadows || 0,
                             })
                           }
                         })
                         setClipProperties(newMap)
                         // Save to history after applying to all clips
                         setTimeout(() => saveToHistory(), 0)
-                        // Explicitly save edit data after applying to all clips
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className="text-xs bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
                     >
@@ -5872,6 +6323,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -5879,10 +6333,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })))
                       }}
                       onMouseUp={() => {
-                        // Explicitly save edit data after brightness adjustment completes
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className="w-full"
                     />
@@ -5913,6 +6363,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -5920,10 +6373,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })))
                       }}
                       onMouseUp={() => {
-                        // Explicitly save edit data after contrast adjustment completes
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className="w-full"
                     />
@@ -5954,6 +6403,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -5961,10 +6413,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })))
                       }}
                       onMouseUp={() => {
-                        // Explicitly save edit data after saturation adjustment completes
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className="w-full"
                     />
@@ -5995,6 +6443,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           contrast: 0,
                           saturation: 0,
                           exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
                         }
                         setClipProperties(new Map(clipProperties.set(key, {
                           ...current,
@@ -6002,10 +6453,126 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })))
                       }}
                       onMouseUp={() => {
-                        // Explicitly save edit data after exposure adjustment completes
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Highlights */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-gray-300">Highlights</label>
+                      <span className="text-xs text-gray-400">
+                        {clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.highlights || 0}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      value={clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.highlights || 0}
+                      onChange={(e) => {
+                        const key = `${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`
+                        const current = clipProperties.get(key) || {
+                          enhanceVoice: false,
+                          volume: 0,
+                          removeNoise: false,
+                          noiseRemovalLevel: 93,
+                          audioQuality: 'best' as const,
+                          brightness: 0,
+                          contrast: 0,
+                          saturation: 0,
+                          exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
+                        }
+                        setClipProperties(new Map(clipProperties.set(key, {
+                          ...current,
+                          highlights: parseInt(e.target.value),
+                        })))
+                      }}
+                      onMouseUp={() => {
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Midtones */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-gray-300">Midtones</label>
+                      <span className="text-xs text-gray-400">
+                        {clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.midtones || 0}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      value={clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.midtones || 0}
+                      onChange={(e) => {
+                        const key = `${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`
+                        const current = clipProperties.get(key) || {
+                          enhanceVoice: false,
+                          volume: 0,
+                          removeNoise: false,
+                          noiseRemovalLevel: 93,
+                          audioQuality: 'best' as const,
+                          brightness: 0,
+                          contrast: 0,
+                          saturation: 0,
+                          exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
+                        }
+                        setClipProperties(new Map(clipProperties.set(key, {
+                          ...current,
+                          midtones: parseInt(e.target.value),
+                        })))
+                      }}
+                      onMouseUp={() => {
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Shadows */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-gray-300">Shadows</label>
+                      <span className="text-xs text-gray-400">
+                        {clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.shadows || 0}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-100"
+                      max="100"
+                      value={clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.shadows || 0}
+                      onChange={(e) => {
+                        const key = `${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`
+                        const current = clipProperties.get(key) || {
+                          enhanceVoice: false,
+                          volume: 0,
+                          removeNoise: false,
+                          noiseRemovalLevel: 93,
+                          audioQuality: 'best' as const,
+                          brightness: 0,
+                          contrast: 0,
+                          saturation: 0,
+                          exposure: 0,
+                          highlights: 0,
+                          midtones: 0,
+                          shadows: 0,
+                        }
+                        setClipProperties(new Map(clipProperties.set(key, {
+                          ...current,
+                          shadows: parseInt(e.target.value),
+                        })))
+                      }}
+                      onMouseUp={() => {
                       }}
                       className="w-full"
                     />
@@ -6018,40 +6585,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           {activeTab === 'captions' && (
             <div className="p-4">
               <h3 className="text-sm font-semibold mb-4">CAPTIONS</h3>
-
-              {/* Font Selection */}
-              <div className="mb-4">
-                <label className="text-xs text-gray-300 mb-2 block">Font Family</label>
-                <select
-                  value={captionFont}
-                  onChange={(e) => setCaptionFont(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
-                  style={{ fontFamily: availableFonts.find(f => f.name === captionFont)?.value || 'Inter' }}
-                >
-                  {availableFonts.map(font => (
-                    <option key={font.name} value={font.name} style={{ fontFamily: font.value }}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Font Size */}
-              <div className="mb-4">
-                <label className="text-xs text-gray-300 mb-2 block">Font Size: {captionSize}px</label>
-                <input
-                  type="range"
-                  min="12"
-                  max="200"
-                  value={captionSize}
-                  onChange={(e) => setCaptionSize(parseInt(e.target.value))}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>12px</span>
-                  <span>200px</span>
-                </div>
-              </div>
 
               {/* Max Words */}
               <div className="mb-4">
@@ -6110,79 +6643,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             <div className="flex flex-col h-full">
               <div className="p-4 border-b border-gray-700">
                 <h3 className="text-sm font-semibold mb-3">LAYOUT</h3>
-                {/* Sub-tab buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setLayoutSubTab('text-background')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded transition-colors ${
-                      layoutSubTab === 'text-background'
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                  >
-                    Text & Background
-                  </button>
-                  <button
-                    onClick={() => setLayoutSubTab('presets')}
-                    className={`flex-1 px-3 py-1.5 text-xs rounded transition-colors ${
-                      layoutSubTab === 'presets'
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                  >
-                    Layout Presets
-                  </button>
-                </div>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {layoutSubTab === 'text-background' && (
-                  <>
-                    {/* Global Title Settings */}
-                    <div className="pt-4">
-                <h4 className="text-xs font-semibold mb-3 text-gray-300">Title Settings (Global)</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Font Family</label>
-                    <select
-                      value={titleSettings.font}
-                      onChange={(e) => setTitleSettings({ ...titleSettings, font: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs"
-                      style={{ fontFamily: titleSettings.font }}
-                    >
-                      {availableFonts.map(font => (
-                        <option key={font.name} value={font.value} style={{ fontFamily: font.value }}>
-                          {font.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Font Size: {titleSettings.size}px</label>
-                    <input
-                      type="range"
-                      min="12"
-                      max="200"
-                      value={titleSettings.size}
-                      onChange={(e) => setTitleSettings({ ...titleSettings, size: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Line Height: {titleSettings.lineHeight.toFixed(1)}</label>
-                    <input
-                      type="range"
-                      min="0.8"
-                      max="3.0"
-                      step="0.1"
-                      value={titleSettings.lineHeight}
-                      onChange={(e) => setTitleSettings({ ...titleSettings, lineHeight: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
+                <>
               {/* Background Image */}
               <div className="border-t border-gray-700 pt-4">
                 <h4 className="text-xs font-semibold mb-3 text-gray-300">Background Image</h4>
@@ -6253,10 +6717,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                     : lc
                                 ))
                                 saveToHistory()
-                                // Explicitly save edit data after removing background image
-                                setTimeout(() => {
-                                  saveEditData()
-                                }, 0)
                               }
                             }}
                             className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
@@ -6318,9 +6778,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           >
                             <u>U</u>
                           </button>
-                        </div>
-                        {/* Text Alignment Buttons */}
-                        <div className="flex gap-1 mb-1 p-1 bg-gray-800 border border-gray-700 border-t-0">
+                          {/* Text Alignment Buttons */}
                           <button
                             type="button"
                             onClick={() => {
@@ -6452,9 +6910,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             }
                           }}
                           onBlur={() => {
-                            setTimeout(() => {
-                              saveEditData()
-                            }, 0)
                           }}
                           className="w-full bg-gray-800 border border-gray-700 border-t-0 rounded-b px-2 py-1.5 text-xs text-white min-h-[4rem] focus:outline-none focus:ring-1 focus:ring-gray-500"
                           placeholder="Enter title text... (supports formatting)"
@@ -6583,14 +7038,49 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   )
                 })()}
               </div>
-                  </>
-                )}
-                
-                {layoutSubTab === 'presets' && (
-                  <>
-                    {/* Save Current Layout as Preset */}
-                    <div className="pt-4">
-                      <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
+
+              {/* Transition Duration */}
+              <div className="border-t border-gray-700 pt-4">
+                <h4 className="text-xs font-semibold mb-3 text-gray-300">Transition Duration</h4>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">
+                    Transition Duration: {canvasSettings.transitionDuration.toFixed(2)}s
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={canvasSettings.transitionDuration}
+                    onChange={(e) => {
+                      setCanvasSettings({ 
+                        ...canvasSettings, 
+                        transitionDuration: parseFloat(e.target.value) 
+                      })
+                      markAsEdited()
+                    }}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duration for animated transitions between clip positions
+                  </p>
+                </div>
+              </div>
+                </>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'presets' && (
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b border-gray-700">
+                <h3 className="text-sm font-semibold mb-3">LAYOUT PRESETS</h3>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* Save Current Layout as Preset */}
+                <div className="pt-4">
+                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
                 <div className="space-y-2">
                   <input
                     type="text"
@@ -6759,8 +7249,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 x: 0.5,
                                 y: 0.1,
                                 textAlign: 'center',
-                                animationIn: 'none',
-                                animationOut: 'none',
+                                animationIn: 'fade',
+                                animationOut: 'fade',
                                 animationDuration: 0.5,
                               },
                               backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
@@ -6781,10 +7271,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             })
                             // Canvas holders are now stored in layout clips, so they're automatically updated
                             saveToHistory()
-                            // Explicitly save edit data after creating layout clip from preset
-                            setTimeout(() => {
-                              saveEditData()
-                            }, 0)
                             markAsEdited()
                           }
                         }}
@@ -6808,8 +7294,140 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     </div>
                   </div>
                 )}
-                  </>
-                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'fonts' && (
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b border-gray-700">
+                <h3 className="text-sm font-semibold mb-3">FONTS</h3>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* Title Font Settings */}
+                <div className="pt-4">
+                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Title Font</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Font Family</label>
+                      <select
+                        value={titleSettings.font}
+                        onChange={(e) => {
+                          setTitleSettings({ ...titleSettings, font: e.target.value })
+                          markAsEdited()
+                        }}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs"
+                        style={{ fontFamily: titleSettings.font }}
+                      >
+                        {availableFonts.map(font => (
+                          <option key={font.name} value={font.value} style={{ fontFamily: font.value }}>
+                            {font.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Font Size: {titleSettings.size}px</label>
+                      <input
+                        type="range"
+                        min="12"
+                        max="200"
+                        value={titleSettings.size}
+                        onChange={(e) => {
+                          setTitleSettings({ ...titleSettings, size: parseInt(e.target.value) })
+                          markAsEdited()
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>12px</span>
+                        <span>200px</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Line Height: {titleSettings.lineHeight.toFixed(1)}</label>
+                      <input
+                        type="range"
+                        min="0.8"
+                        max="3.0"
+                        step="0.1"
+                        value={titleSettings.lineHeight}
+                        onChange={(e) => {
+                          setTitleSettings({ ...titleSettings, lineHeight: parseFloat(e.target.value) })
+                          markAsEdited()
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>0.8</span>
+                        <span>3.0</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Caption Font Settings */}
+                <div className="border-t border-gray-700 pt-4">
+                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Caption Font</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Font Family</label>
+                      <select
+                        value={captionFont}
+                        onChange={(e) => {
+                          setCaptionFont(e.target.value)
+                          markAsEdited()
+                        }}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs"
+                        style={{ fontFamily: availableFonts.find(f => f.name === captionFont)?.value || 'Inter' }}
+                      >
+                        {availableFonts.map(font => (
+                          <option key={font.name} value={font.name} style={{ fontFamily: font.value }}>
+                            {font.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Font Size: {captionSize}px</label>
+                      <input
+                        type="range"
+                        min="12"
+                        max="200"
+                        value={captionSize}
+                        onChange={(e) => {
+                          setCaptionSize(parseInt(e.target.value))
+                          markAsEdited()
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>12px</span>
+                        <span>200px</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Line Height: {captionLineHeight.toFixed(1)}</label>
+                      <input
+                        type="range"
+                        min="0.8"
+                        max="3.0"
+                        step="0.1"
+                        value={captionLineHeight}
+                        onChange={(e) => {
+                          setCaptionLineHeight(parseFloat(e.target.value))
+                          markAsEdited()
+                        }}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>0.8</span>
+                        <span>3.0</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -6834,9 +7452,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           resolution: { width: currentWidth, height: newHeight }
                         })
                         markAsEdited()
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6854,9 +7469,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           resolution: { width: currentWidth, height: newHeight }
                         })
                         markAsEdited()
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6873,9 +7485,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           resolution: { width: snappedWidth, height: snappedWidth }
                         })
                         markAsEdited()
-                        setTimeout(() => {
-                          saveEditData()
-                        }, 0)
                       }}
                       className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
@@ -6907,9 +7516,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             resolution: { width: newWidth, height: newHeight }
                           })
                           markAsEdited()
-                          setTimeout(() => {
-                            saveEditData()
-                          }, 0)
                     }}
                     className="w-full"
                   />
@@ -6933,9 +7539,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             resolution: { width: newWidth, height: newHeight }
                           })
                           markAsEdited()
-                          setTimeout(() => {
-                            saveEditData()
-                          }, 0)
                     }}
                     className="w-full"
                   />
@@ -6952,9 +7555,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     onChange={(e) => {
                       setCanvasSettings({ ...canvasSettings, workAreaBackgroundColor: e.target.value })
                       markAsEdited()
-                      setTimeout(() => {
-                        saveEditData()
-                      }, 0)
                     }}
                     className="w-full h-10 rounded cursor-pointer"
                   />
@@ -6968,42 +7568,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     onChange={(e) => {
                       setCanvasSettings({ ...canvasSettings, videoBackgroundColor: e.target.value })
                       markAsEdited()
-                      setTimeout(() => {
-                        saveEditData()
-                      }, 0)
                     }}
                     className="w-full h-10 rounded cursor-pointer"
                   />
                   <p className="text-xs text-gray-500 mt-1">Used in exported video</p>
-                </div>
-
-
-                {/* Transition Duration */}
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">
-                    Transition Duration: {canvasSettings.transitionDuration.toFixed(2)}s
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={canvasSettings.transitionDuration}
-                    onChange={(e) => {
-                      setCanvasSettings({ 
-                        ...canvasSettings, 
-                        transitionDuration: parseFloat(e.target.value) 
-                      })
-                      markAsEdited()
-                      setTimeout(() => {
-                        saveEditData()
-                      }, 0)
-                    }}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Duration for animated transitions between clip positions
-                  </p>
                 </div>
 
               </div>
@@ -7440,9 +8008,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         const contrast = props?.contrast ?? 0
                         const saturation = props?.saturation ?? 0
                         const exposure = props?.exposure ?? 0
+                        const highlights = props?.highlights ?? 0
+                        const midtones = props?.midtones ?? 0
+                        const shadows = props?.shadows ?? 0
                         
                         // Build CSS filter string
-                        const brightnessValue = Math.max(0, 1 + (brightness + exposure) / 100)
+                        // Note: CSS filters don't support highlights/midtones/shadows directly,
+                        // so we approximate by adjusting overall brightness
+                        const avgTonalAdjustment = (highlights + midtones + shadows) / 3
+                        const brightnessValue = Math.max(0, 1 + (brightness + exposure + avgTonalAdjustment) / 100)
                         const contrastValue = Math.max(0, 1 + contrast / 100)
                         const saturationValue = Math.max(0, 1 + saturation / 100)
                         const filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
@@ -7552,11 +8126,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       const contrast = props?.contrast ?? 0
                       const saturation = props?.saturation ?? 0
                       const exposure = props?.exposure ?? 0
+                      const highlights = props?.highlights ?? 0
+                      const midtones = props?.midtones ?? 0
+                      const shadows = props?.shadows ?? 0
                       
                       // Build CSS filter string
                       // Brightness: -100 to 100 maps to 0 to 2.0 (0 = normal, 100 = 2x brighter, -100 = black)
                       // Combine exposure with brightness (exposure also affects brightness)
-                      const brightnessValue = Math.max(0, 1 + (brightness + exposure) / 100)
+                      // Note: CSS filters don't support highlights/midtones/shadows directly,
+                      // so we approximate by adjusting overall brightness
+                      const avgTonalAdjustment = (highlights + midtones + shadows) / 3
+                      const brightnessValue = Math.max(0, 1 + (brightness + exposure + avgTonalAdjustment) / 100)
                       // Contrast: -100 to 100 maps to 0 to 2.0 (0 = no contrast, 100 = 2x contrast, -100 = gray)
                       const contrastValue = Math.max(0, 1 + contrast / 100)
                       // Saturation: -100 to 100 maps to 0 to 2.0 (0 = grayscale, 100 = 2x saturation, -100 = grayscale)
@@ -7698,8 +8278,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       const timeInClip = currentTime - currentLayoutClip.timelineStart
                       const timeFromEnd = currentLayoutClip.timelineEnd - currentTime
                       
-                      const animationIn = title.animationIn || 'none'
-                      const animationOut = title.animationOut || 'none'
+                      const animationIn = title.animationIn || 'fade'
+                      const animationOut = title.animationOut || 'fade'
                       
                       // Determine if we're in the in/out animation phase
                       const isInAnimation = animationIn !== 'none' && timeInClip < animationDuration
@@ -8586,3 +9166,4 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     </>
   )
 }
+
