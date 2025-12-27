@@ -7705,9 +7705,19 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       const isInAnimation = animationIn !== 'none' && timeInClip < animationDuration
                       const isOutAnimation = animationOut !== 'none' && timeFromEnd < animationDuration
                       
-                      // Calculate animation progress (0 to 1)
-                      const inProgress = isInAnimation ? Math.min(1, timeInClip / animationDuration) : 1
-                      const outProgress = isOutAnimation ? Math.min(1, timeFromEnd / animationDuration) : 1
+                      // EaseInOut function for smooth animation
+                      const easeInOut = (t: number): number => {
+                        // Cubic ease-in-out: smooth acceleration and deceleration
+                        return t < 0.5
+                          ? 4 * t * t * t
+                          : 1 - Math.pow(-2 * t + 2, 3) / 2
+                      }
+                      
+                      // Calculate animation progress (0 to 1) with easing
+                      const rawInProgress = isInAnimation ? Math.min(1, timeInClip / animationDuration) : 1
+                      const rawOutProgress = isOutAnimation ? Math.min(1, timeFromEnd / animationDuration) : 1
+                      const inProgress = easeInOut(rawInProgress)
+                      const outProgress = easeInOut(rawOutProgress)
                       
                       // Base transform for text alignment
                       let translateXValue = transformX
