@@ -11,8 +11,8 @@ export interface VideoCut {
 export interface Layout {
   type: 'side-by-side' | 'picture-in-picture' | 'screen-only' | 'camera-only' | 'custom'
   name?: string
-  cameraPosition?: { x: number; y: number; width: number; height: number }
-  screenPosition?: { x: number; y: number; width: number; height: number }
+  cameraPosition?: { x: number; y: number; width: number; height: number; rotation?: number }
+  screenPosition?: { x: number; y: number; width: number; height: number; rotation?: number }
 }
 
 export interface CaptionData {
@@ -62,6 +62,8 @@ export async function applyCutsToVideo(
 /**
  * Combine multiple video/audio blobs into a single video with layout
  */
+import type { TitleData, BackgroundImageData } from './ffmpeg'
+
 export async function combineLayersWithLayout(
   cameraBlob: Blob | null,
   microphoneBlob: Blob | null,
@@ -79,7 +81,9 @@ export async function combineLayersWithLayout(
   backgroundMusicFile: Blob | null = null,
   backgroundMusicVolume: number = 0.5,
   videoDuration: number = 0,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  titleData?: TitleData,
+  backgroundImageData?: BackgroundImageData
 ): Promise<Blob> {
   try {
     // Apply cuts to each input if cuts exist
@@ -110,7 +114,10 @@ export async function combineLayersWithLayout(
       captionData,
       backgroundMusicFile,
       backgroundMusicVolume,
-      videoDuration
+      videoDuration,
+      onProgress,
+      titleData,
+      backgroundImageData
     )
 
     return outputBlob

@@ -424,6 +424,29 @@ export interface CaptionData {
   }
 }
 
+export interface TitleData {
+  text: string
+  x: number // Position (0-1, relative to canvas width)
+  y: number // Position (0-1, relative to canvas height)
+  textAlign?: 'left' | 'center' | 'right'
+  font?: string
+  fontSize?: number
+  lineHeight?: number
+  animationIn?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
+  animationOut?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
+  animationDuration?: number
+  timelineStart?: number
+  timelineEnd?: number
+}
+
+export interface BackgroundImageData {
+  url: string // Data URL or blob URL
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export async function combineVideos(
   cameraBlob: Blob | null,
   microphoneBlob: Blob | null,
@@ -441,7 +464,9 @@ export async function combineVideos(
   backgroundMusicFile: Blob | null = null,
   backgroundMusicVolume: number = 0.5,
   videoDuration: number = 0,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  titleData?: TitleData,
+  backgroundImageData?: BackgroundImageData
 ): Promise<Blob> {
   const ffmpeg = await getFFmpeg()
 
@@ -557,22 +582,56 @@ export async function combineVideos(
       let currentVideoChain = `[${backgroundIndex}:v]scale=${outputWidth}:${outputHeight}[bg]`
 
       if (hasScreen && layout.screenPosition) {
+        // Convert percentage (0-100) to pixels
         const scrX = Math.floor(layout.screenPosition.x * outputWidth / 100)
         const scrY = Math.floor(layout.screenPosition.y * outputHeight / 100)
         const scrW = Math.floor(layout.screenPosition.width * outputWidth / 100)
         const scrH = Math.floor(layout.screenPosition.height * outputHeight / 100)
-        currentVideoChain += `;[${screenIndex}:v]scale=${scrW}:${scrH}:force_original_aspect_ratio=decrease,pad=${scrW}:${scrH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[scr];[bg][scr]overlay=${scrX}:${scrY}[tmp_scr]`
+        const scrRotation = layout.screenPosition.rotation || 0
+        
+        // Scale video to match holder size, using object-cover behavior (crop to fill)
+        // This matches CSS object-cover: scale to cover, maintaining aspect ratio
+        // Revert to working approach: use decrease with pad (object-contain), which is more reliable
+        // Note: This doesn't exactly match object-cover but is more stable
+        let screenFilter = `[${screenIndex}:v]scale=${scrW}:${scrH}:force_original_aspect_ratio=decrease,pad=${scrW}:${scrH}:(ow-iw)/2:(oh-ih)/2`
+        
+        // Apply rotation if needed (after scaling and padding)
+        if (scrRotation !== 0) {
+          // Rotation in FFmpeg rotate filter uses radians
+          const rotationRad = scrRotation * Math.PI / 180
+          screenFilter += `,rotate=${rotationRad}:fillcolor=black@0`
+        }
+        
+        screenFilter += `,format=yuv420p[scr]`
+        currentVideoChain += `;${screenFilter};[bg][scr]overlay=${scrX}:${scrY}[tmp_scr]`
         videoOutput = '[tmp_scr]'
       } else {
         videoOutput = '[bg]'
       }
 
       if (hasCamera && layout.cameraPosition) {
+        // Convert percentage (0-100) to pixels
         const camX = Math.floor(layout.cameraPosition.x * outputWidth / 100)
         const camY = Math.floor(layout.cameraPosition.y * outputHeight / 100)
         const camW = Math.floor(layout.cameraPosition.width * outputWidth / 100)
         const camH = Math.floor(layout.cameraPosition.height * outputHeight / 100)
-        currentVideoChain += `;[${cameraIndex}:v]scale=${camW}:${camH}:force_original_aspect_ratio=decrease,pad=${camW}:${camH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[cam];${videoOutput}[cam]overlay=${camX}:${camY}[v0]`
+        const camRotation = layout.cameraPosition.rotation || 0
+        
+        // Scale video to match holder size, using object-cover behavior (crop to fill)
+        // This matches CSS object-cover: scale to cover, maintaining aspect ratio
+        // Revert to working approach: use decrease with pad (object-contain), which is more reliable
+        // Note: This doesn't exactly match object-cover but is more stable
+        let cameraFilter = `[${cameraIndex}:v]scale=${camW}:${camH}:force_original_aspect_ratio=decrease,pad=${camW}:${camH}:(ow-iw)/2:(oh-ih)/2`
+        
+        // Apply rotation if needed (after scaling and padding)
+        if (camRotation !== 0) {
+          // Rotation in FFmpeg rotate filter uses radians
+          const rotationRad = camRotation * Math.PI / 180
+          cameraFilter += `,rotate=${rotationRad}:fillcolor=black@0`
+        }
+        
+        cameraFilter += `,format=yuv420p[cam]`
+        currentVideoChain += `;${cameraFilter};${videoOutput}[cam]overlay=${camX}:${camY}[v0]`
         videoOutput = '[v0]'
       } else if (videoOutput === '[bg]') {
         // If only background and no camera/screen, just output background
@@ -583,12 +642,184 @@ export async function combineVideos(
         currentVideoChain += `;[tmp_scr]null[v0]`
         videoOutput = '[v0]'
       }
+      
+      // Add background image if present
+      if (backgroundImageData) {
+        try {
+          const bgImgBlob = await fetch(backgroundImageData.url).then(r => r.blob())
+          const bgImgData = await fetchFile(bgImgBlob)
+          await writeFile(ffmpeg, 'background_image.png', bgImgData)
+          
+          // Background image positions are in 0-1 range (relative to canvas)
+          const bgX = Math.floor(backgroundImageData.x * outputWidth)
+          const bgY = Math.floor(backgroundImageData.y * outputHeight)
+          const bgW = Math.floor(backgroundImageData.width * outputWidth)
+          const bgH = Math.floor(backgroundImageData.height * outputHeight)
+          
+          inputs.push('-i', 'background_image.png')
+          const bgImgIndex = inputCount++
+          
+          currentVideoChain += `;[${bgImgIndex}:v]scale=${bgW}:${bgH}:force_original_aspect_ratio=decrease,format=rgba[bgimg];${videoOutput}[bgimg]overlay=${bgX}:${bgY}[v_bg]`
+          videoOutput = '[v_bg]'
+        } catch (error) {
+          console.warn('Failed to add background image:', error)
+        }
+      }
+      
+      // Add title text if present
+      if (titleData && titleData.text) {
+        const titleText = titleData.text.replace(/<[^>]*>/g, '') // Remove HTML tags
+        const titleX = Math.floor(titleData.x * outputWidth)
+        const titleY = Math.floor(titleData.y * outputHeight)
+        const fontSize = titleData.fontSize || 48
+        const animationIn = titleData.animationIn || 'fade'
+        const animationOut = titleData.animationOut || 'fade'
+        const animationDuration = titleData.animationDuration || 0.5
+        const timelineStart = titleData.timelineStart || 0
+        const timelineEnd = titleData.timelineEnd || videoDuration
+        
+        // Calculate text alignment - FFmpeg drawtext uses x position differently
+        // For center/right, we need to calculate the actual x position
+        let textX = titleX
+        let textAlignParam = ''
+        if (titleData.textAlign === 'center') {
+          // For center, x is the center point, use text_align=center
+          textAlignParam = ':text_align=center'
+        } else if (titleData.textAlign === 'right') {
+          // For right, x is the right edge, use text_align=right
+          textAlignParam = ':text_align=right'
+        }
+        
+        // Escape special characters for FFmpeg drawtext
+        // FFmpeg drawtext requires escaping: \ ' : [ ]
+        const escapeDrawtext = (text: string): string => {
+          return text
+            .replace(/\\/g, '\\\\')  // Escape backslashes first
+            .replace(/'/g, "\\'")    // Escape single quotes
+            .replace(/:/g, "\\:")     // Escape colons
+            .replace(/\[/g, "\\[")   // Escape brackets
+            .replace(/\]/g, "\\]")   // Escape brackets
+        }
+        
+        // Build alpha expression for fade animations
+        let alphaExpression = '1.0' // Default: fully opaque
+        if (animationIn === 'fade' || animationOut === 'fade') {
+          // Calculate fade based on time
+          // For fade in: alpha goes from 0 to 1 during animationDuration at the start
+          // For fade out: alpha goes from 1 to 0 during animationDuration at the end
+          const fadeInStart = timelineStart
+          const fadeInEnd = timelineStart + animationDuration
+          const fadeOutStart = timelineEnd - animationDuration
+          const fadeOutEnd = timelineEnd
+          
+          if (animationIn === 'fade' && animationOut === 'fade') {
+            // Both fade in and fade out
+            alphaExpression = `if(between(t,${fadeInStart},${fadeInEnd}), (t-${fadeInStart})/${animationDuration}, if(between(t,${fadeOutStart},${fadeOutEnd}), 1-(t-${fadeOutStart})/${animationDuration}, if(lt(t,${fadeInStart}), 0, if(gt(t,${fadeOutEnd}), 0, 1))))`
+          } else if (animationIn === 'fade') {
+            // Only fade in
+            alphaExpression = `if(between(t,${fadeInStart},${fadeInEnd}), (t-${fadeInStart})/${animationDuration}, if(lt(t,${fadeInStart}), 0, 1))`
+          } else if (animationOut === 'fade') {
+            // Only fade out
+            alphaExpression = `if(between(t,${fadeOutStart},${fadeOutEnd}), 1-(t-${fadeOutStart})/${animationDuration}, if(gt(t,${fadeOutEnd}), 0, 1))`
+          }
+        }
+        
+        // Handle line breaks
+        const lines = titleText.split('\n').filter(line => line.trim())
+        if (lines.length > 1) {
+          const lineHeight = fontSize * (titleData.lineHeight || 1.2)
+          let currentOutput = videoOutput
+          lines.forEach((line, index) => {
+            const lineY = titleY + (index * lineHeight)
+            const escapedLine = escapeDrawtext(line)
+            const lineFilter = `drawtext=text='${escapedLine}':fontsize=${fontSize}:fontcolor=white@${alphaExpression}:x=${textX}:y=${lineY}${textAlignParam}:shadowx=2:shadowy=2:shadowcolor=black@0.8:enable='between(t,${timelineStart},${timelineEnd})'`
+            currentVideoChain += `;${currentOutput}${lineFilter}[v_title${index}]`
+            currentOutput = `[v_title${index}]`
+          })
+          videoOutput = currentOutput
+        } else if (lines.length === 1) {
+          // Single line
+          const escapedText = escapeDrawtext(lines[0])
+          const drawtextFilter = `drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=white@${alphaExpression}:x=${textX}:y=${titleY}${textAlignParam}:shadowx=2:shadowy=2:shadowcolor=black@0.8:enable='between(t,${timelineStart},${timelineEnd})'`
+          currentVideoChain += `;${videoOutput}${drawtextFilter}[v_title]`
+          videoOutput = '[v_title]'
+        }
+      }
+      
       filterComplex = currentVideoChain
     } else {
       // Fallback: use first available video
       const fallbackIndex = cameraIndex !== -1 ? cameraIndex : (screenIndex !== -1 ? screenIndex : 0)
-      filterComplex = `[${fallbackIndex}:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0]`
+      let fallbackChain = `[${fallbackIndex}:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease,pad=${outputWidth}:${outputHeight}:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0]`
       videoOutput = '[v0]'
+      
+      // Add title even in fallback mode
+      if (titleData && titleData.text) {
+        const titleText = titleData.text.replace(/<[^>]*>/g, '')
+        const titleX = Math.floor(titleData.x * outputWidth)
+        const titleY = Math.floor(titleData.y * outputHeight)
+        const fontSize = titleData.fontSize || 48
+        const animationIn = titleData.animationIn || 'fade'
+        const animationOut = titleData.animationOut || 'fade'
+        const animationDuration = titleData.animationDuration || 0.5
+        const timelineStart = titleData.timelineStart || 0
+        const timelineEnd = titleData.timelineEnd || videoDuration
+        
+        let textX = titleX
+        let textAlignParam = ''
+        if (titleData.textAlign === 'center') {
+          textAlignParam = ':text_align=center'
+        } else if (titleData.textAlign === 'right') {
+          textAlignParam = ':text_align=right'
+        }
+        
+        const escapeDrawtext = (text: string): string => {
+          return text
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/:/g, "\\:")
+            .replace(/\[/g, "\\[")
+            .replace(/\]/g, "\\]")
+        }
+        
+        // Build alpha expression for fade animations
+        let alphaExpression = '1.0'
+        if (animationIn === 'fade' || animationOut === 'fade') {
+          const fadeInStart = timelineStart
+          const fadeInEnd = timelineStart + animationDuration
+          const fadeOutStart = timelineEnd - animationDuration
+          const fadeOutEnd = timelineEnd
+          
+          if (animationIn === 'fade' && animationOut === 'fade') {
+            alphaExpression = `if(between(t,${fadeInStart},${fadeInEnd}), (t-${fadeInStart})/${animationDuration}, if(between(t,${fadeOutStart},${fadeOutEnd}), 1-(t-${fadeOutStart})/${animationDuration}, if(lt(t,${fadeInStart}), 0, if(gt(t,${fadeOutEnd}), 0, 1))))`
+          } else if (animationIn === 'fade') {
+            alphaExpression = `if(between(t,${fadeInStart},${fadeInEnd}), (t-${fadeInStart})/${animationDuration}, if(lt(t,${fadeInStart}), 0, 1))`
+          } else if (animationOut === 'fade') {
+            alphaExpression = `if(between(t,${fadeOutStart},${fadeOutEnd}), 1-(t-${fadeOutStart})/${animationDuration}, if(gt(t,${fadeOutEnd}), 0, 1))`
+          }
+        }
+        
+        const lines = titleText.split('\n').filter(line => line.trim())
+        if (lines.length > 1) {
+          const lineHeight = fontSize * (titleData.lineHeight || 1.2)
+          let currentOutput = videoOutput
+          lines.forEach((line, index) => {
+            const lineY = titleY + (index * lineHeight)
+            const escapedLine = escapeDrawtext(line)
+            const lineFilter = `drawtext=text='${escapedLine}':fontsize=${fontSize}:fontcolor=white@${alphaExpression}:x=${textX}:y=${lineY}${textAlignParam}:shadowx=2:shadowy=2:shadowcolor=black@0.8:enable='between(t,${timelineStart},${timelineEnd})'`
+            fallbackChain += `;${currentOutput}${lineFilter}[v_title${index}]`
+            currentOutput = `[v_title${index}]`
+          })
+          videoOutput = currentOutput
+        } else if (lines.length === 1) {
+          const escapedText = escapeDrawtext(lines[0])
+          const drawtextFilter = `drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=white@${alphaExpression}:x=${textX}:y=${titleY}${textAlignParam}:shadowx=2:shadowy=2:shadowcolor=black@0.8:enable='between(t,${timelineStart},${timelineEnd})'`
+          fallbackChain += `;${videoOutput}${drawtextFilter}[v_title]`
+          videoOutput = '[v_title]'
+        }
+      }
+      
+      filterComplex = fallbackChain
     }
 
     // Handle audio - microphone and background music
@@ -814,6 +1045,187 @@ export async function concatVideos(
     return outputBlob
   } catch (error) {
     console.error('Error concatenating videos:', error)
+    throw error
+  } finally {
+    // Remove progress handler
+    ffmpeg.off('progress', progressHandler)
+  }
+}
+
+/**
+ * Encode frames from canvas into video
+ */
+export async function encodeFramesToVideo(
+  frames: Blob[], // Array of image blobs (PNG/JPEG)
+  frameRate: number = 60,
+  outputFilename: string = 'output.mp4',
+  audioBlob?: Blob | null,
+  onProgress?: (progress: number) => void
+): Promise<Blob> {
+  if (frames.length === 0) {
+    throw new Error('No frames to encode')
+  }
+
+  const ffmpeg = await getFFmpeg()
+
+  // Set up progress listener
+  const progressHandler = ({ progress }: { progress: number }) => {
+    if (onProgress) onProgress(progress)
+  }
+  ffmpeg.on('progress', progressHandler)
+
+  const frameFiles: string[] = []
+  let audioFileWritten = false
+
+  try {
+    // Write all frame images with error handling
+    for (let i = 0; i < frames.length; i++) {
+      const filename = `frame_${i.toString().padStart(6, '0')}.png`
+      try {
+        const frameData = await fetchFile(frames[i])
+        await writeFile(ffmpeg, filename, frameData)
+        frameFiles.push(filename)
+      } catch (error) {
+        console.error(`Error writing frame ${i}:`, error)
+        // Clean up what we've written so far
+        for (const file of frameFiles) {
+          try {
+            await ffmpeg.deleteFile(file)
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+        throw new Error(`Failed to write frame ${i}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    // Create frame list file for concat demuxer
+    const frameList = frameFiles.map(f => `file '${f}'`).join('\n')
+    try {
+      await ffmpeg.writeFile('frame_list.txt', frameList)
+    } catch (error) {
+      // Clean up frame files
+      for (const file of frameFiles) {
+        try {
+          await ffmpeg.deleteFile(file)
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      throw new Error(`Failed to write frame list: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    // Build FFmpeg command
+    const ffmpegArgs: string[] = [
+      '-f', 'concat',
+      '-safe', '0',
+      '-r', frameRate.toString(),
+      '-i', 'frame_list.txt',
+      '-vf', 'fps=' + frameRate,
+      '-c:v', 'libx264',
+      '-preset', 'slow',
+      '-crf', '18',
+      '-pix_fmt', 'yuv420p',
+      '-profile:v', 'high',
+      '-level:v', '4.2',
+      '-movflags', '+faststart',
+    ]
+
+    // Add audio if provided
+    if (audioBlob) {
+      try {
+        const audioData = await fetchFile(audioBlob)
+        await writeFile(ffmpeg, 'audio.mp4', audioData)
+        audioFileWritten = true
+        ffmpegArgs.push(
+          '-i', 'audio.mp4',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-ar', '48000',
+          '-shortest'
+        )
+      } catch (error) {
+        console.warn('Failed to write audio file, continuing without audio:', error)
+        // Continue without audio
+      }
+    }
+
+    ffmpegArgs.push(outputFilename)
+
+    try {
+      await ffmpeg.exec(ffmpegArgs)
+    } catch (error) {
+      // Cleanup on exec error
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('FFmpeg exec error:', errorMsg)
+      throw new Error(`FFmpeg encoding failed: ${errorMsg}`)
+    }
+
+    let outputBlob: Blob
+    try {
+      outputBlob = await readFile(ffmpeg, outputFilename)
+      if (!outputBlob || outputBlob.size === 0) {
+        throw new Error('Output blob is empty')
+      }
+    } catch (error) {
+      throw new Error(`Failed to read output file: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    // Cleanup - always try to clean up, even if there was an error
+    try {
+      await ffmpeg.deleteFile(outputFilename)
+    } catch (e) {
+      console.warn('Failed to delete output file:', e)
+    }
+    try {
+      await ffmpeg.deleteFile('frame_list.txt')
+    } catch (e) {
+      console.warn('Failed to delete frame list:', e)
+    }
+    if (audioFileWritten) {
+      try {
+        await ffmpeg.deleteFile('audio.mp4')
+      } catch (e) {
+        console.warn('Failed to delete audio file:', e)
+      }
+    }
+    // Clean up frame files in batches to avoid overwhelming the filesystem
+    for (const file of frameFiles) {
+      try {
+        await ffmpeg.deleteFile(file)
+      } catch (e) {
+        // Ignore individual frame cleanup errors
+      }
+    }
+
+    return outputBlob
+  } catch (error) {
+    // Ensure cleanup on error
+    try {
+      for (const file of frameFiles) {
+        try {
+          await ffmpeg.deleteFile(file)
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      try {
+        await ffmpeg.deleteFile('frame_list.txt')
+      } catch (e) {
+        // Ignore
+      }
+      if (audioFileWritten) {
+        try {
+          await ffmpeg.deleteFile('audio.mp4')
+        } catch (e) {
+          // Ignore
+        }
+      }
+    } catch (cleanupError) {
+      console.warn('Error during cleanup:', cleanupError)
+    }
+    
+    console.error('Error encoding frames to video:', error)
     throw error
   } finally {
     // Remove progress handler
