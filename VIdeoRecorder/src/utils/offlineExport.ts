@@ -6,7 +6,7 @@
 import { exportVideo, type ExportConfig, type ExportProgress } from './exportWorker'
 import type { RenderState } from './renderer'
 import type { Scene } from '../App'
-import type { TimelineClip, LayoutClip } from './renderer'
+import type { TimelineClip, LayoutClip, CanvasVideoHolder } from './renderer'
 import { projectManager } from './projectManager'
 
 export interface OfflineExportOptions {
@@ -51,11 +51,63 @@ export async function exportOfflineVideo(
     throw new Error('No video content to export')
   }
 
+  // Ensure layoutClips have holders - create default layout clips if needed
+  let finalRenderState = renderState
+  if (!renderState.layoutClips || renderState.layoutClips.length === 0 || renderState.layoutClips.every(lc => !lc.holders || lc.holders.length === 0)) {
+    console.warn('No layout clips with holders found, creating default layout clips from timeline clips')
+    
+    // Create a default layout clip covering the entire timeline
+    const defaultLayoutClip: LayoutClip = {
+      id: 'default_layout',
+      timelineStart: 0,
+      timelineEnd: totalDuration,
+      holders: renderState.timelineClips
+        .filter(clip => clip.layer === 'camera' || clip.layer === 'screen')
+        .map((clip, index) => {
+          // Create holders with default positions (full screen for first, side-by-side if multiple)
+          const numVideoClips = renderState.timelineClips.filter(c => c.layer === 'camera' || c.layer === 'screen').length
+          let x = 0
+          let y = 0
+          let holderWidth = 1
+          let holderHeight = 1
+          
+          if (numVideoClips > 1 && clip.layer === 'screen') {
+            // Screen on left, camera on right
+            holderWidth = 0.5
+            x = 0
+          } else if (numVideoClips > 1 && clip.layer === 'camera') {
+            // Camera on right
+            holderWidth = 0.5
+            x = 0.5
+          }
+          
+          return {
+            id: `holder_${clip.id}`,
+            clipId: clip.id,
+            layer: clip.layer,
+            x,
+            y,
+            width: holderWidth,
+            height: holderHeight,
+            rotation: 0,
+            zIndex: clip.layer === 'screen' ? 0 : 1,
+            borderRadius: 0,
+          }
+        }),
+    }
+    
+    // Update render state with default layout clips
+    finalRenderState = {
+      ...renderState,
+      layoutClips: [defaultLayoutClip],
+    }
+  }
+
   // Collect all video blobs needed
   const videoBlobs = new Map<string, Blob>()
   const sceneTakes = new Map<string, { sceneId: string; takeId: string }>()
 
-  for (const clip of renderState.timelineClips) {
+  for (const clip of finalRenderState.timelineClips) {
     const key = `${clip.sceneId}_${clip.takeId}`
     if (!sceneTakes.has(key)) {
       sceneTakes.set(key, { sceneId: clip.sceneId, takeId: clip.takeId })
@@ -82,20 +134,20 @@ export async function exportOfflineVideo(
 
   // Collect image URLs
   const imageUrls = new Map<string, string>()
-  if (renderState.backgroundImageData) {
-    imageUrls.set('background', renderState.backgroundImageData.url)
+  if (finalRenderState.backgroundImageData) {
+    imageUrls.set('background', finalRenderState.backgroundImageData.url)
   }
 
   // Collect fonts
   const fonts: string[] = []
-  if (renderState.captionSettings?.font) {
-    fonts.push(renderState.captionSettings.font)
+  if (finalRenderState.captionSettings?.font) {
+    fonts.push(finalRenderState.captionSettings.font)
   }
-  if (renderState.titleSettings?.font) {
-    fonts.push(renderState.titleSettings.font)
+  if (finalRenderState.titleSettings?.font) {
+    fonts.push(finalRenderState.titleSettings.font)
   }
 
-  // Create export config
+  // Create export config with final render state
   const exportConfig: ExportConfig = {
     width,
     height,
@@ -106,7 +158,7 @@ export async function exportOfflineVideo(
     keyframeInterval: Math.floor(fps * 2), // Keyframe every 2 seconds
     codec,
     format,
-    renderState,
+    renderState: finalRenderState, // Use final render state with layout clips
     videoBlobs,
     imageUrls,
     fonts,
