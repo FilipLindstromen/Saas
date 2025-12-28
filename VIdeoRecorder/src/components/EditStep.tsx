@@ -13,6 +13,7 @@ import { analyzeWaveform } from '../utils/waveformAnalyzer'
 import SettingsPanel from './SettingsPanel'
 import { TimelineAudioClip } from './TimelineAudioClip'
 import { exportWithOfflinePipeline, isWebCodecsAvailable, downloadExportedVideo } from '../utils/exportIntegration'
+import { exportWithMultiTechnique, getAvailableTechniques, type ExportTechnique } from '../utils/multiExportIntegration'
 
 interface EditStepProps {
   scenes: Scene[]
@@ -167,6 +168,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     enabled: boolean
     x: number // Position (0-1, relative to canvas width)
     y: number // Position (0-1, relative to canvas height)
+    width?: number // Width (0-1, relative to canvas width, optional - calculated from text if not provided)
+    height?: number // Height (0-1, relative to canvas height, optional - calculated from text if not provided)
+    size?: number // Font size in pixels (defaults to titleSettings.size)
     textAlign?: 'left' | 'center' | 'right' // Text alignment
     animationIn?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
     animationOut?: 'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'zoomIn' | 'zoomOut'
@@ -269,6 +273,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4')
   const [exportMode, setExportMode] = useState<'combined' | 'separate'>('combined')
   const [exportProgressPercent, setExportProgressPercent] = useState(0)
+  const [selectedExportTechnique, setSelectedExportTechnique] = useState<ExportTechnique | 'auto'>('auto')
   
   // FFmpeg loading state
   const [ffmpegLoading, setFfmpegLoading] = useState(false)
@@ -3028,10 +3033,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
               Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
               Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
-              Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1 ||
+              Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1
+            
+            const hasBorderRadiusChange = 
               Math.abs((prevHolder.borderRadius ?? 0) - (newHolder.borderRadius ?? 0)) > 0.1
             
-            if (hasPositionChange) {
+            // Set up transition if position/size/rotation OR borderRadius changes
+            if (hasPositionChange || hasBorderRadiusChange) {
               const clipKey = `${clipId}_${layer}`
               
               // Always include borderRadius in transitions, even if it's the same value
@@ -5608,7 +5616,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       ctx.globalAlpha = opacity
       
       // Draw text
-      const fontSize = titleSettings.size
+      const fontSize = title.size ?? titleSettings.size
       const lineHeight = fontSize * titleSettings.lineHeight
       ctx.font = `${fontSize}px ${titleSettings.font}`
       ctx.fillStyle = '#ffffff'
@@ -5621,13 +5629,69 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       
       const text = title.text.replace(/<[^>]*>/g, '') // Remove HTML tags
       const lines = text.split('\n').filter(l => l.trim())
+      
+      // Calculate text bounds for boundary visualization
+      let maxWidth = 0
+      let totalHeight = lines.length * lineHeight
+      lines.forEach((line) => {
+        const metrics = ctx.measureText(line)
+        maxWidth = Math.max(maxWidth, metrics.width)
+      })
+      
+      // Draw boundary box if layout clip is selected
+      const isSelected = selectedLayoutClipIds.has(currentLayoutClip.id)
+      if (isSelected && title.enabled && lines.length > 0) {
+        // Save current transform state before drawing boundary
+        const boundarySave = ctx.getTransform()
+        // Reset transforms to draw boundary in canvas coordinates
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = '#00ff00'
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'
+        ctx.lineWidth = 2
+        ctx.setLineDash([5, 5])
+        
+        // Calculate boundary box position based on text alignment
+        // Use the actual text position after all transforms
+        let boxX = titleX
+        let boxWidth = maxWidth
+        
+        if (textAlign === 'center') {
+          boxX = titleX - maxWidth / 2
+        } else if (textAlign === 'right') {
+          boxX = titleX - maxWidth
+        }
+        
+        // Account for alignment offset
+        boxX += alignOffsetX * (canvas.width / 100)
+        
+        // Account for transforms (but we're drawing in canvas coords, so apply inverse)
+        const transformedX = boxX + translateX * (canvas.width / 100)
+        const transformedY = titleY + translateY * (canvas.height / 100)
+        
+        // Apply scale to box dimensions
+        const scaledWidth = boxWidth * scale
+        const scaledHeight = totalHeight * scale
+        
+        // Draw boundary rectangle (accounting for scale)
+        const finalX = transformedX - (textAlign === 'center' ? scaledWidth / 2 : textAlign === 'right' ? scaledWidth : 0)
+        const finalY = transformedY
+        
+        ctx.fillRect(finalX, finalY, scaledWidth, scaledHeight)
+        ctx.strokeRect(finalX, finalY, scaledWidth, scaledHeight)
+        
+        // Restore transform for text drawing
+        ctx.setTransform(boundarySave)
+      }
+      
+      // Draw text
       lines.forEach((line, index) => {
         ctx.fillText(line, 0, index * lineHeight)
       })
       
       ctx.restore()
     }
-  }, [canvasDimensions, canvasSettings, getCurrentLayoutClip, layoutClips, timelineClips, clipProperties, titleSettings, setupLayoutClipTransitions])
+  }, [canvasDimensions, canvasSettings, getCurrentLayoutClip, layoutClips, timelineClips, clipProperties, titleSettings, setupLayoutClipTransitions, selectedLayoutClipIds])
 
   // Export
   const handleExport = async () => {
@@ -6620,6 +6684,115 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
   }
 
+  // Multi-technique export handler
+  const handleMultiExport = async () => {
+    if (sceneTakes.length === 0) {
+      alert('No scenes with selected takes')
+      return
+    }
+
+    // Determine which scenes to export
+    const scenesToExport = selectedScenesForExport.size > 0
+      ? sceneTakes.filter(st => selectedScenesForExport.has(st.sceneId))
+      : sceneTakes // Export all if none selected
+
+    if (scenesToExport.length === 0) {
+      alert('Please select at least one scene to export')
+      return
+    }
+
+    setIsExporting(true)
+    setExportProgress('Starting multi-technique export...')
+    setExportProgressPercent(0)
+
+    try {
+      // Get current layout clip's title and background image (if any)
+      const currentLayoutClip = layoutClips.find(lc => 
+        currentTime >= lc.timelineStart && currentTime < lc.timelineEnd
+      ) || layoutClips[0]
+
+      const titleData = currentLayoutClip?.title?.enabled && currentLayoutClip.title.text
+        ? {
+            text: currentLayoutClip.title.text,
+            x: currentLayoutClip.title.x,
+            y: currentLayoutClip.title.y,
+            textAlign: currentLayoutClip.title.textAlign || 'center',
+            font: titleSettings.font,
+            fontSize: titleSettings.size,
+            lineHeight: titleSettings.lineHeight,
+            animationIn: currentLayoutClip.title.animationIn || 'none',
+            animationOut: currentLayoutClip.title.animationOut || 'none',
+            animationDuration: currentLayoutClip.title.animationDuration || 0.5,
+            timelineStart: 0, // Could be calculated from layout clips
+            timelineEnd: timelineClips.reduce((max, clip) => Math.max(max, clip.timelineEnd), 0),
+          }
+        : undefined
+
+      const backgroundImageData = currentLayoutClip?.backgroundImage?.enabled && currentLayoutClip.backgroundImage.url
+        ? {
+            url: currentLayoutClip.backgroundImage.url,
+            x: 0, // Full canvas - adjust if needed
+            y: 0,
+            width: 1,
+            height: 1,
+          }
+        : undefined
+
+      const result = await exportWithMultiTechnique(
+        scenes,
+        timelineClips,
+        layoutClips,
+        canvasSettings,
+        layout,
+        {
+          style: selectedCaptionStyle !== 'none' 
+            ? captionStyles.find(s => s.id === selectedCaptionStyle) 
+            : undefined,
+          font: captionFont,
+          size: captionSize,
+          lineHeight: captionLineHeight,
+          maxWords: captionMaxWords,
+          enabled: selectedCaptionStyle !== 'none',
+        },
+        titleData,
+        backgroundImageData,
+        transcripts,
+        {
+          technique: selectedExportTechnique,
+          fps: 30,
+          bitrate: 5_000_000, // 5 Mbps
+          format: exportFormat,
+          codec: exportFormat === 'webm' ? 'vp9' : 'avc1',
+          onProgress: (message, percent, technique, error) => {
+            setExportProgress(`${technique ? `[${technique}] ` : ''}${message}`)
+            setExportProgressPercent(percent)
+            if (error) {
+              console.error(`[${technique}] Export error:`, error)
+            }
+          }
+        }
+      )
+
+      downloadExportedVideo(result.blob, `export_${Date.now()}.${exportFormat}`)
+      setIsExporting(false)
+      setExportProgress(`Export complete! (Used: ${result.technique})`)
+      setExportProgressPercent(100)
+      
+      // Log export details
+      console.log('Export successful!')
+      console.log('Used technique:', result.technique)
+      console.log('Full logs:', result.log)
+      
+      setShowExportDialog(false)
+    } catch (error) {
+      console.error('Multi-technique export failed:', error)
+      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+      setIsExporting(false)
+      setExportProgress('Export failed')
+      setExportProgressPercent(0)
+    }
+  }
+
   // Export DaVinci Resolve timeline
   const handleExportDaVinci = () => {
     if (sceneTakes.length === 0) {
@@ -6896,16 +7069,55 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 </p>
               </div>
 
-              {/* New Offline Export Section */}
+              {/* Multi-Technique Export Section */}
               <div className="mb-4 p-3 bg-gray-900/20 border border-gray-500/50 rounded">
                 <div className="flex items-center gap-2 mb-2">
                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  <span className="text-sm font-medium text-gray-300">New: Offline Export (WebCodecs)</span>
+                  <span className="text-sm font-medium text-gray-300">Multi-Technique Export</span>
                 </div>
-                <p className="text-xs text-gray-200/80 mb-2">
-                  Faster, more accurate export that matches exactly what you see. Requires Chrome/Edge browser.
+                <p className="text-xs text-gray-200/80 mb-3">
+                  Test different export techniques. Select "auto" to try all until one succeeds.
+                </p>
+                
+                {/* Export Technique Selector */}
+                <div className="mb-3">
+                  <label className="text-xs text-gray-300 mb-1 block">Export Technique</label>
+                  <select
+                    value={selectedExportTechnique}
+                    onChange={(e) => setSelectedExportTechnique(e.target.value as ExportTechnique | 'auto')}
+                    disabled={isExporting}
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="auto">Auto (Try all until one succeeds)</option>
+                    <option value="webcodecs-canvas">WebCodecs Canvas (Best Quality - Chrome/Edge)</option>
+                    <option value="ffmpeg-frames">FFmpeg Frames (Most Compatible)</option>
+                    <option value="mediarecorder-canvas">MediaRecorder Canvas (Fast - Modern Browsers)</option>
+                    <option value="canvas-capture-ffmpeg">Canvas CaptureStream + FFmpeg (Balanced)</option>
+                    <option value="canvas-capture-mediarecorder">Canvas CaptureStream + MediaRecorder (Fastest)</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Available: {getAvailableTechniques().join(', ') || 'None'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleMultiExport}
+                  disabled={isExporting}
+                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                >
+                  {isExporting ? 'Exporting...' : 'Export with Selected Technique'}
+                </button>
+              </div>
+
+              {/* Legacy Offline Export Section */}
+              <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-400">Legacy: Offline Export (WebCodecs Only)</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Older export method. Use Multi-Technique Export above for better compatibility.
                 </p>
                 <button
                   onClick={handleOfflineExport}
@@ -7921,6 +8133,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                         text: htmlContent,
                                         x: lc.title?.x ?? 0.5,
                                         y: lc.title?.y ?? 0.1,
+                                        size: lc.title?.size ?? titleSettings.size,
                                         textAlign: lc.title?.textAlign ?? 'center',
                                         animationIn: lc.title?.animationIn ?? 'none',
                                         animationOut: lc.title?.animationOut ?? 'none',
@@ -7938,6 +8151,50 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           placeholder="Enter title text... (supports formatting)"
                         />
                       </div>
+                      
+                      {/* Title Size Control */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs text-gray-300">Title Size: {title?.size ?? titleSettings.size}px</label>
+                        </div>
+                        <input
+                          type="range"
+                          min="12"
+                          max="200"
+                          step="1"
+                          value={title?.size ?? titleSettings.size}
+                          onChange={(e) => {
+                            const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                            if (currentLayoutClip) {
+                              setLayoutClips(prev => prev.map(lc => 
+                                lc.id === currentLayoutClip.id 
+                                  ? { 
+                                      ...lc, 
+                                      title: { 
+                                        enabled: lc.title?.enabled ?? true,
+                                        text: lc.title?.text || '',
+                                        x: lc.title?.x ?? 0.5,
+                                        y: lc.title?.y ?? 0.1,
+                                        size: parseInt(e.target.value),
+                                        textAlign: lc.title?.textAlign ?? 'center',
+                                        animationIn: lc.title?.animationIn ?? 'none',
+                                        animationOut: lc.title?.animationOut ?? 'none',
+                                        animationDuration: lc.title?.animationDuration ?? 0.5,
+                                      } 
+                                    }
+                                  : lc
+                              ))
+                              saveToHistory()
+                            }
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>12px</span>
+                          <span>200px</span>
+                        </div>
+                      </div>
+                      
                       <div className="text-xs text-gray-400">
                         Select text and use formatting buttons for bold, italic, or underline. Drag the title in the canvas to reposition it.
                       </div>
@@ -9216,45 +9473,55 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         const elapsed = currentTime - transition.startTime
                         const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
                         
-                        // Easing function (ease-in-out cubic) for smooth, natural motion
-                        const easeInOut = (t: number): number => {
-                          return t < 0.5
-                            ? 4 * t * t * t
-                            : 1 - Math.pow(-2 * t + 2, 3) / 2
-                        }
-                        const eased = easeInOut(progress)
-                        
-                        // Interpolate position and size
-                        displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
-                        displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
-                        displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
-                        displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
-                        
-                        // Interpolate rotation if provided
-                        if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
-                          // Handle rotation wrapping (e.g., 350° to 10° should go through 0°, not backwards)
-                          let startRot = transition.startRotation
-                          let endRot = transition.endRotation
-                          let diff = endRot - startRot
+                        // Only apply transition if we're within the transition window
+                        if (elapsed >= 0 && elapsed <= transition.duration) {
+                          // Easing function (ease-in-out cubic) for smooth, natural motion
+                          const easeInOut = (t: number): number => {
+                            return t < 0.5
+                              ? 4 * t * t * t
+                              : 1 - Math.pow(-2 * t + 2, 3) / 2
+                          }
+                          const eased = easeInOut(progress)
                           
-                          // Normalize to shortest path
-                          if (Math.abs(diff) > 180) {
-                            if (diff > 0) {
-                              diff -= 360
-                            } else {
-                              diff += 360
+                          // Interpolate position and size
+                          displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
+                          displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
+                          displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
+                          displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
+                          
+                          // Interpolate rotation if provided
+                          if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
+                            // Handle rotation wrapping (e.g., 350° to 10° should go through 0°, not backwards)
+                            let startRot = transition.startRotation
+                            let endRot = transition.endRotation
+                            let diff = endRot - startRot
+                            
+                            // Normalize to shortest path
+                            if (Math.abs(diff) > 180) {
+                              if (diff > 0) {
+                                diff -= 360
+                              } else {
+                                diff += 360
+                              }
                             }
+                            
+                            displayRotation = startRot + diff * eased
                           }
                           
-                          displayRotation = startRot + diff * eased
+                          // Interpolate borderRadius - always interpolate if transition exists and values are defined
+                          // This ensures borderRadius transitions smoothly along with position/size/rotation
+                          if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
+                            displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
+                          }
+                        } else if (elapsed > transition.duration) {
+                          // Transition complete - use end values
+                          displayX = transition.endPos.x
+                          displayY = transition.endPos.y
+                          displayWidth = transition.endPos.width
+                          displayHeight = transition.endPos.height
+                          displayRotation = transition.endRotation ?? holder.rotation
+                          displayBorderRadius = transition.endBorderRadius ?? (holder.borderRadius ?? 0)
                         }
-                        
-                        // Interpolate borderRadius - always interpolate if transition exists and values are defined
-                        // This ensures borderRadius transitions smoothly along with position/size/rotation
-                        if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
-                          displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
-                        }
-                        // Note: If borderRadius values are not defined in transition, keep the current holder value
                         
                         // Clean up completed transitions
                         if (progress >= 1) {
