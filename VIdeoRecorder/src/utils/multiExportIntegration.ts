@@ -64,7 +64,7 @@ export async function exportWithMultiTechnique(
     format?: 'mp4' | 'webm'
     codec?: 'avc1' | 'vp8' | 'vp9'
     technique?: ExportTechnique | 'auto'
-    onProgress?: (message: string, percent: number, technique?: string, error?: string) => void
+    onProgress?: (message: string, percent: number, technique?: string, error?: string, timeRemaining?: number, elapsedTime?: number) => void
   }
 ): Promise<{ blob: Blob; technique: string; log: string[] }> {
   // Prepare render state
@@ -95,7 +95,9 @@ export async function exportWithMultiTechnique(
             progress.message,
             progress.progress * 100,
             progress.technique,
-            progress.error
+            progress.error,
+            progress.timeRemaining,
+            progress.elapsedTime
           )
         }
       : undefined,
@@ -135,6 +137,11 @@ export function downloadExportedVideo(blob: Blob, filename: string = 'export.mp4
  */
 export function getAvailableTechniques(): ExportTechnique[] {
   const allTechniques: ExportTechnique[] = [
+    'smart-compositor', // SMART: Optimized compositing
+    'fast-mediarecorder', // PRO: Fastest, most accurate - Production ready
+    'webcodecs-accelerated',
+    'offscreencanvas-webcodecs',
+    'mediarecorder-optimized',
     'webcodecs-canvas',
     'ffmpeg-frames',
     'mediarecorder-canvas',

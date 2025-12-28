@@ -9,11 +9,16 @@ import type { Scene } from '../App'
 import type { TimelineClip, LayoutClip } from './renderer'
 
 export type ExportTechnique = 
+  | 'smart-compositor' // SMART: Optimized compositing technique
+  | 'fast-mediarecorder' // PRO: Fastest, most accurate - Production ready
   | 'webcodecs-canvas'
   | 'ffmpeg-frames'
   | 'mediarecorder-canvas'
   | 'canvas-capture-ffmpeg'
   | 'canvas-capture-mediarecorder'
+  | 'webcodecs-accelerated' // Hardware-accelerated WebCodecs
+  | 'offscreencanvas-webcodecs' // OffscreenCanvas with WebCodecs
+  | 'mediarecorder-optimized' // Optimized MediaRecorder
 
 export interface ExportOptions {
   // Export settings
@@ -33,6 +38,8 @@ export interface ExportOptions {
     message: string
     technique?: ExportTechnique
     error?: string
+    timeRemaining?: number // Estimated seconds remaining
+    elapsedTime?: number // Elapsed seconds
   }) => void
   
   // Scene selection
@@ -46,6 +53,40 @@ export interface ExportResult {
   error?: string
   duration?: number // Export duration in milliseconds
   log: string[]
+}
+
+/**
+ * Helper to format time remaining
+ */
+function formatTimeRemaining(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`
+  } else if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.round(seconds % 60)
+    return `${mins}m ${secs}s`
+  } else {
+    const hours = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    return `${hours}h ${mins}m`
+  }
+}
+
+/**
+ * Helper to calculate time remaining from progress
+ */
+function calculateTimeRemaining(
+  progress: number,
+  startTime: number,
+  currentTime: number = Date.now()
+): { timeRemaining: number; elapsedTime: number } {
+  const elapsedTime = (currentTime - startTime) / 1000 // seconds
+  if (progress <= 0) {
+    return { timeRemaining: Infinity, elapsedTime }
+  }
+  const estimatedTotal = elapsedTime / progress
+  const timeRemaining = Math.max(0, estimatedTotal - elapsedTime)
+  return { timeRemaining, elapsedTime }
 }
 
 /**
@@ -116,13 +157,23 @@ export async function exportVideoMulti(
     logger.log(`Export configuration: ${width}x${height} @ ${fps}fps, ${format}, ${codec}`)
     logger.log(`Selected technique: ${technique}`)
 
-    // Prepare progress callback with logging
+    // Track start time for time estimation
+    const exportStartTime = Date.now()
+    
+    // Prepare progress callback with logging and time estimation
     const progressCallback = (progress: { progress: number; message: string; technique?: ExportTechnique; error?: string }) => {
-      logger.log(`Progress [${(progress.progress * 100).toFixed(1)}%]: ${progress.message}`)
+      const { timeRemaining, elapsedTime } = calculateTimeRemaining(progress.progress, exportStartTime)
+      const timeRemainingStr = timeRemaining !== Infinity ? formatTimeRemaining(timeRemaining) : 'calculating...'
+      
+      logger.log(`Progress [${(progress.progress * 100).toFixed(1)}%]: ${progress.message} (${timeRemainingStr} remaining)`)
       if (progress.error) {
         logger.error(progress.error)
       }
-      onProgress?.(progress)
+      onProgress?.({
+        ...progress,
+        timeRemaining,
+        elapsedTime,
+      })
     }
 
     let result: ExportResult
@@ -175,11 +226,16 @@ async function tryAllTechniques(
   logger: ExportLogger
 ): Promise<ExportResult> {
   const techniques: ExportTechnique[] = [
-    'webcodecs-canvas',
-    'ffmpeg-frames',
-    'mediarecorder-canvas',
+    'smart-compositor', // SMART: Optimized compositing
+    'fast-mediarecorder', // PRO: Fastest, most accurate - Production ready
+    'mediarecorder-optimized', // Fast - renders frames at correct timing
+    'mediarecorder-canvas', // Also fast - proven to work
+    'webcodecs-canvas', // Good quality with WebCodecs
+    'webcodecs-accelerated', // Fast if hardware accelerated
+    'offscreencanvas-webcodecs',
     'canvas-capture-mediarecorder',
     'canvas-capture-ffmpeg',
+    'ffmpeg-frames', // Slowest - only as last resort
   ]
 
   for (const technique of techniques) {
@@ -246,6 +302,21 @@ async function loadTechnique(technique: ExportTechnique) {
     case 'canvas-capture-mediarecorder':
       const canvasMR = await import('./exportTechniques/canvasCaptureMediaRecorder')
       return canvasMR.exportCanvasCaptureMediaRecorder
+    case 'webcodecs-accelerated':
+      const webcodecsAccel = await import('./exportTechniques/webcodecsAccelerated')
+      return webcodecsAccel.exportWebCodecsAccelerated
+    case 'offscreencanvas-webcodecs':
+      const offscreenWC = await import('./exportTechniques/offscreenCanvasWebCodecs')
+      return offscreenWC.exportOffscreenCanvasWebCodecs
+    case 'mediarecorder-optimized':
+      const mrOptimized = await import('./exportTechniques/mediarecorderOptimized')
+      return mrOptimized.exportMediaRecorderOptimized
+    case 'fast-mediarecorder':
+      const fastMR = await import('./exportTechniques/fastMediaRecorder')
+      return fastMR.exportFastMediaRecorder
+    case 'smart-compositor':
+      const smartComp = await import('./exportTechniques/smartCompositor')
+      return smartComp.exportSmartCompositor
     default:
       throw new Error(`Unknown technique: ${technique}`)
   }
@@ -256,6 +327,21 @@ async function loadTechnique(technique: ExportTechnique) {
  */
 export function isTechniqueAvailable(technique: ExportTechnique): boolean {
   switch (technique) {
+    case 'smart-compositor':
+      return typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function'
+    
+    case 'fast-mediarecorder':
+      return typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function'
+    
+    case 'webcodecs-accelerated':
+      return typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined'
+    
+    case 'offscreencanvas-webcodecs':
+      return typeof OffscreenCanvas !== 'undefined' && typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined'
+    
+    case 'mediarecorder-optimized':
+      return typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function'
+    
     case 'webcodecs-canvas':
       return typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined'
     
