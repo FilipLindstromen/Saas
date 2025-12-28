@@ -108,7 +108,7 @@ export default function BottomNavigation({
         {currentStep === 'script' && (
           <button
             onClick={() => onStepChange('record')}
-            className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
+            className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-lg transition-colors"
           >
             Continue to Recording &gt;
           </button>
@@ -116,7 +116,7 @@ export default function BottomNavigation({
         {currentStep === 'record' && (
           <button
             onClick={() => onStepChange('edit')}
-            className="bg-gray-600 hover:bg-gray-500 px-6 py-2 rounded-lg transition-colors"
+            className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-lg transition-colors"
           >
             Continue to Editing &gt;
           </button>

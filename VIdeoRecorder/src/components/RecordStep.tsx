@@ -700,7 +700,7 @@ export default function RecordStep({
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div
-                    className={`w-2 h-2 rounded-full ${status === 'green' ? 'bg-gray-300' : 'bg-gray-600'
+                    className={`w-2 h-2 rounded-full ${status === 'green' ? 'bg-gray-300' : 'bg-gray-700'
                       }`}
                   />
                   <span className="text-gray-400 text-sm">Scene {index + 1}</span>
@@ -723,7 +723,7 @@ export default function RecordStep({
                               e.stopPropagation()
                               resumeRecording()
                             }}
-                            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                            className="px-3 py-1 bg-gray-700 hover:bg-gray-700 rounded text-sm"
                           >
                             Resume
                           </button>
@@ -733,7 +733,7 @@ export default function RecordStep({
                               e.stopPropagation()
                               pauseRecording()
                             }}
-                            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                            className="px-3 py-1 bg-gray-700 hover:bg-gray-700 rounded text-sm"
                           >
                             Pause
                           </button>
@@ -771,7 +771,7 @@ export default function RecordStep({
                             // Start recording with the scene ID directly to avoid race conditions
                             startRecording(scene.id)
                           }}
-                          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                          className="px-4 py-2 bg-gray-700 hover:bg-gray-700 rounded text-sm"
                         >
                           Record
                         </button>
@@ -797,7 +797,7 @@ export default function RecordStep({
                             // Start recording with the scene ID directly to avoid race conditions
                             startRecording(scene.id)
                           }}
-                          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+                          className="px-4 py-2 bg-gray-700 hover:bg-gray-700 rounded text-sm"
                         >
                           Record
                         </button>
