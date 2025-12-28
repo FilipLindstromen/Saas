@@ -376,8 +376,8 @@ export async function exportVideoFast(
         await Promise.all(seekPromises)
       }
 
-      // Render frame
-      await renderFrame(renderContext, renderState)
+      // Render frame with isExport=true to skip expensive async waits
+      await renderFrame(renderContext, renderState, true)
 
       frameIndex++
       

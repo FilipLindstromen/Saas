@@ -181,6 +181,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   interface LayoutBackgroundImage {
     url: string // Data URL or blob URL
     enabled: boolean
+    x?: number // X position (0-1 normalized, default 0)
+    y?: number // Y position (0-1 normalized, default 0)
+    width?: number // Width (0-1 normalized, default 1 for full width)
+    height?: number // Height (0-1 normalized, default 1 for full height)
   }
 
   interface LayoutClip {
@@ -1122,6 +1126,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         backgroundImage: {
           enabled: true,
           url: '',
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
         },
       }
       
@@ -1238,6 +1246,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [draggingTitle, setDraggingTitle] = useState<boolean>(false)
   const [titleDragStartPos, setTitleDragStartPos] = useState<{ x: number; y: number } | null>(null)
   const [titleDragStartLayoutClip, setTitleDragStartLayoutClip] = useState<LayoutClip | null>(null)
+
+  // Background image dragging state
+  const [draggingBackground, setDraggingBackground] = useState<boolean>(false)
+  const [backgroundDragStartPos, setBackgroundDragStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [backgroundDragStartLayoutClip, setBackgroundDragStartLayoutClip] = useState<LayoutClip | null>(null)
   
   // Timeline clip dragging state (different from canvas holder dragging)
   const [draggingClipId, setDraggingClipId] = useState<string | null>(null)
@@ -1334,7 +1347,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               ...lc, 
               backgroundImage: { 
                 enabled: true, 
-                url: imageUrl 
+                url: imageUrl,
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1,
               } 
             }
           : lc
@@ -2160,6 +2177,63 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [draggingTitle, titleDragStartPos, titleDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory])
+
+  // Handle background image dragging (panning)
+  useEffect(() => {
+    if (!draggingBackground || !backgroundDragStartPos || !backgroundDragStartLayoutClip) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement
+      if (!canvasContainer) return
+
+      const rect = canvasContainer.getBoundingClientRect()
+      const deltaX = (e.clientX - backgroundDragStartPos.x) / rect.width
+      const deltaY = (e.clientY - backgroundDragStartPos.y) / rect.height
+
+      const currentLayoutClip = getCurrentLayoutClip(currentTime)
+      if (!currentLayoutClip || currentLayoutClip.id !== backgroundDragStartLayoutClip.id) return
+
+      const startBackground = backgroundDragStartLayoutClip.backgroundImage
+      if (!startBackground) return
+
+      let newX = (startBackground.x || 0) + deltaX
+      let newY = (startBackground.y || 0) + deltaY
+
+      // Allow panning beyond canvas bounds (image can extend outside)
+      // But we'll constrain it reasonably to prevent extreme offsets
+      const maxOffset = 1 // Allow image to pan up to 100% of its size outside canvas
+      newX = Math.max(-maxOffset, Math.min(maxOffset, newX))
+      newY = Math.max(-maxOffset, Math.min(maxOffset, newY))
+
+      setLayoutClips(prev => prev.map(lc => {
+        if (lc.id !== currentLayoutClip.id) return lc
+        return {
+          ...lc,
+          backgroundImage: {
+            ...lc.backgroundImage!,
+            x: newX,
+            y: newY,
+            width: lc.backgroundImage?.width ?? 1,
+            height: lc.backgroundImage?.height ?? 1,
+          }
+        }
+      }))
+    }
+
+    const handleMouseUp = () => {
+      setDraggingBackground(false)
+      setBackgroundDragStartPos(null)
+      setBackgroundDragStartLayoutClip(null)
+      saveToHistory()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingBackground, backgroundDragStartPos, backgroundDragStartLayoutClip, currentTime, getCurrentLayoutClip, saveToHistory])
 
   // Load selected take's recordings
   useEffect(() => {
@@ -4912,16 +4986,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     const currentLayoutClip = getCurrentLayoutClip(time)
     
     // Draw background image if present
-    if (currentLayoutClip?.backgroundImage?.url) {
+    if (currentLayoutClip?.backgroundImage?.enabled && currentLayoutClip?.backgroundImage?.url) {
       const bgImg = currentLayoutClip.backgroundImage
       const img = new Image()
       img.crossOrigin = 'anonymous'
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          const bgX = bgImg.x * canvas.width
-          const bgY = bgImg.y * canvas.height
-          const bgW = bgImg.width * canvas.width
-          const bgH = bgImg.height * canvas.height
+          // Use position values (normalized 0-1) or defaults
+          const bgX = (bgImg.x ?? 0) * canvas.width
+          const bgY = (bgImg.y ?? 0) * canvas.height
+          const bgW = (bgImg.width ?? 1) * canvas.width
+          const bgH = (bgImg.height ?? 1) * canvas.height
           
           // Calculate fade in/out
           const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
@@ -6063,12 +6138,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         } : undefined
 
         // Prepare background image data for export
-        const exportBackgroundImageData: BackgroundImageData | undefined = sceneLayoutClip?.backgroundImage ? {
+        const exportBackgroundImageData: BackgroundImageData | undefined = (sceneLayoutClip?.backgroundImage?.enabled && sceneLayoutClip?.backgroundImage?.url) ? {
           url: sceneLayoutClip.backgroundImage.url,
-          x: sceneLayoutClip.backgroundImage.x || 0,
-          y: sceneLayoutClip.backgroundImage.y || 0,
-          width: sceneLayoutClip.backgroundImage.width || 1,
-          height: sceneLayoutClip.backgroundImage.height || 1,
+          x: sceneLayoutClip.backgroundImage.x ?? 0,
+          y: sceneLayoutClip.backgroundImage.y ?? 0,
+          width: sceneLayoutClip.backgroundImage.width ?? 1,
+          height: sceneLayoutClip.backgroundImage.height ?? 1,
         } : undefined
 
         // Canvas-based export: render frames exactly as shown
@@ -7020,7 +7095,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
                     <div 
-                      className="bg-gray-600 h-2 rounded-full transition-all duration-300" 
+                      className="bg-gray-700 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${exportProgressPercent}%` }}
                     ></div>
                   </div>
@@ -7049,13 +7124,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <div className="flex gap-2">
                   <button
                     onClick={() => setExportFormat('mp4')}
-                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'mp4' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'mp4' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     MP4
                   </button>
                   <button
                     onClick={() => setExportFormat('webm')}
-                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'webm' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportFormat === 'webm' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     WebM
                   </button>
@@ -7067,13 +7142,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <div className="flex gap-2">
                   <button
                     onClick={() => setExportMode('combined')}
-                    className={`px-4 py-2 rounded text-sm ${exportMode === 'combined' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'combined' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     Combined Video
                   </button>
                   <button
                     onClick={() => setExportMode('separate')}
-                    className={`px-4 py-2 rounded text-sm ${exportMode === 'separate' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportMode === 'separate' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                   >
                     Separate Videos
                   </button>
@@ -7101,7 +7176,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   </button>
                   <button
                     onClick={() => setExportTechnique('cpu')}
-                    className={`px-4 py-2 rounded text-sm ${exportTechnique === 'cpu' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    className={`px-4 py-2 rounded text-sm ${exportTechnique === 'cpu' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                     title="Standard CPU rendering"
                   >
                     CPU (Standard)
@@ -7173,7 +7248,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <button
                   onClick={handleExport}
                   disabled={isExporting || !ffmpegReady || ffmpegLoading}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!ffmpegReady ? (ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? `FFmpeg error: ${ffmpegError}` : 'FFmpeg not ready') : undefined}
                 >
                   {ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? 'FFmpeg Error' : 'Export Video (FFmpeg)'}
@@ -7183,7 +7258,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     handleExportDaVinci()
                   }}
                   disabled={isExporting}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Export DaVinci Timeline
                 </button>
@@ -7198,7 +7273,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         <div className="w-16 bg-gray-900 border-r border-gray-700 flex flex-col items-center py-4 space-y-4">
           <button
             onClick={() => setActiveTab('canvas')}
-            className={`p-2 rounded ${activeTab === 'canvas' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'canvas' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Project Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7208,7 +7283,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('layout')}
-            className={`p-2 rounded ${activeTab === 'layout' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'layout' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Layout"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7217,7 +7292,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('presets')}
-            className={`p-2 rounded ${activeTab === 'presets' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'presets' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Layout Presets"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7226,7 +7301,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('fonts')}
-            className={`p-2 rounded ${activeTab === 'fonts' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'fonts' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Fonts"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7235,7 +7310,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('clip')}
-            className={`p-2 rounded ${activeTab === 'clip' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'clip' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Clip"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7244,7 +7319,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('captions')}
-            className={`p-2 rounded ${activeTab === 'captions' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'captions' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Captions"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7253,7 +7328,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('audio')}
-            className={`p-2 rounded ${activeTab === 'audio' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'audio' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Audio Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7262,7 +7337,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           </button>
           <button
             onClick={() => setActiveTab('visual')}
-            className={`p-2 rounded ${activeTab === 'visual' ? 'bg-gray-600' : 'hover:bg-gray-800'}`}
+            className={`p-2 rounded ${activeTab === 'visual' ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
             title="Visual Settings"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7321,7 +7396,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })
                         setClipProperties(newMap)
                       }}
-                      className="text-xs bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
+                      className="text-xs bg-gray-700/20 hover:bg-gray-700/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
                     >
                       Apply to all clips
                     </button>
@@ -7349,7 +7424,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             enhanceVoice: !current.enhanceVoice,
                           })))
                         }}
-                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'bg-green-500' : 'bg-gray-600'
+                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.enhanceVoice) ? 'bg-green-500' : 'bg-gray-700'
                           }`}
                       >
                         <div
@@ -7421,7 +7496,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             removeNoise: !current.removeNoise,
                           })))
                         }}
-                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'bg-green-500' : 'bg-gray-600'
+                        className={`w-12 h-6 rounded-full transition-colors ${(clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.removeNoise) ? 'bg-green-500' : 'bg-gray-700'
                           }`}
                       >
                         <div
@@ -7556,7 +7631,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         // Save to history after applying to all clips
                         setTimeout(() => saveToHistory(), 0)
                       }}
-                      className="text-xs bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
+                      className="text-xs bg-gray-700/20 hover:bg-gray-700/40 text-gray-400 hover:text-gray-300 px-3 py-1.5 rounded transition-colors border border-gray-500/30"
                     >
                       Apply to all clips
                     </button>
@@ -7936,7 +8011,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                           ...lc, 
                                           backgroundImage: { 
                                             enabled: true, 
-                                            url: dataUrl 
+                                            url: dataUrl,
+                                            x: 0,
+                                            y: 0,
+                                            width: 1,
+                                            height: 1,
                                           } 
                                         }
                                       : lc
@@ -7947,7 +8026,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               reader.readAsDataURL(file)
                             }
                           }}
-                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
+                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-700"
                         />
                         <button
                           onClick={() => {
@@ -7956,7 +8035,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               searchUnsplash(unsplashSearchQuery)
                             }
                           }}
-                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded whitespace-nowrap"
+                          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-700 text-white text-xs rounded whitespace-nowrap"
                         >
                           Unsplash
                         </button>
@@ -7974,7 +8053,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                         ...lc, 
                                         backgroundImage: { 
                                           enabled: true, 
-                                          url: '' 
+                                          url: '',
+                                          x: 0,
+                                          y: 0,
+                                          width: 1,
+                                          height: 1,
                                         } 
                                       }
                                     : lc
@@ -8012,7 +8095,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               document.execCommand('bold', false)
                               titleEditorRef.current?.focus()
                             }}
-                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-700 rounded text-white"
                             title="Bold"
                           >
                             <strong>B</strong>
@@ -8024,7 +8107,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               document.execCommand('italic', false)
                               titleEditorRef.current?.focus()
                             }}
-                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-700 rounded text-white"
                             title="Italic"
                           >
                             <em>I</em>
@@ -8036,7 +8119,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               document.execCommand('underline', false)
                               titleEditorRef.current?.focus()
                             }}
-                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-700 rounded text-white"
                             title="Underline"
                           >
                             <u>U</u>
@@ -8068,7 +8151,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              title?.textAlign === 'left' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
+                              title?.textAlign === 'left' ? 'bg-gray-700 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-700'
                             }`}
                             title="Align Left"
                           >
@@ -8102,7 +8185,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              (title?.textAlign === 'center' || !title?.textAlign) ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
+                              (title?.textAlign === 'center' || !title?.textAlign) ? 'bg-gray-700 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-700'
                             }`}
                             title="Align Center"
                           >
@@ -8136,7 +8219,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              title?.textAlign === 'right' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
+                              title?.textAlign === 'right' ? 'bg-gray-700 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-700'
                             }`}
                             title="Align Right"
                           >
@@ -8549,7 +8632,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         alert('Error saving layout preset')
                       }
                     }}
-                    className="w-full bg-gray-600 hover:bg-gray-700 py-2 rounded text-xs text-white"
+                    className="w-full bg-gray-700 hover:bg-gray-700 py-2 rounded text-xs text-white"
                   >
                     Save as Preset
                   </button>
@@ -8804,7 +8887,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })
                         markAsEdited()
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '16:9' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       16:9
                     </button>
@@ -8821,7 +8904,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })
                         markAsEdited()
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '9:16' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       9:16
                     </button>
@@ -8837,7 +8920,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         })
                         markAsEdited()
                       }}
-                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      className={`px-3 py-2 rounded text-xs ${canvasSettings.format === '1:1' ? 'bg-gray-700' : 'bg-gray-800 hover:bg-gray-700'}`}
                     >
                       1:1
                     </button>
@@ -8939,7 +9022,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">Noise Reduction</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, noiseReduction: !audioSettings.noiseReduction })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.noiseReduction ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.noiseReduction ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -8970,7 +9053,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">Enhance Voice</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, enhanceVoice: !audioSettings.enhanceVoice })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.enhanceVoice ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.enhanceVoice ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -8987,7 +9070,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">Normalize Audio</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, normalizeAudio: !audioSettings.normalizeAudio })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.normalizeAudio ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.normalizeAudio ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -9004,7 +9087,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">Remove Echo</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, removeEcho: !audioSettings.removeEcho })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeEcho ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeEcho ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -9021,7 +9104,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">Remove Background Noise</label>
                     <button
                       onClick={() => setAudioSettings({ ...audioSettings, removeBackgroundNoise: !audioSettings.removeBackgroundNoise })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeBackgroundNoise ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${audioSettings.removeBackgroundNoise ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -9069,7 +9152,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           markAsEdited()
                         }
                       }}
-                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
+                      className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-700"
                     />
                     {backgroundMusic.file && (
                       <div className="bg-gray-800 rounded p-2">
@@ -9135,7 +9218,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     <label className="text-xs text-gray-300">LUT (Look-Up Table)</label>
                     <button
                       onClick={() => setVisualSettings({ ...visualSettings, lutEnabled: !visualSettings.lutEnabled })}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${visualSettings.lutEnabled ? 'bg-green-500' : 'bg-gray-600'
+                      className={`relative w-12 h-6 rounded-full transition-colors ${visualSettings.lutEnabled ? 'bg-green-500' : 'bg-gray-700'
                         }`}
                     >
                       <span
@@ -9169,7 +9252,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             }
                           }
                         }}
-                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-600 file:text-white hover:file:bg-gray-700"
+                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-700"
                       />
                       {visualSettings.lutFile && (
                         <div className="text-xs text-gray-400">
@@ -9310,7 +9393,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   {(() => {
                     const currentLayoutClip = getCurrentLayoutClip(currentTime)
                     const bgImage = currentLayoutClip?.backgroundImage
-                    if (bgImage?.url && currentLayoutClip) {
+                    if (bgImage?.enabled && bgImage?.url && currentLayoutClip) {
                       // Calculate fade in/out based on layout clip position
                       const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
                       const fadeDuration = Math.min(0.5, clipDuration * 0.1) // 10% of clip duration or max 0.5s
@@ -9325,15 +9408,46 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         // Fade out
                         opacity = timeFromEnd / fadeDuration
                       }
+
+                      // Get container to calculate actual pixel dimensions
+                      const container = document.querySelector('[data-canvas-container]') as HTMLElement
+                      if (!container) return null
+
+                      const containerWidth = container.offsetWidth
+                      const containerHeight = container.offsetHeight
+                      
+                      // Use width/height from stored values (normalized 0-1), default to 1 (full canvas)
+                      // For panning, we can make the image larger than canvas (e.g., 1.5x) to allow panning
+                      const normalizedWidth = bgImage.width ?? 1
+                      const normalizedHeight = bgImage.height ?? 1
+                      
+                      const bgWidth = normalizedWidth * containerWidth
+                      const bgHeight = normalizedHeight * containerHeight
+                      
+                      // Position offset (normalized 0-1, converted to pixels)
+                      // Negative values allow panning image left/up, positive values pan right/down
+                      const bgX = (bgImage.x ?? 0) * containerWidth
+                      const bgY = (bgImage.y ?? 0) * containerHeight
                       
                       return (
                         <img
                           src={bgImage.url}
                           alt="Background"
-                          className="absolute inset-0 w-full h-full object-cover"
+                          className="absolute object-cover cursor-move"
                           style={{
+                            left: `${bgX}px`,
+                            top: `${bgY}px`,
+                            width: `${bgWidth}px`,
+                            height: `${bgHeight}px`,
                             opacity,
                             zIndex: 0,
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDraggingBackground(true)
+                            setBackgroundDragStartPos({ x: e.clientX, y: e.clientY })
+                            setBackgroundDragStartLayoutClip(currentLayoutClip)
                           }}
                         />
                       )
@@ -10007,7 +10121,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 className={`px-1 rounded transition-all cursor-pointer ${
                                   showStrikethrough ? 'line-through text-red-400' : ''
                                 } ${
-                                  isSelected ? 'bg-gray-600/30 text-gray-200' : 'hover:bg-gray-700/50'
+                                  isSelected ? 'bg-gray-700/30 text-gray-200' : 'hover:bg-gray-700/50'
                                 }`}
                               >
                                 {displayText}{' '}
@@ -10052,14 +10166,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               <div className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-800">
                 <button
                   onClick={() => setTimelineTool('select')}
-                  className={`p-2 rounded-md transition-colors ${timelineTool === 'select' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'select' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title="Select Tool (V)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
                 </button>
                 <button
                   onClick={() => setTimelineTool('cut')}
-                  className={`p-2 rounded-md transition-colors ${timelineTool === 'cut' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`p-2 rounded-md transition-colors ${timelineTool === 'cut' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                   title="Cut Tool (C)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 3.293a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121a1 1 0 011.414 0l1.172 1.172a1 1 0 010 1.414l-8.586 8.586a1 1 0 01-1.414 0l-1.172-1.172a1 1 0 010-1.414l8.586-8.586z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6" /></svg>
@@ -10126,7 +10240,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(timelineLayerHeightScale * 100)}%</span>
               </div>
               <div className="h-4 w-px bg-gray-800 mx-1"></div>
-              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-gray-900/20">
+              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-gray-700 hover:bg-gray-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-gray-900/20">
                 Export
               </button>
             </div>
@@ -10222,7 +10336,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     className="absolute top-0 text-xs font-semibold text-gray-500 flex items-center"
                     style={{ left: `${st.startTime * timelineZoom}px` }}
                   >
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-600 mr-2" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-gray-700 mr-2" />
                     SCENE {idx + 1}
                   </div>
                 ))}
@@ -10532,7 +10646,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   <button
                     onClick={() => searchUnsplash(unsplashSearchQuery)}
                     disabled={unsplashLoading || !unsplashSearchQuery.trim()}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
                   >
                     {unsplashLoading ? 'Searching...' : 'Search'}
                   </button>

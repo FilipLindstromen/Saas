@@ -365,33 +365,60 @@ export async function exportVideoGPU(
     const frameDuration = 1 / fps
     const totalFrames = Math.ceil(totalDuration * fps)
 
-    // Ensure videos are at the start
+    console.log(`Calculated: ${totalFrames} frames to render (${totalDuration.toFixed(2)}s at ${fps} fps)`)
+
+    // Ensure videos are at the start - with timeout to prevent hanging
+    console.log('Preparing videos for rendering...')
+    let prepIndex = 0
+    const totalVideosToPrep = videoElements.size
+    
     for (const video of videoElements.values()) {
+      prepIndex++
+      console.log(`Preparing video ${prepIndex}/${totalVideosToPrep}, readyState: ${video.readyState}`)
+      
       video.currentTime = 0
+      
       await new Promise<void>((resolve) => {
+        // If already ready, resolve immediately
         if (video.readyState >= 2) {
+          console.log(`Video ${prepIndex} already ready (readyState: ${video.readyState})`)
           resolve()
-        } else {
-          const onLoadedData = () => {
-            video.removeEventListener('loadeddata', onLoadedData)
-            resolve()
-          }
-          video.addEventListener('loadeddata', onLoadedData, { once: true })
+          return
         }
+        
+        // Otherwise wait with timeout
+        const timeout = setTimeout(() => {
+          console.warn(`Video ${prepIndex} readyState timeout (still at ${video.readyState}), continuing anyway`)
+          video.removeEventListener('loadeddata', onLoadedData)
+          resolve()
+        }, 2000) // Max 2s wait
+        
+        const onLoadedData = () => {
+          clearTimeout(timeout)
+          video.removeEventListener('loadeddata', onLoadedData)
+          console.log(`Video ${prepIndex} loadeddata event fired`)
+          resolve()
+        }
+        
+        video.addEventListener('loadeddata', onLoadedData, { once: true })
       })
+      
       await new Promise(resolve => setTimeout(resolve, 50))
+      console.log(`Video ${prepIndex} prepared`)
     }
+    
+    console.log('All videos prepared, starting render loop...')
 
     const startTime = performance.now()
     let frameIndex = 0
-    let lastFrameTime = 0
     const targetFrameTime = 1000 / fps
 
     // Use iterative loop instead of recursive to prevent stack overflow
     console.log(`Starting render loop: ${totalFrames} frames at ${fps} fps`)
     
-    // Add timeout to prevent infinite hanging
-    const maxExportTime = totalDuration * 1000 * 3 // 3x the video duration as max time
+    // Add timeout to prevent infinite hanging - use a more reasonable timeout
+    // For slow rendering (500ms/frame), a 10s video at 30fps would take ~150s, so use 20x duration
+    const maxExportTime = Math.max(totalDuration * 1000 * 20, 300000) // 20x duration or 5 minutes minimum
     const exportStartTime = Date.now()
 
     while (frameIndex < totalFrames) {
@@ -410,8 +437,8 @@ export async function exportVideoGPU(
         console.log(`Rendering frame ${frameIndex + 1}/${totalFrames} at time ${timelineTime.toFixed(2)}s`)
       }
 
-      // Seek videos to correct time (with timeout to prevent hanging)
-      const seekPromises: Promise<void>[] = []
+      // Seek videos to correct time (without waiting - much faster)
+      // Since frames are sequential, videos will naturally advance, so we only need to correct when significantly off
       for (const clip of renderState.timelineClips) {
         if (timelineTime >= clip.timelineStart && timelineTime < clip.timelineEnd) {
           const key = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
@@ -425,49 +452,34 @@ export async function exportVideoGPU(
             const clampedTime = Math.max(0, Math.min(targetTime, video.duration || targetTime))
             
             const timeDiff = Math.abs(video.currentTime - clampedTime)
-            if (timeDiff > 0.15) {
+            // Only seek if significantly off (larger threshold for faster rendering)
+            // Since we're rendering sequentially, videos should mostly be in sync already
+            if (timeDiff > 0.1) { // Only seek if more than 100ms off
               video.currentTime = clampedTime
-              seekPromises.push(
-                new Promise<void>((resolve) => {
-                  const timeout = setTimeout(() => {
-                    resolve() // Always resolve after timeout
-                  }, 200)
-                  const onSeeked = () => {
-                    clearTimeout(timeout)
-                    video.removeEventListener('seeked', onSeeked)
-                    resolve()
-                  }
-                  video.addEventListener('seeked', onSeeked, { once: true })
-                  if (Math.abs(video.currentTime - clampedTime) < 0.1) {
-                    clearTimeout(timeout)
-                    video.removeEventListener('seeked', onSeeked)
-                    resolve()
-                  }
-                })
-              )
+              // Don't wait for seek - just set it and continue (video will catch up during render)
+              // This is much faster than waiting for seeked events
             }
           }
         }
       }
 
-      // Wait for seeks with timeout to prevent hanging
-      if (seekPromises.length > 0) {
-        try {
-          await Promise.race([
-            Promise.all(seekPromises),
-            new Promise<void>((resolve) => setTimeout(() => resolve(), 300))
-          ])
-        } catch (error) {
-          console.warn('Seek error, continuing:', error)
-        }
-      }
-
-      // Render frame with error handling
+      // Render frame with error handling and timeout
       try {
-        await renderFrame(renderContext, renderState)
+        const renderStartTime = performance.now()
+        
+        // Call renderFrame with isExport=true to skip expensive async waits
+        await renderFrame(renderContext, renderState, true)
+        
+        const renderTime = performance.now() - renderStartTime
+        // Only warn for truly slow frames (200ms+) - normal frames should be <50ms now
+        if (renderTime > 200) {
+          console.warn(`Frame ${frameIndex} took ${renderTime.toFixed(0)}ms to render (slow)`)
+        }
       } catch (error) {
         console.error(`Error rendering frame ${frameIndex}:`, error)
-        // Continue with next frame
+        // Continue with next frame - draw black frame as fallback
+        ctx.fillStyle = '#000000'
+        ctx.fillRect(0, 0, width, height)
       }
 
       frameIndex++

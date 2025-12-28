@@ -370,10 +370,12 @@ function getTransitionBorderRadius(
 /**
  * Render a single frame at time t
  * This is the core rendering function used by both preview and export
+ * @param isExport - If true, skips expensive async waits for faster export rendering
  */
 export async function renderFrame(
   context: RenderContext,
-  state: RenderState
+  state: RenderState,
+  isExport: boolean = false
 ): Promise<void> {
   const { canvas, ctx, time, width, height } = context
   const { timelineClips, layoutClips, canvasSettings, layout } = state
@@ -415,94 +417,98 @@ export async function renderFrame(
       
       // For export, skip readyState check - videos are already loaded and ready
       // This saves ~50ms per frame
-      if (video.readyState < 2) {
-        // Only wait briefly if video is truly not ready
+      if (!isExport && video.readyState < 2) {
+        // Only wait briefly if video is truly not ready (preview only)
         await new Promise(resolve => setTimeout(resolve, 10))
         if (video.readyState < 2) {
           continue
         }
       }
       
-      // Calculate video time
-      const clipStartTime = activeClip.timelineStart
-      const relativeTime = time - clipStartTime
-      const clipDuration = activeClip.timelineEnd - activeClip.timelineStart
-      const sourceDuration = activeClip.sourceOut - activeClip.sourceIn
-      const targetVideoTime = activeClip.sourceIn + (relativeTime / clipDuration) * sourceDuration
-      
-      if (targetVideoTime < 0 || targetVideoTime >= video.duration) {
-        continue
-      }
-      
-      // Seek video to correct time - only if significantly off (optimize for sequential rendering)
-      // For export, frames are sequential so we can be more lenient with seeks
-      const timeDiff = Math.abs(video.currentTime - targetVideoTime)
-      if (timeDiff > 0.1) { // Increased threshold for faster rendering
-        video.currentTime = targetVideoTime
-        // For export, don't wait for seek - just set it and continue (video will catch up)
-        // Only wait if we're way off
-        if (timeDiff > 1.0) {
+      // Skip video seeking if isExport is true - the export loop already handles seeking
+      // This eliminates redundant seeks and saves significant time
+      if (!isExport) {
+        // Calculate video time
+        const clipStartTime = activeClip.timelineStart
+        const relativeTime = time - clipStartTime
+        const clipDuration = activeClip.timelineEnd - activeClip.timelineStart
+        const sourceDuration = activeClip.sourceOut - activeClip.sourceIn
+        const targetVideoTime = activeClip.sourceIn + (relativeTime / clipDuration) * sourceDuration
+        
+        if (targetVideoTime < 0 || targetVideoTime >= video.duration) {
+          continue
+        }
+        
+        // Seek video to correct time - only if significantly off (optimize for sequential rendering)
+        // For export, frames are sequential so we can be more lenient with seeks
+        const timeDiff = Math.abs(video.currentTime - targetVideoTime)
+        if (timeDiff > 0.1) { // Increased threshold for faster rendering
+          video.currentTime = targetVideoTime
+          // Only wait if we're way off
+          if (timeDiff > 1.0) {
+            await new Promise<void>((resolve) => {
+              let resolved = false
+              const timeout = setTimeout(() => {
+                if (!resolved) {
+                  resolved = true
+                  resolve()
+                }
+              }, 500) // Shorter timeout for export
+              
+              const onSeeked = () => {
+                if (!resolved) {
+                  resolved = true
+                  clearTimeout(timeout)
+                  video.removeEventListener('seeked', onSeeked)
+                  resolve()
+                }
+              }
+              
+              video.addEventListener('seeked', onSeeked, { once: true })
+            })
+          }
+        }
+        
+        // Wait for video frame (preview only)
+        if (video.readyState < 2) {
           await new Promise<void>((resolve) => {
-            let resolved = false
-            const timeout = setTimeout(() => {
-              if (!resolved) {
-                resolved = true
-                resolve()
-              }
-            }, 500) // Shorter timeout for export
-            
-            const onSeeked = () => {
-              if (!resolved) {
-                resolved = true
-                clearTimeout(timeout)
-                video.removeEventListener('seeked', onSeeked)
-                resolve()
-              }
+            if (video.readyState >= 2) {
+              resolve()
+              return
             }
             
-            video.addEventListener('seeked', onSeeked, { once: true })
+            const onCanPlay = () => {
+              video.removeEventListener('canplay', onCanPlay)
+              video.removeEventListener('canplaythrough', onCanPlayThrough)
+              resolve()
+            }
+            
+            const onCanPlayThrough = () => {
+              video.removeEventListener('canplay', onCanPlay)
+              video.removeEventListener('canplaythrough', onCanPlayThrough)
+              resolve()
+            }
+            
+            video.addEventListener('canplay', onCanPlay, { once: true })
+            video.addEventListener('canplaythrough', onCanPlayThrough, { once: true })
+            
+            setTimeout(() => {
+              video.removeEventListener('canplay', onCanPlay)
+              video.removeEventListener('canplaythrough', onCanPlayThrough)
+              resolve()
+            }, 2000)
           })
         }
-      }
-      
-      // Wait for video frame
-      if (video.readyState < 2) {
-        await new Promise<void>((resolve) => {
-          if (video.readyState >= 2) {
-            resolve()
-            return
-          }
-          
-          const onCanPlay = () => {
-            video.removeEventListener('canplay', onCanPlay)
-            video.removeEventListener('canplaythrough', onCanPlayThrough)
-            resolve()
-          }
-          
-          const onCanPlayThrough = () => {
-            video.removeEventListener('canplay', onCanPlay)
-            video.removeEventListener('canplaythrough', onCanPlayThrough)
-            resolve()
-          }
-          
-          video.addEventListener('canplay', onCanPlay, { once: true })
-          video.addEventListener('canplaythrough', onCanPlayThrough, { once: true })
-          
-          setTimeout(() => {
-            video.removeEventListener('canplay', onCanPlay)
-            video.removeEventListener('canplaythrough', onCanPlayThrough)
-            resolve()
-          }, 2000)
-        })
-      }
-      
-      if ('requestVideoFrameCallback' in video) {
-        await new Promise<void>((resolve) => {
-          (video as any).requestVideoFrameCallback(() => {
-            resolve()
+        
+        // requestVideoFrameCallback is very slow - skip for export
+        if ('requestVideoFrameCallback' in video) {
+          await new Promise<void>((resolve) => {
+            (video as any).requestVideoFrameCallback(() => {
+              resolve()
+            })
+            setTimeout(() => resolve(), 500)
           })
-          setTimeout(() => resolve(), 500)
-        })
+        }
       }
       
       // Get transition border radius if transitioning
@@ -651,13 +657,16 @@ export async function renderFrame(
       continue
     }
     
-    // For export, skip readyState check - videos are pre-loaded
-    if (video.readyState < 2) {
-      // Only wait briefly if video is truly not ready
-      await new Promise(resolve => setTimeout(resolve, 10))
+    // Skip expensive waits when exporting - videos are pre-loaded and seeks are handled by export loop
+    if (!isExport) {
+      // For preview, check readyState
       if (video.readyState < 2) {
-        // Video still not ready - skip
-        continue
+        // Only wait briefly if video is truly not ready
+        await new Promise(resolve => setTimeout(resolve, 10))
+        if (video.readyState < 2) {
+          // Video still not ready - skip
+          continue
+        }
       }
     }
     
@@ -679,46 +688,48 @@ export async function renderFrame(
       continue
     }
     
-    // Ensure video is at correct time - optimize for sequential frame rendering
-    const timeDiff = Math.abs(video.currentTime - targetVideoTime)
-    if (timeDiff > 0.1) { // Increased threshold for faster rendering
-      video.currentTime = targetVideoTime
-      // Only wait for seek if we're way off (for export speed)
-      if (timeDiff > 1.0) {
+    // Skip seeking in renderFrame when exporting - the export loop already handles this
+    if (!isExport) {
+      // Ensure video is at correct time - optimize for sequential frame rendering
+      const timeDiff = Math.abs(video.currentTime - targetVideoTime)
+      if (timeDiff > 0.1) { // Increased threshold for faster rendering
+        video.currentTime = targetVideoTime
+        // Only wait for seek if we're way off (for export speed)
+        if (timeDiff > 1.0) {
+          await new Promise<void>((resolve) => {
+            let resolved = false
+            const timeout = setTimeout(() => {
+              if (!resolved) {
+                resolved = true
+                resolve()
+              }
+            }, 500) // Shorter timeout for export
+            
+            const onSeeked = () => {
+              if (!resolved) {
+                resolved = true
+                clearTimeout(timeout)
+                video.removeEventListener('seeked', onSeeked)
+                resolve()
+              }
+            }
+            
+            video.addEventListener('seeked', onSeeked, { once: true })
+          })
+        }
+      }
+      
+      // For preview, minimize waiting - just check readyState briefly
+      if (video.readyState < 2) {
         await new Promise<void>((resolve) => {
-          let resolved = false
-          const timeout = setTimeout(() => {
-            if (!resolved) {
-              resolved = true
-              resolve()
-            }
-          }, 500) // Shorter timeout for export
-          
-          const onSeeked = () => {
-            if (!resolved) {
-              resolved = true
-              clearTimeout(timeout)
-              video.removeEventListener('seeked', onSeeked)
-              resolve()
-            }
+          if (video.readyState >= 2) {
+            resolve()
+            return
           }
           
-          video.addEventListener('seeked', onSeeked, { once: true })
-        })
-      }
-    }
-    
-    // For export, minimize waiting - just check readyState briefly
-    if (video.readyState < 2) {
-      await new Promise<void>((resolve) => {
-        if (video.readyState >= 2) {
-          resolve()
-          return
-        }
-        
-        const timeout = setTimeout(() => resolve(), 100) // Short timeout for export speed
-        
-        const onCanPlay = () => {
+          const timeout = setTimeout(() => resolve(), 100) // Short timeout for export speed
+          
+          const onCanPlay = () => {
           clearTimeout(timeout)
           video.removeEventListener('canplay', onCanPlay)
           video.removeEventListener('canplaythrough', onCanPlayThrough)
@@ -735,6 +746,17 @@ export async function renderFrame(
         video.addEventListener('canplay', onCanPlay, { once: true })
         video.addEventListener('canplaythrough', onCanPlayThrough, { once: true })
       })
+      }
+      
+      // requestVideoFrameCallback is very slow - skip for export
+      if (!isExport && 'requestVideoFrameCallback' in video) {
+        await new Promise<void>((resolve) => {
+          (video as any).requestVideoFrameCallback(() => {
+            resolve()
+          })
+          setTimeout(() => resolve(), 500)
+        })
+      }
     }
     
     // Skip requestVideoFrameCallback for export - too slow, just render current frame
