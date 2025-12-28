@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Scene, RecordingTake } from '../App'
 import { projectManager } from '../utils/projectManager'
 import { transcribeAudio, WordTimestamp } from '../utils/transcription'
+import { log } from '../utils/logger'
 import { VideoCut, Layout, combineLayersWithLayout, concatVideos } from '../utils/videoProcessing'
 import type { TitleData, BackgroundImageData } from '../utils/ffmpeg'
 import { trimVideo, getFFmpeg, encodeFramesToVideo } from '../utils/ffmpeg'
@@ -239,7 +240,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         setLayoutPresets(JSON.parse(stored))
       }
     } catch (error) {
-      console.error('Error loading layout presets:', error)
+      log.error('Error loading layout presets', error)
     }
   }, [])
 
@@ -248,7 +249,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     try {
       localStorage.setItem('layoutPresets', JSON.stringify(layoutPresets))
     } catch (error) {
-      console.error('Error saving layout presets:', error)
+      log.error('Error saving layout presets', error)
     }
   }, [layoutPresets])
 
@@ -303,11 +304,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         // Retry up to 20 times (2 seconds total) if project isn't ready yet
         if (retryCount < 20) {
           if (retryCount === 0) {
-            console.log('Waiting for project to be available...')
+            log.debug('Waiting for project to be available...')
           }
           retryTimeoutId = setTimeout(() => attemptLoad(retryCount + 1), 100)
         } else {
-          console.warn('Project not available after retries, editData may not load')
+          log.warn('Project not available after retries, editData may not load')
         }
         return
       }
@@ -316,7 +317,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         // Retry if scenes aren't loaded yet
         if (retryCount < 20) {
           if (retryCount === 0) {
-            console.log('Waiting for scenes to be loaded...')
+            log.debug('Waiting for scenes to be loaded...')
           }
           retryTimeoutId = setTimeout(() => attemptLoad(retryCount + 1), 100)
         }
@@ -325,11 +326,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
       // Don't load if we've already loaded for this set of scenes
       if (hasLoadedEditDataRef.current) {
-        console.log('EditData already loaded for this project')
+        log.debug('EditData already loaded for this project')
         return
       }
 
-      console.log('Attempting to load editData, retry count:', retryCount)
+      log.debug('Attempting to load editData', { retryCount })
 
       // Add a small delay to ensure project is fully initialized
       timeoutId = setTimeout(async () => {
@@ -337,12 +338,12 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       try {
         const editData = await projectManager.loadEditData()
         if (!editData) {
-          console.log('No edit data found to load')
+          log.debug('No edit data found to load')
           hasLoadedEditDataRef.current = true // Mark as loaded even if no data
           isLoadingEditDataRef.current = false
           return
         }
-        console.log('Loading edit data:', editData)
+        log.debug('Loading edit data', { editData })
 
         // Restore cuts
         if (editData.cuts) {
@@ -3118,63 +3119,71 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     lastLayoutClipCheckTimeRef.current = time
   }, [layoutClips, getCurrentLayoutClip, canvasSettings.transitionDuration, timelineClips])
 
+  // Throttle seek requests during scrubbing to improve performance
+  const seekThrottleRef = useRef<number | null>(null)
+  const pendingSeekRef = useRef<number | null>(null)
+
   // Handle seek - must be defined before playback loop
   const handleSeek = useCallback((absoluteTime: number, immediate: boolean = false) => {
-    // Update timeline position immediately for smooth scrubbing
-    const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
-    setCurrentTime(clampedTime)
-    timelineTimeRef.current = clampedTime
-    
-    // Setup layout clip transitions for this time point (for smooth transitions when scrubbing)
-    setupLayoutClipTransitions(clampedTime)
+    try {
+      // Update timeline position immediately for smooth scrubbing
+      const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
+      
+      // Always update timeline position immediately for responsive UI
+      setCurrentTime(clampedTime)
+      timelineTimeRef.current = clampedTime
+      
+      // Setup layout clip transitions for this time point (for smooth transitions when scrubbing)
+      setupLayoutClipTransitions(clampedTime)
 
-    const result = timelineToVideoTime(clampedTime)
-    if (!result) {
-      // If time is beyond all clips, pause and stay at current position
-      const video = videoRef.current
-      const audio = audioRef.current
-      if (video && !video.paused) {
-        video.pause()
+      const result = timelineToVideoTime(clampedTime)
+      if (!result) {
+        // If time is beyond all clips, pause and stay at current position
+        const video = videoRef.current
+        const audio = audioRef.current
+        if (video && !video.paused) {
+          video.pause().catch(err => console.warn('Error pausing video:', err))
+        }
+        if (audio && !audio.paused) {
+          audio.pause().catch(err => console.warn('Error pausing audio:', err))
+        }
+        setIsPlaying(false)
+        return
       }
-      if (audio && !audio.paused) {
-        audio.pause()
+
+      const { videoTime, sceneId, takeId } = result
+
+      // Switch to this scene/take if not already selected
+      const sceneIndex = sceneTakes.findIndex(st =>
+        st.sceneId === sceneId && st.take.id === takeId
+      )
+
+      const needsSceneSwitch = sceneIndex >= 0 && sceneIndex !== selectedSceneIndex
+
+      if (needsSceneSwitch) {
+        setSelectedSceneIndex(sceneIndex)
       }
-      setIsPlaying(false)
-      return
-    }
 
-    const { videoTime, sceneId, takeId } = result
+      // Throttle video/audio seeks during scrubbing to prevent excessive seeks
+      const performSeek = () => {
+        const video = videoRef.current
+        const audio = audioRef.current
 
-    // Switch to this scene/take if not already selected
-    const sceneIndex = sceneTakes.findIndex(st =>
-      st.sceneId === sceneId && st.take.id === takeId
-    )
+        if (!video && !audio) return
 
-    const needsSceneSwitch = sceneIndex >= 0 && sceneIndex !== selectedSceneIndex
+        // Only seek if the time has changed significantly (more than 0.1 seconds)
+        // This prevents excessive seeks during fast scrubbing
+        const currentVideoTime = video?.currentTime || 0
+        const timeDiff = Math.abs(videoTime - currentVideoTime)
+        
+        if (timeDiff < 0.05) {
+          // Time is close enough, skip seek
+          return
+        }
 
-    if (needsSceneSwitch) {
-      setSelectedSceneIndex(sceneIndex)
-    }
-
-    // Seek video/audio - use requestAnimationFrame for immediate updates during scrubbing
-    const seekToTime = () => {
-      const video = videoRef.current
-      const audio = audioRef.current
-
-      if (video) {
-        if (video.readyState >= 2) {
-          isSeekingRef.current = true
-          video.currentTime = videoTime
-          // Reset seeking flag after seek completes
-          const onSeeked = () => {
-            isSeekingRef.current = false
-            video.removeEventListener('seeked', onSeeked)
-          }
-          video.addEventListener('seeked', onSeeked, { once: true })
-        } else {
-          // Wait for video to be ready
-          const onCanPlay = () => {
-            if (video) {
+        if (video) {
+          try {
+            if (video.readyState >= 2) {
               isSeekingRef.current = true
               video.currentTime = videoTime
               // Reset seeking flag after seek completes
@@ -3183,35 +3192,105 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 video.removeEventListener('seeked', onSeeked)
               }
               video.addEventListener('seeked', onSeeked, { once: true })
-              video.removeEventListener('canplay', onCanPlay)
+            } else {
+              // Wait for video to be ready
+              const onCanPlay = () => {
+                if (video) {
+                  try {
+                    isSeekingRef.current = true
+                    video.currentTime = videoTime
+                    // Reset seeking flag after seek completes
+                    const onSeeked = () => {
+                      isSeekingRef.current = false
+                      video.removeEventListener('seeked', onSeeked)
+                    }
+                    video.addEventListener('seeked', onSeeked, { once: true })
+                    video.removeEventListener('canplay', onCanPlay)
+                  } catch (err) {
+                    console.warn('Error seeking video:', err)
+                    isSeekingRef.current = false
+                  }
+                }
+              }
+              video.addEventListener('canplay', onCanPlay, { once: true })
             }
+          } catch (err) {
+            console.warn('Error setting video currentTime:', err)
+            isSeekingRef.current = false
           }
-          video.addEventListener('canplay', onCanPlay)
         }
-      }
 
-      if (audio) {
-        if (audio.readyState >= 2) {
-          audio.currentTime = videoTime
-        } else {
-          // Wait for audio to be ready
-          const onCanPlay = () => {
-            if (audio) {
+        if (audio) {
+          try {
+            if (audio.readyState >= 2) {
               audio.currentTime = videoTime
-              audio.removeEventListener('canplay', onCanPlay)
+            } else {
+              // Wait for audio to be ready
+              const onCanPlay = () => {
+                if (audio) {
+                  try {
+                    audio.currentTime = videoTime
+                    audio.removeEventListener('canplay', onCanPlay)
+                  } catch (err) {
+                    console.warn('Error seeking audio:', err)
+                  }
+                }
+              }
+              audio.addEventListener('canplay', onCanPlay, { once: true })
             }
+          } catch (err) {
+            console.warn('Error setting audio currentTime:', err)
           }
-          audio.addEventListener('canplay', onCanPlay)
         }
       }
-    }
 
-    if (immediate) {
-      seekToTime()
-    } else {
-      requestAnimationFrame(seekToTime)
+      if (immediate) {
+        // For immediate seeks (during scrubbing), throttle to max 30fps
+        if (seekThrottleRef.current === null) {
+          performSeek()
+          seekThrottleRef.current = requestAnimationFrame(() => {
+            seekThrottleRef.current = null
+            // Process any pending seek by directly performing it
+            if (pendingSeekRef.current !== null) {
+              const pendingTime = pendingSeekRef.current
+              pendingSeekRef.current = null
+              // Update timeline position
+              setCurrentTime(pendingTime)
+              timelineTimeRef.current = pendingTime
+              setupLayoutClipTransitions(pendingTime)
+              // Perform seek without recursion
+              const pendingResult = timelineToVideoTime(pendingTime)
+              if (pendingResult) {
+                const video = videoRef.current
+                const audio = audioRef.current
+                if (video && video.readyState >= 2) {
+                  try {
+                    video.currentTime = pendingResult.videoTime
+                  } catch (err) {
+                    console.warn('Error in pending video seek:', err)
+                  }
+                }
+                if (audio && audio.readyState >= 2) {
+                  try {
+                    audio.currentTime = pendingResult.videoTime
+                  } catch (err) {
+                    console.warn('Error in pending audio seek:', err)
+                  }
+                }
+              }
+            }
+          })
+        } else {
+          // Store pending seek
+          pendingSeekRef.current = clampedTime
+        }
+      } else {
+        requestAnimationFrame(performSeek)
+      }
+    } catch (error) {
+      console.error('Error in handleSeek:', error)
     }
-  }, [totalDuration, timelineToVideoTime, sceneTakes, selectedSceneIndex, drawFrame, setupLayoutClipTransitions])
+  }, [totalDuration, timelineToVideoTime, sceneTakes, selectedSceneIndex, setupLayoutClipTransitions])
 
   // Convert video time back to timeline time (inverse of timelineToVideoTime)
   const videoTimeToTimeline = useCallback((videoTime: number, clip: TimelineClip): number => {
@@ -3229,11 +3308,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   // Playback Loop - timeline-driven with continuous advancement
   useEffect(() => {
     let animationFrameId: number
+    let isMounted = true
 
     const renderLoop = () => {
+      if (!isMounted) return
+      
       if (!isPlaying) {
         if (animationFrameId) {
           cancelAnimationFrame(animationFrameId)
+          animationFrameId = 0
         }
         return
       }
@@ -3543,9 +3626,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
 
     return () => {
+      isMounted = false
       if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId)
-    }
+        cancelAnimationFrame(animationFrameId)
+        animationFrameId = 0
+      }
+      // Clean up any pending seeks
+      if (seekThrottleRef.current !== null) {
+        cancelAnimationFrame(seekThrottleRef.current)
+        seekThrottleRef.current = null
+      }
+      pendingSeekRef.current = null
     }
   }, [isPlaying, selectedSceneIndex, sceneTakes, timelineClips, totalDuration, playbackRate, drawFrame, timelineToVideoTime, canvasHolders, canvasSettings.transitionDuration])
 
@@ -6658,6 +6749,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         titleData,
         backgroundImageData,
         transcripts,
+        clipProperties,
         {
           fps: 30,
           bitrate: 5_000_000, // 5 Mbps
@@ -6912,14 +7004,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
   return (
     <>
-    <div className="h-full flex flex-col bg-black text-white">
+    <div className="h-full flex flex-col bg-gray-900 text-white">
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Export Dialog */}
       {showExportDialog && (
         <>
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50"
             onClick={() => !isExporting && setShowExportDialog(false)}
           />
           <div className="fixed inset-0 flex items-center justify-center z-50">
@@ -10397,8 +10489,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       return (
                         <div
                           key={clip.id}
-                          className={`absolute top-0 bottom-0 bg-zinc-800 rounded-2xl overflow-hidden border transition-all cursor-move group
-                                       ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-zinc-700'}
+                          className={`absolute top-0 bottom-0 bg-gray-800 rounded-2xl overflow-hidden border transition-all cursor-move group
+                                       ${isSelected ? 'border-gray-400 ring-1 ring-gray-400 z-10' : 'border-gray-600'}
                                        ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
                                        ${isTrimming ? 'z-30' : ''}
                                     `}

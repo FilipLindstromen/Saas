@@ -8,6 +8,7 @@ export interface PreflightResult {
   errors: string[]
   warnings: string[]
   videoElements: Map<string, HTMLVideoElement>
+  videoBlobUrls: Map<string, string> // Keep blob URLs alive during export
   images: Map<string, HTMLImageElement>
   fonts: string[]
 }
@@ -52,13 +53,16 @@ export async function preloadFonts(fontFamilies: string[]): Promise<void> {
 async function preloadVideo(
   blob: Blob,
   key: string
-): Promise<HTMLVideoElement> {
+): Promise<{ video: HTMLVideoElement; url: string }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     video.preload = 'auto'
     video.muted = true
     video.playsInline = true
     video.crossOrigin = 'anonymous'
+    // Set playsInline to prevent fullscreen on mobile
+    video.setAttribute('playsinline', 'true')
+    video.setAttribute('webkit-playsinline', 'true')
 
     const url = URL.createObjectURL(blob)
     video.src = url
@@ -66,25 +70,26 @@ async function preloadVideo(
     const cleanup = () => {
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       video.removeEventListener('error', onError)
-      URL.revokeObjectURL(url)
+      // Don't revoke URL here - keep it alive for export
     }
 
     const onLoadedMetadata = () => {
       // Ensure video is fully loaded
       if (video.readyState >= 2) {
         cleanup()
-        resolve(video)
+        resolve({ video, url })
       } else {
         // Wait for canplaythrough
         video.addEventListener('canplaythrough', () => {
           cleanup()
-          resolve(video)
+          resolve({ video, url })
         }, { once: true })
       }
     }
 
     const onError = (error: Event) => {
       cleanup()
+      URL.revokeObjectURL(url) // Only revoke on error
       reject(new Error(`Failed to load video ${key}: ${error}`))
     }
 
@@ -95,9 +100,10 @@ async function preloadVideo(
     setTimeout(() => {
       if (video.readyState >= 2) {
         cleanup()
-        resolve(video)
+        resolve({ video, url })
       } else {
         cleanup()
+        URL.revokeObjectURL(url) // Only revoke on timeout
         reject(new Error(`Video ${key} load timeout`))
       }
     }, 30000) // 30 second timeout
@@ -153,6 +159,7 @@ export async function preflightAssets(
     errors: [],
     warnings: [],
     videoElements: new Map(),
+    videoBlobUrls: new Map(),
     images: new Map(),
     fonts: [],
   }
@@ -170,8 +177,9 @@ export async function preflightAssets(
   // Preload videos
   const videoPromises = Array.from(videos.entries()).map(async ([key, blob]) => {
     try {
-      const video = await preloadVideo(blob, key)
+      const { video, url } = await preloadVideo(blob, key)
       result.videoElements.set(key, video)
+      result.videoBlobUrls.set(key, url) // Keep blob URL alive
     } catch (error) {
       const errorMsg = `Video preload failed for ${key}: ${error instanceof Error ? error.message : String(error)}`
       result.errors.push(errorMsg)

@@ -182,13 +182,18 @@ export async function exportFFmpegFrames(
 
     logger.log(`FFmpeg Frames export completed. Blob size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`)
 
-    // Cleanup
-    for (const video of preflightResult.videoElements.values()) {
-      const url = video.src
-      video.src = ''
-      if (url && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url)
+    // Cleanup - revoke blob URLs if provided in preflight result
+    if (preflightResult.videoBlobUrls) {
+      for (const url of preflightResult.videoBlobUrls.values()) {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url)
+        }
       }
+    }
+    
+    // Also cleanup video elements
+    for (const video of preflightResult.videoElements.values()) {
+      video.src = ''
     }
 
     return {

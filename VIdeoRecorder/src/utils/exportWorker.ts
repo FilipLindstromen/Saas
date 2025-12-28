@@ -88,6 +88,7 @@ export async function exportVideo(
     }
 
     const videoElements = preflightResult.videoElements
+    const videoBlobUrls = preflightResult.videoBlobUrls // Keep reference for cleanup
 
     if (onProgress) {
       onProgress({
@@ -306,13 +307,18 @@ export async function exportVideo(
 
     const blob = await muxer.mux()
 
-    // Cleanup
-    for (const video of videoElements.values()) {
-      const url = video.src
-      video.src = ''
-      if (url && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url)
+    // Cleanup - revoke blob URLs if provided in preflight result
+    if (preflightResult?.videoBlobUrls) {
+      for (const url of preflightResult.videoBlobUrls.values()) {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url)
+        }
       }
+    }
+    
+    // Also cleanup video elements
+    for (const video of videoElements.values()) {
+      video.src = ''
     }
 
     if (onProgress) {

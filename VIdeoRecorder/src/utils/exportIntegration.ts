@@ -64,6 +64,15 @@ export async function exportWithOfflinePipeline(
     height: number
   },
   transcripts?: Map<string, { words: Array<{ word: string; start: number; end: number }> }>,
+  clipProperties?: Map<string, {
+    brightness: number
+    contrast: number
+    saturation: number
+    exposure: number
+    highlights: number
+    midtones: number
+    shadows: number
+  }>,
   // Export options
   options?: {
     fps?: number
@@ -90,38 +99,70 @@ export async function exportWithOfflinePipeline(
     captionSettings,
     titleSettings,
     backgroundImageData,
-    transcripts
+    transcripts,
+    clipProperties
   )
 
-  // Export with progress
-  const blob = await exportOfflineVideo(renderState, {
-    width: canvasSettings.resolution.width,
-    height: canvasSettings.resolution.height,
-    fps: options?.fps || 30,
-    bitrate: options?.bitrate || 5_000_000, // 5 Mbps default
-    format: options?.format || 'mp4',
-    codec: options?.codec || 'avc1',
-    onProgress: options?.onProgress
-      ? (progress) => {
-          options.onProgress!(progress.message, progress.progress * 100)
-        }
-      : undefined,
-  })
+  try {
+    // Export with progress
+    const blob = await exportOfflineVideo(renderState, {
+      width: canvasSettings.resolution.width,
+      height: canvasSettings.resolution.height,
+      fps: options?.fps || 30,
+      bitrate: options?.bitrate || 5_000_000, // 5 Mbps default
+      format: options?.format || 'mp4',
+      codec: options?.codec || 'avc1',
+      onProgress: options?.onProgress
+        ? (progress) => {
+            try {
+              options.onProgress!(progress.message, progress.progress * 100)
+            } catch (error) {
+              console.warn('Error in progress callback:', error)
+            }
+          }
+        : undefined,
+    })
 
-  return blob
+    if (!blob || blob.size === 0) {
+      throw new Error('Export produced an empty blob')
+    }
+
+    return blob
+  } catch (error) {
+    console.error('Export error:', error)
+    throw new Error(
+      `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+      'Please check that all video sources are valid and try again.'
+    )
+  }
 }
 
 /**
  * Helper to download the exported blob
  */
 export function downloadExportedVideo(blob: Blob, filename: string = 'export.mp4'): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  try {
+    if (!blob || blob.size === 0) {
+      throw new Error('Cannot download empty blob')
+    }
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    
+    // Clean up after a short delay to ensure download starts
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 100)
+  } catch (error) {
+    console.error('Error downloading video:', error)
+    throw new Error(
+      `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+  }
 }
 

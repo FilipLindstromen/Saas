@@ -6,11 +6,16 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc --noEmit && vite build",
+    "build:prod": "cross-env NODE_ENV=production npm run build",
     "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "echo 'Linting not configured'",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "electron:pack": "npm run build && electron-builder --dir"
+    "electron:build": "npm run build:prod && electron-builder",
+    "electron:pack": "npm run build:prod && electron-builder --dir",
+    "electron:build:win": "npm run build:prod && electron-builder --win",
+    "prebuild": "npm run type-check"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",
@@ -31,6 +36,7 @@
     "concurrently": "^8.2.2",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
+    "cross-env": "^7.0.3",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",

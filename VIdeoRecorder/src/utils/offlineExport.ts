@@ -182,7 +182,8 @@ export function prepareRenderState(
   captionSettings?: any,
   titleSettings?: any,
   backgroundImageData?: any,
-  transcripts?: Map<string, any>
+  transcripts?: Map<string, any>,
+  clipProperties?: Map<string, any>
 ): RenderState {
   return {
     scenes,
@@ -195,6 +196,7 @@ export function prepareRenderState(
         height: canvasSettings.resolution?.height || 1080,
       },
       videoBackgroundColor: canvasSettings.videoBackgroundColor || '#000000',
+      transitionDuration: canvasSettings.transitionDuration ?? 0,
     },
     layout: {
       type: layout.type || 'custom',
@@ -225,6 +227,7 @@ export function prepareRenderState(
     } : undefined,
     backgroundImageData,
     transcripts,
+    clipProperties,
   }
 }
 

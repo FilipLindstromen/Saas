@@ -525,11 +525,11 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Camera</span>
           <button
             onClick={() => handleCameraToggle(!cameraEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${cameraEnabled ? 'bg-white' : 'bg-zinc-800'
+            className={`w-12 h-6 rounded-full transition-colors ${cameraEnabled ? 'bg-white' : 'bg-gray-700'
               }`}
           >
             <div
-              className={`w-5 h-5 rounded-full transition-transform ${cameraEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+              className={`w-5 h-5 rounded-full transition-transform ${cameraEnabled ? 'translate-x-6 bg-gray-900' : 'translate-x-0.5 bg-gray-500'
                 }`}
             />
           </button>
@@ -568,11 +568,11 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Microphone</span>
           <button
             onClick={() => handleMicToggle(!micEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${micEnabled ? 'bg-white' : 'bg-zinc-800'
+            className={`w-12 h-6 rounded-full transition-colors ${micEnabled ? 'bg-white' : 'bg-gray-700'
               }`}
           >
             <div
-              className={`w-5 h-5 rounded-full transition-transform ${micEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+              className={`w-5 h-5 rounded-full transition-transform ${micEnabled ? 'translate-x-6 bg-gray-900' : 'translate-x-0.5 bg-gray-500'
                 }`}
             />
           </button>
@@ -607,11 +607,11 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">Screen</span>
           <button
             onClick={() => handleScreenToggle(!screenEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${screenEnabled ? 'bg-white' : 'bg-zinc-800'
+            className={`w-12 h-6 rounded-full transition-colors ${screenEnabled ? 'bg-white' : 'bg-gray-700'
               }`}
           >
             <div
-              className={`w-5 h-5 rounded-full transition-transform ${screenEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+              className={`w-5 h-5 rounded-full transition-transform ${screenEnabled ? 'translate-x-6 bg-gray-900' : 'translate-x-0.5 bg-gray-500'
                 }`}
             />
           </button>
@@ -639,11 +639,11 @@ export default function DevicePanel({
           <span className="text-white text-sm font-medium">System Sound</span>
           <button
             onClick={() => setSystemSoundEnabled(!systemSoundEnabled)}
-            className={`w-12 h-6 rounded-full transition-colors ${systemSoundEnabled ? 'bg-white' : 'bg-zinc-800'
+            className={`w-12 h-6 rounded-full transition-colors ${systemSoundEnabled ? 'bg-white' : 'bg-gray-700'
               }`}
           >
             <div
-              className={`w-5 h-5 rounded-full transition-transform ${systemSoundEnabled ? 'translate-x-6 bg-black' : 'translate-x-0.5 bg-zinc-500'
+              className={`w-5 h-5 rounded-full transition-transform ${systemSoundEnabled ? 'translate-x-6 bg-gray-900' : 'translate-x-0.5 bg-gray-500'
                 }`}
             />
           </button>
