@@ -334,54 +334,65 @@ export async function renderFrame(
     const holderWidth = holder.width * width
     const holderHeight = holder.height * height
     
-    // Draw video frame
+    // Draw video frame (matches canvas preview exactly)
     ctx.save()
     
-    // Apply rotation if needed
+    // Apply rotation around holder center
+    const centerX = holderX + holderWidth / 2
+    const centerY = holderY + holderHeight / 2
+    ctx.translate(centerX, centerY)
     if (holder.rotation) {
-      const centerX = holderX + holderWidth / 2
-      const centerY = holderY + holderHeight / 2
-      ctx.translate(centerX, centerY)
       ctx.rotate((holder.rotation * Math.PI) / 180)
-      ctx.translate(-centerX, -centerY)
     }
     
-    // Draw video frame (maintain aspect ratio, center crop like object-cover)
+    // Calculate video frame dimensions (object-cover behavior: maintain aspect, center crop)
+    // Coordinates are relative to center after rotation (matches canvas preview)
     const videoAspect = video.videoWidth / video.videoHeight
     const holderAspect = holderWidth / holderHeight
     
     let drawWidth = holderWidth
     let drawHeight = holderHeight
-    let drawX = holderX
-    let drawY = holderY
+    let drawX = -holderWidth / 2  // Relative to center
+    let drawY = -holderHeight / 2 // Relative to center
     
-    if (videoAspect > holderAspect) {
-      // Video is wider - fit to height, crop width
+    // Apply object-cover scaling (matches canvas preview logic exactly)
+    if (holderAspect > videoAspect) {
+      // Holder is wider than video - fit to height (object-cover)
       drawHeight = holderHeight
       drawWidth = drawHeight * videoAspect
-      drawX = holderX - (drawWidth - holderWidth) / 2
+      drawX = -drawWidth / 2
     } else {
-      // Video is taller - fit to width, crop height
+      // Holder is taller or same - fit to width (object-cover)
       drawWidth = holderWidth
       drawHeight = drawWidth / videoAspect
-      drawY = holderY - (drawHeight - holderHeight) / 2
+      drawY = -drawHeight / 2
     }
     
     // Apply rounded corners if specified
     // Check if borderRadius exists and is greater than 0
     const borderRadius = holder.borderRadius ?? 0
     if (borderRadius > 0) {
-      // Convert borderRadius from pixels to canvas coordinates
-      // Since holder dimensions are 0-1 normalized, we need to scale borderRadius
-      // borderRadius is in export resolution pixels, so we need to scale it to canvas pixels
-      const scaleX = width / (state.canvasSettings?.resolution?.width || width)
-      const scaleY = height / (state.canvasSettings?.resolution?.height || height)
+      // borderRadius is stored in export resolution pixels (e.g., 1920x1080)
+      // The width/height parameters are already at export resolution
+      // So we can use borderRadius directly (scale = 1.0) when canvas matches export resolution
+      // But we still calculate scale in case canvas resolution differs
+      const exportWidth = state.canvasSettings?.resolution?.width || width
+      const exportHeight = state.canvasSettings?.resolution?.height || height
+      
+      // Calculate scale factor from export resolution to actual canvas size
+      // Typically this will be 1.0 if canvas is at export resolution
+      const scaleX = width / exportWidth
+      const scaleY = height / exportHeight
       const scale = Math.min(scaleX, scaleY) // Use minimum to maintain aspect ratio
-      const scaledRadius = Math.min(borderRadius * scale, Math.min(holderWidth, holderHeight) / 2)
+      
+      // Scale the borderRadius from export resolution pixels to canvas pixels
+      // Use the holder's actual pixel dimensions (holderWidth/holderHeight) for clamping
+      const scaledRadius = Math.min(borderRadius * scale, Math.min(Math.abs(drawWidth), Math.abs(drawHeight)) / 2)
       
       ctx.beginPath()
       
       // Use roundRect if available, otherwise use manual path
+      // The clipping path uses the actual draw coordinates
       if (typeof (ctx as any).roundRect === 'function') {
         (ctx as any).roundRect(drawX, drawY, drawWidth, drawHeight, scaledRadius)
       } else {
@@ -407,6 +418,7 @@ export async function renderFrame(
       ctx.clip()
     }
     
+    // Draw video using the calculated draw coordinates
     ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
     ctx.restore()
   }
