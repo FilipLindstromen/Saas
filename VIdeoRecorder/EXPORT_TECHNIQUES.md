@@ -169,3 +169,4 @@ if (result.success) {
 - Quality presets (fast, balanced, best)
 - Batch export support
 
+

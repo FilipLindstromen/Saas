@@ -13,8 +13,8 @@ import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
 import { analyzeWaveform } from '../utils/waveformAnalyzer'
 import SettingsPanel from './SettingsPanel'
 import { TimelineAudioClip } from './TimelineAudioClip'
-import { exportWithOfflinePipeline, isWebCodecsAvailable, downloadExportedVideo } from '../utils/exportIntegration'
-import { exportWithMultiTechnique, getAvailableTechniques, type ExportTechnique } from '../utils/multiExportIntegration'
+import { exportWithOfflinePipeline, exportWithGPUPipeline, isExportAvailable, downloadExportedVideo } from '../utils/exportIntegration'
+import { isGPUSupported } from '../utils/gpuExport'
 
 interface EditStepProps {
   scenes: Scene[]
@@ -273,8 +273,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   const [exportProgress, setExportProgress] = useState('')
   const [exportFormat, setExportFormat] = useState<'mp4' | 'webm'>('mp4')
   const [exportMode, setExportMode] = useState<'combined' | 'separate'>('combined')
+  const [exportTechnique, setExportTechnique] = useState<'cpu' | 'gpu'>('gpu') // Default to GPU for better performance
   const [exportProgressPercent, setExportProgressPercent] = useState(0)
-  const [selectedExportTechnique, setSelectedExportTechnique] = useState<ExportTechnique | 'auto'>('auto')
+  const [exportTimeRemaining, setExportTimeRemaining] = useState<number | undefined>(undefined)
   
   // FFmpeg loading state
   const [ffmpegLoading, setFfmpegLoading] = useState(false)
@@ -6673,15 +6674,26 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
 
   // Offline export using WebCodecs
   const handleOfflineExport = async () => {
+    console.log('handleOfflineExport called')
+    
     if (sceneTakes.length === 0) {
       alert('No scenes with selected takes')
       return
     }
 
-    if (!isWebCodecsAvailable()) {
-      alert('WebCodecs API is not available. Please use Chrome or Edge browser (Chrome 94+, Edge 94+).')
+    // Check if GPU export is selected but not available
+    if (exportTechnique === 'gpu' && !isGPUSupported()) {
+      alert('GPU acceleration is not available. Please use CPU rendering or enable WebGL in your browser.')
       return
     }
+
+    // Check if MediaRecorder is available
+    if (!isExportAvailable()) {
+      alert('MediaRecorder API is not available. Please use a modern browser (Chrome 47+, Firefox 25+, Safari 14.1+).')
+      return
+    }
+    
+    console.log('Export checks passed, starting export...')
 
     // Determine which scenes to export
     const scenesToExport = selectedScenesForExport.size > 0
@@ -6694,7 +6706,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
 
     setIsExporting(true)
-    setExportProgress('Starting offline export...')
+    setExportProgress(exportTechnique === 'gpu' ? 'Starting GPU-accelerated export...' : 'Starting CPU export...')
     setExportProgressPercent(0)
 
     try {
@@ -6730,7 +6742,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           }
         : undefined
 
-      const blob = await exportWithOfflinePipeline(
+      // Use GPU or CPU export based on selection
+      const exportFunction = exportTechnique === 'gpu' ? exportWithGPUPipeline : exportWithOfflinePipeline
+      
+      console.log(`Using ${exportTechnique === 'gpu' ? 'GPU' : 'CPU'} export function`)
+      console.log('Export parameters:', {
+        scenesCount: scenes.length,
+        timelineClipsCount: timelineClips.length,
+        layoutClipsCount: layoutClips.length,
+        format: exportFormat,
+      })
+      
+      const blob = await exportFunction(
         scenes,
         timelineClips,
         layoutClips,
@@ -6762,128 +6785,24 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         }
       )
 
+      console.log('Export completed, blob size:', blob.size)
+      
       downloadExportedVideo(blob, `export_${Date.now()}.${exportFormat}`)
       setIsExporting(false)
-      setExportProgress('Export complete!')
+      setExportProgress(`${exportTechnique === 'gpu' ? 'GPU ' : ''}Export complete!`)
       setExportProgressPercent(100)
       setShowExportDialog(false)
     } catch (error) {
-      console.error('Offline export failed:', error)
-      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+      console.error('Export failed:', error)
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}\n\nCheck the browser console for more details.`)
       setIsExporting(false)
       setExportProgress('Export failed')
       setExportProgressPercent(0)
+      setExportTimeRemaining(undefined)
     }
   }
 
-  // Multi-technique export handler
-  const handleMultiExport = async () => {
-    if (sceneTakes.length === 0) {
-      alert('No scenes with selected takes')
-      return
-    }
-
-    // Determine which scenes to export
-    const scenesToExport = selectedScenesForExport.size > 0
-      ? sceneTakes.filter(st => selectedScenesForExport.has(st.sceneId))
-      : sceneTakes // Export all if none selected
-
-    if (scenesToExport.length === 0) {
-      alert('Please select at least one scene to export')
-      return
-    }
-
-    setIsExporting(true)
-    setExportProgress('Starting multi-technique export...')
-    setExportProgressPercent(0)
-
-    try {
-      // Get current layout clip's title and background image (if any)
-      const currentLayoutClip = layoutClips.find(lc => 
-        currentTime >= lc.timelineStart && currentTime < lc.timelineEnd
-      ) || layoutClips[0]
-
-      const titleData = currentLayoutClip?.title?.enabled && currentLayoutClip.title.text
-        ? {
-            text: currentLayoutClip.title.text,
-            x: currentLayoutClip.title.x,
-            y: currentLayoutClip.title.y,
-            textAlign: currentLayoutClip.title.textAlign || 'center',
-            font: titleSettings.font,
-            fontSize: titleSettings.size,
-            lineHeight: titleSettings.lineHeight,
-            animationIn: currentLayoutClip.title.animationIn || 'none',
-            animationOut: currentLayoutClip.title.animationOut || 'none',
-            animationDuration: currentLayoutClip.title.animationDuration || 0.5,
-            timelineStart: 0, // Could be calculated from layout clips
-            timelineEnd: timelineClips.reduce((max, clip) => Math.max(max, clip.timelineEnd), 0),
-          }
-        : undefined
-
-      const backgroundImageData = currentLayoutClip?.backgroundImage?.enabled && currentLayoutClip.backgroundImage.url
-        ? {
-            url: currentLayoutClip.backgroundImage.url,
-            x: 0, // Full canvas - adjust if needed
-            y: 0,
-            width: 1,
-            height: 1,
-          }
-        : undefined
-
-      const result = await exportWithMultiTechnique(
-        scenes,
-        timelineClips,
-        layoutClips,
-        canvasSettings,
-        layout,
-        {
-          style: selectedCaptionStyle !== 'none' 
-            ? captionStyles.find(s => s.id === selectedCaptionStyle) 
-            : undefined,
-          font: captionFont,
-          size: captionSize,
-          lineHeight: captionLineHeight,
-          maxWords: captionMaxWords,
-          enabled: selectedCaptionStyle !== 'none',
-        },
-        titleData,
-        backgroundImageData,
-        transcripts,
-        {
-          technique: selectedExportTechnique,
-          fps: 30,
-          bitrate: 5_000_000, // 5 Mbps
-          format: exportFormat,
-          codec: exportFormat === 'webm' ? 'vp9' : 'avc1',
-          onProgress: (message, percent, technique, error) => {
-            setExportProgress(`${technique ? `[${technique}] ` : ''}${message}`)
-            setExportProgressPercent(percent)
-            if (error) {
-              console.error(`[${technique}] Export error:`, error)
-            }
-          }
-        }
-      )
-
-      downloadExportedVideo(result.blob, `export_${Date.now()}.${exportFormat}`)
-      setIsExporting(false)
-      setExportProgress(`Export complete! (Used: ${result.technique})`)
-      setExportProgressPercent(100)
-      
-      // Log export details
-      console.log('Export successful!')
-      console.log('Used technique:', result.technique)
-      console.log('Full logs:', result.log)
-      
-      setShowExportDialog(false)
-    } catch (error) {
-      console.error('Multi-technique export failed:', error)
-      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
-      setIsExporting(false)
-      setExportProgress('Export failed')
-      setExportProgressPercent(0)
-    }
-  }
 
   // Export DaVinci Resolve timeline
   const handleExportDaVinci = () => {
@@ -7106,8 +7025,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     ></div>
                   </div>
                   {exportProgressPercent > 0 && exportProgressPercent < 100 && (
-                    <div className="text-xs text-gray-400 mt-1 text-right">
-                      {Math.round(exportProgressPercent)}%
+                    <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                      <span>
+                        {exportTimeRemaining !== undefined && exportTimeRemaining !== Infinity && exportTimeRemaining > 0
+                          ? `~${Math.round(exportTimeRemaining / 60)}m ${Math.round(exportTimeRemaining % 60)}s remaining`
+                          : ''}
+                      </span>
+                      <span>{Math.round(exportProgressPercent)}%</span>
                     </div>
                   )}
                 </div>
@@ -7161,64 +7085,76 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 </p>
               </div>
 
-              {/* Multi-Technique Export Section */}
-              <div className="mb-4 p-3 bg-gray-900/20 border border-gray-500/50 rounded">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span className="text-sm font-medium text-gray-300">Multi-Technique Export</span>
-                </div>
-                <p className="text-xs text-gray-200/80 mb-3">
-                  Test different export techniques. Select "auto" to try all until one succeeds.
-                </p>
-                
-                {/* Export Technique Selector */}
-                <div className="mb-3">
-                  <label className="text-xs text-gray-300 mb-1 block">Export Technique</label>
-                  <select
-                    value={selectedExportTechnique}
-                    onChange={(e) => setSelectedExportTechnique(e.target.value as ExportTechnique | 'auto')}
-                    disabled={isExporting}
-                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              <div className="mb-4">
+                <label className="text-sm text-gray-300 mb-2 block">Render Technique</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setExportTechnique('gpu')}
+                    disabled={!isGPUSupported()}
+                    className={`px-4 py-2 rounded text-sm flex items-center gap-2 ${exportTechnique === 'gpu' ? 'bg-purple-600' : 'bg-gray-800 hover:bg-gray-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={!isGPUSupported() ? 'GPU acceleration not available. WebGL required.' : 'Uses GPU for faster rendering'}
                   >
-                    <option value="auto">Auto (Try all until one succeeds)</option>
-                    <option value="webcodecs-canvas">WebCodecs Canvas (Best Quality - Chrome/Edge)</option>
-                    <option value="ffmpeg-frames">FFmpeg Frames (Most Compatible)</option>
-                    <option value="mediarecorder-canvas">MediaRecorder Canvas (Fast - Modern Browsers)</option>
-                    <option value="canvas-capture-ffmpeg">Canvas CaptureStream + FFmpeg (Balanced)</option>
-                    <option value="canvas-capture-mediarecorder">Canvas CaptureStream + MediaRecorder (Fastest)</option>
-                  </select>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Available: {getAvailableTechniques().join(', ') || 'None'}
-                  </p>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    GPU (Faster)
+                  </button>
+                  <button
+                    onClick={() => setExportTechnique('cpu')}
+                    className={`px-4 py-2 rounded text-sm ${exportTechnique === 'cpu' ? 'bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                    title="Standard CPU rendering"
+                  >
+                    CPU (Standard)
+                  </button>
                 </div>
-
-                <button
-                  onClick={handleMultiExport}
-                  disabled={isExporting}
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
-                >
-                  {isExporting ? 'Exporting...' : 'Export with Selected Technique'}
-                </button>
+                {exportTechnique === 'gpu' && !isGPUSupported() && (
+                  <p className="text-xs text-yellow-400 mt-2">
+                    ⚠ GPU acceleration not available. WebGL required. Falling back to CPU rendering.
+                  </p>
+                )}
+                {exportTechnique === 'gpu' && isGPUSupported() && (
+                  <p className="text-xs text-green-400 mt-2">
+                    ✓ GPU acceleration available. Rendering will be 2-5x faster.
+                  </p>
+                )}
               </div>
 
-              {/* Legacy Offline Export Section */}
-              <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded">
+              {/* Fast Export Section */}
+              <div className="mb-4 p-3 bg-gray-900/20 border border-gray-500/50 rounded">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-gray-400">Legacy: Offline Export (WebCodecs Only)</span>
+                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-300">Fast Export (Recommended)</span>
                 </div>
-                <p className="text-xs text-gray-500 mb-2">
-                  Older export method. Use Multi-Technique Export above for better compatibility.
+                <p className="text-xs text-gray-200/80 mb-3">
+                  Production-ready export using MediaRecorder API. Fast, accurate, and reliable. Records canvas directly - what you see is what you get.
                 </p>
                 <button
-                  onClick={handleOfflineExport}
-                  disabled={isExporting || !isWebCodecsAvailable()}
-                  className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
-                  title={!isWebCodecsAvailable() ? 'WebCodecs not available. Please use Chrome or Edge browser.' : undefined}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log('Export button clicked, isExporting:', isExporting, 'isExportAvailable:', isExportAvailable())
+                    if (!isExporting && isExportAvailable()) {
+                      handleOfflineExport().catch(err => {
+                        console.error('Unhandled export error:', err)
+                        alert(`Export error: ${err instanceof Error ? err.message : String(err)}`)
+                      })
+                    } else {
+                      console.warn('Export button clicked but conditions not met:', { isExporting, isExportAvailable: isExportAvailable() })
+                    }
+                  }}
+                  disabled={isExporting || !isExportAvailable()}
+                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                  title={!isExportAvailable() ? 'MediaRecorder not available. Please use a modern browser (Chrome, Firefox, Safari).' : undefined}
                 >
-                  {isExporting ? 'Exporting...' : 'Export with Offline Pipeline'}
+                  {isExporting ? 'Exporting...' : 'Export Video'}
                 </button>
+                {!isExportAvailable() && (
+                  <p className="text-xs text-red-400 mt-2">
+                    MediaRecorder API not available. Please use Chrome, Firefox, or Safari.
+                  </p>
+                )}
               </div>
 
               {/* Legacy Export Section */}

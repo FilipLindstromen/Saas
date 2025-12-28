@@ -57,13 +57,22 @@ export class Muxer {
   }
 
   /**
-   * Mux to MP4 - simplified implementation
-   * For production, consider using mp4box.js or similar library
+   * Mux to MP4 - using mp4box.js for proper MP4 structure
    */
   private async muxMP4(): Promise<Blob> {
-    // For now, use basic muxing
-    // In production, you'd want to use a proper MP4 muxer library
-    return this.muxMP4Basic()
+    // Try to use mp4box.js if available
+    try {
+      const MP4Box = (await import('mp4box')).default
+      return this.muxMP4WithMP4Box(MP4Box)
+    } catch (error) {
+      console.warn('mp4box.js not available, trying webm-muxer fallback for MP4...', error)
+      // Fallback: If mp4box fails, try using webm-muxer but this won't work for MP4
+      // In this case, we'll throw an error to make it clear
+      throw new Error(
+        'MP4 muxing requires mp4box.js. Please ensure it is installed: npm install mp4box. ' +
+        'Error: ' + (error instanceof Error ? error.message : String(error))
+      )
+    }
   }
 
   private async muxMP4WithMP4Box(MP4Box: any): Promise<Blob> {

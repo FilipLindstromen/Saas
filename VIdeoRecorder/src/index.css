@@ -51,3 +51,37 @@ body {
   background: #1f2937;
 }
 
+/* Override blue selection colors with grey */
+select option:checked,
+select option:focus {
+  background-color: #4b5563 !important;
+  color: white !important;
+}
+
+select option {
+  background-color: #1f2937 !important;
+  color: white !important;
+}
+
+select option:hover {
+  background-color: #374151 !important;
+}
+
+/* Override browser default blue focus/selection */
+select:focus {
+  outline: none;
+  border-color: #6b7280 !important;
+  box-shadow: 0 0 0 1px #6b7280 !important;
+}
+
+/* Override any blue accent colors */
+*::selection {
+  background-color: #4b5563 !important;
+  color: white !important;
+}
+
+*::-moz-selection {
+  background-color: #4b5563 !important;
+  color: white !important;
+}
+

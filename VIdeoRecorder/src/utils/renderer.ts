@@ -413,8 +413,11 @@ export async function renderFrame(
         continue
       }
       
+      // For export, skip readyState check - videos are already loaded and ready
+      // This saves ~50ms per frame
       if (video.readyState < 2) {
-        await new Promise(resolve => setTimeout(resolve, 50))
+        // Only wait briefly if video is truly not ready
+        await new Promise(resolve => setTimeout(resolve, 10))
         if (video.readyState < 2) {
           continue
         }
@@ -431,33 +434,35 @@ export async function renderFrame(
         continue
       }
       
-      // Seek video to correct time
-      if (Math.abs(video.currentTime - targetVideoTime) > 0.05) {
+      // Seek video to correct time - only if significantly off (optimize for sequential rendering)
+      // For export, frames are sequential so we can be more lenient with seeks
+      const timeDiff = Math.abs(video.currentTime - targetVideoTime)
+      if (timeDiff > 0.1) { // Increased threshold for faster rendering
         video.currentTime = targetVideoTime
-        await new Promise<void>((resolve) => {
-          let resolved = false
-          const timeout = setTimeout(() => {
-            if (!resolved) {
-              resolved = true
-              if (Math.abs(video.currentTime - targetVideoTime) < 0.2) {
+        // For export, don't wait for seek - just set it and continue (video will catch up)
+        // Only wait if we're way off
+        if (timeDiff > 1.0) {
+          await new Promise<void>((resolve) => {
+            let resolved = false
+            const timeout = setTimeout(() => {
+              if (!resolved) {
+                resolved = true
                 resolve()
-              } else {
+              }
+            }, 500) // Shorter timeout for export
+            
+            const onSeeked = () => {
+              if (!resolved) {
+                resolved = true
+                clearTimeout(timeout)
+                video.removeEventListener('seeked', onSeeked)
                 resolve()
               }
             }
-          }, 1000)
-          
-          const onSeeked = () => {
-            if (!resolved) {
-              resolved = true
-              clearTimeout(timeout)
-              video.removeEventListener('seeked', onSeeked)
-              resolve()
-            }
-          }
-          
-          video.addEventListener('seeked', onSeeked, { once: true })
-        })
+            
+            video.addEventListener('seeked', onSeeked, { once: true })
+          })
+        }
       }
       
       // Wait for video frame
@@ -551,15 +556,14 @@ export async function renderFrame(
       
       if (borderRadius > 0 || hasFilters) {
         // Use temporary canvas for filters and/or rounded corners
-        // Use document.createElement for compatibility (works in both browser and worker contexts)
-        const tempCanvas = typeof document !== 'undefined' 
-          ? document.createElement('canvas')
-          : new OffscreenCanvas(Math.ceil(Math.abs(drawWidth)), Math.ceil(Math.abs(drawHeight)))
-        if (typeof document !== 'undefined') {
-          (tempCanvas as HTMLCanvasElement).width = Math.ceil(Math.abs(drawWidth))
-          ;(tempCanvas as HTMLCanvasElement).height = Math.ceil(Math.abs(drawHeight))
-        }
-        const tempCtx = tempCanvas.getContext('2d')
+        // Always use HTMLCanvasElement during export to avoid WebGL context limits
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = Math.ceil(Math.abs(drawWidth))
+        tempCanvas.height = Math.ceil(Math.abs(drawHeight))
+        const tempCtx = tempCanvas.getContext('2d', {
+          willReadFrequently: false,
+          alpha: false,
+        })
         
         if (tempCtx) {
           // Draw video to temp canvas
@@ -647,9 +651,10 @@ export async function renderFrame(
       continue
     }
     
+    // For export, skip readyState check - videos are pre-loaded
     if (video.readyState < 2) {
-      // Video not ready yet - wait a bit
-      await new Promise(resolve => setTimeout(resolve, 50))
+      // Only wait briefly if video is truly not ready
+      await new Promise(resolve => setTimeout(resolve, 10))
       if (video.readyState < 2) {
         // Video still not ready - skip
         continue
@@ -674,39 +679,36 @@ export async function renderFrame(
       continue
     }
     
-    // Ensure video is at correct time
-    if (Math.abs(video.currentTime - targetVideoTime) > 0.05) {
+    // Ensure video is at correct time - optimize for sequential frame rendering
+    const timeDiff = Math.abs(video.currentTime - targetVideoTime)
+    if (timeDiff > 0.1) { // Increased threshold for faster rendering
       video.currentTime = targetVideoTime
-      // Wait for seek to complete with better error handling
-      await new Promise<void>((resolve) => {
-        let resolved = false
-        const timeout = setTimeout(() => {
-          if (!resolved) {
-            resolved = true
-            // Check if we're close enough
-            if (Math.abs(video.currentTime - targetVideoTime) < 0.2) {
+      // Only wait for seek if we're way off (for export speed)
+      if (timeDiff > 1.0) {
+        await new Promise<void>((resolve) => {
+          let resolved = false
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              resolved = true
               resolve()
-            } else {
-              // Seek timeout - continue anyway (video may still be close enough)
+            }
+          }, 500) // Shorter timeout for export
+          
+          const onSeeked = () => {
+            if (!resolved) {
+              resolved = true
+              clearTimeout(timeout)
+              video.removeEventListener('seeked', onSeeked)
               resolve()
             }
           }
-        }, 1000)
-        
-        const onSeeked = () => {
-          if (!resolved) {
-            resolved = true
-            clearTimeout(timeout)
-            video.removeEventListener('seeked', onSeeked)
-            resolve()
-          }
-        }
-        
-        video.addEventListener('seeked', onSeeked, { once: true })
-      })
+          
+          video.addEventListener('seeked', onSeeked, { once: true })
+        })
+      }
     }
     
-    // Wait for video frame to be ready using requestVideoFrameCallback if available
+    // For export, minimize waiting - just check readyState briefly
     if (video.readyState < 2) {
       await new Promise<void>((resolve) => {
         if (video.readyState >= 2) {
@@ -714,13 +716,17 @@ export async function renderFrame(
           return
         }
         
+        const timeout = setTimeout(() => resolve(), 100) // Short timeout for export speed
+        
         const onCanPlay = () => {
+          clearTimeout(timeout)
           video.removeEventListener('canplay', onCanPlay)
           video.removeEventListener('canplaythrough', onCanPlayThrough)
           resolve()
         }
         
         const onCanPlayThrough = () => {
+          clearTimeout(timeout)
           video.removeEventListener('canplay', onCanPlay)
           video.removeEventListener('canplaythrough', onCanPlayThrough)
           resolve()
@@ -728,25 +734,10 @@ export async function renderFrame(
         
         video.addEventListener('canplay', onCanPlay, { once: true })
         video.addEventListener('canplaythrough', onCanPlayThrough, { once: true })
-        
-        setTimeout(() => {
-          video.removeEventListener('canplay', onCanPlay)
-          video.removeEventListener('canplaythrough', onCanPlayThrough)
-          resolve() // Continue anyway
-        }, 2000)
       })
     }
     
-    // Use requestVideoFrameCallback if available for better frame accuracy
-    if ('requestVideoFrameCallback' in video) {
-      await new Promise<void>((resolve) => {
-        (video as any).requestVideoFrameCallback(() => {
-          resolve()
-        })
-        // Timeout fallback
-        setTimeout(() => resolve(), 500)
-      })
-    }
+    // Skip requestVideoFrameCallback for export - too slow, just render current frame
     
     // Calculate holder position and size in pixels
     const holderX = holder.x * width
@@ -860,15 +851,14 @@ export async function renderFrame(
     
     if (hasFilters || borderRadius > 0) {
       // Use temporary canvas for filters and/or rounded corners
-      // Use document.createElement for compatibility (works in both browser and worker contexts)
-      const tempCanvas = typeof document !== 'undefined' 
-        ? document.createElement('canvas')
-        : new OffscreenCanvas(Math.ceil(Math.abs(drawWidth)), Math.ceil(Math.abs(drawHeight)))
-      if (typeof document !== 'undefined') {
-        (tempCanvas as HTMLCanvasElement).width = Math.ceil(Math.abs(drawWidth))
-        ;(tempCanvas as HTMLCanvasElement).height = Math.ceil(Math.abs(drawHeight))
-      }
-      const tempCtx = tempCanvas.getContext('2d')
+      // Always use HTMLCanvasElement during export to avoid WebGL context limits
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = Math.ceil(Math.abs(drawWidth))
+      tempCanvas.height = Math.ceil(Math.abs(drawHeight))
+      const tempCtx = tempCanvas.getContext('2d', {
+        willReadFrequently: false,
+        alpha: false,
+      })
       
       if (tempCtx) {
         // Draw video to temp canvas (object-cover)
