@@ -61,20 +61,79 @@ const copyFFmpegFiles = () => {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), copyFFmpegFiles()],
-  base: './', // Important for Electron - use relative paths
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-  },
-  optimizeDeps: {
-    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/core'],
-  },
-  server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+export default defineConfig(({ mode }) => {
+  const isProduction = mode === 'production'
+  
+  return {
+    plugins: [react(), copyFFmpegFiles()],
+    base: './', // Important for Electron - use relative paths
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      // Production optimizations
+      minify: isProduction ? 'esbuild' : false,
+      sourcemap: isProduction ? false : true, // No source maps in production for security
+      target: 'es2020',
+      cssCodeSplit: true,
+      // Optimize chunking strategy
+      rollupOptions: {
+        output: {
+          // Manual chunking for better caching
+          manualChunks: (id) => {
+            // Vendor chunks
+            if (id.includes('node_modules')) {
+              // React and React DOM
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'react-vendor'
+              }
+              // FFmpeg (large, separate chunk)
+              if (id.includes('@ffmpeg')) {
+                return 'ffmpeg-vendor'
+              }
+              // Other large libraries
+              if (id.includes('html2canvas') || id.includes('mp4box') || id.includes('webm-muxer')) {
+                return 'media-vendor'
+              }
+              // All other node_modules
+              return 'vendor'
+            }
+          },
+          // Optimize chunk file names
+          chunkFileNames: 'assets/js/[name]-[hash].js',
+          entryFileNames: 'assets/js/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name?.split('.') || []
+            const ext = info[info.length - 1]
+            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+              return `assets/images/[name]-[hash][extname]`
+            }
+            if (/woff2?|eot|ttf|otf/i.test(ext)) {
+              return `assets/fonts/[name]-[hash][extname]`
+            }
+            return `assets/[name]-[hash][extname]`
+          },
+        },
+      },
+      // Chunk size warnings
+      chunkSizeWarningLimit: 1000,
+      // Optimize assets
+      assetsInlineLimit: 4096, // Inline assets smaller than 4kb
     },
-  },
+    optimizeDeps: {
+      exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/core'],
+      include: ['react', 'react-dom'],
+    },
+    server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      },
+    },
+    // Define environment variables
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+      __IS_PRODUCTION__: JSON.stringify(isProduction),
+    },
+  }
 })

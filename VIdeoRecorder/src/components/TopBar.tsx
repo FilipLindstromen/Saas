@@ -141,7 +141,7 @@ export default function TopBar({
           <button
             onClick={handleSaveProject}
             disabled={isSaving}
-            className="flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors bg-white hover:bg-zinc-200 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-4 h-4"

@@ -24,7 +24,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-50"
+        className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50"
         onClick={onClose}
       />
       <div className="fixed right-0 top-0 bottom-0 w-96 bg-gray-900 border-l border-gray-700 z-50 flex flex-col">
@@ -69,7 +69,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         <div className="p-4 border-t border-gray-700">
           <button
             onClick={handleSave}
-            className="w-full bg-white hover:bg-zinc-200 text-black py-2 rounded"
+            className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded"
           >
             Save Settings
           </button>

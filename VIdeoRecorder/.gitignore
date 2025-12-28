@@ -7,10 +7,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build outputs
 dist
+dist-ssr
 dist-electron
+release
+build
 *.local
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
@@ -23,6 +34,24 @@ dist-electron
 *.sln
 *.sw?
 
+# OS files
+Thumbs.db
+.DS_Store
+
 # Electron
-release
-build
+out
+*.asar
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+.vite
+
+# Error logs (user data)
+error_logs.json
+
+# Public FFmpeg files (generated during build)
+public/ffmpeg/*.js
+public/ffmpeg/*.wasm
+public/ffmpeg/*.worker.js

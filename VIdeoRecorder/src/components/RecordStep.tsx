@@ -296,10 +296,11 @@ export default function RecordStep({
         screen: !screenRecorderRef.current
       }
 
-      // Set up stop handler
+      // Set up stop handler with race condition protection
       const handleStop = async () => {
-        // Wait a bit for all recorders to finish collecting data
-        await new Promise(resolve => setTimeout(resolve, 500))
+        try {
+          // Wait a bit for all recorders to finish collecting data
+          await new Promise(resolve => setTimeout(resolve, 500))
 
         const duration = (Date.now() - recordingStartTimeRef.current) / 1000
 
@@ -389,13 +390,26 @@ export default function RecordStep({
           }
         }
 
-        // Generate thumbnail for the new recording
-        await generateTakeThumbnail(newTake, targetSceneId)
+          // Generate thumbnail for the new recording
+          await generateTakeThumbnail(newTake, targetSceneId)
 
-        onEditedChange(true)
-        setRecordingTime(0)
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
+          onEditedChange(true)
+          setRecordingTime(0)
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = undefined
+          }
+        } catch (error) {
+          console.error('Error in handleStop:', error)
+          // Still update UI state even if there's an error
+          setIsRecording(false)
+          setIsPaused(false)
+          setRecordingTime(0)
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = undefined
+          }
+          alert('Error stopping recording: ' + (error instanceof Error ? error.message : 'Unknown error'))
         }
       }
 
@@ -406,9 +420,20 @@ export default function RecordStep({
         }
       }
 
-      // Set up onstop handlers for all recorders
+      // Set up onstop handlers for all recorders with error handling
       if (cameraRecorderRef.current) {
         cameraRecorderRef.current.onstop = () => {
+          try {
+            stoppedRecorders.camera = true
+            checkAllStopped()
+          } catch (error) {
+            console.error('Error in camera recorder onstop:', error)
+            stoppedRecorders.camera = true
+            checkAllStopped() // Still check even on error
+          }
+        }
+        cameraRecorderRef.current.onerror = (event) => {
+          console.error('Camera recorder error:', event)
           stoppedRecorders.camera = true
           checkAllStopped()
         }
@@ -416,6 +441,17 @@ export default function RecordStep({
 
       if (microphoneRecorderRef.current) {
         microphoneRecorderRef.current.onstop = () => {
+          try {
+            stoppedRecorders.microphone = true
+            checkAllStopped()
+          } catch (error) {
+            console.error('Error in microphone recorder onstop:', error)
+            stoppedRecorders.microphone = true
+            checkAllStopped() // Still check even on error
+          }
+        }
+        microphoneRecorderRef.current.onerror = (event) => {
+          console.error('Microphone recorder error:', event)
           stoppedRecorders.microphone = true
           checkAllStopped()
         }
@@ -423,6 +459,17 @@ export default function RecordStep({
 
       if (screenRecorderRef.current) {
         screenRecorderRef.current.onstop = () => {
+          try {
+            stoppedRecorders.screen = true
+            checkAllStopped()
+          } catch (error) {
+            console.error('Error in screen recorder onstop:', error)
+            stoppedRecorders.screen = true
+            checkAllStopped() // Still check even on error
+          }
+        }
+        screenRecorderRef.current.onerror = (event) => {
+          console.error('Screen recorder error:', event)
           stoppedRecorders.screen = true
           checkAllStopped()
         }
@@ -647,13 +694,13 @@ export default function RecordStep({
                 key={scene.id}
                 onClick={() => setSelectedSceneId(scene.id)}
                 className={`p-4 rounded-lg cursor-pointer transition-colors ${isSelected
-                  ? 'bg-zinc-900 border-2 border-white'
-                  : 'bg-black border-2 border-transparent hover:bg-zinc-900'
+                  ? 'bg-gray-800 border-2 border-gray-400'
+                  : 'bg-gray-900 border-2 border-transparent hover:bg-gray-800'
                   }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div
-                    className={`w-2 h-2 rounded-full ${status === 'green' ? 'bg-white' : 'bg-zinc-600'
+                    className={`w-2 h-2 rounded-full ${status === 'green' ? 'bg-gray-300' : 'bg-gray-600'
                       }`}
                   />
                   <span className="text-gray-400 text-sm">Scene {index + 1}</span>
@@ -770,7 +817,7 @@ export default function RecordStep({
                 )}
 
                 {hasRecordings && scene.recordings.length > 0 && (
-                  <div className="flex items-center gap-3 p-2 rounded bg-zinc-800 border border-zinc-500">
+                  <div className="flex items-center gap-3 p-2 rounded bg-gray-800 border border-gray-600">
                     {(() => {
                       const take = scene.recordings[0]
                       const thumbnailKey = `${scene.id}_${take.id}`
@@ -785,8 +832,8 @@ export default function RecordStep({
                             />
                           )}
                           {!thumbnail && (
-                            <div className="w-20 h-12 bg-zinc-700 rounded flex-shrink-0 flex items-center justify-center">
-                              <svg className="w-6 h-6 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-20 h-12 bg-gray-700 rounded flex-shrink-0 flex items-center justify-center">
+                              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                               </svg>
                             </div>

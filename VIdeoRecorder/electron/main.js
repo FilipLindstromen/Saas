@@ -10,6 +10,8 @@ if (require('electron-squirrel-startup')) {
 let mainWindow
 
 function createWindow() {
+  const isDevelopment = process.env.NODE_ENV === 'development' || !app.isPackaged
+  
   // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -20,17 +22,31 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false, // May be needed for file access
+      webSecurity: !isDevelopment, // Enable web security in production
+      sandbox: false, // FFmpeg requires non-sandboxed context
     },
     icon: path.join(__dirname, '../dist/icon.ico'), // Optional: add an icon
+    show: false, // Don't show until ready to prevent flash
+  })
+
+  // Show window when ready to prevent flash
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+    if (isDevelopment) {
+      mainWindow.focus()
+    }
   })
 
   // Load the app
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    // Disable DevTools in production
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow.webContents.closeDevTools()
+    })
   }
 
   // Handle window closed
@@ -57,12 +73,31 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Expose Electron APIs to renderer process via preload
+// Security: Prevent new window creation
 app.on('web-contents-created', (event, contents) => {
   contents.on('new-window', (event, navigationUrl) => {
     event.preventDefault()
-    // Optionally open in default browser
+    // Open external URLs in default browser
     require('electron').shell.openExternal(navigationUrl)
   })
+  
+  // Prevent navigation to external URLs
+  contents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl)
+    if (parsedUrl.origin !== 'http://localhost:5173' && !navigationUrl.startsWith('file://')) {
+      event.preventDefault()
+    }
+  })
+})
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error)
+  dialog.showErrorBox('Application Error', error.message || 'An unexpected error occurred')
+})
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
 })
 

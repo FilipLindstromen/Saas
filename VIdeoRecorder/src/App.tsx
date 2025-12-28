@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import TopBar from './components/TopBar'
-import ScriptStep from './components/ScriptStep'
-import RecordStep from './components/RecordStep'
-import EditStep from './components/EditStep'
 import BottomNavigation from './components/BottomNavigation'
 import { projectManager } from './utils/projectManager'
 import type { ProjectData } from './utils/projectManager'
+import { log } from './utils/logger'
+
+// Lazy load heavy components for better initial load performance
+const ScriptStep = lazy(() => import('./components/ScriptStep'))
+const RecordStep = lazy(() => import('./components/RecordStep'))
+const EditStep = lazy(() => import('./components/EditStep'))
 
 export type Step = 'script' | 'record' | 'edit'
 
@@ -71,9 +74,9 @@ function App() {
           setHasProject(true)
           setIsEdited(false)
         }
-      } catch (error) {
-        console.error('Error restoring last project:', error)
-      }
+        } catch (error) {
+          log.error('Error restoring last project', error)
+        }
     }
     restoreLastProject()
   }, [])
@@ -114,7 +117,7 @@ function App() {
       await projectManager.saveProject(projectData)
       setIsEdited(false)
     } catch (error) {
-      console.error('Error saving project:', error)
+      log.error('Error saving project', error)
     }
   }, [hasProject, projectTitle, scenes])
 
@@ -158,7 +161,7 @@ function App() {
       ])
       setIsEdited(false)
     } catch (error) {
-      console.error('Error deleting project:', error)
+      log.error('Error deleting project', error)
     }
   }
 
@@ -200,16 +203,16 @@ function App() {
           await saveEditDataRef.current()
           console.log('Edit data saved successfully')
         } catch (error) {
-          console.error('Error saving edit data:', error)
+          log.error('Error saving edit data', error)
           // Don't fail the entire save if edit data save fails
         }
       } else {
-        console.warn('Edit data save function not available - EditStep may not be mounted')
+        log.warn('Edit data save function not available - EditStep may not be mounted')
       }
 
       setIsEdited(false)
     } catch (error) {
-      console.error('Error saving project:', error)
+      log.error('Error saving project', error)
       alert('Failed to save project: ' + (error as Error).message)
     }
   }
@@ -243,35 +246,50 @@ function App() {
   }
 
   const renderStep = () => {
+    const LoadingFallback = () => (
+      <div className="flex items-center justify-center h-full bg-gray-900">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+
     switch (currentStep) {
       case 'script':
         return (
-          <ScriptStep
-            scenes={scenes}
-            onAddScene={handleAddScene}
-            onUpdateScene={handleUpdateScene}
-            onDeleteScene={handleDeleteScene}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ScriptStep
+              scenes={scenes}
+              onAddScene={handleAddScene}
+              onUpdateScene={handleUpdateScene}
+              onDeleteScene={handleDeleteScene}
+            />
+          </Suspense>
         )
       case 'record':
         return (
-          <RecordStep
-            scenes={scenes}
-            onScenesChange={setScenes}
-            onEditedChange={setIsEdited}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <RecordStep
+              scenes={scenes}
+              onScenesChange={setScenes}
+              onEditedChange={setIsEdited}
+            />
+          </Suspense>
         )
       case 'edit':
         return (
-          <EditStep
-            scenes={scenes}
-            onScenesChange={setScenes}
-            showExportDialog={showExportDialog}
-            onExportDialogChange={setShowExportDialog}
-            onSaveRequest={(saveFn) => {
-              saveEditDataRef.current = saveFn
-            }}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <EditStep
+              scenes={scenes}
+              onScenesChange={setScenes}
+              showExportDialog={showExportDialog}
+              onExportDialogChange={setShowExportDialog}
+              onSaveRequest={(saveFn) => {
+                saveEditDataRef.current = saveFn
+              }}
+            />
+          </Suspense>
         )
       default:
         return null
@@ -279,7 +297,7 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white">
+    <div className="flex flex-col h-screen bg-gray-900 text-white">
       <TopBar
         title={projectTitle}
         onTitleChange={handleProjectTitleChange}
