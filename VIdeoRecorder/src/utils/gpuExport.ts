@@ -9,6 +9,8 @@
 import type { RenderState, RenderContext } from './renderer'
 import { renderFrame } from './renderer'
 import { projectManager } from './projectManager'
+import { getFFmpeg } from './ffmpeg'
+import { fetchFile } from '@ffmpeg/util'
 
 export interface GPUExportOptions {
   // Export settings
@@ -226,12 +228,13 @@ export async function exportVideoGPU(
     outputCanvas.height = height
     
     // Request hardware-accelerated 2D context (browsers will use GPU when available)
+    // Use desynchronized: false to prevent flickering - ensures frames are synchronized
     const outputCtx = outputCanvas.getContext('2d', {
       willReadFrequently: false,
       alpha: false,
       colorSpace: 'srgb',
       // @ts-ignore - some browsers support these hints
-      desynchronized: true, // Hint for GPU acceleration
+      desynchronized: false, // Set to false to prevent flickering - ensures frame sync
       powerPreference: 'high-performance', // Hint for GPU preference
     })
 
@@ -246,26 +249,24 @@ export async function exportVideoGPU(
     }
 
     // Step 5: Create MediaRecorder
+    // CRITICAL: MediaRecorder with canvas streams only reliably supports WebM format
+    // Even if MP4 is "supported", it often produces black videos with canvas streams
+    // So we always record as WebM, then convert to MP4 if needed using FFmpeg
     const stream = outputCanvas.captureStream(fps)
     
+    // Always use WebM for MediaRecorder (most reliable with canvas streams)
     let mimeType: string
-    if (format === 'webm') {
-      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-        mimeType = 'video/webm;codecs=vp9'
-      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-        mimeType = 'video/webm;codecs=vp8'
-      } else {
-        mimeType = 'video/webm'
-      }
+    const needsConversion = format === 'mp4' // Track if we need to convert later
+    
+    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+      mimeType = 'video/webm;codecs=vp9'
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+      mimeType = 'video/webm;codecs=vp8'
     } else {
-      if (MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = 'video/mp4'
-      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-        mimeType = 'video/webm;codecs=vp9'
-      } else {
-        mimeType = 'video/webm'
-      }
+      mimeType = 'video/webm'
     }
+    
+    console.log(`Recording as ${mimeType}${needsConversion ? ' (will convert to MP4)' : ''}`)
 
     let qualityValue: number
     if (typeof quality === 'string') {
@@ -437,8 +438,10 @@ export async function exportVideoGPU(
         console.log(`Rendering frame ${frameIndex + 1}/${totalFrames} at time ${timelineTime.toFixed(2)}s`)
       }
 
-      // Seek videos to correct time (without waiting - much faster)
-      // Since frames are sequential, videos will naturally advance, so we only need to correct when significantly off
+      // Seek videos to correct time and wait for seeks to complete to prevent flickering
+      // This ensures videos are at the correct frame before rendering
+      const seekPromises: Promise<void>[] = []
+      
       for (const clip of renderState.timelineClips) {
         if (timelineTime >= clip.timelineStart && timelineTime < clip.timelineEnd) {
           const key = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
@@ -452,15 +455,109 @@ export async function exportVideoGPU(
             const clampedTime = Math.max(0, Math.min(targetTime, video.duration || targetTime))
             
             const timeDiff = Math.abs(video.currentTime - clampedTime)
-            // Only seek if significantly off (larger threshold for faster rendering)
-            // Since we're rendering sequentially, videos should mostly be in sync already
-            if (timeDiff > 0.1) { // Only seek if more than 100ms off
-              video.currentTime = clampedTime
-              // Don't wait for seek - just set it and continue (video will catch up during render)
-              // This is much faster than waiting for seeked events
+            // Only seek if significantly off (more than 1 frame duration)
+            const frameTolerance = frameDuration * 1.5 // Allow 1.5 frames of tolerance
+            if (timeDiff > frameTolerance) {
+              // Wait for seek to complete to ensure video is at correct frame
+              const seekPromise = new Promise<void>((resolve) => {
+                // If already very close, resolve immediately
+                if (timeDiff < frameTolerance * 2) {
+                  video.currentTime = clampedTime
+                  // For small seeks, wait a short time for video to update
+                  setTimeout(() => resolve(), 10)
+                  return
+                }
+                
+                // For larger seeks, wait for seeked event
+                const onSeeked = () => {
+                  video.removeEventListener('seeked', onSeeked)
+                  video.removeEventListener('error', onError)
+                  resolve()
+                }
+                
+                const onError = () => {
+                  video.removeEventListener('seeked', onSeeked)
+                  video.removeEventListener('error', onError)
+                  resolve() // Resolve anyway to not block rendering
+                }
+                
+                const timeout = setTimeout(() => {
+                  video.removeEventListener('seeked', onSeeked)
+                  video.removeEventListener('error', onError)
+                  resolve() // Resolve after timeout to not block rendering
+                }, 200) // Max 200ms wait for seek
+                
+                video.addEventListener('seeked', onSeeked, { once: true })
+                video.addEventListener('error', onError, { once: true })
+                video.currentTime = clampedTime
+              })
+              
+              seekPromises.push(seekPromise)
             }
           }
         }
+      }
+      
+      // Wait for all seeks to complete before rendering
+      if (seekPromises.length > 0) {
+        await Promise.all(seekPromises)
+        // Wait for video frames to be ready after seek - critical for preventing flickering
+        await new Promise(resolve => setTimeout(resolve, 16)) // Wait one frame (16ms at 60fps)
+      }
+      
+      // Ensure all active videos are ready and playing before rendering
+      // This prevents flickering from videos that aren't ready
+      const videoReadyPromises: Promise<void>[] = []
+      for (const clip of renderState.timelineClips) {
+        if (timelineTime >= clip.timelineStart && timelineTime < clip.timelineEnd) {
+          const key = `${clip.sceneId}_${clip.takeId}_${clip.layer}`
+          const video = videoElements.get(key)
+          
+          if (video) {
+            // Ensure video is ready
+            if (video.readyState < 2) {
+              // Wait for video to be ready
+              const readyPromise = new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => resolve(), 100) // Max 100ms wait
+                const onCanPlay = () => {
+                  clearTimeout(timeout)
+                  video.removeEventListener('canplay', onCanPlay)
+                  resolve()
+                }
+                video.addEventListener('canplay', onCanPlay, { once: true })
+              })
+              videoReadyPromises.push(readyPromise)
+            }
+            
+            // Ensure video is playing (for smooth frame capture)
+            if (video.paused && video.readyState >= 2) {
+              try {
+                await video.play()
+                // Wait a frame after play to ensure frame is ready
+                await new Promise(resolve => setTimeout(resolve, 16))
+              } catch (e) {
+                // Ignore play errors (video might already be playing)
+              }
+            }
+            
+            // Use requestVideoFrameCallback if available to ensure we capture the correct frame
+            // This is critical for preventing flickering
+            if ('requestVideoFrameCallback' in video && video.readyState >= 2) {
+              await new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => resolve(), 50) // Max 50ms wait
+                ;(video as any).requestVideoFrameCallback(() => {
+                  clearTimeout(timeout)
+                  resolve()
+                })
+              })
+            }
+          }
+        }
+      }
+      
+      // Wait for all videos to be ready
+      if (videoReadyPromises.length > 0) {
+        await Promise.all(videoReadyPromises)
       }
 
       // Render frame with error handling and timeout
@@ -524,10 +621,66 @@ export async function exportVideoGPU(
     ])
 
     if (onProgress) {
-      onProgress({ message: 'Finalizing video...', percent: 96 })
+      onProgress({ message: needsConversion ? 'Converting to MP4...' : 'Finalizing video...', percent: 96 })
     }
 
-    const blob = new Blob(recordedChunks, { type: mimeType })
+    let blob = new Blob(recordedChunks, { type: mimeType })
+
+    // Convert WebM to MP4 if requested (MediaRecorder can't reliably do MP4 with canvas streams)
+    if (needsConversion && blob.size > 0) {
+      try {
+        console.log('Converting WebM to MP4 using FFmpeg...')
+        if (onProgress) {
+          onProgress({ message: 'Converting WebM to MP4...', percent: 97 })
+        }
+        
+        const ffmpeg = await getFFmpeg()
+        
+        // Write WebM file
+        const webmData = await fetchFile(blob)
+        await ffmpeg.writeFile('input.webm', webmData)
+        
+        // Convert to MP4 with good quality settings
+        await ffmpeg.exec([
+          '-i', 'input.webm',
+          '-c:v', 'libx264',
+          '-preset', 'medium',
+          '-crf', '23',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          'output.mp4'
+        ])
+        
+        // Read MP4 file
+        const mp4Data = await ffmpeg.readFile('output.mp4')
+        // Handle different return types from FFmpeg
+        if (mp4Data instanceof Uint8Array) {
+          blob = new Blob([mp4Data], { type: 'video/mp4' })
+        } else if (typeof mp4Data === 'string') {
+          // Shouldn't happen for binary, but handle it
+          blob = new Blob([mp4Data], { type: 'video/mp4' })
+        } else {
+          blob = mp4Data as unknown as Blob
+        }
+        
+        // Cleanup
+        try {
+          await ffmpeg.deleteFile('input.webm')
+          await ffmpeg.deleteFile('output.mp4')
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        
+        console.log('Successfully converted to MP4')
+      } catch (conversionError) {
+        console.error('Error converting to MP4:', conversionError)
+        // Return WebM blob if conversion fails (better than nothing)
+        console.warn('Falling back to WebM format')
+        if (onProgress) {
+          onProgress({ message: 'MP4 conversion failed, using WebM format', percent: 98 })
+        }
+      }
+    }
 
     // Cleanup
     for (const url of videoBlobUrls) {

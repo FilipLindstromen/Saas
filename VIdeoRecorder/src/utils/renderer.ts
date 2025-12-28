@@ -114,6 +114,9 @@ export interface RenderState {
     y: number
     width: number
     height: number
+    scale?: number
+    flipHorizontal?: boolean
+    alpha?: number
   }
   
   // Transcripts for captions
@@ -380,24 +383,93 @@ export async function renderFrame(
   const { canvas, ctx, time, width, height } = context
   const { timelineClips, layoutClips, canvasSettings, layout } = state
   
-  // Clear canvas with background color
+  // Clear canvas with background color - use save/restore to prevent flickering
+  // Reset transform to ensure clean clear
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0) // Reset transform to identity
   ctx.fillStyle = canvasSettings.videoBackgroundColor || '#000000'
   ctx.fillRect(0, 0, width, height)
+  ctx.restore()
   
-  // Find which clip is active at this time
-  const timelineResult = timelineToVideoTime(time, timelineClips)
-  
-  // If we're in a gap, just show background
-  if (!timelineResult || !timelineResult.clip) {
-    return
+  // Ensure canvas is ready for drawing (prevent flickering from partial renders)
+  if (isExport) {
+    // For export, ensure we have a clean slate
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
   }
-  
-  const { videoTime, sceneId, takeId, clip } = timelineResult
   
   // Find layout clip that contains this timeline time
   const layoutClip = layoutClips.find(
     lc => time >= lc.timelineStart && time < lc.timelineEnd
   )
+  
+  // Render background image FIRST (behind everything) - only if layout clip is active
+  if (layoutClip && state.backgroundImageData && layoutClip.backgroundImage?.enabled && layoutClip.backgroundImage?.url) {
+    const bgImg = await loadImage(state.backgroundImageData.url)
+    if (bgImg) {
+      // Calculate dimensions to fill canvas while maintaining aspect ratio (object-cover behavior)
+      const canvasAspect = width / height
+      const imgAspect = bgImg.width / bgImg.height
+      
+      let drawWidth = width
+      let drawHeight = height
+      let drawX = 0
+      let drawY = 0
+      
+      if (imgAspect > canvasAspect) {
+        // Image is wider than canvas - fit to height, crop width (object-cover behavior)
+        drawHeight = height
+        drawWidth = bgImg.width * (height / bgImg.height)
+        drawX = (width - drawWidth) / 2
+      } else {
+        // Image is taller than canvas - fit to width, crop height (object-cover behavior)
+        drawWidth = width
+        drawHeight = bgImg.height * (width / bgImg.width)
+        drawY = (height - drawHeight) / 2
+      }
+      
+      // Apply panning offset (normalized 0-1 values)
+      const offsetX = (state.backgroundImageData.x ?? 0) * width
+      const offsetY = (state.backgroundImageData.y ?? 0) * height
+      
+      // Apply the pan offset to the centered position
+      drawX += offsetX
+      drawY += offsetY
+      
+      // Apply scale factor (0.1 to 3.0)
+      const scale = state.backgroundImageData.scale ?? 1
+      const centerX = drawX + drawWidth / 2
+      const centerY = drawY + drawHeight / 2
+      drawWidth *= scale
+      drawHeight *= scale
+      // Re-center after scaling
+      drawX = centerX - drawWidth / 2
+      drawY = centerY - drawHeight / 2
+      
+      // Apply horizontal flip if needed
+      ctx.save()
+      if (state.backgroundImageData.flipHorizontal) {
+        ctx.translate(width, 0)
+        ctx.scale(-1, 1)
+        drawX = width - drawX - drawWidth
+      }
+      
+      // Apply alpha/opacity
+      ctx.globalAlpha = state.backgroundImageData.alpha ?? 1
+      ctx.drawImage(bgImg, drawX, drawY, drawWidth, drawHeight)
+      ctx.restore()
+    }
+  }
+  
+  // Find which clip is active at this time
+  const timelineResult = timelineToVideoTime(time, timelineClips)
+  
+  // If we're in a gap, just show background (already drawn above)
+  if (!timelineResult || !timelineResult.clip) {
+    return
+  }
+  
+  const { videoTime, sceneId, takeId, clip } = timelineResult
   
   // If no layout clip, render video full screen (matches preview behavior)
   if (!layoutClip || !layoutClip.holders || layoutClip.holders.length === 0) {
@@ -563,17 +635,39 @@ export async function renderFrame(
       if (borderRadius > 0 || hasFilters) {
         // Use temporary canvas for filters and/or rounded corners
         // Always use HTMLCanvasElement during export to avoid WebGL context limits
+        // Temp canvas should match full canvas size to ensure correct object-cover behavior
         const tempCanvas = document.createElement('canvas')
-        tempCanvas.width = Math.ceil(Math.abs(drawWidth))
-        tempCanvas.height = Math.ceil(Math.abs(drawHeight))
+        tempCanvas.width = Math.ceil(Math.abs(width))
+        tempCanvas.height = Math.ceil(Math.abs(height))
         const tempCtx = tempCanvas.getContext('2d', {
           willReadFrequently: false,
           alpha: false,
         })
         
         if (tempCtx) {
-          // Draw video to temp canvas
-          tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height)
+          // Draw video to temp canvas with object-cover behavior (fill canvas, maintain aspect, crop excess)
+          // This matches CSS object-cover exactly
+          const tempVideoAspect = video.videoWidth / video.videoHeight
+          const tempAspect = tempCanvas.width / tempCanvas.height
+          
+          let tempDrawW = tempCanvas.width
+          let tempDrawH = tempCanvas.height
+          let tempDrawX = 0
+          let tempDrawY = 0
+          
+          if (tempAspect > tempVideoAspect) {
+            // Temp canvas is wider than video - fit to height, crop width (center crop)
+            tempDrawH = tempCanvas.height
+            tempDrawW = tempDrawH * tempVideoAspect
+            tempDrawX = (tempCanvas.width - tempDrawW) / 2
+          } else {
+            // Temp canvas is taller than video - fit to width, crop height (center crop)
+            tempDrawW = tempCanvas.width
+            tempDrawH = tempDrawW / tempVideoAspect
+            tempDrawY = (tempCanvas.height - tempDrawH) / 2
+          }
+          
+          tempCtx.drawImage(video, tempDrawX, tempDrawY, tempDrawW, tempDrawH)
           
           // Apply filters if needed
           if (hasFilters) {
@@ -608,8 +702,8 @@ export async function renderFrame(
             tempCtx.fill()
           }
           
-          // Draw the processed temp canvas to main canvas
-          ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight)
+          // Draw the processed temp canvas to main canvas at full size
+          ctx.drawImage(tempCanvas, 0, 0, width, height)
         } else {
           // Fallback: draw directly if OffscreenCanvas not supported
           ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
@@ -785,25 +879,35 @@ export async function renderFrame(
     
     // Calculate video frame dimensions (object-cover behavior: maintain aspect, center crop)
     // Coordinates are relative to center after rotation (matches canvas preview)
+    // IMPORTANT: We always draw to fill the entire holder area (holderWidth x holderHeight)
+    // The object-cover behavior only affects how the video is scaled within that area
     const videoAspect = video.videoWidth / video.videoHeight
     const holderAspect = holderWidth / holderHeight
     
+    // For direct drawing (no filters/borderRadius), calculate object-cover dimensions
+    // For temp canvas approach, we'll fill the entire holder area
     let drawWidth = holderWidth
     let drawHeight = holderHeight
-    let drawX = -holderWidth / 2  // Relative to center
-    let drawY = -holderHeight / 2 // Relative to center
+    let drawX = -holderWidth / 2  // Relative to center - always fill holder width
+    let drawY = -holderHeight / 2 // Relative to center - always fill holder height
     
     // Apply object-cover scaling (matches CSS object-cover exactly)
     // Object-cover: scale to fill container, maintain aspect, crop excess
+    // CRITICAL: The video must always fill the holder in the correct dimension
+    // to ensure proper height and width matching the preview
     if (holderAspect > videoAspect) {
       // Holder is wider than video - fit to height, crop width (center crop)
+      // Video MUST fill holder height completely (drawHeight = holderHeight)
       drawHeight = holderHeight
       drawWidth = drawHeight * videoAspect
       drawX = -drawWidth / 2
+      drawY = -holderHeight / 2  // Always use full holder height
     } else {
       // Holder is taller than video - fit to width, crop height (center crop)
+      // Video MUST fill holder width completely (drawWidth = holderWidth)
       drawWidth = holderWidth
       drawHeight = drawWidth / videoAspect
+      drawX = -holderWidth / 2  // Always use full holder width
       drawY = -drawHeight / 2
     }
     
@@ -874,16 +978,18 @@ export async function renderFrame(
     if (hasFilters || borderRadius > 0) {
       // Use temporary canvas for filters and/or rounded corners
       // Always use HTMLCanvasElement during export to avoid WebGL context limits
+      // Temp canvas should match holder dimensions (not object-cover dimensions) to ensure correct cropping
       const tempCanvas = document.createElement('canvas')
-      tempCanvas.width = Math.ceil(Math.abs(drawWidth))
-      tempCanvas.height = Math.ceil(Math.abs(drawHeight))
+      tempCanvas.width = Math.ceil(Math.abs(holderWidth))
+      tempCanvas.height = Math.ceil(Math.abs(holderHeight))
       const tempCtx = tempCanvas.getContext('2d', {
         willReadFrequently: false,
         alpha: false,
       })
       
       if (tempCtx) {
-        // Draw video to temp canvas (object-cover)
+        // Draw video to temp canvas with object-cover behavior (fill holder, maintain aspect, crop excess)
+        // This matches CSS object-cover exactly
         const tempVideoAspect = video.videoWidth / video.videoHeight
         const tempAspect = tempCanvas.width / tempCanvas.height
         
@@ -893,13 +999,38 @@ export async function renderFrame(
         let tempDrawY = 0
         
         if (tempAspect > tempVideoAspect) {
+          // Temp canvas is wider than video - fit to height, crop width (center crop)
+          // CRITICAL: Video MUST fill temp canvas height completely
           tempDrawH = tempCanvas.height
           tempDrawW = tempDrawH * tempVideoAspect
           tempDrawX = (tempCanvas.width - tempDrawW) / 2
+          tempDrawY = 0 // Start at top to fill height
         } else {
+          // Temp canvas is taller than video - fit to width, crop height (center crop)
+          // CRITICAL: Video MUST fill temp canvas width completely
           tempDrawW = tempCanvas.width
           tempDrawH = tempDrawW / tempVideoAspect
+          tempDrawX = 0 // Start at left to fill width
           tempDrawY = (tempCanvas.height - tempDrawH) / 2
+        }
+        
+        // Verify dimensions are correct
+        if (tempAspect > tempVideoAspect) {
+          // Should fill height
+          if (Math.abs(tempDrawH - tempCanvas.height) > 0.1) {
+            console.warn('Temp canvas height mismatch:', { tempDrawH, tempCanvasHeight: tempCanvas.height })
+            tempDrawH = tempCanvas.height
+            tempDrawW = tempDrawH * tempVideoAspect
+            tempDrawX = (tempCanvas.width - tempDrawW) / 2
+          }
+        } else {
+          // Should fill width
+          if (Math.abs(tempDrawW - tempCanvas.width) > 0.1) {
+            console.warn('Temp canvas width mismatch:', { tempDrawW, tempCanvasWidth: tempCanvas.width })
+            tempDrawW = tempCanvas.width
+            tempDrawH = tempDrawW / tempVideoAspect
+            tempDrawY = (tempCanvas.height - tempDrawH) / 2
+          }
         }
         
         tempCtx.drawImage(video, tempDrawX, tempDrawY, tempDrawW, tempDrawH)
@@ -941,31 +1072,57 @@ export async function renderFrame(
           tempCtx.fill()
         }
         
-        // Draw the processed temp canvas to main canvas
-        ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight)
+        // Draw the processed temp canvas to main canvas at holder position with holder dimensions
+        // Position is relative to center after rotation
+        // The temp canvas is already holderWidth x holderHeight, so draw it to fill the entire holder area
+        // This ensures the video fills the holder correctly with proper height and width/cropping
+        // CRITICAL: Verify temp canvas matches holder dimensions
+        if (Math.abs(tempCanvas.width - Math.abs(holderWidth)) > 1 || Math.abs(tempCanvas.height - Math.abs(holderHeight)) > 1) {
+          console.warn('Temp canvas size mismatch:', {
+            tempCanvasWidth: tempCanvas.width,
+            tempCanvasHeight: tempCanvas.height,
+            holderWidth,
+            holderHeight
+          })
+        }
+        // Always draw at full holder dimensions to ensure correct height and width
+        ctx.drawImage(tempCanvas, -holderWidth / 2, -holderHeight / 2, holderWidth, holderHeight)
       } else {
         // Fallback: draw directly if OffscreenCanvas not supported
         ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
       }
     } else {
       // No filters or rounded corners - draw directly
+      // CRITICAL: We've already clipped to holder bounds, so the video must fill the holder
+      // The object-cover calculation ensures the video fills the holder in the correct dimension
+      // (height when holder is wider, width when holder is taller)
+      // Verify the dimensions are correct before drawing
+      if (holderAspect > videoAspect) {
+        // Holder is wider - video MUST fill holder height
+        // drawHeight should equal holderHeight, drawWidth will be smaller (gets cropped by clip)
+        if (Math.abs(drawHeight - holderHeight) > 0.1) {
+          console.warn('Height mismatch in object-cover calculation:', { drawHeight, holderHeight, holderAspect, videoAspect })
+          drawHeight = holderHeight
+          drawWidth = drawHeight * videoAspect
+          drawX = -drawWidth / 2
+          drawY = -holderHeight / 2
+        }
+      } else {
+        // Holder is taller - video MUST fill holder width
+        // drawWidth should equal holderWidth, drawHeight will be larger (gets cropped by clip)
+        if (Math.abs(drawWidth - holderWidth) > 0.1) {
+          console.warn('Width mismatch in object-cover calculation:', { drawWidth, holderWidth, holderAspect, videoAspect })
+          drawWidth = holderWidth
+          drawHeight = drawWidth / videoAspect
+          drawX = -holderWidth / 2
+          drawY = -drawHeight / 2
+        }
+      }
       ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight)
     }
     
     ctx.restore()
   }
-  }
-  
-  // Render background image if present
-  if (state.backgroundImageData) {
-    const bgImg = await loadImage(state.backgroundImageData.url)
-    if (bgImg) {
-      const bgX = state.backgroundImageData.x * width
-      const bgY = state.backgroundImageData.y * height
-      const bgW = state.backgroundImageData.width * width
-      const bgH = state.backgroundImageData.height * height
-      ctx.drawImage(bgImg, bgX, bgY, bgW, bgH)
-    }
   }
   
   // Render title if present and within timeline
