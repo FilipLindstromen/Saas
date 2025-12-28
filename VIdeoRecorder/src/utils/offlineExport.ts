@@ -56,44 +56,36 @@ export async function exportOfflineVideo(
   if (!renderState.layoutClips || renderState.layoutClips.length === 0 || renderState.layoutClips.every(lc => !lc.holders || lc.holders.length === 0)) {
     console.warn('No layout clips with holders found, creating default layout clips from timeline clips')
     
+    // Get video clips (camera and screen only, not microphone)
+    const videoClips = renderState.timelineClips.filter(clip => clip.layer === 'camera' || clip.layer === 'screen')
+    
+    if (videoClips.length === 0) {
+      throw new Error('No video clips found to export')
+    }
+    
     // Create a default layout clip covering the entire timeline
+    // For single clip: fullscreen
+    // For multiple clips: stack them (first clip fullscreen, others behind)
     const defaultLayoutClip: LayoutClip = {
       id: 'default_layout',
       timelineStart: 0,
       timelineEnd: totalDuration,
-      holders: renderState.timelineClips
-        .filter(clip => clip.layer === 'camera' || clip.layer === 'screen')
-        .map((clip, index) => {
-          // Create holders with default positions (full screen for first, side-by-side if multiple)
-          const numVideoClips = renderState.timelineClips.filter(c => c.layer === 'camera' || c.layer === 'screen').length
-          let x = 0
-          let y = 0
-          let holderWidth = 1
-          let holderHeight = 1
-          
-          if (numVideoClips > 1 && clip.layer === 'screen') {
-            // Screen on left, camera on right
-            holderWidth = 0.5
-            x = 0
-          } else if (numVideoClips > 1 && clip.layer === 'camera') {
-            // Camera on right
-            holderWidth = 0.5
-            x = 0.5
-          }
-          
-          return {
-            id: `holder_${clip.id}`,
-            clipId: clip.id,
-            layer: clip.layer,
-            x,
-            y,
-            width: holderWidth,
-            height: holderHeight,
-            rotation: 0,
-            zIndex: clip.layer === 'screen' ? 0 : 1,
-            borderRadius: 0,
-          }
-        }),
+      holders: videoClips.map((clip, index) => {
+        // Always use fullscreen for default layout (x=0, y=0, width=1, height=1)
+        // Multiple clips will stack (later clips on top due to zIndex)
+        return {
+          id: `holder_${clip.id}`,
+          clipId: clip.id,
+          layer: clip.layer,
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          rotation: 0,
+          zIndex: index, // Stack clips by order
+          borderRadius: 0,
+        }
+      }),
     }
     
     // Update render state with default layout clips
