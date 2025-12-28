@@ -185,6 +185,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     y?: number // Y position (0-1 normalized, default 0)
     width?: number // Width (0-1 normalized, default 1 for full width)
     height?: number // Height (0-1 normalized, default 1 for full height)
+    scale?: number // Scale factor (0.1 to 3.0, default 1.0 for 100%)
+    flipHorizontal?: boolean // Flip image horizontally (default false)
+    alpha?: number // Opacity/alpha value (0.0 to 1.0, default 1.0 for fully opaque)
   }
 
   interface LayoutClip {
@@ -1130,6 +1133,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           y: 0,
           width: 1,
           height: 1,
+          scale: 1,
+          flipHorizontal: false,
+          alpha: 1,
         },
       }
       
@@ -1352,6 +1358,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 y: 0,
                 width: 1,
                 height: 1,
+                scale: 1,
+                flipHorizontal: false,
+                alpha: 1,
               } 
             }
           : lc
@@ -4985,34 +4994,63 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     // Get current layout clip at this time
     const currentLayoutClip = getCurrentLayoutClip(time)
     
-    // Draw background image if present
+    // Draw background image FIRST (behind everything) - only if layout clip is active and enabled
     if (currentLayoutClip?.backgroundImage?.enabled && currentLayoutClip?.backgroundImage?.url) {
       const bgImg = currentLayoutClip.backgroundImage
       const img = new Image()
       img.crossOrigin = 'anonymous'
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          // Use position values (normalized 0-1) or defaults
-          const bgX = (bgImg.x ?? 0) * canvas.width
-          const bgY = (bgImg.y ?? 0) * canvas.height
-          const bgW = (bgImg.width ?? 1) * canvas.width
-          const bgH = (bgImg.height ?? 1) * canvas.height
+          // Calculate dimensions to fill canvas while maintaining aspect ratio (object-cover behavior)
+          const canvasAspect = canvas.width / canvas.height
+          const imgAspect = img.width / img.height
           
-          // Calculate fade in/out
-          const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
-          const fadeDuration = Math.min(0.5, clipDuration * 0.1)
-          const timeInClip = time - currentLayoutClip.timelineStart
-          const timeFromEnd = currentLayoutClip.timelineEnd - time
-          let opacity = 1
-          if (timeInClip < fadeDuration) {
-            opacity = timeInClip / fadeDuration
-          } else if (timeFromEnd < fadeDuration) {
-            opacity = timeFromEnd / fadeDuration
+          let drawWidth = canvas.width
+          let drawHeight = canvas.height
+          let drawX = 0
+          let drawY = 0
+          
+          if (imgAspect > canvasAspect) {
+            // Image is wider than canvas - fit to height, crop width (object-cover behavior)
+            drawHeight = canvas.height
+            drawWidth = img.width * (canvas.height / img.height)
+            drawX = (canvas.width - drawWidth) / 2
+          } else {
+            // Image is taller than canvas - fit to width, crop height (object-cover behavior)
+            drawWidth = canvas.width
+            drawHeight = img.height * (canvas.width / img.width)
+            drawY = (canvas.height - drawHeight) / 2
           }
           
+          // Apply panning offset (normalized 0-1 values)
+          const offsetX = (bgImg.x ?? 0) * canvas.width
+          const offsetY = (bgImg.y ?? 0) * canvas.height
+          
+          // Apply the pan offset to the centered position
+          drawX += offsetX
+          drawY += offsetY
+          
+          // Apply scale factor (0.1 to 3.0, default 1.0)
+          const scale = bgImg.scale ?? 1
+          const centerX = drawX + drawWidth / 2
+          const centerY = drawY + drawHeight / 2
+          drawWidth *= scale
+          drawHeight *= scale
+          // Re-center after scaling
+          drawX = centerX - drawWidth / 2
+          drawY = centerY - drawHeight / 2
+          
+          // Apply horizontal flip if needed
           ctx.save()
-          ctx.globalAlpha = opacity
-          ctx.drawImage(img, bgX, bgY, bgW, bgH)
+          if (bgImg.flipHorizontal) {
+            ctx.translate(canvas.width, 0)
+            ctx.scale(-1, 1)
+            drawX = canvas.width - drawX - drawWidth
+          }
+          
+          // Apply alpha/opacity
+          ctx.globalAlpha = bgImg.alpha ?? 1
+          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
           ctx.restore()
           resolve()
         }
@@ -6144,6 +6182,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           y: sceneLayoutClip.backgroundImage.y ?? 0,
           width: sceneLayoutClip.backgroundImage.width ?? 1,
           height: sceneLayoutClip.backgroundImage.height ?? 1,
+          scale: sceneLayoutClip.backgroundImage.scale ?? 1,
+          flipHorizontal: sceneLayoutClip.backgroundImage.flipHorizontal ?? false,
+          alpha: sceneLayoutClip.backgroundImage.alpha ?? 1,
         } : undefined
 
         // Canvas-based export: render frames exactly as shown
@@ -7983,7 +8024,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <h3 className="text-sm font-semibold mb-3">LAYOUT</h3>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              <div className="flex-1 overflow-y-auto p-4 space-y-6" style={{ direction: 'rtl' }}>
+                <div style={{ direction: 'ltr' }}>
                 <>
               {/* Background Image */}
               <div className="border-t border-gray-700 pt-4">
@@ -7993,58 +8035,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   const bgImage = currentLayoutClip?.backgroundImage
                   return (
                     <div className="space-y-3">
-                      <div className="flex gap-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (event) => {
-                                const dataUrl = event.target?.result as string
-                                const currentLayoutClip = getCurrentLayoutClip(currentTime)
-                                if (currentLayoutClip) {
-                                  setLayoutClips(prev => prev.map(lc => 
-                                    lc.id === currentLayoutClip.id 
-                                      ? { 
-                                          ...lc, 
-                                          backgroundImage: { 
-                                            enabled: true, 
-                                            url: dataUrl,
-                                            x: 0,
-                                            y: 0,
-                                            width: 1,
-                                            height: 1,
-                                          } 
-                                        }
-                                      : lc
-                                  ))
-                                  saveToHistory()
-                                }
-                              }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="flex-1 text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-700"
-                        />
-                        <button
-                          onClick={() => {
-                            setUnsplashModalOpen(true)
-                            if (unsplashSearchQuery) {
-                              searchUnsplash(unsplashSearchQuery)
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-700 text-white text-xs rounded whitespace-nowrap"
-                        >
-                          Unsplash
-                        </button>
-                      </div>
-                      {bgImage?.url && (
-                        <div className="relative w-full h-32 bg-gray-900 rounded overflow-hidden">
-                          <img src={bgImage.url} alt="Background" className="w-full h-full object-cover" />
-                <button
-                            onClick={() => {
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            const reader = new FileReader()
+                            reader.onload = (event) => {
+                              const dataUrl = event.target?.result as string
                               const currentLayoutClip = getCurrentLayoutClip(currentTime)
                               if (currentLayoutClip) {
                                 setLayoutClips(prev => prev.map(lc => 
@@ -8053,11 +8052,166 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                         ...lc, 
                                         backgroundImage: { 
                                           enabled: true, 
-                                          url: '',
+                                          url: dataUrl,
                                           x: 0,
                                           y: 0,
                                           width: 1,
                                           height: 1,
+                                          scale: 1,
+                                          flipHorizontal: false,
+                                          alpha: 1,
+                                        } 
+                                      }
+                                    : lc
+                                ))
+                                saveToHistory()
+                              }
+                            }
+                            reader.readAsDataURL(file)
+                          }
+                        }}
+                        className="w-full text-xs text-gray-400 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-700 file:text-white hover:file:bg-gray-700"
+                      />
+                      <button
+                        onClick={() => {
+                          setUnsplashModalOpen(true)
+                          if (unsplashSearchQuery) {
+                            searchUnsplash(unsplashSearchQuery)
+                          }
+                        }}
+                        className="w-full px-3 py-1.5 bg-gray-700 hover:bg-gray-700 text-white text-xs rounded whitespace-nowrap"
+                      >
+                        Unsplash
+                      </button>
+                      {bgImage?.url && (
+                        <>
+                          <div className="relative w-full h-32 bg-gray-900 rounded overflow-hidden">
+                            <img 
+                              src={bgImage.url} 
+                              alt="Background" 
+                              className="w-full h-full object-cover"
+                              style={{
+                                transform: bgImage.flipHorizontal ? 'scaleX(-1)' : 'none',
+                              }}
+                            />
+                            <button
+                              onClick={() => {
+                                const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                                if (currentLayoutClip) {
+                                  setLayoutClips(prev => prev.map(lc => 
+                                    lc.id === currentLayoutClip.id 
+                                      ? { 
+                                          ...lc, 
+                                          backgroundImage: { 
+                                            enabled: true, 
+                                            url: '',
+                                            x: 0,
+                                            y: 0,
+                                            width: 1,
+                                            height: 1,
+                                            scale: 1,
+                                            flipHorizontal: false,
+                                          } 
+                                        }
+                                      : lc
+                                  ))
+                                  saveToHistory()
+                                }
+                              }}
+                              className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          
+                          {/* Scale Control */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="text-xs text-gray-300">Scale</label>
+                              <span className="text-xs text-gray-400">
+                                {Math.round((bgImage.scale ?? 1) * 100)}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="3.0"
+                              step="0.01"
+                              value={bgImage.scale ?? 1}
+                              onChange={(e) => {
+                                const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                                if (currentLayoutClip) {
+                                  setLayoutClips(prev => prev.map(lc => 
+                                    lc.id === currentLayoutClip.id 
+                                      ? { 
+                                          ...lc, 
+                                          backgroundImage: { 
+                                            ...lc.backgroundImage!,
+                                            scale: parseFloat(e.target.value),
+                                          } 
+                                        }
+                                      : lc
+                                  ))
+                                  saveToHistory()
+                                }
+                              }}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-gray-400 mt-1">
+                              <span>10%</span>
+                              <span>300%</span>
+                            </div>
+                          </div>
+
+                          {/* Flip Horizontal Toggle */}
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-300">Flip Horizontal</label>
+                            <button
+                              onClick={() => {
+                                const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                                if (currentLayoutClip) {
+                                  setLayoutClips(prev => prev.map(lc => 
+                                    lc.id === currentLayoutClip.id 
+                                      ? { 
+                                          ...lc, 
+                                          backgroundImage: { 
+                                            ...lc.backgroundImage!,
+                                            flipHorizontal: !(lc.backgroundImage?.flipHorizontal ?? false),
+                                          } 
+                                        }
+                                      : lc
+                                  ))
+                                  saveToHistory()
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded text-xs transition-colors ${
+                                bgImage.flipHorizontal 
+                                  ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                  : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                              }`}
+                            >
+                              {bgImage.flipHorizontal ? 'Flipped' : 'Flip'}
+                            </button>
+                          </div>
+
+                          {/* Reset Button */}
+                          <button
+                            onClick={() => {
+                              const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                              if (currentLayoutClip) {
+                                setLayoutClips(prev => prev.map(lc => 
+                                  lc.id === currentLayoutClip.id 
+                                    ? { 
+                                        ...lc, 
+                                        backgroundImage: { 
+                                          ...lc.backgroundImage!,
+                                          x: 0,
+                                          y: 0,
+                                          width: 1,
+                                          height: 1,
+                                          scale: 1,
+                                          flipHorizontal: false,
+                                          alpha: 1,
                                         } 
                                       }
                                     : lc
@@ -8065,11 +8219,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                                 saveToHistory()
                               }
                             }}
-                            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
+                            className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
                           >
-                            Remove
-                </button>
-              </div>
+                            Reset to Fill Screen
+                          </button>
+                        </>
                       )}
                     </div>
                   )
@@ -8305,11 +8459,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           <span>200px</span>
                         </div>
                       </div>
-                      
-                      <div className="text-xs text-gray-400">
-                        Select text and use formatting buttons for bold, italic, or underline. Drag the title in the canvas to reposition it.
-                      </div>
-                      
                       {/* Animation Settings */}
                       <div className="space-y-3">
                         <div>
@@ -8501,6 +8650,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 })()}
               </div>
                 </>
+                </div>
               </div>
             </div>
           )}
@@ -8690,6 +8840,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               backgroundImage: preset.backgroundImage ? JSON.parse(JSON.stringify(preset.backgroundImage)) : {
                                 enabled: true,
                                 url: '',
+                                x: 0,
+                                y: 0,
+                                width: 1,
+                                height: 1,
+                                scale: 1,
+                                flipHorizontal: false,
+                                alpha: 1,
                               },
                               name: preset.name
                             }
@@ -9389,26 +9546,72 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     height: '100%',
                   }}
                 >
+                  {/* Video elements for sources - visible fullscreen when no layout clip, hidden when layout clip exists */}
+                  {(() => {
+                    const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                    const hasLayoutClip = currentLayoutClip !== null
+                    
+                    // Find active video clip at current time
+                    const activeClip = !hasLayoutClip ? timelineClips.find(clip => 
+                      currentTime >= clip.timelineStart && 
+                      currentTime < clip.timelineEnd &&
+                      (clip.layer === 'camera' || clip.layer === 'screen')
+                    ) : null
+                    
+                    // Get clip properties for filters when fullscreen
+                    let filterString = ''
+                    if (!hasLayoutClip && activeClip) {
+                      const clipKeyProps = `${activeClip.sceneId}_${activeClip.takeId}_${activeClip.layer}`
+                      const props = clipProperties.get(clipKeyProps)
+                      const brightness = props?.brightness ?? 0
+                      const contrast = props?.contrast ?? 0
+                      const saturation = props?.saturation ?? 0
+                      const exposure = props?.exposure ?? 0
+                      const highlights = props?.highlights ?? 0
+                      const midtones = props?.midtones ?? 0
+                      const shadows = props?.shadows ?? 0
+                      
+                      // Build CSS filter string
+                      const avgTonalAdjustment = (highlights + midtones + shadows) / 3
+                      const brightnessValue = Math.max(0, 1 + (brightness + exposure + avgTonalAdjustment) / 100)
+                      const contrastValue = Math.max(0, 1 + contrast / 100)
+                      const saturationValue = Math.max(0, 1 + saturation / 100)
+                      filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
+                    }
+                    
+                    return (
+                      <>
+                        <video 
+                          ref={videoRef} 
+                          className={!hasLayoutClip && activeClip && activeClip.layer === 'camera' ? "absolute inset-0 w-full h-full object-cover pointer-events-none" : "hidden"}
+                          style={{
+                            display: !hasLayoutClip && activeClip && activeClip.layer === 'camera' ? 'block' : 'none',
+                            filter: !hasLayoutClip && activeClip && activeClip.layer === 'camera' ? filterString : undefined,
+                            zIndex: !hasLayoutClip && activeClip && activeClip.layer === 'camera' ? 1 : undefined,
+                          }}
+                          muted={activeClip?.layer !== 'microphone'}
+                          playsInline
+                        />
+                        <video 
+                          ref={screenVideoRef} 
+                          className={!hasLayoutClip && activeClip && activeClip.layer === 'screen' ? "absolute inset-0 w-full h-full object-cover pointer-events-none" : "hidden"}
+                          style={{
+                            display: !hasLayoutClip && activeClip && activeClip.layer === 'screen' ? 'block' : 'none',
+                            filter: !hasLayoutClip && activeClip && activeClip.layer === 'screen' ? filterString : undefined,
+                            zIndex: !hasLayoutClip && activeClip && activeClip.layer === 'screen' ? 1 : undefined,
+                          }}
+                          muted={activeClip?.layer !== 'microphone'}
+                          playsInline
+                        />
+                      </>
+                    )
+                  })()}
+                  
                   {/* Background Image - rendered behind everything */}
                   {(() => {
                     const currentLayoutClip = getCurrentLayoutClip(currentTime)
                     const bgImage = currentLayoutClip?.backgroundImage
                     if (bgImage?.enabled && bgImage?.url && currentLayoutClip) {
-                      // Calculate fade in/out based on layout clip position
-                      const clipDuration = currentLayoutClip.timelineEnd - currentLayoutClip.timelineStart
-                      const fadeDuration = Math.min(0.5, clipDuration * 0.1) // 10% of clip duration or max 0.5s
-                      const timeInClip = currentTime - (currentLayoutClip.timelineStart || 0)
-                      const timeFromEnd = (currentLayoutClip.timelineEnd || 0) - currentTime
-                      
-                      let opacity = 1
-                      if (timeInClip < fadeDuration) {
-                        // Fade in
-                        opacity = timeInClip / fadeDuration
-                      } else if (timeFromEnd < fadeDuration) {
-                        // Fade out
-                        opacity = timeFromEnd / fadeDuration
-                      }
-
                       // Get container to calculate actual pixel dimensions
                       const container = document.querySelector('[data-canvas-container]') as HTMLElement
                       if (!container) return null
@@ -9416,18 +9619,33 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       const containerWidth = container.offsetWidth
                       const containerHeight = container.offsetHeight
                       
-                      // Use width/height from stored values (normalized 0-1), default to 1 (full canvas)
-                      // For panning, we can make the image larger than canvas (e.g., 1.5x) to allow panning
-                      const normalizedWidth = bgImage.width ?? 1
-                      const normalizedHeight = bgImage.height ?? 1
+                      // Calculate dimensions to fill canvas while maintaining aspect ratio (object-cover behavior)
+                      // We'll use CSS to handle object-cover, but need to calculate the size
+                      const canvasAspect = containerWidth / containerHeight
                       
-                      const bgWidth = normalizedWidth * containerWidth
-                      const bgHeight = normalizedHeight * containerHeight
+                      // Use scale factor (0.1 to 3.0, default 1.0)
+                      const scale = bgImage.scale ?? 1
                       
-                      // Position offset (normalized 0-1, converted to pixels)
-                      // Negative values allow panning image left/up, positive values pan right/down
-                      const bgX = (bgImage.x ?? 0) * containerWidth
-                      const bgY = (bgImage.y ?? 0) * containerHeight
+                      // Calculate base size for object-cover
+                      // The image will maintain aspect ratio via CSS object-cover
+                      let bgWidth = containerWidth
+                      let bgHeight = containerHeight
+                      
+                      // Apply scale - scale both dimensions
+                      bgWidth *= scale
+                      bgHeight *= scale
+                      
+                      // Calculate centered position, then apply pan offset
+                      let bgX = (containerWidth - bgWidth) / 2
+                      let bgY = (containerHeight - bgHeight) / 2
+                      
+                      // Apply panning offset (normalized 0-1, converted to pixels)
+                      // The offset is relative to the container size
+                      const offsetX = (bgImage.x ?? 0) * containerWidth
+                      const offsetY = (bgImage.y ?? 0) * containerHeight
+                      
+                      bgX += offsetX
+                      bgY += offsetY
                       
                       return (
                         <img
@@ -9439,8 +9657,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             top: `${bgY}px`,
                             width: `${bgWidth}px`,
                             height: `${bgHeight}px`,
-                            opacity,
+                            opacity: bgImage.alpha ?? 1,
                             zIndex: 0,
+                            transform: bgImage.flipHorizontal ? 'scaleX(-1)' : 'scale(1)',
+                            transformOrigin: 'center center',
                           }}
                           onMouseDown={(e) => {
                             e.preventDefault()
@@ -9456,122 +9676,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   })()}
                   
                   {/* Default video rendering when no layout clip is active - fill whole canvas with transitions */}
-                  {(() => {
-                    const currentLayoutClip = getCurrentLayoutClip(currentTime)
-                    if (!currentLayoutClip) {
-                      // Find active video clip at current time
-                      const activeClip = timelineClips.find(clip => 
-                        currentTime >= clip.timelineStart && 
-                        currentTime < clip.timelineEnd &&
-                        (clip.layer === 'camera' || clip.layer === 'screen')
-                      )
-                      
-                      if (activeClip) {
-                        const clipKey = `${activeClip.id}_${activeClip.layer}`
-                        const transition = transitioningByClipRef.current.get(clipKey)
-                        
-                        // Default position for empty space (full canvas)
-                        let displayX = 0
-                        let displayY = 0
-                        let displayWidth = 1
-                        let displayHeight = 1
-                        let displayRotation = 0
-                        let displayBorderRadius = 0
-                        
-                        // Apply transition if active
-                        if (transition && canvasSettings.transitionDuration > 0) {
-                          const elapsed = currentTime - transition.startTime
-                          if (elapsed >= 0 && elapsed < transition.duration) {
-                            const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
-                            
-                            // Ease-in-out cubic function for smooth animation
-                            const easeInOut = (t: number): number => {
-                              return t < 0.5
-                                ? 4 * t * t * t
-                                : 1 - Math.pow(-2 * t + 2, 3) / 2
-                            }
-                            const eased = easeInOut(progress)
-                            
-                            // Interpolate position and size
-                            displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
-                            displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
-                            displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
-                            displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
-                            
-                            // Interpolate rotation
-                            if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
-                              let startRot = transition.startRotation
-                              let endRot = transition.endRotation
-                              let diff = endRot - startRot
-                              
-                              // Normalize to shortest path
-                              if (Math.abs(diff) > 180) {
-                                if (diff > 0) {
-                                  diff -= 360
-                                } else {
-                                  diff += 360
-                                }
-                              }
-                              
-                              displayRotation = startRot + diff * eased
-                            }
-                            
-                            // Interpolate borderRadius if provided
-                            if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
-                              displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
-                            }
-                          } else if (elapsed >= transition.duration) {
-                            // Transition complete, use end position
-                            displayX = transition.endPos.x
-                            displayY = transition.endPos.y
-                            displayWidth = transition.endPos.width
-                            displayHeight = transition.endPos.height
-                            displayRotation = transition.endRotation || 0
-                            displayBorderRadius = transition.endBorderRadius ?? 0
-                          }
-                        }
-                        
-                        const clipKeyProps = `${activeClip.sceneId}_${activeClip.takeId}_${activeClip.layer}`
-                        const props = clipProperties.get(clipKeyProps)
-                        const brightness = props?.brightness ?? 0
-                        const contrast = props?.contrast ?? 0
-                        const saturation = props?.saturation ?? 0
-                        const exposure = props?.exposure ?? 0
-                        const highlights = props?.highlights ?? 0
-                        const midtones = props?.midtones ?? 0
-                        const shadows = props?.shadows ?? 0
-                        
-                        // Build CSS filter string
-                        const avgTonalAdjustment = (highlights + midtones + shadows) / 3
-                        const brightnessValue = Math.max(0, 1 + (brightness + exposure + avgTonalAdjustment) / 100)
-                        const contrastValue = Math.max(0, 1 + contrast / 100)
-                        const saturationValue = Math.max(0, 1 + saturation / 100)
-                        const filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
-                        
-                        return (
-                          <video
-                            ref={activeClip.layer === 'camera' ? videoRef : (activeClip.layer === 'screen' ? screenVideoRef : null)}
-                            className="absolute object-cover pointer-events-none"
-                            style={{
-                              display: 'block',
-                              filter: filterString,
-                              zIndex: 1,
-                              left: `${displayX * 100}%`,
-                              top: `${displayY * 100}%`,
-                              width: `${displayWidth * 100}%`,
-                              height: `${displayHeight * 100}%`,
-                              transform: `rotate(${displayRotation}deg)`,
-                              transformOrigin: 'center',
-                              transition: transition ? 'none' : undefined, // Disable CSS transitions during programmatic transitions
-                            }}
-                            muted={activeClip.layer !== 'microphone'}
-                            playsInline
-                          />
-                        )
-                      }
-                    }
-                    return null
-                  })()}
+                  {/* Note: We don't render a separate video element here to avoid ref conflicts.
+                      Instead, the hidden video elements below will be made visible when there's no layout clip */}
                   
                   {/* Video Holders - render in z-index order */}
                   {canvasHolders
@@ -9998,9 +10104,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               </div>
             </div>
             
-            {/* Hidden video elements for sources */}
-            <video ref={videoRef} className="hidden" />
-            <video ref={screenVideoRef} className="hidden" />
+            {/* Audio element for sources */}
             <audio ref={audioRef} style={{ display: 'none' }} />
             </div>
 

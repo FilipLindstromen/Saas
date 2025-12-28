@@ -501,6 +501,9 @@ export interface BackgroundImageData {
   y: number
   width: number
   height: number
+  scale?: number
+  flipHorizontal?: boolean
+  alpha?: number
 }
 
 export async function combineVideos(
