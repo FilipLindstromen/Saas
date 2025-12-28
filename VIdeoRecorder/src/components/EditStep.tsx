@@ -7,6 +7,7 @@ import type { TitleData, BackgroundImageData } from '../utils/ffmpeg'
 import { trimVideo, getFFmpeg, encodeFramesToVideo } from '../utils/ffmpeg'
 import { fetchFile } from '@ffmpeg/util'
 import { exportDaVinciResolveTimeline } from '../utils/davinciExport'
+import html2canvas from 'html2canvas'
 import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
 import { analyzeWaveform } from '../utils/waveformAnalyzer'
 import SettingsPanel from './SettingsPanel'
@@ -693,11 +694,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     { id: 'style1', name: 'Classic', backgroundColor: 'rgba(0, 0, 0, 0.75)', textColor: '#ffffff', padding: '8px 16px', borderRadius: '4px', fontWeight: 400 },
     { id: 'style2', name: 'Bold White', backgroundColor: 'rgba(255, 255, 255, 0.95)', textColor: '#000000', padding: '10px 18px', borderRadius: '6px', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' },
     { id: 'style3', name: 'Highlight Yellow', backgroundColor: '#FFEB3B', textColor: '#000000', padding: '8px 14px', borderRadius: '8px', fontWeight: 600 },
-    { id: 'style4', name: 'Neon Blue', backgroundColor: 'rgba(107, 114, 128, 0.9)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '12px', fontWeight: 600, boxShadow: '0 0 20px rgba(107, 114, 128, 0.5)' },
+    { id: 'style4', name: 'Neon Gray', backgroundColor: 'rgba(107, 114, 128, 0.9)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '12px', fontWeight: 600, boxShadow: '0 0 20px rgba(107, 114, 128, 0.5)' },
     { id: 'style5', name: 'Subtle Gray', backgroundColor: 'rgba(66, 66, 66, 0.85)', textColor: '#ffffff', padding: '6px 12px', borderRadius: '2px', fontWeight: 400 },
     { id: 'style6', name: 'Vibrant Red', backgroundColor: '#F44336', textColor: '#ffffff', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, boxShadow: '0 4px 12px rgba(244, 67, 54, 0.4)' },
     { id: 'style7', name: 'Outlined', backgroundColor: 'rgba(0, 0, 0, 0.7)', textColor: '#ffffff', padding: '8px 16px', borderRadius: '4px', border: '2px solid #ffffff', fontWeight: 500 },
-    { id: 'style8', name: 'Modern Gradient', backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '20px', fontWeight: 600, boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)' },
+    { id: 'style8', name: 'Modern Gradient', backgroundColor: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)', textColor: '#ffffff', padding: '10px 20px', borderRadius: '20px', fontWeight: 600, boxShadow: '0 4px 15px rgba(107, 114, 128, 0.4)' },
     { id: 'style9', name: 'Uppercase Bold', backgroundColor: 'rgba(0, 0, 0, 0.8)', textColor: '#ffffff', padding: '10px 18px', borderRadius: '6px', fontWeight: 700, textTransform: 'uppercase' },
     { id: 'style10', name: 'Soft Pink', backgroundColor: 'rgba(236, 64, 122, 0.9)', textColor: '#ffffff', padding: '9px 17px', borderRadius: '14px', fontWeight: 500, boxShadow: '0 2px 10px rgba(236, 64, 122, 0.3)' },
   ]
@@ -1082,7 +1083,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           : lc
       ))
       if (!skipSave) {
-        markAsEdited()
+      markAsEdited()
       }
     } else {
       // Create new layout clip for current time range
@@ -1121,8 +1122,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         })
       })
       if (!skipSave) {
-        markAsEdited()
-      }
+      markAsEdited()
+    }
     }
   }, [currentTime, getCurrentLayoutClip, layoutClips, totalDuration, markAsEdited])
 
@@ -1574,26 +1575,59 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           (clip.layer === 'camera' || clip.layer === 'screen')
         )
         
+        // Find shared position/scale from existing holders (all clips should share the same position/scale)
+        let sharedPosition: { x: number; y: number; width: number; height: number; rotation: number } | null = null
+        
+        // First pass: find shared position from existing holders
+        activeClips.forEach(clip => {
+          const existingHolder = existingHoldersMap.get(clip.id)
+          if (existingHolder && !sharedPosition) {
+            // Use the first existing holder's position as the shared position
+            sharedPosition = {
+              x: existingHolder.x,
+              y: existingHolder.y,
+              width: existingHolder.width,
+              height: existingHolder.height,
+              rotation: existingHolder.rotation || 0,
+            }
+          }
+        })
+        
+        // If no existing holder, use default position (will be shared by all new holders)
+        if (!sharedPosition) {
+          sharedPosition = {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            rotation: 0,
+          }
+        }
+        
+        // Second pass: create/update all holders with shared position
         activeClips.forEach(clip => {
           const existingHolder = existingHoldersMap.get(clip.id)
           if (existingHolder) {
-            holders.push(existingHolder)
+            // Update existing holder to use shared position
+            holders.push({
+              ...existingHolder,
+              x: sharedPosition!.x,
+              y: sharedPosition!.y,
+              width: sharedPosition!.width,
+              height: sharedPosition!.height,
+              rotation: sharedPosition!.rotation,
+            })
           } else {
-            // Create new holder with default position
-            const defaultX = clip.layer === 'camera' ? 0 : 0.5
-            const defaultY = clip.layer === 'camera' ? 0 : 0.5
-            const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
-            const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
-            
+            // Create new holder with shared position
             holders.push({
               id: `holder_${clip.id}`,
               clipId: clip.id,
               layer: clip.layer,
-              x: defaultX,
-              y: defaultY,
-              width: defaultWidth,
-              height: defaultHeight,
-              rotation: 0,
+              x: sharedPosition.x,
+              y: sharedPosition.y,
+              width: sharedPosition.width,
+              height: sharedPosition.height,
+              rotation: sharedPosition.rotation,
               zIndex: clip.layer === 'camera' ? 1 : 2,
             })
           }
@@ -1638,43 +1672,76 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         (clip.layer === 'camera' || clip.layer === 'screen')
       )
       
+      // Find shared position/scale from existing holders (all clips should share the same position/scale)
+      let sharedPosition: { x: number; y: number; width: number; height: number; rotation: number } | null = null
+      
+      // First pass: find shared position from existing holders
+      activeClips.forEach(clip => {
+        const existingHolder = existingHoldersMap.get(clip.id)
+        if (existingHolder && !sharedPosition) {
+          // Use the first existing holder's position as the shared position
+          sharedPosition = {
+            x: existingHolder.x,
+            y: existingHolder.y,
+            width: existingHolder.width,
+            height: existingHolder.height,
+            rotation: existingHolder.rotation || 0,
+          }
+        }
+      })
+      
+      // If no existing holder found, try to find from original holders or use default
+      if (!sharedPosition) {
+        // Try to find any existing holder in the layout clip to share position from
+        const anyExistingHolder = layoutClip.holders.find(h => {
+          const hClip = timelineClips.find(c => c.id === h.clipId)
+          return hClip && activeClips.some(ac => ac.sceneId === hClip.sceneId && ac.takeId === hClip.takeId)
+        })
+        if (anyExistingHolder) {
+          sharedPosition = {
+            x: anyExistingHolder.x,
+            y: anyExistingHolder.y,
+            width: anyExistingHolder.width,
+            height: anyExistingHolder.height,
+            rotation: anyExistingHolder.rotation || 0,
+          }
+        } else {
+          // Use default position (will be shared by all new holders)
+          sharedPosition = {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            rotation: 0,
+          }
+        }
+      }
+      
+      // Second pass: create/update all holders with shared position
       activeClips.forEach(clip => {
         const existingHolder = existingHoldersMap.get(clip.id)
         if (existingHolder) {
-          holders.push(existingHolder)
+          // Update existing holder to use shared position
+          holders.push({
+            ...existingHolder,
+            x: sharedPosition!.x,
+            y: sharedPosition!.y,
+            width: sharedPosition!.width,
+            height: sharedPosition!.height,
+            rotation: sharedPosition!.rotation,
+          })
         } else {
-          // Try to find original holder by matching scene/take/layer
-          let sourceHolder: CanvasVideoHolder | undefined = undefined
-          
-          const baseId = clip.id.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
-          const baseHolder = originalHoldersMap.get(baseId)
-          if (baseHolder && baseHolder.layer === clip.layer) {
-            sourceHolder = baseHolder
-          } else {
-            const matchingHolder = layoutClip.holders.find(h => {
-              const hClip = timelineClips.find(c => c.id === h.clipId)
-              return hClip && hClip.sceneId === clip.sceneId && hClip.takeId === clip.takeId && h.layer === clip.layer
-            })
-            if (matchingHolder) {
-              sourceHolder = matchingHolder
-            }
-          }
-          
-          const defaultX = clip.layer === 'camera' ? 0 : 0.5
-          const defaultY = clip.layer === 'camera' ? 0 : 0.5
-          const defaultWidth = clip.layer === 'camera' ? 1 : 0.5
-          const defaultHeight = clip.layer === 'camera' ? 1 : 0.5
-          
+          // Create new holder with shared position
           holders.push({
             id: `holder_${clip.id}`,
             clipId: clip.id,
             layer: clip.layer,
-            x: sourceHolder?.x ?? defaultX,
-            y: sourceHolder?.y ?? defaultY,
-            width: sourceHolder?.width ?? defaultWidth,
-            height: sourceHolder?.height ?? defaultHeight,
-            rotation: sourceHolder?.rotation ?? 0,
-            zIndex: sourceHolder?.zIndex ?? (clip.layer === 'camera' ? 1 : 2),
+            x: sharedPosition.x,
+            y: sharedPosition.y,
+            width: sharedPosition.width,
+            height: sharedPosition.height,
+            rotation: sharedPosition.rotation,
+            zIndex: clip.layer === 'camera' ? 1 : 2,
           })
         }
       })
@@ -1877,22 +1944,21 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       const currentLayoutClip = getCurrentLayoutClip(currentTime)
       if (!currentLayoutClip) return
 
-      const updatedHolders = currentLayoutClip.holders.map(holder => {
-        if (holder.id !== draggingHolderId) return holder
+      // Calculate new position
+      let newX = dragStartHolder.x + deltaX
+      let newY = dragStartHolder.y + deltaY
 
-        let newX = dragStartHolder.x + deltaX
-        let newY = dragStartHolder.y + deltaY
+      // Constrain to canvas bounds (use the dragged holder's width/height for bounds calculation)
+      newX = Math.max(0, Math.min(1 - dragStartHolder.width, newX))
+      newY = Math.max(0, Math.min(1 - dragStartHolder.height, newY))
 
-        // Constrain to canvas bounds
-        newX = Math.max(0, Math.min(1 - holder.width, newX))
-        newY = Math.max(0, Math.min(1 - holder.height, newY))
-
-        return {
-          ...holder,
-          x: newX,
-          y: newY,
-        }
-      })
+      // Update ALL holders in the layout clip with the same position
+      // All clips in the same layout clip should share the same position and scale
+      const updatedHolders = currentLayoutClip.holders.map(holder => ({
+        ...holder,
+        x: newX,
+        y: newY,
+      }))
 
       updateHoldersInLayoutClip(updatedHolders, true) // Skip save during drag
     }
@@ -1929,53 +1995,52 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       const currentLayoutClip = getCurrentLayoutClip(currentTime)
       if (!currentLayoutClip) return
 
-      const updatedHolders = currentLayoutClip.holders.map(holder => {
-        if (holder.id !== resizingHolderId) return holder
+      // Calculate new position and size
+      let newX = resizeStartHolder.x
+      let newY = resizeStartHolder.y
+      let newWidth = resizeStartHolder.width
+      let newHeight = resizeStartHolder.height
 
-        let newX = resizeStartHolder.x
-        let newY = resizeStartHolder.y
-        let newWidth = resizeStartHolder.width
-        let newHeight = resizeStartHolder.height
+      // Resize based on corner
+      if (resizeCorner === 'nw') {
+        // Top-left: adjust x, y, width, height
+        newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
+        newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
+        newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
+        newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
+      } else if (resizeCorner === 'ne') {
+        // Top-right: adjust y, width, height
+        newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
+        newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
+        newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
+      } else if (resizeCorner === 'sw') {
+        // Bottom-left: adjust x, width, height
+        newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
+        newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
+        newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
+      } else if (resizeCorner === 'se') {
+        // Bottom-right: adjust width, height
+        newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
+        newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
+      }
 
-        // Resize based on corner
-        if (resizeCorner === 'nw') {
-          // Top-left: adjust x, y, width, height
-          newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
-          newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
-          newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
-          newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
-        } else if (resizeCorner === 'ne') {
-          // Top-right: adjust y, width, height
-          newY = Math.max(0, Math.min(1, resizeStartHolder.y + deltaY))
-          newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
-          newHeight = Math.max(0.05, Math.min(1, resizeStartHolder.height - deltaY))
-        } else if (resizeCorner === 'sw') {
-          // Bottom-left: adjust x, width, height
-          newX = Math.max(0, Math.min(1, resizeStartHolder.x + deltaX))
-          newWidth = Math.max(0.05, Math.min(1, resizeStartHolder.width - deltaX))
-          newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
-        } else if (resizeCorner === 'se') {
-          // Bottom-right: adjust width, height
-          newWidth = Math.max(0.05, Math.min(1 - resizeStartHolder.x, resizeStartHolder.width + deltaX))
-          newHeight = Math.max(0.05, Math.min(1 - resizeStartHolder.y, resizeStartHolder.height + deltaY))
-        }
+      // Ensure holder stays within canvas bounds
+      if (newX + newWidth > 1) {
+        newWidth = 1 - newX
+      }
+      if (newY + newHeight > 1) {
+        newHeight = 1 - newY
+      }
 
-        // Ensure holder stays within canvas bounds
-        if (newX + newWidth > 1) {
-          newWidth = 1 - newX
-        }
-        if (newY + newHeight > 1) {
-          newHeight = 1 - newY
-        }
-
-        return {
-          ...holder,
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        }
-      })
+      // Update ALL holders in the layout clip with the same position and scale
+      // All clips in the same layout clip should share the same position and scale
+      const updatedHolders = currentLayoutClip.holders.map(holder => ({
+        ...holder,
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      }))
 
       updateHoldersInLayoutClip(updatedHolders, true) // Skip save during resize
     }
@@ -2778,12 +2843,230 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
   }, [timelineClips, currentTime])
 
+  // Playback Loop - timeline-driven with continuous advancement
+  const currentClipRef = useRef<TimelineClip | null>(null)
+  const isSeekingRef = useRef(false)
+  const lastFrameTimeRef = useRef<number>(performance.now())
+  const previousLayoutClipIdRef = useRef<string | null>(null)
+  // Track the last checked time for layout clip transitions (to avoid redundant checks)
+  const lastLayoutClipCheckTimeRef = useRef<number>(0)
+  // wasPlayingRef is declared earlier for tracking playback state across scene switches
+  
+  // Helper function to detect and set up layout clip transitions at a specific time
+  const setupLayoutClipTransitions = useCallback((time: number) => {
+    if (canvasSettings.transitionDuration <= 0) return
+    
+    const currentLayoutClip = getCurrentLayoutClip(time)
+    const currentLayoutClipId = currentLayoutClip?.id || null
+    
+    // Find the layout clip that should be active just before this time (for proper backward scrubbing)
+    // Look at a small time offset before the current time to find what layout clip we're transitioning from
+    const smallOffset = 0.001 // 1ms before current time
+    const previousTime = Math.max(0, time - smallOffset)
+    const previousLayoutClipAtTime = getCurrentLayoutClip(previousTime)
+    const previousLayoutClipIdAtTime = previousLayoutClipAtTime?.id || null
+    
+    // Only set up transition if we're crossing a layout clip boundary
+    const layoutClipChanged = previousLayoutClipIdAtTime !== currentLayoutClipId
+    
+    // Default position for empty space (full canvas)
+    const emptySpacePosition = { x: 0, y: 0, width: 1, height: 1, rotation: 0 }
+    
+    if (layoutClipChanged) {
+      const previousLayoutClip = previousLayoutClipAtTime
+      
+      // Determine the boundary time where the transition should start
+      let transitionBoundaryTime: number
+      if (currentLayoutClip) {
+        transitionBoundaryTime = currentLayoutClip.timelineStart
+      } else if (previousLayoutClip) {
+        transitionBoundaryTime = previousLayoutClip.timelineEnd
+      } else {
+        transitionBoundaryTime = time
+      }
+      
+      // Calculate how much time has passed since the transition boundary
+      const timeSinceBoundary = time - transitionBoundaryTime
+      
+      // Only set up transitions if we're still within the transition duration window
+      // If we're past the transition duration, we should already be at the end state
+      // and don't need a transition (the layout clip's holders will be used directly)
+      if (timeSinceBoundary < canvasSettings.transitionDuration && timeSinceBoundary >= -0.1) {
+        // Clear transitions for clips that are no longer relevant
+        // Only clear transitions that involve clips that aren't in the current state
+        const clipsToClear: string[] = []
+        transitioningByClipRef.current.forEach((transition, clipKey) => {
+          // Clear if this transition is for a clip that's not in the current layout clip
+          // and not transitioning to/from empty space
+          if (currentLayoutClip) {
+            const [clipId, layer] = clipKey.split('_')
+            const hasHolder = currentLayoutClip.holders.some(h => h.clipId === clipId && h.layer === layer)
+            if (!hasHolder) {
+              clipsToClear.push(clipKey)
+            }
+          }
+        })
+        clipsToClear.forEach(key => transitioningByClipRef.current.delete(key))
+        
+        // Get active timeline clips at this time to know which video objects should transition
+        const activeClips = timelineClips.filter(clip => 
+          time >= clip.timelineStart && 
+          time < clip.timelineEnd &&
+          (clip.layer === 'camera' || clip.layer === 'screen')
+        )
+        
+        // Case 1: Transitioning from layout clip to empty space
+        if (previousLayoutClip && !currentLayoutClip) {
+          // Transition all holders from previous layout clip to empty space (full canvas)
+          previousLayoutClip.holders.forEach(prevHolder => {
+            const clipKey = `${prevHolder.clipId}_${prevHolder.layer}`
+            
+            transitioningByClipRef.current.set(clipKey, {
+              startPos: { 
+                x: prevHolder.x, 
+                y: prevHolder.y, 
+                width: prevHolder.width, 
+                height: prevHolder.height 
+              },
+              endPos: emptySpacePosition,
+              startRotation: prevHolder.rotation || 0,
+              endRotation: 0,
+              startTime: transitionBoundaryTime,
+              duration: canvasSettings.transitionDuration
+            })
+          })
+        }
+        // Case 2: Transitioning from empty space to layout clip
+        else if (!previousLayoutClip && currentLayoutClip) {
+          // Only add in-transition if there's actually empty space before this layout clip
+          // (i.e., the layout clip doesn't start at time 0)
+          if (currentLayoutClip.timelineStart > 0) {
+            // Transition all active clips from empty space to layout clip positions
+            activeClips.forEach(clip => {
+              const clipKey = `${clip.id}_${clip.layer}`
+              const newHolder = currentLayoutClip.holders.find(h => h.clipId === clip.id && h.layer === clip.layer)
+              
+              if (newHolder) {
+                transitioningByClipRef.current.set(clipKey, {
+                  startPos: emptySpacePosition,
+                  endPos: { 
+                    x: newHolder.x, 
+                    y: newHolder.y, 
+                    width: newHolder.width, 
+                    height: newHolder.height 
+                  },
+                  startRotation: 0,
+                  endRotation: newHolder.rotation || 0,
+                  startTime: transitionBoundaryTime,
+                  duration: canvasSettings.transitionDuration
+                })
+              }
+            })
+          }
+          // If timelineStart === 0, there's no empty space before the first clip, so no transition needed
+        }
+        // Case 3: Transitioning between two layout clips
+        else if (previousLayoutClip && currentLayoutClip) {
+          // Transition holders between layout clips
+          const allHolderKeys = new Set([
+            ...previousLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`),
+            ...currentLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`)
+          ])
+          
+          allHolderKeys.forEach(key => {
+          const [clipId, layer] = key.split('_')
+          const prevHolder = previousLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
+          const newHolder = currentLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
+          
+          // If holder exists in both clips, check for changes
+          if (prevHolder && newHolder) {
+            const hasPositionChange = 
+              Math.abs(prevHolder.x - newHolder.x) > 0.001 ||
+              Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
+              Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
+              Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
+              Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1
+            
+            if (hasPositionChange) {
+              const clipKey = `${clipId}_${layer}`
+              
+              transitioningByClipRef.current.set(clipKey, {
+                startPos: { 
+                  x: prevHolder.x, 
+                  y: prevHolder.y, 
+                  width: prevHolder.width, 
+                  height: prevHolder.height 
+                },
+                endPos: { 
+                  x: newHolder.x, 
+                  y: newHolder.y, 
+                  width: newHolder.width, 
+                  height: newHolder.height 
+                },
+                startRotation: prevHolder.rotation || 0,
+                endRotation: newHolder.rotation || 0,
+                startTime: transitionBoundaryTime,
+                duration: canvasSettings.transitionDuration
+              })
+            }
+          }
+          // Holder exists in previous but not in new - transition to empty space
+          else if (prevHolder && !newHolder) {
+            const clipKey = `${clipId}_${layer}`
+            
+            transitioningByClipRef.current.set(clipKey, {
+              startPos: { 
+                x: prevHolder.x, 
+                y: prevHolder.y, 
+                width: prevHolder.width, 
+                height: prevHolder.height 
+              },
+              endPos: emptySpacePosition,
+              startRotation: prevHolder.rotation || 0,
+              endRotation: 0,
+              startTime: transitionBoundaryTime,
+              duration: canvasSettings.transitionDuration
+            })
+          }
+          // Holder appears in new clip - transition from empty space
+          else if (!prevHolder && newHolder) {
+            const clipKey = `${clipId}_${layer}`
+            
+            transitioningByClipRef.current.set(clipKey, {
+              startPos: emptySpacePosition,
+              endPos: { 
+                x: newHolder.x, 
+                y: newHolder.y, 
+                width: newHolder.width, 
+                height: newHolder.height 
+              },
+              startRotation: 0,
+              endRotation: newHolder.rotation || 0,
+              startTime: transitionStartTime,
+              duration: canvasSettings.transitionDuration
+            })
+          }
+        })
+      }
+      // If we're past the transition duration, transitions should already be cleared
+      // and we'll use the layout clip's holders directly (no transition needed)
+      }
+      
+      previousLayoutClipIdRef.current = currentLayoutClipId
+    }
+    
+    lastLayoutClipCheckTimeRef.current = time
+  }, [layoutClips, getCurrentLayoutClip, canvasSettings.transitionDuration, timelineClips])
+
   // Handle seek - must be defined before playback loop
   const handleSeek = useCallback((absoluteTime: number, immediate: boolean = false) => {
     // Update timeline position immediately for smooth scrubbing
     const clampedTime = Math.max(0, Math.min(totalDuration, absoluteTime))
     setCurrentTime(clampedTime)
     timelineTimeRef.current = clampedTime
+    
+    // Setup layout clip transitions for this time point (for smooth transitions when scrubbing)
+    setupLayoutClipTransitions(clampedTime)
 
     const result = timelineToVideoTime(clampedTime)
     if (!result) {
@@ -2868,7 +3151,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     } else {
       requestAnimationFrame(seekToTime)
     }
-  }, [totalDuration, timelineToVideoTime, sceneTakes, selectedSceneIndex, drawFrame])
+  }, [totalDuration, timelineToVideoTime, sceneTakes, selectedSceneIndex, drawFrame, setupLayoutClipTransitions])
 
   // Convert video time back to timeline time (inverse of timelineToVideoTime)
   const videoTimeToTimeline = useCallback((videoTime: number, clip: TimelineClip): number => {
@@ -2884,12 +3167,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
   }, [])
 
   // Playback Loop - timeline-driven with continuous advancement
-  const currentClipRef = useRef<TimelineClip | null>(null)
-  const isSeekingRef = useRef(false)
-  const lastFrameTimeRef = useRef<number>(performance.now())
-  const previousLayoutClipIdRef = useRef<string | null>(null)
-  // wasPlayingRef is declared earlier for tracking playback state across scene switches
-  
   useEffect(() => {
     let animationFrameId: number
 
@@ -2937,137 +3214,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         return
       }
 
-      // Get current layout clip and apply its holders
-      const currentLayoutClip = getCurrentLayoutClip(timelineTimeRef.current)
-      if (currentLayoutClip) {
-        // Check if we've switched layout clips
-        const layoutClipChanged = previousLayoutClipIdRef.current !== currentLayoutClip.id
-        
-        if (layoutClipChanged && previousLayoutClipIdRef.current && canvasSettings.transitionDuration > 0) {
-          // Find previous layout clip
-          const previousLayoutClip = layoutClips.find(lc => lc.id === previousLayoutClipIdRef.current)
-          
-          if (previousLayoutClip) {
-            // Transition holders between layout clips
-            // Check all holders in both clips for smooth transitions
-            const allHolderKeys = new Set([
-              ...previousLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`),
-              ...currentLayoutClip.holders.map(h => `${h.clipId}_${h.layer}`)
-            ])
-            
-            allHolderKeys.forEach(key => {
-              const [clipId, layer] = key.split('_')
-              const prevHolder = previousLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
-              const newHolder = currentLayoutClip.holders.find(h => h.clipId === clipId && h.layer === layer)
-              
-              // If holder exists in both clips, check for changes
-              if (prevHolder && newHolder) {
-                const hasPositionChange = 
-                  Math.abs(prevHolder.x - newHolder.x) > 0.001 ||
-                  Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
-                  Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
-                  Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
-                  Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1
-                
-                if (hasPositionChange) {
-                  // Store transition by clipId_layer so we can apply it even if holder ID changes
-                  const clipKey = `${clipId}_${layer}`
-                  const existingTransition = transitioningByClipRef.current.get(clipKey)
-                  // Use timeline time instead of performance.now() for proper export/scrub support
-                  const transitionStartTime = existingTransition ? existingTransition.startTime : timelineTimeRef.current
-                  
-                  transitioningByClipRef.current.set(clipKey, {
-                    startPos: { 
-                      x: prevHolder.x, 
-                      y: prevHolder.y, 
-                      width: prevHolder.width, 
-                      height: prevHolder.height 
-                    },
-                    endPos: { 
-                      x: newHolder.x, 
-                      y: newHolder.y, 
-                      width: newHolder.width, 
-                      height: newHolder.height 
-                    },
-                    startRotation: prevHolder.rotation || 0,
-                    endRotation: newHolder.rotation || 0,
-                    startTime: transitionStartTime, // Timeline time in seconds
-                    duration: canvasSettings.transitionDuration // Duration in seconds
-                  })
-                  
-                  // Also set on actual holder if it exists
-                  const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
-                  if (actualHolder) {
-                    transitioningHoldersRef.current.set(actualHolder.id, {
-                      startPos: { 
-                        x: prevHolder.x, 
-                        y: prevHolder.y, 
-                        width: prevHolder.width, 
-                        height: prevHolder.height 
-                      },
-                      endPos: { 
-                        x: newHolder.x, 
-                        y: newHolder.y, 
-                        width: newHolder.width, 
-                        height: newHolder.height 
-                      },
-                      startRotation: prevHolder.rotation || 0,
-                      endRotation: newHolder.rotation || 0,
-                      startTime: transitionStartTime, // Timeline time in seconds
-                      duration: canvasSettings.transitionDuration, // Duration in seconds
-                      clipId: clipId,
-                      layer: layer
-                    })
-                  }
-                }
-              } else if (prevHolder && !newHolder) {
-                // Holder exists in previous clip but not in new clip - fade out
-                const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
-                if (actualHolder) {
-                  fadingOutHoldersRef.current.set(actualHolder.id, {
-                    holder: { ...actualHolder },
-                    startTime: timelineTimeRef.current, // Timeline time in seconds
-                    duration: canvasSettings.transitionDuration // Duration in seconds
-                  })
-                }
-              } else if (!prevHolder && newHolder) {
-                // Holder appears in new clip - fade in (start from new position with opacity transition)
-                const actualHolder = canvasHolders.find(h => h.clipId === clipId && h.layer === layer)
-                if (actualHolder) {
-                  // For fade-in, we'll use the holder's current position but animate opacity
-                  // The position is already correct, so we just need to handle opacity
-                  transitioningHoldersRef.current.set(actualHolder.id, {
-                    startPos: { 
-                      x: newHolder.x, 
-                      y: newHolder.y, 
-                      width: newHolder.width, 
-                      height: newHolder.height 
-                    },
-                    endPos: { 
-                      x: newHolder.x, 
-                      y: newHolder.y, 
-                      width: newHolder.width, 
-                      height: newHolder.height 
-                    },
-                    startRotation: newHolder.rotation || 0,
-                    endRotation: newHolder.rotation || 0,
-                    startTime: timelineTimeRef.current, // Timeline time in seconds
-                    duration: canvasSettings.transitionDuration, // Duration in seconds
-                    fadeIn: true // Flag to indicate this is a fade-in
-                  })
-                }
-              }
-            })
-          }
-          
-          previousLayoutClipIdRef.current = currentLayoutClip.id
-        } else if (layoutClipChanged) {
-          previousLayoutClipIdRef.current = currentLayoutClip.id
-        }
-        
-        // Canvas holders are now derived from layout clips via useMemo
-        // No need to set them here - they're automatically computed from currentLayoutClip.holders
-      }
+      // Setup layout clip transitions (this will detect changes and set up transitions)
+      setupLayoutClipTransitions(timelineTimeRef.current)
 
       // Find which clip should be playing at this timeline position
       const timelineResult = timelineToVideoTime(timelineTimeRef.current)
@@ -3268,7 +3416,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       }
 
       // Update holder transitions
-      const transitionNow = performance.now()
+      // Use timeline time instead of performance.now() for proper export/scrub support
+      const transitionNow = timelineTimeRef.current
       const transitioningHolders = transitioningHoldersRef.current
       const fadingOutHolders = fadingOutHoldersRef.current
       
@@ -3277,9 +3426,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       const holdersToDelete: string[] = []
       transitioningHolders.forEach((transition, holderId) => {
         const elapsed = transitionNow - transition.startTime
-        if (elapsed < transition.duration) {
+        if (elapsed >= 0 && elapsed < transition.duration) {
           hasActiveTransitions = true
-        } else {
+        } else if (elapsed >= transition.duration) {
           holdersToDelete.push(holderId)
         }
       })
@@ -3289,9 +3438,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       const clipTransitionsToDelete: string[] = []
       transitioningByClipRef.current.forEach((transition, clipKey) => {
         const elapsed = transitionNow - transition.startTime
-        if (elapsed < transition.duration) {
+        if (elapsed >= 0 && elapsed < transition.duration) {
           hasActiveTransitions = true
-        } else {
+        } else if (elapsed >= transition.duration) {
           clipTransitionsToDelete.push(clipKey)
         }
       })
@@ -4596,6 +4745,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     ctx: CanvasRenderingContext2D,
     videoElements: { camera: HTMLVideoElement | null, screen: HTMLVideoElement | null }
   ): Promise<void> => {
+    // Setup layout clip transitions for this time point (ensures transitions work during export)
+    setupLayoutClipTransitions(time)
+    
     // Set canvas to exact export resolution
     canvas.width = canvasDimensions.width
     canvas.height = canvasDimensions.height
@@ -4642,11 +4794,90 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       })
     }
     
-    // Get active holders at this time
-    const activeHolders = canvasHolders.filter(holder => {
-      const clip = timelineClips.find(c => c.id === holder.clipId)
-      return clip && time >= clip.timelineStart && time < clip.timelineEnd && clip.layer === holder.layer
-    }).sort((a, b) => a.zIndex - b.zIndex)
+    // Get active holders at this time - calculate from layout clip at this specific time (not from preview's currentTime)
+    // If no layout clip, render videos in empty space (full canvas) with transitions
+    let activeHolders: CanvasVideoHolder[] = []
+    
+    if (currentLayoutClip) {
+      activeHolders = (currentLayoutClip.holders || []).filter(holder => {
+        const clip = timelineClips.find(c => c.id === holder.clipId)
+        return clip && time >= clip.timelineStart && time < clip.timelineEnd && clip.layer === holder.layer
+      }).sort((a, b) => a.zIndex - b.zIndex)
+    } else {
+      // No layout clip - render active clips in empty space (full canvas) with transitions
+      const activeClips = timelineClips.filter(clip => 
+        time >= clip.timelineStart && 
+        time < clip.timelineEnd &&
+        (clip.layer === 'camera' || clip.layer === 'screen')
+      )
+      
+      activeClips.forEach(clip => {
+        const clipKey = `${clip.id}_${clip.layer}`
+        const transition = transitioningByClipRef.current.get(clipKey)
+        
+        // Default position for empty space (full canvas)
+        let displayX = 0
+        let displayY = 0
+        let displayWidth = 1
+        let displayHeight = 1
+        let displayRotation = 0
+        
+        // Apply transition if active
+        if (transition && canvasSettings.transitionDuration > 0) {
+          const elapsed = time - transition.startTime
+          if (elapsed >= 0 && elapsed < transition.duration) {
+            const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
+            
+            const easeInOut = (t: number): number => {
+              return t < 0.5
+                ? 4 * t * t * t
+                : 1 - Math.pow(-2 * t + 2, 3) / 2
+            }
+            const eased = easeInOut(progress)
+            
+            displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
+            displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
+            displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
+            displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
+            
+            if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
+              let startRot = transition.startRotation
+              let endRot = transition.endRotation
+              let diff = endRot - startRot
+              
+              if (Math.abs(diff) > 180) {
+                if (diff > 0) {
+                  diff -= 360
+                } else {
+                  diff += 360
+                }
+              }
+              
+              displayRotation = startRot + diff * eased
+            }
+          } else if (elapsed >= transition.duration) {
+            displayX = transition.endPos.x
+            displayY = transition.endPos.y
+            displayWidth = transition.endPos.width
+            displayHeight = transition.endPos.height
+            displayRotation = transition.endRotation || 0
+          }
+        }
+        
+        // Create a temporary holder for rendering
+        activeHolders.push({
+          id: `empty_${clip.id}`,
+          clipId: clip.id,
+          layer: clip.layer,
+          x: displayX,
+          y: displayY,
+          width: displayWidth,
+          height: displayHeight,
+          rotation: displayRotation,
+          zIndex: clip.layer === 'camera' ? 1 : 2,
+        })
+      })
+    }
     
     // Draw each video holder
     for (const holder of activeHolders) {
@@ -4708,16 +4939,67 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       const midtones = props?.midtones ?? 0
       const shadows = props?.shadows ?? 0
       
-      // Calculate position and size
-      const holderX = holder.x * canvas.width
-      const holderY = holder.y * canvas.height
-      const holderW = holder.width * canvas.width
-      const holderH = holder.height * canvas.height
+      // Check for active transition for this holder
+      let displayX = holder.x
+      let displayY = holder.y
+      let displayW = holder.width
+      let displayH = holder.height
+      let displayRotation = holder.rotation || 0
+      
+      // Check for transition by clipId_layer (for layout clip transitions)
+      const transitionClipKey = `${holder.clipId}_${holder.layer}`
+      const transition = transitioningByClipRef.current.get(transitionClipKey)
+      
+      if (transition && canvasSettings.transitionDuration > 0) {
+        const elapsed = time - transition.startTime
+        if (elapsed >= 0 && elapsed < transition.duration) {
+          const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
+          
+          // Ease-in-out cubic function for smooth animation
+          const easeInOut = (t: number): number => {
+            return t < 0.5
+              ? 4 * t * t * t
+              : 1 - Math.pow(-2 * t + 2, 3) / 2
+          }
+          
+          const eased = easeInOut(progress)
+          
+          // Interpolate position and size
+          displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
+          displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
+          displayW = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
+          displayH = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
+          
+          // Interpolate rotation if provided
+          if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
+            let startRot = transition.startRotation
+            let endRot = transition.endRotation
+            let diff = endRot - startRot
+            
+            // Normalize to shortest path
+            if (Math.abs(diff) > 180) {
+              if (diff > 0) {
+                diff -= 360
+              } else {
+                diff += 360
+              }
+            }
+            
+            displayRotation = startRot + diff * eased
+          }
+        }
+      }
+      
+      // Calculate position and size (using transition values if active)
+      const holderX = displayX * canvas.width
+      const holderY = displayY * canvas.height
+      const holderW = displayW * canvas.width
+      const holderH = displayH * canvas.height
       
       // Draw video with rotation
       ctx.save()
       ctx.translate(holderX + holderW / 2, holderY + holderH / 2)
-      ctx.rotate((holder.rotation || 0) * Math.PI / 180)
+      ctx.rotate(displayRotation * Math.PI / 180)
       
       // Apply filters using canvas operations
       // Brightness/Exposure
@@ -4941,7 +5223,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       
       ctx.restore()
     }
-  }, [canvasDimensions, canvasSettings, getCurrentLayoutClip, canvasHolders, timelineClips, clipProperties, titleSettings])
+  }, [canvasDimensions, canvasSettings, getCurrentLayoutClip, layoutClips, timelineClips, clipProperties, titleSettings, setupLayoutClipTransitions])
 
   // Export
   const handleExport = async () => {
@@ -5240,7 +5522,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             tempCameraVideo.src = URL.createObjectURL(sceneCameraBlob)
             tempCameraVideo.muted = true
             tempCameraVideo.playsInline = true
-            await new Promise<void>((resolve, reject) => {
+              await new Promise<void>((resolve, reject) => {
               tempCameraVideo.onloadedmetadata = () => resolve()
               tempCameraVideo.onerror = () => reject(new Error('Failed to load camera video'))
               tempCameraVideo.load()
@@ -5277,9 +5559,167 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             throw new Error('Failed to create canvas context')
           }
           
-          // Capture frames
+          // Capture frames directly from the actual rendered canvas container
           const frameBlobs: Blob[] = []
           const frameInterval = 1 / frameRate
+          
+          // Function to capture the actual canvas container element as it appears on screen
+          const captureCanvasFrame = async (time: number): Promise<Blob> => {
+            // Seek to the correct time to update the preview
+            const clampedTime = Math.max(0, Math.min(totalDuration, time))
+            setCurrentTime(clampedTime)
+            timelineTimeRef.current = clampedTime
+            
+            // Setup transitions for this time
+            setupLayoutClipTransitions(clampedTime)
+            
+            // Seek videos to the correct time
+            const result = timelineToVideoTime(clampedTime)
+            if (result) {
+              const { videoTime, sceneId, takeId } = result
+              const sceneIndex = sceneTakes.findIndex(st =>
+                st.sceneId === sceneId && st.take.id === takeId
+              )
+              
+              if (sceneIndex >= 0 && sceneIndex !== selectedSceneIndex) {
+                setSelectedSceneIndex(sceneIndex)
+                // Wait for scene switch and videos to load
+                await new Promise(resolve => setTimeout(resolve, 200))
+              }
+              
+              // Seek videos and wait for seek to complete
+              const seekPromises: Promise<void>[] = []
+              
+              if (videoRef.current) {
+                if (videoRef.current.readyState >= 2) {
+                  const seekPromise = new Promise<void>((resolve) => {
+                    const onSeeked = () => {
+                      videoRef.current?.removeEventListener('seeked', onSeeked)
+                      resolve()
+                    }
+                    videoRef.current?.addEventListener('seeked', onSeeked, { once: true })
+                    videoRef.current.currentTime = videoTime
+                    // Timeout after 1 second
+                    setTimeout(() => {
+                      videoRef.current?.removeEventListener('seeked', onSeeked)
+                      resolve()
+                    }, 1000)
+                  })
+                  seekPromises.push(seekPromise)
+                }
+              }
+              
+              if (screenVideoRef.current) {
+                if (screenVideoRef.current.readyState >= 2) {
+                  const seekPromise = new Promise<void>((resolve) => {
+                    const onSeeked = () => {
+                      screenVideoRef.current?.removeEventListener('seeked', onSeeked)
+                      resolve()
+                    }
+                    screenVideoRef.current?.addEventListener('seeked', onSeeked, { once: true })
+                    screenVideoRef.current.currentTime = videoTime
+                    setTimeout(() => {
+                      screenVideoRef.current?.removeEventListener('seeked', onSeeked)
+                      resolve()
+                    }, 1000)
+                  })
+                  seekPromises.push(seekPromise)
+                }
+              }
+              
+              // Wait for all seeks to complete
+              await Promise.all(seekPromises)
+            }
+            
+            // Wait for React to render and transitions to apply
+            // Use requestAnimationFrame to ensure DOM has fully updated
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            await new Promise(resolve => setTimeout(resolve, 150)) // Extra wait for video seeks and rendering to complete
+            
+            // Find the canvas container element (the actual rendered element with data-canvas-container)
+            const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement
+            if (!canvasContainer) {
+              throw new Error('Canvas container not found')
+            }
+            
+            try {
+              // Use html2canvas to capture the actual canvas container element as it appears
+              // html2canvas will capture at the element's current rendered size
+              const capturedCanvas = await html2canvas(canvasContainer, {
+                useCORS: true,
+                backgroundColor: canvasSettings.videoBackgroundColor,
+                logging: false,
+                allowTaint: true,
+                foreignObjectRendering: true,
+                removeContainer: false,
+              })
+              
+              // Get the actual rendered size (accounting for any scale transforms)
+              const renderedWidth = capturedCanvas.width
+              const renderedHeight = capturedCanvas.height
+              
+              // If the captured size doesn't match export resolution, scale it
+              let finalCanvas = capturedCanvas
+              if (renderedWidth !== canvasDimensions.width || renderedHeight !== canvasDimensions.height) {
+                // Create a new canvas at export resolution
+                finalCanvas = document.createElement('canvas')
+                finalCanvas.width = canvasDimensions.width
+                finalCanvas.height = canvasDimensions.height
+                const finalCtx = finalCanvas.getContext('2d')
+                if (!finalCtx) {
+                  throw new Error('Failed to create final canvas context')
+                }
+                
+                // Draw the captured canvas scaled to export resolution
+                finalCtx.drawImage(
+                  capturedCanvas,
+                  0, 0, renderedWidth, renderedHeight,
+                  0, 0, canvasDimensions.width, canvasDimensions.height
+                )
+              }
+              
+              // Return the captured canvas as blob
+              return new Promise<Blob>((resolve, reject) => {
+                finalCanvas.toBlob((blob) => {
+                  if (blob) {
+                    resolve(blob)
+                  } else {
+                    reject(new Error('Failed to convert captured canvas to blob'))
+                  }
+                }, 'image/png')
+              })
+            } catch (error) {
+              console.error('Error capturing canvas with html2canvas:', error)
+              // Fallback: Use renderFrameToCanvas
+              console.log('html2canvas failed, using renderFrameToCanvas fallback for frame at', time)
+              const captureCanvas = document.createElement('canvas')
+              captureCanvas.width = canvasDimensions.width
+              captureCanvas.height = canvasDimensions.height
+              const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true })
+              if (!captureCtx) {
+                throw new Error('Failed to create capture canvas context')
+              }
+              await renderFrameToCanvas(
+                clampedTime,
+                captureCanvas,
+                captureCtx,
+                {
+                  camera: videoRef.current,
+                  screen: screenVideoRef.current
+                }
+              )
+              
+              return new Promise<Blob>((resolve, reject) => {
+                captureCanvas.toBlob((blob) => {
+                  if (blob) {
+                    resolve(blob)
+                  } else {
+                    reject(new Error('Failed to convert canvas to blob'))
+                  }
+                }, 'image/png')
+              })
+            }
+          }
           
           for (let frameIndex = 0; frameIndex < totalFramesForScene; frameIndex++) {
             const frameTime = sceneTake.startTime + (frameIndex * frameInterval)
@@ -5289,30 +5729,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             const sceneProgress = frameIndex / totalFramesForScene
             const overallProgress = (i / scenesToExport.length) + (sceneProgress / scenesToExport.length)
             setExportProgressPercent(Math.min(overallProgress * 100, 95))
-            setExportProgress(`Rendering frame ${frameIndex + 1}/${totalFramesForScene} for scene ${i + 1}...`)
+            setExportProgress(`Capturing frame ${frameIndex + 1}/${totalFramesForScene} for scene ${i + 1} from canvas...`)
             
-            // Render frame to canvas
-            await renderFrameToCanvas(
-              frameTime,
-              exportCanvas,
-              exportCtx,
-              {
-                camera: tempCameraVideo,
-                screen: tempScreenVideo
-              }
-            )
-            
-            // Convert canvas to blob
-            const frameBlob = await new Promise<Blob>((resolve, reject) => {
-              exportCanvas.toBlob((blob) => {
-                if (blob) {
-                  resolve(blob)
-                } else {
-                  reject(new Error('Failed to convert canvas to blob'))
-                }
-              }, 'image/png')
-            })
-            
+            // Capture frame directly from the rendered canvas
+            const frameBlob = await captureCanvasFrame(frameTime)
             frameBlobs.push(frameBlob)
           }
           
@@ -5341,22 +5761,37 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           
           // Encode frames to video
           setExportProgress(`Encoding video for scene ${i + 1}... (${frameBlobs.length} frames)`)
-          const combinedBlob = await Promise.race([
-            encodeFramesToVideo(
-              frameBlobs,
-              frameRate,
-              `scene_${i}.mp4`,
-              audioBlob,
-              (progress) => {
-                const sceneProgress = progress / 100
-                const overallProgress = (i / scenesToExport.length) + (sceneProgress / scenesToExport.length)
-                setExportProgressPercent(Math.min(overallProgress * 100, 98))
-              }
+          
+          // Use a unique filename with timestamp to avoid conflicts
+          const sceneFilename = `scene_${i}_${Date.now()}.mp4`
+          
+          // Clear frame blobs from memory after encoding starts to free up memory
+          // We'll keep the array reference but the blobs will be garbage collected
+          let combinedBlob: Blob
+          try {
+            combinedBlob = await Promise.race([
+              encodeFramesToVideo(
+                frameBlobs,
+                frameRate,
+                sceneFilename,
+                audioBlob,
+                (progress) => {
+                  const sceneProgress = progress / 100
+                  const overallProgress = (i / scenesToExport.length) + (sceneProgress / scenesToExport.length)
+                  setExportProgressPercent(Math.min(overallProgress * 100, 98))
+                }
             ),
             new Promise<Blob>((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout encoding video')), 300000) // 5 minute timeout
-            )
-          ])
+                setTimeout(() => reject(new Error('Timeout encoding video')), 300000) // 5 minute timeout
+              )
+            ])
+            
+            // Additional delay after encoding to ensure filesystem is stable
+            await new Promise(resolve => setTimeout(resolve, 500))
+          } finally {
+            // Clear frame blobs from memory immediately
+            frameBlobs.length = 0
+          }
           
           // Validate the blob before proceeding
           if (!combinedBlob || combinedBlob.size === 0) {
@@ -5428,8 +5863,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           } else {
             // Validate blob before adding to processed list
             if (combinedBlob && combinedBlob.size > 0) {
-              processedSceneBlobs.push(combinedBlob)
-              setExportProgress(`✓ Scene ${i + 1} completed`)
+            processedSceneBlobs.push(combinedBlob)
+            setExportProgress(`✓ Scene ${i + 1} completed`)
             } else {
               throw new Error(`Invalid blob for scene ${i + 1}: size is ${combinedBlob?.size || 0}`)
             }
@@ -5483,9 +5918,63 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           continue
         }
         
-        // Small delay between scenes to allow filesystem to recover
+        // Longer delay between scenes to allow filesystem to recover and cleanup
         if (i < scenesToExport.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // Force garbage collection hint by clearing references
+          // Longer delay to ensure filesystem operations complete
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // Try to clean up any remaining files from previous scene
+          try {
+            const ffmpeg = await getFFmpeg()
+            
+            // Clean up scene files - try multiple timestamp patterns
+            // Since we use unique filenames, try recent timestamps
+            const now = Date.now()
+            for (let ts = now - 60000; ts <= now + 1000; ts += 1000) {
+              try {
+                await ffmpeg.deleteFile(`scene_${i}_${ts}.mp4`)
+              } catch (e) {
+                // Ignore - file might not exist
+              }
+            }
+            
+            const tempFiles = [
+              `scene_${i}.mp4`,
+              'frame_list.txt',
+              'audio.mp4',
+              'input_convert_scene.mp4',
+              'output_scene.webm'
+            ]
+            for (const file of tempFiles) {
+              try {
+                await ffmpeg.deleteFile(file)
+              } catch (e) {
+                // Ignore individual cleanup errors
+              }
+            }
+            
+            // Try to clean up frame files in batches to avoid overwhelming filesystem
+            for (let frameIdx = 0; frameIdx < 1000; frameIdx += 50) {
+              let deleted = 0
+              for (let j = 0; j < 50; j++) {
+                try {
+                  const frameFile = `frame_${(frameIdx + j).toString().padStart(6, '0')}.png`
+                  await ffmpeg.deleteFile(frameFile)
+                  deleted++
+                } catch (e) {
+                  // Stop batch if we hit errors
+                  if (deleted === 0 && j > 0) break
+                }
+              }
+              // Small delay between batches
+              if (frameIdx + 50 < 1000) {
+                await new Promise(resolve => setTimeout(resolve, 50))
+              }
+            }
+          } catch (cleanupError) {
+            console.warn('Error during inter-scene cleanup:', cleanupError)
+          }
         }
 
       }
@@ -5920,7 +6409,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     handleExportDaVinci()
                   }}
                   disabled={isExporting}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Export DaVinci Timeline
                 </button>
@@ -6465,7 +6954,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       <span className="text-xs text-gray-400">
                         {clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.highlights || 0}
                       </span>
-                    </div>
+                </div>
                     <input
                       type="range"
                       min="-100"
@@ -6496,7 +6985,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       }}
                       className="w-full"
                     />
-                  </div>
+            </div>
 
                   {/* Midtones */}
                   <div>
@@ -6536,7 +7025,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       }}
                       className="w-full"
                     />
-                  </div>
+              </div>
 
                   {/* Shadows */}
                   <div>
@@ -6546,8 +7035,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         {clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.shadows || 0}
                       </span>
                     </div>
-                    <input
-                      type="range"
+                <input
+                  type="range"
                       min="-100"
                       max="100"
                       value={clipProperties.get(`${selectedClip.sceneId}_${selectedClip.takeId}_${selectedClip.layer}`)?.shadows || 0}
@@ -6574,10 +7063,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       }}
                       onMouseUp={() => {
                       }}
-                      className="w-full"
-                    />
-                  </div>
+                  className="w-full"
+                />
                 </div>
+              </div>
               )}
             </div>
           )}
@@ -6644,7 +7133,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               <div className="p-4 border-b border-gray-700">
                 <h3 className="text-sm font-semibold mb-3">LAYOUT</h3>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 <>
               {/* Background Image */}
@@ -6693,7 +7182,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               searchUnsplash(unsplashSearchQuery)
                             }
                           }}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded whitespace-nowrap"
+                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded whitespace-nowrap"
                         >
                           Unsplash
                         </button>
@@ -6805,7 +7294,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              title?.textAlign === 'left' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                              title?.textAlign === 'left' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
                             }`}
                             title="Align Left"
                           >
@@ -6839,7 +7328,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              (title?.textAlign === 'center' || !title?.textAlign) ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                              (title?.textAlign === 'center' || !title?.textAlign) ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
                             }`}
                             title="Align Center"
                           >
@@ -6873,7 +7362,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               }
                             }}
                             className={`px-2 py-1 text-xs rounded text-white ${
-                              title?.textAlign === 'right' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-700 hover:bg-gray-600'
+                              title?.textAlign === 'right' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-gray-700 hover:bg-gray-600'
                             }`}
                             title="Align Right"
                           >
@@ -7080,7 +7569,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {/* Save Current Layout as Preset */}
                 <div className="pt-4">
-                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
+                <h4 className="text-xs font-semibold mb-3 text-gray-300">Save Layout Preset</h4>
                 <div className="space-y-2">
                   <input
                     type="text"
@@ -7200,15 +7689,15 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     }}
                     className="w-full bg-gray-600 hover:bg-gray-700 py-2 rounded text-xs text-white"
                   >
-                      Save as Preset
-                    </button>
-                  </div>
+                    Save as Preset
+                  </button>
                 </div>
+              </div>
 
-                {/* Load Layout Presets */}
-                {layoutPresets.length > 0 && (
-                  <div className="border-t border-gray-700 pt-4">
-                    <h4 className="text-xs font-semibold mb-3 text-gray-300">Saved Presets</h4>
+              {/* Load Layout Presets */}
+              {layoutPresets.length > 0 && (
+                <div className="border-t border-gray-700 pt-4">
+                  <h4 className="text-xs font-semibold mb-3 text-gray-300">Saved Presets</h4>
                   <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                     {layoutPresets.map((preset) => (
                     <button
@@ -7290,10 +7779,10 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           ×
                         </button>
                     </button>
-                    ))}
-                    </div>
+                  ))}
                   </div>
-                )}
+                </div>
+              )}
               </div>
             </div>
           )}
@@ -7990,7 +8479,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     return null
                   })()}
                   
-                  {/* Default video rendering when no layout clip is active - fill whole canvas */}
+                  {/* Default video rendering when no layout clip is active - fill whole canvas with transitions */}
                   {(() => {
                     const currentLayoutClip = getCurrentLayoutClip(currentTime)
                     if (!currentLayoutClip) {
@@ -8002,8 +8491,65 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       )
                       
                       if (activeClip) {
-                        const clipKey = `${activeClip.sceneId}_${activeClip.takeId}_${activeClip.layer}`
-                        const props = clipProperties.get(clipKey)
+                        const clipKey = `${activeClip.id}_${activeClip.layer}`
+                        const transition = transitioningByClipRef.current.get(clipKey)
+                        
+                        // Default position for empty space (full canvas)
+                        let displayX = 0
+                        let displayY = 0
+                        let displayWidth = 1
+                        let displayHeight = 1
+                        let displayRotation = 0
+                        
+                        // Apply transition if active
+                        if (transition && canvasSettings.transitionDuration > 0) {
+                          const elapsed = currentTime - transition.startTime
+                          if (elapsed >= 0 && elapsed < transition.duration) {
+                            const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
+                            
+                            // Ease-in-out cubic function for smooth animation
+                            const easeInOut = (t: number): number => {
+                              return t < 0.5
+                                ? 4 * t * t * t
+                                : 1 - Math.pow(-2 * t + 2, 3) / 2
+                            }
+                            const eased = easeInOut(progress)
+                            
+                            // Interpolate position and size
+                            displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
+                            displayY = transition.startPos.y + (transition.endPos.y - transition.startPos.y) * eased
+                            displayWidth = transition.startPos.width + (transition.endPos.width - transition.startPos.width) * eased
+                            displayHeight = transition.startPos.height + (transition.endPos.height - transition.startPos.height) * eased
+                            
+                            // Interpolate rotation
+                            if (transition.startRotation !== undefined && transition.endRotation !== undefined) {
+                              let startRot = transition.startRotation
+                              let endRot = transition.endRotation
+                              let diff = endRot - startRot
+                              
+                              // Normalize to shortest path
+                              if (Math.abs(diff) > 180) {
+                                if (diff > 0) {
+                                  diff -= 360
+                                } else {
+                                  diff += 360
+                                }
+                              }
+                              
+                              displayRotation = startRot + diff * eased
+                            }
+                          } else if (elapsed >= transition.duration) {
+                            // Transition complete, use end position
+                            displayX = transition.endPos.x
+                            displayY = transition.endPos.y
+                            displayWidth = transition.endPos.width
+                            displayHeight = transition.endPos.height
+                            displayRotation = transition.endRotation || 0
+                          }
+                        }
+                        
+                        const clipKeyProps = `${activeClip.sceneId}_${activeClip.takeId}_${activeClip.layer}`
+                        const props = clipProperties.get(clipKeyProps)
                         const brightness = props?.brightness ?? 0
                         const contrast = props?.contrast ?? 0
                         const saturation = props?.saturation ?? 0
@@ -8013,8 +8559,6 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         const shadows = props?.shadows ?? 0
                         
                         // Build CSS filter string
-                        // Note: CSS filters don't support highlights/midtones/shadows directly,
-                        // so we approximate by adjusting overall brightness
                         const avgTonalAdjustment = (highlights + midtones + shadows) / 3
                         const brightnessValue = Math.max(0, 1 + (brightness + exposure + avgTonalAdjustment) / 100)
                         const contrastValue = Math.max(0, 1 + contrast / 100)
@@ -8024,11 +8568,18 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         return (
                           <video
                             ref={activeClip.layer === 'camera' ? videoRef : (activeClip.layer === 'screen' ? screenVideoRef : null)}
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                            className="absolute object-cover pointer-events-none"
                             style={{
                               display: 'block',
                               filter: filterString,
                               zIndex: 1,
+                              left: `${displayX * 100}%`,
+                              top: `${displayY * 100}%`,
+                              width: `${displayWidth * 100}%`,
+                              height: `${displayHeight * 100}%`,
+                              transform: `rotate(${displayRotation}deg)`,
+                              transformOrigin: 'center',
+                              transition: transition ? 'none' : undefined, // Disable CSS transitions during programmatic transitions
                             }}
                             muted={activeClip.layer !== 'microphone'}
                             playsInline
@@ -8076,14 +8627,17 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       let displayRotation = holder.rotation
                       
                       if (transition) {
-                        const now = performance.now()
-                        const elapsed = now - transition.startTime
+                        // Use timeline time instead of performance.now() for proper export/scrub support
+                        const elapsed = currentTime - transition.startTime
                         const progress = Math.min(1, Math.max(0, elapsed / transition.duration))
                         
                         // Easing function (ease-in-out cubic) for smooth, natural motion
-                        const eased = progress < 0.5
-                          ? 4 * progress * progress * progress
-                          : 1 - Math.pow(-2 * progress + 2, 3) / 2
+                        const easeInOut = (t: number): number => {
+                          return t < 0.5
+                            ? 4 * t * t * t
+                            : 1 - Math.pow(-2 * t + 2, 3) / 2
+                        }
+                        const eased = easeInOut(progress)
                         
                         // Interpolate position and size
                         displayX = transition.startPos.x + (transition.endPos.x - transition.startPos.x) * eased
@@ -8667,7 +9221,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 <span className="text-xs text-gray-400 min-w-[3rem] text-right">{Math.round(timelineLayerHeightScale * 100)}%</span>
               </div>
               <div className="h-4 w-px bg-gray-800 mx-1"></div>
-              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-blue-900/20">
+              <button onClick={() => setShowExportDialog(true)} className="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm shadow-gray-900/20">
                 Export
               </button>
             </div>
@@ -8889,8 +9443,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         <div
                           key={clip.id}
                           data-clip-id={clip.id}
-                          className={`absolute top-0 bottom-0 bg-[#3b82f6] rounded-2xl overflow-hidden border transition-all cursor-move group
-                                       ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-[#3b82f6]'}
+                          className={`absolute top-0 bottom-0 bg-[#6b7280] rounded-2xl overflow-hidden border transition-all cursor-move group
+                                       ${isSelected ? 'border-white ring-1 ring-white z-10' : 'border-[#6b7280]'}
                                        ${isDragging ? 'opacity-80 scale-[1.01] shadow-xl z-20' : ''}
                                        ${isTrimming ? 'z-30' : ''}
                                     `}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 type Step = 'script' | 'record' | 'edit'
 
@@ -9,7 +9,7 @@ interface TopBarProps {
   onCreateProject?: () => void
   onLoadProject?: () => void
   onDeleteProject?: () => void
-  onSaveProject?: () => void
+  onSaveProject?: () => void | Promise<void>
   hasProject?: boolean
   currentStep?: Step
   onStepChange?: (step: Step) => void
@@ -32,6 +32,7 @@ export default function TopBar({
   const [showMenu, setShowMenu] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(title)
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = () => {
     onTitleChange(editTitle)
@@ -45,6 +46,28 @@ export default function TopBar({
       setEditTitle(title)
       setIsEditing(false)
     }
+  }
+
+  const handleSaveProject = async () => {
+    if (isSaving) return // Prevent multiple clicks
+    
+    setIsSaving(true)
+    try {
+      const result = onSaveProject?.()
+      // Handle both sync and async cases
+      if (result instanceof Promise) {
+        await result
+      }
+    } catch (error) {
+      console.error('Error saving project:', error)
+      setIsSaving(false) // Re-enable on error
+      return
+    }
+    
+    // Keep button disabled and show "Data Saved" for 3 seconds
+    setTimeout(() => {
+      setIsSaving(false)
+    }, 3000)
   }
 
   return (
@@ -116,8 +139,9 @@ export default function TopBar({
         {/* Save Project Button */}
         {hasProject && (
           <button
-            onClick={() => onSaveProject?.()}
-            className="flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors bg-white hover:bg-zinc-200 text-black"
+            onClick={handleSaveProject}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors bg-white hover:bg-zinc-200 text-black disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-4 h-4"
@@ -132,7 +156,7 @@ export default function TopBar({
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
-            <span>Save Project</span>
+            <span>{isSaving ? 'Data Saved' : 'Save Project'}</span>
           </button>
         )}
       </div>

@@ -18,7 +18,7 @@ export const WaveformClip: React.FC<WaveformClipProps> = ({
     duration,
     width,
     height = 40,
-    color = '#60a5fa', // Blue-400
+    color = '#9ca3af', // Gray-400
     backgroundColor = 'transparent',
     startOffset = 0
 }) => {

@@ -163,24 +163,80 @@ export async function getFFmpeg(): Promise<FFmpeg> {
 /**
  * Convert Blob to file in FFmpeg filesystem
  */
-async function writeFile(ffmpeg: FFmpeg, filename: string, blob: Blob): Promise<void> {
-  const data = await fetchFile(blob)
-  await ffmpeg.writeFile(filename, data)
+async function writeFile(ffmpeg: FFmpeg, filename: string, blob: Blob, retries: number = 3): Promise<void> {
+  let lastError: any = null
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const data = await fetchFile(blob)
+      await ffmpeg.writeFile(filename, data)
+      return // Success
+    } catch (error) {
+      lastError = error
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(`Attempt ${attempt + 1}/${retries} to write ${filename} failed:`, errorMsg)
+      
+      // If it's an FS error and we have retries left, wait before retrying
+      if (attempt < retries - 1) {
+        const waitTime = (errorMsg.includes('FS error') || errorMsg.includes('ErrnoError')) 
+          ? 300 * (attempt + 1) // Longer wait for FS errors
+          : 100 * (attempt + 1)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+    }
+  }
+  
+  throw new Error(`Failed to write file ${filename} after ${retries} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`)
 }
 
 /**
  * Read file from FFmpeg filesystem as Blob
  */
-async function readFile(ffmpeg: FFmpeg, filename: string): Promise<Blob> {
-  const data = await ffmpeg.readFile(filename)
-  if (data instanceof Uint8Array) {
-    return new Blob([data as any])
+async function readFile(ffmpeg: FFmpeg, filename: string, retries: number = 3, delay: number = 200): Promise<Blob> {
+  let lastError: any = null
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // Increasing delay before reading to ensure file is fully written
+      // Longer delays for later attempts to give filesystem more time
+      const waitTime = attempt === 0 ? 100 : delay * (attempt + 1)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+      
+      // Try to read the file
+      const data = await ffmpeg.readFile(filename)
+      
+      if (data instanceof Uint8Array) {
+        const blob = new Blob([data as any])
+        if (blob.size === 0) {
+          throw new Error('File is empty')
+        }
+        return blob
+      }
+      // Handle string case (unlikely for binary files but possible for text)
+      if (typeof data === 'string') {
+        return new Blob([data], { type: 'text/plain' })
+      }
+      const blob = data as unknown as Blob
+      if (blob.size === 0) {
+        throw new Error('File is empty')
+      }
+      return blob
+    } catch (error) {
+      lastError = error
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(`Attempt ${attempt + 1}/${retries} to read ${filename} failed:`, errorMsg)
+      
+      // If it's an FS error and we have retries left, wait longer
+      if (attempt < retries - 1) {
+        const waitTime = errorMsg.includes('FS error') || errorMsg.includes('ErrnoError') 
+          ? delay * (attempt + 2) * 2 // Double wait time for FS errors
+          : delay * (attempt + 1)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+    }
   }
-  // Handle string case (unlikely for binary files but possible for text)
-  if (typeof data === 'string') {
-    return new Blob([data], { type: 'text/plain' })
-  }
-  return data as unknown as Blob
+  
+  throw new Error(`Failed to read file ${filename} after ${retries} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`)
 }
 
 /**
@@ -951,8 +1007,11 @@ export async function combineVideos(
     ffmpegArgs.push(outputFilename)
 
     await ffmpeg.exec(ffmpegArgs)
+    
+    // Longer delay after exec to ensure file is fully written to filesystem
+    await new Promise(resolve => setTimeout(resolve, 500))
 
-    const outputBlob = await readFile(ffmpeg, outputFilename)
+    const outputBlob = await readFile(ffmpeg, outputFilename, 10, 500)
 
     // Cleanup
     try {
@@ -1078,82 +1137,99 @@ export async function encodeFramesToVideo(
   let audioFileWritten = false
 
   try {
-    // Write all frame images with error handling
-    for (let i = 0; i < frames.length; i++) {
-      const filename = `frame_${i.toString().padStart(6, '0')}.png`
-      try {
-        const frameData = await fetchFile(frames[i])
-        await writeFile(ffmpeg, filename, frameData)
-        frameFiles.push(filename)
-      } catch (error) {
-        console.error(`Error writing frame ${i}:`, error)
-        // Clean up what we've written so far
-        for (const file of frameFiles) {
-          try {
-            await ffmpeg.deleteFile(file)
-          } catch (e) {
-            // Ignore cleanup errors
-          }
-        }
-        throw new Error(`Failed to write frame ${i}: ${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-
-    // Create frame list file for concat demuxer
-    const frameList = frameFiles.map(f => `file '${f}'`).join('\n')
-    try {
-      await ffmpeg.writeFile('frame_list.txt', frameList)
-    } catch (error) {
-      // Clean up frame files
-      for (const file of frameFiles) {
+    // Write all frame images with error handling and batching to reduce memory pressure
+    // Use smaller batch size to reduce filesystem pressure
+    const batchSize = 20 // Reduced batch size for better stability
+    for (let batchStart = 0; batchStart < frames.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, frames.length)
+      
+      for (let i = batchStart; i < batchEnd; i++) {
+        const filename = `frame_${i.toString().padStart(6, '0')}.png`
         try {
-          await ffmpeg.deleteFile(file)
-        } catch (e) {
-          // Ignore cleanup errors
+          const frameData = await fetchFile(frames[i])
+          await ffmpeg.writeFile(filename, frameData)
+          frameFiles.push(filename)
+        } catch (error) {
+          console.error(`Error writing frame ${i}:`, error)
+          // Clean up what we've written so far
+          for (const file of frameFiles) {
+            try {
+              await ffmpeg.deleteFile(file)
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          }
+          throw new Error(`Failed to write frame ${i}: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
-      throw new Error(`Failed to write frame list: ${error instanceof Error ? error.message : String(error)}`)
+      
+      // Delay between batches to allow filesystem to recover
+      if (batchEnd < frames.length) {
+        await new Promise(resolve => setTimeout(resolve, 150))
+      }
     }
 
-    // Build FFmpeg command
+    // Use image2 demuxer with pattern - this is the correct way to encode image sequences
+    // The pattern uses %06d to match frame_000000.png, frame_000001.png, etc.
+    const inputPattern = 'frame_%06d.png'
+
+    // Build FFmpeg command using image2 demuxer
+    // Structure: First specify all inputs, then encoding options with proper mapping
     const ffmpegArgs: string[] = [
-      '-f', 'concat',
-      '-safe', '0',
-      '-r', frameRate.toString(),
-      '-i', 'frame_list.txt',
-      '-vf', 'fps=' + frameRate,
-      '-c:v', 'libx264',
-      '-preset', 'slow',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-profile:v', 'high',
-      '-level:v', '4.2',
-      '-movflags', '+faststart',
+      '-framerate', frameRate.toString(), // Input framerate
+      '-i', inputPattern, // Input 0: image sequence pattern
     ]
 
-    // Add audio if provided
+    // Add audio input if provided (must be added before encoding options)
     if (audioBlob) {
       try {
         const audioData = await fetchFile(audioBlob)
-        await writeFile(ffmpeg, 'audio.mp4', audioData)
+        await ffmpeg.writeFile('audio.mp4', audioData)
         audioFileWritten = true
-        ffmpegArgs.push(
-          '-i', 'audio.mp4',
-          '-c:a', 'aac',
-          '-b:a', '192k',
-          '-ar', '48000',
-          '-shortest'
-        )
+        ffmpegArgs.push('-i', 'audio.mp4') // Input 1: audio file
       } catch (error) {
         console.warn('Failed to write audio file, continuing without audio:', error)
         // Continue without audio
       }
     }
 
+    // Map inputs to outputs (must come after all inputs are specified)
+    if (audioBlob && audioFileWritten) {
+      // Map video from input 0, audio from input 1
+      ffmpegArgs.push('-map', '0:v', '-map', '1:a')
+    } else {
+      // Only video, no mapping needed (default behavior)
+      ffmpegArgs.push('-map', '0:v')
+    }
+
+    // Video encoding options (only apply to video streams)
+    ffmpegArgs.push(
+      '-c:v', 'libx264',
+      '-preset', 'medium', // Changed from 'slow' to 'medium' for better performance
+      '-crf', '18',
+      '-pix_fmt', 'yuv420p',
+      '-profile:v', 'high',
+      '-level:v', '4.2',
+      '-r', frameRate.toString(), // Output framerate
+      '-movflags', '+faststart',
+    )
+
+    // Audio encoding options (only apply to audio streams, if audio exists)
+    if (audioBlob && audioFileWritten) {
+      ffmpegArgs.push(
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-ar', '48000',
+        '-shortest' // Finish encoding when shortest input stream ends
+      )
+    }
+
     ffmpegArgs.push(outputFilename)
 
     try {
       await ffmpeg.exec(ffmpegArgs)
+      // Wait longer after exec to ensure file is fully written and flushed
+      await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (error) {
       // Cleanup on exec error
       const errorMsg = error instanceof Error ? error.message : String(error)
@@ -1161,13 +1237,25 @@ export async function encodeFramesToVideo(
       throw new Error(`FFmpeg encoding failed: ${errorMsg}`)
     }
 
+    // Read output file with retry logic
     let outputBlob: Blob
     try {
-      outputBlob = await readFile(ffmpeg, outputFilename)
+      // Read with more retries and longer delays
+      outputBlob = await readFile(ffmpeg, outputFilename, 15, 600) // 15 retries with 600ms delays
       if (!outputBlob || outputBlob.size === 0) {
         throw new Error('Output blob is empty')
       }
+      // Validate blob size is reasonable (at least 1KB)
+      if (outputBlob.size < 1024) {
+        throw new Error(`Output blob is too small: ${outputBlob.size} bytes`)
+      }
     } catch (error) {
+      // Clean up before throwing
+      try {
+        await ffmpeg.deleteFile(outputFilename)
+      } catch (e) {
+        // Ignore cleanup errors
+      }
       throw new Error(`Failed to read output file: ${error instanceof Error ? error.message : String(error)}`)
     }
 
@@ -1177,11 +1265,6 @@ export async function encodeFramesToVideo(
     } catch (e) {
       console.warn('Failed to delete output file:', e)
     }
-    try {
-      await ffmpeg.deleteFile('frame_list.txt')
-    } catch (e) {
-      console.warn('Failed to delete frame list:', e)
-    }
     if (audioFileWritten) {
       try {
         await ffmpeg.deleteFile('audio.mp4')
@@ -1190,11 +1273,19 @@ export async function encodeFramesToVideo(
       }
     }
     // Clean up frame files in batches to avoid overwhelming the filesystem
-    for (const file of frameFiles) {
-      try {
-        await ffmpeg.deleteFile(file)
-      } catch (e) {
-        // Ignore individual frame cleanup errors
+    const cleanupBatchSize = 50
+    for (let i = 0; i < frameFiles.length; i += cleanupBatchSize) {
+      const batch = frameFiles.slice(i, i + cleanupBatchSize)
+      for (const file of batch) {
+        try {
+          await ffmpeg.deleteFile(file)
+        } catch (e) {
+          // Ignore individual frame cleanup errors
+        }
+      }
+      // Small delay between cleanup batches
+      if (i + cleanupBatchSize < frameFiles.length) {
+        await new Promise(resolve => setTimeout(resolve, 50))
       }
     }
 
@@ -1202,6 +1293,7 @@ export async function encodeFramesToVideo(
   } catch (error) {
     // Ensure cleanup on error
     try {
+      // Clean up frame files
       for (const file of frameFiles) {
         try {
           await ffmpeg.deleteFile(file)
@@ -1209,17 +1301,19 @@ export async function encodeFramesToVideo(
           // Ignore cleanup errors
         }
       }
-      try {
-        await ffmpeg.deleteFile('frame_list.txt')
-      } catch (e) {
-        // Ignore
-      }
+      // Clean up audio if written
       if (audioFileWritten) {
         try {
           await ffmpeg.deleteFile('audio.mp4')
         } catch (e) {
           // Ignore
         }
+      }
+      // Clean up output if it exists
+      try {
+        await ffmpeg.deleteFile(outputFilename)
+      } catch (e) {
+        // Ignore
       }
     } catch (cleanupError) {
       console.warn('Error during cleanup:', cleanupError)
