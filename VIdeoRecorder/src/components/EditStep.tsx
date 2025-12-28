@@ -12,6 +12,7 @@ import { parseCubeLUT, applyLUTToImageData } from '../utils/lutProcessor'
 import { analyzeWaveform } from '../utils/waveformAnalyzer'
 import SettingsPanel from './SettingsPanel'
 import { TimelineAudioClip } from './TimelineAudioClip'
+import { exportWithOfflinePipeline, isWebCodecsAvailable, downloadExportedVideo } from '../utils/exportIntegration'
 
 interface EditStepProps {
   scenes: Scene[]
@@ -905,6 +906,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     rotation: number // Degrees
     // Z-index for layering
     zIndex: number
+    // Rounded corners (in pixels, max 600px)
+    borderRadius?: number
   }
 
   // Clip holder on canvas - position and size for rendering
@@ -935,7 +938,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       return currentLayoutClip.holders
     }
     return []
-  }, [currentTime, getCurrentLayoutClip])
+  }, [currentTime, getCurrentLayoutClip, layoutClips])
   
   // Holder transitions - track animated transitions between positions
   // Key is holder ID, but we also track by clipId_layer for layout clip transitions
@@ -945,6 +948,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     endPos: { x: number; y: number; width: number; height: number }
     startRotation?: number
     endRotation?: number
+    startBorderRadius?: number
+    endBorderRadius?: number
     startTime: number // Timeline time in seconds when transition started
     duration: number // Duration in seconds
     clipId?: string // Store clipId for matching
@@ -957,6 +962,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     endPos: { x: number; y: number; width: number; height: number }
     startRotation?: number
     endRotation?: number
+    startBorderRadius?: number
+    endBorderRadius?: number
     startTime: number // Timeline time in seconds when transition started
     duration: number // Duration in seconds
   }>>(new Map())
@@ -1605,10 +1612,19 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         }
         
         // Second pass: create/update all holders with shared position
+        // Find shared borderRadius from existing holders
+        let sharedBorderRadius: number | undefined = undefined
+        for (const holder of layoutClip.holders) {
+          if (holder.borderRadius !== undefined) {
+            sharedBorderRadius = holder.borderRadius
+            break
+          }
+        }
+        
         activeClips.forEach(clip => {
           const existingHolder = existingHoldersMap.get(clip.id)
           if (existingHolder) {
-            // Update existing holder to use shared position
+            // Update existing holder to use shared position, preserve borderRadius
             holders.push({
               ...existingHolder,
               x: sharedPosition!.x,
@@ -1616,9 +1632,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               width: sharedPosition!.width,
               height: sharedPosition!.height,
               rotation: sharedPosition!.rotation,
+              // Preserve borderRadius if it exists
+              borderRadius: existingHolder.borderRadius,
             })
           } else {
-            // Create new holder with shared position
+            // Create new holder with shared position and borderRadius
             holders.push({
               id: `holder_${clip.id}`,
               clipId: clip.id,
@@ -1629,6 +1647,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               height: sharedPosition.height,
               rotation: sharedPosition.rotation,
               zIndex: clip.layer === 'camera' ? 1 : 2,
+              borderRadius: sharedBorderRadius, // Use shared borderRadius if available
             })
           }
         })
@@ -1718,10 +1737,19 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       }
       
       // Second pass: create/update all holders with shared position
+      // Find shared borderRadius from existing holders
+      let sharedBorderRadius: number | undefined = undefined
+      for (const holder of layoutClip.holders) {
+        if (holder.borderRadius !== undefined) {
+          sharedBorderRadius = holder.borderRadius
+          break
+        }
+      }
+      
       activeClips.forEach(clip => {
         const existingHolder = existingHoldersMap.get(clip.id)
         if (existingHolder) {
-          // Update existing holder to use shared position
+          // Update existing holder to use shared position, preserve borderRadius
           holders.push({
             ...existingHolder,
             x: sharedPosition!.x,
@@ -1729,9 +1757,19 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             width: sharedPosition!.width,
             height: sharedPosition!.height,
             rotation: sharedPosition!.rotation,
+            // Preserve borderRadius if it exists
+            borderRadius: existingHolder.borderRadius,
           })
         } else {
-          // Create new holder with shared position
+          // Try to find borderRadius from original holder (for split clips)
+          let borderRadius = sharedBorderRadius
+          const baseId = clip.id.split('_before_')[0].split('_after_')[0].split('_part1_')[0].split('_part2_')[0]
+          const originalHolder = originalHoldersMap.get(baseId)
+          if (originalHolder?.borderRadius !== undefined) {
+            borderRadius = originalHolder.borderRadius
+          }
+          
+          // Create new holder with shared position and borderRadius
           holders.push({
             id: `holder_${clip.id}`,
             clipId: clip.id,
@@ -1742,6 +1780,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             height: sharedPosition.height,
             rotation: sharedPosition.rotation,
             zIndex: clip.layer === 'camera' ? 1 : 2,
+            borderRadius: borderRadius, // Use shared borderRadius if available
           })
         }
       })
@@ -2931,6 +2970,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               endPos: emptySpacePosition,
               startRotation: prevHolder.rotation || 0,
               endRotation: 0,
+              startBorderRadius: prevHolder.borderRadius ?? 0,
+              endBorderRadius: 0, // Empty space has no rounded corners
               startTime: transitionBoundaryTime,
               duration: canvasSettings.transitionDuration
             })
@@ -2957,6 +2998,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   },
                   startRotation: 0,
                   endRotation: newHolder.rotation || 0,
+                  startBorderRadius: 0, // Empty space has no rounded corners
+                  endBorderRadius: newHolder.borderRadius ?? 0,
                   startTime: transitionBoundaryTime,
                   duration: canvasSettings.transitionDuration
                 })
@@ -2985,11 +3028,14 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               Math.abs(prevHolder.y - newHolder.y) > 0.001 ||
               Math.abs(prevHolder.width - newHolder.width) > 0.001 ||
               Math.abs(prevHolder.height - newHolder.height) > 0.001 ||
-              Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1
+              Math.abs((prevHolder.rotation || 0) - (newHolder.rotation || 0)) > 0.1 ||
+              Math.abs((prevHolder.borderRadius ?? 0) - (newHolder.borderRadius ?? 0)) > 0.1
             
             if (hasPositionChange) {
               const clipKey = `${clipId}_${layer}`
               
+              // Always include borderRadius in transitions, even if it's the same value
+              // This ensures smooth transitions when only borderRadius changes
               transitioningByClipRef.current.set(clipKey, {
                 startPos: { 
                   x: prevHolder.x, 
@@ -3005,6 +3051,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 },
                 startRotation: prevHolder.rotation || 0,
                 endRotation: newHolder.rotation || 0,
+                startBorderRadius: prevHolder.borderRadius ?? 0,
+                endBorderRadius: newHolder.borderRadius ?? 0,
                 startTime: transitionBoundaryTime,
                 duration: canvasSettings.transitionDuration
               })
@@ -3024,6 +3072,8 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               endPos: emptySpacePosition,
               startRotation: prevHolder.rotation || 0,
               endRotation: 0,
+              startBorderRadius: prevHolder.borderRadius ?? 0,
+              endBorderRadius: 0, // Empty space has no rounded corners
               startTime: transitionBoundaryTime,
               duration: canvasSettings.transitionDuration
             })
@@ -3042,7 +3092,9 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               },
               startRotation: 0,
               endRotation: newHolder.rotation || 0,
-              startTime: transitionStartTime,
+              startBorderRadius: 0, // Empty space has no rounded corners
+              endBorderRadius: newHolder.borderRadius ?? 0,
+              startTime: transitionBoundaryTime,
               duration: canvasSettings.transitionDuration
             })
           }
@@ -4821,6 +4873,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         let displayWidth = 1
         let displayHeight = 1
         let displayRotation = 0
+        let displayBorderRadius = 0 // Empty space has no rounded corners
         
         // Apply transition if active
         if (transition && canvasSettings.transitionDuration > 0) {
@@ -4855,16 +4908,24 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
               
               displayRotation = startRot + diff * eased
             }
+            
+            // Interpolate borderRadius if provided
+            if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
+              displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
+            }
           } else if (elapsed >= transition.duration) {
             displayX = transition.endPos.x
             displayY = transition.endPos.y
             displayWidth = transition.endPos.width
             displayHeight = transition.endPos.height
             displayRotation = transition.endRotation || 0
+            displayBorderRadius = transition.endBorderRadius ?? 0
           }
         }
         
         // Create a temporary holder for rendering
+        // Find the original holder to preserve borderRadius
+        const originalHolder = currentLayoutClip?.holders.find(h => h.clipId === clip.id && h.layer === clip.layer)
         activeHolders.push({
           id: `empty_${clip.id}`,
           clipId: clip.id,
@@ -4875,6 +4936,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
           height: displayHeight,
           rotation: displayRotation,
           zIndex: clip.layer === 'camera' ? 1 : 2,
+          borderRadius: displayBorderRadius, // Use interpolated borderRadius
         })
       })
     }
@@ -4945,6 +5007,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
       let displayW = holder.width
       let displayH = holder.height
       let displayRotation = holder.rotation || 0
+      let displayBorderRadius = holder.borderRadius ?? 0
       
       // Check for transition by clipId_layer (for layout clip transitions)
       const transitionClipKey = `${holder.clipId}_${holder.layer}`
@@ -4986,6 +5049,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
             }
             
             displayRotation = startRot + diff * eased
+          }
+          
+          // Interpolate borderRadius if provided
+          if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
+            displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
           }
         }
       }
@@ -5029,63 +5097,399 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
         drawY = -drawH / 2
       }
       
-      // Draw video frame first
-      ctx.drawImage(video, drawX, drawY, drawW, drawH)
-      
-      // Apply color adjustments using imageData manipulation
-      if (brightnessValue !== 1 || contrastValue !== 1 || highlights !== 0 || midtones !== 0 || shadows !== 0 || saturation !== 0) {
-        const imageData = ctx.getImageData(drawX, drawY, drawW, drawH)
-        const data = imageData.data
+      // Calculate rounded corner radius if needed
+      // Use displayBorderRadius (which includes transition interpolation) instead of holder.borderRadius
+      const borderRadius = displayBorderRadius
+      let scaledRadius = 0
+      if (borderRadius > 0) {
+        // borderRadius is stored in export resolution pixels (e.g., 1920x1080)
+        // The canvas in renderFrameToCanvas is set to export resolution, so scale should be 1.0
+        // But we still need to scale it properly
+        const exportWidth = canvasSettings.resolution?.width || canvasDimensions.width || 1920
+        const exportHeight = canvasSettings.resolution?.height || canvasDimensions.height || 1080
         
-        for (let i = 0; i < data.length; i += 4) {
-          let r = data[i]
-          let g = data[i + 1]
-          let b = data[i + 2]
-          
-          // Calculate luminance (0-255)
-          const luminance = 0.299 * r + 0.587 * g + 0.114 * b
-          
-          // Determine which tonal range this pixel belongs to
-          let adjustment = 0
-          if (luminance > 200) {
-            // Highlights (bright areas)
-            adjustment = highlights / 100
-          } else if (luminance > 100) {
-            // Midtones
-            adjustment = midtones / 100
-          } else {
-            // Shadows (dark areas)
-            adjustment = shadows / 100
-          }
-          
-          // Apply brightness/exposure
-          const brightnessAdjust = brightnessValue
-          
-          // Apply adjustments
-          r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
-          g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
-          b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
-          
-          // Apply contrast
-          r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
-          g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
-          b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
-          
-          // Apply saturation
-          if (saturation !== 0) {
-            const gray = 0.299 * r + 0.587 * g + 0.114 * b
-            const satValue = 1 + saturation / 100
-            r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
-            g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
-            b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
-          }
-          
-          data[i] = r
-          data[i + 1] = g
-          data[i + 2] = b
+        // Calculate scale factor from export resolution to canvas
+        // In renderFrameToCanvas, canvas is set to export resolution, so this should be ~1.0
+        const scaleX = canvas.width / exportWidth
+        const scaleY = canvas.height / exportHeight
+        const scale = Math.min(scaleX, scaleY) // Use minimum to maintain aspect ratio
+        
+        // Scale the borderRadius
+        const borderRadiusCanvas = borderRadius * scale
+        
+        // Clamp to maximum possible radius (half of smallest dimension)
+        const minDimension = Math.min(Math.abs(drawW), Math.abs(drawH))
+        scaledRadius = Math.min(borderRadiusCanvas, minDimension / 2)
+        
+        // Debug logging
+        if (borderRadius > 0 && scaledRadius === 0) {
+          console.log('borderRadius scaling issue:', {
+            borderRadius,
+            scale,
+            borderRadiusCanvas,
+            minDimension,
+            drawW,
+            drawH,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height,
+            exportWidth,
+            exportHeight
+          })
         }
         
-        ctx.putImageData(imageData, drawX, drawY)
+        // Ensure we have a valid radius - if scaling resulted in 0, use a minimum
+        if (scaledRadius <= 0 && borderRadius > 0) {
+          // Fallback: use a percentage of the smallest dimension
+          scaledRadius = Math.min(borderRadius, minDimension / 2)
+        }
+      }
+      
+      // Apply rounded corners if specified - use direct clip path approach
+      if (scaledRadius > 0) {
+        // Save context state before clipping
+        ctx.save()
+        
+        // Create rounded rectangle path
+        ctx.beginPath()
+        if (typeof (ctx as any).roundRect === 'function') {
+          (ctx as any).roundRect(drawX, drawY, drawW, drawH, scaledRadius)
+        } else {
+          // Fallback: manually draw rounded rectangle
+          const r = scaledRadius
+          const x = drawX
+          const y = drawY
+          const w = drawW
+          const h = drawH
+          
+          ctx.moveTo(x + r, y)
+          ctx.lineTo(x + w - r, y)
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+          ctx.lineTo(x + w, y + h - r)
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+          ctx.lineTo(x + r, y + h)
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+          ctx.lineTo(x, y + r)
+          ctx.quadraticCurveTo(x, y, x + r, y)
+          ctx.closePath()
+        }
+        
+        // Clip to rounded rectangle
+        ctx.clip()
+        
+        // Draw video (will be clipped to rounded rectangle)
+        ctx.drawImage(video, drawX, drawY, drawW, drawH)
+        
+        // Restore context (removes clip)
+        ctx.restore()
+      } else {
+        // No rounded corners - draw directly
+        ctx.drawImage(video, drawX, drawY, drawW, drawH)
+      }
+      
+      // Apply color adjustments if needed (only if no rounded corners, or after rounded corners)
+      if (brightnessValue !== 1 || contrastValue !== 1 || highlights !== 0 || midtones !== 0 || shadows !== 0 || saturation !== 0) {
+        // For rounded corners, we need to use a different approach
+        if (scaledRadius > 0) {
+          // Re-draw with color adjustments on a temporary canvas
+          const tempCanvas = document.createElement('canvas')
+          tempCanvas.width = Math.ceil(Math.abs(drawW))
+          tempCanvas.height = Math.ceil(Math.abs(drawH))
+          const tempCtx = tempCanvas.getContext('2d')
+          
+          if (tempCtx) {
+            // Draw video to temp canvas
+            const videoAspect = video.videoWidth / video.videoHeight
+            const tempAspect = tempCanvas.width / tempCanvas.height
+            
+            let tempDrawW = tempCanvas.width
+            let tempDrawH = tempCanvas.height
+            let tempDrawX = 0
+            let tempDrawY = 0
+            
+            if (tempAspect > videoAspect) {
+              tempDrawH = tempCanvas.height
+              tempDrawW = tempDrawH * videoAspect
+              tempDrawX = (tempCanvas.width - tempDrawW) / 2
+            } else {
+              tempDrawW = tempCanvas.width
+              tempDrawH = tempDrawW / videoAspect
+              tempDrawY = (tempCanvas.height - tempDrawH) / 2
+            }
+            
+            tempCtx.drawImage(video, tempDrawX, tempDrawY, tempDrawW, tempDrawH)
+            
+            // Apply color adjustments
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
+            const data = imageData.data
+            
+            for (let i = 0; i < data.length; i += 4) {
+              let r = data[i]
+              let g = data[i + 1]
+              let b = data[i + 2]
+              
+              const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+              let adjustment = 0
+              if (luminance > 200) {
+                adjustment = highlights / 100
+              } else if (luminance > 100) {
+                adjustment = midtones / 100
+              } else {
+                adjustment = shadows / 100
+              }
+              
+              const brightnessAdjust = brightnessValue
+              r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
+              g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
+              b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
+              
+              r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
+              g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
+              b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
+              
+              if (saturation !== 0) {
+                const gray = 0.299 * r + 0.587 * g + 0.114 * b
+                const satValue = 1 + saturation / 100
+                r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
+                g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
+                b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
+              }
+              
+              data[i] = r
+              data[i + 1] = g
+              data[i + 2] = b
+            }
+            
+            tempCtx.putImageData(imageData, 0, 0)
+            
+            // Apply rounded corners mask
+            tempCtx.globalCompositeOperation = 'destination-in'
+            tempCtx.fillStyle = 'white'
+            tempCtx.beginPath()
+            if ('roundRect' in tempCtx) {
+              (tempCtx as any).roundRect(0, 0, tempCanvas.width, tempCanvas.height, scaledRadius)
+            } else {
+              const r = scaledRadius
+              tempCtx.moveTo(r, 0)
+              tempCtx.lineTo(tempCanvas.width - r, 0)
+              tempCtx.quadraticCurveTo(tempCanvas.width, 0, tempCanvas.width, r)
+              tempCtx.lineTo(tempCanvas.width, tempCanvas.height - r)
+              tempCtx.quadraticCurveTo(tempCanvas.width, tempCanvas.height, tempCanvas.width - r, tempCanvas.height)
+              tempCtx.lineTo(r, tempCanvas.height)
+              tempCtx.quadraticCurveTo(0, tempCanvas.height, 0, tempCanvas.height - r)
+              tempCtx.lineTo(0, r)
+              tempCtx.quadraticCurveTo(0, 0, r, 0)
+              tempCtx.closePath()
+            }
+            tempCtx.fill()
+            
+            // Draw the masked temp canvas to the main canvas
+            ctx.save()
+            ctx.translate(holderX + holderW / 2, holderY + holderH / 2)
+            ctx.rotate(displayRotation * Math.PI / 180)
+            ctx.drawImage(tempCanvas, drawX, drawY, drawW, drawH)
+            ctx.restore()
+          }
+        } else {
+          // No rounded corners - apply color adjustments directly
+          const imageData = ctx.getImageData(drawX, drawY, drawW, drawH)
+          const data = imageData.data
+          
+          for (let i = 0; i < data.length; i += 4) {
+            let r = data[i]
+            let g = data[i + 1]
+            let b = data[i + 2]
+            
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+            let adjustment = 0
+            if (luminance > 200) {
+              adjustment = highlights / 100
+            } else if (luminance > 100) {
+              adjustment = midtones / 100
+            } else {
+              adjustment = shadows / 100
+            }
+            
+            const brightnessAdjust = brightnessValue
+            r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
+            g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
+            b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
+            
+            r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
+            g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
+            b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
+            
+            if (saturation !== 0) {
+              const gray = 0.299 * r + 0.587 * g + 0.114 * b
+              const satValue = 1 + saturation / 100
+              r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
+              g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
+              b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
+            }
+            
+            data[i] = r
+            data[i + 1] = g
+            data[i + 2] = b
+          }
+          
+          ctx.putImageData(imageData, drawX, drawY)
+        }
+      } else if (scaledRadius === 0) {
+        // No rounded corners and no color adjustments - just draw
+        ctx.drawImage(video, drawX, drawY, drawW, drawH)
+      }
+      
+      // Remove the old complex temporary canvas code that was here
+      // The new simpler approach above handles both rounded corners and color adjustments
+      
+      if (false) { // Disable old code
+        // Create a temporary canvas for the video with rounded corners
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = Math.ceil(Math.abs(drawW))
+        tempCanvas.height = Math.ceil(Math.abs(drawH))
+        const tempCtx = tempCanvas.getContext('2d')
+        
+        if (tempCtx) {
+          // Draw video to temp canvas
+          // Calculate the same aspect ratio fit as we did for the main canvas
+          const videoAspect = video.videoWidth / video.videoHeight
+          const tempAspect = tempCanvas.width / tempCanvas.height
+          
+          let tempDrawW = tempCanvas.width
+          let tempDrawH = tempCanvas.height
+          let tempDrawX = 0
+          let tempDrawY = 0
+          
+          if (tempAspect > videoAspect) {
+            // Temp canvas is wider - fit to height
+            tempDrawH = tempCanvas.height
+            tempDrawW = tempDrawH * videoAspect
+            tempDrawX = (tempCanvas.width - tempDrawW) / 2
+          } else {
+            // Temp canvas is taller - fit to width
+            tempDrawW = tempCanvas.width
+            tempDrawH = tempDrawW / videoAspect
+            tempDrawY = (tempCanvas.height - tempDrawH) / 2
+          }
+          
+          tempCtx.drawImage(video, tempDrawX, tempDrawY, tempDrawW, tempDrawH)
+          
+          // Apply color adjustments if needed
+          if (brightnessValue !== 1 || contrastValue !== 1 || highlights !== 0 || midtones !== 0 || shadows !== 0 || saturation !== 0) {
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
+            const data = imageData.data
+            
+            for (let i = 0; i < data.length; i += 4) {
+              let r = data[i]
+              let g = data[i + 1]
+              let b = data[i + 2]
+              
+              const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+              let adjustment = 0
+              if (luminance > 200) {
+                adjustment = highlights / 100
+              } else if (luminance > 100) {
+                adjustment = midtones / 100
+              } else {
+                adjustment = shadows / 100
+              }
+              
+              const brightnessAdjust = brightnessValue
+              r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
+              g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
+              b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
+              
+              r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
+              g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
+              b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
+              
+              if (saturation !== 0) {
+                const gray = 0.299 * r + 0.587 * g + 0.114 * b
+                const satValue = 1 + saturation / 100
+                r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
+                g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
+                b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
+              }
+              
+              data[i] = r
+              data[i + 1] = g
+              data[i + 2] = b
+            }
+            
+            tempCtx.putImageData(imageData, 0, 0)
+          }
+          
+          // Apply rounded corners mask using destination-in composite operation
+          tempCtx.globalCompositeOperation = 'destination-in'
+          tempCtx.fillStyle = 'white'
+          tempCtx.beginPath()
+          if ('roundRect' in tempCtx) {
+            (tempCtx as any).roundRect(0, 0, tempCanvas.width, tempCanvas.height, scaledRadius)
+          } else {
+            const r = scaledRadius
+            tempCtx.moveTo(r, 0)
+            tempCtx.lineTo(tempCanvas.width - r, 0)
+            tempCtx.quadraticCurveTo(tempCanvas.width, 0, tempCanvas.width, r)
+            tempCtx.lineTo(tempCanvas.width, tempCanvas.height - r)
+            tempCtx.quadraticCurveTo(tempCanvas.width, tempCanvas.height, tempCanvas.width - r, tempCanvas.height)
+            tempCtx.lineTo(r, tempCanvas.height)
+            tempCtx.quadraticCurveTo(0, tempCanvas.height, 0, tempCanvas.height - r)
+            tempCtx.lineTo(0, r)
+            tempCtx.quadraticCurveTo(0, 0, r, 0)
+            tempCtx.closePath()
+          }
+          tempCtx.fill()
+          
+          // Draw the masked temp canvas to the main canvas
+          ctx.drawImage(tempCanvas, drawX, drawY, drawW, drawH)
+        }
+      } else {
+        // No rounded corners - draw directly
+        ctx.drawImage(video, drawX, drawY, drawW, drawH)
+        
+        // Apply color adjustments using imageData manipulation
+        if (brightnessValue !== 1 || contrastValue !== 1 || highlights !== 0 || midtones !== 0 || shadows !== 0 || saturation !== 0) {
+          const imageData = ctx.getImageData(drawX, drawY, drawW, drawH)
+          const data = imageData.data
+          
+          for (let i = 0; i < data.length; i += 4) {
+            let r = data[i]
+            let g = data[i + 1]
+            let b = data[i + 2]
+            
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b
+            let adjustment = 0
+            if (luminance > 200) {
+              adjustment = highlights / 100
+            } else if (luminance > 100) {
+              adjustment = midtones / 100
+            } else {
+              adjustment = shadows / 100
+            }
+            
+            const brightnessAdjust = brightnessValue
+            r = Math.max(0, Math.min(255, r * brightnessAdjust * (1 + adjustment)))
+            g = Math.max(0, Math.min(255, g * brightnessAdjust * (1 + adjustment)))
+            b = Math.max(0, Math.min(255, b * brightnessAdjust * (1 + adjustment)))
+            
+            r = Math.max(0, Math.min(255, (r - 128) * contrastValue + 128))
+            g = Math.max(0, Math.min(255, (g - 128) * contrastValue + 128))
+            b = Math.max(0, Math.min(255, (b - 128) * contrastValue + 128))
+            
+            if (saturation !== 0) {
+              const gray = 0.299 * r + 0.587 * g + 0.114 * b
+              const satValue = 1 + saturation / 100
+              r = Math.max(0, Math.min(255, gray + (r - gray) * satValue))
+              g = Math.max(0, Math.min(255, gray + (g - gray) * satValue))
+              b = Math.max(0, Math.min(255, gray + (b - gray) * satValue))
+            }
+            
+            data[i] = r
+            data[i + 1] = g
+            data[i + 2] = b
+          }
+          
+          ctx.putImageData(imageData, drawX, drawY)
+        }
       }
       
       ctx.restore()
@@ -6112,6 +6516,110 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
     }
   }
 
+  // Offline export using WebCodecs
+  const handleOfflineExport = async () => {
+    if (sceneTakes.length === 0) {
+      alert('No scenes with selected takes')
+      return
+    }
+
+    if (!isWebCodecsAvailable()) {
+      alert('WebCodecs API is not available. Please use Chrome or Edge browser (Chrome 94+, Edge 94+).')
+      return
+    }
+
+    // Determine which scenes to export
+    const scenesToExport = selectedScenesForExport.size > 0
+      ? sceneTakes.filter(st => selectedScenesForExport.has(st.sceneId))
+      : sceneTakes // Export all if none selected
+
+    if (scenesToExport.length === 0) {
+      alert('Please select at least one scene to export')
+      return
+    }
+
+    setIsExporting(true)
+    setExportProgress('Starting offline export...')
+    setExportProgressPercent(0)
+
+    try {
+      // Get current layout clip's title and background image (if any)
+      const currentLayoutClip = layoutClips.find(lc => 
+        currentTime >= lc.timelineStart && currentTime < lc.timelineEnd
+      ) || layoutClips[0]
+
+      const titleData = currentLayoutClip?.title?.enabled && currentLayoutClip.title.text
+        ? {
+            text: currentLayoutClip.title.text,
+            x: currentLayoutClip.title.x,
+            y: currentLayoutClip.title.y,
+            textAlign: currentLayoutClip.title.textAlign || 'center',
+            font: titleSettings.font,
+            fontSize: titleSettings.size,
+            lineHeight: titleSettings.lineHeight,
+            animationIn: currentLayoutClip.title.animationIn || 'fade',
+            animationOut: currentLayoutClip.title.animationOut || 'fade',
+            animationDuration: currentLayoutClip.title.animationDuration || 0.5,
+            timelineStart: currentLayoutClip.timelineStart,
+            timelineEnd: currentLayoutClip.timelineEnd,
+          }
+        : undefined
+
+      const backgroundImageData = currentLayoutClip?.backgroundImage?.enabled && currentLayoutClip.backgroundImage.url
+        ? {
+            url: currentLayoutClip.backgroundImage.url,
+            x: 0, // Full canvas - adjust if needed
+            y: 0,
+            width: 1,
+            height: 1,
+          }
+        : undefined
+
+      const blob = await exportWithOfflinePipeline(
+        scenes,
+        timelineClips,
+        layoutClips,
+        canvasSettings,
+        layout,
+        {
+          style: selectedCaptionStyle !== 'none' 
+            ? captionStyles.find(s => s.id === selectedCaptionStyle) 
+            : undefined,
+          font: captionFont,
+          size: captionSize,
+          lineHeight: captionLineHeight,
+          maxWords: captionMaxWords,
+          enabled: selectedCaptionStyle !== 'none',
+        },
+        titleData,
+        backgroundImageData,
+        transcripts,
+        {
+          fps: 30,
+          bitrate: 5_000_000, // 5 Mbps
+          format: exportFormat,
+          codec: exportFormat === 'webm' ? 'vp9' : 'avc1',
+          onProgress: (message, percent) => {
+            setExportProgress(message)
+            setExportProgressPercent(percent)
+          }
+        }
+      )
+
+      downloadExportedVideo(blob, `export_${Date.now()}.${exportFormat}`)
+      setIsExporting(false)
+      setExportProgress('Export complete!')
+      setExportProgressPercent(100)
+      setShowExportDialog(false)
+    } catch (error) {
+      console.error('Offline export failed:', error)
+      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}`)
+      setIsExporting(false)
+      setExportProgress('Export failed')
+      setExportProgressPercent(0)
+    }
+  }
+
   // Export DaVinci Resolve timeline
   const handleExportDaVinci = () => {
     if (sceneTakes.length === 0) {
@@ -6388,6 +6896,32 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                 </p>
               </div>
 
+              {/* New Offline Export Section */}
+              <div className="mb-4 p-3 bg-gray-900/20 border border-gray-500/50 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-300">New: Offline Export (WebCodecs)</span>
+                </div>
+                <p className="text-xs text-gray-200/80 mb-2">
+                  Faster, more accurate export that matches exactly what you see. Requires Chrome/Edge browser.
+                </p>
+                <button
+                  onClick={handleOfflineExport}
+                  disabled={isExporting || !isWebCodecsAvailable()}
+                  className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                  title={!isWebCodecsAvailable() ? 'WebCodecs not available. Please use Chrome or Edge browser.' : undefined}
+                >
+                  {isExporting ? 'Exporting...' : 'Export with Offline Pipeline'}
+                </button>
+              </div>
+
+              {/* Legacy Export Section */}
+              <div className="mb-4 p-3 bg-gray-800/50 border border-gray-700 rounded">
+                <p className="text-xs text-gray-400 mb-2">Legacy Export (FFmpeg)</p>
+              </div>
+
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => !isExporting && setShowExportDialog(false)}
@@ -6402,7 +6936,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!ffmpegReady ? (ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? `FFmpeg error: ${ffmpegError}` : 'FFmpeg not ready') : undefined}
                 >
-                  {ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? 'FFmpeg Error' : 'Export Video'}
+                  {ffmpegLoading ? 'Loading FFmpeg...' : ffmpegError ? 'FFmpeg Error' : 'Export Video (FFmpeg)'}
                 </button>
                 <button
                   onClick={() => {
@@ -7550,10 +8084,53 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                     }}
                     className="w-full"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Duration for animated transitions between clip positions
-                  </p>
                 </div>
+              </div>
+
+              {/* Rounded Corners */}
+              <div className="border-t border-gray-700 pt-4">
+                <h4 className="text-xs font-semibold mb-3 text-gray-300">Rounded Corners</h4>
+                {(() => {
+                  const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                  const holders = currentLayoutClip?.holders || []
+                  // Get the first holder's borderRadius or default to 0
+                  const borderRadius = holders.length > 0 ? (holders[0].borderRadius ?? 0) : 0
+                  
+                  return (
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">
+                        Corner Radius: {borderRadius}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="600"
+                        step="1"
+                        value={borderRadius}
+                        onChange={(e) => {
+                          const currentLayoutClip = getCurrentLayoutClip(currentTime)
+                          if (currentLayoutClip) {
+                            const newRadius = parseInt(e.target.value, 10)
+                            setLayoutClips(prev => prev.map(lc => 
+                              lc.id === currentLayoutClip.id 
+                                ? { 
+                                    ...lc, 
+                                    holders: lc.holders.map(h => ({
+                                      ...h,
+                                      borderRadius: newRadius
+                                    }))
+                                  }
+                                : lc
+                            ))
+                            markAsEdited()
+                            saveToHistory()
+                          }
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                  )
+                })()}
               </div>
                 </>
               </div>
@@ -7821,7 +8398,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       <input
                         type="range"
                         min="12"
-                        max="200"
+                        max="600"
                         value={titleSettings.size}
                         onChange={(e) => {
                           setTitleSettings({ ...titleSettings, size: parseInt(e.target.value) })
@@ -7883,7 +8460,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       <input
                         type="range"
                         min="12"
-                        max="200"
+                        max="600"
                         value={captionSize}
                         onChange={(e) => {
                           setCaptionSize(parseInt(e.target.value))
@@ -8500,6 +9077,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                         let displayWidth = 1
                         let displayHeight = 1
                         let displayRotation = 0
+                        let displayBorderRadius = 0
                         
                         // Apply transition if active
                         if (transition && canvasSettings.transitionDuration > 0) {
@@ -8538,6 +9116,11 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               
                               displayRotation = startRot + diff * eased
                             }
+                            
+                            // Interpolate borderRadius if provided
+                            if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
+                              displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
+                            }
                           } else if (elapsed >= transition.duration) {
                             // Transition complete, use end position
                             displayX = transition.endPos.x
@@ -8545,6 +9128,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             displayWidth = transition.endPos.width
                             displayHeight = transition.endPos.height
                             displayRotation = transition.endRotation || 0
+                            displayBorderRadius = transition.endBorderRadius ?? 0
                           }
                         }
                         
@@ -8625,6 +9209,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       let displayWidth = holder.width
                       let displayHeight = holder.height
                       let displayRotation = holder.rotation
+                      let displayBorderRadius = holder.borderRadius ?? 0
                       
                       if (transition) {
                         // Use timeline time instead of performance.now() for proper export/scrub support
@@ -8664,6 +9249,13 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                           displayRotation = startRot + diff * eased
                         }
                         
+                        // Interpolate borderRadius - always interpolate if transition exists and values are defined
+                        // This ensures borderRadius transitions smoothly along with position/size/rotation
+                        if (transition.startBorderRadius !== undefined && transition.endBorderRadius !== undefined) {
+                          displayBorderRadius = transition.startBorderRadius + (transition.endBorderRadius - transition.startBorderRadius) * eased
+                        }
+                        // Note: If borderRadius values are not defined in transition, keep the current holder value
+                        
                         // Clean up completed transitions
                         if (progress >= 1) {
                           transitioningHoldersRef.current.delete(holder.id)
@@ -8698,6 +9290,22 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                       
                       const filterString = `brightness(${brightnessValue}) contrast(${contrastValue}) saturate(${saturationValue})`
                       
+                      // Calculate borderRadius in pixels for CSS
+                      // Use displayBorderRadius (which includes transition interpolation) instead of holder.borderRadius
+                      // borderRadius is stored in export resolution pixels, need to scale to container
+                      const container = document.querySelector('[data-canvas-container]') as HTMLElement
+                      let borderRadiusPx = 0
+                      if (displayBorderRadius > 0 && container) {
+                        const rect = container.getBoundingClientRect()
+                        const exportWidth = canvasSettings.resolution?.width || 1920
+                        const exportHeight = canvasSettings.resolution?.height || 1080
+                        // Scale from export resolution to container size
+                        const scaleX = rect.width / exportWidth
+                        const scaleY = rect.height / exportHeight
+                        const scale = Math.min(scaleX, scaleY)
+                        borderRadiusPx = displayBorderRadius * scale
+                      }
+                      
                       return (
                         <div
                           key={holder.id}
@@ -8714,6 +9322,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                             backgroundColor: !isActive ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
                             zIndex: holder.zIndex || 10, // Video holders use their zIndex property
                             transition: transition ? 'none' : undefined, // Disable CSS transitions during programmatic transitions
+                            borderRadius: borderRadiusPx > 0 ? `${borderRadiusPx}px` : undefined,
                           }}
                           onMouseDown={(e) => {
                             // Only start drag if clicking on the holder itself (not on resize handles)
@@ -8744,6 +9353,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange, showE
                               style={{
                                 display: 'block',
                                 filter: filterString,
+                                borderRadius: borderRadiusPx > 0 ? `${borderRadiusPx}px` : undefined,
                               }}
                               muted={holder.layer !== 'microphone'}
                               playsInline

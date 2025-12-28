@@ -17,8 +17,10 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "html2canvas": "^1.4.1",
+    "mp4box": "^2.3.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "webm-muxer": "^5.1.4"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
