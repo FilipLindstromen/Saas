@@ -5,8 +5,9 @@ import Editor from './components/Editor';
 import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
+import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics } from './services/openai';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions } from './services/openai';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -50,9 +51,29 @@ function App() {
   const [conversionMetrics, setConversionMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [headerSuggestions, setHeaderSuggestions] = useState(null);
 
   // Legend Highlighting
   const [activeLegendItem, setActiveLegendItem] = useState(null);
+
+  // Load conversion metrics from localStorage on mount
+  useEffect(() => {
+    const savedMetrics = localStorage.getItem('conversionMetrics');
+    if (savedMetrics) {
+      try {
+        setConversionMetrics(JSON.parse(savedMetrics));
+      } catch (e) {
+        console.error('Failed to parse saved metrics:', e);
+      }
+    }
+  }, []);
+
+  // Save conversion metrics to localStorage whenever they change
+  useEffect(() => {
+    if (conversionMetrics) {
+      localStorage.setItem('conversionMetrics', JSON.stringify(conversionMetrics));
+    }
+  }, [conversionMetrics]);
 
   // Legendary Copywriter Selection
   const [copywriter, setCopywriter] = usePersistentState('cw_copywriter', 'None');
@@ -111,6 +132,21 @@ function App() {
       setIsImproving(false);
     }
   };
+
+  const handleHeaderSuggestions = async () => {
+    if (!apiKey) return;
+    setMetricsLoading(true);
+    try {
+      const suggestions = await generateHeaderSuggestions(apiKey, content, targetAudience, docType, style);
+      setHeaderSuggestions(suggestions);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate header suggestions.');
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
 
   const handleAnalyzeAndColor = async () => {
     if (!apiKey || analyzeLoading) return;
@@ -220,6 +256,7 @@ function App() {
             conversionMetrics={conversionMetrics}
             onUpdateMetrics={handleMetricsUpdate}
             onImproveMetrics={handleImproveMetrics}
+            onHeaderSuggestions={handleHeaderSuggestions}
           />
 
         </Layout>
@@ -248,6 +285,13 @@ function App() {
           onClose={() => setBalanceData(null)}
           onImprove={handleBalanceImprove}
           isImproving={isImproving}
+        />
+      )}
+
+      {headerSuggestions && (
+        <HeaderSuggestionsModal
+          suggestions={headerSuggestions}
+          onClose={() => setHeaderSuggestions(null)}
         />
       )}
     </>

@@ -12,7 +12,8 @@ const RightPanel = ({
     conversionMetrics,
     onUpdateMetrics,
     metricsLoading,
-    onImproveMetrics
+    onImproveMetrics,
+    onHeaderSuggestions
 }) => {
 
     const ProgressBar = ({ label, value, color, feedback }) => (
@@ -199,37 +200,71 @@ const RightPanel = ({
                                     color="var(--color-cta-text)"
                                     feedback={conversionMetrics.metrics?.persuasion?.feedback}
                                 />
+                                <ProgressBar
+                                    label="Header Quality"
+                                    value={conversionMetrics.metrics?.headers?.score || 0}
+                                    color="var(--text-primary)"
+                                    feedback={conversionMetrics.metrics?.headers?.feedback}
+                                />
                             </>
                         )}
                     </div>
 
                     {/* Improve Button */}
                     {conversionMetrics && (
-                        <button
-                            onClick={onImproveMetrics}
-                            disabled={!apiKey || metricsLoading}
-                            style={{
-                                marginTop: '0.75rem',
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.5rem',
-                                backgroundColor: 'var(--color-cta-text)',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '0.75rem',
-                                fontSize: '0.9rem',
-                                fontWeight: 600,
-                                borderRadius: '6px',
-                                cursor: !apiKey || metricsLoading ? 'not-allowed' : 'pointer',
-                                opacity: !apiKey || metricsLoading ? 0.6 : 1,
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <Wand2 size={16} />
-                            Improve Copy
-                        </button>
+                        <>
+                            <button
+                                onClick={onImproveMetrics}
+                                disabled={!apiKey || metricsLoading}
+                                style={{
+                                    marginTop: '0.75rem',
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    backgroundColor: 'var(--color-cta-text)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '0.75rem',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    cursor: !apiKey || metricsLoading ? 'not-allowed' : 'pointer',
+                                    opacity: !apiKey || metricsLoading ? 0.6 : 1,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <Wand2 size={16} />
+                                Improve Copy
+                            </button>
+
+                            <button
+                                onClick={onHeaderSuggestions}
+                                disabled={!apiKey || metricsLoading}
+                                style={{
+                                    marginTop: '0.5rem',
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    backgroundColor: 'var(--bg-secondary)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    padding: '0.75rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 500,
+                                    borderRadius: '6px',
+                                    cursor: !apiKey || metricsLoading ? 'not-allowed' : 'pointer',
+                                    opacity: !apiKey || metricsLoading ? 0.6 : 1,
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <MessageCircle size={16} />
+                                Header Suggestions
+                            </button>
+                        </>
                     )}
                 </div>
 

@@ -449,7 +449,7 @@ export async function analyzeConversionMetrics(apiKey, content, targetAudience) 
     });
 
     const systemPrompt = `You are a world-class conversion copywriter and auditor.
-    Your task is to analyze the provided copy and score it from 0-100 on 5 key conversion metrics based on the Target Audience: ${targetAudience}.
+    Your task is to analyze the provided copy and score it from 0-100 on 6 key conversion metrics based on the Target Audience: ${targetAudience}.
 
     Metrics:
     1. **Hook**: Attention grabbing?
@@ -457,6 +457,7 @@ export async function analyzeConversionMetrics(apiKey, content, targetAudience) 
     3. **Novelty**: New mechanism/Unique angle?
     4. **Credibility**: Proof/Trust?
     5. **Persuasion**: Desire/CTA?
+    6. **Headers**: Are headlines & subheadlines clear, compelling, benefit-driven?
 
     Additionally, analyze the text to determine the **"Perfect Fit" Audience** based ONLY on the copy itself (tone, slang, pain points), ignoring any prior inputs.
 
@@ -467,7 +468,8 @@ export async function analyzeConversionMetrics(apiKey, content, targetAudience) 
         "relatable": { "score": 70, "feedback": "Good pain points, but feels too distant." },
         "novelty": { "score": 60, "feedback": "Angle is common. Needs a twist." },
         "credibility": { "score": 40, "feedback": "Needs more specific numbers or names." },
-        "persuasion": { "score": 90, "feedback": "Excellent CTA." }
+        "persuasion": { "score": 90, "feedback": "Excellent CTA." },
+        "headers": { "score": 75, "feedback": "Headlines are clear but lack urgency." }
       },
       "perfect_audience_analysis": "Based on the text, this is perfect for [Who] struggling with [Problem] who wants [Desire]. The tone implies..."
     }
@@ -605,6 +607,64 @@ export async function improveConversionMetrics(apiKey, originalText, metricsData
         return cleanedContent;
     } catch (error) {
         console.error("OpenAI Improve Conversion Error:", error);
+        throw error;
+    }
+}
+
+export async function generateHeaderSuggestions(apiKey, content, targetAudience, docType, style) {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are an expert headline and subheadline copywriter.
+    
+    **Context**:
+    - Target Audience: ${targetAudience}
+    - Document Type: ${docType}
+    - Writing Style: ${style}
+    
+    **Your Task**:
+    Analyze the current headlines and subheadlines in the provided copy and generate 5 BETTER alternatives for each.
+    
+    **What Makes a Great Header**:
+    - Clear benefit or transformation
+    - Specific and concrete (not vague)
+    - Creates curiosity or urgency
+    - Speaks directly to the audience's desires/pain
+    - Uses power words and numbers when appropriate
+    - Simple 5th-grade language
+    
+    **Return Format**:
+    Return ONLY a JSON object with this structure:
+    {
+      "current_headers": ["Current H1", "Current H2", "Current H3"],
+      "suggestions": [
+        {
+          "original": "Current headline text",
+          "alternatives": [
+            "Better option 1",
+            "Better option 2",
+            "Better option 3",
+            "Better option 4",
+            "Better option 5"
+          ],
+          "why_better": "Brief explanation of what makes these better"
+        }
+      ]
+    }
+    `;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: stripTags(content) }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" }
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("OpenAI Header Suggestions Error:", error);
         throw error;
     }
 }
