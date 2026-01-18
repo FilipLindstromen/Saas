@@ -1,0 +1,452 @@
+:root {
+  /* Greyscale Palette */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  /* gray-50 */
+  --bg-tertiary: #f3f4f6;
+  /* gray-100 */
+  --border-color: #e5e7eb;
+  /* gray-200 */
+  --text-primary: #111827;
+  /* gray-900 */
+  --text-secondary: #4b5563;
+  /* gray-600 */
+  --text-tertiary: #9ca3af;
+  /* gray-400 */
+
+  /* Block Colors (Relatable & Pastel/Soft) */
+  --color-story: #fef3c7;
+  /* amber-100 - Warm, nostalgic */
+  --color-story-text: #92400e;
+  /* amber-800 */
+
+  --color-emotion: #fee2e2;
+  /* red-100 - Passion, feeling */
+  --color-emotion-text: #991b1b;
+  /* red-800 */
+
+  --color-logic: #e0f2fe;
+  /* sky-100 - Cool, clear, structured */
+  --color-logic-text: #075985;
+  /* sky-800 */
+
+  --color-cta: #dcfce7;
+  /* green-100 - Go, action */
+  --color-cta-text: #166534;
+  /* green-800 */
+
+  --color-misc: #f3f4f6;
+  /* gray-100 - Neutral */
+  --color-misc-text: #1f2937;
+  /* gray-800 */
+
+  --color-ad: #f3e8ff;
+  /* purple-100 - Creative */
+  --color-ad-text: #6b21a8;
+  /* purple-800 */
+
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #111827;
+  /* gray-900 */
+  --bg-secondary: #1f2937;
+  /* gray-800 */
+  --bg-tertiary: #374151;
+  /* gray-700 */
+  --border-color: #374151;
+  /* gray-700 */
+  --text-primary: #f9fafb;
+  /* gray-50 */
+  --text-secondary: #d1d5db;
+  /* gray-300 */
+  --text-tertiary: #9ca3af;
+  /* gray-400 */
+
+  /* Dark Mode Block Colors - Deeper, richer */
+  --color-story: #78350f;
+  /* amber-900 */
+  --color-story-text: #fef3c7;
+  /* amber-100 */
+
+  --color-emotion: #7f1d1d;
+  /* red-900 */
+  --color-emotion-text: #fee2e2;
+  /* red-100 */
+
+  --color-logic: #0c4a6e;
+  /* sky-900 */
+  --color-logic-text: #e0f2fe;
+  /* sky-100 */
+
+  --color-cta: #14532d;
+  /* green-900 */
+  --color-cta-text: #dcfce7;
+  /* green-100 */
+
+  --color-ad: #581c87;
+  /* purple-900 */
+  --color-ad-text: #f3e8ff;
+  /* purple-100 */
+
+  --color-misc: #374151;
+  /* gray-700 */
+  --color-misc-text: #f3f4f6;
+  /* gray-100 */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+button:hover {
+  background: var(--bg-secondary);
+}
+
+button:active {
+  background: var(--bg-tertiary);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+textarea,
+input,
+select {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  outline: none;
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: var(--text-tertiary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+/* Row Layout */
+.content-row {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+  margin-bottom: 2rem;
+  /* ONE full line break between color blocks */
+}
+
+/* Content Body Wrapper (Right Side) */
+.content-body {
+  flex-grow: 1;
+  width: 100%;
+  /* display: block; - Let it be block to allow inline flow inside */
+}
+
+/* Gutter (Icons) */
+.gutter {
+  width: 2rem;
+  flex-shrink: 0;
+  display: flex !important;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.4rem;
+  /* Align with text */
+  align-items: center;
+}
+
+/* Content Blocks - Layout Container */
+.block-story,
+.block-emotion,
+.block-logic,
+.block-cta,
+.block-ad,
+.block-misc {
+  /* Layout: Standard Block (Vertical Stacking) */
+  display: block;
+  margin: 0;
+  padding: 0;
+
+  /* Reset: No background on the container itself */
+  background: transparent !important;
+  color: inherit;
+  border: none;
+  box-shadow: none;
+}
+
+/* Define Color Variables for Children */
+.block-story {
+  --block-bg: var(--color-story);
+  --block-text: var(--text-primary);
+}
+
+.block-emotion {
+  --block-bg: var(--color-emotion);
+  --block-text: var(--text-primary);
+}
+
+.block-logic {
+  --block-bg: var(--color-logic);
+  --block-text: var(--text-primary);
+}
+
+.block-cta {
+  --block-bg: var(--color-cta);
+  --block-text: var(--text-primary);
+}
+
+.block-ad {
+  --block-bg: var(--color-ad);
+  --block-text: var(--text-primary);
+}
+
+.block-misc {
+  --block-bg: var(--color-misc);
+  --block-text: var(--text-primary);
+}
+
+/* Apply Highlight to SPANS inside Headings/Paragraphs */
+.block-story span,
+.block-emotion span,
+.block-logic span,
+.block-cta span,
+.block-ad span,
+.block-misc span {
+  background-color: var(--block-bg);
+  color: var(--block-text);
+
+  /* Make it look like a highlighter marker */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.2rem 0.2rem;
+  border-radius: 4px;
+
+  /* Ensure it behaves inline */
+  display: inline;
+  line-height: 1.6;
+  box-shadow: none;
+}
+
+/* Ensure Parent Elements (H1, P) flow correctly as blocks */
+.block-story h1,
+.block-story h2,
+.block-story h3,
+.block-story p,
+.block-emotion h1,
+.block-emotion h2,
+.block-emotion h3,
+.block-emotion p,
+.block-logic h1,
+.block-logic h2,
+.block-logic h3,
+.block-logic p,
+.block-cta h1,
+.block-cta h2,
+.block-cta h3,
+.block-cta p,
+.block-ad h1,
+.block-ad h2,
+.block-ad h3,
+.block-ad p,
+.block-misc h1,
+.block-misc h2,
+.block-misc h3,
+.block-misc p,
+.content-body h1,
+.content-body h2,
+.content-body h3,
+.content-body p,
+.content-body div {
+  display: block;
+  /* Force new line for each element */
+  margin: 0 0 0.5rem 0 !important;
+  padding: 0 !important;
+  background: transparent;
+  /* No double background */
+  font-weight: inherit;
+  width: 100%;
+}
+
+/* Make Headings stand out via size/weight, even if inline */
+/* We need to force them to be visually distinct even if inline */
+.content-body h1 {
+  font-size: 1.4em;
+  font-weight: 800;
+}
+
+.content-body h2 {
+  font-size: 1.25em;
+  font-weight: 700;
+}
+
+.content-body h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+/* Force a line break AFTER a heading if it's followed by text, 
+   but since they are inline, they merged. 
+   We rely on the user or AI to put <br> if they want a break. */
+
+/* Background Colors */
+.block-story {
+  background: var(--color-story);
+  color: var(--color-story-text);
+}
+
+.block-emotion {
+  background: var(--color-emotion);
+  color: var(--color-emotion-text);
+}
+
+.block-logic {
+  background: var(--color-logic);
+  color: var(--color-logic-text);
+}
+
+.block-cta {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-weight: 600;
+}
+
+.block-ad {
+  background: var(--color-ad);
+  color: var(--color-ad-text);
+}
+
+.block-misc {
+  background: var(--color-misc);
+  color: var(--color-misc-text);
+}
+
+/* Remove legacy afters */
+.block-story::after,
+.block-emotion::after,
+.block-logic::after,
+.block-cta::after,
+.block-ad::after,
+.block-misc::after {
+  content: none;
+}
+
+/* Icons */
+.icons-container {
+  display: none;
+}
+
+i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 0.9rem;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+i[type="homer"]::before {
+  content: '🍩';
+}
+
+i[type="bart"]::before {
+  content: '⚡';
+}
+
+i[type="marge"]::before {
+  content: '💙';
+}
+
+i[type="lisa"]::before {
+  content: '📊';
+}
+
+i[type="interrupt"]::before {
+  content: '🛑';
+}
+
+i[type="loop-open"]::before {
+  content: '➰';
+}
+
+i[type="loop-close"]::before {
+  content: '✅';
+}
+
+/* Highlights (Inline spans for specific words) */
+.highlight-interrupt,
+.highlight-loop-open,
+.highlight-loop-close {
+  border-bottom: 2px dashed;
+  padding-bottom: 0px;
+}
+
+.highlight-interrupt {
+  border-color: #ef4444;
+  color: #7f1d1d;
+}
+
+.highlight-loop-open {
+  border-color: #8b5cf6;
+  color: #4c1d95;
+}
+
+.highlight-loop-close {
+  border-color: #10b981;
+  color: #064e3b;
+}
