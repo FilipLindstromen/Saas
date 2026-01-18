@@ -29,6 +29,12 @@ export async function generateCopy(apiKey, { docType, style, instructions, targe
     Your goal is to write a ${docType} targeting ${targetAudience || 'the general public'}.
     Tone: ${style}.
 
+    **LANGUAGE CONSTRAINT**: 
+    You MUST write at a **5th-grade reading level**. 
+    - Avoid jargon, complex words, and long sentences.
+    - Use simple, punchy, and clear language.
+    - If a complex concept is needed, explain it simply.
+
     **CRITICAL STRUCTURE REQUIREMENTS**:
     1. **STRONG HOOK**: The very first sentence/paragraph MUST be a powerful, attention-grabbing hook. It must be impossible to ignore.
     ${docType.includes('Sales Page') ? `
@@ -70,7 +76,7 @@ Wraps the content blocks. This is CRITICALLY IMPORTANT for layout.
 </div>
 
 **Content Blocks**:
-Types: block-story, block-emotion, block-logic, block-cta, block-ad, block-misc.
+Types: block-hook, block-story, block-emotion, block-logic, block-proof, block-cta, block-ad, block-misc.
 
 **Highlights (Inline spans)**:
 <span class="highlight-interrupt">...</span>
@@ -393,3 +399,46 @@ CRITICAL: Return ONLY the valid HTML.
         throw error;
     }
 };
+export async function analyzeConversionMetrics(apiKey, content, targetAudience) {
+    const openai = new OpenAI({
+        apiKey: apiKey,
+        dangerouslyAllowBrowser: true
+    });
+
+    const systemPrompt = `You are a world-class conversion copywriter and auditor.
+    Your task is to analyze the provided copy and score it from 0-100 on 5 key conversion metrics based on the Target Audience: ${targetAudience}.
+
+    Metrics:
+    1. **Hook**: Attention grabbing?
+    2. **Relatability**: Empathy/Language match?
+    3. **Novelty**: New mechanism/Unique angle?
+    4. **Credibility**: Proof/Trust?
+    5. **Persuasion**: Desire/CTA?
+
+    Additionally, analyze the text to determine the **"Perfect Fit" Audience** based ONLY on the copy itself (tone, slang, pain points), ignoring any prior inputs.
+
+    Return ONLY a JSON object with this EXACT structure:
+    {
+      "metrics": {
+        "hook": { "score": 85, "feedback": "Strong opening, but simpler words needed." },
+        "relatable": { "score": 70, "feedback": "Good pain points, but feels too distant." },
+        "novelty": { "score": 60, "feedback": "Angle is common. Needs a twist." },
+        "credibility": { "score": 40, "feedback": "Needs more specific numbers or names." },
+        "persuasion": { "score": 90, "feedback": "Excellent CTA." }
+      },
+      "perfect_audience_analysis": "Based on the text, this is perfect for [Who] struggling with [Problem] who wants [Desire]. The tone implies..."
+    }
+    `
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Analyze this content:\n\n${stripTags(content)}` }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+}
