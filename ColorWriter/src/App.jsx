@@ -5,7 +5,8 @@ import Editor from './components/Editor';
 import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
-import { analyzeAudienceFeedback, improveCopy, improveBalance } from './services/openai';
+import RightPanel from './components/RightPanel';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics } from './services/openai';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -45,6 +46,11 @@ function App() {
   const [balanceData, setBalanceData] = useState(null);
   const [isImproving, setIsImproving] = useState(false);
 
+  // Conversion Metrics State
+  const [conversionMetrics, setConversionMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+
   // Legend Highlighting
   const [activeLegendItem, setActiveLegendItem] = useState(null);
 
@@ -69,6 +75,39 @@ function App() {
     setBalanceData(result);
   };
 
+  const handleMetricsUpdate = async () => {
+    if (!apiKey) return;
+    setMetricsLoading(true);
+    try {
+      const metrics = await analyzeConversionMetrics(apiKey, content, targetAudience);
+      setConversionMetrics(metrics);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to update metrics.');
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  const handleAnalyzeAndColor = async () => {
+    if (!apiKey || analyzeLoading) return;
+    const { analyzeCopy } = await import('./services/openai');
+    // We need to parse text from HTML content for analysis if possible, but the service handles it.
+    // Although wait, Editor usually handles this logic. 
+    // We should pass a handler to Editor? Or can we do it here?
+    // The Editor has the ref. But `content` state is synced. 
+
+    setAnalyzeLoading(true);
+    try {
+      const newContent = await analyzeCopy(apiKey, content); // analyzing the HTML content directly is fine if service strips tags
+      setContent(newContent);
+    } catch (e) {
+      alert("Error analyzing text.");
+    } finally {
+      setAnalyzeLoading(false);
+    }
+  };
+
   const handleImprove = async () => {
     if (!apiKey || !feedbackData) return;
     setIsImproving(true);
@@ -87,6 +126,7 @@ function App() {
     if (!apiKey || !balanceData) return;
     setIsImproving(true);
     try {
+      const { improveBalance } = await import('./services/openai');
       const newContent = await improveBalance(apiKey, content, balanceData, docType, style, targetAudience);
       setContent(newContent);
       setBalanceData(null);
@@ -100,12 +140,12 @@ function App() {
   return (
     <>
       <div className="app-container">
-        {/* Theme Toggle - Fixed Top Right */}
+        {/* Theme Toggle - Fixed Top Right - Adjusted position for 3-col layout */}
         <button
           onClick={toggleTheme}
           style={{
             position: 'fixed',
-            top: '1rem',
+            bottom: '1rem', // Moved to bottom right to not conflict with header
             right: '1rem',
             zIndex: 100,
             padding: '0.5rem',
@@ -137,17 +177,27 @@ function App() {
             copywriter={copywriter}
             setCopywriter={setCopywriter}
           />
+
           <Editor
             content={content}
             setContent={setContent}
-            apiKey={apiKey}
             onSelectionChange={setActiveLegendItem}
-            onFeedback={handleAudienceFeedback}
-            onBalance={handleBalanceAnalysis}
-            targetAudience={targetAudience}
-            docType={docType}
-            style={style}
+          // Removed internal action buttons
           />
+
+          <RightPanel
+            apiKey={apiKey}
+            docType={docType}
+            targetAudience={targetAudience}
+            onAnalyze={handleAnalyzeAndColor}
+            onFeedback={() => handleAudienceFeedback(targetAudience, docType)}
+            onBalance={() => handleBalanceAnalysis(targetAudience)}
+            loading={analyzeLoading}
+            metricsLoading={metricsLoading}
+            conversionMetrics={conversionMetrics}
+            onUpdateMetrics={handleMetricsUpdate}
+          />
+
         </Layout>
       </div>
 

@@ -62,9 +62,11 @@ const ColorLegend = ({ activeItem }) => {
             </h4>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <LegendItem label="Hook" color="var(--color-hook)" isActive={checkActive('hook')} isDimmed={checkDimmed('hook')} />
                 <LegendItem label="Story" color="var(--color-story)" isActive={checkActive('story')} isDimmed={checkDimmed('story')} />
                 <LegendItem label="Emotions" color="var(--color-emotion)" isActive={checkActive('emotion')} isDimmed={checkDimmed('emotion')} />
                 <LegendItem label="Logic" color="var(--color-logic)" isActive={checkActive('logic')} isDimmed={checkDimmed('logic')} />
+                <LegendItem label="Proof" color="var(--color-proof)" isActive={checkActive('proof')} isDimmed={checkDimmed('proof')} />
                 <LegendItem label="CTA" color="var(--color-cta)" isActive={checkActive('cta')} isDimmed={checkDimmed('cta')} />
                 <LegendItem label="Ad / Creative" color="var(--color-ad)" isActive={checkActive('ad')} isDimmed={checkDimmed('ad')} />
                 <LegendItem label="Misc" color="var(--color-misc)" isActive={checkActive('misc')} isDimmed={checkDimmed('misc')} />
@@ -82,10 +84,10 @@ const ColorLegend = ({ activeItem }) => {
                 Personas
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <LegendItem label="Homer" subtitle="Fun / Fails" color="#ffffff" type="homer" />
-                <LegendItem label="Bart" subtitle="Fast / Urgent" color="#ffffff" type="bart" />
-                <LegendItem label="Marge" subtitle="Connection" color="#ffffff" type="marge" />
-                <LegendItem label="Lisa" subtitle="Logic / Data" color="#ffffff" type="lisa" />
+                <LegendItem label="Homer" subtitle="Fun / Fails" color="#ffffff" type="homer" isActive={checkActive('homer')} isDimmed={checkDimmed('homer')} />
+                <LegendItem label="Bart" subtitle="Fast / Urgent" color="#ffffff" type="bart" isActive={checkActive('bart')} isDimmed={checkDimmed('bart')} />
+                <LegendItem label="Marge" subtitle="Connection" color="#ffffff" type="marge" isActive={checkActive('marge')} isDimmed={checkDimmed('marge')} />
+                <LegendItem label="Lisa" subtitle="Logic / Data" color="#ffffff" type="lisa" isActive={checkActive('lisa')} isDimmed={checkDimmed('lisa')} />
             </div>
 
             {/* MECHANICS */}

@@ -2,9 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Wand2, Loader2, Scale, MessageCircle, Bold, Heading1, Heading2, Heading3, Type } from 'lucide-react';
 import { analyzeCopy } from '../services/openai';
 
-const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targetAudience, onSelectionChange, onFeedback, onBalance }) => {
+const Editor = ({ content, setContent, onSelectionChange }) => {
     const editorRef = useRef(null);
-    const [loading, setLoading] = useState(false);
 
     // Toolbar State
     const [toolbar, setToolbar] = useState({ show: false, x: 0, y: 0 });
@@ -35,15 +34,43 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
             while (node && node !== editorRef.current) {
                 if (node.nodeType === 1) { // Element node
                     const className = node.className || '';
+
+                    // Check for Block Types
+                    if (className.includes('block-hook')) { onSelectionChange('hook'); break; }
                     if (className.includes('block-story')) { onSelectionChange('story'); break; }
                     if (className.includes('block-emotion')) { onSelectionChange('emotion'); break; }
                     if (className.includes('block-logic')) { onSelectionChange('logic'); break; }
+                    if (className.includes('block-proof')) { onSelectionChange('proof'); break; }
                     if (className.includes('block-cta')) { onSelectionChange('cta'); break; }
                     if (className.includes('block-ad')) { onSelectionChange('ad'); break; }
                     if (className.includes('block-misc')) { onSelectionChange('misc'); break; }
+
+                    // Check for Mechanics (Highlights)
                     if (className.includes('highlight-interrupt')) { onSelectionChange('interrupt'); break; }
                     if (className.includes('highlight-loop-open')) { onSelectionChange('loop-open'); break; }
                     if (className.includes('highlight-loop-close')) { onSelectionChange('loop-close'); break; }
+
+                    // Check for Personas (icon elements in gutter)
+                    if (node.tagName === 'I' && node.hasAttribute('type')) {
+                        const iconType = node.getAttribute('type');
+                        if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
+                            onSelectionChange(iconType);
+                            break;
+                        }
+                    }
+
+                    // Check if we're in a gutter (to detect persona icons)
+                    if (className.includes('gutter')) {
+                        // Look for icon children
+                        const icons = node.querySelectorAll('i[type]');
+                        if (icons.length > 0) {
+                            const iconType = icons[0].getAttribute('type');
+                            if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
+                                onSelectionChange(iconType);
+                                break;
+                            }
+                        }
+                    }
                 }
                 node = node.parentNode;
             }
@@ -140,7 +167,7 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
             flexDirection: 'column',
             height: '100%',
             position: 'relative',
-            backgroundColor: '#e5e7eb'
+            backgroundColor: 'var(--bg-tertiary)'
         }}>
             {/* Floating Toolbar */}
             {toolbar.show && (
@@ -222,105 +249,6 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
                 </div>
             </div>
 
-            <div style={{
-                position: 'fixed',
-                top: '6rem',
-                right: '2rem',
-                zIndex: 10,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch', // Full width for buttons
-                gap: '0.75rem',
-                width: '180px' // consistent width
-            }}>
-                <button
-                    onClick={async () => {
-                        if (!apiKey || loading) return;
-                        const text = editorRef.current.innerText;
-                        if (!text.trim()) return;
-
-                        setLoading(true);
-                        try {
-                            const newContent = await analyzeCopy(apiKey, text);
-                            setContent(newContent);
-                        } catch (e) {
-                            alert("Error analyzing text.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }}
-                    disabled={!apiKey || loading}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        backgroundColor: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        border: '1px solid var(--border-color)',
-                        opacity: !apiKey || loading ? 0.6 : 1,
-                        cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
-                        padding: '0.75rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    {loading ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                    {loading ? 'Thinking...' : 'Analyze / Color'}
-                </button>
-
-                <button
-                    onClick={() => onFeedback(targetAudience, docType)}
-                    disabled={!apiKey || !targetAudience}
-                    style={{
-                        backgroundColor: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                        padding: '0.75rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        opacity: !apiKey || !targetAudience ? 0.6 : 1,
-                        transition: 'all 0.2s'
-                    }}
-                    title={!targetAudience ? "Enter Target Audience in Sidebar first" : "Get Audience Feedback"}
-                >
-                    <MessageCircle size={16} />
-                    Thoughts?
-                </button>
-
-                <button
-                    onClick={() => onBalance(targetAudience)}
-                    disabled={!apiKey || !targetAudience}
-                    style={{
-                        backgroundColor: 'var(--bg-primary)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                        padding: '0.75rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        opacity: !apiKey || !targetAudience ? 0.6 : 1,
-                        transition: 'all 0.2s'
-                    }}
-                    title="Check Color Balance"
-                >
-                    <Scale size={16} />
-                    Balance
-                </button>
-            </div>
         </main >
     );
 };
