@@ -11,7 +11,8 @@ const RightPanel = ({
     loading,
     conversionMetrics,
     onUpdateMetrics,
-    metricsLoading
+    metricsLoading,
+    onImproveMetrics
 }) => {
 
     const ProgressBar = ({ label, value, color, feedback }) => (
@@ -201,6 +202,35 @@ const RightPanel = ({
                             </>
                         )}
                     </div>
+
+                    {/* Improve Button */}
+                    {conversionMetrics && (
+                        <button
+                            onClick={onImproveMetrics}
+                            disabled={!apiKey || metricsLoading}
+                            style={{
+                                marginTop: '0.75rem',
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                backgroundColor: 'var(--color-cta-text)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '0.75rem',
+                                fontSize: '0.9rem',
+                                fontWeight: 600,
+                                borderRadius: '6px',
+                                cursor: !apiKey || metricsLoading ? 'not-allowed' : 'pointer',
+                                opacity: !apiKey || metricsLoading ? 0.6 : 1,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Wand2 size={16} />
+                            Improve Copy
+                        </button>
+                    )}
                 </div>
 
                 {/* Perfect Fit Audience */}

@@ -6,7 +6,7 @@ import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics } from './services/openai';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics } from './services/openai';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -86,6 +86,29 @@ function App() {
       alert('Failed to update metrics.');
     } finally {
       setMetricsLoading(false);
+    }
+  };
+
+  const handleImproveMetrics = async () => {
+    if (!apiKey || !conversionMetrics) return;
+    setIsImproving(true);
+    try {
+      const newContent = await improveConversionMetrics(apiKey, content, conversionMetrics, docType, style, targetAudience, copywriter);
+      setContent(newContent);
+      // Auto-refresh metrics after improvement
+      setTimeout(async () => {
+        try {
+          const updatedMetrics = await analyzeConversionMetrics(apiKey, newContent, targetAudience);
+          setConversionMetrics(updatedMetrics);
+        } catch (e) {
+          console.error('Failed to refresh metrics:', e);
+        }
+      }, 500);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to improve copy based on metrics.');
+    } finally {
+      setIsImproving(false);
     }
   };
 
@@ -196,6 +219,7 @@ function App() {
             metricsLoading={metricsLoading}
             conversionMetrics={conversionMetrics}
             onUpdateMetrics={handleMetricsUpdate}
+            onImproveMetrics={handleImproveMetrics}
           />
 
         </Layout>

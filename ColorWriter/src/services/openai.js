@@ -78,6 +78,27 @@ Wraps the content blocks. This is CRITICALLY IMPORTANT for layout.
 **Content Blocks**:
 Types: block-hook, block-story, block-emotion, block-logic, block-proof, block-cta, block-ad, block-misc.
 
+**CRITICAL CLASSIFICATION RULES**:
+1. **block-hook**: ALWAYS use for the FIRST/OPENING element. Headlines, shocking statements, bold claims, attention-grabbers.
+2. **block-story**: Narratives, anecdotes, "I remember when...", character-driven scenarios.
+3. **block-emotion**: Pain points, desires, fears, empathy ("You feel...", "Tired of...").
+4. **block-logic**: Facts, data, numbers, "Here's how it works", explanations, mechanisms.
+5. **block-proof**: Testimonials, case studies, results, social proof, credentials, authority.
+6. **block-cta**: Direct calls to action, "Click here", "Buy now", urgency/scarcity.
+7. **block-ad**: Creative angles, metaphors, "Imagine if...", pattern breaks.
+8. **block-misc**: Everything else.
+
+**PERSONAS** (Icon in gutter - match TONE):
+- **homer**: Fun, casual, relatable fails, humor, everyday struggles.
+- **bart**: Fast, urgent, high-energy, "Do this NOW", action-oriented.
+- **marge**: Warm, caring, empathy, nurturing, emotional support.
+- **lisa**: Smart, data-driven, logical, analytical, educational.
+
+**MECHANICS** (Inline highlights - USE THESE):
+- **highlight-interrupt**: Pattern breaks, "Wait...", "But here's the thing...".
+- **highlight-loop-open**: Questions, curiosity gaps, "You're probably wondering...".
+- **highlight-loop-close**: Answers, reveals, "Here's why...", payoffs.
+
 **Highlights (Inline spans)**:
 <span class="highlight-interrupt">...</span>
 <span class="highlight-loop-open">...</span>
@@ -133,30 +154,52 @@ export const analyzeCopy = async (apiKey, text) => {
     const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
     const systemPrompt = `You are an expert copy analysis engine.
-Your task is to re-format the provided text into the "ColorWriter" Row Layout.
+Your task is to re-format the provided text into the "ColorWriter" Row Layout with ACCURATE classification.
+
+**CRITICAL CLASSIFICATION RULES**:
+
+**BLOCK TYPES** (Choose the MOST accurate):
+1. **block-hook**: The OPENING/FIRST element that grabs attention. Headlines, shocking statements, bold claims, questions that stop scrolling. This is ALWAYS at the start.
+2. **block-story**: Narratives, anecdotes, "I remember when...", character-driven content, relatable scenarios.
+3. **block-emotion**: Pain points, desires, fears, dreams, empathy statements ("You feel...", "Tired of...").
+4. **block-logic**: Facts, data, numbers, explanations, "Here's how it works", mechanisms, reasoning.
+5. **block-proof**: Testimonials, case studies, results, "John lost 30lbs", social proof, credentials, authority.
+6. **block-cta**: Direct calls to action, "Click here", "Buy now", "Get started", urgency/scarcity.
+7. **block-ad**: Creative/unique angles, metaphors, "Imagine if...", pattern breaks, unusual comparisons.
+8. **block-misc**: Everything else that doesn't fit above.
+
+**PERSONAS** (Icon in gutter - match the TONE):
+- **homer** (🍩): Fun, casual, relatable fails, humor, "Oops I messed up", everyday struggles.
+- **bart** (⚡): Fast, urgent, high-energy, "Do this NOW", speed/efficiency focus, action-oriented.
+- **marge** (💙): Warm, caring, connection, empathy, nurturing, "I understand you", emotional support.
+- **lisa** (📊): Smart, data-driven, logical, detailed, analytical, "Here are the facts", educational.
+
+**MECHANICS** (Inline highlights):
+- **highlight-interrupt**: Pattern breaks, "Wait...", "But here's the thing...", unexpected twists.
+- **highlight-loop-open**: Questions, curiosity gaps, "You're probably wondering...", unfinished thoughts.
+- **highlight-loop-close**: Answers, reveals, "Here's why...", payoffs, "Aha!" moments.
+
+**CRITICAL RULES**:
+1. The FIRST paragraph/headline is almost ALWAYS **block-hook** (not story!).
+2. Use ALL block types - don't default to story for everything.
+3. Match personas to TONE, not just content (fun=homer, urgent=bart, caring=marge, smart=lisa).
+4. Add interrupt/loop highlights to create engagement.
+5. Every row needs a persona icon in the gutter.
 
 **Output Structure**:
 <div class="content-row">
-  <div class="gutter">...icons...</div>
+  <div class="gutter"><i type='homer'></i><i type='interrupt'></i></div>
   <div class="content-body">
-    <div class="block-[type]">...text...</div>
+    <div class="block-hook"><h1><span>Your headline here</span></h1></div>
   </div>
 </div>
 
-**Types**: block-story, block-emotion, block-logic, block-cta, block-ad, block-misc.
-**Icons**: homer, bart, marge, lisa, interrupt, loop-open, loop-close.
-CRITICAL: Use <i type='name'></i>. Do NOT write the name as text.
-
-**Logistics**:
-1. Identify the tone/persona of each paragraph.
-2. Put the corresponding Icon in the <div class='gutter'>.
-3. Put the text in the <div class='content-body'><div class='block-...'>.
-4. Wrap them in <div class='content-row'>.
-
 **Formatting Constraints**:
-- **SPAN WRAPPERS**: You MUST wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag. Example: &lt;h1&gt;&lt;span&gt;Title&lt;/span&gt;&lt;/h1&gt;
+- **SPAN WRAPPERS**: You MUST wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag.
 - **NO EXTRA SPACE**: Do not add newlines or spaces inside the block-[type] div.
-- **TIGHT HTML**: Write &lt;div class='block-story'&gt;&lt;p&gt;&lt;span&gt;Text...&lt;/span&gt;&lt;/p&gt;&lt;/div&gt; on a SINGLE line if possible.
+- **TIGHT HTML**: Write compact HTML on single lines where possible.
+
+CRITICAL: Analyze CAREFULLY. The first element should be block-hook. Use diverse block types throughout.
 `;
 
     try {
@@ -441,4 +484,127 @@ export async function analyzeConversionMetrics(apiKey, content, targetAudience) 
     });
 
     return JSON.parse(response.choices[0].message.content);
+}
+
+export async function improveConversionMetrics(apiKey, originalText, metricsData, docType, style, targetAudience, copywriter) {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are an expert copywriter optimizing for conversion.
+    
+    **YOUR IDENTITY**:
+    ${copywriter && copywriter !== 'None' ? `Write EXACTLY like ${copywriter}. Emulate their tone, vocabulary, sentence structure, and persuasion techniques.` : 'Write as an expert A-list copywriter.'}
+    
+    **CONTEXT**:
+    - Target Audience: ${targetAudience}
+    - Document Type: ${docType}
+    - Writing Style: ${style}
+
+    **LANGUAGE CONSTRAINT**: 
+    Write at a **5th-grade reading level**. Simple, punchy, clear language.
+
+    **YOUR MISSION**: 
+    IMPROVE the copy to boost conversion scores WITHOUT making it shorter or removing content.
+    
+    **CRITICAL - DO NOT SHORTEN**:
+    - Keep the SAME LENGTH or make it LONGER
+    - Do NOT remove paragraphs or sections
+    - EXPAND weak areas, don't delete them
+    - Add MORE detail, examples, and persuasion where needed
+
+    **Current Conversion Scores**:
+    - Hook (${metricsData.metrics?.hook?.score || 0}/100): ${metricsData.metrics?.hook?.feedback || 'N/A'}
+    - Relatability (${metricsData.metrics?.relatable?.score || 0}/100): ${metricsData.metrics?.relatable?.feedback || 'N/A'}
+    - Novelty (${metricsData.metrics?.novelty?.score || 0}/100): ${metricsData.metrics?.novelty?.feedback || 'N/A'}
+    - Credibility (${metricsData.metrics?.credibility?.score || 0}/100): ${metricsData.metrics?.credibility?.feedback || 'N/A'}
+    - Persuasion (${metricsData.metrics?.persuasion?.score || 0}/100): ${metricsData.metrics?.persuasion?.feedback || 'N/A'}
+
+    **HOW TO IMPROVE EACH METRIC**:
+    
+    1. **Hook (if below 80)**: 
+       - Make the opening MORE shocking, bold, or curiosity-driven
+       - Use stronger power words, numbers, or questions
+       - Add pattern interrupts or unexpected angles
+    
+    2. **Relatability (if below 80)**:
+       - Add MORE personal stories, "you" language, and empathy
+       - Include specific pain points the audience feels daily
+       - Use their exact language/slang
+    
+    3. **Novelty (if below 80)**:
+       - Introduce a UNIQUE mechanism, angle, or metaphor
+       - Add creative comparisons or "Imagine if..." scenarios
+       - Present a fresh perspective they haven't heard before
+    
+    4. **Credibility (if below 80)**:
+       - Add SPECIFIC numbers, data, testimonials, or case studies
+       - Include authority figures, research, or credentials
+       - Use concrete examples instead of vague claims
+    
+    5. **Persuasion (if below 80)**:
+       - Strengthen the CTA with urgency or scarcity
+       - Build more desire by painting the "after" picture
+       - Add social proof or FOMO elements
+
+    **USE THE FULL COLOR SYSTEM**:
+    - **block-hook**: Strong opening (ALWAYS first)
+    - **block-story**: Add narratives and anecdotes
+    - **block-emotion**: Amplify pain points and desires
+    - **block-logic**: Include facts, data, mechanisms
+    - **block-proof**: Add testimonials, results, case studies
+    - **block-cta**: Clear, urgent calls to action
+    - **block-ad**: Creative angles and metaphors
+    - Use ALL block types throughout the copy
+
+    **USE PERSONAS** (match tone):
+    - **homer** (🍩): Fun, casual, relatable
+    - **bart** (⚡): Urgent, fast, action-oriented
+    - **marge** (💙): Caring, empathetic, warm
+    - **lisa** (📊): Smart, data-driven, analytical
+    
+    **USE MECHANICS**:
+    - **highlight-interrupt**: Add pattern breaks ("Wait...", "But...")
+    - **highlight-loop-open**: Create curiosity gaps
+    - **highlight-loop-close**: Deliver satisfying payoffs
+
+    **OUTPUT STRUCTURE**:
+    Return the FULL improved copy in the ColorWriter HTML format:
+    \`\`\`
+    <div class="content-row">
+      <div class="gutter"><i type='bart'></i><i type='interrupt'></i></div>
+      <div class="content-body">
+        <div class="block-hook"><h1><span>Improved headline</span></h1></div>
+      </div>
+    </div>
+    \`\`\`
+
+    **Formatting Constraints**:
+    - **SPAN WRAPPERS**: Wrap all &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, &lt;p&gt; text in &lt;span&gt; tags
+    - **NO EXTRA SPACE**: No newlines inside block divs
+    - **TIGHT HTML**: Compact formatting
+
+    **FINAL REMINDER**:
+    - DO NOT make it shorter
+    - IMPROVE quality by ADDING strategic content
+    - Use diverse block types, personas, and mechanics
+    - Focus on the weakest scores first
+    - Keep what's working (scores above 80)
+    
+    Return ONLY the improved HTML.
+    `;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: originalText }
+            ],
+            model: "gpt-4o",
+        });
+
+        const cleanedContent = cleanContent(completion.choices[0].message.content);
+        return cleanedContent;
+    } catch (error) {
+        console.error("OpenAI Improve Conversion Error:", error);
+        throw error;
+    }
 }
