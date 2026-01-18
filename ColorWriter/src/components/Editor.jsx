@@ -30,49 +30,56 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
         // 1. Legend Highlighting Detection
         if (selection.rangeCount > 0) {
             let node = selection.anchorNode;
-            // Traverse up to find a block or highlight class
-            while (node && node !== editorRef.current) {
+            let foundType = null;
+
+            // Traverse up to find a block, highlight, or content-row
+            while (node && node !== editorRef.current && !foundType) {
                 if (node.nodeType === 1) { // Element node
                     const className = node.className || '';
 
                     // Check for Block Types
-                    if (className.includes('block-hook')) { onSelectionChange('hook'); break; }
-                    if (className.includes('block-story')) { onSelectionChange('story'); break; }
-                    if (className.includes('block-emotion')) { onSelectionChange('emotion'); break; }
-                    if (className.includes('block-logic')) { onSelectionChange('logic'); break; }
-                    if (className.includes('block-proof')) { onSelectionChange('proof'); break; }
-                    if (className.includes('block-cta')) { onSelectionChange('cta'); break; }
-                    if (className.includes('block-ad')) { onSelectionChange('ad'); break; }
-                    if (className.includes('block-misc')) { onSelectionChange('misc'); break; }
+                    if (className.includes('block-hook')) { foundType = 'hook'; }
+                    else if (className.includes('block-story')) { foundType = 'story'; }
+                    else if (className.includes('block-emotion')) { foundType = 'emotion'; }
+                    else if (className.includes('block-logic')) { foundType = 'logic'; }
+                    else if (className.includes('block-proof')) { foundType = 'proof'; }
+                    else if (className.includes('block-cta')) { foundType = 'cta'; }
+                    else if (className.includes('block-ad')) { foundType = 'ad'; }
+                    else if (className.includes('block-misc')) { foundType = 'misc'; }
 
-                    // Check for Mechanics (Highlights)
-                    if (className.includes('highlight-interrupt')) { onSelectionChange('interrupt'); break; }
-                    if (className.includes('highlight-loop-open')) { onSelectionChange('loop-open'); break; }
-                    if (className.includes('highlight-loop-close')) { onSelectionChange('loop-close'); break; }
+                    // Check for Mechanics (Highlights) - these take priority
+                    else if (className.includes('highlight-interrupt')) { foundType = 'interrupt'; }
+                    else if (className.includes('highlight-loop-open')) { foundType = 'loop-open'; }
+                    else if (className.includes('highlight-loop-close')) { foundType = 'loop-close'; }
 
-                    // Check for Personas (icon elements in gutter)
-                    if (node.tagName === 'I' && node.hasAttribute('type')) {
-                        const iconType = node.getAttribute('type');
-                        if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
-                            onSelectionChange(iconType);
-                            break;
+                    // If we found a content-row, check for persona icons in its gutter
+                    if (className.includes('content-row')) {
+                        const gutter = node.querySelector('.gutter');
+                        if (gutter) {
+                            const personaIcons = gutter.querySelectorAll('i[type]');
+                            for (let icon of personaIcons) {
+                                const iconType = icon.getAttribute('type');
+                                if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
+                                    foundType = iconType;
+                                    break;
+                                }
+                            }
                         }
                     }
 
-                    // Check if we're in a gutter (to detect persona icons)
-                    if (className.includes('gutter')) {
-                        // Look for icon children
-                        const icons = node.querySelectorAll('i[type]');
-                        if (icons.length > 0) {
-                            const iconType = icons[0].getAttribute('type');
-                            if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
-                                onSelectionChange(iconType);
-                                break;
-                            }
+                    // If we're directly on a persona icon
+                    if (node.tagName === 'I' && node.hasAttribute('type')) {
+                        const iconType = node.getAttribute('type');
+                        if (['homer', 'bart', 'marge', 'lisa', 'interrupt', 'loop-open', 'loop-close'].includes(iconType)) {
+                            foundType = iconType;
                         }
                     }
                 }
                 node = node.parentNode;
+            }
+
+            if (foundType) {
+                onSelectionChange(foundType);
             }
         }
 
