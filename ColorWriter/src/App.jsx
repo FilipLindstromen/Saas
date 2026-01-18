@@ -6,8 +6,9 @@ import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
 import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
+import BigIdeaModal from './components/BigIdeaModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions } from './services/openai';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas } from './services/openai';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -52,6 +53,8 @@ function App() {
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [analyzeLoading, setAnalyzeLoading] = useState(false);
   const [headerSuggestions, setHeaderSuggestions] = useState(null);
+  const [bigIdea, setBigIdea] = usePersistentState('cw_bigIdea', '');
+  const [bigIdeaSuggestions, setBigIdeaSuggestions] = useState(null);
 
   // Legend Highlighting
   const [activeLegendItem, setActiveLegendItem] = useState(null);
@@ -148,6 +151,26 @@ function App() {
   };
 
 
+  const handleGenerateBigIdeas = async () => {
+    if (!apiKey || !instructions) return;
+    setMetricsLoading(true);
+    try {
+      const suggestions = await generateBigIdeas(apiKey, instructions, targetAudience, docType, style);
+      setBigIdeaSuggestions(suggestions);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate big ideas.');
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  const handleSelectBigIdea = (idea) => {
+    setBigIdea(idea);
+  };
+
+
+
   const handleAnalyzeAndColor = async () => {
     if (!apiKey || analyzeLoading) return;
     const { analyzeCopy } = await import('./services/openai');
@@ -232,9 +255,11 @@ function App() {
             onGenerated={setContent}
             onOpenSettings={() => setIsSettingsOpen(true)}
             apiKey={apiKey}
-            activeLegendItem={activeLegendItem}
             copywriter={copywriter}
             setCopywriter={setCopywriter}
+            bigIdea={bigIdea}
+            setBigIdea={setBigIdea}
+            onGenerateBigIdeas={handleGenerateBigIdeas}
           />
 
           <Editor
@@ -257,6 +282,7 @@ function App() {
             onUpdateMetrics={handleMetricsUpdate}
             onImproveMetrics={handleImproveMetrics}
             onHeaderSuggestions={handleHeaderSuggestions}
+            activeLegendItem={activeLegendItem}
           />
 
         </Layout>
@@ -292,6 +318,14 @@ function App() {
         <HeaderSuggestionsModal
           suggestions={headerSuggestions}
           onClose={() => setHeaderSuggestions(null)}
+        />
+      )}
+
+      {bigIdeaSuggestions && (
+        <BigIdeaModal
+          suggestions={bigIdeaSuggestions}
+          onClose={() => setBigIdeaSuggestions(null)}
+          onSelect={handleSelectBigIdea}
         />
       )}
     </>

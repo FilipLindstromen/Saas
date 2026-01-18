@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings, Zap, BookOpen, Smile, Brain, MousePointer2, Box, Loader2, MessageCircle, User, Scale } from 'lucide-react';
-import ColorLegend from './ColorLegend';
+import { Settings, Zap, BookOpen, Smile, Brain, MousePointer2, Box, Loader2, MessageCircle, User, Scale, Lightbulb } from 'lucide-react';
 import { generateCopy, analyzeAudienceFeedback } from '../services/openai';
 
 const Sidebar = ({
@@ -12,9 +11,11 @@ const Sidebar = ({
     onGenerated,
     onOpenSettings,
     apiKey,
-    activeLegendItem,
     copywriter,
-    setCopywriter
+    setCopywriter,
+    bigIdea,
+    setBigIdea,
+    onGenerateBigIdeas
 }) => {
     const [loading, setLoading] = useState(false);
     const [pimpLoading, setPimpLoading] = useState(false);
@@ -55,7 +56,7 @@ const Sidebar = ({
         if (!apiKey) return;
         setLoading(true);
         try {
-            const content = await generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter });
+            const content = await generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter, bigIdea });
             onGenerated(content);
         } catch (e) {
             console.error(e);
@@ -193,11 +194,60 @@ const Sidebar = ({
                 />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {/* Big Idea Section */}
+            <div className="control-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Big Idea (Optional)
+                    </label>
+                    <button
+                        onClick={onGenerateBigIdeas}
+                        disabled={!apiKey || !instructions}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            padding: '0.4rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            borderRadius: '4px',
+                            cursor: !apiKey || !instructions ? 'not-allowed' : 'pointer',
+                            opacity: !apiKey || !instructions ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                        }}
+                        title="Generate 5 big idea suggestions"
+                    >
+                        <Lightbulb size={12} />
+                        Generate Ideas
+                    </button>
+                </div>
+                <input
+                    type="text"
+                    value={bigIdea}
+                    onChange={(e) => setBigIdea(e.target.value)}
+                    placeholder="e.g., 'The 90-second brain reset that stops anxiety'"
+                    style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        fontSize: '0.875rem',
+                        fontFamily: 'inherit',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        backgroundColor: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)'
+                    }}
+                />
+            </div>
+
+            {/* Generate Copy Button - Moved to bottom */}
+            <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
                 <button
                     onClick={handleGenerate}
                     disabled={!apiKey || loading}
                     style={{
+                        width: '100%',
                         background: !apiKey || loading ? 'var(--bg-tertiary)' : '#111827',
                         color: !apiKey || loading ? 'var(--text-tertiary)' : '#ffffff',
                         fontSize: '1rem',
@@ -208,24 +258,19 @@ const Sidebar = ({
                         alignItems: 'center',
                         gap: '0.5rem',
                         border: 'none',
+                        borderRadius: '6px',
                         cursor: !apiKey || loading ? 'not-allowed' : 'pointer'
                     }}
                 >
                     {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                     {loading ? 'Writing...' : 'Generate Copy'}
                 </button>
-                {/* Legend at the bottom */}
-                <div style={{ marginTop: 'auto', paddingTop: '2rem' }}>
-                    <ColorLegend activeItem={activeLegendItem} />
-                </div>
-            </div>
-            {
-                !apiKey && (
+                {!apiKey && (
                     <p style={{ fontSize: '0.75rem', color: 'red', textAlign: 'center', marginTop: '0.5rem' }}>
                         Please add API Key in Settings to generate.
                     </p>
-                )
-            }
+                )}
+            </div>
 
         </aside >
     );
