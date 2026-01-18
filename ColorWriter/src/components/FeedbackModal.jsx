@@ -15,21 +15,23 @@ const FeedbackModal = ({ data, onClose, onImprove, isImproving }) => {
             zIndex: 60
         }}>
             <div style={{
-                backgroundColor: 'white',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
                 borderRadius: '12px',
                 padding: '2rem',
                 maxWidth: '600px',
                 width: '90%',
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid var(--border-color)'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
                         <MessageCircle size={28} />
                         Audience Feedback
                     </h2>
-                    <button onClick={onClose} style={{ border: 'none', background: 'transparent', padding: 0 }}>
+                    <button onClick={onClose} style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--text-secondary)', cursor: 'pointer' }}>
                         <X size={24} />
                     </button>
                 </div>
@@ -45,7 +47,8 @@ const FeedbackModal = ({ data, onClose, onImprove, isImproving }) => {
                         borderLeft: '4px solid var(--text-primary)',
                         fontStyle: 'italic',
                         fontSize: '1.05rem',
-                        lineHeight: '1.6'
+                        lineHeight: '1.6',
+                        color: 'var(--text-primary)'
                     }}>
                         "{data.thoughts}"
                     </div>
@@ -61,7 +64,8 @@ const FeedbackModal = ({ data, onClose, onImprove, isImproving }) => {
                                 marginBottom: '0.75rem',
                                 display: 'flex',
                                 gap: '0.75rem',
-                                alignItems: 'flex-start'
+                                alignItems: 'flex-start',
+                                color: 'var(--text-primary)'
                             }}>
                                 <ThumbsUp size={18} color="var(--text-tertiary)" style={{ marginTop: '0.25rem' }} />
                                 <span>{imp}</span>
@@ -78,7 +82,9 @@ const FeedbackModal = ({ data, onClose, onImprove, isImproving }) => {
                             color: 'var(--text-secondary)',
                             border: '1px solid var(--border-color)',
                             padding: '0.75rem 1.5rem',
-                            fontWeight: 600
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
                         }}
                     >
                         Close
@@ -88,14 +94,17 @@ const FeedbackModal = ({ data, onClose, onImprove, isImproving }) => {
                         onClick={onImprove}
                         disabled={isImproving}
                         style={{
-                            backgroundColor: '#111827',
-                            color: 'white',
+                            backgroundColor: 'var(--text-primary)',
+                            color: 'var(--bg-primary)',
                             border: 'none',
                             padding: '0.75rem 1.5rem',
+                            borderRadius: '6px',
                             fontWeight: 600,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem'
+                            gap: '0.5rem',
+                            cursor: isImproving ? 'not-allowed' : 'pointer',
+                            opacity: isImproving ? 0.7 : 1
                         }}
                     >
                         {isImproving ? 'Improving...' : 'Improve based on this'}
