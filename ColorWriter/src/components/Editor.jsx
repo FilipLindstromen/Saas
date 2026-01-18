@@ -208,8 +208,8 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
                         width: '100%',
                         maxWidth: '850px',
                         minHeight: 'auto',
-                        backgroundColor: '#ffffff',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        backgroundColor: 'transparent',
+                        boxShadow: 'none',
                         padding: '2rem 3rem',
                         outline: 'none',
                         fontSize: '1.125rem',
@@ -223,14 +223,15 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
             </div>
 
             <div style={{
-                position: 'absolute',
-                top: '1rem',
+                position: 'fixed',
+                top: '6rem',
                 right: '2rem',
                 zIndex: 10,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: '0.5rem'
+                alignItems: 'stretch', // Full width for buttons
+                gap: '0.75rem',
+                width: '180px' // consistent width
             }}>
                 <button
                     onClick={async () => {
@@ -252,63 +253,73 @@ const Editor = ({ content, setContent, apiKey, onGenerated, docType, style, targ
                     style={{
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '0.5rem',
-                        backgroundColor: '#ffffff',
+                        backgroundColor: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         border: '1px solid var(--border-color)',
                         opacity: !apiKey || loading ? 0.6 : 1,
-                        cursor: !apiKey || loading ? 'not-allowed' : 'pointer'
+                        cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
+                        padding: '0.75rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        transition: 'all 0.2s'
                     }}
                 >
                     {loading ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                    {loading ? 'Analyzing...' : 'Analyze & Colorize'}
+                    {loading ? 'Thinking...' : 'Analyze / Color'}
                 </button>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                        onClick={() => onFeedback(targetAudience, docType)}
-                        disabled={!apiKey || !targetAudience}
-                        style={{
-                            background: '#ffffff',
-                            color: !apiKey || !targetAudience ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                            border: '1px solid var(--border-color)',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            padding: '0.5rem 0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                        }}
-                        title={!targetAudience ? "Enter Target Audience in Sidebar first" : "Get Audience Feedback"}
-                    >
-                        <MessageCircle size={14} />
-                        Thoughts?
-                    </button>
+                <button
+                    onClick={() => onFeedback(targetAudience, docType)}
+                    disabled={!apiKey || !targetAudience}
+                    style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                        padding: '0.75rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        opacity: !apiKey || !targetAudience ? 0.6 : 1,
+                        transition: 'all 0.2s'
+                    }}
+                    title={!targetAudience ? "Enter Target Audience in Sidebar first" : "Get Audience Feedback"}
+                >
+                    <MessageCircle size={16} />
+                    Thoughts?
+                </button>
 
-                    <button
-                        onClick={() => onBalance(targetAudience)}
-                        disabled={!apiKey || !targetAudience}
-                        style={{
-                            background: '#ffffff',
-                            color: !apiKey || !targetAudience ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                            border: '1px solid var(--border-color)',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            padding: '0.5rem 0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                        }}
-                        title="Check Color Balance"
-                    >
-                        <Scale size={14} />
-                        Balance
-                    </button>
-                </div>
+                <button
+                    onClick={() => onBalance(targetAudience)}
+                    disabled={!apiKey || !targetAudience}
+                    style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        cursor: !apiKey || !targetAudience ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                        padding: '0.75rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        opacity: !apiKey || !targetAudience ? 0.6 : 1,
+                        transition: 'all 0.2s'
+                    }}
+                    title="Check Color Balance"
+                >
+                    <Scale size={16} />
+                    Balance
+                </button>
             </div>
         </main >
     );

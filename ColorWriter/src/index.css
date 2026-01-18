@@ -61,12 +61,12 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #111827;
-  /* gray-900 */
-  --bg-secondary: #1f2937;
-  /* gray-800 */
-  --bg-tertiary: #374151;
-  /* gray-700 */
+  --bg-primary: #030712;
+  /* gray-950 (Main Nav/Sidebar) */
+  --bg-secondary: #111827;
+  /* gray-900 (Cards/Modals) */
+  --bg-tertiary: #1f2937;
+  /* gray-800 (Canvas Background) */
   --border-color: #374151;
   /* gray-700 */
   --text-primary: #f9fafb;
