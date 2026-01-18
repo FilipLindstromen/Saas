@@ -15,7 +15,7 @@ const cleanContent = (text) => {
         .trim();
 };
 
-export async function generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter }) {
+export async function generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter, bigIdea }) {
     const openai = new OpenAI({
         apiKey: apiKey,
         dangerouslyAllowBrowser: true
@@ -28,6 +28,19 @@ export async function generateCopy(apiKey, { docType, style, instructions, targe
 
     Your goal is to write a ${docType} targeting ${targetAudience || 'the general public'}.
     Tone: ${style}.
+
+    ${bigIdea ? `
+    **BIG IDEA (CORE THREAD)**:
+    "${bigIdea}"
+    
+    CRITICAL: This big idea MUST be the central thread running through the ENTIRE copy. 
+    - Introduce it early and powerfully
+    - Reference it throughout the copy
+    - Use it to explain why past solutions failed
+    - Make it the foundation of your argument
+    - Return to it in the CTA
+    - Make the reader feel it's obvious in hindsight
+    ` : ''}
 
     **LANGUAGE CONSTRAINT**: 
     You MUST write at a **5th-grade reading level**. 
@@ -668,3 +681,63 @@ export async function generateHeaderSuggestions(apiKey, content, targetAudience,
         throw error;
     }
 }
+
+export async function generateBigIdeas(apiKey, instructions, targetAudience, docType, style) {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are an expert copywriter specializing in creating powerful "Big Ideas" that drive entire marketing campaigns.
+
+    **Context**:
+    - Target Audience: ${targetAudience}
+    - Document Type: ${docType}
+    - Writing Style: ${style}
+    - Instructions: ${instructions}
+
+    **BIG IDEA REQUIREMENT**:
+    
+    Identify or create ONE clear big idea that reframes the reader's problem.
+    
+    The big idea MUST:
+    1. **Explain why past solutions failed** - Show what they've been missing
+    2. **Introduce a new mechanism or understanding** - A fresh angle or insight
+    3. **Remove blame from the reader** - It's not their fault
+    4. **Make the solution feel obvious in hindsight** - "Of course! Why didn't I see this before?"
+    
+    Do NOT introduce multiple competing ideas. Each suggestion should be a single, focused big idea.
+    
+    **Examples of Strong Big Ideas**:
+    - "Your brain isn't broken - it's just stuck in 'threat mode' from a 90-second loop"
+    - "Fat loss isn't about willpower - it's about fixing your 'hunger hormones'"
+    - "You're not bad at sales - you're just asking questions in the wrong order"
+    
+    **Return Format**:
+    Return ONLY a JSON object with this structure:
+    {
+      "ideas": [
+        {
+          "idea": "The core big idea statement (one sentence)",
+          "explanation": "Why this reframes the problem and makes the solution obvious (2-3 sentences)"
+        }
+      ]
+    }
+    
+    Generate 5 unique big ideas that each meet ALL the requirements above.
+    `;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Generate 5 big ideas based on these instructions:\n\n${instructions}` }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" }
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("OpenAI Big Ideas Error:", error);
+        throw error;
+    }
+}
+

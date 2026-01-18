@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw } from 'lucide-react';
+import ColorLegend from './ColorLegend';
 
 const RightPanel = ({
     apiKey,
@@ -13,7 +14,8 @@ const RightPanel = ({
     onUpdateMetrics,
     metricsLoading,
     onImproveMetrics,
-    onHeaderSuggestions
+    onHeaderSuggestions,
+    activeLegendItem
 }) => {
 
     const ProgressBar = ({ label, value, color, feedback }) => (
@@ -70,6 +72,14 @@ const RightPanel = ({
             </div>
 
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
+
+                {/* Color Legend */}
+                <div>
+                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+                        Content Guide
+                    </h3>
+                    <ColorLegend activeItem={activeLegendItem} />
+                </div>
 
                 {/* Main Actions Group */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
