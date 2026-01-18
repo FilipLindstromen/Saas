@@ -23,6 +23,44 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
         }
     };
 
+    const handlePaste = (e) => {
+        e.preventDefault();
+
+        // Get plain text from clipboard
+        const text = e.clipboardData.getData('text/plain');
+
+        if (!text) return;
+
+        // Split by line breaks and create paragraphs
+        const lines = text.split(/\r?\n/);
+
+        // Create HTML with proper paragraph structure
+        const html = lines
+            .filter(line => line.trim()) // Remove empty lines
+            .map(line => `<p><span>${line.trim()}</span></p>`)
+            .join('');
+
+        // Insert at cursor position
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+
+            const fragment = range.createContextualFragment(html);
+            range.insertNode(fragment);
+
+            // Move cursor to end of inserted content
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        // Update content
+        if (editorRef.current) {
+            setContent(editorRef.current.innerHTML);
+        }
+    };
+
     // Detect active block for Legend Highlighting AND Show Toolbar
     const handleSelection = () => {
         const selection = window.getSelection();
@@ -30,53 +68,64 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
         // 1. Legend Highlighting Detection
         if (selection.rangeCount > 0) {
             let node = selection.anchorNode;
-            let foundType = null;
+            let blockType = null;
+            let personaType = null;
+            let mechanicType = null;
 
-            // Traverse up to find a block, highlight, or content-row
-            while (node && node !== editorRef.current && !foundType) {
+            // Traverse up to find block, persona, and mechanics
+            while (node && node !== editorRef.current) {
                 if (node.nodeType === 1) { // Element node
                     const className = node.className || '';
 
-                    // Check for Block Types
-                    if (className.includes('block-hook')) { foundType = 'hook'; }
-                    else if (className.includes('block-story')) { foundType = 'story'; }
-                    else if (className.includes('block-emotion')) { foundType = 'emotion'; }
-                    else if (className.includes('block-logic')) { foundType = 'logic'; }
-                    else if (className.includes('block-proof')) { foundType = 'proof'; }
-                    else if (className.includes('block-cta')) { foundType = 'cta'; }
-                    else if (className.includes('block-ad')) { foundType = 'ad'; }
-                    else if (className.includes('block-misc')) { foundType = 'misc'; }
+                    // Check for Block Types (only if not found yet)
+                    if (!blockType) {
+                        if (className.includes('block-hook')) blockType = 'hook';
+                        else if (className.includes('block-story')) blockType = 'story';
+                        else if (className.includes('block-emotion')) blockType = 'emotion';
+                        else if (className.includes('block-logic')) blockType = 'logic';
+                        else if (className.includes('block-proof')) blockType = 'proof';
+                        else if (className.includes('block-cta')) blockType = 'cta';
+                        else if (className.includes('block-ad')) blockType = 'ad';
+                        else if (className.includes('block-misc')) blockType = 'misc';
+                    }
 
-                    // Check for Mechanics (Highlights) - these take priority
-                    else if (className.includes('highlight-interrupt')) { foundType = 'interrupt'; }
-                    else if (className.includes('highlight-loop-open')) { foundType = 'loop-open'; }
-                    else if (className.includes('highlight-loop-close')) { foundType = 'loop-close'; }
+                    // Check for Mechanics (Highlights) - these can override
+                    if (!mechanicType) {
+                        if (className.includes('highlight-interrupt')) mechanicType = 'interrupt';
+                        else if (className.includes('highlight-loop-open')) mechanicType = 'loop-open';
+                        else if (className.includes('highlight-loop-close')) mechanicType = 'loop-close';
+                    }
 
-                    // If we found a content-row, check for persona icons in its gutter
-                    if (className.includes('content-row')) {
+                    // Check for Personas in content-row gutter
+                    if (!personaType && className.includes('content-row')) {
                         const gutter = node.querySelector('.gutter');
                         if (gutter) {
                             const personaIcons = gutter.querySelectorAll('i[type]');
                             for (let icon of personaIcons) {
                                 const iconType = icon.getAttribute('type');
                                 if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
-                                    foundType = iconType;
+                                    personaType = iconType;
                                     break;
                                 }
                             }
                         }
                     }
 
-                    // If we're directly on a persona icon
+                    // If directly on an icon
                     if (node.tagName === 'I' && node.hasAttribute('type')) {
                         const iconType = node.getAttribute('type');
-                        if (['homer', 'bart', 'marge', 'lisa', 'interrupt', 'loop-open', 'loop-close'].includes(iconType)) {
-                            foundType = iconType;
+                        if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
+                            personaType = iconType;
+                        } else if (['interrupt', 'loop-open', 'loop-close'].includes(iconType)) {
+                            mechanicType = iconType;
                         }
                     }
                 }
                 node = node.parentNode;
             }
+
+            // Prioritize: mechanic > persona > block
+            const foundType = mechanicType || personaType || blockType;
 
             if (foundType) {
                 onSelectionChange(foundType);
@@ -235,6 +284,7 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleInput}
+                    onPaste={handlePaste}
                     onClick={handleSelection}
                     onKeyUp={handleSelection}
                     onMouseUp={handleSelection} // Added MouseUp for text selection end
