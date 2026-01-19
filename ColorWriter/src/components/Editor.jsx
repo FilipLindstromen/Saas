@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Wand2, Loader2, Scale, MessageCircle, Bold, Heading1, Heading2, Heading3, Type } from 'lucide-react';
 import { analyzeCopy } from '../services/openai';
 
-const Editor = ({ content, setContent, onSelectionChange }) => {
+const Editor = ({ content, setContent, onSelectionChange, showColors = true }) => {
     const editorRef = useRef(null);
 
     // Toolbar State
@@ -20,6 +20,41 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
         // If we want to persist manual edits, we should debounce setContent here or on blur.
         if (editorRef.current) {
             setContent(editorRef.current.innerHTML);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        // Handle Shift+Enter for line breaks within same paragraph
+        if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                
+                // Create and insert a <br> tag
+                const br = document.createElement('br');
+                range.deleteContents();
+                range.insertNode(br);
+                
+                // Move cursor after the <br>
+                range.setStartAfter(br);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            
+            // Update content
+            if (editorRef.current) {
+                setContent(editorRef.current.innerHTML);
+            }
+            return;
+        }
+        
+        // Handle Enter key for new paragraphs (default behavior with span wrapper check)
+        if (e.key === 'Enter' && !e.shiftKey) {
+            // Let the default Enter behavior happen, then ensure proper structure
+            // We'll handle this in handleInput after the DOM updates
         }
     };
 
@@ -69,10 +104,9 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
         if (selection.rangeCount > 0) {
             let node = selection.anchorNode;
             let blockType = null;
-            let personaType = null;
             let mechanicType = null;
 
-            // Traverse up to find block, persona, and mechanics
+            // Traverse up to find block and mechanics
             while (node && node !== editorRef.current) {
                 if (node.nodeType === 1) { // Element node
                     const className = node.className || '';
@@ -96,27 +130,10 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
                         else if (className.includes('highlight-loop-close')) mechanicType = 'loop-close';
                     }
 
-                    // Check for Personas in content-row gutter
-                    if (!personaType && className.includes('content-row')) {
-                        const gutter = node.querySelector('.gutter');
-                        if (gutter) {
-                            const personaIcons = gutter.querySelectorAll('i[type]');
-                            for (let icon of personaIcons) {
-                                const iconType = icon.getAttribute('type');
-                                if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
-                                    personaType = iconType;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // If directly on an icon
+                    // If directly on a mechanic icon
                     if (node.tagName === 'I' && node.hasAttribute('type')) {
                         const iconType = node.getAttribute('type');
-                        if (['homer', 'bart', 'marge', 'lisa'].includes(iconType)) {
-                            personaType = iconType;
-                        } else if (['interrupt', 'loop-open', 'loop-close'].includes(iconType)) {
+                        if (['interrupt', 'loop-open', 'loop-close'].includes(iconType)) {
                             mechanicType = iconType;
                         }
                     }
@@ -124,12 +141,18 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
                 node = node.parentNode;
             }
 
-            // Prioritize: mechanic > persona > block
-            const foundType = mechanicType || personaType || blockType;
+            // Prioritize: mechanic > block
+            const foundType = mechanicType || blockType;
 
             if (foundType) {
                 onSelectionChange(foundType);
+            } else {
+                // Clear selection if nothing found
+                onSelectionChange(null);
             }
+        } else {
+            // Clear selection if collapsed
+            onSelectionChange(null);
         }
 
         // 2. Toolbar Logic
@@ -223,7 +246,8 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
             flexDirection: 'column',
             height: '100%',
             position: 'relative',
-            backgroundColor: 'var(--bg-tertiary)'
+            backgroundColor: 'var(--bg-tertiary)',
+            overflow: 'hidden'
         }}>
             {/* Floating Toolbar */}
             {toolbar.show && (
@@ -280,11 +304,12 @@ const Editor = ({ content, setContent, onSelectionChange }) => {
             }}>
                 <div
                     ref={editorRef}
-                    className="editor-content"
+                    className={`editor-content ${showColors ? '' : 'hide-colors'}`}
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleInput}
                     onPaste={handlePaste}
+                    onKeyDown={handleKeyDown}
                     onClick={handleSelection}
                     onKeyUp={handleSelection}
                     onMouseUp={handleSelection} // Added MouseUp for text selection end

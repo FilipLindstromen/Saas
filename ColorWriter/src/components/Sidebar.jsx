@@ -15,7 +15,9 @@ const Sidebar = ({
     setCopywriter,
     bigIdea,
     setBigIdea,
-    onGenerateBigIdeas
+    onGenerateBigIdeas,
+    persuasionFramework,
+    setPersuasionFramework
 }) => {
     const [loading, setLoading] = useState(false);
     const [pimpLoading, setPimpLoading] = useState(false);
@@ -33,6 +35,18 @@ const Sidebar = ({
     const styles = [
         'Aggressive', 'Story-driven', 'Direct', 'Educational', 'Empathetic',
         'Funny', 'Curiosity', 'Relatable', 'Personal'
+    ];
+
+    const persuasionFrameworks = [
+        'None',
+        'PAS (Problem-Agitate-Solve)',
+        'AIDA',
+        'Jobs-to-Be-Done',
+        'Hormozi Value Equation',
+        'Cialdini Principles',
+        'BAB (Before-After-Bridge)',
+        '4 U\'s (Urgent, Unique, Useful, Ultra-specific)',
+        'Star-Story-Solution'
     ];
 
     // 10+ Legends
@@ -60,7 +74,8 @@ const Sidebar = ({
             onGenerated(content);
         } catch (e) {
             console.error(e);
-            alert("Error generating copy. Check console/API Key.");
+            const errorMessage = e.message || "Error generating copy. Check console/API Key.";
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -143,6 +158,19 @@ const Sidebar = ({
                     style={{ width: '100%' }}
                 >
                     {legends.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                    Persuasion Framework Overlay
+                </label>
+                <select
+                    value={persuasionFramework}
+                    onChange={(e) => setPersuasionFramework(e.target.value)}
+                    style={{ width: '100%' }}
+                >
+                    {persuasionFrameworks.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
 

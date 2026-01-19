@@ -432,22 +432,40 @@ i {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-i[type="homer"]::before {
-  content: '🍩';
+/* Block Type Icons */
+i[type="hook"]::before {
+  content: '🎯';
 }
 
-i[type="bart"]::before {
-  content: '⚡';
+i[type="story"]::before {
+  content: '📖';
 }
 
-i[type="marge"]::before {
-  content: '💙';
+i[type="emotion"]::before {
+  content: '❤️';
 }
 
-i[type="lisa"]::before {
-  content: '📊';
+i[type="logic"]::before {
+  content: '🧠';
 }
 
+i[type="proof"]::before {
+  content: '✅';
+}
+
+i[type="cta"]::before {
+  content: '🚀';
+}
+
+i[type="ad"]::before {
+  content: '💡';
+}
+
+i[type="misc"]::before {
+  content: '📝';
+}
+
+/* Mechanics Icons */
 i[type="interrupt"]::before {
   content: '🛑';
 }
@@ -481,4 +499,29 @@ i[type="loop-close"]::before {
 .highlight-loop-close {
   border-color: #10b981;
   color: #064e3b;
+}
+
+/* Hide Background Colors Toggle */
+.hide-colors .block-story span,
+.hide-colors .block-emotion span,
+.hide-colors .block-logic span,
+.hide-colors .block-cta span,
+.hide-colors .block-ad span,
+.hide-colors .block-misc span,
+.hide-colors .block-hook span,
+.hide-colors .block-proof span {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.hide-colors .block-story,
+.hide-colors .block-emotion,
+.hide-colors .block-logic,
+.hide-colors .block-cta,
+.hide-colors .block-ad,
+.hide-colors .block-misc,
+.hide-colors .block-hook,
+.hide-colors .block-proof {
+  background: transparent !important;
+  color: var(--text-primary) !important;
 }
