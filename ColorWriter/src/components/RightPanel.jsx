@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw } from 'lucide-react';
+import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette } from 'lucide-react';
 import ColorLegend from './ColorLegend';
 
 const RightPanel = ({
@@ -15,7 +15,9 @@ const RightPanel = ({
     metricsLoading,
     onImproveMetrics,
     onHeaderSuggestions,
-    activeLegendItem
+    activeLegendItem,
+    showColors,
+    setShowColors
 }) => {
 
     const ProgressBar = ({ label, value, color, feedback }) => (
@@ -75,9 +77,32 @@ const RightPanel = ({
 
                 {/* Color Legend */}
                 <div>
-                    <h3 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-                        Content Guide
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                            Content Guide
+                        </h3>
+                        <button
+                            onClick={() => setShowColors(!showColors)}
+                            title={showColors ? "Hide background colors" : "Show background colors"}
+                            style={{
+                                border: '1px solid var(--border-color)',
+                                background: showColors ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                padding: '0.4rem 0.75rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <Palette size={14} />
+                            {showColors ? 'Hide Colors' : 'Show Colors'}
+                        </button>
+                    </div>
                     <ColorLegend activeItem={activeLegendItem} />
                 </div>
 

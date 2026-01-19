@@ -25,11 +25,15 @@ const LegendItem = ({ label, color, subtitle, type, iconStart, iconEnd, isActive
             boxShadow: isActive ? '0 0 0 2px var(--text-primary)' : 'none', // Highlight ring
             flexShrink: 0
         }}>
-            {/* Some items have icons instead of just color bg */}
-            {type === 'homer' && '🍩'}
-            {type === 'bart' && '⚡'}
-            {type === 'marge' && '💙'}
-            {type === 'lisa' && '📊'}
+            {/* Show block type icons */}
+            {type === 'hook' && '🎯'}
+            {type === 'story' && '📖'}
+            {type === 'emotion' && '❤️'}
+            {type === 'logic' && '🧠'}
+            {type === 'proof' && '✅'}
+            {type === 'cta' && '🚀'}
+            {type === 'ad' && '💡'}
+            {type === 'misc' && '📝'}
             {type === 'interrupt' && '🛑'}
             {type === 'loop-open' && '➰'}
             {type === 'loop-close' && '✅'}
@@ -62,32 +66,14 @@ const ColorLegend = ({ activeItem }) => {
             </h4>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <LegendItem label="Hook" color="var(--color-hook)" isActive={checkActive('hook')} isDimmed={checkDimmed('hook')} />
-                <LegendItem label="Story" color="var(--color-story)" isActive={checkActive('story')} isDimmed={checkDimmed('story')} />
-                <LegendItem label="Emotions" color="var(--color-emotion)" isActive={checkActive('emotion')} isDimmed={checkDimmed('emotion')} />
-                <LegendItem label="Logic" color="var(--color-logic)" isActive={checkActive('logic')} isDimmed={checkDimmed('logic')} />
-                <LegendItem label="Proof" color="var(--color-proof)" isActive={checkActive('proof')} isDimmed={checkDimmed('proof')} />
-                <LegendItem label="CTA" color="var(--color-cta)" isActive={checkActive('cta')} isDimmed={checkDimmed('cta')} />
-                <LegendItem label="Ad / Creative" color="var(--color-ad)" isActive={checkActive('ad')} isDimmed={checkDimmed('ad')} />
-                <LegendItem label="Misc" color="var(--color-misc)" isActive={checkActive('misc')} isDimmed={checkDimmed('misc')} />
-            </div>
-
-            {/* PERSONAS */}
-            <h4 style={{
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                color: 'var(--text-tertiary)',
-                marginTop: '1.5rem',
-                marginBottom: '1rem',
-                letterSpacing: '0.05em'
-            }}>
-                Personas
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <LegendItem label="Homer" subtitle="Fun / Fails" color="#ffffff" type="homer" isActive={checkActive('homer')} isDimmed={checkDimmed('homer')} />
-                <LegendItem label="Bart" subtitle="Fast / Urgent" color="#ffffff" type="bart" isActive={checkActive('bart')} isDimmed={checkDimmed('bart')} />
-                <LegendItem label="Marge" subtitle="Connection" color="#ffffff" type="marge" isActive={checkActive('marge')} isDimmed={checkDimmed('marge')} />
-                <LegendItem label="Lisa" subtitle="Logic / Data" color="#ffffff" type="lisa" isActive={checkActive('lisa')} isDimmed={checkDimmed('lisa')} />
+                <LegendItem label="Hook" color="var(--color-hook)" type="hook" isActive={checkActive('hook')} isDimmed={checkDimmed('hook')} />
+                <LegendItem label="Story" color="var(--color-story)" type="story" isActive={checkActive('story')} isDimmed={checkDimmed('story')} />
+                <LegendItem label="Emotions" color="var(--color-emotion)" type="emotion" isActive={checkActive('emotion')} isDimmed={checkDimmed('emotion')} />
+                <LegendItem label="Logic" color="var(--color-logic)" type="logic" isActive={checkActive('logic')} isDimmed={checkDimmed('logic')} />
+                <LegendItem label="Proof" color="var(--color-proof)" type="proof" isActive={checkActive('proof')} isDimmed={checkDimmed('proof')} />
+                <LegendItem label="CTA" color="var(--color-cta)" type="cta" isActive={checkActive('cta')} isDimmed={checkDimmed('cta')} />
+                <LegendItem label="Ad / Creative" color="var(--color-ad)" type="ad" isActive={checkActive('ad')} isDimmed={checkDimmed('ad')} />
+                <LegendItem label="Misc" color="var(--color-misc)" type="misc" isActive={checkActive('misc')} isDimmed={checkDimmed('misc')} />
             </div>
 
             {/* MECHANICS */}

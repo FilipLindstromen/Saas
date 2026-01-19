@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
+import TabBar from './components/TabBar';
 import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
@@ -31,7 +32,103 @@ function App() {
   const [style, setStyle] = usePersistentState('cw_style', 'Aggressive');
   const [instructions, setInstructions] = usePersistentState('cw_instructions', '');
   const [targetAudience, setTargetAudience] = usePersistentState('cw_targetAudience', '');
-  const [content, setContent] = usePersistentState('cw_content', '');
+  
+  // Tab Management
+  const [tabs, setTabs] = useState(() => {
+    const saved = localStorage.getItem('cw_tabs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved tabs:', e);
+      }
+    }
+    
+    // Migration: Check if old content exists and migrate it
+    const oldContent = localStorage.getItem('cw_content');
+    if (oldContent) {
+      const migratedTab = {
+        id: '1',
+        name: 'Sales Page',
+        content: oldContent
+      };
+      // Clear old content key after migration
+      localStorage.removeItem('cw_content');
+      return [migratedTab];
+    }
+    
+    // Default: one tab named "Sales Page"
+    return [{ id: '1', name: 'Sales Page', content: '' }];
+  });
+
+  const [activeTabId, setActiveTabId] = useState(() => {
+    const saved = localStorage.getItem('cw_activeTabId');
+    return saved || '1';
+  });
+
+  // Save tabs to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('cw_tabs', JSON.stringify(tabs));
+  }, [tabs]);
+
+  // Save active tab ID
+  useEffect(() => {
+    localStorage.setItem('cw_activeTabId', activeTabId);
+  }, [activeTabId]);
+
+  // Get current tab content
+  const currentTab = tabs.find(tab => tab.id === activeTabId) || tabs[0];
+  const content = currentTab?.content || '';
+  
+  // Set content for current tab
+  const setContent = (newContent) => {
+    setTabs(prevTabs => 
+      prevTabs.map(tab => 
+        tab.id === activeTabId 
+          ? { ...tab, content: newContent }
+          : tab
+      )
+    );
+  };
+
+  // Tab management functions
+  const handleTabSelect = (tabId) => {
+    setActiveTabId(tabId);
+  };
+
+  const handleTabAdd = () => {
+    const newTabId = Date.now().toString();
+    const newTab = {
+      id: newTabId,
+      name: `Tab ${tabs.length + 1}`,
+      content: ''
+    };
+    setTabs(prevTabs => [...prevTabs, newTab]);
+    setActiveTabId(newTabId);
+  };
+
+  const handleTabDelete = (tabId) => {
+    if (tabs.length === 1) {
+      alert('Cannot delete the last tab. Add another tab first.');
+      return;
+    }
+    
+    const newTabs = tabs.filter(tab => tab.id !== tabId);
+    setTabs(newTabs);
+    
+    // If deleted tab was active, switch to first remaining tab
+    if (activeTabId === tabId) {
+      setActiveTabId(newTabs[0].id);
+    }
+  };
+
+  const handleTabRename = (tabId, newName) => {
+    setTabs(prevTabs =>
+      prevTabs.map(tab =>
+        tab.id === tabId ? { ...tab, name: newName } : tab
+      )
+    );
+  };
 
   // Theme State
   const [theme, setTheme] = usePersistentState('cw_theme', 'light');
@@ -81,6 +178,12 @@ function App() {
   // Legendary Copywriter Selection
   const [copywriter, setCopywriter] = usePersistentState('cw_copywriter', 'None');
 
+  // Persuasion Framework Overlay
+  const [persuasionFramework, setPersuasionFramework] = usePersistentState('cw_persuasionFramework', 'None');
+
+  // Show/Hide Background Colors Toggle
+  const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
+
   // Handler for saving API key
   const handleSaveApiKey = (key) => {
     setApiKey(key);
@@ -95,7 +198,7 @@ function App() {
 
   const handleBalanceAnalysis = async (targetAudience) => {
     const { analyzeColorBalance } = await import('./services/openai');
-    const result = await analyzeColorBalance(apiKey, content, targetAudience);
+    const result = await analyzeColorBalance(apiKey, content, targetAudience, docType);
     setBalanceData(result);
   };
 
@@ -260,14 +363,28 @@ function App() {
             bigIdea={bigIdea}
             setBigIdea={setBigIdea}
             onGenerateBigIdeas={handleGenerateBigIdeas}
+            persuasionFramework={persuasionFramework}
+            setPersuasionFramework={setPersuasionFramework}
           />
 
-          <Editor
-            content={content}
-            setContent={setContent}
-            onSelectionChange={setActiveLegendItem}
-          // Removed internal action buttons
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, height: '100%', overflow: 'hidden' }}>
+            <TabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabSelect={handleTabSelect}
+              onTabAdd={handleTabAdd}
+              onTabDelete={handleTabDelete}
+              onTabRename={handleTabRename}
+            />
+            <div style={{ flexGrow: 1, overflow: 'hidden' }}>
+              <Editor
+                content={content}
+                setContent={setContent}
+                onSelectionChange={setActiveLegendItem}
+                showColors={showColors === 'true'}
+              />
+            </div>
+          </div>
 
           <RightPanel
             apiKey={apiKey}
@@ -283,6 +400,8 @@ function App() {
             onImproveMetrics={handleImproveMetrics}
             onHeaderSuggestions={handleHeaderSuggestions}
             activeLegendItem={activeLegendItem}
+            showColors={showColors === 'true'}
+            setShowColors={(value) => setShowColors(value ? 'true' : 'false')}
           />
 
         </Layout>
