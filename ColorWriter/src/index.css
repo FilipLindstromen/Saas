@@ -50,10 +50,10 @@
   --color-hook-text: #c2410c;
   /* orange-700 (Darker for contrast) */
 
-  --color-proof: #cffafe;
-  /* cyan-100 - Distinct from Blue */
-  --color-proof-text: #0e7490;
-  /* cyan-700 */
+  --color-proof: #d1fae5;
+  /* emerald-100 - Soft pastel green matching other block colors */
+  --color-proof-text: #065f46;
+  /* emerald-800 - Dark text for good contrast */
 
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.5;
@@ -234,7 +234,9 @@ select:focus {
 .block-logic,
 .block-cta,
 .block-ad,
-.block-misc {
+.block-misc,
+.block-proof,
+.block-hook {
   /* Layout: Standard Block (Vertical Stacking) */
   display: block;
   margin: 0;
@@ -278,13 +280,20 @@ select:focus {
   --block-text: var(--text-primary);
 }
 
+.block-proof {
+  --block-bg: var(--color-proof);
+  --block-text: var(--color-proof-text);
+}
+
 /* Apply Highlight to SPANS inside Headings/Paragraphs */
 .block-story span,
 .block-emotion span,
 .block-logic span,
 .block-cta span,
 .block-ad span,
-.block-misc span {
+.block-misc span,
+.block-proof span,
+.block-hook span {
   background-color: var(--block-bg);
   color: var(--block-text);
 
@@ -325,6 +334,14 @@ select:focus {
 .block-misc h2,
 .block-misc h3,
 .block-misc p,
+.block-proof h1,
+.block-proof h2,
+.block-proof h3,
+.block-proof p,
+.block-hook h1,
+.block-hook h2,
+.block-hook h3,
+.block-hook p,
 .content-body h1,
 .content-body h2,
 .content-body h3,
@@ -524,4 +541,19 @@ i[type="loop-close"]::before {
 .hide-colors .block-proof {
   background: transparent !important;
   color: var(--text-primary) !important;
+}
+
+/* Block Type Filtering - Fade out non-selected blocks */
+.editor-filter-active .content-row {
+  opacity: 0.15;
+  transition: opacity 0.3s ease;
+}
+
+/* Show selected block type at full opacity */
+.editor-filter-active .content-row:has([class*="block-"][data-selected="true"]) {
+  opacity: 1;
+}
+
+.editor-filter-active .content-row:has([class*="block-"][data-selected="true"]) [class*="block-"] {
+  opacity: 1;
 }

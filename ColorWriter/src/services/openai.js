@@ -1393,3 +1393,380 @@ export async function generateBigIdeas(apiKey, instructions, targetAudience, doc
     }
 }
 
+export async function infuseBlockType(apiKey, { originalText, blockType, docType, style, instructions, targetAudience, copywriter }) {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const blockTypeMap = {
+        'hook': { name: 'Hook', description: 'Attention-grabbing opening, headlines, bold claims, questions that stop scrolling' },
+        'story': { name: 'Story', description: 'Narratives, anecdotes, "I remember when...", character-driven content, relatable scenarios' },
+        'emotion': { name: 'Emotion', description: 'Pain points, desires, fears, dreams, empathy statements ("You feel...", "Tired of...")' },
+        'logic': { name: 'Logic', description: 'Facts, data, numbers, explanations, "Here\'s how it works", mechanisms, reasoning' },
+        'proof': { name: 'Proof', description: 'Testimonials, case studies, results, "John lost 30lbs", social proof, credentials, authority' },
+        'cta': { name: 'CTA', description: 'Direct calls to action, "Click here", "Buy now", "Get started", urgency/scarcity' },
+        'ad': { name: 'Ad/Creative', description: 'Creative/unique angles, metaphors, "Imagine if...", pattern breaks, unusual comparisons' },
+        'misc': { name: 'Misc', description: 'Everything else that doesn\'t fit above categories' }
+    };
+
+    const selectedBlock = blockTypeMap[blockType] || blockTypeMap['story'];
+
+    const systemPrompt = `You are an elite copywriter. Your task is to ADD a few new ${selectedBlock.name.toUpperCase()} blocks to existing copy WITHOUT removing, modifying, or replacing ANY existing content.
+
+**ABSOLUTE REQUIREMENT - DO NOT REPLACE ANYTHING**:
+- Keep EVERY SINGLE existing content-row exactly as it is
+- Do NOT remove any existing blocks
+- Do NOT modify any existing text
+- Do NOT reword any existing content
+- Do NOT change the order of existing content
+- ONLY ADD new ${selectedBlock.name} blocks in strategic locations
+- Add ONLY 2-4 new ${selectedBlock.name} blocks (not many, just a few strategic additions)
+
+**WHAT TO DO**:
+- Read the entire existing copy carefully
+- Identify 2-4 strategic locations where adding a ${selectedBlock.name} block would have the most impact
+- Insert new ${selectedBlock.name} blocks ONLY in those strategic spots
+- Make new blocks feel seamlessly integrated with adjacent content
+- New blocks should reference or build upon nearby existing content
+
+**CONTEXTUAL INTEGRATION (CRITICAL)**:
+- Read the entire existing copy carefully to understand the topic, tone, and flow
+- Identify key themes, pain points, mechanisms, or stories already mentioned
+- New ${selectedBlock.name} blocks must:
+  * Reference specific details from the existing copy
+  * Build upon concepts already introduced
+  * Use the same terminology and language style
+  * Connect to adjacent paragraphs naturally
+  * Feel like a natural continuation, not an insertion
+
+**QUALITY STANDARDS**:
+- Every new block must be high-quality, persuasive, and valuable
+- Use "show, don't tell" - demonstrate outcomes, not vague claims
+- Match the existing copy's level of specificity and detail
+- Maintain consistency in voice, tone, and style
+- New content should feel like it was written by the same expert copywriter
+
+**BLOCK TYPE: ${selectedBlock.name}**
+${selectedBlock.description}
+
+**CONTEXT**:
+- Document Type: ${docType}
+- Writing Style: ${style}
+- Target Audience: ${targetAudience || 'the general public'}
+${copywriter && copywriter !== 'None' ? `- Copywriter Style: ${copywriter}` : ''}
+${instructions ? `- Original Instructions: ${instructions}` : ''}
+
+**OUTPUT STRUCTURE**:
+Use the same HTML structure as the original:
+<div class="content-row">
+  <div class="gutter"><i type="${blockType}"></i></div>
+  <div class="content-body">
+    <div class="block-${blockType}">...content...</div>
+  </div>
+</div>
+
+**FORMATTING CONSTRAINTS**:
+- **SPAN WRAPPERS**: Wrap inner text of every <h1>, <h2>, <h3>, <p> in <span> tag
+- **NO EXTRA SPACE**: No newlines or spaces inside block divs
+- **TIGHT HTML**: Write block divs on SINGLE lines where possible
+- **ICONS**: Every gutter MUST have the correct icon: <i type="${blockType}"></i>
+
+**INTEGRATION STRATEGY**:
+1. First, identify ALL existing content-rows in the copy - these must remain UNCHANGED
+2. Analyze the existing copy to understand:
+   - Main topic and key messages
+   - Specific examples, names, or details mentioned
+   - Pain points or benefits already discussed
+   - Mechanisms or processes explained
+   - Stories or scenarios used
+   - Language patterns and terminology
+
+3. Identify 2-4 strategic insertion points where a ${selectedBlock.name} block would:
+   - Strengthen a weak section
+   - Add depth to an existing point
+   - Create a better transition between sections
+   - Reinforce a key message
+   - Build on a specific example already mentioned
+
+4. Insert NEW ${selectedBlock.name} blocks ONLY at those strategic points:
+   - Write blocks that reference specific details from nearby existing content
+   - Use the same examples, names, or scenarios from the existing copy
+   - Build upon mechanisms or concepts already introduced
+   - Feel like a natural continuation of adjacent paragraphs
+   - Enhance the overall persuasive flow
+
+**OUTPUT REQUIREMENT**:
+- Return the COMPLETE copy with:
+  * ALL original content-rows preserved exactly as they were
+  * 2-4 new ${selectedBlock.name} blocks inserted at strategic locations
+  * No existing content removed, modified, or replaced
+  * New blocks seamlessly integrated between existing blocks
+
+**VERIFICATION CHECKLIST**:
+Before outputting, verify:
+- Every original content-row is still present and unchanged
+- Only 2-4 new ${selectedBlock.name} blocks were added
+- No existing text was modified or removed
+- New blocks are contextually connected to nearby content
+- The copy flows naturally with the additions`;
+
+    const userPrompt = `IMPORTANT: Do NOT replace or modify any existing content. ONLY ADD 2-4 new ${selectedBlock.name} blocks at strategic locations.
+
+Analyze this copy carefully:
+1. Identify ALL existing content-rows - these must remain UNCHANGED
+2. Find 2-4 strategic spots where adding a ${selectedBlock.name} block would have the most impact
+3. Insert ONLY new ${selectedBlock.name} blocks at those strategic locations
+4. Make new blocks reference nearby existing content for seamless integration
+
+The new blocks must:
+- Reference specific details, examples, or concepts from the existing copy
+- Build upon what's already written (don't introduce completely new ideas)
+- Feel like a natural continuation of the existing flow
+- Use the same terminology, tone, and style
+
+${instructions ? `\nOriginal Instructions: ${instructions}\n` : ''}
+
+Existing copy (preserve ALL of this, only add 2-4 new ${selectedBlock.name} blocks):
+${originalText}`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: "gpt-4o",
+            max_tokens: 16000,
+        });
+
+        const rawContent = completion.choices[0].message.content;
+        return cleanContent(rawContent);
+    } catch (error) {
+        console.error("OpenAI Infuse Block Type Error:", error);
+        throw error;
+    }
+}
+export async function generateWeirdStoryIdeas(apiKey, instructions) {
+  const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+  const systemPrompt = `You are a researcher and storyteller who finds TRUE, weird, counter-intuitive stories that can be used for marketing and persuasion.
+
+**YOUR TASK**: Find 10 TRUE, weird, fascinating stories related to the user's instructions. These stories should be:
+- **TRUE and verifiable** (not urban legends, myths, or unverified claims)
+- **Weird or counter-intuitive** (challenge common assumptions, make people think "wait, that's weird")
+- **Connected to the user's topic** (even if indirectly)
+- **Marketing-ready** (can reinforce a specific belief or angle)
+
+**STORY REQUIREMENTS**:
+1. Each story must be **verifiably TRUE** from documented sources (scientific studies, medical journals, historical records, research papers)
+2. Each story should be **weird, strange, or counter-intuitive** - something that challenges assumptions
+3. Each story should **connect to the user's instructions/topic** in a way that could reinforce a marketing angle
+4. Each story should have a clear **"why this is strange"** element that makes it counter-intuitive
+5. Each story should have a **"why this matters"** insight that could be used for persuasion/marketing
+6. Stories should be diverse: scientific discoveries, psychological phenomena, medical cases, historical events, etc.
+
+**STORY STRUCTURE**:
+Each story must include:
+- **title**: Short, intriguing title (5-10 words) that captures the weirdness
+- **story**: 2-3 sentences describing the weird/strange TRUE story
+- **whyStrange**: 1-2 sentences explaining what makes it counter-intuitive or weird
+- **whyMatters**: 1-2 sentences explaining the insight or angle that could be used for marketing/persuasion
+- **hook**: A short, punchy hook (1 sentence) that could be used in an ad or headline
+- **source**: Full URL where this story can be verified
+
+**SOURCE REQUIREMENTS**:
+- Use reputable sources: Wikipedia, scientific journals (PubMed, Nature, Science), medical journals, news archives, historical records, research papers
+- Provide actual URLs that lead to pages where the story is documented
+- If exact URL unavailable, use closest Wikipedia article or journal article path
+- Format URLs as: https://en.wikipedia.org/wiki/[article] or https://pubmed.ncbi.nlm.nih.gov/[id] or https://www.[reputable-source].com/[path]
+
+**OUTPUT FORMAT**:
+Return ONLY a JSON object with this EXACT structure:
+{
+"stories": [
+  {
+    "title": "Short, intriguing title (5-10 words)",
+    "story": "2-3 sentences describing the weird TRUE story",
+    "whyStrange": "1-2 sentences explaining what makes it counter-intuitive",
+    "whyMatters": "1-2 sentences explaining the marketing/persuasion angle",
+    "hook": "One punchy sentence that could be used as an ad hook",
+    "source": "Full URL to where this story can be verified"
+  }
+]
+}
+
+**CRITICAL**: Generate exactly 10 stories. Make them diverse, fascinating, verifiably true, and marketing-ready. Focus on stories that challenge assumptions and can reinforce specific beliefs or angles. Each story should feel like it could be used in a Facebook ad or marketing campaign.`;
+
+  try {
+      const completion = await openai.chat.completions.create({
+          messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Find 10 TRUE, weird, counter-intuitive stories related to these instructions. Make them marketing-ready and able to reinforce specific beliefs or angles:\n\n${instructions || 'Find interesting, weird true stories'}` }
+          ],
+          model: "gpt-4o",
+          response_format: { type: "json_object" },
+          temperature: 0.8
+      });
+
+      const result = JSON.parse(completion.choices[0].message.content);
+      
+      // Ensure all stories have the required fields and backward compatibility
+      if (result.stories) {
+          result.stories = result.stories.map(story => ({
+              title: story.title || 'Untitled Story',
+              summary: story.story || story.summary || '',
+              story: story.story || story.summary || '',
+              whyStrange: story.whyStrange || '',
+              whyMatters: story.whyMatters || '',
+              hook: story.hook || '',
+              source: story.source || ''
+          }));
+      }
+      
+      return result;
+  } catch (error) {
+      console.error("OpenAI Weird Stories Error:", error);
+      throw error;
+  }
+}
+
+export async function generateCopyFromStory(apiKey, { story, docType, style, instructions, targetAudience, copywriter, bigIdea }) {
+  const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+  let systemPrompt = `**ROLE**
+You are an elite conversion copywriter and storyteller.
+Your task is to generate compelling copy that tells a really nice story, then connects it to the document type.
+
+**STORY REQUIREMENTS**:
+- Start by telling the weird/strange story in an engaging, narrative way
+- Make the story vivid and fascinating
+- Use story blocks (block-story) to tell the narrative
+- Build intrigue and curiosity as you tell the story
+
+**CONNECTION REQUIREMENT**:
+- After telling the story, you MUST connect it to the document type (${docType})
+- The connection should feel natural and relevant
+- Adjust the ending of the story so it connects to the document type's purpose
+- Make the transition smooth and logical
+
+${copywriter && copywriter !== 'None' ? `Write in the specific style of ${copywriter}. Emulate their tone, vocabulary, sentence structure, and storytelling techniques perfectly.` : 'Write as an expert storyteller and copywriter.'}
+
+Your goal is to write a ${docType} targeting ${targetAudience || 'the general public'}.
+Tone: ${style}.
+
+**OUTPUT STRUCTURE (HTML FORMAT)**
+
+You MUST construct your response using a "Row-based" HTML structure with a sidebar gutter and content body wrapper.
+
+**The Container**:
+<div class="content-row">
+<div class="gutter">...icons...</div>
+<div class="content-body">
+    <div class="block-[type]">...text...</div>
+</div>
+</div>
+
+**1. Gutter (Left Column) - CRITICAL REQUIREMENT**:
+Every gutter MUST contain the block type icon that matches the block type in the content-body.
+- If content-body has <div class="block-hook">, gutter MUST have <i type="hook"></i>
+- If content-body has <div class="block-story">, gutter MUST have <i type="story"></i>
+- If content-body has <div class="block-emotion">, gutter MUST have <i type="emotion"></i>
+- If content-body has <div class="block-logic">, gutter MUST have <i type="logic"></i>
+- If content-body has <div class="block-proof">, gutter MUST have <i type="proof"></i>
+- If content-body has <div class="block-cta">, gutter MUST have <i type="cta"></i>
+- If content-body has <div class="block-ad">, gutter MUST have <i type="ad"></i>
+- If content-body has <div class="block-misc">, gutter MUST have <i type="misc"></i>
+
+**MULTIPLE ICONS IN GUTTER (MANDATORY WHEN APPLICABLE)**:
+If a content block uses mechanics (interrupt, loop-open, loop-close) in addition to its block type, you MUST include BOTH icons in the gutter:
+- Block type icon (hook, story, emotion, logic, proof, cta, ad, misc) - ALWAYS required
+- Mechanics icon (interrupt, loop-open, loop-close) - Add when the text uses that mechanic
+
+**2. Content Body (Right Wrapper)**:
+Wraps the content blocks. The block type class MUST match the icon in the gutter.
+
+**BLOCK TYPES**:
+1. **block-story** → icon: story 📖 - Use this for telling the weird story
+2. **block-hook** → icon: hook 🎯 - Opening that creates recognition
+3. **block-emotion** → icon: emotion ❤️ - Validates experience, removes blame
+4. **block-logic** → icon: logic 🧠 - Explains mechanism, cause-and-effect
+5. **block-proof** → icon: proof ✅ - Reduces risk, confirms logic
+6. **block-cta** → icon: cta 🚀 - Clear binary decision, consequences
+7. **block-ad** → icon: ad 💡 - Creative angles, pattern breaks
+8. **block-misc** → icon: misc 📝 - Everything else
+
+**MECHANICS (Inline highlights)**
+- **highlight-interrupt**: Pattern breaks, attention shifts
+- **highlight-loop-open**: Questions, curiosity gaps (MUST close later)
+- **highlight-loop-close**: Answers, reveals, payoffs
+
+**FORMATTING CONSTRAINTS**
+- **USE HEADINGS**: Use <h1>, <h2>, <h3> for headlines/subheadlines. Do NOT use bold for headlines.
+- **Bold** key terms sparingly with <b> or <strong>
+- **NO EMPTY LINES**: No empty lines or <br> tags inside content blocks
+- **NO WHITESPACE PADDING**: No spaces/newlines at start or end of text in block divs
+- **SPAN WRAPPERS**: Wrap inner text of every <h1>, <h2>, <h3>, <p> in <span> tag
+- **TIGHT HTML**: Write block divs on SINGLE lines where possible
+
+**STORY STRUCTURE**:
+1. Start with the weird story (use block-story, 3-5 paragraphs)
+2. Build intrigue and curiosity
+3. Transition smoothly to connect the story to the document type
+4. End with content appropriate for the document type (CTA for sales pages, etc.)
+
+**LANGUAGE CONSTRAINT**:
+Write at a **5th-grade reading level**.
+- Simple, punchy, clear language
+- Short sentences
+- No jargon or complex words
+
+**FINAL SELF-CHECK (REQUIRED)**
+
+Before outputting, verify:
+- The story is told in an engaging, narrative way
+- The story connects naturally to the document type
+- The ending is adjusted to fit the document type's purpose
+- Every content-row has a block type icon in the gutter that MATCHES the block type class
+- When a block uses mechanics, the gutter has BOTH the block type icon AND the mechanics icon(s)
+- Copy feels engaging and story-driven
+- The connection between story and document type is clear and logical
+
+If any of the above fails, rewrite.
+
+**OUTPUT FORMAT**
+
+Deliver a complete ${docType} that:
+- Tells a really nice, engaging story
+- Connects the story to the document type naturally
+- Uses proper HTML structure with block types and icons
+- Adjusts the ending to fit the document type's purpose
+`;
+
+  const userPrompt = `Generate copy based on this weird story:
+
+**Story Title**: ${story.title}
+**Story Summary**: ${story.story || story.summary}
+**Story Source**: ${story.source}
+
+${instructions ? `\nAdditional Instructions: ${instructions}` : ''}
+
+Generate a ${docType} that tells this story in an engaging way, then connects it to the document type's purpose.`;
+
+  try {
+      const completion = await openai.chat.completions.create({
+          messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+          ],
+          model: "gpt-4o",
+          max_tokens: 16000,
+      });
+
+      const rawContent = completion.choices[0].message.content;
+      return cleanContent(rawContent);
+  } catch (error) {
+      console.error("OpenAI Generate Copy From Story Error:", error);
+      if (error.message?.includes('content policy')) {
+          throw new Error("Content policy violation. Please try a different story or adjust your instructions.");
+      }
+      throw error;
+  }
+}
