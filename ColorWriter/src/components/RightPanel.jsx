@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette } from 'lucide-react';
+import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette, Plus } from 'lucide-react';
 import ColorLegend from './ColorLegend';
 
 const RightPanel = ({
@@ -9,16 +9,34 @@ const RightPanel = ({
     onAnalyze,
     onFeedback,
     onBalance,
+    onInfuseBlockType,
     loading,
+    feedbackLoading,
+    balanceLoading,
     conversionMetrics,
     onUpdateMetrics,
     metricsLoading,
     onImproveMetrics,
+    isImproving,
     onHeaderSuggestions,
     activeLegendItem,
+    selectedBlockType,
+    onBlockTypeSelect,
     showColors,
     setShowColors
 }) => {
+    const [infuseBlockType, setInfuseBlockType] = useState('story');
+
+    const blockTypes = [
+        { value: 'hook', label: 'Hook', icon: '🎯' },
+        { value: 'story', label: 'Story', icon: '📖' },
+        { value: 'emotion', label: 'Emotion', icon: '❤️' },
+        { value: 'logic', label: 'Logic', icon: '🧠' },
+        { value: 'proof', label: 'Proof', icon: '✅' },
+        { value: 'cta', label: 'CTA', icon: '🚀' },
+        { value: 'ad', label: 'Ad/Creative', icon: '💡' },
+        { value: 'misc', label: 'Misc', icon: '📝' }
+    ];
 
     const ProgressBar = ({ label, value, color, feedback }) => (
         <div style={{ marginBottom: '1rem' }}>
@@ -103,7 +121,7 @@ const RightPanel = ({
                             {showColors ? 'Hide Colors' : 'Show Colors'}
                         </button>
                     </div>
-                    <ColorLegend activeItem={activeLegendItem} />
+                    <ColorLegend activeItem={activeLegendItem} selectedBlockType={selectedBlockType} onBlockTypeSelect={onBlockTypeSelect} />
                 </div>
 
                 {/* Main Actions Group */}
@@ -136,9 +154,58 @@ const RightPanel = ({
                         {loading ? 'Analyzing...' : 'Analyze / Color'}
                     </button>
 
+                    {/* Infuse Block Type Section */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <select
+                            value={infuseBlockType}
+                            onChange={(e) => setInfuseBlockType(e.target.value)}
+                            disabled={!apiKey || loading}
+                            style={{
+                                padding: '0.5rem',
+                                fontSize: '0.85rem',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
+                                opacity: !apiKey || loading ? 0.6 : 1
+                            }}
+                        >
+                            {blockTypes.map(block => (
+                                <option key={block.value} value={block.value}>
+                                    {block.icon} {block.label}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={() => onInfuseBlockType && onInfuseBlockType(infuseBlockType)}
+                            disabled={!apiKey || loading || !onInfuseBlockType}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid var(--border-color)',
+                                opacity: !apiKey || loading ? 0.6 : 1,
+                                cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
+                                padding: '0.6rem',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                borderRadius: '6px',
+                                transition: 'all 0.2s'
+                            }}
+                            title={`Add more ${blockTypes.find(b => b.value === infuseBlockType)?.label} blocks to the copy`}
+                        >
+                            {loading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                            {loading ? 'Infusing...' : `Infuse ${blockTypes.find(b => b.value === infuseBlockType)?.label}`}
+                        </button>
+                    </div>
+
                     <button
                         onClick={onFeedback}
-                        disabled={!apiKey || !targetAudience}
+                        disabled={!apiKey || !targetAudience || feedbackLoading}
                         style={{
                             background: 'var(--bg-secondary)',
                             color: 'var(--text-primary)',
@@ -150,28 +217,32 @@ const RightPanel = ({
                             padding: '0.6rem',
                             fontWeight: 500,
                             borderRadius: '6px',
-                            fontSize: '0.85rem'
+                            fontSize: '0.85rem',
+                            opacity: !apiKey || !targetAudience || feedbackLoading ? 0.6 : 1,
+                            cursor: !apiKey || !targetAudience || feedbackLoading ? 'not-allowed' : 'pointer'
                         }}
                         title={!targetAudience ? "Enter Target Audience in Sidebar first" : "Get Audience Feedback"}
                     >
-                        <MessageCircle size={16} />
-                        Audience Feedback
+                        {feedbackLoading ? <Loader2 className="animate-spin" size={16} /> : <MessageCircle size={16} />}
+                        {feedbackLoading ? 'Getting Feedback...' : 'Audience Feedback'}
                     </button>
 
                     <button
                         onClick={onBalance}
-                        disabled={!apiKey || !targetAudience}
+                        disabled={!apiKey || !targetAudience || balanceLoading}
                         style={{
                             background: 'var(--bg-secondary)',
                             color: 'var(--text-primary)',
                             border: '1px solid var(--border-color)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                            padding: '0.6rem', fontWeight: 500, borderRadius: '6px', fontSize: '0.85rem'
+                            padding: '0.6rem', fontWeight: 500, borderRadius: '6px', fontSize: '0.85rem',
+                            opacity: !apiKey || !targetAudience || balanceLoading ? 0.6 : 1,
+                            cursor: !apiKey || !targetAudience || balanceLoading ? 'not-allowed' : 'pointer'
                         }}
                         title="Check Color Balance"
                     >
-                        <Scale size={16} />
-                        Check Balance
+                        {balanceLoading ? <Loader2 className="animate-spin" size={16} /> : <Scale size={16} />}
+                        {balanceLoading ? 'Analyzing...' : 'Check Balance'}
                     </button>
                 </div>
 
@@ -250,7 +321,7 @@ const RightPanel = ({
                         <>
                             <button
                                 onClick={onImproveMetrics}
-                                disabled={!apiKey || metricsLoading}
+                                disabled={!apiKey || metricsLoading || isImproving}
                                 style={{
                                     marginTop: '0.75rem',
                                     width: '100%',
@@ -265,13 +336,13 @@ const RightPanel = ({
                                     fontSize: '0.9rem',
                                     fontWeight: 600,
                                     borderRadius: '6px',
-                                    cursor: !apiKey || metricsLoading ? 'not-allowed' : 'pointer',
-                                    opacity: !apiKey || metricsLoading ? 0.6 : 1,
+                                    cursor: !apiKey || metricsLoading || isImproving ? 'not-allowed' : 'pointer',
+                                    opacity: !apiKey || metricsLoading || isImproving ? 0.6 : 1,
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <Wand2 size={16} />
-                                Improve Copy
+                                {(metricsLoading || isImproving) ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
+                                {(metricsLoading || isImproving) ? 'Improving...' : 'Improve Copy'}
                             </button>
 
                             <button
@@ -296,8 +367,8 @@ const RightPanel = ({
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <MessageCircle size={16} />
-                                Header Suggestions
+                                {metricsLoading ? <Loader2 className="animate-spin" size={16} /> : <MessageCircle size={16} />}
+                                {metricsLoading ? 'Generating...' : 'Header Suggestions'}
                             </button>
                         </>
                     )}

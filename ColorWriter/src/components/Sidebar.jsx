@@ -16,8 +16,10 @@ const Sidebar = ({
     bigIdea,
     setBigIdea,
     onGenerateBigIdeas,
+    bigIdeaLoading,
     persuasionFramework,
-    setPersuasionFramework
+    setPersuasionFramework,
+    onGenerateWeirdStoryIdeas
 }) => {
     const [loading, setLoading] = useState(false);
     const [pimpLoading, setPimpLoading] = useState(false);
@@ -34,7 +36,7 @@ const Sidebar = ({
     ];
     const styles = [
         'Aggressive', 'Story-driven', 'Direct', 'Educational', 'Empathetic',
-        'Funny', 'Curiosity', 'Relatable', 'Personal'
+        'Funny', 'Curiosity', 'Relatable', 'Personal', '🔮 Weird stories'
     ];
 
     const persuasionFrameworks = [
@@ -230,7 +232,7 @@ const Sidebar = ({
                     </label>
                     <button
                         onClick={onGenerateBigIdeas}
-                        disabled={!apiKey || !instructions}
+                        disabled={!apiKey || !instructions || bigIdeaLoading}
                         style={{
                             background: 'transparent',
                             border: '1px solid var(--border-color)',
@@ -239,16 +241,16 @@ const Sidebar = ({
                             fontSize: '0.75rem',
                             fontWeight: 500,
                             borderRadius: '4px',
-                            cursor: !apiKey || !instructions ? 'not-allowed' : 'pointer',
-                            opacity: !apiKey || !instructions ? 0.6 : 1,
+                            cursor: !apiKey || !instructions || bigIdeaLoading ? 'not-allowed' : 'pointer',
+                            opacity: !apiKey || !instructions || bigIdeaLoading ? 0.6 : 1,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem'
                         }}
                         title="Generate 5 big idea suggestions"
                     >
-                        <Lightbulb size={12} />
-                        Generate Ideas
+                        {bigIdeaLoading ? <Loader2 className="animate-spin" size={12} /> : <Lightbulb size={12} />}
+                        {bigIdeaLoading ? 'Generating...' : 'Generate Ideas'}
                     </button>
                 </div>
                 <input
@@ -268,6 +270,35 @@ const Sidebar = ({
                     }}
                 />
             </div>
+
+            {/* Generate Ideas Button - Only show for Weird stories */}
+            {style.includes('Weird stories') && (
+                <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+                    <button
+                        onClick={onGenerateWeirdStoryIdeas}
+                        disabled={!apiKey || loading}
+                        style={{
+                            width: '100%',
+                            background: !apiKey || loading ? 'var(--bg-tertiary)' : '#7c3aed',
+                            color: !apiKey || loading ? 'var(--text-tertiary)' : '#ffffff',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            padding: '1rem',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
+                            marginBottom: '0.75rem'
+                        }}
+                    >
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : <Lightbulb size={18} />}
+                        {loading ? 'Finding Stories...' : 'Generate Ideas'}
+                    </button>
+                </div>
+            )}
 
             {/* Generate Copy Button - Moved to bottom */}
             <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>

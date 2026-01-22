@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Wand2, Loader2, Scale, MessageCircle, Bold, Heading1, Heading2, Heading3, Type } from 'lucide-react';
 import { analyzeCopy } from '../services/openai';
 
-const Editor = ({ content, setContent, onSelectionChange, showColors = true }) => {
+const Editor = ({ content, setContent, onSelectionChange, showColors = true, selectedBlockType = null }) => {
     const editorRef = useRef(null);
 
     // Toolbar State
@@ -14,6 +14,33 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true }) =
             editorRef.current.innerHTML = content;
         }
     }, [content]);
+
+    // Apply block type filtering - mark selected blocks and fade others
+    useEffect(() => {
+        if (!editorRef.current) return;
+
+        const editor = editorRef.current;
+
+        if (selectedBlockType) {
+            // Mark all blocks with data-selected attribute
+            const allBlocks = editor.querySelectorAll('[class*="block-"]');
+            allBlocks.forEach(block => {
+                const blockClass = Array.from(block.classList).find(cls => cls.startsWith('block-'));
+                if (blockClass) {
+                    const blockType = blockClass.replace('block-', '');
+                    if (blockType === selectedBlockType) {
+                        block.setAttribute('data-selected', 'true');
+                    } else {
+                        block.removeAttribute('data-selected');
+                    }
+                }
+            });
+        } else {
+            // Remove all data-selected attributes
+            const allBlocks = editor.querySelectorAll('[data-selected]');
+            allBlocks.forEach(block => block.removeAttribute('data-selected'));
+        }
+    }, [selectedBlockType, content]);
 
     const handleInput = (e) => {
         // We handle content updates primarily through generation, but manual edits exist.
@@ -294,7 +321,9 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true }) =
             )
             }
 
-            <div style={{
+            <div 
+                className={selectedBlockType ? 'editor-filter-active' : ''}
+                style={{
                 flexGrow: 1,
                 padding: '2rem',
                 paddingBottom: '50vh',

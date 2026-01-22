@@ -8,8 +8,9 @@ import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
 import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
 import BigIdeaModal from './components/BigIdeaModal';
+import WeirdStoriesModal from './components/WeirdStoriesModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas } from './services/openai';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas } from './services';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -149,12 +150,20 @@ function App() {
   const [conversionMetrics, setConversionMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [headerSuggestions, setHeaderSuggestions] = useState(null);
   const [bigIdea, setBigIdea] = usePersistentState('cw_bigIdea', '');
   const [bigIdeaSuggestions, setBigIdeaSuggestions] = useState(null);
+  const [bigIdeaLoading, setBigIdeaLoading] = useState(false);
+  const [weirdStories, setWeirdStories] = useState(null);
+  const [weirdStoryLoading, setWeirdStoryLoading] = useState(false);
 
   // Legend Highlighting
   const [activeLegendItem, setActiveLegendItem] = useState(null);
+  
+  // Block Type Selection (for filtering/fading)
+  const [selectedBlockType, setSelectedBlockType] = useState(null);
 
   // Load conversion metrics from localStorage on mount
   useEffect(() => {
@@ -192,14 +201,32 @@ function App() {
   };
 
   const handleAudienceFeedback = async (targetAudience, currentDocType) => {
-    const result = await analyzeAudienceFeedback(apiKey, content, targetAudience, currentDocType);
-    setFeedbackData(result);
+    if (!apiKey) return;
+    setFeedbackLoading(true);
+    try {
+      const result = await analyzeAudienceFeedback(apiKey, content, targetAudience, currentDocType);
+      setFeedbackData(result);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to get audience feedback.');
+    } finally {
+      setFeedbackLoading(false);
+    }
   };
 
   const handleBalanceAnalysis = async (targetAudience) => {
-    const { analyzeColorBalance } = await import('./services/openai');
-    const result = await analyzeColorBalance(apiKey, content, targetAudience, docType);
-    setBalanceData(result);
+    if (!apiKey) return;
+    setBalanceLoading(true);
+    try {
+      const { analyzeColorBalance } = await import('./services');
+      const result = await analyzeColorBalance(apiKey, content, targetAudience, docType);
+      setBalanceData(result);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to analyze balance.');
+    } finally {
+      setBalanceLoading(false);
+    }
   };
 
   const handleMetricsUpdate = async () => {
@@ -218,6 +245,7 @@ function App() {
 
   const handleImproveMetrics = async () => {
     if (!apiKey || !conversionMetrics) return;
+    setMetricsLoading(true);
     setIsImproving(true);
     try {
       const newContent = await improveConversionMetrics(apiKey, content, conversionMetrics, docType, style, targetAudience, copywriter);
@@ -235,6 +263,7 @@ function App() {
       console.error(e);
       alert('Failed to improve copy based on metrics.');
     } finally {
+      setMetricsLoading(false);
       setIsImproving(false);
     }
   };
@@ -256,7 +285,7 @@ function App() {
 
   const handleGenerateBigIdeas = async () => {
     if (!apiKey || !instructions) return;
-    setMetricsLoading(true);
+    setBigIdeaLoading(true);
     try {
       const suggestions = await generateBigIdeas(apiKey, instructions, targetAudience, docType, style);
       setBigIdeaSuggestions(suggestions);
@@ -264,7 +293,7 @@ function App() {
       console.error(e);
       alert('Failed to generate big ideas.');
     } finally {
-      setMetricsLoading(false);
+      setBigIdeaLoading(false);
     }
   };
 
@@ -272,19 +301,59 @@ function App() {
     setBigIdea(idea);
   };
 
+  const handleGenerateWeirdStoryIdeas = async () => {
+    if (!apiKey || !instructions) return;
+    setWeirdStoryLoading(true);
+    try {
+      const { generateWeirdStoryIdeas } = await import('./services');
+      if (!generateWeirdStoryIdeas || typeof generateWeirdStoryIdeas !== 'function') {
+        throw new Error('generateWeirdStoryIdeas function not found. Please ensure src/services/index.js exports the function.');
+      }
+      const stories = await generateWeirdStoryIdeas(apiKey, instructions);
+      setWeirdStories(stories.stories || []);
+    } catch (e) {
+      console.error('Error generating weird story ideas:', e);
+      alert(`Failed to generate weird story ideas: ${e.message || 'Unknown error'}`);
+    } finally {
+      setWeirdStoryLoading(false);
+    }
+  };
+
+  const handleGenerateCopyFromStory = async (story) => {
+    if (!apiKey) return;
+    setWeirdStoryLoading(true);
+    try {
+      const { generateCopyFromStory } = await import('./services');
+      if (!generateCopyFromStory || typeof generateCopyFromStory !== 'function') {
+        throw new Error('generateCopyFromStory function not found. Please ensure src/services/index.js exports the function.');
+      }
+      const newContent = await generateCopyFromStory(apiKey, {
+        story,
+        docType,
+        style,
+        instructions,
+        targetAudience,
+        copywriter,
+        bigIdea
+      });
+      setContent(newContent);
+      setWeirdStories(null); // Close modal on success
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to generate copy from story: ${e.message || 'Unknown error'}`);
+    } finally {
+      setWeirdStoryLoading(false);
+    }
+  };
+
 
 
   const handleAnalyzeAndColor = async () => {
     if (!apiKey || analyzeLoading) return;
-    const { analyzeCopy } = await import('./services/openai');
-    // We need to parse text from HTML content for analysis if possible, but the service handles it.
-    // Although wait, Editor usually handles this logic. 
-    // We should pass a handler to Editor? Or can we do it here?
-    // The Editor has the ref. But `content` state is synced. 
-
+    const { analyzeCopy } = await import('./services');
     setAnalyzeLoading(true);
     try {
-      const newContent = await analyzeCopy(apiKey, content); // analyzing the HTML content directly is fine if service strips tags
+      const newContent = await analyzeCopy(apiKey, content);
       setContent(newContent);
     } catch (e) {
       alert("Error analyzing text.");
@@ -311,7 +380,7 @@ function App() {
     if (!apiKey || !balanceData) return;
     setIsImproving(true);
     try {
-      const { improveBalance } = await import('./services/openai');
+      const { improveBalance } = await import('./services');
       const newContent = await improveBalance(apiKey, content, balanceData, docType, style, targetAudience);
       setContent(newContent);
       setBalanceData(null);
@@ -319,6 +388,29 @@ function App() {
       alert("Failed to improve balance. Check console.");
     } finally {
       setIsImproving(false);
+    }
+  };
+
+  const handleInfuseBlockType = async (blockType) => {
+    if (!apiKey || !content) return;
+    setAnalyzeLoading(true);
+    try {
+      const { infuseBlockType } = await import('./services');
+      const newContent = await infuseBlockType(apiKey, {
+        originalText: content,
+        blockType,
+        docType,
+        style,
+        instructions,
+        targetAudience,
+        copywriter
+      });
+      setContent(newContent);
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to infuse ${blockType} blocks: ${e.message || 'Unknown error'}`);
+    } finally {
+      setAnalyzeLoading(false);
     }
   };
 
@@ -363,8 +455,10 @@ function App() {
             bigIdea={bigIdea}
             setBigIdea={setBigIdea}
             onGenerateBigIdeas={handleGenerateBigIdeas}
+            bigIdeaLoading={bigIdeaLoading}
             persuasionFramework={persuasionFramework}
             setPersuasionFramework={setPersuasionFramework}
+            onGenerateWeirdStoryIdeas={handleGenerateWeirdStoryIdeas}
           />
 
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, height: '100%', overflow: 'hidden' }}>
@@ -382,6 +476,7 @@ function App() {
                 setContent={setContent}
                 onSelectionChange={setActiveLegendItem}
                 showColors={showColors === 'true'}
+                selectedBlockType={selectedBlockType}
               />
             </div>
           </div>
@@ -393,13 +488,19 @@ function App() {
             onAnalyze={handleAnalyzeAndColor}
             onFeedback={() => handleAudienceFeedback(targetAudience, docType)}
             onBalance={() => handleBalanceAnalysis(targetAudience)}
+            onInfuseBlockType={handleInfuseBlockType}
             loading={analyzeLoading}
+            feedbackLoading={feedbackLoading}
+            balanceLoading={balanceLoading}
             metricsLoading={metricsLoading}
+            isImproving={isImproving}
             conversionMetrics={conversionMetrics}
             onUpdateMetrics={handleMetricsUpdate}
             onImproveMetrics={handleImproveMetrics}
             onHeaderSuggestions={handleHeaderSuggestions}
             activeLegendItem={activeLegendItem}
+            selectedBlockType={selectedBlockType}
+            onBlockTypeSelect={setSelectedBlockType}
             showColors={showColors === 'true'}
             setShowColors={(value) => setShowColors(value ? 'true' : 'false')}
           />
@@ -445,6 +546,15 @@ function App() {
           suggestions={bigIdeaSuggestions}
           onClose={() => setBigIdeaSuggestions(null)}
           onSelect={handleSelectBigIdea}
+        />
+      )}
+
+      {weirdStories && (
+        <WeirdStoriesModal
+          stories={weirdStories}
+          onClose={() => setWeirdStories(null)}
+          onGenerateCopy={handleGenerateCopyFromStory}
+          loading={weirdStoryLoading}
         />
       )}
     </>
