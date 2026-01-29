@@ -657,7 +657,7 @@ function App() {
     <div className="app">
       <div className="app-header">
         <div className="header-left">
-          <h1>Pitch Deck Generator</h1>
+          <h1>Pitch Deck 2000</h1>
           <div className="header-file-actions">
             <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
