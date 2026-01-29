@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import LayoutSelector from './LayoutSelector'
 import './SlideList.css'
 
-function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDuplicate, onUpdate }) {
+function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onReorder }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [editingSubtitle, setEditingSubtitle] = useState(false)
@@ -11,6 +11,9 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
   const [subtitleTextAreaRef, setSubtitleTextAreaRef] = useState(null)
   const [foldedSections, setFoldedSections] = useState(new Set())
   const [isFormatting, setIsFormatting] = useState(false)
+  const [draggedId, setDraggedId] = useState(null)
+  const [dragOverId, setDragOverId] = useState(null)
+  const dragStartTimeRef = useRef(null)
 
   const handleEdit = (slide) => {
     setEditingId(slide.id)
@@ -93,7 +96,11 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
 
   const handleLayoutSelect = (layoutId) => {
     if (selectedSlideId) {
-      onUpdate(selectedSlideId, { layout: layoutId })
+      // If switching to section layout, clear imageUrl
+      const updates = layoutId === 'section' 
+        ? { layout: layoutId, imageUrl: '' }
+        : { layout: layoutId }
+      onUpdate(selectedSlideId, updates)
     }
   }
 
@@ -114,6 +121,17 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     const end = textarea.selectionEnd
     const selectedText = content.substring(start, end)
 
+    // For heading tags, apply to entire field instead of selected text
+    if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+      const headingProperty = isSubtitle ? 'subtitleHeadingLevel' : 'textHeadingLevel'
+      const currentHeading = slides.find(s => s.id === editingId)?.[headingProperty]
+      // Toggle: if already this heading, remove it; otherwise set it
+      const newHeading = currentHeading === tag ? null : tag
+      onUpdate(editingId, { [headingProperty]: newHeading })
+      setIsFormatting(false)
+      return
+    }
+
     if (selectedText.length === 0) {
       setIsFormatting(false)
       return
@@ -127,12 +145,6 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
       formattedText = `<strong>${selectedText}</strong>`
     } else if (tag === 'em') {
       formattedText = `<em>${selectedText}</em>`
-    } else if (tag === 'h1') {
-      formattedText = `<h1>${selectedText}</h1>`
-    } else if (tag === 'h2') {
-      formattedText = `<h2>${selectedText}</h2>`
-    } else if (tag === 'h3') {
-      formattedText = `<h3>${selectedText}</h3>`
     } else {
       setIsFormatting(false)
       return
@@ -193,6 +205,63 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     return visibleSlides
   }
 
+  const handleDragStart = (e, slideId) => {
+    if (editingId === slideId) {
+      e.preventDefault()
+      return
+    }
+    setDraggedId(slideId)
+    dragStartTimeRef.current = Date.now()
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/html', slideId)
+  }
+
+  const handleDragOver = (e, slideId) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (slideId !== draggedId) {
+      setDragOverId(slideId)
+    }
+  }
+
+  const handleDragLeave = () => {
+    setDragOverId(null)
+  }
+
+  const handleDrop = (e, targetSlideId) => {
+    e.preventDefault()
+    setDragOverId(null)
+    
+    if (!draggedId || draggedId === targetSlideId || !onReorder) {
+      setDraggedId(null)
+      return
+    }
+
+    const draggedIndex = slides.findIndex(s => s.id === draggedId)
+    const targetIndex = slides.findIndex(s => s.id === targetSlideId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedId(null)
+      return
+    }
+
+    const newSlides = [...slides]
+    const [removed] = newSlides.splice(draggedIndex, 1)
+    newSlides.splice(targetIndex, 0, removed)
+    
+    onReorder(newSlides)
+    setDraggedId(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedId(null)
+    setDragOverId(null)
+    // Clear drag start time after a short delay to prevent click after drag
+    setTimeout(() => {
+      dragStartTimeRef.current = null
+    }, 100)
+  }
+
   return (
     <div className="slide-list">
       <div className="slide-list-header">
@@ -212,8 +281,16 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
           
           if (isSection) {
             return (
-              <div key={slide.id} className="slide-item-wrapper">
-                <div className="slide-item-number">—</div>
+              <div 
+                key={slide.id} 
+                className={`slide-item-wrapper section-wrapper ${draggedId === slide.id ? 'dragging' : ''} ${dragOverId === slide.id ? 'drag-over' : ''}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, slide.id)}
+                onDragOver={(e) => handleDragOver(e, slide.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, slide.id)}
+                onDragEnd={handleDragEnd}
+              >
                 <div className="slide-item slide-item-section">
                   <div className="slide-item-content">
                   <div className="slide-item-text slide-item-section-text">
@@ -268,11 +345,26 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
           }
           
           return (
-            <div key={slide.id} className="slide-item-wrapper">
+            <div 
+              key={slide.id} 
+              className={`slide-item-wrapper ${draggedId === slide.id ? 'dragging' : ''} ${dragOverId === slide.id ? 'drag-over' : ''}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, slide.id)}
+              onDragOver={(e) => handleDragOver(e, slide.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, slide.id)}
+              onDragEnd={handleDragEnd}
+            >
               <div className="slide-item-number">{originalIndex + 1}</div>
               <div
                 className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
-                onClick={() => onSelect(slide.id)}
+                onClick={(e) => {
+                  // Don't select if we just finished dragging (within 200ms)
+                  const timeSinceDragStart = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : Infinity
+                  if (timeSinceDragStart > 200) {
+                    onSelect(slide.id)
+                  }
+                }}
               >
                 {slide.imageUrl && (
                   <div className="slide-item-thumbnail">
@@ -317,7 +409,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                     </button>
                     <button
                       type="button"
-                      className="format-btn"
+                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h1' ? 'active' : ''}`}
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
@@ -333,7 +425,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                     </button>
                     <button
                       type="button"
-                      className="format-btn"
+                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h2' ? 'active' : ''}`}
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
@@ -349,7 +441,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                     </button>
                     <button
                       type="button"
-                      className="format-btn"
+                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h3' ? 'active' : ''}`}
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
@@ -427,7 +519,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                         </button>
                         <button
                           type="button"
-                          className="format-btn"
+                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h1' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
@@ -443,7 +535,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                         </button>
                         <button
                           type="button"
-                          className="format-btn"
+                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h2' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
@@ -459,7 +551,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                         </button>
                         <button
                           type="button"
-                          className="format-btn"
+                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h3' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()

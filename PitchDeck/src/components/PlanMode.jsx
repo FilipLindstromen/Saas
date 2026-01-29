@@ -46,7 +46,9 @@ function PlanMode({ slides, onUpdateSlides }) {
       gradientFlipped: false,
       imageScale: 1.0,
       imagePositionX: 50,
-      imagePositionY: 50
+      imagePositionY: 50,
+      textHeadingLevel: null,
+      subtitleHeadingLevel: null
     }
     onUpdateSlides([...slides, newSlide])
     setEditingId(newId)
@@ -77,7 +79,9 @@ function PlanMode({ slides, onUpdateSlides }) {
       gradientFlipped: false,
       imageScale: 1.0,
       imagePositionX: 50,
-      imagePositionY: 50
+      imagePositionY: 50,
+      textHeadingLevel: null,
+      subtitleHeadingLevel: null
     }
     onUpdateSlides([...slides, newSection])
     setEditingId(newId)
@@ -169,7 +173,9 @@ function PlanMode({ slides, onUpdateSlides }) {
           gradientFlipped: false,
           imageScale: 1.0,
           imagePositionX: 50,
-          imagePositionY: 50
+          imagePositionY: 50,
+          textHeadingLevel: null,
+          subtitleHeadingLevel: null
         }
         
         const finalSlides = [...updatedSlides, newSlide]

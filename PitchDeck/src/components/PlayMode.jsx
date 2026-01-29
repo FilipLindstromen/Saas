@@ -1,9 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId }) {
+  // Filter out section slides for presentation
+  const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
+  
+  // Find the initial index based on initialSlideId in the filtered slides, or default to 0
+  const getInitialIndex = () => {
+    if (initialSlideId && presentationSlides.length > 0) {
+      const index = presentationSlides.findIndex(slide => slide.id === initialSlideId)
+      return index >= 0 ? index : 0
+    }
+    return 0
+  }
+  
+  const [currentIndex, setCurrentIndex] = useState(getInitialIndex)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
@@ -18,13 +30,13 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       .map(line => line.replace(/^[-•*]\s*/, ''))
   }
 
-  const currentSlide = slides[currentIndex]
+  const currentSlide = presentationSlides[currentIndex]
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
-      if (prevIndex < slides.length - 1) {
+      if (prevIndex < presentationSlides.length - 1) {
         const nextIndex = prevIndex + 1
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
@@ -50,7 +62,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       }
       return prevIndex
     })
-  }, [slides.length])
+  }, [presentationSlides.length])
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
@@ -112,6 +124,22 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         } else {
           prevSlide()
         }
+      } else if (e.key === 'ArrowDown' && !isTransitioning) {
+        e.preventDefault()
+        // If it's a bullet slide and not all bullets are visible, show next bullet
+        if (isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
+          setVisibleBulletIndex(prev => prev + 1)
+        } else {
+          nextSlide()
+        }
+      } else if (e.key === 'ArrowUp' && !isTransitioning) {
+        e.preventDefault()
+        // If it's a bullet slide and some bullets are visible, hide last bullet
+        if (isBulletSlide && visibleBulletIndex >= 0) {
+          setVisibleBulletIndex(prev => prev - 1)
+        } else {
+          prevSlide()
+        }
       }
     }
 
@@ -145,14 +173,29 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Automatically enter fullscreen when component mounts
+  useEffect(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error('Error attempting to enable fullscreen:', err)
+      })
+    }
+  }, [])
+
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      const isCurrentlyFullscreen = !!document.fullscreenElement
+      setIsFullscreen(isCurrentlyFullscreen)
+      
+      // If fullscreen is exited, return to edit mode
+      if (!isCurrentlyFullscreen) {
+        onExit()
+      }
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
+  }, [onExit])
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -164,7 +207,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     }
   }
 
-  if (slides.length === 0) {
+  if (presentationSlides.length === 0) {
     return (
       <div className="play-mode">
         <div className="play-empty">No slides to play</div>
@@ -177,7 +220,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
       <div className={`play-slide-container ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'}`}>
         <Slide 
-          slide={slides[currentIndex]} 
+          slide={presentationSlides[currentIndex]} 
           backgroundColor={backgroundColor}
           textColor={textColor}
           fontFamily={fontFamily}
@@ -203,7 +246,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       {!showMenu && (
         <div className="play-controls">
           <div className="play-slide-indicator">
-            {currentIndex + 1} / {slides.length}
+            {currentIndex + 1} / {presentationSlides.length}
           </div>
           <button className="btn-exit" onClick={onExit}>Exit</button>
         </div>

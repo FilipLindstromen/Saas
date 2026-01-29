@@ -135,6 +135,24 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }
 
   const renderContent = () => {
+    const textHeadingLevel = slide.textHeadingLevel || null
+    const subtitleHeadingLevel = slide.subtitleHeadingLevel || null
+    
+    // Get heading size and font based on heading level
+    const getHeadingSize = (level) => {
+      if (level === 'h1') return h1Size
+      if (level === 'h2') return h2Size
+      if (level === 'h3') return h3Size
+      return null
+    }
+    
+    const getHeadingFont = (level) => {
+      if (level === 'h1') return h1FontFamily || fontFamily
+      if (level === 'h2') return h2FontFamily || fontFamily
+      if (level === 'h3') return h3FontFamily || fontFamily
+      return fontFamily
+    }
+    
     const textStyle = {
       textShadow: textDropShadow 
         ? `${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}` 
@@ -144,7 +162,15 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         : 'transparent',
       padding: textInlineBackground ? `${inlineBgPadding}px` : '0',
       display: textInlineBackground ? 'inline-block' : 'block',
-      borderRadius: textInlineBackground ? '4px' : '0'
+      borderRadius: textInlineBackground ? '4px' : '0',
+      fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
+      fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : undefined
+    }
+    
+    const subtitleStyle = {
+      ...textStyle,
+      fontSize: subtitleHeadingLevel ? `${getHeadingSize(subtitleHeadingLevel)}rem` : undefined,
+      fontFamily: subtitleHeadingLevel ? `"${getHeadingFont(subtitleHeadingLevel)}", sans-serif` : undefined
     }
 
     const isEditable = !isPlayMode && onUpdate
@@ -183,7 +209,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         <div className="slide-section-text">
           <div 
             ref={contentRef}
-            className="slide-section-name"
+            className={`slide-section-name ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
             style={textStyle}
             contentEditable={isEditable}
             suppressContentEditableWarning={true}
@@ -192,7 +218,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
+                e.stopPropagation()
                 document.execCommand('insertLineBreak')
+                // Keep focus on the element
+                setTimeout(() => {
+                  if (contentRef.current) {
+                    contentRef.current.focus()
+                  }
+                }, 0)
               }
             }}
             dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
@@ -208,7 +241,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         <div className="slide-text-centered-wrapper">
           <div 
             ref={contentRef}
-            className="slide-text centered"
+            className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
             style={textStyle}
             contentEditable={isEditable}
             suppressContentEditableWarning={true}
@@ -217,7 +250,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
+                e.stopPropagation()
                 document.execCommand('insertLineBreak')
+                // Keep focus on the element
+                setTimeout(() => {
+                  if (contentRef.current) {
+                    contentRef.current.focus()
+                  }
+                }, 0)
               }
             }}
             dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
@@ -225,8 +265,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           {subtitleHasContent ? (
             <div 
               ref={subtitleRef}
-              className="slide-subtitle"
-              style={textStyle}
+              className={`slide-subtitle ${subtitleHeadingLevel ? `text-heading-${subtitleHeadingLevel}` : ''}`}
+              style={subtitleStyle}
               contentEditable={isEditable}
               suppressContentEditableWarning={true}
               onBlur={handleSubtitleChange}
@@ -234,7 +274,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
+                  e.stopPropagation()
                   document.execCommand('insertLineBreak')
+                  // Keep focus on the element
+                  setTimeout(() => {
+                    if (subtitleRef.current) {
+                      subtitleRef.current.focus()
+                    }
+                  }, 0)
                 }
               }}
               dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.subtitle) }}
@@ -255,7 +302,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
+                  e.stopPropagation()
                   document.execCommand('insertLineBreak')
+                  // Keep focus on the element
+                  setTimeout(() => {
+                    if (e.target) {
+                      e.target.focus()
+                    }
+                  }, 0)
                 }
               }}
               data-placeholder="Subtitle (optional)"
@@ -273,7 +327,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     return (
       <div 
         ref={contentRef}
-        className={`slide-text ${layout === 'centered' ? 'centered' : ''}`}
+        className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
         style={textStyle}
         contentEditable={isEditable}
         suppressContentEditableWarning={true}
@@ -282,7 +336,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
+            e.stopPropagation()
             document.execCommand('insertLineBreak')
+            // Keep focus on the element
+            setTimeout(() => {
+              if (contentRef.current) {
+                contentRef.current.focus()
+              }
+            }, 0)
           }
         }}
         dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
@@ -413,7 +474,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
         }
       `}</style>
-      {slide.imageUrl && (
+      {slide.imageUrl && layout !== 'section' && (
         <div
           className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''}`}
           style={{ 

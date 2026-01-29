@@ -1,11 +1,66 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './ImagePicker.css'
 
-function ImagePicker({ isOpen, onClose, onSelect, settings }) {
+function ImagePicker({ isOpen, onClose, onSelect, settings, initialSearchQuery = '' }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [images, setImages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+
+  // When modal opens with initial search query, set it and search
+  useEffect(() => {
+    if (isOpen && initialSearchQuery) {
+      setSearchQuery(initialSearchQuery)
+      // Trigger search automatically
+      if (settings.unsplashKey && initialSearchQuery.trim()) {
+        const performSearch = async () => {
+          setIsLoading(true)
+          setError(null)
+
+          try {
+            const response = await fetch(
+              `https://api.unsplash.com/search/photos?query=${encodeURIComponent(initialSearchQuery)}&per_page=20&page=1&orientation=landscape`,
+              {
+                headers: {
+                  'Authorization': `Client-ID ${settings.unsplashKey}`
+                }
+              }
+            )
+
+            if (!response.ok) {
+              throw new Error('Failed to search images. Please check your API key.')
+            }
+
+            const data = await response.json()
+            setImages(data.results || [])
+            setCurrentPage(1)
+            setTotalPages(data.total_pages || 1)
+            setHasMore(data.total_pages > 1)
+          } catch (err) {
+            console.error('Error searching images:', err)
+            setError(err.message || 'Failed to search images. Please try again.')
+            setImages([])
+            setHasMore(false)
+          } finally {
+            setIsLoading(false)
+          }
+        }
+        performSearch()
+      }
+    } else if (isOpen && !initialSearchQuery) {
+      // Reset when opening without initial query
+      setSearchQuery('')
+      setImages([])
+      setError(null)
+      setCurrentPage(1)
+      setTotalPages(1)
+      setHasMore(false)
+    }
+  }, [isOpen, initialSearchQuery, settings.unsplashKey])
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -19,7 +74,7 @@ function ImagePicker({ isOpen, onClose, onSelect, settings }) {
 
     try {
       const response = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=20&orientation=landscape`,
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=20&page=1&orientation=landscape`,
         {
           headers: {
             'Authorization': `Client-ID ${settings.unsplashKey}`
@@ -33,12 +88,51 @@ function ImagePicker({ isOpen, onClose, onSelect, settings }) {
 
       const data = await response.json()
       setImages(data.results || [])
+      setCurrentPage(1)
+      setTotalPages(data.total_pages || 1)
+      setHasMore(data.total_pages > 1)
     } catch (err) {
       console.error('Error searching images:', err)
       setError(err.message || 'Failed to search images. Please try again.')
       setImages([])
+      setHasMore(false)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleLoadMore = async () => {
+    if (!searchQuery.trim() || !settings.unsplashKey || isLoadingMore || !hasMore) {
+      return
+    }
+
+    const nextPage = currentPage + 1
+    setIsLoadingMore(true)
+    setError(null)
+
+    try {
+      const response = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=20&page=${nextPage}&orientation=landscape`,
+        {
+          headers: {
+            'Authorization': `Client-ID ${settings.unsplashKey}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to load more images. Please check your API key.')
+      }
+
+      const data = await response.json()
+      setImages(prevImages => [...prevImages, ...(data.results || [])])
+      setCurrentPage(nextPage)
+      setHasMore(nextPage < (data.total_pages || 1))
+    } catch (err) {
+      console.error('Error loading more images:', err)
+      setError(err.message || 'Failed to load more images. Please try again.')
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
@@ -82,24 +176,40 @@ function ImagePicker({ isOpen, onClose, onSelect, settings }) {
             <div className="image-picker-empty">Enter a search term to find images.</div>
           )}
           {!isLoading && images.length > 0 && (
-            <div className="image-grid">
-              {images.map((image) => (
-                <div
-                  key={image.id}
-                  className="image-item"
-                  onClick={() => handleSelectImage(image.urls.regular)}
-                >
-                  <img
-                    src={image.urls.thumb}
-                    alt={image.alt_description || 'Unsplash image'}
-                    loading="lazy"
-                  />
-                  <div className="image-overlay">
-                    <span className="image-select-hint">Click to select</span>
+            <>
+              <div className="image-grid">
+                {images.map((image) => (
+                  <div
+                    key={image.id}
+                    className="image-item"
+                    onClick={() => handleSelectImage(image.urls.regular)}
+                  >
+                    <img
+                      src={image.urls.thumb}
+                      alt={image.alt_description || 'Unsplash image'}
+                      loading="lazy"
+                    />
+                    <div className="image-overlay">
+                      <span className="image-select-hint">Click to select</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {hasMore && (
+                <div className="image-picker-load-more">
+                  <button
+                    className="btn-load-more"
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore || !settings.unsplashKey}
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load More'}
+                  </button>
+                  <div className="image-picker-pagination">
+                    Page {currentPage} of {totalPages}
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

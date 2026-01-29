@@ -35,7 +35,7 @@ function Settings({ settings, onUpdate, onClose }) {
             API Keys
           </button>
         </div>
-        <div className="settings-content">
+        <div className={`settings-content ${activeTab === 'style' ? 'style-tab' : ''}`}>
           {activeTab === 'style' && (
             <>
               <div className="settings-section">
