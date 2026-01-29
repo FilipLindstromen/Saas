@@ -14,6 +14,46 @@
   align-items: center;
 }
 
+.preview-header-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.transition-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.transition-selector label {
+  font-size: 0.9rem;
+  color: #cccccc;
+  font-weight: 500;
+}
+
+.transition-select {
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 140px;
+}
+
+.transition-select:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.transition-select option {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
 .preview-header h3 {
   font-size: 1.25rem;
   font-weight: 600;

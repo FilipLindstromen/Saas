@@ -86,7 +86,8 @@ function App() {
       textInlineBackground: localStorage.getItem('textInlineBackground') === 'true',
       inlineBgColor: localStorage.getItem('inlineBgColor') || '#000000',
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
-      inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8
+      inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
+      transitionStyle: localStorage.getItem('transitionStyle') || 'default'
     }
     return savedSettings
   })
@@ -219,6 +220,7 @@ function App() {
     localStorage.setItem('inlineBgColor', settings.inlineBgColor || '#000000')
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
+    localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
   }, [settings])
 
   // Keyboard navigation for slide selection (only in edit mode)
@@ -545,6 +547,7 @@ function App() {
           inlineBgPadding={settings.inlineBgPadding}
           showMenu={true}
           initialSlideId={selectedSlideId}
+          transitionStyle={settings.transitionStyle || 'default'}
         />
       </>
     )
@@ -766,6 +769,7 @@ function App() {
           slide={selectedSlide}
           onUpdate={(updates) => updateSlide(selectedSlideId, updates)}
           settings={settings}
+          onUpdateSettings={setSettings}
           backgroundColor={settings.backgroundColor}
           textColor={settings.textColor}
           fontFamily={settings.fontFamily}

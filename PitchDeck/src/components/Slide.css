@@ -6,10 +6,10 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  /* Set base font size to scale with slide width */
-  /* At 1200px width, font-size = 16px (1rem) */
-  /* Use clamp to ensure it scales proportionally */
-  font-size: clamp(0.75rem, 1.33vw, 1rem);
+  /* Base font size: Use CSS custom property set via JavaScript */
+  /* This ensures font-size scales with the slide's actual width */
+  /* Default: 16px at 1200px width */
+  font-size: var(--slide-base-font-size, 1rem);
 }
 
 .slide-background {
@@ -49,6 +49,11 @@
   padding: 4% 0 23.7% 9%;
 }
 
+.slide-content.bulletpoints {
+  align-items: center;
+  padding: 4% 0 4% 9%;
+}
+
 .slide-content.centered {
   justify-content: center;
   align-items: center;
@@ -61,7 +66,7 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 3rem;
+  padding: 4%;
 }
 
 .slide-section-text {
@@ -73,7 +78,12 @@
 }
 
 .slide-section-name {
-  font-size: 1.5rem;
+  /* 1.5rem = 24px at base 16px, which is 3.56% of 675px height */
+  /* Use percentage of slide height for consistent scaling */
+  font-size: 3.56%;
+  /* But percentage font-size is relative to parent, so use em instead */
+  /* 1.5rem relative to 1rem base = 1.5em */
+  font-size: 1.5em;
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -235,7 +245,7 @@
 
 .slide-bullet {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   /* 2rem = 32px = 2.67% of 1200px width */
   gap: 0.8em;
   /* 2.5rem = 40px = 3.33% of 1200px width */
@@ -261,14 +271,14 @@
 .bullet-marker {
   /* Marker should be slightly larger than text but proportional */
   font-size: 1.2em;
-  color: #4a9eff;
+  color: #ffffff;
   flex-shrink: 0;
-  line-height: 1.4;
-  margin-top: 0;
-  /* Align with first line of text */
+  line-height: 1;
+  margin: 0;
+  /* Center align with text */
   display: flex;
-  align-items: flex-start;
-  padding-top: 0.1em;
+  align-items: center;
+  justify-content: center;
 }
 
 .bullet-text {

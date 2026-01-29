@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default' }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -19,6 +19,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
+  const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
 
   // Get bullet points for current slide
   const getBulletPoints = (slide) => {
@@ -34,6 +35,20 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
 
+  // Get transition duration based on style
+  const getTransitionDuration = (style) => {
+    switch (style) {
+      case 'dissolve':
+        return 500 // 0.5s
+      case 'sequence':
+        return 600 // 0.6s
+      case 'blur':
+        return 400 // 0.4s
+      default:
+        return 300 // 0.3s
+    }
+  }
+
   const nextSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
       if (prevIndex < presentationSlides.length - 1) {
@@ -41,12 +56,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
         
+        const duration = getTransitionDuration(transitionStyle)
+        
         // Phase 1: Fade out current slide
         setTransitionPhase('fade-out')
         
         setTimeout(() => {
           // Phase 2: Change slide (while invisible)
           setCurrentIndex(nextIndex)
+          setSlideKey(prev => prev + 1) // Force re-render with new slide
           
           // Phase 3: Fade in new slide
           setTimeout(() => {
@@ -54,15 +72,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             setTimeout(() => {
               setIsTransitioning(false)
               setTransitionPhase('idle')
-            }, 300) // Fade in duration
+            }, duration) // Fade in duration
           }, 50) // Small delay to ensure slide change
-        }, 300) // Fade out duration
+        }, duration) // Fade out duration
         
         return prevIndex // Keep current index during fade-out
       }
       return prevIndex
     })
-  }, [presentationSlides.length])
+  }, [presentationSlides.length, transitionStyle])
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
@@ -71,12 +89,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
         
+        const duration = getTransitionDuration(transitionStyle)
+        
         // Phase 1: Fade out current slide
         setTransitionPhase('fade-out')
         
         setTimeout(() => {
           // Phase 2: Change slide (while invisible)
           setCurrentIndex(nextIndex)
+          setSlideKey(prev => prev + 1) // Force re-render with new slide
           
           // Phase 3: Fade in new slide
           setTimeout(() => {
@@ -84,15 +105,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             setTimeout(() => {
               setIsTransitioning(false)
               setTransitionPhase('idle')
-            }, 300) // Fade in duration
+            }, duration) // Fade in duration
           }, 50) // Small delay to ensure slide change
-        }, 300) // Fade out duration
+        }, duration) // Fade out duration
         
         return prevIndex // Keep current index during fade-out
       }
       return prevIndex
     })
-  }, [])
+  }, [transitionStyle])
 
   // Reset bullet index when slide changes
   useEffect(() => {
@@ -218,7 +239,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
-      <div className={`play-slide-container ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'}`}>
+      <div 
+        key={slideKey}
+        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'}`}
+      >
         <Slide 
           slide={presentationSlides[currentIndex]} 
           backgroundColor={backgroundColor}
