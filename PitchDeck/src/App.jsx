@@ -3,7 +3,6 @@ import SlideList from './components/SlideList'
 import SlidePreview from './components/SlidePreview'
 import PlayMode from './components/PlayMode'
 import PlanMode from './components/PlanMode'
-import BottomMenu from './components/BottomMenu'
 import Settings from './components/Settings'
 import './App.css'
 
@@ -28,7 +27,9 @@ function App() {
             subtitle: slide.subtitle || '',
             imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
             imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-            imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50
+            imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+            textHeadingLevel: slide.textHeadingLevel || null,
+            subtitleHeadingLevel: slide.subtitleHeadingLevel || null
           }))
           return {
             slides: slidesWithLayout,
@@ -42,7 +43,7 @@ function App() {
     
     // Default template if no saved data
     return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50 }],
+      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
       selectedId: 1
     }
   }
@@ -257,7 +258,7 @@ function App() {
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
-    setSlides([...slides, { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50 }])
+    setSlides([...slides, { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }])
     setSelectedSlideId(newId)
   }
 
@@ -278,9 +279,7 @@ function App() {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
     const duplicatedSlide = {
       ...slideToDuplicate,
-      id: newId,
-      content: slideToDuplicate.content || '',
-      subtitle: slideToDuplicate.subtitle || ''
+      id: newId
     }
     
     const slideIndex = slides.findIndex(s => s.id === id)
@@ -291,7 +290,17 @@ function App() {
   }
 
   const updateSlide = (id, updates) => {
-    setSlides(slides.map(s => s.id === id ? { ...s, ...updates } : s))
+    setSlides(slides.map(s => {
+      if (s.id === id) {
+        const updated = { ...s, ...updates }
+        // If layout is changed to section, clear imageUrl
+        if (updates.layout === 'section' && updated.imageUrl) {
+          updated.imageUrl = ''
+        }
+        return updated
+      }
+      return s
+    }))
   }
 
   const updateSlides = (newSlides) => {
@@ -305,6 +314,7 @@ function App() {
       slides: slides,
       selectedSlideId: selectedSlideId,
       settings: settings,
+      sidebarWidth: sidebarWidth,
       exportedAt: new Date().toISOString()
     }
 
@@ -351,7 +361,9 @@ function App() {
           subtitle: slide.subtitle || '',
           imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
           imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-          imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50
+          imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+          textHeadingLevel: slide.textHeadingLevel || null,
+          subtitleHeadingLevel: slide.subtitleHeadingLevel || null
         }))
 
         // Confirm before importing (to avoid losing current work)
@@ -373,6 +385,11 @@ function App() {
         // Load settings if provided
         if (importData.settings) {
           setSettings(importData.settings)
+        }
+
+        // Load sidebar width if provided
+        if (importData.sidebarWidth !== undefined) {
+          setSidebarWidth(importData.sidebarWidth)
         }
 
         alert(`Successfully imported ${slidesWithLayout.length} slide(s)!`)
@@ -399,8 +416,11 @@ function App() {
       return
     }
 
-    // Find slides without images
-    const slidesWithoutImages = slides.filter(slide => !slide.imageUrl || slide.imageUrl.trim() === '')
+    // Find slides without images (exclude sections)
+    const slidesWithoutImages = slides.filter(slide => 
+      (slide.layout || 'default') !== 'section' && 
+      (!slide.imageUrl || slide.imageUrl.trim() === '')
+    )
     
     if (slidesWithoutImages.length === 0) {
       alert('All slides already have images!')
@@ -524,8 +544,8 @@ function App() {
           inlineBgOpacity={settings.inlineBgOpacity}
           inlineBgPadding={settings.inlineBgPadding}
           showMenu={true}
+          initialSlideId={selectedSlideId}
         />
-        <BottomMenu currentMode={mode} onModeChange={setMode} />
       </>
     )
   }
@@ -536,7 +556,7 @@ function App() {
       <div className="app plan-mode-app">
         <div className="app-header">
           <div className="header-left">
-            <h1>Pitch Deck Generator</h1>
+            <h1>Pitch Deck 2000</h1>
             <div className="header-file-actions">
               <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -561,32 +581,65 @@ function App() {
               />
             </div>
           </div>
+          <div className="header-mode-buttons">
+            <button
+              className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+              onClick={() => setMode('plan')}
+              title="Plan"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>Plan</span>
+            </button>
+            <button
+              className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+              onClick={() => setMode('edit')}
+              title="Edit"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              <span>Edit</span>
+            </button>
+            <button
+              className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+              onClick={() => setMode('present')}
+              title="Present"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>Present</span>
+            </button>
+          </div>
           <div className="header-actions">
-            <div className="header-actions-row">
-              <button 
-                className="btn-icon-header btn-bulk-images" 
-                onClick={handleBulkSelectImages}
-                title="Auto-select images for all slides without images"
-                disabled={!settings.openaiKey || !settings.unsplashKey}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </button>
-            </div>
-            <div className="header-actions-row">
-              <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-                </svg>
-              </button>
-            </div>
+            <button 
+              className="btn-icon-header btn-bulk-images" 
+              onClick={handleBulkSelectImages}
+              title="Auto-select images for all slides without images"
+              disabled={!settings.openaiKey || !settings.unsplashKey}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </button>
+            <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
+              </svg>
+            </button>
           </div>
         </div>
-        <div className="app-content plan-mode-content" style={{ paddingBottom: '80px' }}>
+        <div className="app-content plan-mode-content">
           <PlanMode slides={slides} onUpdateSlides={updateSlides} />
         </div>
         {showSettings && (
@@ -596,7 +649,6 @@ function App() {
             onClose={() => setShowSettings(false)}
           />
         )}
-        <BottomMenu currentMode={mode} onModeChange={setMode} />
       </div>
     )
   }
@@ -630,32 +682,65 @@ function App() {
             />
           </div>
         </div>
+        <div className="header-mode-buttons">
+          <button
+            className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+            onClick={() => setMode('plan')}
+            title="Plan"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <span>Plan</span>
+          </button>
+          <button
+            className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+            onClick={() => setMode('edit')}
+            title="Edit"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span>Edit</span>
+          </button>
+          <button
+            className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+            onClick={() => setMode('present')}
+            title="Present"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>Present</span>
+          </button>
+        </div>
         <div className="header-actions">
-          <div className="header-actions-row">
-            <button 
-              className="btn-icon-header btn-bulk-images" 
-              onClick={handleBulkSelectImages}
-              title="Auto-select images for all slides without images"
-              disabled={!settings.openaiKey || !settings.unsplashKey}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            </button>
-          </div>
-          <div className="header-actions-row">
-            <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-              </svg>
-            </button>
-          </div>
+          <button 
+            className="btn-icon-header btn-bulk-images" 
+            onClick={handleBulkSelectImages}
+            title="Auto-select images for all slides without images"
+            disabled={!settings.openaiKey || !settings.unsplashKey}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
+          <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
+            </svg>
+          </button>
         </div>
       </div>
-      <div className={`app-content ${isResizing ? 'resizing' : ''}`} style={{ paddingBottom: '80px' }}>
+      <div className={`app-content ${isResizing ? 'resizing' : ''}`}>
         <div 
           ref={sidebarRef}
           className="sidebar-container"
@@ -669,6 +754,7 @@ function App() {
             onDelete={deleteSlide}
             onDuplicate={duplicateSlide}
             onUpdate={updateSlide}
+            onReorder={updateSlides}
           />
         </div>
         <div 
@@ -707,7 +793,6 @@ function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
-      <BottomMenu currentMode={mode} onModeChange={setMode} />
     </div>
   )
 }

@@ -6,6 +6,10 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  /* Set base font size to scale with slide width */
+  /* At 1200px width, font-size = 16px (1rem) */
+  /* Use clamp to ensure it scales proportionally */
+  font-size: clamp(0.75rem, 1.33vw, 1rem);
 }
 
 .slide-background {
@@ -41,17 +45,16 @@
   height: 100%;
   display: flex;
   align-items: flex-end;
-  padding: 3rem;
-  padding-bottom: 10rem;
-  padding-left: calc(3rem + 60px);
+  /* Convert rem to percentage: 3rem = 48px = 4% of 1200px width, 23.7% of 675px height */
+  padding: 4% 0 23.7% 9%;
 }
 
 .slide-content.centered {
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding-left: 3rem;
-  padding-bottom: 3rem;
+  /* Centered: 3rem = 4% of width */
+  padding: 4%;
 }
 
 .slide-content.section {
@@ -82,7 +85,9 @@
 }
 
 .slide-text {
-  font-size: 4rem;
+  /* 4rem = 64px = 5.33% of 1200px width */
+  /* Use em units relative to slide's font-size, which scales with slide width */
+  font-size: 4em;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -92,6 +97,19 @@
   outline: none;
   border: none;
   pointer-events: auto;
+}
+
+/* Heading styles override default font-size and font-family when applied */
+.slide-text.text-heading-h1,
+.slide-text.text-heading-h2,
+.slide-text.text-heading-h3,
+.slide-subtitle.text-heading-h1,
+.slide-subtitle.text-heading-h2,
+.slide-subtitle.text-heading-h3,
+.slide-section-name.text-heading-h1,
+.slide-section-name.text-heading-h2,
+.slide-section-name.text-heading-h3 {
+  /* Font size and family are set via inline style from Slide component */
 }
 
 .slide-text:focus {
@@ -129,7 +147,8 @@
 }
 
 .slide-text.centered {
-  max-width: 90%;
+  width: 95%;
+  max-width: 95%;
   text-align: center;
 }
 
@@ -137,19 +156,24 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  max-width: 90%;
+  /* 2rem = 32px = 2.67% of 1200px width */
+  gap: 2em;
+  width: 95%;
+  max-width: 95%;
   pointer-events: auto;
 }
 
 .slide-subtitle {
-  font-size: 2rem;
+  /* 2rem = 32px = 2.67% of 1200px width */
+  font-size: 2em;
   font-weight: 400;
   text-transform: none;
   letter-spacing: normal;
   line-height: 1.4;
   opacity: 0.9;
+  width: 100%;
   max-width: 100%;
+  text-align: center;
   /* Color, fontFamily, and textShadow are set via inline style */
   outline: none;
   border: none;
@@ -203,7 +227,8 @@
 .slide-bullets {
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
+  /* 2.5rem = 40px = 3.33% of 1200px width */
+  gap: 2.5em;
   max-width: 66.67%;
   pointer-events: auto;
 }
@@ -211,8 +236,10 @@
 .slide-bullet {
   display: flex;
   align-items: flex-start;
-  gap: 2rem;
-  font-size: 2.5rem;
+  /* 2rem = 32px = 2.67% of 1200px width */
+  gap: 0.8em;
+  /* 2.5rem = 40px = 3.33% of 1200px width */
+  font-size: 2.5em;
   font-weight: 600;
   line-height: 1.4;
   opacity: 0;
@@ -232,11 +259,16 @@
 }
 
 .bullet-marker {
-  font-size: 3rem;
+  /* Marker should be slightly larger than text but proportional */
+  font-size: 1.2em;
   color: #4a9eff;
   flex-shrink: 0;
-  line-height: 1;
-  margin-top: 0.2rem;
+  line-height: 1.4;
+  margin-top: 0;
+  /* Align with first line of text */
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.1em;
 }
 
 .bullet-text {
@@ -245,6 +277,8 @@
   letter-spacing: normal;
   outline: none;
   border: none;
+  /* Inherit font-size from parent (.slide-bullet) */
+  font-size: 1em;
 }
 
 .bullet-text:focus {

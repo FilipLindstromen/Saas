@@ -127,9 +127,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
   }
 
   const handleRemoveImage = () => {
-    if (window.confirm('Remove image from this slide?')) {
-      onUpdate({ imageUrl: '' })
-    }
+    onUpdate({ imageUrl: '' })
   }
 
   return (
@@ -165,111 +163,115 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
               </button>
             </>
           )}
-          <div className="gradient-control">
-            <label htmlFor="slide-background-opacity">Image:</label>
-            <input
-              id="slide-background-opacity"
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0}
-              onChange={(e) => onUpdate({ backgroundOpacity: parseFloat(e.target.value) })}
-              className="gradient-slider"
-            />
-            <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0) * 100)}%</span>
-          </div>
-          {slide.imageUrl && (
-            <div className="gradient-control">
-              <label htmlFor="slide-image-scale">Scale:</label>
-              <input
-                id="slide-image-scale"
-                type="range"
-                min="0.5"
-                max="3"
-                step="0.1"
-                value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
-                onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
-                className="gradient-slider"
-              />
-              <span className="gradient-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
-          <button
-            className="btn-icon btn-upload-image"
-            onClick={handleUploadImage}
-            title="Upload Image"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <span className="btn-tooltip">Upload Image</span>
-          </button>
-          <button
-            className="btn-icon btn-swap-image"
-            onClick={handleSwapImage}
-            disabled={!settings.unsplashKey}
-            title="Swap Image"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            <span className="btn-tooltip">Swap Image</span>
-          </button>
-          <button
-            className="btn-icon btn-select-images"
-            onClick={handleSelectImages}
-            disabled={isSelectingImages || !slide.content}
-            title="Select Images"
-          >
-            {isSelectingImages ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            )}
-            <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Select Images'}</span>
-          </button>
-          {slide.imageUrl && (
+          {(slide.layout || 'default') !== 'section' && (
             <>
+              <div className="gradient-control">
+                <label htmlFor="slide-background-opacity">Image:</label>
+                <input
+                  id="slide-background-opacity"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0}
+                  onChange={(e) => onUpdate({ backgroundOpacity: parseFloat(e.target.value) })}
+                  className="gradient-slider"
+                />
+                <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0) * 100)}%</span>
+              </div>
+              {slide.imageUrl && (
+                <div className="gradient-control">
+                  <label htmlFor="slide-image-scale">Scale:</label>
+                  <input
+                    id="slide-image-scale"
+                    type="range"
+                    min="0.5"
+                    max="3"
+                    step="0.1"
+                    value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
+                    onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
+                    className="gradient-slider"
+                  />
+                  <span className="gradient-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
               <button
-                className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
-                onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
-                title="Flip Image Horizontally"
+                className="btn-icon btn-upload-image"
+                onClick={handleUploadImage}
+                title="Upload Image"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                <span className="btn-tooltip">Flip Image</span>
+                <span className="btn-tooltip">Upload Image</span>
               </button>
               <button
-                className="btn-icon btn-remove-image"
-                onClick={handleRemoveImage}
-                title="Remove Image"
+                className="btn-icon btn-swap-image"
+                onClick={handleSwapImage}
+                disabled={!settings.unsplashKey}
+                title="Swap Image"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                 </svg>
-                <span className="btn-tooltip">Remove Image</span>
+                <span className="btn-tooltip">Swap Image</span>
               </button>
+              <button
+                className="btn-icon btn-select-images"
+                onClick={handleSelectImages}
+                disabled={isSelectingImages || !slide.content}
+                title="Select Images"
+              >
+                {isSelectingImages ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                )}
+                <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Select Images'}</span>
+              </button>
+              {slide.imageUrl && (
+                <>
+                  <button
+                    className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
+                    onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
+                    title="Flip Image Horizontally"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                    </svg>
+                    <span className="btn-tooltip">Flip Image</span>
+                  </button>
+                  <button
+                    className="btn-icon btn-remove-image"
+                    onClick={handleRemoveImage}
+                    title="Remove Image"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                    <span className="btn-tooltip">Remove Image</span>
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -303,6 +305,14 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         onClose={() => setShowImagePicker(false)}
         onSelect={handleImageSelect}
         settings={settings}
+        initialSearchQuery={(() => {
+          // Extract text from content (strip HTML tags)
+          const contentText = slide.content ? slide.content.replace(/<[^>]*>/g, '').trim() : ''
+          // Use content if available, otherwise use subtitle
+          const subtitleText = slide.subtitle ? slide.subtitle.replace(/<[^>]*>/g, '').trim() : ''
+          // Prefer content, fallback to subtitle, or empty string
+          return contentText || subtitleText || ''
+        })()}
       />
     </div>
   )

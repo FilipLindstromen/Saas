@@ -15,7 +15,7 @@
   background: #2a2a2a;
   border-radius: 12px;
   width: 90%;
-  max-width: 600px;
+  max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -92,8 +92,20 @@
   overflow-y: auto;
 }
 
+.settings-content.style-tab {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  overflow-y: visible;
+  max-height: none;
+}
+
+.settings-content.style-tab .settings-section {
+  margin-bottom: 0;
+}
+
 .settings-section {
-  margin-bottom: 2rem;
+  margin-bottom: 0;
 }
 
 .settings-section:last-child {
