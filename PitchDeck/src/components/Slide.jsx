@@ -369,6 +369,58 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [imagePositionX, imagePositionY, isDragging])
 
+  // Set base font-size as percentage of slide width for consistent scaling
+  useEffect(() => {
+    const updateFontSize = () => {
+      if (slideRef.current) {
+        const slideWidth = slideRef.current.offsetWidth
+        // At 1200px width (max-width in preview), we want 16px base font-size
+        // Calculate font-size that scales proportionally: (width / 1200) * 16
+        // This ensures the same relative size regardless of actual slide dimensions
+        if (slideWidth > 0) {
+          const baseFontSize = (slideWidth / 1200) * 16
+          slideRef.current.style.setProperty('--slide-base-font-size', `${baseFontSize}px`)
+        }
+      }
+    }
+    
+    // Initial update with a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      updateFontSize()
+    }, 0)
+    
+    // Update on resize (handles both preview and present mode resizing)
+    const resizeObserver = new ResizeObserver(() => {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(updateFontSize)
+    })
+    
+    if (slideRef.current) {
+      resizeObserver.observe(slideRef.current)
+    }
+    
+    // Also listen to window resize for present mode fullscreen changes
+    const handleResize = () => {
+      requestAnimationFrame(updateFontSize)
+    }
+    window.addEventListener('resize', handleResize)
+    
+    // Update when entering/exiting fullscreen (for present mode)
+    const handleFullscreenChange = () => {
+      setTimeout(() => {
+        requestAnimationFrame(updateFontSize)
+      }, 100)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', handleResize)
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [isPlayMode]) // Re-run when play mode changes
+
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || !slide.imageUrl) return
     // Only start dragging if clicking directly on the background, not on text content
@@ -500,7 +552,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         />
       )}
       <div 
-        className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'section' ? 'section' : ''}`}
+        className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
         style={{ 
           color: textColor,
           fontFamily: `"${fontFamily}", sans-serif`,

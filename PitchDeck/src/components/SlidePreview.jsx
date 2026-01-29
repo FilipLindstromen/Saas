@@ -133,7 +133,29 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
   return (
     <div className="slide-preview">
       <div className="preview-header">
-        <h3>Preview</h3>
+        <div className="preview-header-left">
+          <h3>Preview</h3>
+          <div className="transition-selector">
+            <label htmlFor="transition-style">Transition style:</label>
+            <select
+              id="transition-style"
+              value={settings.transitionStyle || 'default'}
+              onChange={(e) => {
+                if (onUpdateSettings) {
+                  onUpdateSettings({ ...settings, transitionStyle: e.target.value })
+                }
+              }}
+              className="transition-select"
+            >
+              <option value="default">Default</option>
+              <option value="slide">Slide</option>
+              <option value="zoom">Zoom</option>
+              <option value="dissolve">Dissolve</option>
+              <option value="blur">Blur</option>
+              <option value="sequence">Object Sequence</option>
+            </select>
+          </div>
+        </div>
         <div className="preview-header-actions">
           {(slide.layout || 'default') !== 'centered' && (
             <>
