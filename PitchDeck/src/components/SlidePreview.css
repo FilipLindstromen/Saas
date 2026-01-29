@@ -90,13 +90,13 @@
 
 .btn-icon {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  background: #5a5a5a;
-  color: white;
-  border: none;
-  border-radius: 50%;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -106,13 +106,18 @@
 }
 
 .btn-icon:hover:not(:disabled) {
-  background: #6a6a6a;
-  transform: scale(1.05);
+  background: #3a3a3a;
+  border-color: #4a4a4a;
 }
 
 .btn-icon:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.btn-icon svg {
+  stroke: #ffffff;
+  fill: none;
 }
 
 .btn-tooltip {
@@ -129,7 +134,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
-  z-index: 1000;
+  z-index: 10000;
 }
 
 .btn-tooltip::after {
@@ -147,59 +152,47 @@
 }
 
 .btn-upload-image {
-  background: #6a5acd;
-}
-
-.btn-upload-image:hover:not(:disabled) {
-  background: #5a4abd;
+  background: #2a2a2a;
 }
 
 .btn-swap-image {
-  background: #5a5a5a;
-}
-
-.btn-swap-image:hover:not(:disabled) {
-  background: #6a6a6a;
+  background: #2a2a2a;
 }
 
 .btn-select-images {
-  background: #4a9eff;
-}
-
-.btn-select-images:hover:not(:disabled) {
-  background: #3a8eef;
+  background: #2a2a2a;
 }
 
 .btn-flip-image {
-  background: #5a5a5a;
-}
-
-.btn-flip-image:hover:not(:disabled) {
-  background: #6a6a6a;
+  background: #2a2a2a;
 }
 
 .btn-flip-image.active {
-  background: #4a9eff;
+  background: #ffffff;
+  color: #1a1a1a;
+  border-color: #ffffff;
 }
 
-.btn-flip-image.active:hover:not(:disabled) {
-  background: #3a8eef;
+.btn-flip-image.active svg {
+  stroke: #1a1a1a;
 }
 
 .btn-flip-gradient {
-  background: #5a5a5a;
-}
-
-.btn-flip-gradient:hover:not(:disabled) {
-  background: #6a6a6a;
+  background: #2a2a2a;
 }
 
 .btn-flip-gradient.active {
-  background: #4a9eff;
+  background: #ffffff;
+  color: #1a1a1a;
+  border-color: #ffffff;
 }
 
-.btn-flip-gradient.active:hover:not(:disabled) {
-  background: #3a8eef;
+.btn-flip-gradient.active svg {
+  stroke: #1a1a1a;
+}
+
+.btn-remove-image {
+  background: #2a2a2a;
 }
 
 .preview-content {

@@ -2,14 +2,21 @@ import { useState } from 'react'
 import LayoutSelector from './LayoutSelector'
 import './SlideList.css'
 
-function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onUpdate }) {
+function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDuplicate, onUpdate }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
+  const [editingSubtitle, setEditingSubtitle] = useState(false)
+  const [editSubtitle, setEditSubtitle] = useState('')
   const [textAreaRef, setTextAreaRef] = useState(null)
+  const [subtitleTextAreaRef, setSubtitleTextAreaRef] = useState(null)
+  const [foldedSections, setFoldedSections] = useState(new Set())
+  const [isFormatting, setIsFormatting] = useState(false)
 
   const handleEdit = (slide) => {
     setEditingId(slide.id)
     setEditContent(slide.content)
+    setEditSubtitle(slide.subtitle || '')
+    setEditingSubtitle(false)
   }
 
   const handleChange = (e, id) => {
@@ -19,8 +26,55 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onUpdat
     onUpdate(id, { content: newContent })
   }
 
-  const handleBlur = () => {
-    setEditingId(null)
+  const handleSubtitleChange = (e, id) => {
+    const newSubtitle = e.target.value
+    setEditSubtitle(newSubtitle)
+    // Auto-save on every change
+    onUpdate(id, { subtitle: newSubtitle })
+  }
+
+  const handleBlur = (e) => {
+    // Don't close edit mode if we're in the middle of formatting
+    if (isFormatting) {
+      return
+    }
+    
+    // Don't close edit mode if focus is moving to another input in the same edit session
+    // Use setTimeout to check if focus moved to subtitle/main textarea or formatting buttons
+    setTimeout(() => {
+      // Check again if formatting is happening
+      if (isFormatting) {
+        return
+      }
+      
+      const activeElement = document.activeElement
+      const isFocusingSubtitle = activeElement === subtitleTextAreaRef
+      const isFocusingMain = activeElement === textAreaRef
+      
+      // Check if the click was on a formatting button or toolbar
+      const isFormattingButton = activeElement?.closest('.format-btn') || 
+                                  activeElement?.closest('.formatting-toolbar')
+      
+      // Only close edit mode if focus is not on either textarea or formatting buttons
+      if (!isFocusingSubtitle && !isFocusingMain && !isFormattingButton) {
+        setEditingId(null)
+        setEditingSubtitle(false)
+      }
+    }, 100)
+  }
+
+  const handleSubtitleBlur = (e) => {
+    // Don't close edit mode if focus is moving to main textarea
+    setTimeout(() => {
+      const activeElement = document.activeElement
+      const isFocusingMain = activeElement === textAreaRef
+      
+      // Only close edit mode if focus is not on main textarea
+      if (!isFocusingMain) {
+        setEditingId(null)
+        setEditingSubtitle(false)
+      }
+    }, 0)
   }
 
   const handleKeyDown = (e, id) => {
@@ -43,38 +97,100 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onUpdat
     }
   }
 
-  const applyFormatting = (tag) => {
-    if (!textAreaRef) return
+  const applyFormatting = (tag, isSubtitle = false) => {
+    setIsFormatting(true)
+    
+    const ref = isSubtitle ? subtitleTextAreaRef : textAreaRef
+    const content = isSubtitle ? editSubtitle : editContent
+    const setContent = isSubtitle ? setEditSubtitle : setEditContent
+    
+    if (!ref) {
+      setIsFormatting(false)
+      return
+    }
 
-    const textarea = textAreaRef
+    const textarea = ref
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
-    const selectedText = editContent.substring(start, end)
+    const selectedText = content.substring(start, end)
 
-    if (selectedText.length === 0) return
+    if (selectedText.length === 0) {
+      setIsFormatting(false)
+      return
+    }
 
-    const beforeText = editContent.substring(0, start)
-    const afterText = editContent.substring(end)
+    const beforeText = content.substring(0, start)
+    const afterText = content.substring(end)
     
     let formattedText
     if (tag === 'strong') {
       formattedText = `<strong>${selectedText}</strong>`
     } else if (tag === 'em') {
       formattedText = `<em>${selectedText}</em>`
+    } else if (tag === 'h1') {
+      formattedText = `<h1>${selectedText}</h1>`
+    } else if (tag === 'h2') {
+      formattedText = `<h2>${selectedText}</h2>`
+    } else if (tag === 'h3') {
+      formattedText = `<h3>${selectedText}</h3>`
     } else {
+      setIsFormatting(false)
       return
     }
 
     const newContent = beforeText + formattedText + afterText
-    setEditContent(newContent)
-    onUpdate(editingId, { content: newContent })
+    setContent(newContent)
+    
+    if (isSubtitle) {
+      onUpdate(editingId, { subtitle: newContent })
+    } else {
+      onUpdate(editingId, { content: newContent })
+    }
 
-    // Restore cursor position after update
-    setTimeout(() => {
-      const newCursorPos = start + formattedText.length
-      textarea.setSelectionRange(newCursorPos, newCursorPos)
-      textarea.focus()
-    }, 0)
+    // Restore cursor position and focus after update
+    // Use requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (textarea) {
+          const newCursorPos = start + formattedText.length
+          textarea.setSelectionRange(newCursorPos, newCursorPos)
+          textarea.focus()
+        }
+        setIsFormatting(false)
+      }, 0)
+    })
+  }
+
+  const toggleSectionFold = (sectionId) => {
+    setFoldedSections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId)
+      } else {
+        newSet.add(sectionId)
+      }
+      return newSet
+    })
+  }
+
+  // Filter slides based on section fold state
+  const getVisibleSlides = () => {
+    const visibleSlides = []
+    let hideUntilNextSection = false
+    
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i]
+      const isSection = slide.layout === 'section'
+      
+      if (isSection) {
+        hideUntilNextSection = foldedSections.has(slide.id)
+        visibleSlides.push(slide)
+      } else if (!hideUntilNextSection) {
+        visibleSlides.push(slide)
+      }
+    }
+    
+    return visibleSlides
   }
 
   return (
@@ -87,89 +203,370 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onUpdat
       </div>
       <LayoutSelector onSelectLayout={handleLayoutSelect} />
       <div className="slide-list-items">
-        {slides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
-            onClick={() => onSelect(slide.id)}
-          >
-            <div className="slide-item-header">
-              <div className="slide-item-number">{index + 1}</div>
-              {slide.imageUrl && (
-                <div className="slide-item-thumbnail">
-                  <img src={slide.imageUrl} alt={`Slide ${index + 1}`} />
+        {getVisibleSlides().map((slide, visibleIndex) => {
+          const isSection = slide.layout === 'section'
+          const isCentered = slide.layout === 'centered'
+          const isEditing = editingId === slide.id
+          const isFolded = foldedSections.has(slide.id)
+          const originalIndex = slides.findIndex(s => s.id === slide.id)
+          
+          if (isSection) {
+            return (
+              <div key={slide.id} className="slide-item-wrapper">
+                <div className="slide-item-number">—</div>
+                <div className="slide-item slide-item-section">
+                  <div className="slide-item-content">
+                  <div className="slide-item-text slide-item-section-text">
+                    <div dangerouslySetInnerHTML={{ __html: slide.content || 'Section Name' }} />
+                  </div>
+                  <div className="slide-item-actions">
+                    <button
+                      className="btn-fold"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleSectionFold(slide.id)
+                      }}
+                      title={isFolded ? 'Unfold' : 'Fold'}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {isFolded ? (
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        ) : (
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        )}
+                      </svg>
+                    </button>
+                    <button
+                      className="btn-duplicate"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDuplicate(slide.id)
+                      }}
+                      title="Duplicate section"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                    <button
+                      className="btn-delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(slide.id)
+                      }}
+                      disabled={slides.length === 1}
+                      title="Delete section"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            )
+          }
+          
+          return (
+            <div key={slide.id} className="slide-item-wrapper">
+              <div className="slide-item-number">{originalIndex + 1}</div>
+              <div
+                className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
+                onClick={() => onSelect(slide.id)}
+              >
+                {slide.imageUrl && (
+                  <div className="slide-item-thumbnail">
+                    <img src={slide.imageUrl} alt={`Slide ${originalIndex + 1}`} />
+                  </div>
+                )}
+                <div className="slide-item-main-content">
+                {isEditing ? (
+                <div className="slide-item-edit" onClick={(e) => e.stopPropagation()}>
+                  <div className="formatting-toolbar">
+                    <button
+                      type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('strong', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Bold (Ctrl+B)"
+                    >
+                      <strong>B</strong>
+                    </button>
+                    <button
+                      type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('em', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Italic (Ctrl+I)"
+                    >
+                      <em>I</em>
+                    </button>
+                    <button
+                      type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('h1', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Heading 1"
+                    >
+                      H1
+                    </button>
+                    <button
+                      type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('h2', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Heading 2"
+                    >
+                      H2
+                    </button>
+                    <button
+                      type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('h3', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Heading 3"
+                    >
+                      H3
+                    </button>
+                  </div>
+                  <textarea
+                    ref={(ref) => setTextAreaRef(ref)}
+                    value={editContent}
+                    onChange={(e) => handleChange(e, slide.id)}
+                    onBlur={handleBlur}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      // Handle keyboard shortcuts
+                      if (e.ctrlKey || e.metaKey) {
+                        if (e.key === 'b') {
+                          e.preventDefault()
+                          applyFormatting('strong', false)
+                          return
+                        }
+                        if (e.key === 'i') {
+                          e.preventDefault()
+                          applyFormatting('em', false)
+                          return
+                        }
+                      }
+                      handleKeyDown(e, slide.id)
+                    }}
+                    autoFocus
+                    className="slide-edit-input"
+                    placeholder="Main text"
+                  />
+                  {isCentered && (
+                    <>
+                      <div className="formatting-toolbar">
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('strong', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Bold (Ctrl+B)"
+                        >
+                          <strong>B</strong>
+                        </button>
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('em', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Italic (Ctrl+I)"
+                        >
+                          <em>I</em>
+                        </button>
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('h1', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Heading 1"
+                        >
+                          H1
+                        </button>
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('h2', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Heading 2"
+                        >
+                          H2
+                        </button>
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('h3', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Heading 3"
+                        >
+                          H3
+                        </button>
+                      </div>
+                      <textarea
+                        ref={(ref) => setSubtitleTextAreaRef(ref)}
+                        value={editSubtitle}
+                        onChange={(e) => handleSubtitleChange(e, slide.id)}
+                        onBlur={handleSubtitleBlur}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => {
+                          e.stopPropagation()
+                          setEditingSubtitle(true)
+                        }}
+                        onKeyDown={(e) => {
+                          // Handle keyboard shortcuts
+                          if (e.ctrlKey || e.metaKey) {
+                            if (e.key === 'b') {
+                              e.preventDefault()
+                              applyFormatting('strong', true)
+                              return
+                            }
+                            if (e.key === 'i') {
+                              e.preventDefault()
+                              applyFormatting('em', true)
+                              return
+                            }
+                          }
+                          // Don't exit edit mode on Enter or Escape when editing subtitle
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            // Just blur the subtitle, don't exit edit mode
+                            return
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            // Just blur the subtitle, don't exit edit mode
+                            subtitleTextAreaRef?.blur()
+                            return
+                          }
+                        }}
+                        className="slide-edit-input slide-edit-subtitle"
+                        placeholder="Subtitle (optional)"
+                      />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="slide-item-content">
+                  <div
+                    className="slide-item-text"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEdit(slide)
+                    }}
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: slide.content || 'Empty slide' }} />
+                    {isCentered && slide.subtitle && (
+                      <div 
+                        className="slide-item-subtitle"
+                        dangerouslySetInnerHTML={{ __html: slide.subtitle }}
+                      />
+                    )}
+                  </div>
+                  <div className="slide-item-actions">
+                    <button
+                      className="btn-duplicate"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDuplicate(slide.id)
+                      }}
+                      title="Duplicate slide"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                    <button
+                      className="btn-delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(slide.id)
+                      }}
+                      disabled={slides.length === 1}
+                      title="Delete slide"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
-            {editingId === slide.id ? (
-              <div className="slide-item-edit">
-                <div className="formatting-toolbar">
-                  <button
-                    type="button"
-                    className="format-btn"
-                    onClick={() => applyFormatting('strong')}
-                    title="Bold (Ctrl+B)"
-                  >
-                    <strong>B</strong>
-                  </button>
-                  <button
-                    type="button"
-                    className="format-btn"
-                    onClick={() => applyFormatting('em')}
-                    title="Italic (Ctrl+I)"
-                  >
-                    <em>I</em>
-                  </button>
                 </div>
-                <textarea
-                  ref={(ref) => setTextAreaRef(ref)}
-                  value={editContent}
-                  onChange={(e) => handleChange(e, slide.id)}
-                  onBlur={handleBlur}
-                  onKeyDown={(e) => {
-                    // Handle keyboard shortcuts
-                    if (e.ctrlKey || e.metaKey) {
-                      if (e.key === 'b') {
-                        e.preventDefault()
-                        applyFormatting('strong')
-                        return
-                      }
-                      if (e.key === 'i') {
-                        e.preventDefault()
-                        applyFormatting('em')
-                        return
-                      }
-                    }
-                    handleKeyDown(e, slide.id)
-                  }}
-                  autoFocus
-                  className="slide-edit-input"
-                />
               </div>
-            ) : (
-              <div className="slide-item-content">
-                <div
-                  className="slide-item-text"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleEdit(slide)
-                  }}
-                  dangerouslySetInnerHTML={{ __html: slide.content || 'Empty slide' }}
-                />
-                <button
-                  className="btn-delete"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(slide.id)
-                  }}
-                  disabled={slides.length === 1}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

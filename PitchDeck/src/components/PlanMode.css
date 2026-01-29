@@ -4,37 +4,17 @@
   flex-direction: column;
   background: #000000;
   overflow: hidden;
+  align-items: center;
+  justify-content: center;
 }
 
-.plan-header {
-  padding: 2rem;
-  border-bottom: 1px solid #2a2a2a;
-}
-
-.plan-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #ffffff;
-  margin-bottom: 0.5rem;
-}
-
-.plan-hint {
-  font-size: 0.9rem;
-  color: #888;
-}
-
-.plan-content {
-  flex: 1;
+.plan-scenes-list {
+  width: 100%;
+  max-width: 800px;
+  padding: 3rem 2rem;
   display: flex;
-  overflow: hidden;
-}
-
-.plan-scenes {
-  width: 400px;
-  border-right: 1px solid #2a2a2a;
-  padding: 2rem;
-  overflow-y: auto;
-  background: #0a0a0a;
+  flex-direction: column;
+  gap: 0;
 }
 
 .plan-scene {
@@ -42,42 +22,127 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 0;
-  border-bottom: 1px solid #1a1a1a;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.plan-scene:hover:not(.dragging) {
+  opacity: 0.8;
+}
+
+.plan-scene.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.plan-scene.drag-over::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 2px;
+  background: #4a9eff;
+  z-index: 1;
+}
+
+.plan-scene.drag-over {
+  margin-top: 2px;
+}
+
+.plan-scene:not(.dragging) {
+  cursor: grab;
+}
+
+.plan-scene:not(.dragging):active {
+  cursor: grabbing;
+}
+
+.plan-scene.plan-section {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  padding: 1rem;
+  margin: 0.5rem 0;
+}
+
+.plan-scene.plan-section:hover:not(.dragging) {
+  opacity: 1;
+  border-color: #cccccc;
 }
 
 .scene-number {
-  font-size: 0.85rem;
-  color: #888;
-  min-width: 60px;
-  font-weight: 500;
+  font-size: 0.9rem;
+  color: #aaaaaa;
+  min-width: 80px;
+  font-weight: 400;
+  flex-shrink: 0;
 }
 
 .scene-separator {
   width: 1px;
   height: 20px;
-  background: #2a2a2a;
+  background: #333333;
+  flex-shrink: 0;
 }
 
 .scene-text {
   flex: 1;
-  color: #ffffff;
+  color: #cccccc;
   font-size: 0.95rem;
   line-height: 1.5;
+  font-weight: 300;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
-.plan-textarea {
+.scene-text:empty::before {
+  content: 'Click to edit...';
+  color: #666666;
+}
+
+.scene-input {
   flex: 1;
-  padding: 2rem;
-  background: #000000;
+  background: transparent;
+  border: 1px solid #333333;
   color: #ffffff;
-  border: none;
+  font-size: 0.95rem;
+  font-weight: 300;
+  padding: 0.5rem;
   outline: none;
-  font-size: 1rem;
+  border-radius: 4px;
   font-family: inherit;
-  line-height: 1.8;
-  resize: none;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
-.plan-textarea::placeholder {
-  color: #444;
+.scene-input:focus {
+  border-color: #4a9eff;
+}
+
+
+.add-buttons-container {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.add-scene-btn {
+  padding: 0.75rem 1.5rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.add-scene-btn:hover {
+  background: #3a3a3a;
+  border-color: #4a4a4a;
 }

@@ -14,9 +14,15 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
   background-repeat: no-repeat;
+  z-index: 0;
+  /* background-size and background-position are set dynamically via inline style */
+}
+
+.slide-background.editable {
+  /* Keep z-index at 0 to stay behind content and gradient */
+  /* Use pointer-events to make it clickable */
+  pointer-events: auto;
 }
 
 .slide-gradient-overlay {
@@ -25,6 +31,7 @@
   left: 0;
   width: 100%;
   height: 100%;
+  z-index: 1;
   /* Gradient is now set dynamically via inline style */
 }
 
@@ -33,13 +40,45 @@
   z-index: 1;
   height: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   padding: 3rem;
+  padding-bottom: 10rem;
+  padding-left: calc(3rem + 60px);
 }
 
 .slide-content.centered {
   justify-content: center;
+  align-items: center;
   text-align: center;
+  padding-left: 3rem;
+  padding-bottom: 3rem;
+}
+
+.slide-content.section {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 3rem;
+}
+
+.slide-section-text {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.slide-section-name {
+  font-size: 1.5rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  outline: none;
+  border: none;
+  pointer-events: auto;
 }
 
 .slide-text {
@@ -48,9 +87,16 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1.2;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
   max-width: 66.67%;
-  /* Color and fontFamily are set via inline style */
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  pointer-events: auto;
+}
+
+.slide-text:focus {
+  outline: none;
+  border: none;
 }
 
 .slide-text strong {
@@ -61,9 +107,97 @@
   font-style: italic;
 }
 
+.slide-text h1 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.slide-text h2 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.slide-text h3 {
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
 .slide-text.centered {
-  max-width: 66.67%;
+  max-width: 90%;
   text-align: center;
+}
+
+.slide-text-centered-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  max-width: 90%;
+  pointer-events: auto;
+}
+
+.slide-subtitle {
+  font-size: 2rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.4;
+  opacity: 0.9;
+  max-width: 100%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  pointer-events: auto;
+}
+
+.slide-subtitle:focus {
+  outline: none;
+  border: none;
+}
+
+.slide-subtitle-placeholder:empty:before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.slide-subtitle-placeholder:empty {
+  min-height: 1em;
+}
+
+.slide-subtitle strong {
+  font-weight: 600;
+}
+
+.slide-subtitle em {
+  font-style: italic;
+}
+
+.slide-subtitle h1 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.slide-subtitle h2 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.slide-subtitle h3 {
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
 }
 
 .slide-bullets {
@@ -71,6 +205,7 @@
   flex-direction: column;
   gap: 2.5rem;
   max-width: 66.67%;
+  pointer-events: auto;
 }
 
 .slide-bullet {
@@ -80,11 +215,10 @@
   font-size: 2.5rem;
   font-weight: 600;
   line-height: 1.4;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(20px);
   transition: opacity 0.5s ease, transform 0.5s ease;
-  /* Color and fontFamily are set via inline style from parent */
+  /* Color, fontFamily, and textShadow are set via inline style from parent */
 }
 
 .slide-bullet.visible {
@@ -109,6 +243,13 @@
   flex: 1;
   text-transform: none;
   letter-spacing: normal;
+  outline: none;
+  border: none;
+}
+
+.bullet-text:focus {
+  outline: none;
+  border: none;
 }
 
 .bullet-text strong {
@@ -117,4 +258,25 @@
 
 .bullet-text em {
   font-style: italic;
+}
+
+.bullet-text h1 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.bullet-text h2 {
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
+}
+
+.bullet-text h3 {
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+  display: block;
 }

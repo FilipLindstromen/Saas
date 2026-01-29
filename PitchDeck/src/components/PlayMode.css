@@ -20,14 +20,33 @@
   justify-content: center;
   padding: 2rem;
   transition: opacity 0.3s ease-in-out;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
-.play-slide-container.fade-in {
+.play-slide-container.visible {
   opacity: 1;
 }
 
 .play-slide-container.fade-out {
   opacity: 0;
+}
+
+.play-slide-container.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .play-mode .slide {
@@ -71,36 +90,39 @@
 
 .btn-fullscreen {
   padding: 0.5rem 1rem;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  border: none;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #3a3a3a;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: background 0.2s;
+  font-weight: 500;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .btn-fullscreen:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: #3a3a3a;
+  border-color: #4a4a4a;
 }
 
 .btn-exit {
   padding: 0.5rem 1.5rem;
-  background: rgba(255, 68, 68, 0.8);
-  color: white;
-  border: none;
+  background: #2a2a2a;
+  color: #ffffff;
+  border: 1px solid #3a3a3a;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-exit:hover {
-  background: rgba(255, 68, 68, 1);
+  background: #3a3a3a;
+  border-color: #4a4a4a;
 }
 
 .play-empty {
