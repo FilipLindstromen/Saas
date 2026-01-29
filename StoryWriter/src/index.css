@@ -1,0 +1,51 @@
+/* Story Writer — dark mode */
+
+:root {
+  --bg: #0f0f12;
+  --surface: #18181c;
+  --surface-elevated: #1e1e24;
+  --border: #2a2a32;
+  --border-hover: #3a3a44;
+  --text: #e8e8ed;
+  --text-muted: #8a8a9a;
+  --accent: #7c6ef6;
+  --accent-dim: rgba(124, 110, 246, 0.2);
+  --text-on-accent: #fff;
+  --hover: rgba(255, 255, 255, 0.06);
+  --error-bg: rgba(239, 68, 68, 0.12);
+  --error-border: rgba(239, 68, 68, 0.35);
+  --error-text: #fca5a5;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(to right, #0f0f12 0%, #16161b 50%, #18181c 100%);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}

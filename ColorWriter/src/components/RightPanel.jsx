@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette, Plus } from 'lucide-react';
+import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette, Plus, TrendingUp, Sparkles } from 'lucide-react';
 import ColorLegend from './ColorLegend';
 
 const RightPanel = ({
@@ -9,10 +9,14 @@ const RightPanel = ({
     onAnalyze,
     onFeedback,
     onBalance,
+    onThreeKeyIngredients,
+    onThreeRulesAnalysis,
     onInfuseBlockType,
     loading,
     feedbackLoading,
     balanceLoading,
+    threeKeyIngredientsLoading,
+    threeRulesLoading,
     conversionMetrics,
     onUpdateMetrics,
     metricsLoading,
@@ -243,6 +247,42 @@ const RightPanel = ({
                     >
                         {balanceLoading ? <Loader2 className="animate-spin" size={16} /> : <Scale size={16} />}
                         {balanceLoading ? 'Analyzing...' : 'Check Balance'}
+                    </button>
+
+                    <button
+                        onClick={onThreeKeyIngredients}
+                        disabled={!apiKey || !targetAudience || threeKeyIngredientsLoading}
+                        style={{
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                            padding: '0.6rem', fontWeight: 500, borderRadius: '6px', fontSize: '0.85rem',
+                            opacity: !apiKey || !targetAudience || threeKeyIngredientsLoading ? 0.6 : 1,
+                            cursor: !apiKey || !targetAudience || threeKeyIngredientsLoading ? 'not-allowed' : 'pointer'
+                        }}
+                        title="Analyze Four Key Ingredients"
+                    >
+                        {threeKeyIngredientsLoading ? <Loader2 className="animate-spin" size={16} /> : <TrendingUp size={16} />}
+                        {threeKeyIngredientsLoading ? 'Analyzing...' : 'Analyze 4 Key Ingredients'}
+                    </button>
+
+                    <button
+                        onClick={onThreeRulesAnalysis}
+                        disabled={!apiKey || !targetAudience || threeRulesLoading}
+                        style={{
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                            padding: '0.6rem', fontWeight: 500, borderRadius: '6px', fontSize: '0.85rem',
+                            opacity: !apiKey || !targetAudience || threeRulesLoading ? 0.6 : 1,
+                            cursor: !apiKey || !targetAudience || threeRulesLoading ? 'not-allowed' : 'pointer'
+                        }}
+                        title="Analyze Three Rules: Visualization, Falsifiability, Originality"
+                    >
+                        {threeRulesLoading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                        {threeRulesLoading ? 'Analyzing...' : 'Analyze 3 Rules'}
                     </button>
                 </div>
 

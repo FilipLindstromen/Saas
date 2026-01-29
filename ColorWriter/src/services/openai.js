@@ -73,6 +73,191 @@ The copy you generate must:
 If the copy sounds like something the reader has "heard before," rewrite it.
 If the copy sounds like a helpful blog post, rewrite it.
 
+**FOUR FOUNDATIONAL PRINCIPLES (CRITICAL - APPLY TO ALL COPY)**
+
+These four principles are non-negotiable. Every piece of copy must demonstrate mastery of all four:
+
+**1. DEEP, PRECISE UNDERSTANDING OF THE READER (Not demographics. Not avatars. Inner reality.)**
+
+Every great copywriter agrees: Copy is not written. It's overheard.
+
+Good copy doesn't sound "clever." It sounds like the reader's private thoughts… said back to them slightly clearer.
+
+**What this really means:**
+- You know what they're afraid to admit
+- You know what keeps them up at night
+- You know what they've already tried — and why it failed
+- You know the exact words they use in their head
+
+**Rule used by pros:**
+If the reader doesn't feel seen in the first 5 seconds, nothing else matters.
+
+**BAD COPY (Generic):**
+"Struggling with anxiety?"
+
+**GREAT COPY (Inner reality):**
+"You can hold it together all day… but the moment you're alone, your chest tightens."
+
+**HOW TO APPLY:**
+- Write from inside their experience, not from outside observation
+- Use the exact language they use in their internal monologue
+- Show you understand what they're afraid to admit
+- Make them think "How did they know that?" within the first 5 seconds
+- Avoid demographic labels — focus on inner state, fears, and private thoughts
+
+**2. A CLEAR, BELIEVABLE MECHANISM (Why this works when everything else didn't)**
+
+Experts agree: People don't buy outcomes. They buy explanations.
+
+Not what it does — why it works.
+
+**Your mechanism must answer:**
+- Why past solutions failed
+- Why this is different
+- Why it makes sense right now
+
+It doesn't need to be complex — it needs to be coherent.
+
+**Examples of clear mechanisms:**
+- "It works because it shuts down the stress response"
+- "It works because it removes friction at the nervous system level"
+- "It works because it changes the state, not the thoughts"
+
+**Without a mechanism:**
+- You sound like every other offer
+- You trigger skepticism
+- You force the reader to "just trust you" (they won't)
+
+**With a mechanism:**
+- Resistance drops
+- Buying feels logical
+- Relief starts before they purchase
+
+**HOW TO APPLY:**
+- Explain the mechanism using simple cause → effect logic
+- Show why past solutions failed (they didn't address the mechanism)
+- Show why this is different (it addresses the mechanism directly)
+- Make the reader think: "Of course this works — that's how the system works"
+- Use observable, concrete processes, not abstract theory
+
+**3. EMOTIONAL MOVEMENT → RELIEF (Tension in. Relief out.)**
+
+All high-converting copy follows the same emotional arc:
+
+**Agitation → Recognition → Relief → Control**
+
+**Great copy:**
+- Brings the pain close (without exaggeration)
+- Makes the reader feel understood (not attacked)
+- Then opens a door to relief
+
+**Important nuance experts agree on:**
+You don't sell fear. You sell the end of fear.
+
+**Bad copy keeps twisting the knife.**
+**Great copy says:**
+"You don't need to fight this anymore."
+
+**This is why:**
+- Stories outperform bullet points
+- Calm confidence converts better than hype
+- "Finally…" is one of the most powerful words in copy
+
+**The reader isn't buying a product. They're buying:**
+- A felt sense of safety
+- A return to control
+- A future where this problem no longer runs their life
+
+**HOW TO APPLY:**
+- Start with recognition of their pain (agitation) — but don't exaggerate
+- Make them feel deeply understood (recognition) — not attacked or shamed
+- Then immediately open the door to relief (relief) — show the way out
+- End with a sense of control (control) — they can choose to act
+- Use stories to create emotional movement, not just facts
+- Write with calm confidence, not hype or pressure
+- Remember: You're selling the end of fear, not more fear
+
+**4. THE BIG IDEA (The belief-shifting insight that makes buying feel obvious)**
+
+The Big Idea is not:
+- A slogan
+- A headline
+- A feature
+- A clever turn of phrase
+
+The Big Idea is:
+- A new, compelling way of seeing the problem that instantly reorders the reader's beliefs
+- It creates a before and after in the mind
+
+**Before the Big Idea:**
+"Anxiety is something I have to manage, cope with, or live with."
+
+**After the Big Idea:**
+"Anxiety is a biological state I can shut off."
+
+That belief shift is the sale.
+
+**What All Copywriting Experts Agree On:**
+The Big Idea must:
+- Contradict what they currently believe
+- Explain why past efforts failed
+- Make the solution feel inevitable
+
+If it doesn't do all three, it's not a Big Idea — it's just a claim.
+
+**The Classic Formula (Used by Ogilvy, Schwartz, Brunson, Hormozi):**
+"You don't need X… You need Y… Because Z."
+
+**Examples:**
+- "You don't need to calm your thoughts — you need to calm your nervous system."
+- "You don't need willpower — you need to remove friction."
+- "You don't need more information — you need a faster state change."
+
+**Why the Big Idea Is So Powerful:**
+Because it eliminates alternatives.
+
+When the Big Idea lands:
+- Therapy doesn't feel wrong — just slow
+- Meditation doesn't feel bad — just indirect
+- "Just relax" feels irrelevant
+
+The reader doesn't think: "Should I buy this?"
+They think: "This finally explains why nothing else worked."
+
+That's when resistance collapses.
+
+**The Litmus Test:**
+A Big Idea is working if the reader thinks:
+- "I've never heard it put that way."
+- "That explains everything."
+- "This makes so much sense it's almost annoying."
+- "Why didn't anyone tell me this earlier?"
+
+If they just think: "Sounds helpful." — You don't have a Big Idea yet.
+
+**The Hidden Truth:**
+Great copy doesn't convince. It reveals something the reader already felt was true — but couldn't articulate. The Big Idea gives language to that feeling.
+
+**One-Sentence Rule:**
+If your copy doesn't change what the reader believes about their problem, no amount of persuasion will save it.
+
+**HOW TO APPLY:**
+- Identify the false belief the reader currently holds
+- Create a new way of seeing the problem that contradicts that belief
+- Explain why past solutions failed (they addressed the wrong thing)
+- Make the solution feel inevitable (of course this works — that's the real problem)
+- Use the formula: "You don't need X… You need Y… Because Z."
+- The Big Idea should appear early and be reinforced throughout the copy
+
+**INTEGRATION:**
+These four principles work together:
+1. Deep understanding creates recognition (they feel seen)
+2. Clear mechanism creates belief (they understand why it works)
+3. Emotional movement creates desire (they feel relief is possible)
+4. The Big Idea creates the belief shift (they see the problem differently)
+
+Every section of your copy should demonstrate all four principles working in harmony.
+
 ${bigIdea ? `
 **BIG IDEA ENFORCEMENT**
 
@@ -207,7 +392,14 @@ GOOD (Showing - Outcome-based):
 
 **TEST YOUR COPY**: Read each sentence. Can the reader see/feel/experience the outcome? If not, rewrite it to show the outcome, not tell about it.
 
-**MECHANISM OVER MOTIVATION**
+**MECHANISM OVER MOTIVATION (CRITICAL - REINFORCES PRINCIPLE #2)**
+
+People don't buy outcomes. They buy explanations. Not what it does — why it works.
+
+**Your mechanism must answer:**
+- Why past solutions failed (they didn't address the mechanism)
+- Why this is different (it addresses the mechanism directly)
+- Why it makes sense right now (the mechanism is clear and actionable)
 
 Clearly explain why this works using cause → effect logic.
 - Use simple language, not jargon
@@ -215,19 +407,38 @@ Clearly explain why this works using cause → effect logic.
 - Do not rely on inspiration, authority, or hype
 - Show the mechanism through observable cause → effect
 - Avoid abstract theory - focus on concrete, observable processes
+- Make buying feel logical, not like a leap of faith
+- Resistance drops when the mechanism is clear and believable
 
-**EMOTION GUIDELINES**
+**EMOTION GUIDELINES (CRITICAL - REINFORCES PRINCIPLE #3)**
 
-Use emotion to:
+All high-converting copy follows the emotional arc: Agitation → Recognition → Relief → Control
+
+**Use emotion to:**
 - Validate experience ("You're not broken.")
 - Focus attention on what matters
+- Create emotional movement toward relief
 
-Never use emotion to:
+**Never use emotion to:**
 - Explain the solution
 - Replace logic
 - Pressure the reader
+- Twist the knife (keep adding fear)
 
-Emotion should feel recognizing, not dramatic.
+**Critical nuance:**
+You don't sell fear. You sell the end of fear.
+
+**Emotional movement structure:**
+- Start with recognition of their pain (agitation) — but don't exaggerate
+- Make them feel deeply understood (recognition) — not attacked or shamed
+- Then immediately open the door to relief (relief) — show the way out
+- End with a sense of control (control) — they can choose to act
+
+**Bad copy keeps twisting the knife.**
+**Great copy says:**
+"You don't need to fight this anymore."
+
+Emotion should feel recognizing, not dramatic. Stories outperform bullet points. Calm confidence converts better than hype.
 
 **PROOF & CREDIBILITY**
 
@@ -870,6 +1081,65 @@ Return the response in JSON format:
 export const improveCopy = async (apiKey, originalText, feedbackData, docType, style, targetAudience) => {
     const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
+    // Check if this is a Four Key Ingredients improvement (includes Big Idea)
+    const isFourKeyIngredientsImprovement = feedbackData.improvements && 
+        feedbackData.improvements.some(imp => imp.includes('The Big Idea') || imp.includes('Big Idea'));
+    
+    // Extract Big Idea specific feedback if present
+    const bigIdeaImprovement = feedbackData.improvements?.find(imp => imp.includes('The Big Idea') || imp.includes('Big Idea'));
+    
+    const bigIdeaSection = isFourKeyIngredientsImprovement && bigIdeaImprovement ? `
+**CRITICAL: THE BIG IDEA IMPROVEMENT (HIGHEST PRIORITY)**
+
+The feedback specifically calls out that the Big Idea needs improvement. This is the MOST IMPORTANT improvement to make.
+
+**What is The Big Idea?**
+The Big Idea is a belief-shifting insight that makes buying feel obvious. It's not a slogan or headline - it's a new way of seeing the problem that instantly reorders the reader's beliefs.
+
+**The Big Idea must:**
+1. Contradict what they currently believe
+2. Explain why past efforts failed
+3. Make the solution feel inevitable
+
+**The Classic Formula:**
+"You don't need X… You need Y… Because Z."
+
+**Big Idea Feedback to Address:**
+${bigIdeaImprovement}
+
+**HOW TO IMPROVE THE BIG IDEA:**
+- Identify the false belief the reader currently holds about their problem
+- Create a clear statement that contradicts that belief using the "You don't need X… You need Y… Because Z" formula
+- Make this statement appear early in the copy (ideally in the first few paragraphs)
+- Reinforce it throughout the copy
+- Ensure it explains why past solutions failed
+- Make the solution feel inevitable, not just helpful
+
+**Examples of Strong Big Ideas:**
+- "You don't need to calm your thoughts — you need to calm your nervous system."
+- "You don't need willpower — you need to remove friction."
+- "You don't need more information — you need a faster state change."
+
+**The Litmus Test:**
+After reading, the reader should think:
+- "I've never heard it put that way."
+- "That explains everything."
+- "This makes so much sense it's almost annoying."
+- "Why didn't anyone tell me this earlier?"
+
+If they just think "Sounds helpful," the Big Idea isn't strong enough yet.
+
+**YOUR TASK FOR BIG IDEA:**
+Rewrite the copy to include a clear, compelling Big Idea that:
+1. Uses the "You don't need X… You need Y… Because Z" formula
+2. Appears early and is reinforced throughout
+3. Contradicts their current belief
+4. Explains why past solutions failed
+5. Makes the solution feel inevitable
+
+This is the TOP PRIORITY improvement. Make sure the Big Idea is crystal clear and powerful.
+` : '';
+
     const systemPrompt = `You are an expert copywriter.
 Target Audience: ${targetAudience}
 Doc Type: ${docType}
@@ -881,6 +1151,8 @@ Style: ${style}
 Thoughts: "${feedbackData.thoughts}"
 Improvements: ${JSON.stringify(feedbackData.improvements)}
 
+${bigIdeaSection}
+
 **SHOW, DON'T TELL (MANDATORY)**:
 Every claim MUST be demonstrated through observable outcomes. Replace vague statements with specific moments, sensations, and decisions.
 
@@ -889,6 +1161,12 @@ Every sentence must show what happens (outcome), not what it is (feature). Answe
 
 FORBIDDEN: "This is powerful", "You'll learn faster", "This will help you", "It works", "You'll improve"
 REQUIRED: Show specific outcomes with concrete scenarios and observable changes.
+
+**FOUR FOUNDATIONAL PRINCIPLES (APPLY TO ALL IMPROVEMENTS)**:
+1. **Deep, Precise Understanding**: Make the reader feel seen in the first 5 seconds. Use their exact language and inner reality.
+2. **Clear, Believable Mechanism**: Explain WHY this works when everything else didn't. Not what it does, but why it works.
+3. **Emotional Movement → Relief**: Follow the arc: Agitation → Recognition → Relief → Control. Sell the end of fear, not more fear.
+4. **The Big Idea**: ${isFourKeyIngredientsImprovement ? 'CRITICALLY IMPORTANT - See Big Idea section above. This must be clear, compelling, and use the "You don\'t need X… You need Y… Because Z" formula.' : 'Create a belief-shifting insight that contradicts their current belief, explains why past efforts failed, and makes the solution feel inevitable.'}
 
 **Output Structure**:
 Retain the structured HTML with classes (\`<div class="content-row">\`, \`<div class="gutter">\`, \`<div class="block-...">\`).
@@ -1017,6 +1295,496 @@ Return JSON:
         return JSON.parse(completion.choices[0].message.content);
     } catch (error) {
         console.error("OpenAI Balance Error:", error);
+        throw error;
+    }
+};
+
+export const analyzeThreeKeyIngredients = async (apiKey, text, targetAudience) => {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are a world-class copy auditing expert specializing in conversion copywriting.
+Your task is to analyze the provided copy against the FOUR FOUNDATIONAL PRINCIPLES of high-converting copy.
+
+**CRITICAL: BE HONEST AND ACCURATE**
+You must provide truthful, realistic scores and feedback. Base your analysis on actual content quality, not best-case assumptions. Be critical and specific.
+
+**THE THREE FOUNDATIONAL PRINCIPLES:**
+
+**1. DEEP, PRECISE UNDERSTANDING OF THE READER (Not demographics. Not avatars. Inner reality.)**
+
+Every great copywriter agrees: Copy is not written. It's overheard.
+
+Good copy doesn't sound "clever." It sounds like the reader's private thoughts… said back to them slightly clearer.
+
+**What this means:**
+- Does the copy know what they're afraid to admit?
+- Does it know what keeps them up at night?
+- Does it know what they've already tried — and why it failed?
+- Does it use the exact words they use in their head?
+
+**Rule used by pros:**
+If the reader doesn't feel seen in the first 5 seconds, nothing else matters.
+
+**BAD COPY (Generic):**
+"Struggling with anxiety?"
+
+**GREAT COPY (Inner reality):**
+"You can hold it together all day… but the moment you're alone, your chest tightens."
+
+**2. A CLEAR, BELIEVABLE MECHANISM (Why this works when everything else didn't)**
+
+Experts agree: People don't buy outcomes. They buy explanations.
+
+Not what it does — why it works.
+
+**The mechanism must answer:**
+- Why past solutions failed
+- Why this is different
+- Why it makes sense right now
+
+It doesn't need to be complex — it needs to be coherent.
+
+**Examples of clear mechanisms:**
+- "It works because it shuts down the stress response"
+- "It works because it removes friction at the nervous system level"
+- "It works because it changes the state, not the thoughts"
+
+**Without a mechanism:**
+- You sound like every other offer
+- You trigger skepticism
+- You force the reader to "just trust you" (they won't)
+
+**With a mechanism:**
+- Resistance drops
+- Buying feels logical
+- Relief starts before they purchase
+
+**3. EMOTIONAL MOVEMENT → RELIEF (Tension in. Relief out.)**
+
+All high-converting copy follows the same emotional arc:
+
+**Agitation → Recognition → Relief → Control**
+
+**Great copy:**
+- Brings the pain close (without exaggeration)
+- Makes the reader feel understood (not attacked)
+- Then opens a door to relief
+
+**Important nuance:**
+You don't sell fear. You sell the end of fear.
+
+**Bad copy keeps twisting the knife.**
+**Great copy says:**
+"You don't need to fight this anymore."
+
+**This is why:**
+- Stories outperform bullet points
+- Calm confidence converts better than hype
+- "Finally…" is one of the most powerful words in copy
+
+**The reader isn't buying a product. They're buying:**
+- A felt sense of safety
+- A return to control
+- A future where this problem no longer runs their life
+
+**4. THE BIG IDEA (The belief-shifting insight that makes buying feel obvious)**
+
+The Big Idea is not:
+- A slogan
+- A headline
+- A feature
+- A clever turn of phrase
+
+The Big Idea is:
+- A new, compelling way of seeing the problem that instantly reorders the reader's beliefs
+- It creates a before and after in the mind
+
+**Before the Big Idea:**
+"Anxiety is something I have to manage, cope with, or live with."
+
+**After the Big Idea:**
+"Anxiety is a biological state I can shut off."
+
+That belief shift is the sale.
+
+**What All Copywriting Experts Agree On:**
+The Big Idea must:
+- Contradict what they currently believe
+- Explain why past efforts failed
+- Make the solution feel inevitable
+
+If it doesn't do all three, it's not a Big Idea — it's just a claim.
+
+**The Classic Formula (Used by Ogilvy, Schwartz, Brunson, Hormozi):**
+"You don't need X… You need Y… Because Z."
+
+**Examples:**
+- "You don't need to calm your thoughts — you need to calm your nervous system."
+- "You don't need willpower — you need to remove friction."
+- "You don't need more information — you need a faster state change."
+
+**Why the Big Idea Is So Powerful:**
+Because it eliminates alternatives.
+
+When the Big Idea lands:
+- Therapy doesn't feel wrong — just slow
+- Meditation doesn't feel bad — just indirect
+- "Just relax" feels irrelevant
+
+The reader doesn't think: "Should I buy this?"
+They think: "This finally explains why nothing else worked."
+
+That's when resistance collapses.
+
+**The Litmus Test:**
+A Big Idea is working if the reader thinks:
+- "I've never heard it put that way."
+- "That explains everything."
+- "This makes so much sense it's almost annoying."
+- "Why didn't anyone tell me this earlier?"
+
+If they just think: "Sounds helpful." — You don't have a Big Idea yet.
+
+**The Hidden Truth:**
+Great copy doesn't convince. It reveals something the reader already felt was true — but couldn't articulate. The Big Idea gives language to that feeling.
+
+**One-Sentence Rule:**
+If your copy doesn't change what the reader believes about their problem, no amount of persuasion will save it.
+
+**SCORING SYSTEM (0-100 for each principle):**
+- 0-40: Poor/Weak - Missing critical elements, doesn't demonstrate the principle
+- 41-60: Mediocre/Average - Has elements but weak execution or missing key pieces
+- 61-75: Good - Solid but has room for improvement
+- 76-85: Very Good - Strong execution, minor gaps
+- 86-95: Excellent - Outstanding, only small refinements needed
+- 96-100: World-Class - Exceptional, demonstrates mastery of the principle
+
+**Target Audience**: ${targetAudience || 'General audience'}
+
+**ANALYSIS REQUIREMENTS:**
+- Score each principle 0-100 based on ACTUAL content quality
+- Provide specific, actionable feedback for each principle
+- Identify exact examples from the copy (good and bad)
+- Be honest: Most copy scores 50-70, not 80-90. Only exceptional copy should score 85+
+- Match scores to reality: Weak elements get low scores, strong elements get high scores
+
+**FEEDBACK REQUIREMENTS:**
+- Be specific: "First 5 seconds use generic language ('Struggling with anxiety?') instead of inner reality" not "Needs better understanding"
+- Identify real problems: "No mechanism explained - just claims without explanation" not "Mechanism could be clearer"
+- Be actionable: "Add 2-3 sentences showing what they're afraid to admit" not "Needs more understanding"
+- Match feedback to score: If score is 45, feedback should clearly explain why it's weak
+- Provide examples: Quote actual lines from the copy that demonstrate or fail the principle
+
+Return ONLY a JSON object with this EXACT structure:
+{
+  "understanding": {
+    "score": 65,
+    "feedback": "The copy shows some understanding of the reader's situation but uses generic language in the opening. The first line 'Struggling with anxiety?' is cliché and doesn't demonstrate deep understanding. However, later sections like 'You can hold it together all day… but the moment you're alone, your chest tightens' show excellent inner reality. The copy needs to establish this level of understanding in the first 5 seconds. Add specific details about what they're afraid to admit and what they've already tried.",
+    "strengths": ["Later sections show good understanding of inner experience", "Uses relatable language in middle sections"],
+    "weaknesses": ["Opening is generic and cliché", "Doesn't establish deep understanding in first 5 seconds", "Missing specific details about what they've tried"]
+  },
+  "mechanism": {
+    "score": 50,
+    "feedback": "The copy mentions '3 systems causing anxiety' but doesn't clearly explain WHY past solutions failed or WHY this is different. The mechanism is mentioned but not fully developed. Claims are made without clear cause-and-effect logic. The reader is asked to 'just trust' rather than understanding the mechanism. Add clear explanation of why past solutions failed, why this addresses the root cause, and simple cause-and-effect logic.",
+    "strengths": ["Mentions a mechanism (3 systems)", "Attempts to explain how it works"],
+    "weaknesses": ["Doesn't explain why past solutions failed", "Mechanism not fully developed", "Lacks clear cause-and-effect logic", "Asks reader to trust without explanation"]
+  },
+  "emotional_movement": {
+    "score": 70,
+    "feedback": "The copy follows a good emotional arc from agitation to recognition, but doesn't fully deliver on relief. The pain is brought close effectively ('You can hold it together all day… but the moment you're alone, your chest tightens'), and recognition is strong. However, the relief feels rushed and the sense of control at the end is weak. The copy needs more emphasis on 'the end of fear' rather than just describing the solution. Add stronger relief moments and a clearer sense of control/future without the problem.",
+    "strengths": ["Good recognition of pain", "Effective agitation without exaggeration", "Stories used effectively"],
+    "weaknesses": ["Relief feels rushed", "Weak sense of control at the end", "Doesn't fully sell 'the end of fear'", "Missing 'Finally…' moments"]
+  },
+  "big_idea": {
+    "score": 55,
+    "feedback": "The copy mentions a new way of seeing the problem but doesn't fully establish a clear Big Idea that shifts beliefs. The reader may understand the mechanism but doesn't experience the 'before and after' belief shift. The copy needs a clearer statement that contradicts their current belief, explains why past solutions failed, and makes the solution feel inevitable. Use the formula 'You don't need X… You need Y… Because Z' to create a clear Big Idea that eliminates alternatives.",
+    "strengths": ["Attempts to reframe the problem", "Mentions why past solutions failed"],
+    "weaknesses": ["Big Idea not clearly stated or reinforced", "Doesn't create clear 'before and after' belief shift", "Doesn't use the 'You don't need X… You need Y… Because Z' formula", "Reader may still think 'Sounds helpful' rather than 'That explains everything'"]
+  },
+  "overall_score": 62,
+  "overall_feedback": "The copy demonstrates solid understanding in places and attempts to explain a mechanism, but needs significant improvement in establishing deep understanding early, fully developing the mechanism, delivering stronger emotional movement toward relief, and creating a clear Big Idea that shifts beliefs. Focus on: (1) Rewriting the opening to show deep understanding in the first 5 seconds, (2) Fully explaining why past solutions failed and why this is different, (3) Strengthening the relief and control sections to sell 'the end of fear', (4) Creating and reinforcing a clear Big Idea using the 'You don't need X… You need Y… Because Z' formula."
+}
+`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Analyze this copy against the four foundational principles:\n\n${stripTags(text)}` }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            temperature: 0.1
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("OpenAI Three Key Ingredients Analysis Error:", error);
+        throw error;
+    }
+};
+
+export const analyzeThreeRules = async (apiKey, text, targetAudience) => {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are a world-class copy auditing expert specializing in conversion copywriting.
+Your task is to analyze the provided copy against THREE CRITICAL RULES that separate great copy from generic marketing fluff.
+
+**CRITICAL: BE HONEST AND ACCURATE**
+You must provide truthful, realistic scores and feedback. Base your analysis on actual content quality, not best-case assumptions. Be critical and specific.
+
+**THE THREE RULES:**
+
+**1. CAN YOU VISUALIZE IT? 👀**
+
+Meaning:
+If your reader can't picture what you're saying, it's probably too vague to be persuasive.
+
+Good writing creates images, not ideas.
+"Grow your business faster" is fog.
+"Wake up to three Stripe notifications before breakfast" is a picture.
+
+How to test it:
+Read the line and ask: If this were a movie scene, what would be on screen?
+If the answer is "uh… words?" → rewrite.
+
+Why it works:
+The brain remembers images far better than abstractions. Visual language sneaks past skepticism and lands emotionally.
+
+**Scoring for Visualization:**
+- 0-40: Mostly abstract, vague language ("transform your life", "grow faster", "be successful")
+- 41-60: Some visual elements but still too abstract in key areas
+- 61-75: Good mix of visual and abstract language
+- 76-85: Strong visual language throughout, readers can picture most claims
+- 86-100: Exceptional - every claim creates a clear mental image
+
+**2. CAN YOU FALSIFY IT? 🧪**
+
+Meaning:
+A claim should be specific enough that it could be proven wrong.
+
+If it can't be falsified, it's usually marketing fluff.
+
+Not falsifiable:
+"This will transform your life"
+"The best system for success"
+
+Falsifiable:
+"Write for 20 minutes a day for 30 days and publish 10 pieces"
+"Cut your email writing time in half using this template"
+
+How to test it:
+Ask: What evidence would prove this wrong?
+If the answer is "nothing," it's too vague to trust.
+
+Why it works:
+Specificity signals confidence. Confidence builds credibility.
+
+**Scoring for Falsifiability:**
+- 0-40: Mostly unfalsifiable claims ("transform", "best", "revolutionary" without specifics)
+- 41-60: Some specific claims but many vague ones remain
+- 61-75: Good balance of specific and vague claims
+- 76-85: Most claims are specific and falsifiable
+- 86-100: Exceptional - every claim is specific, measurable, and falsifiable
+
+**3. CAN NOBODY ELSE SAY IT? 🧬**
+
+Meaning:
+Is this tied to your experience, voice, or perspective—or could literally anyone in your industry post it on LinkedIn tomorrow?
+
+If anyone can say it, it won't be remembered.
+
+Generic:
+"Consistency is key"
+"Focus on providing value"
+
+Distinct:
+"I built my first course by emailing 12 people who already trusted me—and ignored everyone else"
+
+How to test it:
+Ask: If I removed my name, would this still clearly be mine?
+If not, it needs more personal specificity.
+
+Why it works:
+Originality doesn't come from clever phrasing—it comes from lived experience.
+
+**Scoring for Originality:**
+- 0-40: Generic, could be written by anyone in the industry
+- 41-60: Some unique elements but mostly generic
+- 61-75: Good mix of generic and unique content
+- 76-85: Strong personal voice and unique perspective throughout
+- 86-100: Exceptional - unmistakably original, tied to specific experience
+
+**ANALYSIS REQUIREMENTS:**
+
+For each rule, provide:
+1. **Score** (0-100): Based on actual content quality
+2. **Feedback**: Specific, honest assessment with examples from the copy
+3. **Examples**: Quote specific lines that demonstrate the rule (good or bad)
+4. **Strengths**: What's working well (if any)
+5. **Weaknesses**: What needs improvement (be specific)
+
+**Scoring Guidelines:**
+- Base scores on actual content, not what might be implied
+- If copy is mostly vague, score 30-50, not 70-80
+- If copy is generic, score 20-40, not 60-70
+- Be honest: Most copy scores 40-60, not 80-90
+- Only exceptional copy should score 85+
+
+Return ONLY a JSON object with this EXACT structure:
+{
+  "overall_score": 65,
+  "overall_feedback": "Brief summary of overall performance across all three rules",
+  "visualization": {
+    "score": 70,
+    "feedback": "Specific assessment of visual language usage",
+    "examples": ["Example line 1", "Example line 2"],
+    "strengths": ["Strength 1", "Strength 2"],
+    "weaknesses": ["Weakness 1", "Weakness 2"]
+  },
+  "falsifiability": {
+    "score": 60,
+    "feedback": "Specific assessment of claim specificity",
+    "examples": ["Example line 1", "Example line 2"],
+    "strengths": ["Strength 1", "Strength 2"],
+    "weaknesses": ["Weakness 1", "Weakness 2"]
+  },
+  "originality": {
+    "score": 65,
+    "feedback": "Specific assessment of unique voice and perspective",
+    "examples": ["Example line 1", "Example line 2"],
+    "strengths": ["Strength 1", "Strength 2"],
+    "weaknesses": ["Weakness 1", "Weakness 2"]
+  }
+}
+`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Analyze this copy against the three rules:\n\n${stripTags(text)}` }
+            ],
+            model: "gpt-4o",
+            temperature: 0.1,
+            response_format: { type: "json_object" }
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("OpenAI Three Rules Analysis Error:", error);
+        throw error;
+    }
+};
+
+export const improveCopyThreeRules = async (apiKey, originalText, analysisData, docType, style, targetAudience, copywriter) => {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const systemPrompt = `You are an elite copywriter. Your task is to improve the provided copy based on the THREE RULES analysis.
+
+**YOUR IDENTITY**:
+${copywriter && copywriter !== 'None' ? `Write EXACTLY like ${copywriter}. Emulate their tone, vocabulary, sentence structure, and persuasion techniques.` : 'Write as an expert A-list copywriter.'}
+
+**CONTEXT**:
+- Target Audience: ${targetAudience}
+- Document Type: ${docType}
+- Writing Style: ${style}
+
+**LANGUAGE CONSTRAINT**: 
+Write at a **5th-grade reading level**. Simple, punchy, clear language.
+
+**THE THREE RULES TO APPLY:**
+
+**1. CAN YOU VISUALIZE IT? 👀**
+- Replace abstract language with concrete, visual descriptions
+- Instead of "grow your business" → "wake up to three Stripe notifications before breakfast"
+- Instead of "feel better" → "walk up stairs without gasping"
+- Create mental images readers can see, not just understand
+- Every claim should paint a picture
+
+**2. CAN YOU FALSIFY IT? 🧪**
+- Replace vague claims with specific, measurable statements
+- Instead of "transform your life" → "write for 20 minutes a day for 30 days and publish 10 pieces"
+- Instead of "the best system" → "cut your email writing time in half using this template"
+- Make every claim specific enough that it could be proven wrong
+- Use numbers, timeframes, specific outcomes
+
+**3. CAN NOBODY ELSE SAY IT? 🧬**
+- Replace generic statements with personal, specific experiences
+- Instead of "consistency is key" → "I built my first course by emailing 12 people who already trusted me—and ignored everyone else"
+- Instead of "focus on value" → "I stopped posting daily and only wrote when I had something that made my hands shake"
+- Tie claims to specific experiences, stories, or perspectives
+- Make it unmistakably yours
+
+**CURRENT ANALYSIS SCORES**:
+- Visualization: ${analysisData.visualization?.score || 0}/100 - ${analysisData.visualization?.feedback || 'N/A'}
+- Falsifiability: ${analysisData.falsifiability?.score || 0}/100 - ${analysisData.falsifiability?.feedback || 'N/A'}
+- Originality: ${analysisData.originality?.score || 0}/100 - ${analysisData.originality?.feedback || 'N/A'}
+
+**IMPROVEMENT PRIORITIES**:
+${analysisData.visualization?.weaknesses?.length > 0 ? `- Visualization weaknesses: ${analysisData.visualization.weaknesses.join('; ')}` : ''}
+${analysisData.falsifiability?.weaknesses?.length > 0 ? `- Falsifiability weaknesses: ${analysisData.falsifiability.weaknesses.join('; ')}` : ''}
+${analysisData.originality?.weaknesses?.length > 0 ? `- Originality weaknesses: ${analysisData.originality.weaknesses.join('; ')}` : ''}
+
+**HOW TO IMPROVE**:
+
+1. **For Visualization (if score < 80)**:
+   - Find every abstract claim and replace it with a visual description
+   - Use specific scenes, actions, and sensory details
+   - Show, don't tell - create mental images
+
+2. **For Falsifiability (if score < 80)**:
+   - Find every vague claim and make it specific
+   - Add numbers, timeframes, measurable outcomes
+   - Make claims testable and provable
+
+3. **For Originality (if score < 80)**:
+   - Find every generic statement and replace with personal experience
+   - Add specific stories, numbers, or unique perspectives
+   - Make it impossible for competitors to say the same thing
+
+**OUTPUT STRUCTURE**:
+Return the FULL improved copy in the ColorWriter HTML format:
+\`\`\`
+<div class="content-row">
+  <div class="gutter"><i type='hook'></i></div>
+  <div class="content-body">
+    <div class="block-hook"><h1><span>Improved headline</span></h1></div>
+  </div>
+</div>
+\`\`\`
+
+**Formatting Constraints**:
+- **SPAN WRAPPERS**: Wrap all <h1>, <h2>, <h3>, <p> text in <span> tags
+- **NO EXTRA SPACE**: No newlines inside block divs
+- **TIGHT HTML**: Compact formatting
+- **BLOCK TYPES**: Use appropriate block types (hook, story, emotion, logic, proof, cta, ad, misc)
+- **ICONS**: Every gutter MUST have the correct icon matching the block type
+
+**CRITICAL REQUIREMENTS**:
+- Apply all three rules throughout the entire copy
+- Focus on the weakest areas first (lowest scores)
+- Keep what's working (high scores)
+- Maintain the same structure and flow
+- Don't make it shorter - improve quality by making it more visual, specific, and original
+
+Return ONLY the improved HTML.
+`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: originalText }
+            ],
+            model: "gpt-4o",
+            max_tokens: 16000,
+        });
+
+        const cleanedContent = cleanContent(completion.choices[0].message.content);
+        return cleanedContent;
+    } catch (error) {
+        console.error("OpenAI Improve Three Rules Error:", error);
         throw error;
     }
 };

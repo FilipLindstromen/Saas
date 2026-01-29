@@ -199,6 +199,47 @@ select:focus {
   border-radius: 4px;
 }
 
+/* Hide slider track lines */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Hide track lines for WebKit browsers (Chrome, Safari, Edge) */
+input[type="range"]::-webkit-slider-track {
+  background: transparent;
+  border: none;
+  height: 0;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+  border: none;
+  height: 0;
+}
+
+/* Hide track lines for Firefox */
+input[type="range"]::-moz-range-track {
+  background: transparent;
+  border: none;
+  height: 0;
+}
+
+/* Hide track lines for IE/Edge */
+input[type="range"]::-ms-track {
+  background: transparent;
+  border: none;
+  color: transparent;
+  height: 0;
+}
+
+input[type="range"]::-ms-fill-lower,
+input[type="range"]::-ms-fill-upper {
+  background: transparent;
+}
+
 /* Row Layout */
 .content-row {
   display: flex !important;

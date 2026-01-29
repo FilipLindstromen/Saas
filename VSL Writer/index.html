@@ -1,0 +1,2247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VSL Writer - AI-Powered Video Sales Letter Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --accent: #2563eb;
+            --accent-hover: #3b82f6;
+            --accent-dark: #1e40af;
+            --border: #404040;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        .left-column,
+        .right-column {
+            overflow-y: auto;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        #vslSections {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .left-column::-webkit-scrollbar,
+        .right-column::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .left-column::-webkit-scrollbar-track,
+        .right-column::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .left-column::-webkit-scrollbar-thumb,
+        .right-column::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .left-column::-webkit-scrollbar-thumb:hover,
+        .right-column::-webkit-scrollbar-thumb:hover {
+            background: var(--border);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            background: var(--accent-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: var(--bg-tertiary);
+        }
+
+        .status-indicator.saved {
+            color: var(--success);
+        }
+
+        .status-indicator.saving {
+            color: var(--warning);
+        }
+
+        .status-indicator.unsaved {
+            color: var(--error);
+        }
+
+        .input-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .input-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-section h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--accent-dark);
+            border-radius: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .input-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .vsl-section {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            transition: all 0.2s;
+        }
+
+        .vsl-section:hover {
+            border-color: var(--accent);
+        }
+
+        .vsl-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .vsl-section-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .history-btn {
+            position: relative;
+        }
+
+        .history-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .history-dropdown.active {
+            display: block;
+        }
+
+        .history-item {
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .history-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .history-item-title {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .history-item-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .vsl-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .vsl-section-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--accent-dark);
+            color: white;
+            border-radius: 50%;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-right: 0.75rem;
+        }
+
+        .vsl-section textarea {
+            width: 100%;
+            min-height: 60px;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: inherit;
+            line-height: 1.7;
+            resize: none;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .vsl-section textarea:focus {
+            outline: none;
+            background: var(--bg-secondary);
+        }
+
+        .generate-btn {
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .modal-content input {
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .notification {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            border-left: 4px solid var(--success);
+        }
+
+        /* Hook Selector Modal Styles */
+        .hook-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .hook-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+        }
+
+        .hook-item:hover {
+            border-color: var(--accent);
+        }
+
+        .hook-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        #hookModal .modal-content {
+            max-width: 800px;
+        }
+
+        .hook-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .hook-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .hook-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .hook-list::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .notification.error {
+            border-left: 4px solid var(--error);
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-modal.active {
+            display: flex;
+        }
+
+        .settings-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .settings-content h3 {
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .left-column,
+            .right-column {
+                height: auto;
+                max-height: 50vh;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .toolbar {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>VSL Writer</h1>
+            <div class="toolbar">
+                <div class="status-indicator" id="statusIndicator">
+                    <span id="statusText">Ready</span>
+                </div>
+                <button class="btn btn-secondary" id="settingsBtn" title="Settings">⚙️</button>
+                <button class="btn btn-secondary" id="exportBtn">Export</button>
+                <button class="btn btn-secondary" id="loadBtn">Load Project</button>
+                <button class="btn btn-secondary" id="saveBtn">Save Project</button>
+                <button class="btn btn-primary" id="copyScriptBtn">Copy Full Script</button>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <div class="left-column">
+                <div class="input-section">
+                    <h2>Project Information</h2>
+                    <div class="input-group">
+                        <label for="productName">Product Name</label>
+                        <input type="text" id="productName" placeholder="Enter product name">
+                    </div>
+                    <div class="input-group">
+                        <label for="targetAudience">Target Audience</label>
+                        <input type="text" id="targetAudience" placeholder="Describe your target audience">
+                    </div>
+                    <div class="input-group">
+                        <label for="coreProblem">Core Problem</label>
+                        <textarea id="coreProblem"
+                            placeholder="Describe the core problem your product solves"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="desiredOutcome">Desired Outcome</label>
+                        <textarea id="desiredOutcome"
+                            placeholder="Describe the desired outcome for your audience"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="mechanism">Mechanism (Optional)</label>
+                        <textarea id="mechanism"
+                            placeholder="Enter the hidden mechanism, switch, or blind spot that causes the struggle and enables the transition"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="hookIdea">Specific Hook Idea (Optional)</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <textarea id="hookIdea"
+                                placeholder="Enter a specific idea or concept for the hook section"></textarea>
+                            <button class="btn btn-secondary btn-small" id="generateHooksBtn">
+                                <span>✨ Generate 10 hooks based on my idea</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="additionalInfo">Additional Information or Ideas (Optional)</label>
+                        <textarea id="additionalInfo"
+                            placeholder="Add any additional information, ideas, or context that should be considered"></textarea>
+                    </div>
+                    <button class="btn btn-primary generate-btn" id="generateBtn">
+                        <span>Generate All Sections</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="right-column">
+                <div id="vslSections">
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">1</span>
+                                BIG PROMISE – Hyper-Specific (First 3 Mins)
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="bigPromise"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-bigPromise"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="bigPromise">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="bigPromise"
+                            placeholder="One outcome, one method, one timeframe. 'How to [result] without [pain] even if [objection]'."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">2</span>
+                                AUTHORITY TRANSFER – Not Ego
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="authorityTransfer"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-authorityTransfer"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small"
+                                    data-section="authorityTransfer">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="authorityTransfer"
+                            placeholder="Proof by association, borrowed credibility, student outcomes. 'I am not special, I just found a system'."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">3</span>
+                                VEHICLE REVEAL – The New Mechanism
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="vehicleReveal"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-vehicleReveal"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="vehicleReveal">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="vehicleReveal"
+                            placeholder="Introduce the named framework. Not 'Facebook Ads', but 'The $3-a-day Lead Loop Method'."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">4</span>
+                                FUTURE PACING – Mental Movie
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="futurePacing"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-futurePacing"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="futurePacing">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="futurePacing"
+                            placeholder="Walk them into a mental movie of life in 30 days. Financial, emotional, and social changes."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">5</span>
+                                PATTERN INTERRUPT – Teaching (Incomplete)
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="patternInterrupt"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-patternInterrupt"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small"
+                                    data-section="patternInterrupt">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="patternInterrupt"
+                            placeholder="Teach 2-3 counter-intuitive ideas but create a gap. Create dependence on the next step."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">6</span>
+                                SOFT OFFER BRIDGE – Not a Pitch
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="softOffer"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-softOffer"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="softOffer">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="softOffer"
+                            placeholder="'Some people asked me to help them implement this...'. Make it feel organic and requested."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">7</span>
+                                OFFER STACK – Identity Shift
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="offerStack"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-offerStack"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="offerStack">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="offerStack"
+                            placeholder="Sell who they become. Each bonus answers: Who you are after this, what you stop fearing."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">8</span>
+                                RISK COLLAPSE – Kill Fear
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="riskCollapse"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-riskCollapse"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="riskCollapse">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="riskCollapse"
+                            placeholder="Extreme guarantees, no-logic refunds, performance promises. Remove decision fatigue."></textarea>
+                    </div>
+
+                    <div class="vsl-section">
+                        <div class="vsl-section-header">
+                            <div class="vsl-section-title">
+                                <span class="vsl-section-number">9</span>
+                                URGENCY – Moral Scarcity
+                            </div>
+                            <div class="vsl-section-actions">
+                                <div class="history-btn">
+                                    <button class="btn btn-secondary btn-small" data-history="urgency"
+                                        title="Version History">History</button>
+                                    <div class="history-dropdown" id="history-urgency"></div>
+                                </div>
+                                <button class="btn btn-primary btn-small" data-section="urgency">Generate</button>
+                            </div>
+                        </div>
+                        <textarea id="urgency"
+                            placeholder="'I only let serious people in because it protects my students'. Scarcity as protection."></textarea>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal" id="saveModal">
+                <div class="modal-content">
+                    <h3>Save Project</h3>
+                    <input type="text" id="saveFileName" placeholder="Enter file name (without extension)">
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelSaveBtn">Cancel</button>
+                        <button class="btn btn-primary" id="confirmSaveBtn">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-modal" id="settingsModal">
+                <div class="settings-content">
+                    <h3>Settings</h3>
+                    <div class="input-group">
+                        <label for="apiKey">OpenAI API Key</label>
+                        <input type="password" id="apiKey" placeholder="Enter your OpenAI API key">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="closeSettingsBtn">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal" id="hookModal">
+                <div class="modal-content">
+                    <h3>Select a Hook</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">Choose a hook to
+                        use in your Big Promise section.</p>
+                    <div id="hookList" class="hook-list">
+                        <!-- Hooks will be generated here -->
+                    </div>
+                    <div class="modal-actions" style="margin-top: 1.5rem;">
+                        <button class="btn btn-secondary" id="closeHookModal">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // State management
+                let currentFileHandle = null;
+                let autosaveInterval = null;
+                let hasUnsavedChanges = false;
+                let isGenerating = false;
+                let browserSaveTimeout = null;
+
+                // Version history for each section
+                const sectionHistory = {
+                    bigPromise: [],
+                    authorityTransfer: [],
+                    vehicleReveal: [],
+                    futurePacing: [],
+                    patternInterrupt: [],
+                    softOffer: [],
+                    offerStack: [],
+                    riskCollapse: [],
+                    urgency: []
+                };
+
+                // DOM elements
+                const apiKeyInput = document.getElementById('apiKey');
+                const productNameInput = document.getElementById('productName');
+                const targetAudienceInput = document.getElementById('targetAudience');
+                const coreProblemInput = document.getElementById('coreProblem');
+                const desiredOutcomeInput = document.getElementById('desiredOutcome');
+                const mechanismInput = document.getElementById('mechanism');
+                const hookIdeaInput = document.getElementById('hookIdea');
+                const additionalInfoInput = document.getElementById('additionalInfo');
+                const generateBtn = document.getElementById('generateBtn');
+                const saveBtn = document.getElementById('saveBtn');
+                const loadBtn = document.getElementById('loadBtn');
+                const exportBtn = document.getElementById('exportBtn');
+                const statusIndicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                const saveModal = document.getElementById('saveModal');
+                const saveFileNameInput = document.getElementById('saveFileName');
+                const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+                const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+                const settingsBtn = document.getElementById('settingsBtn');
+                const settingsModal = document.getElementById('settingsModal');
+                const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+                // VSL section textareas
+                const vslSections = {
+                    bigPromise: document.getElementById('bigPromise'),
+                    authorityTransfer: document.getElementById('authorityTransfer'),
+                    vehicleReveal: document.getElementById('vehicleReveal'),
+                    futurePacing: document.getElementById('futurePacing'),
+                    patternInterrupt: document.getElementById('patternInterrupt'),
+                    softOffer: document.getElementById('softOffer'),
+                    offerStack: document.getElementById('offerStack'),
+                    riskCollapse: document.getElementById('riskCollapse'),
+                    urgency: document.getElementById('urgency')
+                };
+
+                // Load API key from localStorage
+                const savedApiKey = localStorage.getItem('openai_api_key');
+                if (savedApiKey) {
+                    apiKeyInput.value = savedApiKey;
+                }
+
+                // Save API key to localStorage
+                apiKeyInput.addEventListener('blur', () => {
+                    if (apiKeyInput.value) {
+                        localStorage.setItem('openai_api_key', apiKeyInput.value);
+                    }
+                });
+
+                // Settings modal
+                settingsBtn.addEventListener('click', () => {
+                    settingsModal.classList.add('active');
+                });
+
+                closeSettingsBtn.addEventListener('click', () => {
+                    settingsModal.classList.remove('active');
+                });
+
+                settingsModal.addEventListener('click', (e) => {
+                    if (e.target === settingsModal) {
+                        settingsModal.classList.remove('active');
+                    }
+                });
+
+                // Format text with line breaks after sentences
+                function formatTextWithLineBreaks(text) {
+                    if (!text) return '';
+                    // Split by sentence endings (. ! ?) followed by space
+                    return text
+                        .replace(/([.!?])\s+/g, '$1\n\n')
+                        .split('\n\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .join('\n\n');
+                }
+
+                // Auto-resize textarea based on content
+                function autoResizeTextarea(textarea) {
+                    if (!textarea) return;
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                }
+
+                // Track changes for autosave
+                const allInputs = [
+                    productNameInput,
+                    targetAudienceInput,
+                    coreProblemInput,
+                    desiredOutcomeInput,
+                    mechanismInput,
+                    hookIdeaInput,
+                    additionalInfoInput,
+                    ...Object.values(vslSections)
+                ];
+
+                allInputs.forEach(input => {
+                    input.addEventListener('input', () => {
+                        hasUnsavedChanges = true;
+                        updateStatus('unsaved');
+                        if (currentFileHandle && autosaveInterval === null) {
+                            startAutosave();
+                        }
+                        // Save to browser storage with debounce
+                        saveToBrowserStorage();
+                    });
+                });
+
+                // Update status indicator
+                function updateStatus(status) {
+                    statusIndicator.className = `status-indicator ${status}`;
+                    switch (status) {
+                        case 'saved':
+                            statusText.textContent = 'Saved';
+                            break;
+                        case 'saving':
+                            statusText.textContent = 'Saving...';
+                            break;
+                        case 'unsaved':
+                            statusText.textContent = 'Unsaved changes';
+                            break;
+                        default:
+                            statusText.textContent = 'Ready';
+                    }
+                }
+
+                // Start autosave when file is loaded
+                function startAutosave() {
+                    if (autosaveInterval) return;
+
+                    autosaveInterval = setInterval(() => {
+                        if (hasUnsavedChanges && currentFileHandle) {
+                            saveToFile(currentFileHandle, true);
+                        }
+                    }, 5000); // Autosave every 5 seconds
+                }
+
+                // Stop autosave
+                function stopAutosave() {
+                    if (autosaveInterval) {
+                        clearInterval(autosaveInterval);
+                        autosaveInterval = null;
+                    }
+                }
+
+                // Get project data
+                function getProjectData() {
+                    return {
+                        productName: productNameInput.value,
+                        targetAudience: targetAudienceInput.value,
+                        coreProblem: coreProblemInput.value,
+                        desiredOutcome: desiredOutcomeInput.value,
+                        mechanism: mechanismInput.value,
+                        hookIdea: hookIdeaInput.value,
+                        additionalInfo: additionalInfoInput.value,
+                        vsl: {
+                            bigPromise: vslSections.bigPromise.value,
+                            authorityTransfer: vslSections.authorityTransfer.value,
+                            vehicleReveal: vslSections.vehicleReveal.value,
+                            futurePacing: vslSections.futurePacing.value,
+                            patternInterrupt: vslSections.patternInterrupt.value,
+                            softOffer: vslSections.softOffer.value,
+                            offerStack: vslSections.offerStack.value,
+                            riskCollapse: vslSections.riskCollapse.value,
+                            urgency: vslSections.urgency.value
+                        },
+                        timestamp: new Date().toISOString()
+                    };
+                }
+
+                // Save to browser localStorage (debounced)
+                function saveToBrowserStorage() {
+                    // Clear existing timeout
+                    if (browserSaveTimeout) {
+                        clearTimeout(browserSaveTimeout);
+                    }
+
+                    // Set new timeout to save after 500ms of no changes
+                    browserSaveTimeout = setTimeout(() => {
+                        try {
+                            const data = getProjectData();
+                            localStorage.setItem('vsl_writer_project_data', JSON.stringify(data));
+                        } catch (error) {
+                            console.error('Error saving to browser storage:', error);
+                        }
+                    }, 500);
+                }
+
+                // Load from browser localStorage
+                function loadFromBrowserStorage() {
+                    try {
+                        const savedData = localStorage.getItem('vsl_writer_project_data');
+                        if (savedData) {
+                            const data = JSON.parse(savedData);
+                            loadProjectData(data, true); // Skip browser save to avoid loop
+                            // Don't mark as unsaved since we just loaded
+                            hasUnsavedChanges = false;
+                            updateStatus('ready');
+                        }
+                    } catch (error) {
+                        console.error('Error loading from browser storage:', error);
+                    }
+                }
+
+                // Load project data
+                function loadProjectData(data, skipBrowserSave = false) {
+                    productNameInput.value = data.productName || '';
+                    targetAudienceInput.value = data.targetAudience || '';
+                    coreProblemInput.value = data.coreProblem || '';
+                    desiredOutcomeInput.value = data.desiredOutcome || '';
+                    mechanismInput.value = data.mechanism || '';
+                    hookIdeaInput.value = data.hookIdea || '';
+                    additionalInfoInput.value = data.additionalInfo || '';
+
+                    if (data.vsl) {
+                        vslSections.bigPromise.value = data.vsl.bigPromise || '';
+                        vslSections.authorityTransfer.value = data.vsl.authorityTransfer || '';
+                        vslSections.vehicleReveal.value = data.vsl.vehicleReveal || '';
+                        vslSections.futurePacing.value = data.vsl.futurePacing || '';
+                        vslSections.patternInterrupt.value = data.vsl.patternInterrupt || '';
+                        vslSections.softOffer.value = data.vsl.softOffer || '';
+                        vslSections.offerStack.value = data.vsl.offerStack || '';
+                        vslSections.riskCollapse.value = data.vsl.riskCollapse || '';
+                        vslSections.urgency.value = data.vsl.urgency || '';
+
+                        // Auto-resize all textareas after loading
+                        Object.values(vslSections).forEach(textarea => {
+                            autoResizeTextarea(textarea);
+                        });
+                    }
+
+                    hasUnsavedChanges = false;
+                    updateStatus('saved');
+
+                    // Save to browser storage after loading (unless explicitly skipped)
+                    if (!skipBrowserSave) {
+                        saveToBrowserStorage();
+                    }
+                }
+
+                // Verify file handle permissions
+                async function verifyPermission(fileHandle, readWrite) {
+                    const options = {};
+                    if (readWrite) {
+                        options.mode = 'readwrite';
+                    }
+                    // Check if permission was already granted. If so, return true.
+                    if ((await fileHandle.queryPermission(options)) === 'granted') {
+                        return true;
+                    }
+                    // Request permission. If the user grants permission, return true.
+                    if ((await fileHandle.requestPermission(options)) === 'granted') {
+                        return true;
+                    }
+                    // The user didn't grant permission, so return false.
+                    return false;
+                }
+
+                // Save to file
+                async function saveToFile(fileHandle, isAutosave = false) {
+                    try {
+                        if (fileHandle) {
+                            // During autosave, check if we have permission first
+                            // queryPermission doesn't require a user gesture, but requestPermission does.
+                            if (isAutosave) {
+                                const status = await fileHandle.queryPermission({ mode: 'readwrite' });
+                                if (status !== 'granted') {
+                                    // Silently skip autosave to disk if not granted
+                                    return;
+                                }
+                            }
+
+                            if (!isAutosave) {
+                                updateStatus('saving');
+                            }
+
+                            const data = getProjectData();
+                            const json = JSON.stringify(data, null, 2);
+                            const blob = new Blob([json], { type: 'application/json' });
+
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+
+                            hasUnsavedChanges = false;
+                            updateStatus('saved');
+
+                            if (!isAutosave) {
+                                showNotification('Project saved successfully!', 'success');
+                            }
+                        } else if (!isAutosave) {
+                            // Manual save for new file
+                            updateStatus('saving');
+                            const data = getProjectData();
+                            const json = JSON.stringify(data, null, 2);
+                            const blob = new Blob([json], { type: 'application/json' });
+
+                            const newFileHandle = await window.showSaveFilePicker({
+                                suggestedName: saveFileNameInput.value || 'vsl-project',
+                                types: [{
+                                    description: 'VSL Project Files',
+                                    accept: { 'application/json': ['.json'] }
+                                }]
+                            });
+
+                            const writable = await newFileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+
+                            currentFileHandle = newFileHandle;
+                            startAutosave();
+
+                            hasUnsavedChanges = false;
+                            updateStatus('saved');
+                            showNotification('Project saved successfully!', 'success');
+                        }
+                    } catch (error) {
+                        // Suppress SecurityError during autosave as it's expected if no gesture occurred
+                        if (isAutosave && (error.name === 'SecurityError' || error.name === 'NotAllowedError')) {
+                            return;
+                        }
+
+                        if (error.name !== 'AbortError') {
+                            console.error('Error saving file:', error);
+                            if (!isAutosave) {
+                                showNotification('Error saving file: ' + error.message, 'error');
+                                updateStatus('unsaved');
+                            }
+                        }
+                    }
+                }
+
+                // Load from file
+                async function loadFromFile() {
+                    try {
+                        const [fileHandle] = await window.showOpenFilePicker({
+                            types: [{
+                                description: 'VSL Project Files',
+                                accept: { 'application/json': ['.json'] }
+                            }]
+                        });
+
+                        const file = await fileHandle.getFile();
+                        const text = await file.text();
+                        const data = JSON.parse(text);
+
+                        loadProjectData(data);
+                        currentFileHandle = fileHandle;
+                        startAutosave();
+
+                        // Also save to browser storage
+                        saveToBrowserStorage();
+
+                        showNotification('Project loaded successfully!', 'success');
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.error('Error loading file:', error);
+                            showNotification('Error loading file: ' + error.message, 'error');
+                        }
+                    }
+                }
+
+                // Save version to history
+                function saveVersionToHistory(sectionKey, content) {
+                    if (!content || content.trim().length === 0) return;
+
+                    const version = {
+                        content: content,
+                        timestamp: new Date().toISOString(),
+                        timeString: new Date().toLocaleString()
+                    };
+
+                    sectionHistory[sectionKey].unshift(version);
+
+                    // Keep only last 10 versions per section
+                    if (sectionHistory[sectionKey].length > 10) {
+                        sectionHistory[sectionKey] = sectionHistory[sectionKey].slice(0, 10);
+                    }
+
+                    updateHistoryDropdown(sectionKey);
+                    saveHistoryToStorage();
+                }
+
+                // Update history dropdown UI
+                function updateHistoryDropdown(sectionKey) {
+                    const dropdown = document.getElementById(`history-${sectionKey}`);
+                    if (!dropdown) return;
+
+                    const history = sectionHistory[sectionKey];
+
+                    if (history.length === 0) {
+                        dropdown.innerHTML = '<div class="history-item" style="color: var(--text-secondary);">No previous versions</div>';
+                        return;
+                    }
+
+                    dropdown.innerHTML = history.map((version, index) => {
+                        const isCurrent = index === 0;
+                        return `
+                    <div class="history-item" data-index="${index}">
+                        <div class="history-item-title">${isCurrent ? 'Current' : `Version ${history.length - index}`}</div>
+                        <div class="history-item-time">${version.timeString}</div>
+                    </div>
+                `;
+                    }).join('');
+
+                    // Add click handlers
+                    dropdown.querySelectorAll('.history-item').forEach(item => {
+                        const index = parseInt(item.getAttribute('data-index'));
+                        if (!isNaN(index)) {
+                            item.addEventListener('click', () => {
+                                restoreVersion(sectionKey, index);
+                                dropdown.classList.remove('active');
+                            });
+                        }
+                    });
+                }
+
+                // Restore version from history
+                function restoreVersion(sectionKey, index) {
+                    const history = sectionHistory[sectionKey];
+                    if (!history || !history[index]) return;
+
+                    const version = history[index];
+                    vslSections[sectionKey].value = version.content;
+                    autoResizeTextarea(vslSections[sectionKey]);
+
+                    // Move restored version to top
+                    sectionHistory[sectionKey].splice(index, 1);
+                    sectionHistory[sectionKey].unshift(version);
+                    updateHistoryDropdown(sectionKey);
+                    saveHistoryToStorage();
+
+                    hasUnsavedChanges = true;
+                    updateStatus('unsaved');
+                    saveToBrowserStorage();
+
+                    showNotification('Version restored', 'success');
+                }
+
+                // Save history to localStorage
+                function saveHistoryToStorage() {
+                    try {
+                        localStorage.setItem('vsl_section_history', JSON.stringify(sectionHistory));
+                    } catch (error) {
+                        console.error('Error saving history:', error);
+                    }
+                }
+
+                // Load history from localStorage
+                function loadHistoryFromStorage() {
+                    try {
+                        const saved = localStorage.getItem('vsl_section_history');
+                        if (saved) {
+                            const loaded = JSON.parse(saved);
+                            Object.keys(sectionHistory).forEach(key => {
+                                if (loaded[key]) {
+                                    sectionHistory[key] = loaded[key];
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error loading history:', error);
+                    }
+                }
+
+                // Generate individual section
+                async function generateSection(sectionKey) {
+                    const apiKey = apiKeyInput.value.trim();
+                    if (!apiKey) {
+                        showNotification('Please enter your OpenAI API key in Settings', 'error');
+                        settingsModal.classList.add('active');
+                        return;
+                    }
+
+                    const productName = productNameInput.value.trim();
+                    const targetAudience = targetAudienceInput.value.trim();
+                    const coreProblem = coreProblemInput.value.trim();
+                    const desiredOutcome = desiredOutcomeInput.value.trim();
+                    const mechanism = mechanismInput.value.trim();
+                    const hookIdea = hookIdeaInput.value.trim();
+                    const additionalInfo = additionalInfoInput.value.trim();
+
+                    if (!productName || !targetAudience || !coreProblem || !desiredOutcome) {
+                        showNotification('Please fill in all required project information fields', 'error');
+                        return;
+                    }
+
+                    // Save current version to history before generating
+                    const currentContent = vslSections[sectionKey].value.trim();
+                    if (currentContent) {
+                        saveVersionToHistory(sectionKey, currentContent);
+                    }
+
+                    if (isGenerating) return;
+                    isGenerating = true;
+
+                    const sectionNames = {
+                        bigPromise: '1. BIG PROMISE – Hyper-Specific (First 3 Mins)',
+                        authorityTransfer: '2. AUTHORITY TRANSFER – Not Ego',
+                        vehicleReveal: '3. VEHICLE REVEAL – The New Mechanism',
+                        futurePacing: '4. FUTURE PACING – Mental Movie',
+                        patternInterrupt: '5. PATTERN INTERRUPT – Teaching (Incomplete)',
+                        softOffer: '6. SOFT OFFER BRIDGE – Not a Pitch',
+                        offerStack: '7. OFFER STACK – Identity Shift',
+                        riskCollapse: '8. RISK COLLAPSE – Kill Fear',
+                        urgency: '9. URGENCY – Moral Scarcity'
+                    };
+
+                    const sectionName = sectionNames[sectionKey];
+                    const sectionGenerateBtn = document.querySelector(`[data-section="${sectionKey}"]`);
+                    const originalText = sectionGenerateBtn.innerHTML;
+                    sectionGenerateBtn.disabled = true;
+                    sectionGenerateBtn.innerHTML = '<span class="loading"></span>';
+
+                    const sectionDescriptions = {
+                        bigPromise: `1. BIG PROMISE – Hyper-Specific (First 3 Mins)
+One outcome. One method. One time frame.
+"How to [result] without [pain] even if [objection]."
+Forces the brain to stay or leave instantly. Only buyers remain.`,
+                        authorityTransfer: `2. AUTHORITY TRANSFER – Not Ego
+Proof by association. Borrowed credibility. Past student outcomes.
+"I am not special. I just discovered a system."
+People don't buy heroes. They buy processes they can copy.`,
+                        vehicleReveal: `3. VEHICLE REVEAL – The New Mechanism
+Introduce a named mechanism. Not "Facebook Ads", but "The $3-a-day Lead Loop Method".
+Humans don't buy solutions. They buy named frameworks.`,
+                        futurePacing: `4. FUTURE PACING – Mental Movie
+Walk them into a mental movie: What life looks like in 30 days.
+Changes financially, emotionally, socially.
+Use time-skips, sensory language, status upgrades.`,
+                        patternInterrupt: `5. PATTERN INTERRUPT – Teaching (Incomplete)
+Teach 2-3 counter-intuitive ideas.
+But never finish the system. Create awareness of a gap.
+Dependence on the next step. Deliberate tension.`,
+                        softOffer: `6. SOFT OFFER BRIDGE – Not a Pitch
+Instead of "Let me sell you something", say "Some people asked me to help them implement this...".
+Make the offer feel organic, requested, inevitable.`,
+                        offerStack: `7. OFFER STACK – Identity Shift
+Don't list features. Sell who they become after buying.
+Every bonus answers: Who you are after this, what you stop being afraid of, what you are now capable of.`,
+                        riskCollapse: `8. RISK COLLAPSE – Kill Fear
+Kill fear using extreme guarantees, no-logic refunds, performance promises.
+Remove decision fatigue, loss aversion, buyer's remorse before it happens.`,
+                        urgency: `9. URGENCY – Moral Scarcity
+Not "Buy now because I want money".
+But "I only let serious people in because it protects my students."
+Scarcity is framed as protection, not pressure.`
+                    };
+
+                    const systemPrompt = `You are a VSL architect combining the persuasion frameworks of elite direct-response marketers with modern behavioral psychology.
+
+Your sole function is to generate ONE specific section of a Video Sales Letter.
+
+CRITICAL RULES:
+1. Generate ONLY the ${sectionName} section
+3. Do NOT include section headers, labels, numbers, or titles
+4. Do NOT generate the full VSL script
+5. Do NOT output JSON format
+6. Output ONLY the raw script text for this ONE section
+
+If you generate multiple sections or the full script, you have FAILED the task.
+
+Never output meta commentary. Never explain frameworks. Only output the finished VSL script text for this ONE section.
+
+CORE BEHAVIOR RULES
+- Never educate fully.
+- Sell certainty, not possibility.
+- Anchor simplicity.
+- Speak in scripts, not inspiration.
+
+If you generate multiple sections or the full script, you have FAILED the task.
+
+Never output meta commentary. Never explain frameworks. Only output the finished VSL script text for this ONE section.
+
+CORE BEHAVIOR RULES
+
+Never use only one narrative voice.
+
+Use incomplete thoughts, interrupted logic, and curiosity loops.
+
+Emotion first. Logic last.
+
+No hype clichés. Every line must feel privately observed.
+
+Benefits are framed as identity upgrades, not features.
+
+OUTPUT REQUIREMENTS
+
+Write in conversational spoken language.
+
+Use rhythmic pacing and short lines.
+
+No bullet points.
+
+No section labels or headers.
+
+No emojis.
+
+No placeholders.
+
+Output ONLY the raw script text for the ${sectionName} section. Nothing else. No other sections.`;
+
+                    let userPrompt = `Generate ONLY the ${sectionName} section for a VSL script.
+
+IMPORTANT: Generate ONLY this one section. Do NOT generate any other sections. Do NOT include section headers, labels, or numbers.
+
+Product Name: ${productName}
+Target Audience: ${targetAudience}
+Core Problem: ${coreProblem}
+Desired Outcome: ${desiredOutcome}
+
+Section Requirements:
+${sectionDescriptions[sectionKey]}`;
+
+                    // Include current section content if it exists
+                    if (currentContent) {
+                        userPrompt += `\n\nCurrent version of this section (use this as reference and improve/regenerate based on it):\n${currentContent}`;
+                    }
+
+                    if (mechanism && (sectionKey === 'bigPromise' || sectionKey === 'vehicleReveal' || sectionKey === 'authorityTransfer')) {
+                        userPrompt += `\n\nMechanism: ${mechanism}`;
+                    }
+
+                    if (hookIdea && sectionKey === 'bigPromise') {
+                        userPrompt += `\n\nSpecific Hook Idea: ${hookIdea}`;
+                    }
+
+                    if (additionalInfo) {
+                        userPrompt += `\n\nAdditional Information/Ideas: ${additionalInfo}`;
+                    }
+
+                    userPrompt += `\n\nCRITICAL INSTRUCTIONS:
+- Output ONLY the raw script text for the ${sectionName} section
+- Do NOT include any section headers, labels, or numbers
+- Do NOT generate any other sections (BIG PROMISE, AUTHORITY TRANSFER, VEHICLE REVEAL, FUTURE PACING, PATTERN INTERRUPT, SOFT OFFER, OFFER STACK, RISK COLLAPSE, URGENCY)
+- Do NOT output JSON format
+- Start directly with the script text
+- End when this section is complete
+- If you include any other sections, you have FAILED the task
+
+Output now:`;
+
+                    try {
+                        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: 'gpt-4',
+                                messages: [
+                                    { role: 'system', content: systemPrompt },
+                                    { role: 'user', content: userPrompt }
+                                ],
+                                temperature: 0.8,
+                                max_tokens: 2000
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error?.message || 'Failed to generate section');
+                        }
+
+                        const data = await response.json();
+                        let content = data.choices[0].message.content.trim();
+
+                        // First, check if this looks like JSON with multiple sections
+                        let cleanContent = content;
+                        try {
+                            // Try to parse as JSON first
+                            const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+                            if (jsonMatch) {
+                                const parsed = JSON.parse(jsonMatch[1]);
+                                // Extract only the requested section from JSON
+                                const sectionKeyMap = {
+                                    bigPromise: 'bigPromise',
+                                    authorityTransfer: 'authorityTransfer',
+                                    vehicleReveal: 'vehicleReveal',
+                                    futurePacing: 'futurePacing',
+                                    patternInterrupt: 'patternInterrupt',
+                                    softOffer: 'softOffer',
+                                    offerStack: 'offerStack',
+                                    riskCollapse: 'riskCollapse',
+                                    urgency: 'urgency'
+                                };
+                                if (parsed[sectionKeyMap[sectionKey]]) {
+                                    cleanContent = parsed[sectionKeyMap[sectionKey]];
+                                } else {
+                                    // If JSON doesn't have the key, use the original content
+                                    cleanContent = content;
+                                }
+                            } else if (content.trim().startsWith('{')) {
+                                const parsed = JSON.parse(content);
+                                const sectionKeyMap = {
+                                    bigPromise: 'bigPromise',
+                                    authorityTransfer: 'authorityTransfer',
+                                    vehicleReveal: 'vehicleReveal',
+                                    futurePacing: 'futurePacing',
+                                    patternInterrupt: 'patternInterrupt',
+                                    softOffer: 'softOffer',
+                                    offerStack: 'offerStack',
+                                    riskCollapse: 'riskCollapse',
+                                    urgency: 'urgency'
+                                };
+                                if (parsed[sectionKeyMap[sectionKey]]) {
+                                    cleanContent = parsed[sectionKeyMap[sectionKey]];
+                                }
+                            }
+                        } catch (e) {
+                            // Not JSON, continue with text extraction
+                        }
+
+                        // Clean up the content (remove any section labels, headers, or formatting)
+                        cleanContent = cleanContent
+                            // Remove markdown code blocks
+                            .replace(/^```[a-z]*\n?/i, '')
+                            .replace(/\n?```$/i, '')
+                            // Remove quotes if the entire content is quoted
+                            .replace(/^["']([^"']*)["']$/s, '$1')
+                            .trim();
+
+                        // Check if content contains multiple section markers - if so, extract only the requested one
+                        const sectionMarkers = {
+                            bigPromise: /(?:^|\n)(?:1\.|BIG PROMISE|Big Promise)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:2\.|AUTHORITY|Authority)|$)/is,
+                            authorityTransfer: /(?:^|\n)(?:2\.|AUTHORITY|Authority)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:3\.|VEHICLE|Vehicle)|$)/is,
+                            vehicleReveal: /(?:^|\n)(?:3\.|VEHICLE|Vehicle)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:4\.|FUTURE|Future)|$)/is,
+                            futurePacing: /(?:^|\n)(?:4\.|FUTURE|Future)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:5\.|PATTERN|Pattern)|$)/is,
+                            patternInterrupt: /(?:^|\n)(?:5\.|PATTERN|Pattern)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:6\.|SOFT|Soft)|$)/is,
+                            softOffer: /(?:^|\n)(?:6\.|SOFT|Soft)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:7\.|OFFER STACK|Offer Stack)|$)/is,
+                            offerStack: /(?:^|\n)(?:7\.|OFFER STACK|Offer Stack)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:8\.|RISK|Risk)|$)/is,
+                            riskCollapse: /(?:^|\n)(?:8\.|RISK|Risk)[\s:–\-]*[\n\r]*(.*?)(?=(?:\n|^)(?:9\.|URGENCY|Urgency)|$)/is,
+                            urgency: /(?:^|\n)(?:9\.|URGENCY|Urgency)[\s:–\-]*[\n\r]*(.*?)$/is
+                        };
+
+                        // Check if multiple sections are present by counting section markers
+                        const allSectionPattern = /(?:^|\n)(?:[1-9]\.|BIG PROMISE|AUTHORITY|VEHICLE|FUTURE|PATTERN|SOFT|OFFER STACK|RISK|URGENCY)/gi;
+                        const sectionMatches = cleanContent.match(allSectionPattern);
+
+                        // Final check: if content is suspiciously long or contains multiple section markers, take only first part
+                        if (content.length > 5000 || (sectionMatches && sectionMatches.length > 1)) {
+                            // If we detect multiple sections or very long content, be aggressive with extractions
+                            if (sectionMarkers[sectionKey] && sectionMarkers[sectionKey].test(cleanContent)) {
+                                const match = cleanContent.match(sectionMarkers[sectionKey]);
+                                if (match && match[1]) {
+                                    cleanContent = match[1].trim();
+                                }
+                            }
+                        }
+
+                        // Final cleanup: remove any remaining markers or weird headers
+                        cleanContent = cleanContent
+                            .replace(/^[1-9]\.\s+/g, '') // Remove starting numbers like "1. "
+                            .replace(/^(BIG PROMISE|AUTHORITY|VEHICLE|FUTURE|PATTERN|SOFT|OFFER STACK|RISK|URGENCY)[\s:–\-]*[\n\r]*/i, '')
+                            .trim();
+
+                        // Format with line breaks after sentences
+                        vslSections[sectionKey].value = formatTextWithLineBreaks(cleanContent);
+                        autoResizeTextarea(vslSections[sectionKey]);
+
+                        hasUnsavedChanges = true;
+                        updateStatus('unsaved');
+                        saveToBrowserStorage();
+                        showNotification(`${sectionName} generated successfully!`, 'success');
+
+                    } catch (error) {
+                        console.error('Error generating section:', error);
+                        showNotification('Error generating section: ' + error.message, 'error');
+                    } finally {
+                        isGenerating = false;
+                        sectionGenerateBtn.disabled = false;
+                        sectionGenerateBtn.innerHTML = originalText;
+                    }
+                }
+
+                // Generate VSL script
+                async function generateVSL() {
+                    const apiKey = apiKeyInput.value.trim();
+                    if (!apiKey) {
+                        showNotification('Please enter your OpenAI API key', 'error');
+                        return;
+                    }
+
+                    const productName = productNameInput.value.trim();
+                    const targetAudience = targetAudienceInput.value.trim();
+                    const coreProblem = coreProblemInput.value.trim();
+                    const desiredOutcome = desiredOutcomeInput.value.trim();
+                    const mechanism = mechanismInput.value.trim();
+                    const hookIdea = hookIdeaInput.value.trim();
+                    const additionalInfo = additionalInfoInput.value.trim();
+
+                    if (!productName || !targetAudience || !coreProblem || !desiredOutcome) {
+                        showNotification('Please fill in all required project information fields', 'error');
+                        return;
+                    }
+
+                    if (isGenerating) return;
+                    isGenerating = true;
+                    const mainGenerateBtn = document.getElementById('generateBtn');
+                    mainGenerateBtn.disabled = true;
+                    mainGenerateBtn.innerHTML = '<span class="loading"></span> Generating...';
+
+                    const systemPrompt = `You are a VSL architect combining the persuasion frameworks of elite direct-response marketers with modern behavioral psychology.
+
+Your sole function is to generate high-converting Video Sales Letters using the structure:
+
+Big Promise → Authority Transfer → Vehicle Reveal → Future Pacing → Pattern Interrupt → Soft Offer → Offer Stack → Risk Collapse → Urgency
+
+Never output meta commentary. Never explain frameworks. Only output the finished VSL script.
+
+CORE BEHAVIOR RULES
+
+Never use only one narrative voice.
+
+Use incomplete thoughts, interrupted logic, and curiosity loops in the first 60%.
+
+Close every open loop near the end before the offer is introduced.
+
+Emotion first. Logic last.
+
+No hype clichés. Every line must feel privately observed.
+
+Benefits are framed as identity upgrades, not features.
+
+VSL STRUCTURE
+1. BIG PROMISE – Hyper-Specific (First 3 Mins)
+One outcome. One method. One time frame.
+"How to [result] without [pain] even if [objection]."
+Forces the brain to stay or leave instantly. Only buyers remain.
+
+2. AUTHORITY TRANSFER – Not Ego
+Proof by association. Borrowed credibility. Past student outcomes.
+"I am not special. I just discovered a system."
+People don't buy heroes. They buy processes they can copy.
+
+3. VEHICLE REVEAL – The New Mechanism
+Introduce a named mechanism. Not "Facebook Ads", but "The $3-a-day Lead Loop Method".
+Humans don't buy solutions. They buy named frameworks.
+
+4. FUTURE PACING – Mental Movie
+Walk them into a mental movie: What life looks like in 30 days.
+Changes financially, emotionally, socially.
+Use time-skips, sensory language, status upgrades.
+
+5. PATTERN INTERRUPT – Teaching (Incomplete)
+Teach 2-3 counter-intuitive ideas.
+But never finish the system. Create awareness of a gap.
+Dependence on the next step. Deliberate tension.
+
+6. SOFT OFFER BRIDGE – Not a Pitch
+Instead of "Let me sell you something", say "Some people asked me to help them implement this...".
+Make the offer feel organic, requested, inevitable.
+
+7. OFFER STACK – Identity Shift
+Don't list features. Sell who they become after buying.
+Every bonus answers: Who you are after this, what you stop being afraid of, what you are now capable of.
+
+8. RISK COLLAPSE – Kill Fear
+Kill fear using extreme guarantees, no-logic refunds, performance promises.
+Remove decision fatigue, loss aversion, buyer's remorse before it happens.
+
+9. URGENCY – Moral Scarcity
+Not "Buy now because I want money".
+But "I only let serious people in because it protects my students."
+Scarcity is framed as protection, not pressure.
+
+OUTPUT REQUIREMENTS
+
+Write in conversational spoken language.
+
+Use rhythmic pacing and short lines.
+
+No bullet points.
+
+No section labels.
+
+No emojis.
+
+No placeholders.
+
+Output the VSL script in JSON format with these exact keys: bigPromise, authorityTransfer, vehicleReveal, futurePacing, patternInterrupt, softOffer, offerStack, riskCollapse, urgency. Each key should contain only the script text for that section, nothing else.`;
+
+                    let userPrompt = `Generate a VSL script for:
+
+Product Name: ${productName}
+Target Audience: ${targetAudience}
+Core Problem: ${coreProblem}
+Desired Outcome: ${desiredOutcome}`;
+
+                    if (mechanism) {
+                        userPrompt += `\n\nMechanism: ${mechanism}`;
+                    }
+
+                    if (hookIdea) {
+                        userPrompt += `\n\nSpecific Hook Idea: ${hookIdea}`;
+                    }
+
+                    if (additionalInfo) {
+                        userPrompt += `\n\nAdditional Information/Ideas: ${additionalInfo}`;
+                    }
+
+                    userPrompt += `\n\nOutput the complete VSL script in JSON format with keys: bigPromise, authorityTransfer, vehicleReveal, futurePacing, patternInterrupt, softOffer, offerStack, riskCollapse, urgency.`;
+
+                    try {
+                        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: 'gpt-4',
+                                messages: [
+                                    { role: 'system', content: systemPrompt },
+                                    { role: 'user', content: userPrompt }
+                                ],
+                                temperature: 0.8,
+                                max_tokens: 4000
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error?.message || 'Failed to generate VSL script');
+                        }
+
+                        const data = await response.json();
+                        const content = data.choices[0].message.content.trim();
+
+                        // Try to parse JSON from the response
+                        let vslData;
+                        try {
+                            // Extract JSON if it's wrapped in markdown code blocks
+                            const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+                            if (jsonMatch) {
+                                vslData = JSON.parse(jsonMatch[1]);
+                            } else {
+                                vslData = JSON.parse(content);
+                            }
+                        } catch (parseError) {
+                            // If JSON parsing fails, try to extract sections manually
+                            console.warn('Failed to parse JSON, attempting manual extraction');
+                            vslData = extractSectionsFromText(content);
+                        }
+
+                        // Populate VSL sections with formatted text (line breaks after sentences)
+                        if (vslData.bigPromise) {
+                            vslSections.bigPromise.value = formatTextWithLineBreaks(vslData.bigPromise);
+                            autoResizeTextarea(vslSections.bigPromise);
+                        }
+                        if (vslData.authorityTransfer) {
+                            vslSections.authorityTransfer.value = formatTextWithLineBreaks(vslData.authorityTransfer);
+                            autoResizeTextarea(vslSections.authorityTransfer);
+                        }
+                        if (vslData.vehicleReveal) {
+                            vslSections.vehicleReveal.value = formatTextWithLineBreaks(vslData.vehicleReveal);
+                            autoResizeTextarea(vslSections.vehicleReveal);
+                        }
+                        if (vslData.futurePacing) {
+                            vslSections.futurePacing.value = formatTextWithLineBreaks(vslData.futurePacing);
+                            autoResizeTextarea(vslSections.futurePacing);
+                        }
+                        if (vslData.patternInterrupt) {
+                            vslSections.patternInterrupt.value = formatTextWithLineBreaks(vslData.patternInterrupt);
+                            autoResizeTextarea(vslSections.patternInterrupt);
+                        }
+                        if (vslData.softOffer) {
+                            vslSections.softOffer.value = formatTextWithLineBreaks(vslData.softOffer);
+                            autoResizeTextarea(vslSections.softOffer);
+                        }
+                        if (vslData.offerStack) {
+                            vslSections.offerStack.value = formatTextWithLineBreaks(vslData.offerStack);
+                            autoResizeTextarea(vslSections.offerStack);
+                        }
+                        if (vslData.riskCollapse) {
+                            vslSections.riskCollapse.value = formatTextWithLineBreaks(vslData.riskCollapse);
+                            autoResizeTextarea(vslSections.riskCollapse);
+                        }
+                        if (vslData.urgency) {
+                            vslSections.urgency.value = formatTextWithLineBreaks(vslData.urgency);
+                            autoResizeTextarea(vslSections.urgency);
+                        }
+
+                        hasUnsavedChanges = true;
+                        updateStatus('unsaved');
+                        // Save to browser storage after generation
+                        saveToBrowserStorage();
+                        showNotification('VSL script generated successfully!', 'success');
+
+                    } catch (error) {
+                        console.error('Error generating VSL:', error);
+                        showNotification('Error generating VSL: ' + error.message, 'error');
+                    } finally {
+                        isGenerating = false;
+                        const mainGenerateBtn = document.getElementById('generateBtn');
+                        mainGenerateBtn.disabled = false;
+                        mainGenerateBtn.innerHTML = '<span>Generate All Sections</span>';
+                    }
+                }
+
+                // Extract sections from text if JSON parsing fails
+                function extractSectionsFromText(text) {
+                    const sections = {
+                        bigPromise: '',
+                        authorityTransfer: '',
+                        vehicleReveal: '',
+                        futurePacing: '',
+                        patternInterrupt: '',
+                        softOffer: '',
+                        offerStack: '',
+                        riskCollapse: '',
+                        urgency: ''
+                    };
+
+                    // Try to find section markers
+                    const sectionPatterns = {
+                        bigPromise: /(?:BIG PROMISE|1\.|Big Promise)[\s:]*[\n\r]+(.*?)(?=(?:AUTHORITY|2\.|Authority)|$)/is,
+                        authorityTransfer: /(?:AUTHORITY|2\.|Authority)[\s:]*[\n\r]+(.*?)(?=(?:VEHICLE|3\.|Vehicle)|$)/is,
+                        vehicleReveal: /(?:VEHICLE|3\.|Vehicle)[\s:]*[\n\r]+(.*?)(?=(?:FUTURE|4\.|Future)|$)/is,
+                        futurePacing: /(?:FUTURE|4\.|Future)[\s:]*[\n\r]+(.*?)(?=(?:PATTERN|5\.|Pattern)|$)/is,
+                        patternInterrupt: /(?:PATTERN|5\.|Pattern)[\s:]*[\n\r]+(.*?)(?=(?:SOFT|6\.|Soft)|$)/is,
+                        softOffer: /(?:SOFT|6\.|Soft)[\s:]*[\n\r]+(.*?)(?=(?:OFFER STACK|7\.|Offer Stack)|$)/is,
+                        offerStack: /(?:OFFER STACK|7\.|Offer Stack)[\s:]*[\n\r]+(.*?)(?=(?:RISK|8\.|Risk)|$)/is,
+                        riskCollapse: /(?:RISK|8\.|Risk)[\s:]*[\n\r]+(.*?)(?=(?:URGENCY|9\.|Urgency)|$)/is,
+                        urgency: /(?:URGENCY|9\.|Urgency)[\s:]*[\n\r]+(.*?)$/is
+                    };
+
+                    for (const [key, pattern] of Object.entries(sectionPatterns)) {
+                        const match = text.match(pattern);
+                        if (match && match[1]) {
+                            sections[key] = match[1].trim();
+                        }
+                    }
+
+                    return sections;
+                }
+
+                // Generate 10 hooks
+                async function generate10Hooks() {
+                    const apiKey = apiKeyInput.value.trim();
+                    if (!apiKey) {
+                        showNotification('Please enter your OpenAI API key', 'error');
+                        return;
+                    }
+
+                    const productName = productNameInput.value.trim();
+                    const targetAudience = targetAudienceInput.value.trim();
+                    const coreProblem = coreProblemInput.value.trim();
+                    const desiredOutcome = desiredOutcomeInput.value.trim();
+                    const mechanism = mechanismInput.value.trim();
+                    const hookIdea = hookIdeaInput.value.trim();
+
+                    if (!productName || !targetAudience || !coreProblem) {
+                        showNotification('Please fill in required project info first', 'error');
+                        return;
+                    }
+
+                    const generateHooksBtn = document.getElementById('generateHooksBtn');
+                    const originalText = generateHooksBtn.innerHTML;
+                    generateHooksBtn.disabled = true;
+                    generateHooksBtn.innerHTML = '<span class="loading"></span> Generating Hooks...';
+
+                    const systemPrompt = `You are a world-class advertiser specializing in Jason Fladlien's "Hyper-Specific Big Promise" framework for VSLs.
+
+Your goal is to generate 10 unique, invasive, and accurate hooks that immediately grab attention in the first 3 minutes.
+
+CONSTRAINTS FOR EVERY HOOK:
+1. ONE Outcome: Be hyper-specific about the result.
+2. ONE Method: Reference a unique mechanism or process.
+3. ONE Time Frame: State exactly how long it takes.
+4. "The Filter": The promise must be so specific that it forces the brain to stay or leave instantly. Only buyers remain.
+5. Formula (use as baseline): "How to [Result] without [Pain] even if [Objection] in [Timeframe]."
+
+Rule: No hype cliches. No greetings. No placeholders. No meta commentary.
+Output ONLY a JSON array of 10 strings.`;
+
+                    let userPrompt = `Generate 10 specific VSL hooks for:
+Product: ${productName}
+Audience: ${targetAudience}
+Problem: ${coreProblem}
+Desired Outcome: ${desiredOutcome}`;
+
+                    if (mechanism) userPrompt += `\nMechanism: ${mechanism}`;
+                    if (hookIdea) userPrompt += `\nSeed Idea/Concept: ${hookIdea}`;
+
+                    userPrompt += `\n\nOutput only a JSON array: ["hook 1", "hook 2", ...]`;
+
+                    try {
+                        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: 'gpt-4',
+                                messages: [
+                                    { role: 'system', content: systemPrompt },
+                                    { role: 'user', content: userPrompt }
+                                ],
+                                temperature: 0.9
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('API request failed');
+
+                        const data = await response.json();
+                        let hooks = [];
+                        try {
+                            const content = data.choices[0].message.content.trim();
+                            const jsonMatch = content.match(/\[[\s\S]*\]/);
+                            hooks = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+                        } catch (e) {
+                            console.error('Failed to parse hooks JSON', e);
+                            throw new Error('Failed to parse hooks from AI response');
+                        }
+
+                        if (!Array.isArray(hooks)) throw new Error('AI did not return an array of hooks');
+
+                        // Display hooks in modal
+                        const hookList = document.getElementById('hookList');
+                        hookList.innerHTML = '';
+                        hooks.forEach((hook, index) => {
+                            const item = document.createElement('div');
+                            item.className = 'hook-item';
+                            item.innerHTML = `
+                                <div class="hook-text">${hook}</div>
+                                <div class="hook-actions">
+                                    <button class="btn btn-primary btn-small" onclick="useHook('${hook.replace(/'/g, "\\'")}')">Use</button>
+                                </div>
+                            `;
+                            hookList.appendChild(item);
+                        });
+
+                        document.getElementById('hookModal').classList.add('active');
+
+                    } catch (error) {
+                        console.error('Error generating hooks:', error);
+                        showNotification('Error: ' + error.message, 'error');
+                    } finally {
+                        generateHooksBtn.disabled = false;
+                        generateHooksBtn.innerHTML = originalText;
+                    }
+                }
+
+                // Use selected hook
+                window.useHook = function (hookText) {
+                    hookIdeaInput.value = hookText;
+                    document.getElementById('hookModal').classList.remove('active');
+                    showNotification('Hook updated!', 'success');
+                    autoResizeTextarea(hookIdeaInput);
+                    // Also trigger generate for Big Promise automatically?
+                    // generateSection('bigPromise');
+                };
+
+                // Copy full script to clipboard (raw text only)
+                async function copyFullScriptToClipboard() {
+                    try {
+                        let fullScript = "";
+                        const sectionsOrder = [
+                            'bigPromise', 'authorityTransfer', 'vehicleReveal',
+                            'futurePacing', 'patternInterrupt', 'softOffer',
+                            'offerStack', 'riskCollapse', 'urgency'
+                        ];
+
+                        sectionsOrder.forEach(key => {
+                            const content = vslSections[key].value.trim();
+                            if (content) {
+                                fullScript += content + "\n\n";
+                            }
+                        });
+
+                        if (!fullScript.trim()) {
+                            showNotification('Script is empty. Generate some sections first!', 'error');
+                            return;
+                        }
+
+                        await navigator.clipboard.writeText(fullScript.trim());
+                        showNotification('Full script copied to clipboard!', 'success');
+                    } catch (err) {
+                        console.error('Failed to copy script:', err);
+                        showNotification('Failed to copy script', 'error');
+                    }
+                }
+
+                // Show notification
+                function showNotification(message, type = 'success') {
+                    const notification = document.createElement('div');
+                    notification.className = `notification ${type}`;
+                    notification.textContent = message;
+                    document.body.appendChild(notification);
+
+                    setTimeout(() => {
+                        notification.style.animation = 'slideIn 0.3s ease-out reverse';
+                        setTimeout(() => notification.remove(), 300);
+                    }, 3000);
+                }
+
+                // Export all VSL sections to clipboard
+                async function exportToClipboard() {
+                    const sectionNames = {
+                        bigPromise: '1. BIG PROMISE – Hyper-Specific (First 3 Mins)',
+                        authorityTransfer: '2. AUTHORITY TRANSFER – Not Ego',
+                        vehicleReveal: '3. VEHICLE REVEAL – The New Mechanism',
+                        futurePacing: '4. FUTURE PACING – Mental Movie',
+                        patternInterrupt: '5. PATTERN INTERRUPT – Teaching (Incomplete)',
+                        softOffer: '6. SOFT OFFER BRIDGE – Not a Pitch',
+                        offerStack: '7. OFFER STACK – Identity Shift',
+                        riskCollapse: '8. RISK COLLAPSE – Kill Fear',
+                        urgency: '9. URGENCY – Moral Scarcity'
+                    };
+
+                    let exportText = '';
+
+                    // Add project information if available
+                    const productName = productNameInput.value.trim();
+                    if (productName) {
+                        exportText += `PRODUCT: ${productName}\n\n`;
+                    }
+
+                    // Add each section
+                    Object.keys(sectionNames).forEach((key, index) => {
+                        const content = vslSections[key].value.trim();
+                        if (content) {
+                            exportText += `${index + 1}. ${sectionNames[key]}\n\n`;
+                            exportText += `${content}\n\n`;
+                            exportText += `${'='.repeat(60)}\n\n`;
+                        }
+                    });
+
+                    // Remove trailing separators
+                    exportText = exportText.trim();
+
+                    try {
+                        await navigator.clipboard.writeText(exportText);
+                        showNotification('VSL script copied to clipboard!', 'success');
+                    } catch (error) {
+                        console.error('Error copying to clipboard:', error);
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = exportText;
+                        textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        textArea.style.top = '-999999px';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            showNotification('VSL script copied to clipboard!', 'success');
+                        } catch (err) {
+                            showNotification('Failed to copy to clipboard. Please copy manually.', 'error');
+                        }
+                        document.body.removeChild(textArea);
+                    }
+                }
+
+                // Event listeners
+                generateBtn.addEventListener('click', generateVSL);
+                exportBtn.addEventListener('click', exportToClipboard);
+                document.getElementById('copyScriptBtn').addEventListener('click', copyFullScriptToClipboard);
+                document.getElementById('generateHooksBtn').addEventListener('click', generate10Hooks);
+                document.getElementById('closeHookModal').addEventListener('click', () => {
+                    document.getElementById('hookModal').classList.remove('active');
+                });
+
+                // Individual section generate buttons
+                document.querySelectorAll('[data-section]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const sectionKey = btn.getAttribute('data-section');
+                        generateSection(sectionKey);
+                    });
+                });
+
+                // History button click handlers
+                document.querySelectorAll('[data-history]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const sectionKey = btn.getAttribute('data-history');
+                        const dropdown = document.getElementById(`history-${sectionKey}`);
+                        if (dropdown) {
+                            // Close all other dropdowns
+                            document.querySelectorAll('.history-dropdown').forEach(d => {
+                                if (d !== dropdown) d.classList.remove('active');
+                            });
+                            dropdown.classList.toggle('active');
+                        }
+                    });
+                });
+
+                // Close dropdowns when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.history-btn')) {
+                        document.querySelectorAll('.history-dropdown').forEach(d => {
+                            d.classList.remove('active');
+                        });
+                    }
+                });
+
+                saveBtn.addEventListener('click', () => {
+                    if (currentFileHandle) {
+                        saveToFile(currentFileHandle);
+                    } else {
+                        saveModal.classList.add('active');
+                        saveFileNameInput.focus();
+                    }
+                });
+
+                loadBtn.addEventListener('click', loadFromFile);
+
+                confirmSaveBtn.addEventListener('click', async () => {
+                    const fileName = saveFileNameInput.value.trim();
+                    if (!fileName) {
+                        showNotification('Please enter a file name', 'error');
+                        return;
+                    }
+                    saveModal.classList.remove('active');
+                    await saveToFile(null);
+                    saveFileNameInput.value = '';
+                });
+
+                cancelSaveBtn.addEventListener('click', () => {
+                    saveModal.classList.remove('active');
+                    saveFileNameInput.value = '';
+                });
+
+                // Close modal on outside click
+                saveModal.addEventListener('click', (e) => {
+                    if (e.target === saveModal) {
+                        saveModal.classList.remove('active');
+                        saveFileNameInput.value = '';
+                    }
+                });
+
+                // Initialize auto-resize for all VSL section textareas
+                Object.values(vslSections).forEach(textarea => {
+                    // Auto-resize on input
+                    textarea.addEventListener('input', () => {
+                        autoResizeTextarea(textarea);
+                    });
+                });
+
+                // Initialize - Load from browser storage on page load
+                loadHistoryFromStorage();
+                loadFromBrowserStorage();
+                updateStatus('ready');
+
+                // Initialize history dropdowns
+                Object.keys(sectionHistory).forEach(sectionKey => {
+                    updateHistoryDropdown(sectionKey);
+                });
+
+                // Auto-resize all textareas after initialization
+                setTimeout(() => {
+                    Object.values(vslSections).forEach(textarea => {
+                        autoResizeTextarea(textarea);
+                    });
+                }, 100);
+            </script>
+</body>
+
+</html>

@@ -1,0 +1,83 @@
+.plan-mode {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  overflow: hidden;
+}
+
+.plan-header {
+  padding: 2rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.plan-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 0.5rem;
+}
+
+.plan-hint {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+.plan-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.plan-scenes {
+  width: 400px;
+  border-right: 1px solid #2a2a2a;
+  padding: 2rem;
+  overflow-y: auto;
+  background: #0a0a0a;
+}
+
+.plan-scene {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.scene-number {
+  font-size: 0.85rem;
+  color: #888;
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.scene-separator {
+  width: 1px;
+  height: 20px;
+  background: #2a2a2a;
+}
+
+.scene-text {
+  flex: 1;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.plan-textarea {
+  flex: 1;
+  padding: 2rem;
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.8;
+  resize: none;
+}
+
+.plan-textarea::placeholder {
+  color: #444;
+}
