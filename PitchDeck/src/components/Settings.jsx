@@ -107,6 +107,130 @@ function Settings({ settings, onUpdate, onClose }) {
                     <option value="Bebas Neue">Bebas Neue</option>
                   </select>
                 </div>
+                <div className="settings-field">
+                  <label className="settings-sub-section-title">Heading Sizes (rem)</label>
+                  <div className="settings-sub-fields">
+                    <div className="settings-sub-field">
+                      <label htmlFor="h1-size">H1 Size</label>
+                      <input
+                        id="h1-size"
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="0.1"
+                        value={localSettings.h1Size !== undefined ? localSettings.h1Size : 5}
+                        onChange={(e) => handleChange('h1Size', parseFloat(e.target.value) || 5)}
+                        className="settings-number-input"
+                      />
+                    </div>
+                    <div className="settings-sub-field">
+                      <label htmlFor="h2-size">H2 Size</label>
+                      <input
+                        id="h2-size"
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="0.1"
+                        value={localSettings.h2Size !== undefined ? localSettings.h2Size : 3.5}
+                        onChange={(e) => handleChange('h2Size', parseFloat(e.target.value) || 3.5)}
+                        className="settings-number-input"
+                      />
+                    </div>
+                    <div className="settings-sub-field">
+                      <label htmlFor="h3-size">H3 Size</label>
+                      <input
+                        id="h3-size"
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="0.1"
+                        value={localSettings.h3Size !== undefined ? localSettings.h3Size : 2.5}
+                        onChange={(e) => handleChange('h3Size', parseFloat(e.target.value) || 2.5)}
+                        className="settings-number-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-sub-section-title">Heading Fonts</label>
+                  <div className="settings-sub-fields">
+                    <div className="settings-sub-field">
+                      <label htmlFor="h1-font">H1 Font</label>
+                      <select
+                        id="h1-font"
+                        value={localSettings.h1FontFamily || localSettings.fontFamily || 'Inter'}
+                        onChange={(e) => handleChange('h1FontFamily', e.target.value)}
+                        className="settings-select"
+                      >
+                        <option value="Inter">Inter</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Lato">Lato</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Raleway">Raleway</option>
+                        <option value="Oswald">Oswald</option>
+                        <option value="Playfair Display">Playfair Display</option>
+                        <option value="Merriweather">Merriweather</option>
+                        <option value="Source Sans Pro">Source Sans Pro</option>
+                        <option value="Nunito">Nunito</option>
+                        <option value="Ubuntu">Ubuntu</option>
+                        <option value="Dancing Script">Dancing Script</option>
+                        <option value="Bebas Neue">Bebas Neue</option>
+                      </select>
+                    </div>
+                    <div className="settings-sub-field">
+                      <label htmlFor="h2-font">H2 Font</label>
+                      <select
+                        id="h2-font"
+                        value={localSettings.h2FontFamily || localSettings.fontFamily || 'Inter'}
+                        onChange={(e) => handleChange('h2FontFamily', e.target.value)}
+                        className="settings-select"
+                      >
+                        <option value="Inter">Inter</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Lato">Lato</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Raleway">Raleway</option>
+                        <option value="Oswald">Oswald</option>
+                        <option value="Playfair Display">Playfair Display</option>
+                        <option value="Merriweather">Merriweather</option>
+                        <option value="Source Sans Pro">Source Sans Pro</option>
+                        <option value="Nunito">Nunito</option>
+                        <option value="Ubuntu">Ubuntu</option>
+                        <option value="Dancing Script">Dancing Script</option>
+                        <option value="Bebas Neue">Bebas Neue</option>
+                      </select>
+                    </div>
+                    <div className="settings-sub-field">
+                      <label htmlFor="h3-font">H3 Font</label>
+                      <select
+                        id="h3-font"
+                        value={localSettings.h3FontFamily || localSettings.fontFamily || 'Inter'}
+                        onChange={(e) => handleChange('h3FontFamily', e.target.value)}
+                        className="settings-select"
+                      >
+                        <option value="Inter">Inter</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Lato">Lato</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Raleway">Raleway</option>
+                        <option value="Oswald">Oswald</option>
+                        <option value="Playfair Display">Playfair Display</option>
+                        <option value="Merriweather">Merriweather</option>
+                        <option value="Source Sans Pro">Source Sans Pro</option>
+                        <option value="Nunito">Nunito</option>
+                        <option value="Ubuntu">Ubuntu</option>
+                        <option value="Dancing Script">Dancing Script</option>
+                        <option value="Bebas Neue">Bebas Neue</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="settings-section">

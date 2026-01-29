@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
 
   // Get bullet points for current slide
@@ -24,12 +25,28 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const nextSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
       if (prevIndex < slides.length - 1) {
+        const nextIndex = prevIndex + 1
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
+        
+        // Phase 1: Fade out current slide
+        setTransitionPhase('fade-out')
+        
         setTimeout(() => {
-          setIsTransitioning(false)
-        }, 300)
-        return prevIndex + 1
+          // Phase 2: Change slide (while invisible)
+          setCurrentIndex(nextIndex)
+          
+          // Phase 3: Fade in new slide
+          setTimeout(() => {
+            setTransitionPhase('fade-in')
+            setTimeout(() => {
+              setIsTransitioning(false)
+              setTransitionPhase('idle')
+            }, 300) // Fade in duration
+          }, 50) // Small delay to ensure slide change
+        }, 300) // Fade out duration
+        
+        return prevIndex // Keep current index during fade-out
       }
       return prevIndex
     })
@@ -38,12 +55,28 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const prevSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
       if (prevIndex > 0) {
+        const nextIndex = prevIndex - 1
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
+        
+        // Phase 1: Fade out current slide
+        setTransitionPhase('fade-out')
+        
         setTimeout(() => {
-          setIsTransitioning(false)
-        }, 300)
-        return prevIndex - 1
+          // Phase 2: Change slide (while invisible)
+          setCurrentIndex(nextIndex)
+          
+          // Phase 3: Fade in new slide
+          setTimeout(() => {
+            setTransitionPhase('fade-in')
+            setTimeout(() => {
+              setIsTransitioning(false)
+              setTransitionPhase('idle')
+            }, 300) // Fade in duration
+          }, 50) // Small delay to ensure slide change
+        }, 300) // Fade out duration
+        
+        return prevIndex // Keep current index during fade-out
       }
       return prevIndex
     })
@@ -142,12 +175,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
-      <div className={`play-slide-container ${isTransitioning ? 'fade-out' : 'fade-in'}`}>
+      <div className={`play-slide-container ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'}`}>
         <Slide 
           slide={slides[currentIndex]} 
           backgroundColor={backgroundColor}
           textColor={textColor}
           fontFamily={fontFamily}
+          h1Size={h1Size}
+          h2Size={h2Size}
+          h3Size={h3Size}
+          h1FontFamily={h1FontFamily}
+          h2FontFamily={h2FontFamily}
+          h3FontFamily={h3FontFamily}
           isPlayMode={true}
           visibleBulletIndex={visibleBulletIndex}
           textDropShadow={textDropShadow}
@@ -161,25 +200,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           inlineBgPadding={inlineBgPadding}
         />
       </div>
-      <div className="play-controls">
-        <div className="play-slide-indicator">
-          {currentIndex + 1} / {slides.length}
+      {!showMenu && (
+        <div className="play-controls">
+          <div className="play-slide-indicator">
+            {currentIndex + 1} / {slides.length}
+          </div>
+          <button className="btn-exit" onClick={onExit}>Exit</button>
         </div>
-        {showMenu && (
-          <button className="btn-fullscreen" onClick={toggleFullscreen} title="Toggle Fullscreen">
-            {isFullscreen ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-              </svg>
-            )}
-          </button>
-        )}
-        <button className="btn-exit" onClick={onExit}>Exit</button>
-      </div>
+      )}
     </div>
   )
 }

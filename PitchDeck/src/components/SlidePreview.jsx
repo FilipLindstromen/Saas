@@ -3,7 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const fileInputRef = useRef(null)
@@ -126,6 +126,12 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     e.target.value = ''
   }
 
+  const handleRemoveImage = () => {
+    if (window.confirm('Remove image from this slide?')) {
+      onUpdate({ imageUrl: '' })
+    }
+  }
+
   return (
     <div className="slide-preview">
       <div className="preview-header">
@@ -173,6 +179,22 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             />
             <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0) * 100)}%</span>
           </div>
+          {slide.imageUrl && (
+            <div className="gradient-control">
+              <label htmlFor="slide-image-scale">Scale:</label>
+              <input
+                id="slide-image-scale"
+                type="range"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
+                onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
+                className="gradient-slider"
+              />
+              <span className="gradient-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -226,16 +248,29 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Select Images'}</span>
           </button>
           {slide.imageUrl && (
-            <button
-              className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
-              onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
-              title="Flip Image Horizontally"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
-              </svg>
-              <span className="btn-tooltip">Flip Image</span>
-            </button>
+            <>
+              <button
+                className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
+                onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
+                title="Flip Image Horizontally"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                </svg>
+                <span className="btn-tooltip">Flip Image</span>
+              </button>
+              <button
+                className="btn-icon btn-remove-image"
+                onClick={handleRemoveImage}
+                title="Remove Image"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                <span className="btn-tooltip">Remove Image</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -245,6 +280,12 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           backgroundColor={backgroundColor} 
           textColor={textColor} 
           fontFamily={fontFamily}
+          h1Size={h1Size}
+          h2Size={h2Size}
+          h3Size={h3Size}
+          h1FontFamily={h1FontFamily}
+          h2FontFamily={h2FontFamily}
+          h3FontFamily={h3FontFamily}
           textDropShadow={textDropShadow}
           shadowBlur={shadowBlur}
           shadowOffsetX={shadowOffsetX}
@@ -254,6 +295,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           inlineBgColor={inlineBgColor}
           inlineBgOpacity={inlineBgOpacity}
           inlineBgPadding={inlineBgPadding}
+          onUpdate={onUpdate}
         />
       </div>
       <ImagePicker
