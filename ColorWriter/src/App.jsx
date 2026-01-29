@@ -6,11 +6,13 @@ import TabBar from './components/TabBar';
 import SettingsModal from './components/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
+import ThreeKeyIngredientsModal from './components/ThreeKeyIngredientsModal';
+import ThreeRulesModal from './components/ThreeRulesModal';
 import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
 import BigIdeaModal from './components/BigIdeaModal';
 import WeirdStoriesModal from './components/WeirdStoriesModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas } from './services';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules } from './services';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
@@ -144,6 +146,8 @@ function App() {
 
   const [feedbackData, setFeedbackData] = useState(null);
   const [balanceData, setBalanceData] = useState(null);
+  const [threeKeyIngredientsData, setThreeKeyIngredientsData] = useState(null);
+  const [threeRulesData, setThreeRulesData] = useState(null);
   const [isImproving, setIsImproving] = useState(false);
 
   // Conversion Metrics State
@@ -152,6 +156,9 @@ function App() {
   const [analyzeLoading, setAnalyzeLoading] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [threeKeyIngredientsLoading, setThreeKeyIngredientsLoading] = useState(false);
+  const [threeRulesLoading, setThreeRulesLoading] = useState(false);
+  const [isImprovingThreeRules, setIsImprovingThreeRules] = useState(false);
   const [headerSuggestions, setHeaderSuggestions] = useState(null);
   const [bigIdea, setBigIdea] = usePersistentState('cw_bigIdea', '');
   const [bigIdeaSuggestions, setBigIdeaSuggestions] = useState(null);
@@ -226,6 +233,49 @@ function App() {
       alert('Failed to analyze balance.');
     } finally {
       setBalanceLoading(false);
+    }
+  };
+
+  const handleThreeKeyIngredientsAnalysis = async (targetAudience) => {
+    if (!apiKey) return;
+    setThreeKeyIngredientsLoading(true);
+    try {
+      const result = await analyzeThreeKeyIngredients(apiKey, content, targetAudience);
+      setThreeKeyIngredientsData(result);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to analyze three key ingredients.');
+    } finally {
+      setThreeKeyIngredientsLoading(false);
+    }
+  };
+
+  const handleThreeRulesAnalysis = async (targetAudience) => {
+    if (!apiKey) return;
+    setThreeRulesLoading(true);
+    try {
+      const result = await analyzeThreeRules(apiKey, content, targetAudience);
+      setThreeRulesData(result);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to analyze three rules.');
+    } finally {
+      setThreeRulesLoading(false);
+    }
+  };
+
+  const handleThreeRulesImprove = async () => {
+    if (!apiKey || !threeRulesData) return;
+    setIsImprovingThreeRules(true);
+    try {
+      const newContent = await improveCopyThreeRules(apiKey, content, threeRulesData, docType, style, targetAudience, copywriter);
+      setContent(newContent);
+      setThreeRulesData(null); // Close modal after improvement
+    } catch (e) {
+      console.error(e);
+      alert('Failed to improve copy based on three rules.');
+    } finally {
+      setIsImprovingThreeRules(false);
     }
   };
 
@@ -391,6 +441,32 @@ function App() {
     }
   };
 
+  const handleThreeKeyIngredientsImprove = async () => {
+    if (!apiKey || !threeKeyIngredientsData) return;
+    setIsImproving(true);
+    try {
+      // Format the analysis as feedback data for improveCopy
+      const feedbackData = {
+        thoughts: `Four Key Ingredients Analysis Results:
+- Overall Score: ${threeKeyIngredientsData.overall_score}/100
+- Overall Feedback: ${threeKeyIngredientsData.overall_feedback}`,
+        improvements: [
+          `1. Deep, Precise Understanding (${threeKeyIngredientsData.understanding.score}/100): ${threeKeyIngredientsData.understanding.feedback}`,
+          `2. Clear, Believable Mechanism (${threeKeyIngredientsData.mechanism.score}/100): ${threeKeyIngredientsData.mechanism.feedback}`,
+          `3. Emotional Movement → Relief (${threeKeyIngredientsData.emotional_movement.score}/100): ${threeKeyIngredientsData.emotional_movement.feedback}`,
+          `4. The Big Idea (${threeKeyIngredientsData.big_idea.score}/100): ${threeKeyIngredientsData.big_idea.feedback}`
+        ]
+      };
+      const improved = await improveCopy(apiKey, content, feedbackData, docType, style, targetAudience);
+      setContent(improved);
+      setThreeKeyIngredientsData(null);
+    } catch (e) {
+      alert("Failed to improve copy. Check console.");
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
   const handleInfuseBlockType = async (blockType) => {
     if (!apiKey || !content) return;
     setAnalyzeLoading(true);
@@ -488,10 +564,14 @@ function App() {
             onAnalyze={handleAnalyzeAndColor}
             onFeedback={() => handleAudienceFeedback(targetAudience, docType)}
             onBalance={() => handleBalanceAnalysis(targetAudience)}
+            onThreeKeyIngredients={() => handleThreeKeyIngredientsAnalysis(targetAudience)}
+            onThreeRulesAnalysis={() => handleThreeRulesAnalysis(targetAudience)}
             onInfuseBlockType={handleInfuseBlockType}
             loading={analyzeLoading}
             feedbackLoading={feedbackLoading}
             balanceLoading={balanceLoading}
+            threeKeyIngredientsLoading={threeKeyIngredientsLoading}
+            threeRulesLoading={threeRulesLoading}
             metricsLoading={metricsLoading}
             isImproving={isImproving}
             conversionMetrics={conversionMetrics}
@@ -531,6 +611,24 @@ function App() {
           onClose={() => setBalanceData(null)}
           onImprove={handleBalanceImprove}
           isImproving={isImproving}
+        />
+      )}
+
+      {threeKeyIngredientsData && (
+        <ThreeKeyIngredientsModal
+          data={threeKeyIngredientsData}
+          onClose={() => setThreeKeyIngredientsData(null)}
+          onImprove={handleThreeKeyIngredientsImprove}
+          isImproving={isImproving}
+        />
+      )}
+
+      {threeRulesData && (
+        <ThreeRulesModal
+          data={threeRulesData}
+          onClose={() => setThreeRulesData(null)}
+          onImprove={handleThreeRulesImprove}
+          isImproving={isImprovingThreeRules}
         />
       )}
 
