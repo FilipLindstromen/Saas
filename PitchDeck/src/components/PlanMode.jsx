@@ -17,6 +17,14 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     const saved = localStorage.getItem('pitchDeckSelectedTemplate')
     return saved ? JSON.parse(saved) : null
   })
+  const [isRecording, setIsRecording] = useState(false)
+  const [availableMicrophones, setAvailableMicrophones] = useState([])
+  const [selectedMicrophone, setSelectedMicrophone] = useState(null)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [showGenerate, setShowGenerate] = useState(false)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const streamRef = useRef(null)
   const textareaRef = useRef(null)
   const lastEnterTimeRef = useRef(0)
 
@@ -31,6 +39,233 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       localStorage.setItem('pitchDeckSelectedTemplate', JSON.stringify(selectedTemplate))
     }
   }, [selectedTemplate])
+
+  // Load available microphones on mount
+  useEffect(() => {
+    loadMicrophones()
+    
+    // Listen for device changes (e.g., when user plugs in a new microphone)
+    const handleDeviceChange = () => {
+      loadMicrophones()
+    }
+    
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+    }
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [])
+
+  const loadMicrophones = async () => {
+    try {
+      // First, request permission to access media devices
+      // This is required for browsers to show proper device labels
+      try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        // Stop the temporary stream immediately
+        tempStream.getTracks().forEach(track => track.stop())
+      } catch (permError) {
+        console.warn('Permission not granted for microphone access:', permError)
+        // Continue anyway - devices might still be enumerable
+      }
+
+      // Now enumerate devices with proper labels
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const microphones = devices.filter(device => device.kind === 'audioinput')
+      
+      // Filter out duplicate device IDs and ensure we have valid labels
+      const uniqueMicrophones = []
+      const seenIds = new Set()
+      
+      for (const mic of microphones) {
+        if (!seenIds.has(mic.deviceId)) {
+          seenIds.add(mic.deviceId)
+          // If label is empty, provide a default name
+          if (!mic.label || mic.label.trim() === '') {
+            uniqueMicrophones.push({
+              ...mic,
+              label: `Microphone ${uniqueMicrophones.length + 1}`
+            })
+          } else {
+            uniqueMicrophones.push(mic)
+          }
+        }
+      }
+      
+      setAvailableMicrophones(uniqueMicrophones)
+      
+      // Set default microphone if none selected
+      if (!selectedMicrophone && uniqueMicrophones.length > 0) {
+        setSelectedMicrophone(uniqueMicrophones[0].deviceId)
+      }
+    } catch (error) {
+      console.error('Error loading microphones:', error)
+      alert(`Error loading microphones: ${error.message}`)
+    }
+  }
+
+  const handleStartRecording = async () => {
+    if (!settings?.openaiKey) {
+      alert('Please set your OpenAI API key in settings first.')
+      return
+    }
+
+    try {
+      // Build audio constraints with device selection
+      const audioConstraints = selectedMicrophone 
+        ? { 
+            deviceId: { exact: selectedMicrophone },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+      
+      const constraints = {
+        audio: audioConstraints
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      streamRef.current = stream
+      
+      // Verify we got the right device
+      const audioTracks = stream.getAudioTracks()
+      if (audioTracks.length > 0 && selectedMicrophone) {
+        const actualDeviceId = audioTracks[0].getSettings().deviceId
+        if (actualDeviceId !== selectedMicrophone) {
+          console.warn('Device mismatch. Requested:', selectedMicrophone, 'Got:', actualDeviceId)
+        }
+      }
+      
+      // Find supported mime type
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/mpeg'
+      ]
+      
+      let mimeType = 'audio/webm'
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type
+          break
+        }
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType
+      })
+      
+      audioChunksRef.current = []
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+      
+      mediaRecorder.onstop = async () => {
+        await handleTranscribe()
+      }
+      
+      mediaRecorderRef.current = mediaRecorder
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (error) {
+      console.error('Error starting recording:', error)
+      alert(`Error starting recording: ${error.message}`)
+    }
+  }
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      
+      // Stop all tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+    }
+  }
+
+  const handleTranscribe = async () => {
+    if (audioChunksRef.current.length === 0) {
+      return
+    }
+
+    setIsTranscribing(true)
+
+    try {
+      // Determine file extension and mime type based on recorded format
+      const firstChunk = audioChunksRef.current[0]
+      const blobType = firstChunk.type || 'audio/webm'
+      let fileName = 'recording.webm'
+      let fileType = 'audio/webm'
+      
+      if (blobType.includes('mp4') || blobType.includes('mpeg')) {
+        fileName = 'recording.mp4'
+        fileType = 'audio/mp4'
+      } else if (blobType.includes('ogg')) {
+        fileName = 'recording.ogg'
+        fileType = 'audio/ogg'
+      }
+      
+      // Create a blob from audio chunks
+      const audioBlob = new Blob(audioChunksRef.current, { type: blobType })
+      
+      // Convert to File for OpenAI API
+      const audioFile = new File([audioBlob], fileName, { type: fileType })
+      
+      // Create FormData for OpenAI Whisper API
+      const formData = new FormData()
+      formData.append('file', audioFile)
+      formData.append('model', 'whisper-1')
+      
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.openaiKey}`
+        },
+        body: formData
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`)
+      }
+
+      const data = await response.json()
+      const transcribedText = data.text || ''
+      
+      // Append transcribed text to existing input (or replace if empty)
+      if (transcribedText) {
+        setGenerateInput(prev => prev ? `${prev} ${transcribedText}` : transcribedText)
+      }
+    } catch (error) {
+      console.error('Error transcribing audio:', error)
+      alert(`Error transcribing audio: ${error.message}`)
+    } finally {
+      setIsTranscribing(false)
+      audioChunksRef.current = []
+    }
+  }
 
   // Focus textarea when editing starts and auto-resize
   useEffect(() => {
@@ -65,7 +300,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       layout: 'default',
       gradientStrength: 0.7,
       flipHorizontal: false,
-      backgroundOpacity: 1.0,
+      backgroundOpacity: 0.6,
       gradientFlipped: false,
       imageScale: 1.0,
       imagePositionX: 50,
@@ -98,7 +333,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       layout: 'section',
       gradientStrength: 0.7,
       flipHorizontal: false,
-      backgroundOpacity: 1.0,
+      backgroundOpacity: 0.6,
       gradientFlipped: false,
       imageScale: 1.0,
       imagePositionX: 50,
@@ -192,7 +427,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
           layout: 'default',
           gradientStrength: 0.7,
           flipHorizontal: false,
-          backgroundOpacity: 1.0,
+          backgroundOpacity: 0.6,
           gradientFlipped: false,
           imageScale: 1.0,
           imagePositionX: 50,
@@ -416,7 +651,7 @@ Example format:
             layout: genSlide.layout || 'default',
             gradientStrength: 0.7,
             flipHorizontal: false,
-            backgroundOpacity: 1.0,
+            backgroundOpacity: 0.6,
             gradientFlipped: false,
             imageScale: 1.0,
             imagePositionX: 50,
@@ -466,23 +701,98 @@ Example format:
                 />
               </div>
             )}
-            <div className="plan-generate-section">
-              <h3 className="plan-generate-title">Generate Presentation</h3>
-              <textarea
-                className="plan-generate-input"
-                placeholder="Enter your content or topic here..."
-                value={generateInput}
-                onChange={(e) => setGenerateInput(e.target.value)}
-                rows={4}
-              />
-              <button
-                className="plan-generate-btn"
-                onClick={handleGenerateSlides}
-                disabled={!generateInput.trim() || !selectedTemplate || isGenerating || !settings?.openaiKey}
-              >
-                {isGenerating ? 'Generating...' : 'Generate'}
-              </button>
-            </div>
+            <button 
+              className="plan-generate-toggle"
+              onClick={() => setShowGenerate(!showGenerate)}
+              title={showGenerate ? 'Hide generate' : 'Show generate'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              <span>Generate Presentation</span>
+            </button>
+            {showGenerate && (
+              <div className="plan-generate-content show">
+                <div className="plan-generate-section">
+                  <div className="plan-ramble-section">
+                    <div className="plan-ramble-controls">
+                      <label className="plan-ramble-label">Microphone</label>
+                      <div className="plan-ramble-select-wrapper">
+                        <select
+                          className="plan-ramble-select"
+                          value={selectedMicrophone || ''}
+                          onChange={(e) => setSelectedMicrophone(e.target.value)}
+                          disabled={isRecording}
+                        >
+                          {availableMicrophones.map((mic) => (
+                            <option key={mic.deviceId} value={mic.deviceId}>
+                              {mic.label || `Microphone ${availableMicrophones.indexOf(mic) + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="plan-ramble-refresh"
+                          onClick={loadMicrophones}
+                          disabled={isRecording}
+                          title="Refresh microphones"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                            <path d="M21 3v5h-5" />
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                            <path d="M3 21v-5h5" />
+                          </svg>
+                        </button>
+                      </div>
+                      <button
+                        className={`plan-ramble-btn ${isRecording ? 'recording' : ''}`}
+                        onClick={isRecording ? handleStopRecording : handleStartRecording}
+                        disabled={isTranscribing || !settings?.openaiKey}
+                      >
+                        {isTranscribing ? (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M12 6v6l4 2" />
+                            </svg>
+                            <span>Transcribing...</span>
+                          </>
+                        ) : isRecording ? (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                            <span>Stop</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <span>Ramble</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    className="plan-generate-input"
+                    placeholder="Enter your content or topic here..."
+                    value={generateInput}
+                    onChange={(e) => setGenerateInput(e.target.value)}
+                    rows={4}
+                  />
+                  <button
+                    className="plan-generate-btn"
+                    onClick={handleGenerateSlides}
+                    disabled={!generateInput.trim() || !selectedTemplate || isGenerating || !settings?.openaiKey}
+                  >
+                    {isGenerating ? 'Generating...' : 'Generate'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div className="plan-scenes-list">
@@ -551,7 +861,7 @@ Example format:
           </button>
         </div>
       </div>
-      </div>
+    </div>
     </div>
   )
 }

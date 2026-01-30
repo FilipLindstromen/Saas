@@ -22,7 +22,7 @@ function App() {
             layout: slide.layout || 'default',
             gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
             flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-            backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0,
+            backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
             gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
             subtitle: slide.subtitle || '',
             imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
@@ -43,7 +43,7 @@ function App() {
     
     // Default template if no saved data
     return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
+      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
       selectedId: 1
     }
   }
@@ -263,7 +263,7 @@ function App() {
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
-    setSlides([...slides, { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 1.0, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }])
+    setSlides([...slides, { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }])
     setSelectedSlideId(newId)
   }
 
@@ -324,7 +324,7 @@ function App() {
         layout: 'default',
         gradientStrength: 0.7,
         flipHorizontal: false,
-        backgroundOpacity: 1.0,
+        backgroundOpacity: 0.6,
         gradientFlipped: false,
         imageScale: 1.0,
         imagePositionX: 50,

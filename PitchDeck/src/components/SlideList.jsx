@@ -81,10 +81,9 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
   }
 
   const handleKeyDown = (e, id) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      setEditingId(null)
-    } else if (e.key === 'Escape') {
+    // Allow Enter to create new lines naturally in textarea
+    // Only handle Escape to exit edit mode
+    if (e.key === 'Escape') {
       // Revert to original content and exit edit mode
       const slide = slides.find(s => s.id === id)
       if (slide) {
