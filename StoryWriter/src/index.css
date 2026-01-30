@@ -1,17 +1,19 @@
-/* Story Writer — dark mode */
+/* Story Writer — dark theme (Pitch Deck–style) */
 
 :root {
-  --bg: #0f0f12;
-  --surface: #18181c;
-  --surface-elevated: #1e1e24;
-  --border: #2a2a32;
-  --border-hover: #3a3a44;
-  --text: #e8e8ed;
-  --text-muted: #8a8a9a;
-  --accent: #7c6ef6;
-  --accent-dim: rgba(124, 110, 246, 0.2);
-  --text-on-accent: #fff;
-  --hover: rgba(255, 255, 255, 0.06);
+  --bg: #1a1a1a;
+  --surface: #222222;
+  --surface-elevated: #2a2a2a;
+  --border: #333333;
+  --border-hover: #444444;
+  --text: #ffffff;
+  --text-muted: #b0b0b0;
+  --accent: #5c88bf;
+  --accent-dim: rgba(92, 136, 191, 0.25);
+  --text-on-accent: #ffffff;
+  --focus-bg: #335378;
+  --focus-border: #5c88bf;
+  --hover: rgba(255, 255, 255, 0.08);
   --error-bg: rgba(239, 68, 68, 0.12);
   --error-border: rgba(239, 68, 68, 0.35);
   --error-text: #fca5a5;
@@ -32,7 +34,7 @@ html {
 body {
   margin: 0;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: linear-gradient(to right, #0f0f12 0%, #16161b 50%, #18181c 100%);
+  background: #1a1a1a;
   color: var(--text);
   line-height: 1.5;
 }
@@ -46,6 +48,16 @@ button {
 }
 
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  background: var(--focus-bg);
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+  outline: none;
 }

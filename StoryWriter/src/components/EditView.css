@@ -1,0 +1,136 @@
+.edit-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.edit-view__opacity {
+  margin-bottom: 0.5rem;
+}
+
+.edit-view__opacity-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+}
+
+.edit-view__opacity-slider {
+  width: 100%;
+  max-width: 200px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.edit-view__opacity-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.edit-view__opacity-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+.edit-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.edit-step__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.edit-step__content {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  min-height: 1.7em;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.edit-step__content:focus {
+  background: transparent;
+  box-shadow: none;
+}
+
+.edit-step__content::placeholder {
+  color: var(--text-muted);
+}
+
+.edit-step__background {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.edit-step__background-thumb {
+  width: 64px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--border);
+}
+
+.edit-step__background-btn {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.edit-step__background-btn:hover {
+  background: var(--border);
+}
+
+.edit-step__background-remove {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.edit-step__background-remove:hover {
+  color: var(--text);
+  background: var(--hover);
+}

@@ -1,0 +1,163 @@
+.ramble-recorder {
+  margin-bottom: 0.75rem;
+}
+
+.ramble-recorder__mic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ramble-recorder__mic-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.ramble-recorder__mic-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12' fill='none' stroke='%238a8a9a' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 1.5rem;
+}
+
+.ramble-recorder__mic-select:focus {
+  background: var(--focus-bg);
+  border-color: var(--focus-border);
+}
+
+.ramble-recorder__refresh {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ramble-recorder__refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.ramble-recorder__refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ramble-waveform {
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.ramble-waveform__canvas {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: 48px;
+}
+
+.ramble-recorder__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ramble-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ramble-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border-hover);
+}
+
+.ramble-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ramble-btn--stop {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.ramble-btn--stop:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.ramble-btn--cancel {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+.ramble-btn--cancel:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.ramble-btn__icon {
+  flex-shrink: 0;
+}
+
+.ramble-btn__pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: ramble-pulse 1s ease-in-out infinite;
+}
+
+.ramble-btn__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ramble-dot 0.6s ease-in-out infinite;
+}
+
+@keyframes ramble-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+@keyframes ramble-dot {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}

@@ -8,11 +8,11 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import StorySection from './StorySection';
-import { SECTION_DEFINITIONS } from '../constants/sections';
 import './SortableSectionList.css';
 
 export default function SortableSectionList({
   sectionOrder,
+  sectionDefs,
   sectionsData,
   onReorder,
   onContentChange,
@@ -38,7 +38,7 @@ export default function SortableSectionList({
       <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
         <div className="section-list" role="list">
           {sectionOrder.map((sectionId, index) => {
-            const def = SECTION_DEFINITIONS[sectionId];
+            const def = sectionDefs[sectionId];
             if (!def) return null;
             return (
               <StorySection

@@ -1,0 +1,69 @@
+.present-view {
+  /* font-family set inline from settings (Google Fonts) */
+  font-weight: 700;
+}
+
+.present-view--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 3rem;
+  box-sizing: border-box;
+}
+
+.present-view__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  transition: opacity 0.4s ease;
+}
+
+.present-view__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.present-view__sentence {
+  /* font-size set inline from settings (small/medium/large) */
+  line-height: 1.4;
+  color: var(--text);
+  animation: present-sentence-in 0.35s ease-out forwards;
+}
+
+@keyframes present-sentence-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.present-view__empty {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.present-view__hint {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+  margin: 0.5rem 0 0;
+}

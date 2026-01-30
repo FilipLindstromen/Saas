@@ -1,3 +1,4 @@
+import { useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import './StorySection.css';
@@ -10,6 +11,7 @@ export default function StorySection({
   isGenerating,
 }) {
   const { content = '' } = sectionData || {};
+  const textareaRef = useRef(null);
   const {
     attributes,
     listeners,
@@ -18,6 +20,17 @@ export default function StorySection({
     transition,
     isDragging,
   } = useSortable({ id: sectionDef.id });
+
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.max(el.scrollHeight, 80) + 'px';
+  }, []);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [content, adjustHeight]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -35,19 +48,22 @@ export default function StorySection({
         <span className="story-section__number">{index + 1}</span>
       </div>
       <div className="story-section__body">
-        <h3 className="story-section__title">{sectionDef.title}</h3>
-        <p className="story-section__desc">{sectionDef.description}</p>
-        <label className="story-section__content-label">
-          Story text
-          <textarea
+        <h3 className="story-section__title" title={sectionDef.description}>
+          {sectionDef.title}
+        </h3>
+        <textarea
+            ref={textareaRef}
             className="story-section__textarea"
             placeholder="Generated or edited story text will appear here…"
             value={content}
-            onChange={(e) => onContentChange(sectionDef.id, e.target.value)}
+            onChange={(e) => {
+              onContentChange(sectionDef.id, e.target.value);
+              adjustHeight();
+            }}
+            onFocus={adjustHeight}
             disabled={isGenerating}
-            rows={6}
+            rows={3}
           />
-        </label>
       </div>
     </div>
   );
