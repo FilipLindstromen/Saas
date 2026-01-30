@@ -54,7 +54,30 @@ function App() {
     ? initialData.selectedId 
     : initialData.slides[0]?.id || 1
   
-  const [slides, setSlides] = useState(initialData.slides)
+  const [chapters, setChapters] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckChapters')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Error parsing chapters:', e)
+      }
+    }
+    // Default: create one chapter with existing slides
+    return [{
+      id: 1,
+      name: 'Chapter 1',
+      slides: initialData.slides
+    }]
+  })
+  const [currentChapterId, setCurrentChapterId] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckCurrentChapterId')
+    return saved ? parseInt(saved, 10) : 1
+  })
+  const [slides, setSlides] = useState(() => {
+    const currentChapter = chapters.find(c => c.id === currentChapterId) || chapters[0]
+    return currentChapter ? currentChapter.slides : initialData.slides
+  })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
   const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present'
   const [showSettings, setShowSettings] = useState(false)
@@ -97,14 +120,49 @@ function App() {
     return savedSettings
   })
 
-  // Save slides to localStorage whenever they change
+  // Update current chapter's slides when slides change
+  useEffect(() => {
+    setChapters(prevChapters => {
+      const updated = prevChapters.map(chapter => 
+        chapter.id === currentChapterId 
+          ? { ...chapter, slides: slides }
+          : chapter
+      )
+      try {
+        localStorage.setItem('pitchDeckChapters', JSON.stringify(updated))
+      } catch (error) {
+        console.error('Error saving chapters:', error)
+      }
+      return updated
+    })
+  }, [slides, currentChapterId])
+
+  // Update slides when current chapter changes
+  useEffect(() => {
+    const currentChapter = chapters.find(c => c.id === currentChapterId)
+    if (currentChapter) {
+      setSlides(currentChapter.slides)
+      // Select first slide of new chapter
+      const firstSlide = currentChapter.slides.find(s => s.layout !== 'section') || currentChapter.slides[0]
+      if (firstSlide) {
+        setSelectedSlideId(firstSlide.id)
+      }
+    }
+    try {
+      localStorage.setItem('pitchDeckCurrentChapterId', currentChapterId.toString())
+    } catch (error) {
+      console.error('Error saving current chapter ID:', error)
+    }
+  }, [currentChapterId])
+
+  // Save chapters to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem('pitchDeckSlides', JSON.stringify(slides))
+      localStorage.setItem('pitchDeckChapters', JSON.stringify(chapters))
     } catch (error) {
-      console.error('Error saving slides:', error)
+      console.error('Error saving chapters:', error)
     }
-  }, [slides])
+  }, [chapters])
 
   // Save selectedSlideId to localStorage whenever it changes
   useEffect(() => {
@@ -315,6 +373,39 @@ function App() {
     setSlides(newSlides)
   }
 
+  // Chapter management functions
+  const handleAddChapter = () => {
+    const newChapterId = Math.max(...chapters.map(c => c.id), 0) + 1
+    const newChapter = {
+      id: newChapterId,
+      name: `Chapter ${newChapterId}`,
+      slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
+    }
+    setChapters([...chapters, newChapter])
+    setCurrentChapterId(newChapterId)
+  }
+
+  const handleDeleteChapter = (chapterId) => {
+    if (chapters.length === 1) {
+      alert('Cannot delete the last chapter. Create a new chapter first.')
+      return
+    }
+    if (window.confirm('Are you sure you want to delete this chapter? All slides in this chapter will be lost.')) {
+      const updatedChapters = chapters.filter(c => c.id !== chapterId)
+      setChapters(updatedChapters)
+      // Switch to first remaining chapter
+      if (currentChapterId === chapterId) {
+        setCurrentChapterId(updatedChapters[0].id)
+      }
+    }
+  }
+
+  const handleUpdateChapterName = (chapterId, newName) => {
+    setChapters(chapters.map(c => 
+      c.id === chapterId ? { ...c, name: newName } : c
+    ))
+  }
+
   // Create a new presentation (clear all slides)
   const handleNewPresentation = () => {
     if (window.confirm('Create a new presentation? This will clear all current slides.')) {
@@ -335,8 +426,17 @@ function App() {
         textHeadingLevel: null,
         subtitleHeadingLevel: null
       }
+      const newChapter = {
+        id: 1,
+        name: 'Chapter 1',
+        slides: [newSlide]
+      }
+      setChapters([newChapter])
+      setCurrentChapterId(1)
       setSlides([newSlide])
       setSelectedSlideId(newSlide.id)
+      localStorage.removeItem('pitchDeckChapters')
+      localStorage.removeItem('pitchDeckCurrentChapterId')
     }
   }
 
@@ -347,6 +447,14 @@ function App() {
       ...slide,
       id: index + 1
     }))
+    // Update current chapter's slides
+    setChapters(prevChapters => 
+      prevChapters.map(chapter => 
+        chapter.id === currentChapterId 
+          ? { ...chapter, slides: newSlides }
+          : chapter
+      )
+    )
     setSlides(newSlides)
     // Select the first non-section slide, or first slide if all are sections
     const firstNonSection = newSlides.find(s => s.layout !== 'section')
@@ -362,7 +470,9 @@ function App() {
   const handleExportFile = () => {
     const exportData = {
       version: '1.0',
-      slides: slides,
+      chapters: chapters,
+      currentChapterId: currentChapterId,
+      slides: slides, // Keep for backward compatibility
       selectedSlideId: selectedSlideId,
       settings: settings,
       sidebarWidth: sidebarWidth,
@@ -400,19 +510,57 @@ function App() {
       try {
         const importData = JSON.parse(event.target?.result || '{}')
         
-        // Validate the imported data
-        if (!importData.slides || !Array.isArray(importData.slides)) {
-          alert('Invalid file format. The file must contain slides data.')
+        // Load chapters if available, otherwise fall back to slides
+        if (importData.chapters && Array.isArray(importData.chapters)) {
+          // New format with chapters
+          setChapters(importData.chapters)
+          if (importData.currentChapterId) {
+            setCurrentChapterId(importData.currentChapterId)
+          } else {
+            setCurrentChapterId(importData.chapters[0]?.id || 1)
+          }
+        } else if (importData.slides && Array.isArray(importData.slides)) {
+          // Old format - convert to chapters
+          const slidesWithLayout = importData.slides.map(slide => ({
+            ...slide,
+            layout: slide.layout || 'default',
+            gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+            flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+            backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+            gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+            subtitle: slide.subtitle || '',
+            imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+            imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+            imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+            textHeadingLevel: slide.textHeadingLevel || null,
+            subtitleHeadingLevel: slide.subtitleHeadingLevel || null
+          }))
+          const convertedChapter = {
+            id: 1,
+            name: 'Chapter 1',
+            slides: slidesWithLayout
+          }
+          setChapters([convertedChapter])
+          setCurrentChapterId(1)
+        } else {
+          alert('Invalid file format. The file must contain slides or chapters data.')
           return
         }
 
-        // Ensure all slides have required properties
-        const slidesWithLayout = importData.slides.map(slide => ({
+        // Ensure all slides have required properties (for current chapter)
+        const currentChapter = importData.chapters 
+          ? importData.chapters.find(c => c.id === (importData.currentChapterId || importData.chapters[0]?.id))
+          : null
+        const slidesToLoad = currentChapter 
+          ? currentChapter.slides 
+          : (importData.slides || [])
+        
+        const slidesWithLayout = slidesToLoad.map(slide => ({
           ...slide,
           layout: slide.layout || 'default',
           gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
           flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-          backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0,
+          backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
           gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
           subtitle: slide.subtitle || '',
           imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
@@ -423,13 +571,13 @@ function App() {
         }))
 
         // Confirm before importing (to avoid losing current work)
-        const confirmMessage = `This will replace your current ${slides.length} slide(s) with ${slidesWithLayout.length} slide(s) from the file. Continue?`
+        const confirmMessage = `This will replace your current presentation with the imported data. Continue?`
         if (!window.confirm(confirmMessage)) {
           e.target.value = '' // Reset file input
           return
         }
 
-        // Load slides
+        // Load slides for current chapter
         setSlides(slidesWithLayout)
         
         // Load selected slide ID (validate it exists)
@@ -626,7 +774,8 @@ function App() {
     return (
       <div className="app plan-mode-app">
         <div className="app-header">
-          <div className="header-left">
+          <div className="header-top-row">
+            <div className="header-left">
             <h1>Pitch Deck 2000</h1>
             <div className="header-file-actions">
               <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
@@ -664,66 +813,116 @@ function App() {
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />
+              </div>
             </div>
-          </div>
-          <div className="header-mode-buttons">
-            <button
-              className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-              onClick={() => setMode('plan')}
-              title="Plan"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              <span>Plan</span>
-            </button>
-            <button
-              className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-              onClick={() => setMode('edit')}
-              title="Edit"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              <span>Edit</span>
-            </button>
-            <button
-              className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-              onClick={() => setMode('present')}
-              title="Present"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-              <span>Present</span>
-            </button>
-          </div>
-          <div className="header-actions">
-            <button 
-              className="btn-icon-header btn-bulk-images" 
-              onClick={handleBulkSelectImages}
-              title="Auto-select images for all slides without images"
-              disabled={!settings.openaiKey || !settings.unsplashKey}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18" />
-                <path d="M12 3l-2 2M12 3l2 2" />
-                <path d="M8 6l-1.5-1.5M16 6l1.5-1.5" />
-                <path d="M6 9l-1-1M18 9l1-1" />
-                <circle cx="12" cy="12" r="1" fill="currentColor" />
-              </svg>
-            </button>
-            <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+            <div className="header-center">
+              <div className="header-mode-buttons">
+                <button
+                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+                  onClick={() => setMode('plan')}
+                  title="Plan"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span>Plan</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+                  onClick={() => setMode('edit')}
+                  title="Edit"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+                  onClick={() => setMode('present')}
+                  title="Present"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  <span>Present</span>
+                </button>
+              </div>
+              {(mode === 'plan' || mode === 'edit') && (
+                <div className="header-chapters">
+                  <div className="chapters-tabs">
+                {chapters.map((chapter) => (
+                  <div key={chapter.id} className={`chapter-tab ${currentChapterId === chapter.id ? 'active' : ''}`}>
+                    <input
+                      type="text"
+                      className="chapter-tab-name"
+                      value={chapter.name}
+                      onChange={(e) => handleUpdateChapterName(chapter.id, e.target.value)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setCurrentChapterId(chapter.id)
+                      }}
+                      onFocus={(e) => {
+                        e.stopPropagation()
+                        setCurrentChapterId(chapter.id)
+                      }}
+                    />
+                    {chapters.length > 1 && (
+                      <button
+                        className="chapter-tab-delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteChapter(chapter.id)
+                        }}
+                        title="Delete chapter"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  className="chapter-tab-add"
+                  onClick={handleAddChapter}
+                  title="Add chapter"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+            </div>
+            <div className="header-right">
+              <button 
+                className="btn-icon-header btn-bulk-images" 
+                onClick={handleBulkSelectImages}
+                title="Auto-select images for all slides without images"
+                disabled={!settings.openaiKey || !settings.unsplashKey}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
         <div className="app-content plan-mode-content">
@@ -742,104 +941,157 @@ function App() {
 
   return (
     <div className="app">
-      <div className="app-header">
-        <div className="header-left">
-          <h1>Pitch Deck 2000</h1>
-          <div className="header-file-actions">
-            <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
+        <div className="app-header">
+          <div className="header-top-row">
+            <div className="header-left">
+              <h1>Pitch Deck 2000</h1>
+              <div className="header-file-actions">
+                <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-            </button>
-            <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
+                </button>
+                <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-            </button>
-            <button className="btn-icon-header btn-import" onClick={handleImportFile} title="Load from file">
+                </button>
+                <button className="btn-icon-header btn-import" onClick={handleImportFile} title="Load from file">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 <polyline points="12 11 12 17" />
                 <line x1="9" y1="14" x2="15" y2="14" />
               </svg>
-            </button>
-            <input
-              type="text"
-              className="project-name-input"
-              placeholder="Project name"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              title="Project name (used when saving files)"
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
+                </button>
+                <input
+                  type="text"
+                  className="project-name-input"
+                  placeholder="Project name"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  title="Project name (used when saving files)"
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+              </div>
+            </div>
+            <div className="header-center">
+              <div className="header-mode-buttons">
+                <button
+                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+                  onClick={() => setMode('plan')}
+                  title="Plan"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span>Plan</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+                  onClick={() => setMode('edit')}
+                  title="Edit"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+                  onClick={() => setMode('present')}
+                  title="Present"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  <span>Present</span>
+                </button>
+              </div>
+              {(mode === 'plan' || mode === 'edit') && (
+                <div className="header-chapters">
+                  <div className="chapters-tabs">
+              {chapters.map((chapter) => (
+                <div key={chapter.id} className={`chapter-tab ${currentChapterId === chapter.id ? 'active' : ''}`}>
+                  <input
+                    type="text"
+                    className="chapter-tab-name"
+                    value={chapter.name}
+                    onChange={(e) => handleUpdateChapterName(chapter.id, e.target.value)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCurrentChapterId(chapter.id)
+                    }}
+                    onFocus={(e) => {
+                      e.stopPropagation()
+                      setCurrentChapterId(chapter.id)
+                    }}
+                  />
+                  {chapters.length > 1 && (
+                    <button
+                      className="chapter-tab-delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteChapter(chapter.id)
+                      }}
+                      title="Delete chapter"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                className="chapter-tab-add"
+                onClick={handleAddChapter}
+                title="Add chapter"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="header-mode-buttons">
-          <button
-            className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-            onClick={() => setMode('plan')}
-            title="Plan"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-            <span>Plan</span>
-          </button>
-          <button
-            className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-            onClick={() => setMode('edit')}
-            title="Edit"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            <span>Edit</span>
-          </button>
-          <button
-            className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-            onClick={() => setMode('present')}
-            title="Present"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            <span>Present</span>
-          </button>
-        </div>
-        <div className="header-actions">
-          <button 
-            className="btn-icon-header btn-bulk-images" 
-            onClick={handleBulkSelectImages}
-            title="Auto-select images for all slides without images"
-            disabled={!settings.openaiKey || !settings.unsplashKey}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          </button>
-          <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-            </svg>
-          </button>
-        </div>
+        )}
+            </div>
+            <div className="header-right">
+              <button 
+                className="btn-icon-header btn-bulk-images" 
+                onClick={handleBulkSelectImages}
+                title="Auto-select images for all slides without images"
+                disabled={!settings.openaiKey || !settings.unsplashKey}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            </div>
+          </div>
       </div>
       <div className={`app-content ${isResizing ? 'resizing' : ''}`}>
         <div 

@@ -1,10 +1,13 @@
 const STORY_SYSTEM_PROMPT = `You are an expert storyteller who writes emotional, gripping stories that keep the audience hooked.
 
-You follow a specific narrative framework. For each section you write:
+STYLE RULES (follow strictly):
+- Use simple, easy-to-understand language. No jargon or fancy words.
+- Use short, punchy sentences. Cut long sentences into two or three. Avoid run-ons.
+- Do not use metaphors. Say things literally and concretely.
+- Use specific, recognizable examples so the audience can easily picture them (concrete details: places, actions, objects, moments they can see in their heads).
 - Be emotional and direct. Grab the audience and keep them wanting to know how it goes.
 - Use open and close loops: create curiosity and pay it off.
 - Write in first person when appropriate (the hero's voice).
-- Use short, punchy sentences where it hits hardest. Longer sentences for reflection.
 - No generic self-help tone. Sound like a real person telling a real story.
 - Each section should feel complete but leave a thread to the next.
 
@@ -18,18 +21,30 @@ Framework reminder:
 7. The new life — what life looks like now.
 8. Call out the audience + moral — speak to the reader, leave the takeaway.`;
 
-function buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent) {
+const LENGTH_INSTRUCTIONS = {
+  micro: 'Keep this section very short: 1–2 sentences only. Be punchy and concise.',
+  short: 'Keep this section short: 1–3 sentences per section.',
+  medium: 'Write 2–5 sentences for this section.',
+  long: 'Write 2–7 sentences for this section.',
+};
+
+function buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength) {
+  const lengthInstruction = LENGTH_INSTRUCTIONS[storyLength] || LENGTH_INSTRUCTIONS.medium;
   const part = existingContent ? `Current text (user may have edited; preserve their intent, improve if needed):\n${existingContent}\n\nRewrite or refine the above for this section only.` : `Write this section from scratch.`;
   return `Story theme: ${storyAbout}
 Section: "${sectionDef.title}"
 ${sectionDef.description}
+Length: ${lengthInstruction}
 ${sectionInput ? `Additional context for this section: ${sectionInput}` : ''}
 
 ${part}
 Output only the story text for this section. No section title, no numbering, no meta-commentary.`;
 }
 
-export async function generateSection(apiKey, { sectionId, sectionDef, storyAbout, sectionInput, existingContent }) {
+const LENGTH_MAX_TOKENS = { micro: 80, short: 150, medium: 350, long: 500 };
+
+export async function generateSection(apiKey, { sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength }) {
+  const maxTokens = LENGTH_MAX_TOKENS[storyLength] ?? LENGTH_MAX_TOKENS.medium;
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -42,11 +57,11 @@ export async function generateSection(apiKey, { sectionId, sectionDef, storyAbou
         { role: 'system', content: STORY_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent),
+          content: buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength),
         },
       ],
       temperature: 0.8,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -60,7 +75,7 @@ export async function generateSection(apiKey, { sectionId, sectionDef, storyAbou
   return text;
 }
 
-export async function generateFullStory(apiKey, { storyAbout, sectionsData, sectionOrder, sectionDefs }) {
+export async function generateFullStory(apiKey, { storyAbout, storyLength, sectionsData, sectionOrder, sectionDefs }) {
   const results = {};
   for (const sectionId of sectionOrder) {
     const def = sectionDefs[sectionId];
@@ -71,8 +86,32 @@ export async function generateFullStory(apiKey, { storyAbout, sectionsData, sect
       storyAbout,
       sectionInput: data.input || '',
       existingContent: null,
+      storyLength: storyLength || 'medium',
     });
     results[sectionId] = content;
   }
   return results;
+}
+
+/** Transcribe audio blob using OpenAI Whisper. Returns plain text. */
+export async function transcribeAudio(apiKey, audioBlob) {
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+  formData.append('model', 'whisper-1');
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Transcription failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.text || '').trim();
 }

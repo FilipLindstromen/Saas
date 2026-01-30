@@ -85,8 +85,9 @@
 }
 
 .settings-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
+  background: var(--focus-bg);
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
 .settings-input::placeholder {

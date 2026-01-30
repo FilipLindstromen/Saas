@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
-import { getSettings, saveSettings } from '../utils/settings';
+import { getSettings, saveSettings, PRESENTATION_FONTS, PRESENTATION_SIZES } from '../utils/settings';
 import './SettingsModal.css';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [presentationFont, setPresentationFont] = useState('Poppins');
+  const [presentationFontSize, setPresentationFontSize] = useState('medium');
+  const [unsplashAccessKey, setUnsplashAccessKey] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       const s = getSettings();
       setOpenaiApiKey(s.openaiApiKey || '');
+      setPresentationFont(s.presentationFont || 'Poppins');
+      setPresentationFontSize(s.presentationFontSize || 'medium');
+      setUnsplashAccessKey(s.unsplashAccessKey || '');
     }
   }, [isOpen]);
 
   const handleSave = (e) => {
     e.preventDefault();
-    saveSettings({ openaiApiKey });
+    saveSettings({ openaiApiKey, presentationFont, presentationFontSize, unsplashAccessKey });
     onClose();
   };
 
@@ -53,6 +59,45 @@ export default function SettingsModal({ isOpen, onClose }) {
               onChange={(e) => setOpenaiApiKey(e.target.value)}
               autoComplete="off"
             />
+          </label>
+          <label className="settings-label">
+            Presentation font
+            <select
+              className="settings-input"
+              value={presentationFont}
+              onChange={(e) => setPresentationFont(e.target.value)}
+            >
+              {PRESENTATION_FONTS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="settings-label">
+            Unsplash Access Key
+            <input
+              type="password"
+              className="settings-input"
+              placeholder="For section background images (optional)"
+              value={unsplashAccessKey}
+              onChange={(e) => setUnsplashAccessKey(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <label className="settings-label">
+            Presentation text size
+            <select
+              className="settings-input"
+              value={presentationFontSize}
+              onChange={(e) => setPresentationFontSize(e.target.value)}
+            >
+              {PRESENTATION_SIZES.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="settings-actions">
             <button type="button" className="btn secondary" onClick={onClose}>
