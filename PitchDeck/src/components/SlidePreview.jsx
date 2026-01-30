@@ -157,8 +157,18 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           </div>
         </div>
         <div className="preview-header-actions">
-          {(slide.layout || 'default') !== 'centered' && (
+          {(slide.layout || 'default') !== 'centered' && (slide.layout || 'default') !== 'right' && (
             <>
+              <button
+                className={`btn-icon btn-flip-gradient ${slide.gradientFlipped ? 'active' : ''}`}
+                onClick={() => onUpdate({ gradientFlipped: !slide.gradientFlipped })}
+                title="Flip Gradient Direction"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                </svg>
+                <span className="btn-tooltip">Flip Gradient</span>
+              </button>
               <div className="gradient-control">
                 <label htmlFor="slide-gradient-strength">Gradient:</label>
                 <input
@@ -173,20 +183,22 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                 />
                 <span className="gradient-value">{Math.round((slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7) * 100)}%</span>
               </div>
-              <button
-                className={`btn-icon btn-flip-gradient ${slide.gradientFlipped ? 'active' : ''}`}
-                onClick={() => onUpdate({ gradientFlipped: !slide.gradientFlipped })}
-                title="Flip Gradient Direction"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
-                </svg>
-                <span className="btn-tooltip">Flip Gradient</span>
-              </button>
             </>
           )}
           {(slide.layout || 'default') !== 'section' && (
             <>
+              {slide.imageUrl && (
+                <button
+                  className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
+                  onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
+                  title="Flip Image Horizontally"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                  </svg>
+                  <span className="btn-tooltip">Flip Image</span>
+                </button>
+              )}
               <div className="gradient-control">
                 <label htmlFor="slide-background-opacity">Image:</label>
                 <input
@@ -202,20 +214,32 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                 <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0) * 100)}%</span>
               </div>
               {slide.imageUrl && (
-                <div className="gradient-control">
-                  <label htmlFor="slide-image-scale">Scale:</label>
-                  <input
-                    id="slide-image-scale"
-                    type="range"
-                    min="0.5"
-                    max="3"
-                    step="0.1"
-                    value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
-                    onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
-                    className="gradient-slider"
-                  />
-                  <span className="gradient-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
-                </div>
+                <>
+                  <button
+                    className="btn-icon btn-fill-screen"
+                    onClick={() => onUpdate({ imageScale: 1.0 })}
+                    title="Fill Screen"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                    </svg>
+                    <span className="btn-tooltip">Fill Screen</span>
+                  </button>
+                  <div className="gradient-control">
+                    <label htmlFor="slide-image-scale">Scale:</label>
+                    <input
+                      id="slide-image-scale"
+                      type="range"
+                      min="0.5"
+                      max="3"
+                      step="0.1"
+                      value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
+                      onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
+                      className="gradient-slider"
+                    />
+                    <span className="gradient-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
+                  </div>
+                </>
               )}
               <input
                 ref={fileInputRef}
@@ -240,20 +264,20 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                 className="btn-icon btn-swap-image"
                 onClick={handleSwapImage}
                 disabled={!settings.unsplashKey}
-                title="Swap Image"
+                title="Choose image"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
                 </svg>
-                <span className="btn-tooltip">Swap Image</span>
+                <span className="btn-tooltip">Choose image</span>
               </button>
               <button
                 className="btn-icon btn-select-images"
                 onClick={handleSelectImages}
                 disabled={isSelectingImages || !slide.content}
-                title="Select Images"
+                title="Auto select image"
               >
                 {isSelectingImages ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -261,26 +285,18 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3v18" />
+                    <path d="M12 3l-2 2M12 3l2 2" />
+                    <path d="M8 6l-1.5-1.5M16 6l1.5-1.5" />
+                    <path d="M6 9l-1-1M18 9l1-1" />
+                    <circle cx="12" cy="12" r="1" fill="currentColor" />
                   </svg>
                 )}
-                <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Select Images'}</span>
+                <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Auto select image'}</span>
               </button>
               {slide.imageUrl && (
                 <>
-                  <button
-                    className={`btn-icon btn-flip-image ${slide.flipHorizontal ? 'active' : ''}`}
-                    onClick={() => onUpdate({ flipHorizontal: !slide.flipHorizontal })}
-                    title="Flip Image Horizontally"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
-                    </svg>
-                    <span className="btn-tooltip">Flip Image</span>
-                  </button>
                   <button
                     className="btn-icon btn-remove-image"
                     onClick={handleRemoveImage}

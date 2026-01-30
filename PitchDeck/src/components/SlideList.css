@@ -97,19 +97,19 @@
 }
 
 .slide-item-section {
-  padding: 0.4rem 0.75rem;
+  padding: 0.25rem 0.75rem;
   cursor: default;
   min-height: auto;
-  border: 1px solid #ffffff;
+  border: none;
+  background: #4a4a4a;
 }
 
 .slide-item-section:hover {
-  border-color: #cccccc;
-  background: #2a2a2a;
+  background: #555555;
 }
 
 .slide-item-section-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #888;
   font-weight: 600;
   min-width: 80px;
@@ -117,9 +117,9 @@
 }
 
 .slide-item-section-text {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #cccccc;
-  font-weight: 400;
+  font-weight: 700;
 }
 
 .slide-item-number {

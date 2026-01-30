@@ -22,6 +22,16 @@ const LAYOUTS = [
     )
   },
   {
+    id: 'right',
+    name: 'Right Aligned',
+    description: 'Text aligned to the right',
+    thumbnail: (
+      <div className="layout-thumbnail-content">
+        <div className="layout-thumbnail-text-right">TEXT</div>
+      </div>
+    )
+  },
+  {
     id: 'bulletpoints',
     name: 'Bullet Points',
     description: 'Animated bullet points',

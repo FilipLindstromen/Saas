@@ -2,14 +2,35 @@ import { useState, useEffect, useRef } from 'react'
 import TemplateSelector from './TemplateSelector'
 import './PlanMode.css'
 
-function PlanMode({ slides, onUpdateSlides, onLoadTemplate }) {
+function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [draggedId, setDraggedId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
-  const [showTemplates, setShowTemplates] = useState(false)
+  const [generateInput, setGenerateInput] = useState(() => {
+    // Load from localStorage on mount
+    return localStorage.getItem('pitchDeckGenerateInput') || ''
+  })
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState(() => {
+    // Load from localStorage on mount
+    const saved = localStorage.getItem('pitchDeckSelectedTemplate')
+    return saved ? JSON.parse(saved) : null
+  })
   const textareaRef = useRef(null)
   const lastEnterTimeRef = useRef(0)
+
+  // Save generateInput to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('pitchDeckGenerateInput', generateInput)
+  }, [generateInput])
+
+  // Save selectedTemplate to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedTemplate) {
+      localStorage.setItem('pitchDeckSelectedTemplate', JSON.stringify(selectedTemplate))
+    }
+  }, [selectedTemplate])
 
   // Focus textarea when editing starts and auto-resize
   useEffect(() => {
@@ -286,8 +307,140 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate }) {
     setDragOverId(null)
   }
 
+  const handleGenerateSlides = async () => {
+    if (!settings?.openaiKey || !generateInput.trim()) {
+      alert('Please enter content and ensure OpenAI API key is set in settings.')
+      return
+    }
+
+    // Get current sections (keep them)
+    const sections = slides.filter(slide => slide.layout === 'section')
+    
+    if (sections.length === 0) {
+      alert('No sections found. Please load a template first.')
+      return
+    }
+
+    setIsGenerating(true)
+
+    try {
+      // Build prompt for OpenAI
+      const sectionsList = sections.map(s => s.content).join(', ')
+      const prompt = `You are creating a presentation based on the following template structure with these sections: ${sectionsList}
+
+User input: ${generateInput}
+
+Generate slide content for each section. Rules:
+1. Create concise headlines (not detailed text) for each slide
+2. If the content mentions a list of 3-5 items, create TWO slides:
+   - First: A headline slide describing the list topic (e.g., "3 steps to a stronger body")
+   - Second: A bullet points slide with the items (e.g., "Exercise", "Eat well", "Sleep well")
+3. For other content, create regular headline slides
+4. Match the number of slides to fit the template structure
+
+Return a JSON array where each object has:
+- "section": the section name it belongs to
+- "content": the headline text
+- "layout": either "default" or "bulletpoints" (use bulletpoints for lists)
+
+Example format:
+[
+  {"section": "The Problem", "content": "3 steps to a stronger body", "layout": "default"},
+  {"section": "The Problem", "content": "Exercise\\nEat well\\nSleep well", "layout": "bulletpoints"},
+  {"section": "The Solution", "content": "Our fitness program", "layout": "default"}
+]`
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a presentation content generator. Always return valid JSON arrays only, no additional text.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const generatedContent = data.choices[0]?.message?.content?.trim() || ''
+      
+      // Parse JSON (might have markdown code blocks)
+      let generatedSlides = []
+      try {
+        // Remove markdown code blocks if present
+        const jsonMatch = generatedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || [null, generatedContent]
+        const jsonContent = jsonMatch[1] || generatedContent
+        generatedSlides = JSON.parse(jsonContent)
+      } catch (parseError) {
+        console.error('Failed to parse OpenAI response:', parseError)
+        alert('Failed to parse generated content. Please try again.')
+        setIsGenerating(false)
+        return
+      }
+
+      // Build new slides array: sections + generated slides
+      const newSlides = []
+      let nextId = Math.max(...slides.map(s => s.id), 0) + 1
+
+      for (const section of sections) {
+        // Add the section
+        newSlides.push({
+          ...section,
+          id: nextId++
+        })
+
+        // Add generated slides for this section
+        const sectionSlides = generatedSlides.filter(s => s.section === section.content)
+        for (const genSlide of sectionSlides) {
+          newSlides.push({
+            id: nextId++,
+            content: genSlide.content,
+            subtitle: '',
+            imageUrl: '',
+            layout: genSlide.layout || 'default',
+            gradientStrength: 0.7,
+            flipHorizontal: false,
+            backgroundOpacity: 1.0,
+            gradientFlipped: false,
+            imageScale: 1.0,
+            imagePositionX: 50,
+            imagePositionY: 50,
+            textHeadingLevel: null,
+            subtitleHeadingLevel: null
+          })
+        }
+      }
+
+      // Update slides
+      onUpdateSlides(newSlides)
+      setGenerateInput('')
+      alert(`Generated ${generatedSlides.length} slides based on your input!`)
+    } catch (error) {
+      console.error('Error generating slides:', error)
+      alert(`Error generating slides: ${error.message}`)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   return (
-    <div className="plan-mode">
+    <div className={`plan-mode ${showTemplates ? 'templates-visible' : ''}`}>
       <div className="plan-layout">
         {onLoadTemplate && (
           <div className={`plan-templates-sidebar ${showTemplates ? 'expanded' : ''}`}>
@@ -303,9 +456,33 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate }) {
             </button>
             {showTemplates && (
               <div className="plan-templates-content">
-                <TemplateSelector onLoadTemplate={onLoadTemplate} />
+                <TemplateSelector 
+                  onLoadTemplate={(templateSlides) => {
+                    // Track which template was loaded by checking section names
+                    const sections = templateSlides.filter(s => s.layout === 'section')
+                    setSelectedTemplate(sections.map(s => s.content))
+                    onLoadTemplate(templateSlides)
+                  }} 
+                />
               </div>
             )}
+            <div className="plan-generate-section">
+              <h3 className="plan-generate-title">Generate Presentation</h3>
+              <textarea
+                className="plan-generate-input"
+                placeholder="Enter your content or topic here..."
+                value={generateInput}
+                onChange={(e) => setGenerateInput(e.target.value)}
+                rows={4}
+              />
+              <button
+                className="plan-generate-btn"
+                onClick={handleGenerateSlides}
+                disabled={!generateInput.trim() || !selectedTemplate || isGenerating || !settings?.openaiKey}
+              >
+                {isGenerating ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
           </div>
         )}
         <div className="plan-scenes-list">
