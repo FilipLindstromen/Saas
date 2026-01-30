@@ -87,7 +87,8 @@ function App() {
       inlineBgColor: localStorage.getItem('inlineBgColor') || '#000000',
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
-      transitionStyle: localStorage.getItem('transitionStyle') || 'default'
+      transitionStyle: localStorage.getItem('transitionStyle') || 'default',
+      lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4
     }
     return savedSettings
   })
@@ -221,6 +222,7 @@ function App() {
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
+    localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
   }, [settings])
 
   // Keyboard navigation for slide selection (only in edit mode)
@@ -309,6 +311,44 @@ function App() {
     setSlides(newSlides)
   }
 
+  // Create a new presentation (clear all slides)
+  const handleNewPresentation = () => {
+    if (window.confirm('Create a new presentation? This will clear all current slides.')) {
+      // Create a single empty slide
+      const newSlide = {
+        id: 1,
+        content: '',
+        subtitle: '',
+        imageUrl: '',
+        layout: 'default',
+        gradientStrength: 0.7,
+        flipHorizontal: false,
+        backgroundOpacity: 1.0,
+        gradientFlipped: false,
+        imageScale: 1.0,
+        imagePositionX: 50,
+        imagePositionY: 50,
+        textHeadingLevel: null,
+        subtitleHeadingLevel: null
+      }
+      setSlides([newSlide])
+      setSelectedSlideId(newSlide.id)
+    }
+  }
+
+  // Load a template
+  const handleLoadTemplate = (templateSlides) => {
+    // Regenerate IDs to ensure they're unique
+    const newSlides = templateSlides.map((slide, index) => ({
+      ...slide,
+      id: index + 1
+    }))
+    setSlides(newSlides)
+    // Select the first non-section slide, or first slide if all are sections
+    const firstNonSection = newSlides.find(s => s.layout !== 'section')
+    setSelectedSlideId(firstNonSection ? firstNonSection.id : newSlides[0]?.id || null)
+  }
+
   // Export all data to a file
   const handleExportFile = () => {
     const exportData = {
@@ -384,9 +424,17 @@ function App() {
           : slidesWithLayout[0]?.id || 1
         setSelectedSlideId(validSelectedId)
 
-        // Load settings if provided
+        // Load settings if provided (merge with existing to preserve API keys if not in file)
         if (importData.settings) {
-          setSettings(importData.settings)
+          setSettings(prevSettings => ({
+            ...prevSettings,
+            ...importData.settings
+          }))
+        }
+
+        // Load sidebar width if provided
+        if (importData.sidebarWidth !== undefined) {
+          setSidebarWidth(importData.sidebarWidth)
         }
 
         // Load sidebar width if provided
@@ -548,6 +596,7 @@ function App() {
           showMenu={true}
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
+          lineHeight={settings.lineHeight || 1.4}
         />
       </>
     )
@@ -561,6 +610,12 @@ function App() {
           <div className="header-left">
             <h1>Pitch Deck 2000</h1>
             <div className="header-file-actions">
+              <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
               <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -643,7 +698,7 @@ function App() {
           </div>
         </div>
         <div className="app-content plan-mode-content">
-          <PlanMode slides={slides} onUpdateSlides={updateSlides} />
+          <PlanMode slides={slides} onUpdateSlides={updateSlides} onLoadTemplate={handleLoadTemplate} />
         </div>
         {showSettings && (
           <Settings
@@ -662,6 +717,12 @@ function App() {
         <div className="header-left">
           <h1>Pitch Deck 2000</h1>
           <div className="header-file-actions">
+            <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
             <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -788,6 +849,7 @@ function App() {
           inlineBgColor={settings.inlineBgColor}
           inlineBgOpacity={settings.inlineBgOpacity}
           inlineBgPadding={settings.inlineBgPadding}
+          lineHeight={settings.lineHeight || 1.4}
         />
       </div>
       {showSettings && (

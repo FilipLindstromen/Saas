@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
+import TemplateSelector from './TemplateSelector'
 import './PlanMode.css'
 
-function PlanMode({ slides, onUpdateSlides }) {
+function PlanMode({ slides, onUpdateSlides, onLoadTemplate }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [draggedId, setDraggedId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
+  const [showTemplates, setShowTemplates] = useState(false)
   const textareaRef = useRef(null)
   const lastEnterTimeRef = useRef(0)
 
@@ -286,7 +288,27 @@ function PlanMode({ slides, onUpdateSlides }) {
 
   return (
     <div className="plan-mode">
-      <div className="plan-scenes-list">
+      <div className="plan-layout">
+        {onLoadTemplate && (
+          <div className={`plan-templates-sidebar ${showTemplates ? 'expanded' : ''}`}>
+            <button 
+              className="plan-templates-toggle"
+              onClick={() => setShowTemplates(!showTemplates)}
+              title={showTemplates ? 'Hide templates' : 'Show templates'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span>Templates</span>
+            </button>
+            {showTemplates && (
+              <div className="plan-templates-content">
+                <TemplateSelector onLoadTemplate={onLoadTemplate} />
+              </div>
+            )}
+          </div>
+        )}
+        <div className="plan-scenes-list">
         {slides.map((slide, index) => {
           // Remove HTML tags for display
           const tempDiv = document.createElement('div')
@@ -351,6 +373,7 @@ function PlanMode({ slides, onUpdateSlides }) {
             + Add section
           </button>
         </div>
+      </div>
       </div>
     </div>
   )

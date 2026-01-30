@@ -45,13 +45,14 @@
   height: 100%;
   display: flex;
   align-items: flex-end;
-  /* Convert rem to percentage: 3rem = 48px = 4% of 1200px width, 23.7% of 675px height */
-  padding: 4% 0 23.7% 9%;
+  /* Position text in lower third: ~16.67% from bottom centers content in lower third */
+  padding: 4% 0 16.67% 9%;
 }
 
 .slide-content.bulletpoints {
-  align-items: center;
-  padding: 4% 0 4% 9%;
+  align-items: flex-end;
+  /* Position bullet points in lower third: ~16.67% from bottom centers content in lower third */
+  padding: 4% 0 16.67% 9%;
 }
 
 .slide-content.centered {
@@ -92,12 +93,14 @@
   outline: none;
   border: none;
   pointer-events: auto;
+  cursor: text;
 }
 
 .slide-text {
   /* 4rem = 64px = 5.33% of 1200px width */
   /* Use em units relative to slide's font-size, which scales with slide width */
   font-size: 4em;
+  cursor: text;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -188,6 +191,7 @@
   outline: none;
   border: none;
   pointer-events: auto;
+  cursor: text;
 }
 
 .slide-subtitle:focus {
@@ -287,6 +291,7 @@
   letter-spacing: normal;
   outline: none;
   border: none;
+  cursor: text;
   /* Inherit font-size from parent (.slide-bullet) */
   font-size: 1em;
 }
