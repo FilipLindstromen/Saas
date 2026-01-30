@@ -207,11 +207,11 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                   min="0"
                   max="1"
                   step="0.1"
-                  value={slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0}
+                  value={slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6}
                   onChange={(e) => onUpdate({ backgroundOpacity: parseFloat(e.target.value) })}
                   className="gradient-slider"
                 />
-                <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0) * 100)}%</span>
+                <span className="gradient-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6) * 100)}%</span>
               </div>
               {slide.imageUrl && (
                 <>

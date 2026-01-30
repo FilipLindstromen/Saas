@@ -12,7 +12,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const layout = slide.layout || 'default'
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
-  const backgroundOpacity = slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 1.0
+  const backgroundOpacity = slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6
   const gradientFlipped = slide.gradientFlipped !== undefined ? slide.gradientFlipped : false
   const imageScale = slide.imageScale !== undefined ? slide.imageScale : 1.0
   const imagePositionX = slide.imagePositionX !== undefined ? slide.imagePositionX : 50
@@ -47,18 +47,30 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   // Convert line breaks to HTML breaks for display
   const formatContentForDisplay = (content) => {
     if (!content) return ''
+    
+    // First, convert literal <BR> or <br> text (case insensitive) to actual <br> tags
+    // This handles cases where users type <BR> or <br> as text
+    content = content.replace(/<BR\s*\/?>/gi, '<br>')
+    
     // If content already contains HTML tags (from formatting or contentEditable), 
     // convert \n to <br> within the HTML
     if (content.includes('<') && content.includes('>')) {
       // Replace \n with <br> but preserve existing HTML structure
       return content.replace(/\n/g, '<br>')
     }
-    // Otherwise, escape HTML and convert \n to <br>
-    return content
+    
+    // For plain text content, we need to escape HTML but preserve <br> tags
+    // Use a placeholder to protect <br> tags during escaping
+    const brPlaceholder = '___BR_TAG_PLACEHOLDER___'
+    content = content
+      .replace(/<br\s*\/?>/gi, brPlaceholder)  // Protect <br> tags
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br>')
+      .replace(/\n/g, brPlaceholder)  // Convert newlines to placeholder
+      .replace(new RegExp(brPlaceholder, 'g'), '<br>')  // Restore <br> tags
+    
+    return content
   }
 
   // Check if subtitle has actual text content (strips HTML tags)
@@ -283,41 +295,70 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'centered') {
       const subtitleHasContent = hasSubtitleContent()
+      const getPlainText = (content) => {
+        if (!content) return ''
+        return content
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<BR\s*\/?>/gi, '\n')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+      }
+      const plainText = getPlainText(slide.content || '')
+      
+      // Auto-resize textarea
+      useEffect(() => {
+        if (contentRef.current && !isPlayMode) {
+          contentRef.current.style.height = 'auto'
+          contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
+        }
+      }, [plainText, isPlayMode])
       
       return (
         <div className="slide-text-centered-wrapper">
-          <div 
-            ref={contentRef}
-            className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
-            style={textStyle}
-            contentEditable={isEditable}
-            suppressContentEditableWarning={true}
-            onBlur={handleContentChange}
-        onFocus={handleContentFocus}
-        onClick={(e) => {
-          if (isEditable) {
-            e.stopPropagation()
-          }
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            e.stopPropagation()
-            document.execCommand('insertLineBreak')
-            // Keep focus on the element
-            setTimeout(() => {
-              if (contentRef.current) {
-                contentRef.current.focus()
-              }
-            }, 0)
-          }
-        }}
-        onInput={(e) => {
-          // Mark as editing immediately when user types
-          isEditingContentRef.current = true
-        }}
-        dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
-          />
+          {isPlayMode ? (
+            <div 
+              ref={contentRef}
+              className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+              style={textStyle}
+              dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
+            />
+          ) : (
+            <textarea
+              ref={contentRef}
+              className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+              style={textStyle}
+              value={plainText}
+              onChange={(e) => {
+                if (onUpdate && !isPlayMode) {
+                  isEditingContentRef.current = true
+                  const htmlContent = e.target.value.replace(/\n/g, '<br>')
+                  onUpdate({ content: htmlContent })
+                  e.target.style.height = 'auto'
+                  e.target.style.height = e.target.scrollHeight + 'px'
+                }
+              }}
+              onFocus={handleContentFocus}
+              onBlur={(e) => {
+                if (onUpdate && !isPlayMode) {
+                  isEditingContentRef.current = false
+                  const htmlContent = e.target.value.replace(/\n/g, '<br>')
+                  handleContentChange({ target: { innerHTML: htmlContent } })
+                }
+              }}
+              onClick={(e) => {
+                if (isEditable) {
+                  e.stopPropagation()
+                }
+              }}
+              readOnly={!isEditable}
+              rows={1}
+            />
+          )}
           {subtitleHasContent ? (
             <div 
               ref={subtitleRef}
@@ -385,48 +426,78 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       )
     }
 
-    // Get initial content for the element
-    const initialContent = formatContentForDisplay(slide.content || '')
+    // Convert content to plain text for textarea (replace <br> with newlines)
+    const getPlainText = (content) => {
+      if (!content) return ''
+      // Convert HTML <br> tags to newlines
+      return content
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<BR\s*\/?>/gi, '\n')
+        .replace(/&nbsp;/g, ' ')
+        // Strip other HTML tags but keep text
+        .replace(/<[^>]*>/g, '')
+        // Decode HTML entities
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+    }
+    
+    const plainText = getPlainText(slide.content || '')
+    
+    // Auto-resize textarea
+    useEffect(() => {
+      if (contentRef.current && !isPlayMode) {
+        contentRef.current.style.height = 'auto'
+        contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
+      }
+    }, [plainText, isPlayMode])
+    
+    // For play mode, render as div with formatted content
+    if (isPlayMode) {
+      return (
+        <div 
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+          style={textStyle}
+          dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
+        />
+      )
+    }
     
     return (
-      <div 
+      <textarea
         ref={contentRef}
         className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
         style={textStyle}
-        contentEditable={isEditable}
-        suppressContentEditableWarning={true}
-        onBlur={handleContentChange}
+        value={plainText}
+        onChange={(e) => {
+          if (onUpdate && !isPlayMode) {
+            isEditingContentRef.current = true
+            // Convert newlines to <br> for storage
+            const htmlContent = e.target.value.replace(/\n/g, '<br>')
+            onUpdate({ content: htmlContent })
+            // Auto-resize
+            e.target.style.height = 'auto'
+            e.target.style.height = e.target.scrollHeight + 'px'
+          }
+        }}
         onFocus={handleContentFocus}
+        onBlur={(e) => {
+          if (onUpdate && !isPlayMode) {
+            isEditingContentRef.current = false
+            const htmlContent = e.target.value.replace(/\n/g, '<br>')
+            handleContentChange({ target: { innerHTML: htmlContent } })
+          }
+        }}
         onClick={(e) => {
           if (isEditable) {
             e.stopPropagation()
-            // Ensure element has content when clicked
-            if (!contentRef.current.innerHTML && !contentRef.current.textContent) {
-              contentRef.current.innerHTML = initialContent
-            }
           }
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            e.stopPropagation()
-            document.execCommand('insertLineBreak')
-            // Keep focus on the element
-            setTimeout(() => {
-              if (contentRef.current) {
-                contentRef.current.focus()
-              }
-            }, 0)
-          }
-        }}
-        onInput={(e) => {
-          // Update the ref immediately when user types
-          isEditingContentRef.current = true
-        }}
-        dangerouslySetInnerHTML={!isEditable ? { __html: initialContent } : undefined}
-      >
-        {isEditable && initialContent && !contentRef.current?.innerHTML ? initialContent : null}
-      </div>
+        readOnly={!isEditable}
+        rows={1}
+      />
     )
   }
 
