@@ -63,6 +63,13 @@
   padding: 4%;
 }
 
+.slide-content.right {
+  align-items: flex-end;
+  justify-content: flex-end;
+  /* Position text in lower third: ~16.67% from bottom centers content in lower third */
+  padding: 4% 9% 16.67% 0;
+}
+
 .slide-content.section {
   justify-content: center;
   align-items: center;
@@ -83,9 +90,9 @@
   /* Use percentage of slide height for consistent scaling */
   font-size: 3.56%;
   /* But percentage font-size is relative to parent, so use em instead */
-  /* 1.5rem relative to 1rem base = 1.5em */
-  font-size: 1.5em;
-  font-weight: 400;
+  /* 1.2rem relative to 1rem base = 1.2em (smaller) */
+  font-size: 1.2em;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.6);
@@ -163,6 +170,11 @@
   width: 95%;
   max-width: 95%;
   text-align: center;
+}
+
+.slide-text.right {
+  text-align: right;
+  max-width: 66.67%;
 }
 
 .slide-text-centered-wrapper {

@@ -72,7 +72,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const handleContentChange = (e) => {
     if (!onUpdate || isPlayMode) return
     isEditingContentRef.current = false
-    const newContent = e.target.innerHTML
+    const newContent = e.target.innerHTML || e.target.textContent || ''
+    // Save the content immediately
     onUpdate({ content: newContent })
   }
 
@@ -93,20 +94,35 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   // Update contentEditable elements only when not being edited
   useEffect(() => {
+    // Don't update if currently being edited or if element is focused
     if (!isEditingContentRef.current && contentRef.current && slide.content !== undefined) {
+      // Check if element is currently focused - if so, don't update
+      if (document.activeElement === contentRef.current) {
+        return
+      }
+      
+      // Check if there's a selection range in the element
+      const selection = window.getSelection()
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        if (contentRef.current.contains(range.commonAncestorContainer)) {
+          return
+        }
+      }
+      
       const formattedContent = formatContentForDisplay(slide.content)
-      // Only update if content actually changed (avoid unnecessary updates)
-      if (contentRef.current.innerHTML !== formattedContent) {
+      // Only update if content actually changed
+      const currentInnerHTML = contentRef.current.innerHTML || ''
+      if (currentInnerHTML !== formattedContent) {
+        // Save selection if any
         const selection = window.getSelection()
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-        const wasFocused = document.activeElement === contentRef.current
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null
         
         contentRef.current.innerHTML = formattedContent
         
-        // Restore focus and selection if it was focused
-        if (wasFocused && range) {
+        // Try to restore selection if it existed
+        if (range && contentRef.current.contains(range.commonAncestorContainer)) {
           try {
-            contentRef.current.focus()
             selection.removeAllRanges()
             selection.addRange(range)
           } catch (e) {
@@ -116,6 +132,20 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
     }
   }, [slide.content])
+  
+  // Initialize content when element is first created or when slide changes
+  useEffect(() => {
+    if (contentRef.current && !isEditingContentRef.current && document.activeElement !== contentRef.current) {
+      const formattedContent = formatContentForDisplay(slide.content || '')
+      // Always set content when slide changes (by ID) to ensure it's synced
+      if (formattedContent) {
+        contentRef.current.innerHTML = formattedContent
+      } else if (!contentRef.current.innerHTML && !contentRef.current.textContent) {
+        // If empty, set empty string
+        contentRef.current.innerHTML = ''
+      }
+    }
+  }, [slide.id]) // Re-initialize when slide changes
 
   useEffect(() => {
     if (!isEditingSubtitleRef.current && subtitleRef.current && slide.subtitle !== undefined) {
@@ -137,6 +167,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const renderContent = () => {
     const textHeadingLevel = slide.textHeadingLevel || null
     const subtitleHeadingLevel = slide.subtitleHeadingLevel || null
+    const isEditable = !isPlayMode && onUpdate
     
     // Get heading size and font based on heading level
     const getHeadingSize = (level) => {
@@ -165,21 +196,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       borderRadius: textInlineBackground ? '4px' : '0',
       fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
       fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : undefined,
-      lineHeight: lineHeight
+      lineHeight: lineHeight,
+      pointerEvents: isEditable ? 'auto' : undefined
     }
     
     const subtitleStyle = {
       ...textStyle,
       fontSize: subtitleHeadingLevel ? `${getHeadingSize(subtitleHeadingLevel)}rem` : undefined,
-      fontFamily: subtitleHeadingLevel ? `"${getHeadingFont(subtitleHeadingLevel)}", sans-serif` : undefined
+      fontFamily: subtitleHeadingLevel ? `"${getHeadingFont(subtitleHeadingLevel)}", sans-serif` : undefined,
+      pointerEvents: isEditable ? 'auto' : undefined
     }
-
-    const isEditable = !isPlayMode && onUpdate
 
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
       return (
-        <div className="slide-bullets" style={textStyle}>
+        <div className="slide-bullets" style={{ ...textStyle, pointerEvents: isEditable ? 'auto' : undefined }}>
           {bullets.map((bullet, index) => (
             <div
               key={index}
@@ -188,9 +219,15 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               <span className="bullet-marker">•</span>
               <span 
                 className="bullet-text"
+                style={{ pointerEvents: isEditable ? 'auto' : undefined }}
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
                 onBlur={(e) => handleBulletChange(index, e)}
+                onClick={(e) => {
+                  if (isEditable) {
+                    e.stopPropagation()
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -215,21 +252,30 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             contentEditable={isEditable}
             suppressContentEditableWarning={true}
             onBlur={handleContentChange}
-            onFocus={handleContentFocus}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                e.stopPropagation()
-                document.execCommand('insertLineBreak')
-                // Keep focus on the element
-                setTimeout(() => {
-                  if (contentRef.current) {
-                    contentRef.current.focus()
-                  }
-                }, 0)
+        onFocus={handleContentFocus}
+        onClick={(e) => {
+          if (isEditable) {
+            e.stopPropagation()
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            e.stopPropagation()
+            document.execCommand('insertLineBreak')
+            // Keep focus on the element
+            setTimeout(() => {
+              if (contentRef.current) {
+                contentRef.current.focus()
               }
-            }}
-            dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
+            }, 0)
+          }
+        }}
+        onInput={(e) => {
+          // Mark as editing immediately when user types
+          isEditingContentRef.current = true
+        }}
+        dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
           />
         </div>
       )
@@ -247,21 +293,30 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             contentEditable={isEditable}
             suppressContentEditableWarning={true}
             onBlur={handleContentChange}
-            onFocus={handleContentFocus}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                e.stopPropagation()
-                document.execCommand('insertLineBreak')
-                // Keep focus on the element
-                setTimeout(() => {
-                  if (contentRef.current) {
-                    contentRef.current.focus()
-                  }
-                }, 0)
+        onFocus={handleContentFocus}
+        onClick={(e) => {
+          if (isEditable) {
+            e.stopPropagation()
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            e.stopPropagation()
+            document.execCommand('insertLineBreak')
+            // Keep focus on the element
+            setTimeout(() => {
+              if (contentRef.current) {
+                contentRef.current.focus()
               }
-            }}
-            dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
+            }, 0)
+          }
+        }}
+        onInput={(e) => {
+          // Mark as editing immediately when user types
+          isEditingContentRef.current = true
+        }}
+        dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
           />
           {subtitleHasContent ? (
             <div 
@@ -272,6 +327,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               suppressContentEditableWarning={true}
               onBlur={handleSubtitleChange}
               onFocus={handleSubtitleFocus}
+              onClick={(e) => {
+                if (isEditable) {
+                  e.stopPropagation()
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -325,15 +385,27 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       )
     }
 
+    // Get initial content for the element
+    const initialContent = formatContentForDisplay(slide.content || '')
+    
     return (
       <div 
         ref={contentRef}
-        className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+        className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
         style={textStyle}
         contentEditable={isEditable}
         suppressContentEditableWarning={true}
         onBlur={handleContentChange}
         onFocus={handleContentFocus}
+        onClick={(e) => {
+          if (isEditable) {
+            e.stopPropagation()
+            // Ensure element has content when clicked
+            if (!contentRef.current.innerHTML && !contentRef.current.textContent) {
+              contentRef.current.innerHTML = initialContent
+            }
+          }
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -347,8 +419,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             }, 0)
           }
         }}
-        dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
-      />
+        onInput={(e) => {
+          // Update the ref immediately when user types
+          isEditingContentRef.current = true
+        }}
+        dangerouslySetInnerHTML={!isEditable ? { __html: initialContent } : undefined}
+      >
+        {isEditable && initialContent && !contentRef.current?.innerHTML ? initialContent : null}
+      </div>
     )
   }
 
@@ -425,7 +503,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || !slide.imageUrl) return
     // Only start dragging if clicking directly on the background, not on text content
-    if (e.target.closest('.slide-content')) return
+    // Check if the click is on a text element (these have pointerEvents: auto)
+    const target = e.target
+    const isTextElement = target.classList.contains('slide-text') || 
+                         target.classList.contains('slide-subtitle') || 
+                         target.classList.contains('bullet-text') || 
+                         target.classList.contains('slide-section-name') ||
+                         target.closest('.slide-text, .slide-subtitle, .bullet-text, .slide-section-name')
+    
+    if (isTextElement) {
+      return
+    }
     e.preventDefault()
     e.stopPropagation()
     const rect = slideRef.current?.getBoundingClientRect()
@@ -541,7 +629,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {layout !== 'centered' && layout !== 'section' && (
+      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && (
         <div 
           className="slide-gradient-overlay"
           style={{
@@ -553,11 +641,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         />
       )}
       <div 
-        className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
+        className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
         style={{ 
           color: textColor,
-          fontFamily: `"${fontFamily}", sans-serif`,
-          pointerEvents: (!isPlayMode && onUpdate) ? 'none' : 'auto'
+          fontFamily: `"${fontFamily}", sans-serif`
         }}
       >
         {renderContent()}
