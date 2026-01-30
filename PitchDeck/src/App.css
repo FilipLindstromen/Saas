@@ -34,6 +34,29 @@
   align-items: center;
 }
 
+.project-name-input {
+  padding: 0.5rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-family: inherit;
+  min-width: 150px;
+  max-width: 250px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.project-name-input:focus {
+  background: #2a2a2a;
+  border-color: #4a9eff;
+}
+
+.project-name-input::placeholder {
+  color: #888;
+}
+
 .header-templates-toggle {
   display: flex;
   align-items: center;

@@ -31,8 +31,9 @@
 }
 
 .plan-templates-sidebar.expanded {
-  width: 100%;
+  width: 280px;
   min-width: 280px;
+  flex-shrink: 0;
 }
 
 .plan-templates-toggle {
@@ -84,7 +85,7 @@
 }
 
 .plan-generate-content {
-  width: 100%;
+  width: 280px;
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease, opacity 0.3s ease;
@@ -99,7 +100,7 @@
 }
 
 .plan-templates-content {
-  width: 100%;
+  width: 280px;
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease;

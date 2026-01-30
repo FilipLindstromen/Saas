@@ -20,6 +20,10 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     setEditContent(slide.content)
     setEditSubtitle(slide.subtitle || '')
     setEditingSubtitle(false)
+    // Also select the slide in the preview
+    if (onSelect) {
+      onSelect(slide.id)
+    }
   }
 
   const handleChange = (e, id) => {
