@@ -108,6 +108,19 @@ function Settings({ settings, onUpdate, onClose }) {
                   </select>
                 </div>
                 <div className="settings-field">
+                  <label htmlFor="line-height">Line Height</label>
+                  <input
+                    id="line-height"
+                    type="number"
+                    min="0.5"
+                    max="3"
+                    step="0.1"
+                    value={localSettings.lineHeight !== undefined ? localSettings.lineHeight : 1.4}
+                    onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1.4)}
+                    className="settings-number-input"
+                  />
+                </div>
+                <div className="settings-field">
                   <label className="settings-sub-section-title">Heading Sizes (rem)</label>
                   <div className="settings-sub-fields">
                     <div className="settings-sub-field">

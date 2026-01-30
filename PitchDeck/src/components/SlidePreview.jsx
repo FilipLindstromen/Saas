@@ -3,7 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4 }) {
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const fileInputRef = useRef(null)
@@ -319,6 +319,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           inlineBgColor={inlineBgColor}
           inlineBgOpacity={inlineBgOpacity}
           inlineBgPadding={inlineBgPadding}
+          lineHeight={lineHeight}
           onUpdate={onUpdate}
         />
       </div>
