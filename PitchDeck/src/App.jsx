@@ -64,6 +64,9 @@ function App() {
     const saved = localStorage.getItem('sidebarWidth')
     return saved ? parseInt(saved, 10) : 350
   })
+  const [projectName, setProjectName] = useState(() => {
+    return localStorage.getItem('pitchDeckProjectName') || ''
+  })
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
   const [settings, setSettings] = useState(() => {
@@ -350,6 +353,11 @@ function App() {
     setSelectedSlideId(firstNonSection ? firstNonSection.id : newSlides[0]?.id || null)
   }
 
+  // Save project name to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('pitchDeckProjectName', projectName)
+  }, [projectName])
+
   // Export all data to a file
   const handleExportFile = () => {
     const exportData = {
@@ -358,6 +366,7 @@ function App() {
       selectedSlideId: selectedSlideId,
       settings: settings,
       sidebarWidth: sidebarWidth,
+      projectName: projectName,
       exportedAt: new Date().toISOString()
     }
 
@@ -366,7 +375,11 @@ function App() {
     const url = URL.createObjectURL(dataBlob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+    // Use project name for filename, or fallback to default
+    const filename = projectName.trim() 
+      ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
+      : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -441,6 +454,11 @@ function App() {
         // Load sidebar width if provided
         if (importData.sidebarWidth !== undefined) {
           setSidebarWidth(importData.sidebarWidth)
+        }
+
+        // Load project name if provided
+        if (importData.projectName !== undefined) {
+          setProjectName(importData.projectName)
         }
 
         alert(`Successfully imported ${slidesWithLayout.length} slide(s)!`)
@@ -632,6 +650,14 @@ function App() {
                 </svg>
               </button>
               <input
+                type="text"
+                className="project-name-input"
+                placeholder="Project name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                title="Project name (used when saving files)"
+              />
+              <input
                 ref={fileInputRef}
                 type="file"
                 accept=".json,application/json"
@@ -740,6 +766,14 @@ function App() {
                 <line x1="9" y1="14" x2="15" y2="14" />
               </svg>
             </button>
+            <input
+              type="text"
+              className="project-name-input"
+              placeholder="Project name"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              title="Project name (used when saving files)"
+            />
             <input
               ref={fileInputRef}
               type="file"
