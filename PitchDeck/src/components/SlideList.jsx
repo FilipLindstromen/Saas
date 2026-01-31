@@ -363,9 +363,10 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
               onDrop={(e) => handleDrop(e, slide.id)}
               onDragEnd={handleDragEnd}
             >
-              <div className="slide-item-number">{originalIndex + 1}</div>
-              <div
-                className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', width: '100%' }}>
+                <div className="slide-item-number">{originalIndex + 1}</div>
+                <div
+                  className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
                 onClick={(e) => {
                   // Don't select if we just finished dragging (within 200ms)
                   const timeSinceDragStart = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : Infinity
@@ -705,6 +706,7 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                 </div>
               )}
                 </div>
+              </div>
               </div>
             </div>
           )

@@ -3,7 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, recordSettings }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, recordSettings, analysisFolded = false, onToggleAnalysisFold }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -324,6 +324,25 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           onUpdate={onUpdate}
         />
       </div>
+      {slide.analysis && (
+        <div className="preview-analysis">
+          <div className="preview-analysis-header" onClick={onToggleAnalysisFold}>
+            <div className="preview-analysis-label">Analysis:</div>
+            <button className="preview-analysis-toggle" title={analysisFolded ? 'Expand' : 'Collapse'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {analysisFolded ? (
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                ) : (
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                )}
+              </svg>
+            </button>
+          </div>
+          {!analysisFolded && (
+            <div className="preview-analysis-text">{slide.analysis}</div>
+          )}
+        </div>
+      )}
       <ImagePicker
         isOpen={showImagePicker}
         onClose={() => setShowImagePicker(false)}

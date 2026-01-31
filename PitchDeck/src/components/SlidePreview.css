@@ -295,3 +295,58 @@
   color: #666;
   font-size: 1.1rem;
 }
+
+.preview-analysis {
+  padding: 1.5rem;
+  background: #1f2a3a;
+  border-top: 1px solid #3a3a3a;
+  border-left: 3px solid #4a9eff;
+  margin: 0 2rem 2rem 2rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.preview-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.preview-analysis-label {
+  color: #4a9eff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-analysis-toggle {
+  background: transparent;
+  border: none;
+  color: #4a9eff;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  border-radius: 4px;
+}
+
+.preview-analysis-toggle:hover {
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.preview-analysis-toggle svg {
+  stroke: #4a9eff;
+}
+
+.preview-analysis-text {
+  color: #cccccc;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-top: 0.75rem;
+}

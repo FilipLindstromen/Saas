@@ -50,7 +50,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10 }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -101,25 +101,35 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     // This handles cases where users type <BR> or <br> as text
     content = content.replace(/<BR\s*\/?>/gi, '<br>')
     
+    // Check if content contains HTML tags (including mark tags)
+    const hasHtmlTags = content.includes('<') && content.includes('>')
+    
     // Apply highlight styling to <mark> tags if text highlighting is enabled
     if (textInlineBackground) {
-      const highlightColor = `rgba(${hexToRgb(inlineBgColor).r}, ${hexToRgb(inlineBgColor).g}, ${hexToRgb(inlineBgColor).b}, ${inlineBgOpacity})`
-      // Wrap existing mark tags with styled spans, or add style attribute
-      content = content.replace(/<mark\s*([^>]*)>/gi, (match, attrs) => {
-        // Check if style already exists
-        if (attrs && attrs.includes('style=')) {
-          // Update existing style
-          return match.replace(/style\s*=\s*["'][^"']*["']/i, `style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;"`)
-        } else {
-          // Add style attribute
-          return `<mark style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;" ${attrs || ''}>`
-        }
-      })
+      try {
+        const rgb = hexToRgb(inlineBgColor)
+        const highlightColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${inlineBgOpacity})`
+        // Process mark tags and add style attribute
+        // Match <mark> or <mark ...> with any attributes
+        content = content.replace(/<mark(\s[^>]*)?>/gi, (match, attrs = '') => {
+          // Check if style already exists
+          if (attrs && attrs.includes('style=')) {
+            // Update existing style - replace the entire style attribute
+            return match.replace(/style\s*=\s*["'][^"']*["']/i, `style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;"`)
+          } else {
+            // Add style attribute - ensure proper spacing
+            const spacing = attrs.trim() ? ' ' : ''
+            return `<mark style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;"${spacing}${attrs}>`
+          }
+        })
+      } catch (e) {
+        console.error('Error applying highlight styling:', e)
+      }
     }
     
     // If content already contains HTML tags (from formatting or contentEditable), 
-    // convert \n to <br> within the HTML
-    if (content.includes('<') && content.includes('>')) {
+    // convert \n to <br> within the HTML and preserve all HTML tags
+    if (hasHtmlTags) {
       // Replace \n with <br> but preserve existing HTML structure
       return content.replace(/\n/g, '<br>')
     }
@@ -208,7 +218,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         }
       }
     }
-  }, [slide.content])
+  }, [slide.content, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding])
   
   // Initialize content when element is first created or when slide changes
   useEffect(() => {
@@ -222,7 +232,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         contentRef.current.innerHTML = ''
       }
     }
-  }, [slide.id]) // Re-initialize when slide changes
+  }, [slide.id, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding]) // Re-initialize when slide changes or highlight settings change
 
   useEffect(() => {
     if (!isEditingSubtitleRef.current && subtitleRef.current && slide.subtitle !== undefined) {
@@ -231,7 +241,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         subtitleRef.current.innerHTML = formattedSubtitle
       }
     }
-  }, [slide.subtitle])
+  }, [slide.subtitle, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding])
 
   // Auto-resize textarea for non-bulletpoint, non-section layouts (centered, default, right)
   // This must be outside renderContent to avoid conditional hook calls
@@ -312,11 +322,15 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             <div
               key={index}
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
+              style={{ lineHeight: bulletLineHeight }}
             >
               <span className="bullet-marker">•</span>
               <span 
                 className="bullet-text"
-                style={{ pointerEvents: isEditable ? 'auto' : undefined }}
+                style={{ 
+                  pointerEvents: isEditable ? 'auto' : undefined,
+                  lineHeight: bulletLineHeight
+                }}
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
                 onBlur={(e) => handleBulletChange(index, e)}
@@ -757,7 +771,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       `}</style>
       {slide.imageUrl && layout !== 'section' && (
         <div
-          className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''}`}
+          className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: `${imageScale * 100}%`,
@@ -765,7 +779,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             cursor: (!isPlayMode && onUpdate) ? 'move' : 'default',
-            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : 'none'
+            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : 'none',
+            ...(isPlayMode && backgroundScaleAnimation ? {
+              '--scale-duration': `${backgroundScaleTime}s`,
+              '--initial-scale': `${imageScale * 100}%`,
+              '--final-scale': `${(imageScale * 100) + 20}%` // Always scale up by 20% from current scale
+            } : {})
           }}
         />
       )}

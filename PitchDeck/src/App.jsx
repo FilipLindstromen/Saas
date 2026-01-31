@@ -31,7 +31,8 @@ function App() {
             imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
             imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
             textHeadingLevel: slide.textHeadingLevel || null,
-            subtitleHeadingLevel: slide.subtitleHeadingLevel || null
+            subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
+            analysis: slide.analysis || null
           }))
           return {
             slides: slidesWithLayout,
@@ -86,6 +87,11 @@ function App() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [showRecordingOptions, setShowRecordingOptions] = useState(false)
   const [showTransitionOptions, setShowTransitionOptions] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisFolded, setAnalysisFolded] = useState(() => {
+    const saved = localStorage.getItem('analysisFolded')
+    return saved === 'true'
+  })
   const fileInputRef = useRef(null)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('sidebarWidth')
@@ -120,6 +126,8 @@ function App() {
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
       textAnimation: localStorage.getItem('textAnimation') || 'none',
+      backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
+      backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
       lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4,
       bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1.4
     }
@@ -283,6 +291,11 @@ function App() {
     })
   }, [settings.fontFamily, settings.h1FontFamily, settings.h2FontFamily, settings.h3FontFamily])
 
+  // Save analysisFolded to localStorage
+  useEffect(() => {
+    localStorage.setItem('analysisFolded', analysisFolded.toString())
+  }, [analysisFolded])
+
   // Save settings to localStorage
   useEffect(() => {
     if (settings.openaiKey) {
@@ -323,6 +336,8 @@ function App() {
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
+    localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
+    localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1.4')
   }, [settings])
@@ -624,7 +639,8 @@ function App() {
           textHeadingLevel: slide.textHeadingLevel || null,
           subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
           webcamEnabled: slide.webcamEnabled !== undefined ? slide.webcamEnabled : false,
-          selectedCameraId: slide.selectedCameraId || ''
+          selectedCameraId: slide.selectedCameraId || '',
+          analysis: slide.analysis || null
         }))
 
         // Confirm before importing (to avoid losing current work)
@@ -795,6 +811,182 @@ function App() {
     alert(message)
   }
 
+  const handleAnalyzeSlides = async () => {
+    if (!settings.openaiKey) {
+      alert('Please set your OpenAI API key in settings first.')
+      return
+    }
+
+    if (slides.length === 0) {
+      alert('No slides to analyze.')
+      return
+    }
+
+    setIsAnalyzing(true)
+
+    try {
+      // Get current chapter name for context
+      const currentChapter = chapters.find(c => c.id === currentChapterId)
+      const chapterName = currentChapter?.name || 'Chapter'
+
+      // Prepare slide data for analysis (exclude section slides)
+      const slidesToAnalyze = slides.filter(s => (s.layout || 'default') !== 'section')
+      
+      if (slidesToAnalyze.length === 0) {
+        alert('No content slides to analyze.')
+        setIsAnalyzing(false)
+        return
+      }
+
+      // Build context about slides
+      const slidesContext = slidesToAnalyze.map((slide, index) => {
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = slide.content || ''
+        const contentText = tempDiv.textContent || tempDiv.innerText || ''
+        const subtitleText = slide.subtitle || ''
+        return {
+          index: index + 1,
+          layout: slide.layout || 'default',
+          content: contentText,
+          subtitle: subtitleText
+        }
+      }).map(s => `Slide ${s.index} (${s.layout}): "${s.content}"${s.subtitle ? ` - Subtitle: "${s.subtitle}"` : ''}`).join('\n')
+
+      // Build the request body - using OpenAI API
+      const requestBody = {
+        model: 'gpt-3.5-turbo',
+        messages: [
+            {
+              role: 'system',
+              content: `You are an expert presentation analyst. Analyze pitch deck slides and provide concise, actionable feedback for each slide. 
+
+The slides are like headlines/outlines - they contain minimal content, not full paragraphs. Consider:
+- The chapter/section context: "${chapterName}"
+- What the slide should emphasize: emotions, facts, proof, credibility, benefits, etc.
+- What would make the slide stronger
+- Suggestions for additional slides if needed
+
+IMPORTANT: Do NOT suggest changing the layout or template. Focus only on content, messaging, and what the slide should emphasize.
+
+For each slide, provide:
+1. What the slide should push on (emotions, facts, proof, etc.)
+2. How to strengthen the content and messaging
+3. Optional: Suggest adding more slides about specific topics if the presentation needs more depth
+
+Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON with this exact structure:
+{
+  "analyses": [
+    {"slideIndex": 1, "analysis": "Analysis text here"},
+    {"slideIndex": 2, "analysis": "Analysis text here"}
+  ]
+}`
+            },
+          {
+            role: 'user',
+            content: `Analyze these slides from "${chapterName}":\n\n${slidesContext}\n\nReturn ONLY the JSON object, no other text.`
+          }
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 2000
+      }
+
+      // Analyze all slides at once using OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.openaiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        let errorMessage = `API error: ${response.status} ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message
+          } else if (errorData.error) {
+            errorMessage = JSON.stringify(errorData.error)
+          }
+        } catch (e) {
+          // If we can't parse the error, use the status text
+        }
+        console.error('OpenAI API Error:', errorMessage)
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Invalid response from OpenAI')
+      }
+
+      const analysisText = data.choices[0].message.content
+      if (!analysisText) {
+        throw new Error('Empty response from OpenAI')
+      }
+
+      let analysisData
+      
+      try {
+        analysisData = JSON.parse(analysisText)
+      } catch (e) {
+        console.error('Failed to parse analysis response:', analysisText)
+        throw new Error('Could not parse analysis response as JSON')
+      }
+
+      if (!analysisData.analyses || !Array.isArray(analysisData.analyses)) {
+        throw new Error('Invalid analysis format: missing analyses array')
+      }
+
+      // Update slides with analysis
+      const updatedSlides = slides.map(slide => {
+        if ((slide.layout || 'default') === 'section') {
+          return slide // Skip section slides
+        }
+
+        // Find analysis for this slide
+        const slideIndex = slidesToAnalyze.findIndex(s => s.id === slide.id) + 1
+        let analysis = null
+
+        if (analysisData.analyses && Array.isArray(analysisData.analyses)) {
+          const slideAnalysis = analysisData.analyses.find(a => a.slideIndex === slideIndex)
+          if (slideAnalysis) {
+            analysis = slideAnalysis.analysis
+          }
+        }
+
+        return { ...slide, analysis }
+      })
+
+      setSlides(updatedSlides)
+
+      // Save to localStorage
+      try {
+        const currentChapter = chapters.find(c => c.id === currentChapterId)
+        if (currentChapter) {
+          const updatedChapter = {
+            ...currentChapter,
+            slides: updatedSlides
+          }
+          const updatedChapters = chapters.map(ch => ch.id === currentChapterId ? updatedChapter : ch)
+          localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
+        }
+      } catch (error) {
+        console.error('Error saving analysis:', error)
+      }
+
+      alert(`Analysis complete! ${slidesToAnalyze.length} slide(s) analyzed.`)
+    } catch (error) {
+      console.error('Error analyzing slides:', error)
+      const errorMessage = error.message || 'Unknown error'
+      alert(`Error analyzing slides: ${errorMessage}\n\nPlease check your OpenAI API key in settings and ensure it's valid.`)
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   const selectedSlide = slides.find(s => s.id === selectedSlideId)
 
   // Present mode (fullscreen)
@@ -825,6 +1017,8 @@ function App() {
           showMenu={true}
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
+          backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
+          backgroundScaleTime={settings.backgroundScaleTime || 10}
           lineHeight={settings.lineHeight || 1.4}
           bulletLineHeight={settings.bulletLineHeight || 1.4}
           recordSettings={recordSettings}
@@ -999,6 +1193,18 @@ function App() {
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </button>
+              <button 
+                className="btn-icon-header btn-analyze" 
+                onClick={handleAnalyzeSlides}
+                title="Analyze slides"
+                disabled={!settings.openaiKey || isAnalyzing}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />
+                  <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
+                  <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
                 </svg>
               </button>
               <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
@@ -1208,6 +1414,18 @@ function App() {
                   <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </button>
+              <button 
+                className="btn-icon-header btn-analyze" 
+                onClick={handleAnalyzeSlides}
+                title="Analyze slides"
+                disabled={!settings.openaiKey || isAnalyzing}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />
+                  <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
+                  <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
+                </svg>
+              </button>
               <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
@@ -1244,6 +1462,8 @@ function App() {
           onUpdate={(updates) => updateSlide(selectedSlideId, updates)}
           settings={settings}
           onUpdateSettings={setSettings}
+          analysisFolded={analysisFolded}
+          onToggleAnalysisFold={() => setAnalysisFolded(!analysisFolded)}
           backgroundColor={settings.backgroundColor}
           textColor={settings.textColor}
           fontFamily={settings.fontFamily}

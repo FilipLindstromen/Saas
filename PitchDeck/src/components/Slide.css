@@ -29,6 +29,20 @@
   pointer-events: auto;
 }
 
+.slide-background.background-scale-animation {
+  animation: backgroundScale var(--scale-duration, 10s) linear forwards;
+  animation-fill-mode: forwards;
+}
+
+@keyframes backgroundScale {
+  from {
+    background-size: var(--initial-scale, 100%);
+  }
+  to {
+    background-size: var(--final-scale, 120%);
+  }
+}
+
 .slide-gradient-overlay {
   position: absolute;
   top: 0;
@@ -257,6 +271,14 @@
   /* Highlight styling is applied inline via formatContentForDisplay */
   /* This ensures the highlight color, opacity, padding, and border-radius are applied */
   display: inline;
+  background-color: transparent;
+}
+
+.slide-text mark[style],
+.slide-subtitle mark[style],
+.slide-bullet mark[style] {
+  /* When style attribute is present, use inline styles (higher specificity) */
+  display: inline;
 }
 
 .slide-text h1 {
@@ -385,7 +407,7 @@
   /* 2.5rem = 40px = 3.33% of 1200px width */
   font-size: 2.5em;
   font-weight: 600;
-  line-height: 1.4;
+  /* line-height is set via inline style from Slide component (bulletLineHeight prop) */
   opacity: 0;
   transform: translateY(20px);
   transition: opacity 0.5s ease, transform 0.5s ease;
