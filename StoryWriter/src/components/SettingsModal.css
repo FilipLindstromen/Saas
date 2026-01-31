@@ -70,16 +70,27 @@
   color: var(--text);
 }
 
+.settings-label--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-label--checkbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
 .settings-input {
   display: block;
   width: 100%;
   margin-top: 0.375rem;
   padding: 0.625rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--btn-font-size);
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--btn-radius);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -104,30 +115,32 @@
 }
 
 .settings-actions .btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 8px;
+  padding: var(--btn-padding-y) var(--btn-padding-x);
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  font-family: inherit;
+  border-radius: var(--btn-radius);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, filter 0.15s;
 }
 
 .settings-actions .btn.secondary {
-  background: transparent;
+  background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
 }
 
 .settings-actions .btn.secondary:hover {
   background: var(--hover);
+  border-color: var(--border-hover);
 }
 
 .settings-actions .btn.primary {
-  background: var(--accent);
+  background: var(--btn-primary-bg);
   border: none;
-  color: var(--text-on-accent);
+  color: var(--btn-primary-text);
 }
 
 .settings-actions .btn.primary:hover {
-  filter: brightness(1.1);
+  filter: brightness(0.96);
 }

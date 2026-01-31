@@ -54,7 +54,7 @@ export default function StorySection({
         <textarea
             ref={textareaRef}
             className="story-section__textarea"
-            placeholder="Generated or edited story text will appear here…"
+            placeholder="Written or edited story text will appear here…"
             value={content}
             onChange={(e) => {
               onContentChange(sectionDef.id, e.target.value);

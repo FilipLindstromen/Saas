@@ -148,6 +148,8 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
       formattedText = `<strong>${selectedText}</strong>`
     } else if (tag === 'em') {
       formattedText = `<em>${selectedText}</em>`
+    } else if (tag === 'mark') {
+      formattedText = `<mark>${selectedText}</mark>`
     } else {
       setIsFormatting(false)
       return
@@ -415,6 +417,27 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                     </button>
                     <button
                       type="button"
+                      className="format-btn"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyFormatting('mark', false)
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      title="Highlight text"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <path d="M3 20h18v2H3v-2z" opacity="0.3" />
+                        <path d="M5 18h14v-2H5v2z" />
+                        <path d="M7 16h10v-1H7v1z" />
+                        <path d="M9 14h6v-1H9v1z" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
                       className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h1' ? 'active' : ''}`}
                       onClick={(e) => {
                         e.preventDefault()
@@ -522,6 +545,27 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                           title="Italic (Ctrl+I)"
                         >
                           <em>I</em>
+                        </button>
+                        <button
+                          type="button"
+                          className="format-btn"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            applyFormatting('mark', true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          title="Highlight text"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 2H2v9h9V2z" />
+                            <path d="M22 13h-9v9h9v-9z" />
+                            <path d="M11 13H2v9h9v-9z" />
+                            <path d="M22 2h-9v9h9V2z" />
+                          </svg>
                         </button>
                         <button
                           type="button"

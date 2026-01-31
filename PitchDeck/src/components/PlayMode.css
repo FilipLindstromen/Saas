@@ -356,6 +356,34 @@
   color: #ffffff;
 }
 
+/* Webcam overlay - separate from slide transitions */
+.play-webcam-overlay {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  /* Use 'all' for seamless transitions in both directions */
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: top, right, bottom, left, width, height, min-width, min-height, border-radius, clip-path, aspect-ratio;
+  /* Ensure smooth rendering and prevent layout shifts */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Contain layout to prevent reflows during transitions */
+  contain: layout style paint;
+}
+
+.play-webcam-overlay video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Ensure video doesn't cause layout shifts */
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 .btn-fullscreen {
   padding: 0.5rem 1rem;
   background: #2a2a2a;

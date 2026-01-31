@@ -1,20 +1,16 @@
 .story-section {
   display: flex;
   gap: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.story-section:hover {
-  border-color: var(--border-hover);
+  transition: box-shadow 0.2s;
 }
 
 .story-section--dragging {
   opacity: 0.9;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   z-index: 1;
 }
 
@@ -23,12 +19,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.5rem 0.375rem;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
+  padding: 0.5rem 0.25rem;
+  background: transparent;
+  border: none;
   cursor: grab;
   color: var(--text-muted);
-  min-width: 40px;
+  min-width: 28px;
 }
 
 .story-section__handle:active {
@@ -37,7 +33,6 @@
 
 .story-section__handle:hover {
   color: var(--text);
-  background: var(--hover);
 }
 
 .story-section__handle-icon {
@@ -54,12 +49,12 @@
 
 .story-section__body {
   flex: 1;
-  padding: 0.5rem 0.75rem;
+  padding: 0;
   min-width: 0;
 }
 
 .story-section__title {
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.5rem;
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--accent);
@@ -69,25 +64,25 @@
 .story-section__textarea {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.625rem;
-  font-size: 0.875rem;
-  line-height: 1.55;
+  margin: 0;
+  padding: 0;
+  font-size: 1.0625rem;
+  line-height: 1.7;
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   outline: none;
   resize: none;
   overflow: hidden;
-  min-height: 80px;
-  transition: border-color 0.15s;
+  min-height: 1.7em;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 .story-section__textarea:focus {
-  background: var(--focus-bg);
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px var(--accent-dim);
+  background: transparent;
+  box-shadow: none;
 }
 
 .story-section__textarea::placeholder {
