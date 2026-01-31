@@ -273,7 +273,10 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
           + Add Slide
         </button>
       </div>
-      <LayoutSelector onSelectLayout={handleLayoutSelect} />
+      <LayoutSelector 
+        onSelectLayout={handleLayoutSelect} 
+        selectedLayout={slides.find(s => s.id === selectedSlideId)?.layout || 'default'} 
+      />
       <div className="slide-list-items">
         {getVisibleSlides().map((slide, visibleIndex) => {
           const isSection = slide.layout === 'section'

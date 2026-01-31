@@ -44,10 +44,25 @@ const LAYOUTS = [
         </div>
       </div>
     )
+  },
+  {
+    id: 'video',
+    name: 'Video Only',
+    description: 'Full screen video/webcam',
+    thumbnail: (
+      <div className="layout-thumbnail-content">
+        <div className="layout-thumbnail-video">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 7l-7 5 7 5V7z" />
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+          </svg>
+        </div>
+      </div>
+    )
   }
 ]
 
-function LayoutSelector({ onSelectLayout }) {
+function LayoutSelector({ onSelectLayout, selectedLayout = 'default' }) {
   return (
     <div className="layout-selector">
       <div className="layout-selector-header">
@@ -57,7 +72,7 @@ function LayoutSelector({ onSelectLayout }) {
         {LAYOUTS.map((layout) => (
           <div
             key={layout.id}
-            className="layout-thumbnail"
+            className={`layout-thumbnail ${selectedLayout === layout.id ? 'selected' : ''}`}
             onClick={() => onSelectLayout(layout.id)}
             title={layout.description}
           >

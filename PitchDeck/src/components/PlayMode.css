@@ -24,16 +24,18 @@
   left: 0;
   right: 0;
   bottom: 0;
-  /* Reset all transform and filter properties */
-  transform: none;
-  filter: none;
+  /* Initial state - visible */
   opacity: 1;
+  transform: translateX(0) scale(1);
+  filter: blur(0);
+  /* Ensure transitions are smooth */
+  will-change: opacity, transform, filter;
 }
 
 .play-slide-container.visible {
   opacity: 1;
-  transform: none;
-  filter: none;
+  transform: translateX(0) scale(1);
+  filter: blur(0);
 }
 
 @keyframes fadeIn {
@@ -47,12 +49,23 @@
 
 /* Transition Styles */
 .play-slide-container.transition-default.fade-out {
-  opacity: 0;
+  animation: fadeOut 0.3s ease-in-out forwards;
 }
 
 .play-slide-container.transition-default.fade-in {
   opacity: 0;
   animation: fadeIn 0.3s ease-in-out forwards;
+  /* Ensure it starts invisible to prevent flicker */
+  visibility: visible;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Slide Transition */
@@ -61,6 +74,8 @@
 }
 
 .play-slide-container.transition-slide.fade-in {
+  opacity: 0;
+  transform: translateX(-100%);
   animation: slideIn 0.3s ease-in-out forwards;
 }
 
@@ -92,6 +107,8 @@
 }
 
 .play-slide-container.transition-zoom.fade-in {
+  opacity: 0;
+  transform: scale(1.2);
   animation: zoomIn 0.3s ease-in-out forwards;
 }
 
@@ -123,6 +140,7 @@
 }
 
 .play-slide-container.transition-dissolve.fade-in {
+  opacity: 0;
   animation: dissolveIn 0.5s ease-in-out forwards;
 }
 
@@ -150,6 +168,8 @@
 }
 
 .play-slide-container.transition-blur.fade-in {
+  opacity: 0;
+  filter: blur(10px);
   animation: blurIn 0.4s ease-in-out forwards;
 }
 
@@ -181,6 +201,8 @@
 }
 
 .play-slide-container.transition-sequence.fade-in {
+  opacity: 0;
+  transform: scale(1.1) translateY(-20px);
   animation: sequenceIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
@@ -223,10 +245,94 @@
   /* Font-size is set via CSS custom property in Slide component */
   /* This ensures it scales proportionally with slide width */
   /* Don't override - let the Slide component handle it */
+  /* Ensure webcam positioning is relative to slide container */
+  position: relative;
+}
+
+/* Ensure webcam positioning is identical in present mode */
+.play-mode .slide .slide-webcam {
+  position: absolute;
+  /* Positioning values are inherited from Slide.css */
+  /* This ensures webcam appears in the same relative position */
+  /* Do not override bottom, right, left, top, width, or height values */
+  /* All positioning must match Slide.css exactly */
+  /* Ensure object-fit and aspect-ratio are maintained */
+  object-fit: cover;
+}
+
+/* Explicitly ensure webcam positioning classes match edit mode exactly */
+.play-mode .slide .slide-webcam.webcam-video-bottom-right {
+  position: absolute;
+  bottom: 4%;
+  right: 4%;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+  z-index: 5;
+  /* Ensure these values exactly match Slide.css */
+}
+
+.play-mode .slide .slide-webcam.webcam-video-bottom-left {
+  position: absolute;
+  bottom: 4%;
+  left: 4%;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+  z-index: 5;
+  /* Ensure these values exactly match Slide.css */
+}
+
+.play-mode .slide .slide-webcam.webcam-video-fullscreen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  aspect-ratio: auto;
+  z-index: 5;
+  /* Ensure these values exactly match Slide.css */
 }
 
 /* All sizing is now percentage-based in Slide.css, so it scales naturally */
 /* No need for additional scaling overrides */
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ff4444;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 68, 68, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  background: #ff4444;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
 
 .play-controls {
   position: absolute;

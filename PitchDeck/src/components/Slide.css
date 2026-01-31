@@ -77,6 +77,67 @@
   padding: 4%;
 }
 
+.slide-content.video {
+  display: none;
+}
+
+/* Webcam video styling */
+.slide-webcam {
+  position: absolute;
+  z-index: 5;
+  object-fit: cover;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  aspect-ratio: 1 / 1;
+}
+
+.slide-webcam.webcam-video-bottom-right {
+  position: absolute;
+  bottom: 4%;
+  right: 4%;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  /* Ensure consistent positioning in both edit and present modes */
+  z-index: 5;
+}
+
+.slide-webcam.webcam-video-bottom-left {
+  position: absolute;
+  bottom: 4%;
+  left: 4%;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  /* Ensure consistent positioning in both edit and present modes */
+  z-index: 5;
+}
+
+.slide-webcam.webcam-video-fullscreen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  /* Ensure consistent positioning in both edit and present modes */
+  z-index: 5;
+}
+
+.slide-webcam.play-mode:not(.webcam-video-fullscreen) {
+  border-radius: 50%;
+  clip-path: circle(50% at center);
+  -webkit-clip-path: circle(50% at center);
+}
+
+.slide-webcam.webcam-video-fullscreen.play-mode {
+  border-radius: 0;
+  clip-path: none;
+  -webkit-clip-path: none;
+}
+
 .slide-section-text {
   display: flex;
   justify-content: center;
