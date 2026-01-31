@@ -262,28 +262,32 @@
 
 /* Explicitly ensure webcam positioning classes match edit mode exactly */
 .play-mode .slide .slide-webcam.webcam-video-bottom-right {
-  position: absolute;
-  bottom: 4%;
-  right: 4%;
-  width: 20%;
-  height: auto;
-  min-width: 120px;
-  min-height: 120px;
-  aspect-ratio: 1 / 1;
-  z-index: 5;
+  position: absolute !important;
+  bottom: 4% !important;
+  right: 4% !important;
+  top: auto !important;
+  left: auto !important;
+  width: 20% !important;
+  height: auto !important;
+  min-width: 120px !important;
+  min-height: 120px !important;
+  aspect-ratio: 1 / 1 !important;
+  z-index: 5 !important;
   /* Ensure these values exactly match Slide.css */
 }
 
 .play-mode .slide .slide-webcam.webcam-video-bottom-left {
-  position: absolute;
-  bottom: 4%;
-  left: 4%;
-  width: 20%;
-  height: auto;
-  min-width: 120px;
-  min-height: 120px;
-  aspect-ratio: 1 / 1;
-  z-index: 5;
+  position: absolute !important;
+  bottom: 4% !important;
+  left: 4% !important;
+  top: auto !important;
+  right: auto !important;
+  width: 20% !important;
+  height: auto !important;
+  min-width: 120px !important;
+  min-height: 120px !important;
+  aspect-ratio: 1 / 1 !important;
+  z-index: 5 !important;
   /* Ensure these values exactly match Slide.css */
 }
 

@@ -95,6 +95,8 @@
   position: absolute;
   bottom: 4%;
   right: 4%;
+  top: auto;
+  left: auto;
   width: 20%;
   height: auto;
   min-width: 120px;
@@ -107,6 +109,8 @@
   position: absolute;
   bottom: 4%;
   left: 4%;
+  top: auto;
+  right: auto;
   width: 20%;
   height: auto;
   min-width: 120px;

@@ -128,7 +128,11 @@ function App() {
     const saved = localStorage.getItem('pitchDeckRecordSettings')
     if (saved) {
       try {
-        return JSON.parse(saved)
+        const parsed = JSON.parse(saved)
+        return {
+          ...parsed,
+          webcamSize: parsed.webcamSize || 'large'
+        }
       } catch (e) {
         console.error('Error parsing record settings:', e)
       }
@@ -136,11 +140,13 @@ function App() {
     return {
       recordInPresentMode: false,
       webcamEnabled: false,
+      webcamSize: 'large',
       selectedCameraId: '',
       microphoneEnabled: false,
       selectedMicrophoneId: ''
     }
   })
+  const recordButtonRef = useRef(null)
 
   // Update current chapter's slides when slides change
   useEffect(() => {
@@ -203,6 +209,15 @@ function App() {
       console.error('Error saving sidebar width:', error)
     }
   }, [sidebarWidth])
+
+  // Save recordSettings to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckRecordSettings', JSON.stringify(recordSettings))
+    } catch (error) {
+      console.error('Error saving record settings:', error)
+    }
+  }, [recordSettings])
 
   // Handle sidebar resize
   const handleResizeStart = (e) => {
@@ -952,6 +967,7 @@ function App() {
             </div>
             <div className="header-right">
               <button 
+                ref={recordButtonRef}
                 className="btn-record-menu" 
                 onClick={() => setShowRecordingOptions(true)}
                 title="Record"
@@ -1009,6 +1025,7 @@ function App() {
             setRecordSettings(updatedSettings)
           }}
           onClose={() => setShowRecordingOptions(false)}
+          buttonRef={recordButtonRef}
         />
       )}
       {showTransitionOptions && (
@@ -1158,6 +1175,7 @@ function App() {
             </div>
             <div className="header-right">
               <button 
+                ref={recordButtonRef}
                 className="btn-record-menu" 
                 onClick={() => setShowRecordingOptions(true)}
                 title="Record"
@@ -1261,6 +1279,7 @@ function App() {
             setRecordSettings(updatedSettings)
           }}
           onClose={() => setShowRecordingOptions(false)}
+          buttonRef={recordButtonRef}
         />
       )}
       {showTransitionOptions && (
