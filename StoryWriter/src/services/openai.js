@@ -1,13 +1,13 @@
 const STORY_SYSTEM_PROMPT = `You are an expert storyteller who writes emotional, gripping stories that keep the audience hooked.
 
-STYLE RULES (follow strictly):
-- Use simple, easy-to-understand language. No jargon or fancy words.
-- Use short, punchy sentences. Cut long sentences into two or three. Avoid run-ons.
-- Do not use metaphors. Say things literally and concretely.
-- Use specific, recognizable examples so the audience can easily picture them (concrete details: places, actions, objects, moments they can see in their heads).
-- Be emotional and direct. Grab the audience and keep them wanting to know how it goes.
-- Use open and close loops: create curiosity and pay it off.
-- Write in first person when appropriate (the hero's voice).
+CRITICAL — PRESERVE THE USER'S STYLE (follow strictly):
+- The user's input defines both the content AND the style. Match their voice exactly: same type of words, same sentence length and rhythm, same tone (formal or casual), same level of detail.
+- Do not simplify, "improve", or rewrite in a different voice. If they use longer, flowing sentences, keep that. If they use short punchy ones, keep that. If they use specific or plain words, keep that.
+- Stay in the same person (first person if they wrote in first person, etc.). Preserve their phrasing habits and vocabulary.
+
+STYLE RULES (when not overridden by the user's input):
+- Use specific, recognizable examples so the audience can picture them (concrete details: places, actions, objects).
+- Be emotional and direct. Use open and close loops: create curiosity and pay it off.
 - No generic self-help tone. Sound like a real person telling a real story.
 - Each section should feel complete but leave a thread to the next.
 
@@ -30,15 +30,20 @@ const LENGTH_INSTRUCTIONS = {
 
 function buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength) {
   const lengthInstruction = LENGTH_INSTRUCTIONS[storyLength] || LENGTH_INSTRUCTIONS.medium;
-  const part = existingContent ? `Current text (user may have edited; preserve their intent, improve if needed):\n${existingContent}\n\nRewrite or refine the above for this section only.` : `Write this section from scratch.`;
-  return `Story theme: ${storyAbout}
+  const part = existingContent ? `Current text (user may have edited; preserve their intent and style):\n${existingContent}\n\nRewrite or refine the above for this section only.` : `Write this section from scratch.`;
+  return `Story theme and STYLE REFERENCE (match this voice, vocabulary, and sentence style in your output):
+---
+${storyAbout}
+---
+
 Section: "${sectionDef.title}"
 ${sectionDef.description}
 Length: ${lengthInstruction}
 ${sectionInput ? `Additional context for this section: ${sectionInput}` : ''}
 
 ${part}
-Output only the story text for this section. No section title, no numbering, no meta-commentary.`;
+
+Keep the same kind of words and style as the user's input above. Output only the story text for this section. No section title, no numbering, no meta-commentary.`;
 }
 
 const LENGTH_MAX_TOKENS = { micro: 80, short: 150, medium: 350, long: 500 };

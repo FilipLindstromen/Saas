@@ -34,6 +34,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
 
   const getWebcamClass = () => {
     if (layout === 'video') return 'webcam-video-fullscreen'
+    if (layout === 'left-video') return 'webcam-video-right-panel'
     if (layout === 'right') return 'webcam-video-bottom-left'
     return 'webcam-video-bottom-right'
   }
@@ -92,13 +93,29 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       .map(line => line.replace(/^[-•*]\s*/, '')) // Remove bullet markers if present
   }
 
-  // Convert line breaks to HTML breaks for display
+  // Convert line breaks to HTML breaks for display and apply text highlighting
   const formatContentForDisplay = (content) => {
     if (!content) return ''
     
     // First, convert literal <BR> or <br> text (case insensitive) to actual <br> tags
     // This handles cases where users type <BR> or <br> as text
     content = content.replace(/<BR\s*\/?>/gi, '<br>')
+    
+    // Apply highlight styling to <mark> tags if text highlighting is enabled
+    if (textInlineBackground) {
+      const highlightColor = `rgba(${hexToRgb(inlineBgColor).r}, ${hexToRgb(inlineBgColor).g}, ${hexToRgb(inlineBgColor).b}, ${inlineBgOpacity})`
+      // Wrap existing mark tags with styled spans, or add style attribute
+      content = content.replace(/<mark\s*([^>]*)>/gi, (match, attrs) => {
+        // Check if style already exists
+        if (attrs && attrs.includes('style=')) {
+          // Update existing style
+          return match.replace(/style\s*=\s*["'][^"']*["']/i, `style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;"`)
+        } else {
+          // Add style attribute
+          return `<mark style="background-color: ${highlightColor}; padding: ${inlineBgPadding}px; border-radius: 4px;" ${attrs || ''}>`
+        }
+      })
+    }
     
     // If content already contains HTML tags (from formatting or contentEditable), 
     // convert \n to <br> within the HTML
@@ -274,12 +291,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       textShadow: textDropShadow 
         ? `${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}` 
         : undefined,
-      backgroundColor: textInlineBackground 
-        ? `rgba(${hexToRgb(inlineBgColor).r}, ${hexToRgb(inlineBgColor).g}, ${hexToRgb(inlineBgColor).b}, ${inlineBgOpacity})` 
-        : 'transparent',
-      padding: textInlineBackground ? `${inlineBgPadding}px` : '0',
-      display: textInlineBackground ? 'inline-block' : 'block',
-      borderRadius: textInlineBackground ? '4px' : '0',
       fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
       fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : undefined,
       lineHeight: lineHeight,
@@ -516,7 +527,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     if (isPlayMode) {
       return (
         <div 
-          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
           style={textStyle}
           dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
         />
@@ -758,7 +769,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && (
+      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && (
         <div 
           className="slide-gradient-overlay"
           style={{
@@ -790,7 +801,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         )
       ) : (
         <div 
-          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
+          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''}`}
           style={{ 
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`

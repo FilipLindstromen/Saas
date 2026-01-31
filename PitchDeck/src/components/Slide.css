@@ -81,6 +81,12 @@
   display: none;
 }
 
+.slide-content.left-video {
+  align-items: flex-end;
+  /* Position text in lower third, but leave right third for video */
+  padding: 4% 33.33% 16.67% 9%;
+}
+
 /* Webcam video styling */
 .slide-webcam {
   position: absolute;
@@ -126,6 +132,18 @@
   width: 100%;
   height: 100%;
   border-radius: 0;
+  /* Ensure consistent positioning in both edit and present modes */
+  z-index: 5;
+}
+
+.slide-webcam.webcam-video-right-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 33.33%;
+  height: 100%;
+  border-radius: 0;
+  aspect-ratio: auto;
   /* Ensure consistent positioning in both edit and present modes */
   z-index: 5;
 }
@@ -224,6 +242,14 @@
   font-style: italic;
 }
 
+.slide-text mark,
+.slide-subtitle mark,
+.slide-bullet mark {
+  /* Highlight styling is applied inline via formatContentForDisplay */
+  /* This ensures the highlight color, opacity, padding, and border-radius are applied */
+  display: inline;
+}
+
 .slide-text h1 {
   font-weight: 700;
   margin: 0;
@@ -254,6 +280,10 @@
 .slide-text.right {
   text-align: right;
   max-width: 66.67%;
+}
+
+.slide-text.left-video {
+  font-size: 3em; /* Smaller text for left-video layout */
 }
 
 .slide-text-centered-wrapper {

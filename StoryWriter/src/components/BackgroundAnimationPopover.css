@@ -1,0 +1,102 @@
+.background-animation-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.background-animation-btn {
+  /* reuses .app-settings-btn from App.css */
+}
+
+.background-animation-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 280px;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--btn-radius);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+}
+
+.background-animation-popover__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.background-animation-popover__label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.background-animation-popover__label--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.background-animation-popover__label--checkbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+.background-animation-popover__select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--btn-font-size);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--btn-radius);
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.background-animation-popover__select:focus {
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.background-animation-popover__range {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  accent-color: var(--accent);
+}
+
+.background-animation-popover__actions {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.background-animation-popover__btn {
+  padding: var(--btn-padding-y) var(--btn-padding-x);
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, filter 0.15s;
+  font-family: inherit;
+}
+
+.background-animation-popover__btn--primary {
+  background: var(--btn-primary-bg);
+  border: none;
+  color: var(--btn-primary-text);
+}
+
+.background-animation-popover__btn--primary:hover {
+  filter: brightness(0.96);
+}

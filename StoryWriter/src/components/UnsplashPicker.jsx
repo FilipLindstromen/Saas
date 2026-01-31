@@ -4,21 +4,21 @@ import './UnsplashPicker.css';
 
 const UNSPLASH_SEARCH = 'https://api.unsplash.com/search/photos';
 
-export default function UnsplashPicker({ isOpen, onClose, onSelect }) {
-  const [query, setQuery] = useState('');
+export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery = '', inline = false }) {
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const accessKey = getSettings().unsplashAccessKey?.trim();
 
-  const search = useCallback(async () => {
+  const searchWithQuery = useCallback(async (searchQuery) => {
     if (!accessKey) {
       setError('Add your Unsplash Access Key in Settings.');
       setResults([]);
       return;
     }
-    const q = query.trim();
+    const q = String(searchQuery ?? '').trim().slice(0, 100);
     if (!q) {
       setResults([]);
       setError('');
@@ -44,21 +44,25 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect }) {
     } finally {
       setLoading(false);
     }
-  }, [accessKey, query]);
+  }, [accessKey]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const t = setTimeout(search, 400);
+    const q = (query || initialQuery).trim();
+    if (!q) return;
+    const t = setTimeout(() => searchWithQuery(q), 400);
     return () => clearTimeout(t);
-  }, [isOpen, query, search]);
+  }, [isOpen, query, initialQuery, searchWithQuery]);
 
   useEffect(() => {
     if (!isOpen) {
       setQuery('');
       setResults([]);
       setError('');
+    } else {
+      setQuery(initialQuery);
     }
-  }, [isOpen]);
+  }, [isOpen, initialQuery]);
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose();
@@ -73,6 +77,48 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect }) {
 
   if (!isOpen) return null;
 
+  const pickerContent = (
+    <div className={inline ? 'unsplash-picker-inline' : 'unsplash-picker-modal'}>
+      <div className="unsplash-picker-header">
+        <h3 className="unsplash-picker-title">{initialQuery ? 'Set image for sentence' : 'Set section background image'}</h3>
+        <button type="button" className="unsplash-picker-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+      </div>
+      <div className="unsplash-picker-search">
+        <input
+          type="search"
+          className="unsplash-picker-input"
+          placeholder="Search Unsplash…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus={!inline}
+        />
+      </div>
+      {!accessKey && (
+        <p className="unsplash-picker-hint">
+          Add your Unsplash Access Key in Settings. Get a free key at unsplash.com/developers.
+        </p>
+      )}
+      {error && <p className="unsplash-picker-error">{error}</p>}
+      {loading && <p className="unsplash-picker-loading">Loading…</p>}
+      <div className="unsplash-picker-grid">
+        {results.map((photo) => (
+          <button
+            type="button"
+            key={photo.id}
+            className="unsplash-picker-item"
+            onClick={() => handleSelect(photo)}
+            style={{ backgroundImage: `url(${photo.urls?.thumb || photo.urls?.small || ''})` }}
+            title={photo.alt_description || 'Select'}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  if (inline) return pickerContent;
+
   return (
     <div
       className="unsplash-picker-backdrop"
@@ -81,43 +127,7 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect }) {
       aria-modal="true"
       aria-label="Choose Unsplash image"
     >
-      <div className="unsplash-picker-modal">
-        <div className="unsplash-picker-header">
-          <h3 className="unsplash-picker-title">Set section background image</h3>
-          <button type="button" className="unsplash-picker-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div className="unsplash-picker-search">
-          <input
-            type="search"
-            className="unsplash-picker-input"
-            placeholder="Search Unsplash…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
-        {!accessKey && (
-          <p className="unsplash-picker-hint">
-            Add your Unsplash Access Key in Settings. Get a free key at unsplash.com/developers.
-          </p>
-        )}
-        {error && <p className="unsplash-picker-error">{error}</p>}
-        {loading && <p className="unsplash-picker-loading">Loading…</p>}
-        <div className="unsplash-picker-grid">
-          {results.map((photo) => (
-            <button
-              type="button"
-              key={photo.id}
-              className="unsplash-picker-item"
-              onClick={() => handleSelect(photo)}
-              style={{ backgroundImage: `url(${photo.urls?.thumb || photo.urls?.small || ''})` }}
-              title={photo.alt_description || 'Select'}
-            />
-          ))}
-        </div>
-      </div>
+      {pickerContent}
     </div>
   );
 }

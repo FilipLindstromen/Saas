@@ -22,6 +22,40 @@
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
 }
 
+.unsplash-picker-inline {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  background: transparent;
+}
+
+.unsplash-picker-inline .unsplash-picker-header {
+  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.unsplash-picker-inline .unsplash-picker-search {
+  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.unsplash-picker-inline .unsplash-picker-grid {
+  flex: 1;
+  min-height: 0;
+  padding: 0.5rem 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.5rem;
+}
+
+.unsplash-picker-inline .unsplash-picker-hint,
+.unsplash-picker-inline .unsplash-picker-error,
+.unsplash-picker-inline .unsplash-picker-loading {
+  margin: 0 0.75rem 0.5rem;
+  flex-shrink: 0;
+}
+
 .unsplash-picker-header {
   display: flex;
   align-items: center;

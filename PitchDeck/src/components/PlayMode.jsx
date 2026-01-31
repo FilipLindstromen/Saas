@@ -2,6 +2,177 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
+// Webcam overlay component - separate from slide transitions
+function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true }) {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const containerRef = useRef(null)
+  const prevLayoutRef = useRef(layout)
+  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight })
+
+  // Update dimensions on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({ width: window.innerWidth, height: window.innerHeight })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Get webcam size based on setting
+  const getWebcamSize = () => {
+    switch (webcamSize) {
+      case 'small': return { width: '15%', minWidth: '100px', minHeight: '100px' }
+      case 'medium': return { width: '20%', minWidth: '120px', minHeight: '120px' }
+      case 'large': return { width: '25%', minWidth: '150px', minHeight: '150px' }
+      default: return { width: '20%', minWidth: '120px', minHeight: '120px' }
+    }
+  }
+
+  // Get webcam position based on layout
+  // Always use top/left positioning with explicit pixel values for smooth CSS transitions
+  const getWebcamPosition = () => {
+    if (layout === 'video') {
+      return { 
+        top: 0, 
+        left: 0, 
+        width: dimensions.width,
+        height: dimensions.height
+      }
+    }
+    
+    if (layout === 'left-video') {
+      // Full height on right third of slide
+      const rightPanelWidth = dimensions.width / 3
+      return {
+        top: 0,
+        left: dimensions.width - rightPanelWidth,
+        width: rightPanelWidth,
+        height: dimensions.height
+      }
+    }
+    
+    // Calculate webcam size in pixels
+    const webcamWidth = dimensions.width * (webcamSize === 'small' ? 0.15 : webcamSize === 'medium' ? 0.20 : 0.25)
+    const webcamHeight = webcamWidth // Square aspect ratio
+    
+    // Calculate position from top-left for smooth transitions
+    const bottomOffset = dimensions.height * 0.04 // 4% from bottom
+    const sideOffset = dimensions.width * 0.04 // 4% from side
+    
+    if (layout === 'right') {
+      // Bottom-left: calculate top position
+      return { 
+        top: dimensions.height - bottomOffset - webcamHeight,
+        left: sideOffset,
+        width: webcamWidth,
+        height: webcamHeight
+      }
+    }
+    // Default: bottom-right - calculate top and left positions
+    return { 
+      top: dimensions.height - bottomOffset - webcamHeight,
+      left: dimensions.width - sideOffset - webcamWidth,
+      width: webcamWidth,
+      height: webcamHeight
+    }
+  }
+
+  useEffect(() => {
+    if (!cameraId || !isVisible) return
+
+    const startStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: cameraId } }
+        })
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          streamRef.current = stream
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error)
+      }
+    }
+
+    startStream()
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [cameraId, isVisible])
+
+  // Update transition when layout changes - ensure smooth transition
+  useEffect(() => {
+    if (prevLayoutRef.current !== layout && containerRef.current) {
+      // Use requestAnimationFrame to ensure the browser has rendered the current position
+      // before applying the new position, enabling smooth transitions in both directions
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Force a reflow to ensure the browser recognizes the current position
+          if (containerRef.current) {
+            containerRef.current.offsetHeight
+          }
+        })
+      })
+      prevLayoutRef.current = layout
+    }
+  }, [layout, dimensions])
+
+  if (!isVisible || !cameraId) return null
+
+  const size = getWebcamSize()
+  const position = getWebcamPosition()
+  const isFullscreen = layout === 'video'
+
+  // Build style object with all properties explicitly set for smooth transitions
+  // Always use top/left positioning with explicit pixel values for seamless transitions
+  // This ensures CSS can smoothly interpolate between all values (small to big and vice versa)
+  const style = {
+    position: 'fixed',
+    top: `${position.top}px`,
+    left: `${position.left}px`,
+    width: `${position.width}px`,
+    height: isFullscreen ? `${position.height}px` : `${position.height}px`, // Always use explicit height
+    minWidth: isFullscreen ? '0' : size.minWidth,
+    minHeight: isFullscreen ? '0' : size.minHeight,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    aspectRatio: (isFullscreen || layout === 'left-video') ? 'auto' : '1 / 1',
+    borderRadius: (isFullscreen || layout === 'left-video') ? '0' : '50%',
+    clipPath: (isFullscreen || layout === 'left-video') ? 'none' : 'circle(50% at center)',
+    WebkitClipPath: (isFullscreen || layout === 'left-video') ? 'none' : 'circle(50% at center)',
+    zIndex: 1000,
+    pointerEvents: 'none'
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="play-webcam-overlay"
+      style={style}
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          borderRadius: 'inherit'
+        }}
+      />
+    </div>
+  )
+}
+
 function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', lineHeight = 1.4, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
@@ -442,6 +613,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     )
   }
 
+  const currentSlideLayout = currentSlide?.layout || 'default'
+  const nextSlideLayout = presentationSlides[currentIndex + 1]?.layout || currentSlideLayout
+
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
       <div 
@@ -464,8 +638,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           textDropShadow={textDropShadow}
           shadowBlur={shadowBlur}
           shadowOffsetX={shadowOffsetX}
-          webcamEnabled={recordSettings.webcamEnabled}
-          selectedCameraId={recordSettings.selectedCameraId}
+          webcamEnabled={false}
+          selectedCameraId=""
           shadowOffsetY={shadowOffsetY}
           shadowColor={shadowColor}
           textInlineBackground={textInlineBackground}
@@ -475,6 +649,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           lineHeight={lineHeight}
         />
       </div>
+      {/* Webcam overlay - outside slide transitions */}
+      {recordSettings.webcamEnabled && recordSettings.selectedCameraId && (
+        <WebcamOverlay
+          cameraId={recordSettings.selectedCameraId}
+          layout={currentSlideLayout}
+          webcamSize={recordSettings.webcamSize || 'large'}
+          isVisible={true}
+        />
+      )}
       {!showMenu && (
         <div className="play-controls">
           <div className="play-slide-indicator">

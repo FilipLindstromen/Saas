@@ -47,11 +47,16 @@ export function loadContent(getDefaultSectionOrder, createEmptySections) {
     data = { ...empty };
     for (const id of validOrder) {
       if (sectionsData[id] && typeof sectionsData[id] === 'object') {
+        const sentenceImages = sectionsData[id].sentenceImages;
+        const arr = Array.isArray(sentenceImages)
+          ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
+          : [];
         data[id] = {
           input: sectionsData[id].input ?? empty[id].input,
           content: sectionsData[id].content ?? empty[id].content,
           backgroundImageUrl: typeof sectionsData[id].backgroundImageUrl === 'string' ? sectionsData[id].backgroundImageUrl : undefined,
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
+          sentenceImages: arr,
         };
       }
     }
@@ -74,11 +79,16 @@ export function saveContent(payload) {
     const sectionsData = {};
     for (const [id, section] of Object.entries(sections)) {
       if (section && typeof section === 'object') {
+        const sentenceImages = section.sentenceImages;
+        const arr = Array.isArray(sentenceImages)
+          ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
+          : [];
         sectionsData[id] = {
           input: section.input ?? '',
           content: section.content ?? '',
           backgroundImageUrl: typeof section.backgroundImageUrl === 'string' ? section.backgroundImageUrl : undefined,
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
+          sentenceImages: arr,
         };
       }
     }

@@ -1,5 +1,11 @@
 const STORAGE_KEY = 'storywriter_settings';
 
+function clampNum(val, min, max, fallback) {
+  const n = Number(val);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 /** Google Fonts suitable for presentation (display name = family name in URL). */
 export const PRESENTATION_FONTS = [
   'Poppins',
@@ -20,12 +26,43 @@ export const PRESENTATION_SIZES = [
   { value: 'large', label: 'Large' },
 ];
 
+/** Line height for presentation text (unitless multiplier). */
+export const LINE_HEIGHT_OPTIONS = [
+  { value: '1.2', label: '1.2' },
+  { value: '1.3', label: '1.3' },
+  { value: '1.4', label: '1.4' },
+  { value: '1.5', label: '1.5' },
+  { value: '1.6', label: '1.6' },
+  { value: '1.8', label: '1.8' },
+  { value: '2', label: '2' },
+];
+
+/** Text animation when advancing sentences in Present mode. */
+export const TEXT_ANIMATION_OPTIONS = [
+  { value: 'slide-up', label: 'Slide up' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide-left', label: 'Slide from left' },
+  { value: 'slide-right', label: 'Slide from right' },
+  { value: 'scale', label: 'Scale in' },
+  { value: 'none', label: 'None' },
+];
+
 const defaults = {
   openaiApiKey: '',
   presentationFont: 'Poppins',
   presentationFontSize: 'medium',
+  presentationLineHeight: '1.4',
   unsplashAccessKey: '',
   presentationBackgroundOpacity: 0.35,
+  presentationWebcamEnabled: false,
+  presentationCameraId: '',
+  presentationMicrophoneId: '',
+  presentationRecordScreen: false,
+  presentationBackgroundAnimation: true,
+  presentationBackgroundAnimationDuration: 30,
+  presentationBackgroundAnimationScale: 1.15,
+  presentationTextAnimation: 'slide-up',
+  presentationWebcamSize: 'medium',
 };
 
 export function getSettings() {
@@ -53,9 +90,23 @@ export function saveSettings(settings) {
     openaiApiKey: String(settings.openaiApiKey ?? '').trim(),
     presentationFont: PRESENTATION_FONTS.includes(font) ? font : defaults.presentationFont,
     presentationFontSize: ['small', 'medium', 'large'].includes(size) ? size : defaults.presentationFontSize,
+    presentationLineHeight: LINE_HEIGHT_OPTIONS.some((o) => o.value === settings.presentationLineHeight)
+      ? settings.presentationLineHeight
+      : defaults.presentationLineHeight,
     unsplashAccessKey: String(settings.unsplashAccessKey ?? '').trim(),
     presentationBackgroundOpacity:
       typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
+    presentationWebcamEnabled: Boolean(settings.presentationWebcamEnabled),
+    presentationCameraId: String(settings.presentationCameraId ?? '').trim(),
+    presentationMicrophoneId: String(settings.presentationMicrophoneId ?? '').trim(),
+    presentationRecordScreen: Boolean(settings.presentationRecordScreen),
+    presentationBackgroundAnimation: Boolean(settings.presentationBackgroundAnimation),
+    presentationBackgroundAnimationDuration: clampNum(settings.presentationBackgroundAnimationDuration, 1, 30, 10),
+    presentationBackgroundAnimationScale: clampNum(settings.presentationBackgroundAnimationScale, 1, 1.5, 1.15),
+    presentationTextAnimation: TEXT_ANIMATION_OPTIONS.some((o) => o.value === settings.presentationTextAnimation)
+      ? settings.presentationTextAnimation
+      : defaults.presentationTextAnimation,
+    presentationWebcamSize: ['small', 'medium', 'large'].includes(settings.presentationWebcamSize) ? settings.presentationWebcamSize : 'medium',
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   return next;

@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getSettings, saveSettings, PRESENTATION_FONTS, PRESENTATION_SIZES } from '../utils/settings';
+import { getSettings, saveSettings } from '../utils/settings';
 import './SettingsModal.css';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [presentationFont, setPresentationFont] = useState('Poppins');
-  const [presentationFontSize, setPresentationFontSize] = useState('medium');
   const [unsplashAccessKey, setUnsplashAccessKey] = useState('');
 
   useEffect(() => {
@@ -20,7 +18,11 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const handleSave = (e) => {
     e.preventDefault();
-    saveSettings({ openaiApiKey, presentationFont, presentationFontSize, unsplashAccessKey });
+    saveSettings({
+      ...getSettings(),
+      openaiApiKey,
+      unsplashAccessKey,
+    });
     onClose();
   };
 
@@ -84,20 +86,6 @@ export default function SettingsModal({ isOpen, onClose }) {
               onChange={(e) => setUnsplashAccessKey(e.target.value)}
               autoComplete="off"
             />
-          </label>
-          <label className="settings-label">
-            Presentation text size
-            <select
-              className="settings-input"
-              value={presentationFontSize}
-              onChange={(e) => setPresentationFontSize(e.target.value)}
-            >
-              {PRESENTATION_SIZES.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
           </label>
           <div className="settings-actions">
             <button type="button" className="btn secondary" onClick={onClose}>

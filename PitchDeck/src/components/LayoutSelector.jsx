@@ -12,6 +12,19 @@ const LAYOUTS = [
     )
   },
   {
+    id: 'left-video',
+    name: 'Left with Video',
+    description: 'Left aligned text with full-height video on right',
+    thumbnail: (
+      <div className="layout-thumbnail-content">
+        <div className="layout-thumbnail-left-video">
+          <div className="layout-thumbnail-text-left-small">TEXT</div>
+          <div className="layout-thumbnail-video-panel"></div>
+        </div>
+      </div>
+    )
+  },
+  {
     id: 'centered',
     name: 'Centered',
     description: 'Text centered on slide',

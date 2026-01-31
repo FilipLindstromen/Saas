@@ -324,12 +324,12 @@ function Settings({ settings, onUpdate, onClose }) {
                       checked={localSettings.textInlineBackground || false}
                       onChange={(e) => handleChange('textInlineBackground', e.target.checked)}
                     />
-                    <span>Enable Inline Background</span>
+                    <span>Enable Text Highlight</span>
                   </label>
                   {localSettings.textInlineBackground && (
                     <div className="settings-sub-fields">
                       <div className="settings-sub-field">
-                        <label htmlFor="inline-bg-color">Background Color</label>
+                        <label htmlFor="inline-bg-color">Highlight Color</label>
                         <div className="color-input-group">
                           <input
                             id="inline-bg-color"
