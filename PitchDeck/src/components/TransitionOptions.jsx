@@ -4,7 +4,9 @@ import './TransitionOptions.css'
 function TransitionOptions({ settings, onUpdateSettings, onClose }) {
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
-    textAnimation: settings?.textAnimation || 'none'
+    textAnimation: settings?.textAnimation || 'none',
+    backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
+    backgroundScaleTime: settings?.backgroundScaleTime || 10
   })
 
   const handleChange = (key, value) => {
@@ -66,6 +68,37 @@ function TransitionOptions({ settings, onUpdateSettings, onClose }) {
                 <option value="bounce">Bounce</option>
               </select>
             </div>
+          </div>
+
+          <div className="transition-options-section">
+            <h3>Background Animations</h3>
+            <div className="transition-options-field">
+              <label className="transition-options-checkbox">
+                <input
+                  type="checkbox"
+                  checked={localSettings.backgroundScaleAnimation}
+                  onChange={(e) => handleChange('backgroundScaleAnimation', e.target.checked)}
+                />
+                <span>Enable Background Scale Animation</span>
+              </label>
+            </div>
+            {localSettings.backgroundScaleAnimation && (
+              <div className="transition-options-field">
+                <label htmlFor="background-scale-time-slider">
+                  Scale Animation Duration: {localSettings.backgroundScaleTime}s
+                </label>
+                <input
+                  id="background-scale-time-slider"
+                  type="range"
+                  min="1"
+                  max="30"
+                  step="1"
+                  value={localSettings.backgroundScaleTime}
+                  onChange={(e) => handleChange('backgroundScaleTime', parseFloat(e.target.value))}
+                  className="transition-options-slider"
+                />
+              </div>
+            )}
           </div>
         </div>
         <div className="transition-options-footer">
