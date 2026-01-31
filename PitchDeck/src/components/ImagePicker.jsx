@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './ImagePicker.css'
 
-function ImagePicker({ isOpen, onClose, onSelect, settings, initialSearchQuery = '' }) {
+function ImagePicker({ isOpen, onClose, onSelect, settings, initialSearchQuery = '', onSearchQueryChange }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [images, setImages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -67,6 +67,11 @@ function ImagePicker({ isOpen, onClose, onSelect, settings, initialSearchQuery =
     if (!searchQuery.trim() || !settings.unsplashKey) {
       setError('Please enter a search query and set your Unsplash API key.')
       return
+    }
+
+    // Save the search query when user performs a search
+    if (onSearchQueryChange && searchQuery.trim()) {
+      onSearchQueryChange(searchQuery.trim())
     }
 
     setIsLoading(true)
@@ -137,18 +142,30 @@ function ImagePicker({ isOpen, onClose, onSelect, settings, initialSearchQuery =
   }
 
   const handleSelectImage = (imageUrl) => {
+    // Save search query before closing if user has typed something
+    if (onSearchQueryChange && searchQuery.trim()) {
+      onSearchQueryChange(searchQuery.trim())
+    }
     onSelect(imageUrl)
+    onClose()
+  }
+
+  const handleClose = () => {
+    // Save search query before closing if user has typed something
+    if (onSearchQueryChange && searchQuery.trim()) {
+      onSearchQueryChange(searchQuery.trim())
+    }
     onClose()
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="image-picker-overlay" onClick={onClose}>
+    <div className="image-picker-overlay" onClick={handleClose}>
       <div className="image-picker-modal" onClick={(e) => e.stopPropagation()}>
         <div className="image-picker-header">
           <h2>Select Image from Unsplash</h2>
-          <button className="btn-close" onClick={onClose}>×</button>
+          <button className="btn-close" onClick={handleClose}>×</button>
         </div>
         <div className="image-picker-search">
           <form onSubmit={handleSearch}>

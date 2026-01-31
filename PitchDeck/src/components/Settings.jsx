@@ -121,6 +121,19 @@ function Settings({ settings, onUpdate, onClose }) {
                   />
                 </div>
                 <div className="settings-field">
+                  <label htmlFor="bullet-line-height">Bullet Points Line Height</label>
+                  <input
+                    id="bullet-line-height"
+                    type="number"
+                    min="0.5"
+                    max="3"
+                    step="0.1"
+                    value={localSettings.bulletLineHeight !== undefined ? localSettings.bulletLineHeight : 1.4}
+                    onChange={(e) => handleChange('bulletLineHeight', parseFloat(e.target.value) || 1.4)}
+                    className="settings-number-input"
+                  />
+                </div>
+                <div className="settings-field">
                   <label className="settings-sub-section-title">Heading Sizes (rem)</label>
                   <div className="settings-sub-fields">
                     <div className="settings-sub-field">
