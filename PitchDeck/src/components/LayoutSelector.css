@@ -52,6 +52,17 @@
   border-color: #4a9eff;
 }
 
+.layout-thumbnail.selected .layout-thumbnail-preview {
+  border-color: #4a9eff;
+  border-width: 3px;
+  background: #2a2a2a;
+}
+
+.layout-thumbnail.selected .layout-thumbnail-name {
+  color: #4a9eff;
+  font-weight: 600;
+}
+
 .layout-thumbnail-content {
   width: 100%;
   height: 100%;
@@ -106,4 +117,13 @@
   color: #ccc;
   text-align: center;
   font-weight: 500;
+}
+
+.layout-thumbnail-video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #ffffff;
 }

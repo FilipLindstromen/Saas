@@ -51,6 +51,11 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
     
+    // Cleanup: remove event listener on unmount
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+    }
+    
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
     }
@@ -306,7 +311,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       imagePositionX: 50,
       imagePositionY: 50,
       textHeadingLevel: null,
-      subtitleHeadingLevel: null
+      subtitleHeadingLevel: null,
     }
     onUpdateSlides([...slides, newSlide])
     setEditingId(newId)
@@ -657,7 +662,9 @@ Example format:
             imagePositionX: 50,
             imagePositionY: 50,
             textHeadingLevel: null,
-            subtitleHeadingLevel: null
+            subtitleHeadingLevel: null,
+            webcamEnabled: false,
+            selectedCameraId: ''
           })
         }
       }

@@ -1,7 +1,55 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './Slide.css'
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, onUpdate }) {
+// Webcam component - defined outside to avoid hooks issues
+function WebcamVideo({ cameraId, layout, isPlayMode }) {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+
+  useEffect(() => {
+    if (!cameraId) return
+
+    const startStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: cameraId } }
+        })
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          streamRef.current = stream
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error)
+      }
+    }
+
+    startStream()
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [cameraId])
+
+  const getWebcamClass = () => {
+    if (layout === 'video') return 'webcam-video-fullscreen'
+    if (layout === 'right') return 'webcam-video-bottom-left'
+    return 'webcam-video-bottom-right'
+  }
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted
+      className={`slide-webcam ${getWebcamClass()} ${isPlayMode ? 'play-mode' : ''}`}
+    />
+  )
+}
+
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -168,6 +216,32 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [slide.subtitle])
 
+  // Auto-resize textarea for non-bulletpoint, non-section layouts (centered, default, right)
+  // This must be outside renderContent to avoid conditional hook calls
+  useEffect(() => {
+    if (contentRef.current && !isPlayMode && layout !== 'bulletpoints' && layout !== 'section' && contentRef.current.tagName === 'TEXTAREA') {
+      const getPlainText = (content) => {
+        if (!content) return ''
+        return content
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<BR\s*\/?>/gi, '\n')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+      }
+      const plainText = getPlainText(slide.content || '')
+      // Only resize if it's a textarea
+      if (contentRef.current.tagName === 'TEXTAREA') {
+        contentRef.current.style.height = 'auto'
+        contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
+      }
+    }
+  }, [slide.content, isPlayMode, layout])
+
   const handleBulletChange = (index, e) => {
     if (!onUpdate || isPlayMode) return
     const bullets = getBulletPoints()
@@ -310,14 +384,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
       const plainText = getPlainText(slide.content || '')
       
-      // Auto-resize textarea
-      useEffect(() => {
-        if (contentRef.current && !isPlayMode) {
-          contentRef.current.style.height = 'auto'
-          contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
-        }
-      }, [plainText, isPlayMode])
-      
       return (
         <div className="slide-text-centered-wrapper">
           {isPlayMode ? (
@@ -445,14 +511,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
     
     const plainText = getPlainText(slide.content || '')
-    
-    // Auto-resize textarea
-    useEffect(() => {
-      if (contentRef.current && !isPlayMode) {
-        contentRef.current.style.height = 'auto'
-        contentRef.current.style.height = contentRef.current.scrollHeight + 'px'
-      }
-    }, [plainText, isPlayMode])
     
     // For play mode, render as div with formatted content
     if (isPlayMode) {
@@ -700,7 +758,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && (
+      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && (
         <div 
           className="slide-gradient-overlay"
           style={{
@@ -711,15 +769,36 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      <div 
-        className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
-        style={{ 
-          color: textColor,
-          fontFamily: `"${fontFamily}", sans-serif`
-        }}
-      >
-        {renderContent()}
-      </div>
+      {webcamEnabled && selectedCameraId && (
+        <WebcamVideo 
+          cameraId={selectedCameraId}
+          layout={layout}
+          isPlayMode={isPlayMode}
+        />
+      )}
+      {layout === 'video' ? (
+        slide.content && (
+          <div 
+            className="slide-content"
+            style={{ 
+              color: textColor,
+              fontFamily: `"${fontFamily}", sans-serif`
+            }}
+          >
+            {renderContent()}
+          </div>
+        )
+      ) : (
+        <div 
+          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''}`}
+          style={{ 
+            color: textColor,
+            fontFamily: `"${fontFamily}", sans-serif`
+          }}
+        >
+          {renderContent()}
+        </div>
+      )}
     </div>
   )
 }

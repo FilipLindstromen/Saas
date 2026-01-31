@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', lineHeight = 1.4 }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', lineHeight = 1.4, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -20,6 +20,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
+  
+  // Recording state
+  const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
+  const mediaRecorderRef = useRef(null)
+  const recordedChunksRef = useRef([])
+  const screenStreamRef = useRef(null)
+  const audioStreamRef = useRef(null)
+  const combinedStreamRef = useRef(null)
+  const isStartingRecordingRef = useRef(false) // Prevent multiple simultaneous recording starts
 
   // Get bullet points for current slide
   const getBulletPoints = (slide) => {
@@ -44,6 +53,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         return 600 // 0.6s
       case 'blur':
         return 400 // 0.4s
+      case 'zoom':
+        return 300 // 0.3s
+      case 'slide':
+        return 300 // 0.3s
       default:
         return 300 // 0.3s
     }
@@ -58,22 +71,28 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         
         const duration = getTransitionDuration(transitionStyle)
         
-        // Phase 1: Fade out current slide
+        // Phase 1: Start fade-out animation
         setTransitionPhase('fade-out')
         
+        // Wait for fade-out animation to complete
         setTimeout(() => {
-          // Phase 2: Change slide (while invisible)
-          setCurrentIndex(nextIndex)
-          setSlideKey(prev => prev + 1) // Force re-render with new slide
-          
-          // Phase 3: Fade in new slide
-          setTimeout(() => {
-            setTransitionPhase('fade-in')
-            setTimeout(() => {
-              setIsTransitioning(false)
-              setTransitionPhase('idle')
-            }, duration) // Fade in duration
-          }, 50) // Small delay to ensure slide change
+          // Phase 2: Set fade-in phase FIRST to prevent flicker
+          setTransitionPhase('fade-in')
+          // Use double requestAnimationFrame to ensure phase is set before slide change
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Phase 3: Change slide (now it will render with fade-in class)
+              // Update state outside of the callback to avoid nested state updates
+              setCurrentIndex(nextIndex)
+              setSlideKey(prev => prev + 1) // Force re-render with new slide
+              
+              // Phase 4: Wait for fade-in animation to complete
+              setTimeout(() => {
+                setIsTransitioning(false)
+                setTransitionPhase('idle')
+              }, duration) // Fade in duration
+            })
+          })
         }, duration) // Fade out duration
         
         return prevIndex // Keep current index during fade-out
@@ -91,22 +110,28 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         
         const duration = getTransitionDuration(transitionStyle)
         
-        // Phase 1: Fade out current slide
+        // Phase 1: Start fade-out animation
         setTransitionPhase('fade-out')
         
+        // Wait for fade-out animation to complete
         setTimeout(() => {
-          // Phase 2: Change slide (while invisible)
-          setCurrentIndex(nextIndex)
-          setSlideKey(prev => prev + 1) // Force re-render with new slide
-          
-          // Phase 3: Fade in new slide
-          setTimeout(() => {
-            setTransitionPhase('fade-in')
-            setTimeout(() => {
-              setIsTransitioning(false)
-              setTransitionPhase('idle')
-            }, duration) // Fade in duration
-          }, 50) // Small delay to ensure slide change
+          // Phase 2: Set fade-in phase FIRST to prevent flicker
+          setTransitionPhase('fade-in')
+          // Use double requestAnimationFrame to ensure phase is set before slide change
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Phase 3: Change slide (now it will render with fade-in class)
+              // Update state outside of the callback to avoid nested state updates
+              setCurrentIndex(nextIndex)
+              setSlideKey(prev => prev + 1) // Force re-render with new slide
+              
+              // Phase 4: Wait for fade-in animation to complete
+              setTimeout(() => {
+                setIsTransitioning(false)
+                setTransitionPhase('idle')
+              }, duration) // Fade in duration
+            })
+          })
         }, duration) // Fade out duration
         
         return prevIndex // Keep current index during fade-out
@@ -119,6 +144,186 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   useEffect(() => {
     setVisibleBulletIndex(-1)
   }, [currentIndex])
+
+  // Auto-enter fullscreen and start recording when entering record mode
+  useEffect(() => {
+    if (isRecording && recordingState === 'idle' && !isStartingRecordingRef.current) {
+      // Prevent multiple simultaneous calls
+      isStartingRecordingRef.current = true
+      
+      // Request fullscreen first, then start recording
+      const enterFullscreenAndRecord = async () => {
+        try {
+          // Enter fullscreen first
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen()
+          }
+          
+          // Wait for fullscreen to be active before requesting screen share
+          // This ensures we're in fullscreen when the dialog appears
+          let attempts = 0
+          while (!document.fullscreenElement && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 50))
+            attempts++
+          }
+          
+          // Small additional delay to ensure fullscreen is fully active
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // Now start recording (this will show the screen share dialog)
+          // But we're already in fullscreen, so it won't exit
+          if (recordingState === 'idle' && !screenStreamRef.current) {
+            await startRecording()
+          } else {
+            isStartingRecordingRef.current = false
+          }
+        } catch (err) {
+          console.warn('Could not enter fullscreen or start recording:', err)
+          isStartingRecordingRef.current = false
+        }
+      }
+      
+      enterFullscreenAndRecord()
+    } else if (!isRecording && recordingState === 'recording') {
+      stopRecording()
+      isStartingRecordingRef.current = false
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (combinedStreamRef.current) {
+        combinedStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      isStartingRecordingRef.current = false
+    }
+  }, [isRecording, recordingState])
+
+  const startRecording = async () => {
+    try {
+      // Don't set recording state until we actually have the stream
+      // This prevents the effect from running multiple times
+      recordedChunksRef.current = []
+
+      // Get screen capture - this will show the browser's native dialog
+      // We can't bypass this for security reasons, but we're already in fullscreen
+      // The dialog will appear, but we're already in fullscreen so it won't exit
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { 
+          mediaSource: 'screen',
+          displaySurface: 'monitor' // Prefer entire screen
+        },
+        audio: false
+      })
+      
+      // Only set recording state after we have the stream
+      setRecordingState('recording')
+      isStartingRecordingRef.current = false
+      screenStreamRef.current = screenStream
+
+      // Get audio if microphone is enabled
+      let audioStream = null
+      if (recordSettings.microphoneEnabled && recordSettings.selectedMicrophoneId) {
+        try {
+          audioStream = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: recordSettings.selectedMicrophoneId } }
+          })
+          audioStreamRef.current = audioStream
+        } catch (error) {
+          console.warn('Could not access microphone:', error)
+        }
+      }
+
+      // Combine streams
+      const combinedStream = new MediaStream()
+      screenStream.getVideoTracks().forEach(track => combinedStream.addTrack(track))
+      if (audioStream) {
+        audioStream.getAudioTracks().forEach(track => combinedStream.addTrack(track))
+      }
+      combinedStreamRef.current = combinedStream
+
+      // Create MediaRecorder
+      const options = {
+        mimeType: 'video/webm;codecs=vp9,opus',
+        videoBitsPerSecond: 2500000
+      }
+      
+      // Fallback to other codecs if vp9 is not supported
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'video/webm;codecs=vp8,opus'
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options.mimeType = 'video/webm'
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(combinedStream, options)
+      mediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `presentation-recording-${new Date().toISOString().split('T')[0]}.webm`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        
+        // Cleanup streams
+        if (screenStreamRef.current) {
+          screenStreamRef.current.getTracks().forEach(track => track.stop())
+        }
+        if (audioStreamRef.current) {
+          audioStreamRef.current.getTracks().forEach(track => track.stop())
+        }
+        if (combinedStreamRef.current) {
+          combinedStreamRef.current.getTracks().forEach(track => track.stop())
+        }
+        
+        setRecordingState('idle')
+      }
+
+      // Handle screen share stop - don't exit fullscreen, just stop recording
+      screenStream.getVideoTracks()[0].onended = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          stopRecording()
+        }
+        isStartingRecordingRef.current = false
+        // Don't exit fullscreen when screen share stops
+        // The user can exit manually with ESC
+      }
+
+      mediaRecorder.start(1000) // Collect data every second
+    } catch (error) {
+      console.error('Error starting recording:', error)
+      setRecordingState('idle')
+      isStartingRecordingRef.current = false
+      alert('Failed to start recording. Please check your permissions.')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      setRecordingState('stopping')
+      mediaRecorderRef.current.stop()
+    }
+    isStartingRecordingRef.current = false
+  }
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -259,6 +464,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           textDropShadow={textDropShadow}
           shadowBlur={shadowBlur}
           shadowOffsetX={shadowOffsetX}
+          webcamEnabled={recordSettings.webcamEnabled}
+          selectedCameraId={recordSettings.selectedCameraId}
           shadowOffsetY={shadowOffsetY}
           shadowColor={shadowColor}
           textInlineBackground={textInlineBackground}
@@ -273,6 +480,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           <div className="play-slide-indicator">
             {currentIndex + 1} / {presentationSlides.length}
           </div>
+          {isRecording && recordingState === 'recording' && (
+            <div className="recording-indicator">
+              <span className="recording-dot"></span>
+              <span>Recording</span>
+            </div>
+          )}
           <button className="btn-exit" onClick={onExit}>Exit</button>
         </div>
       )}

@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4 }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, recordSettings }) {
+  // Default recordSettings if not provided
+  const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const fileInputRef = useRef(null)
@@ -57,7 +59,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
       if (unsplashData.results && unsplashData.results.length > 0) {
         // Use the first result
         const imageUrl = unsplashData.results[0].urls.regular
-        onUpdate({ imageUrl })
+        onUpdate({ imageUrl, backgroundOpacity: 0.6 })
       } else {
         alert('No images found. Try a different search query.')
       }
@@ -86,7 +88,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
   }
 
   const handleImageSelect = (imageUrl) => {
-    onUpdate({ imageUrl })
+    onUpdate({ imageUrl, backgroundOpacity: 0.6 })
   }
 
   const handleUploadImage = () => {
@@ -114,7 +116,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     reader.onload = (event) => {
       const dataUrl = event.target?.result
       if (dataUrl) {
-        onUpdate({ imageUrl: dataUrl })
+        onUpdate({ imageUrl: dataUrl, backgroundOpacity: 0.6 })
       }
     }
     reader.onerror = () => {
@@ -135,26 +137,6 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
       <div className="preview-header">
         <div className="preview-header-left">
           <h3>Preview</h3>
-          <div className="transition-selector">
-            <label htmlFor="transition-style">Transition style:</label>
-            <select
-              id="transition-style"
-              value={settings.transitionStyle || 'default'}
-              onChange={(e) => {
-                if (onUpdateSettings) {
-                  onUpdateSettings({ ...settings, transitionStyle: e.target.value })
-                }
-              }}
-              className="transition-select"
-            >
-              <option value="default">Default</option>
-              <option value="slide">Slide</option>
-              <option value="zoom">Zoom</option>
-              <option value="dissolve">Dissolve</option>
-              <option value="blur">Blur</option>
-              <option value="sequence">Object Sequence</option>
-            </select>
-          </div>
         </div>
         <div className="preview-header-actions">
           {(slide.layout || 'default') !== 'centered' && (slide.layout || 'default') !== 'right' && (
@@ -326,6 +308,8 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           h1FontFamily={h1FontFamily}
           h2FontFamily={h2FontFamily}
           h3FontFamily={h3FontFamily}
+          webcamEnabled={safeRecordSettings.webcamEnabled}
+          selectedCameraId={safeRecordSettings.selectedCameraId}
           textDropShadow={textDropShadow}
           shadowBlur={shadowBlur}
           shadowOffsetX={shadowOffsetX}

@@ -4,6 +4,8 @@ import SlidePreview from './components/SlidePreview'
 import PlayMode from './components/PlayMode'
 import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
+import RecordingOptions from './components/RecordingOptions'
+import TransitionOptions from './components/TransitionOptions'
 import './App.css'
 
 function App() {
@@ -79,9 +81,11 @@ function App() {
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present'
+  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record'
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showRecordingOptions, setShowRecordingOptions] = useState(false)
+  const [showTransitionOptions, setShowTransitionOptions] = useState(false)
   const fileInputRef = useRef(null)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('sidebarWidth')
@@ -115,9 +119,27 @@ function App() {
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
+      textAnimation: localStorage.getItem('textAnimation') || 'none',
       lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4
     }
     return savedSettings
+  })
+  const [recordSettings, setRecordSettings] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckRecordSettings')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Error parsing record settings:', e)
+      }
+    }
+    return {
+      recordInPresentMode: false,
+      webcamEnabled: false,
+      selectedCameraId: '',
+      microphoneEnabled: false,
+      selectedMicrophoneId: ''
+    }
   })
 
   // Update current chapter's slides when slides change
@@ -284,6 +306,7 @@ function App() {
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
+    localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
   }, [settings])
 
@@ -362,6 +385,20 @@ function App() {
         // If layout is changed to section, clear imageUrl
         if (updates.layout === 'section' && updated.imageUrl) {
           updated.imageUrl = ''
+        }
+        // Save to localStorage immediately
+        try {
+          const currentChapter = chapters.find(c => c.id === currentChapterId)
+          if (currentChapter) {
+            const updatedChapter = {
+              ...currentChapter,
+              slides: currentChapter.slides.map(slide => slide.id === id ? updated : slide)
+            }
+            const updatedChapters = chapters.map(ch => ch.id === currentChapterId ? updatedChapter : ch)
+            localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
+          }
+        } catch (error) {
+          console.error('Error saving slide update:', error)
         }
         return updated
       }
@@ -475,6 +512,7 @@ function App() {
       slides: slides, // Keep for backward compatibility
       selectedSlideId: selectedSlideId,
       settings: settings,
+      recordSettings: recordSettings,
       sidebarWidth: sidebarWidth,
       projectName: projectName,
       exportedAt: new Date().toISOString()
@@ -567,7 +605,9 @@ function App() {
           imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
           imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
           textHeadingLevel: slide.textHeadingLevel || null,
-          subtitleHeadingLevel: slide.subtitleHeadingLevel || null
+          subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
+          webcamEnabled: slide.webcamEnabled !== undefined ? slide.webcamEnabled : false,
+          selectedCameraId: slide.selectedCameraId || ''
         }))
 
         // Confirm before importing (to avoid losing current work)
@@ -607,6 +647,11 @@ function App() {
         // Load project name if provided
         if (importData.projectName !== undefined) {
           setProjectName(importData.projectName)
+        }
+
+        // Load record settings if provided
+        if (importData.recordSettings) {
+          setRecordSettings(importData.recordSettings)
         }
 
         alert(`Successfully imported ${slidesWithLayout.length} slide(s)!`)
@@ -710,7 +755,7 @@ function App() {
           const imageUrl = unsplashData.results[0].urls.regular
           const slideIndex = updatedSlides.findIndex(s => s.id === slide.id)
           if (slideIndex !== -1) {
-            updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], imageUrl }
+            updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], imageUrl, backgroundOpacity: 0.6 }
             successCount++
           }
         } else {
@@ -736,7 +781,7 @@ function App() {
   const selectedSlide = slides.find(s => s.id === selectedSlideId)
 
   // Present mode (fullscreen)
-  if (mode === 'present') {
+  if (mode === 'present' || mode === 'record') {
     return (
       <>
         <PlayMode 
@@ -764,6 +809,8 @@ function App() {
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
           lineHeight={settings.lineHeight || 1.4}
+          recordSettings={recordSettings}
+          isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
         />
       </>
     )
@@ -905,6 +952,17 @@ function App() {
             </div>
             <div className="header-right">
               <button 
+                className="btn-record-menu" 
+                onClick={() => setShowRecordingOptions(true)}
+                title="Record"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                </svg>
+                <span>Record</span>
+              </button>
+              <button 
                 className="btn-icon-header btn-bulk-images" 
                 onClick={handleBulkSelectImages}
                 title="Auto-select images for all slides without images"
@@ -914,6 +972,15 @@ function App() {
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <button 
+                className="btn-icon-header btn-transitions" 
+                onClick={() => setShowTransitionOptions(true)} 
+                title="Transitions & Animations"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </button>
               <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
@@ -935,9 +1002,27 @@ function App() {
             onClose={() => setShowSettings(false)}
           />
         )}
-      </div>
-    )
-  }
+      {showRecordingOptions && (
+        <RecordingOptions
+          recordSettings={recordSettings}
+          onUpdateSettings={(updatedSettings) => {
+            setRecordSettings(updatedSettings)
+          }}
+          onClose={() => setShowRecordingOptions(false)}
+        />
+      )}
+      {showTransitionOptions && (
+        <TransitionOptions
+          settings={settings}
+          onUpdateSettings={(updatedSettings) => {
+            setSettings(updatedSettings)
+          }}
+          onClose={() => setShowTransitionOptions(false)}
+        />
+      )}
+    </div>
+  )
+}
 
   return (
     <div className="app">
@@ -1073,6 +1158,17 @@ function App() {
             </div>
             <div className="header-right">
               <button 
+                className="btn-record-menu" 
+                onClick={() => setShowRecordingOptions(true)}
+                title="Record"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                </svg>
+                <span>Record</span>
+              </button>
+              <button 
                 className="btn-icon-header btn-bulk-images" 
                 onClick={handleBulkSelectImages}
                 title="Auto-select images for all slides without images"
@@ -1082,6 +1178,15 @@ function App() {
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <button 
+                className="btn-icon-header btn-transitions" 
+                onClick={() => setShowTransitionOptions(true)} 
+                title="Transitions & Animations"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </button>
               <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="Style & Settings">
@@ -1139,6 +1244,7 @@ function App() {
           inlineBgOpacity={settings.inlineBgOpacity}
           inlineBgPadding={settings.inlineBgPadding}
           lineHeight={settings.lineHeight || 1.4}
+          recordSettings={recordSettings}
         />
       </div>
       {showSettings && (
@@ -1146,6 +1252,24 @@ function App() {
           settings={settings}
           onUpdate={setSettings}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+      {showRecordingOptions && (
+        <RecordingOptions
+          recordSettings={recordSettings}
+          onUpdateSettings={(updatedSettings) => {
+            setRecordSettings(updatedSettings)
+          }}
+          onClose={() => setShowRecordingOptions(false)}
+        />
+      )}
+      {showTransitionOptions && (
+        <TransitionOptions
+          settings={settings}
+          onUpdateSettings={(updatedSettings) => {
+            setSettings(updatedSettings)
+          }}
+          onClose={() => setShowTransitionOptions(false)}
         />
       )}
     </div>
