@@ -120,7 +120,8 @@ function App() {
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
       textAnimation: localStorage.getItem('textAnimation') || 'none',
-      lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4
+      lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4,
+      bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1.4
     }
     return savedSettings
   })
@@ -323,6 +324,7 @@ function App() {
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
+    localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1.4')
   }, [settings])
 
   // Keyboard navigation for slide selection (only in edit mode)
@@ -824,6 +826,7 @@ function App() {
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
           lineHeight={settings.lineHeight || 1.4}
+          bulletLineHeight={settings.bulletLineHeight || 1.4}
           recordSettings={recordSettings}
           isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
         />
@@ -976,7 +979,6 @@ function App() {
                   <circle cx="12" cy="12" r="10" />
                   <circle cx="12" cy="12" r="3" fill="currentColor" />
                 </svg>
-                <span>Record</span>
               </button>
               <button 
                 className="btn-icon-header btn-bulk-images" 
@@ -1184,7 +1186,6 @@ function App() {
                   <circle cx="12" cy="12" r="10" />
                   <circle cx="12" cy="12" r="3" fill="currentColor" />
                 </svg>
-                <span>Record</span>
               </button>
               <button 
                 className="btn-icon-header btn-bulk-images" 
@@ -1262,6 +1263,7 @@ function App() {
           inlineBgOpacity={settings.inlineBgOpacity}
           inlineBgPadding={settings.inlineBgPadding}
           lineHeight={settings.lineHeight || 1.4}
+          bulletLineHeight={settings.bulletLineHeight || 1.4}
           recordSettings={recordSettings}
         />
       </div>

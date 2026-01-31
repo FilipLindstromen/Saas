@@ -50,7 +50,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -790,10 +790,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {layout === 'video' ? (
         slide.content && (
           <div 
-            className="slide-content"
+            className="slide-content slide-content-video"
             style={{ 
               color: textColor,
-              fontFamily: `"${fontFamily}", sans-serif`
+              fontFamily: `"${fontFamily}", sans-serif`,
+              zIndex: 1001, // Higher than webcam overlay (1000) to appear on top
+              position: 'relative'
             }}
           >
             {renderContent()}

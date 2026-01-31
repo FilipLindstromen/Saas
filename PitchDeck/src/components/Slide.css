@@ -81,6 +81,15 @@
   display: none;
 }
 
+.slide-content-video {
+  /* Text overlay for video layout - appears on top of video */
+  position: relative;
+  z-index: 1001;
+  display: flex;
+  align-items: flex-end;
+  padding: 4% 0 16.67% 9%; /* Same positioning as default left layout */
+}
+
 .slide-content.left-video {
   align-items: flex-end;
   /* Position text in lower third, but leave right third for video */

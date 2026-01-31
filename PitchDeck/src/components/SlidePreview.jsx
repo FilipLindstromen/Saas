@@ -3,7 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, recordSettings }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, recordSettings }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -320,6 +320,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           inlineBgOpacity={inlineBgOpacity}
           inlineBgPadding={inlineBgPadding}
           lineHeight={lineHeight}
+          bulletLineHeight={bulletLineHeight}
           onUpdate={onUpdate}
         />
       </div>
@@ -329,13 +330,21 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         onSelect={handleImageSelect}
         settings={settings}
         initialSearchQuery={(() => {
-          // Extract text from content (strip HTML tags)
+          // First check if there's a saved search query for this slide
+          if (slide.unsplashSearchQuery) {
+            return slide.unsplashSearchQuery
+          }
+          // Otherwise, extract text from content (strip HTML tags)
           const contentText = slide.content ? slide.content.replace(/<[^>]*>/g, '').trim() : ''
           // Use content if available, otherwise use subtitle
           const subtitleText = slide.subtitle ? slide.subtitle.replace(/<[^>]*>/g, '').trim() : ''
           // Prefer content, fallback to subtitle, or empty string
           return contentText || subtitleText || ''
         })()}
+        onSearchQueryChange={(query) => {
+          // Save the search query to the slide
+          onUpdate({ unsplashSearchQuery: query })
+        }}
       />
     </div>
   )

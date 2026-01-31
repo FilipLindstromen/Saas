@@ -118,7 +118,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
                 checked={localSettings.recordInPresentMode}
                 onChange={(e) => handleChange('recordInPresentMode', e.target.checked)}
               />
-              <span>Record screen and audio in Present mode</span>
+              <span>Enable Recording</span>
             </label>
           </div>
           
@@ -129,7 +129,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
                 checked={localSettings.webcamEnabled}
                 onChange={(e) => handleChange('webcamEnabled', e.target.checked)}
               />
-              <span>Show camera in Edit and Present (round, lower right)</span>
+              <span>Enable Webcam</span>
             </label>
           </div>
 
@@ -172,25 +172,40 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
           )}
               
           {localSettings.recordInPresentMode && (
-            <div className="recording-options-field">
-              <label htmlFor="recording-microphone-select">Microphone</label>
-              <select
-                id="recording-microphone-select"
-                value={localSettings.selectedMicrophoneId || ''}
-                onChange={(e) => handleChange('selectedMicrophoneId', e.target.value)}
-                className="recording-options-select"
-              >
-                {availableMicrophones.length === 0 ? (
-                  <option value="">Default microphone</option>
-                ) : (
-                  availableMicrophones.map((microphone) => (
-                    <option key={microphone.deviceId} value={microphone.deviceId}>
-                      {microphone.label || `Microphone ${microphone.deviceId.slice(0, 8)}`}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
+            <>
+              <div className="recording-options-field">
+                <label className="recording-options-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={localSettings.microphoneEnabled}
+                    onChange={(e) => handleChange('microphoneEnabled', e.target.checked)}
+                  />
+                  <span>Enable Microphone</span>
+                </label>
+              </div>
+              
+              {localSettings.microphoneEnabled && (
+                <div className="recording-options-field">
+                  <label htmlFor="recording-microphone-select">Microphone</label>
+                  <select
+                    id="recording-microphone-select"
+                    value={localSettings.selectedMicrophoneId || ''}
+                    onChange={(e) => handleChange('selectedMicrophoneId', e.target.value)}
+                    className="recording-options-select"
+                  >
+                    {availableMicrophones.length === 0 ? (
+                      <option value="">Default microphone</option>
+                    ) : (
+                      availableMicrophones.map((microphone) => (
+                        <option key={microphone.deviceId} value={microphone.deviceId}>
+                          {microphone.label || `Microphone ${microphone.deviceId.slice(0, 8)}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
