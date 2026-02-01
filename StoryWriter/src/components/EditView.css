@@ -131,6 +131,7 @@
 
 .edit-view__side-actions {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   gap: 0.5rem;
 }

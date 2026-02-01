@@ -2,16 +2,17 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #1a1a1a;
+  background: var(--bg-secondary);
   overflow: hidden;
 }
 
 .preview-header {
   padding: 1.5rem;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: var(--bg-elevated);
 }
 
 .preview-header-left {
@@ -298,13 +299,14 @@
 
 .preview-analysis {
   padding: 1.5rem;
-  background: #1f2a3a;
-  border-top: 1px solid #3a3a3a;
-  border-left: 3px solid #4a9eff;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
   margin: 0 2rem 2rem 2rem;
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 0.9rem;
   line-height: 1.6;
+  box-shadow: var(--shadow-sm);
 }
 
 .preview-analysis-header {
@@ -316,7 +318,7 @@
 }
 
 .preview-analysis-label {
-  color: #4a9eff;
+  color: var(--accent);
   font-weight: 600;
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -345,7 +347,7 @@
 }
 
 .preview-analysis-text {
-  color: #cccccc;
+  color: var(--text-secondary);
   white-space: pre-wrap;
   word-wrap: break-word;
   margin-top: 0.75rem;
