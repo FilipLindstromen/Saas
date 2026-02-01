@@ -16,6 +16,7 @@
   min-width: 280px;
   max-width: 380px;
   max-height: 85vh;
+  overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -30,6 +31,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
 .style-dropdown-title {
@@ -39,10 +41,42 @@
   margin-bottom: 0.25rem;
 }
 
+.style-dropdown-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.style-dropdown-header-row .style-dropdown-title {
+  margin-bottom: 0;
+}
+
+.style-dropdown-btn-reset {
+  flex-shrink: 0;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.style-dropdown-btn-reset:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
 .style-dropdown-field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .style-dropdown-field > label:not(.style-dropdown-checkbox) {
@@ -117,11 +151,33 @@
 .style-dropdown-color-picker::-webkit-color-swatch { border: none; border-radius: 5px; }
 .style-dropdown-color-picker::-moz-color-swatch { border: none; border-radius: 5px; }
 
+.style-dropdown-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.style-dropdown-section-title:first-of-type {
+  margin-top: 0.5rem;
+  padding-top: 0;
+  border-top: none;
+}
+
 .style-dropdown-sub-fields {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 0.5rem;
+}
+
+.style-dropdown-sub-fields-inline {
+  margin-top: 0.35rem;
 }
 
 .style-dropdown-sub-field {
@@ -175,8 +231,93 @@
   filter: brightness(1.1);
 }
 
+.style-dropdown-btn-reset-fields {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-color: var(--border-default);
+}
+
+.style-dropdown-btn-reset-fields:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
 .style-dropdown-error {
   font-size: 0.75rem;
   color: var(--text-danger, #ef4444);
   margin: 0.25rem 0 0;
+}
+
+/* Font preview dropdown (Serif Font list) */
+.font-preview-select-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.font-preview-select-trigger {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  padding-right: 2rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.font-preview-select-trigger:hover,
+.font-preview-select-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.font-preview-select-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-preview-select-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 10002;
+}
+
+.font-preview-select-option {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.font-preview-select-option:hover,
+.font-preview-select-option[aria-selected="true"] {
+  background: var(--bg-hover);
+}
+
+.font-preview-select-option[aria-selected="true"] {
+  background: var(--accent-subtle, rgba(249, 115, 22, 0.15));
 }

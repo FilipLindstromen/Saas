@@ -305,7 +305,6 @@
   border: none;
   resize: none;
   overflow: visible;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1.2;
   pointer-events: auto;
@@ -349,10 +348,10 @@
   /* Highlight styling is applied inline via formatContentForDisplay when enabled */
 }
 
-/* When text highlight is disabled, ensure no background on mark */
-.slide.no-text-highlight .slide-text mark,
-.slide.no-text-highlight .slide-subtitle mark,
-.slide.no-text-highlight .slide-bullet mark {
+/* When text highlight is disabled globally, strip background only from marks without inline style; toolbar-applied marks keep their color */
+.slide.no-text-highlight .slide-text mark:not([style*="background"]),
+.slide.no-text-highlight .slide-subtitle mark:not([style*="background"]),
+.slide.no-text-highlight .slide-bullet mark:not([style*="background"]) {
   background: none !important;
   padding: 0 !important;
   border-radius: 0 !important;
@@ -360,7 +359,7 @@
 
 .slide-bullet {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 0.5em;
   margin-bottom: 0.5em;
 }
@@ -374,12 +373,21 @@
   display: none;
 }
 
+/* Present mode: top-align bullet with text (edit mode keeps bottom alignment above) */
+.play-mode .slide-bullet {
+  align-items: flex-start;
+}
+
 .slide-bullet::before {
   content: '•';
   font-size: 1.2em;
   line-height: 1;
   flex-shrink: 0;
   margin-top: 0.1em;
+}
+
+.play-mode .slide-bullet::before {
+  margin-top: 0;
 }
 
 /* Bullet text (class is "bullet-text" in JSX) */
@@ -404,10 +412,11 @@
   background: transparent;
 }
 
+/* Webcam is positioned inside the slide (position: absolute) so edit and present match */
 .slide-webcam {
-  position: fixed;
+  position: absolute;
   z-index: 1000;
-  border-radius: 12px;
+  border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -415,32 +424,50 @@
 }
 
 .slide-webcam.webcam-video-bottom-right {
-  bottom: 20px;
-  right: 20px;
-  width: 320px;
-  height: 180px;
+  bottom: 4%;
+  right: 4%;
+  top: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
 }
 
 .slide-webcam.webcam-video-bottom-left {
-  bottom: 20px;
-  left: 20px;
-  width: 320px;
-  height: 180px;
+  bottom: 4%;
+  left: 4%;
+  top: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
 }
 
 .slide-webcam.webcam-video-right-panel {
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
-  width: 400px;
-  height: 225px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
 }
 
 .slide-webcam.webcam-video-fullscreen {
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
   border-radius: 0;
 }
 
@@ -474,4 +501,205 @@
 
 .slide-font-pairing-menu-item:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* ========== Text in/out animations (present mode) ========== */
+.slide[class*="text-animation-"] .slide-content,
+.slide[class*="text-animation-"] .slide-text,
+.slide[class*="text-animation-"] .slide-subtitle,
+.slide[class*="text-animation-"] .slide-section-name,
+.slide[class*="text-animation-"] .slide-bullet .bullet-text {
+  animation-duration: 0.7s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+/* Words-fade-up: animate each word (staggered) */
+.slide.text-animation-words-fade-up .slide-text-words .text-animation-word,
+.slide.text-animation-words-fade-up .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: text-word-fade-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes text-word-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1. Fade in */
+.slide.text-animation-fade-in .slide-content,
+.slide.text-animation-fade-in .slide-text,
+.slide.text-animation-fade-in .slide-subtitle,
+.slide.text-animation-fade-in .slide-section-name,
+.slide.text-animation-fade-in .slide-bullet .bullet-text {
+  opacity: 0;
+  animation-name: text-fade-in;
+}
+
+@keyframes text-fade-in {
+  to { opacity: 1; }
+}
+
+/* 2. Fade in + slide up */
+.slide.text-animation-fade-in-up .slide-content,
+.slide.text-animation-fade-in-up .slide-text,
+.slide.text-animation-fade-in-up .slide-subtitle,
+.slide.text-animation-fade-in-up .slide-section-name,
+.slide.text-animation-fade-in-up .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: translateY(32px);
+  animation-name: text-fade-in-up;
+}
+
+@keyframes text-fade-in-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Fade in + slide down */
+.slide.text-animation-fade-in-down .slide-content,
+.slide.text-animation-fade-in-down .slide-text,
+.slide.text-animation-fade-in-down .slide-subtitle,
+.slide.text-animation-fade-in-down .slide-section-name,
+.slide.text-animation-fade-in-down .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: translateY(-32px);
+  animation-name: text-fade-in-down;
+}
+
+@keyframes text-fade-in-down {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 4. Slide in from right (-x) */
+.slide.text-animation-slide-in-left .slide-content,
+.slide.text-animation-slide-in-left .slide-text,
+.slide.text-animation-slide-in-left .slide-subtitle,
+.slide.text-animation-slide-in-left .slide-section-name,
+.slide.text-animation-slide-in-left .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: translateX(48px);
+  animation-name: text-slide-in-left;
+}
+
+@keyframes text-slide-in-left {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 5. Slide in from left (+x) */
+.slide.text-animation-slide-in-right .slide-content,
+.slide.text-animation-slide-in-right .slide-text,
+.slide.text-animation-slide-in-right .slide-subtitle,
+.slide.text-animation-slide-in-right .slide-section-name,
+.slide.text-animation-slide-in-right .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: translateX(-48px);
+  animation-name: text-slide-in-right;
+}
+
+@keyframes text-slide-in-right {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 6. Typewriter */
+.slide.text-animation-typewriter .slide-content,
+.slide.text-animation-typewriter .slide-text,
+.slide.text-animation-typewriter .slide-subtitle,
+.slide.text-animation-typewriter .slide-section-name,
+.slide.text-animation-typewriter .slide-bullet .bullet-text {
+  overflow: hidden;
+  border-right: 0.08em solid currentColor;
+  white-space: nowrap;
+  width: 0;
+  animation: text-typewriter 1.2s steps(40, end) 0.3s both;
+}
+
+.slide.text-animation-typewriter .slide-content br,
+.slide.text-animation-typewriter .slide-text br,
+.slide.text-animation-typewriter .slide-subtitle br,
+.slide.text-animation-typewriter .slide-bullet .bullet-text br {
+  display: none;
+}
+
+@keyframes text-typewriter {
+  0% { width: 0; border-right-color: currentColor; }
+  95% { width: 100%; border-right-color: currentColor; }
+  100% { width: 100%; border-right-color: transparent; }
+}
+
+/* 7. Zoom in */
+.slide.text-animation-zoom-in .slide-content,
+.slide.text-animation-zoom-in .slide-text,
+.slide.text-animation-zoom-in .slide-subtitle,
+.slide.text-animation-zoom-in .slide-section-name,
+.slide.text-animation-zoom-in .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: scale(0.85);
+  animation-name: text-zoom-in;
+}
+
+@keyframes text-zoom-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 8. Bounce in */
+.slide.text-animation-bounce-in .slide-content,
+.slide.text-animation-bounce-in .slide-text,
+.slide.text-animation-bounce-in .slide-subtitle,
+.slide.text-animation-bounce-in .slide-section-name,
+.slide.text-animation-bounce-in .slide-bullet .bullet-text {
+  opacity: 0;
+  transform: scale(0.3);
+  animation: text-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes text-bounce-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 9. Words fade up - word spans handled above; subtitle and bullets without word spans use fade-in-up */
+.slide.text-animation-words-fade-up .slide-subtitle,
+.slide.text-animation-words-fade-up .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(24px);
+  animation-name: text-fade-in-up;
+}
+
+/* 10. Blur in */
+.slide.text-animation-blur-in .slide-content,
+.slide.text-animation-blur-in .slide-text,
+.slide.text-animation-blur-in .slide-subtitle,
+.slide.text-animation-blur-in .slide-section-name,
+.slide.text-animation-blur-in .slide-bullet .bullet-text {
+  opacity: 0;
+  filter: blur(12px);
+  animation-name: text-blur-in;
+}
+
+@keyframes text-blur-in {
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }

@@ -6,7 +6,7 @@ import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
 import RecordingOptions from './components/RecordingOptions'
 import ColorOptions from './components/ColorOptions'
-import TypographyOptions from './components/TypographyOptions'
+import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import TextEffectsOptions from './components/TextEffectsOptions'
 import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
@@ -135,20 +135,21 @@ function App() {
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
   const updateSlideTimeoutRef = useRef(null)
+  const latestStateRef = useRef(null)
   const [settings, setSettings] = useState(() => {
     const savedSettings = {
       openaiKey: localStorage.getItem('openaiKey') || '',
       unsplashKey: localStorage.getItem('unsplashKey') || '',
       backgroundColor: localStorage.getItem('backgroundColor') || '#1a1a1a',
       textColor: localStorage.getItem('textColor') || '#ffffff',
-      fontFamily: localStorage.getItem('fontFamily') || 'Inter',
+      fontFamily: localStorage.getItem('fontFamily') || 'Poppins',
       defaultTextSize: parseFloat(localStorage.getItem('defaultTextSize')) || 5,
-      h1Size: parseFloat(localStorage.getItem('h1Size')) || 5,
+      h1Size: parseFloat(localStorage.getItem('h1Size')) || 7,
       h2Size: parseFloat(localStorage.getItem('h2Size')) || 3.5,
       h3Size: parseFloat(localStorage.getItem('h3Size')) || 2.5,
-      h1FontFamily: localStorage.getItem('h1FontFamily') || '',
-      h2FontFamily: localStorage.getItem('h2FontFamily') || '',
-      h3FontFamily: localStorage.getItem('h3FontFamily') || '',
+      h1FontFamily: localStorage.getItem('h1FontFamily') || 'Poppins',
+      h2FontFamily: localStorage.getItem('h2FontFamily') || 'Poppins',
+      h3FontFamily: localStorage.getItem('h3FontFamily') || 'Oswald',
       textDropShadow: localStorage.getItem('textDropShadow') === 'true',
       shadowBlur: parseInt(localStorage.getItem('shadowBlur')) || 4,
       shadowOffsetX: parseInt(localStorage.getItem('shadowOffsetX')) || 2,
@@ -162,10 +163,10 @@ function App() {
       textAnimation: localStorage.getItem('textAnimation') || 'none',
       backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
       backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
-      lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1.4,
-      bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1.4,
+      lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1,
+      bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1,
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
-      textStyleMode: localStorage.getItem('textStyleMode') || 'standard',
+      textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display'
     }
     return savedSettings
@@ -314,6 +315,10 @@ function App() {
     if (settings.h3FontFamily && settings.h3FontFamily !== fontFamily) {
       fontsToLoad.add(settings.h3FontFamily)
     }
+    // Serif pairing font and all serif options (for dropdown preview)
+    const serifFont = settings.fontPairingSerifFont || 'Playfair Display'
+    fontsToLoad.add(serifFont)
+    SERIF_OPTIONS.forEach(f => fontsToLoad.add(f))
     
     // Remove old font links
     const oldLinks = document.querySelectorAll('link[data-google-font]')
@@ -330,7 +335,7 @@ function App() {
       link.setAttribute('data-google-font', font)
       document.head.appendChild(link)
     })
-  }, [settings.fontFamily, settings.h1FontFamily, settings.h2FontFamily, settings.h3FontFamily])
+  }, [settings.fontFamily, settings.h1FontFamily, settings.h2FontFamily, settings.h3FontFamily, settings.fontPairingSerifFont])
 
   // Save analysisFolded to localStorage
   useEffect(() => {
@@ -395,6 +400,8 @@ function App() {
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1.4')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
+    localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
+    localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
   }, [settings])
 
   // Save workspace data when it changes
@@ -424,6 +431,19 @@ function App() {
   useEffect(() => {
     historyIndexRef.current = historyIndex
   }, [historyIndex])
+
+  // Keep latest state in ref so debounced updateSlide save uses current state
+  useEffect(() => {
+    latestStateRef.current = {
+      slides,
+      chapters,
+      currentChapterId,
+      selectedSlideId,
+      settings,
+      recordSettings,
+      analysisFolded
+    }
+  }, [slides, chapters, currentChapterId, selectedSlideId, settings, recordSettings, analysisFolded])
 
   // Push initial state to history once so undo has a baseline
   useEffect(() => {
@@ -713,43 +733,31 @@ function App() {
   }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
-    const updatedSlides = slides.map(s => {
-      if (s.id === id) {
-        const updated = { ...s, ...updates }
-        // If layout is changed to section, clear imageUrl
-        if (updates.layout === 'section' && updated.imageUrl) {
-          updated.imageUrl = ''
+    // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
+    // otherwise each call would overwrite the previous when using stale `slides` from closure.
+    setSlides(prevSlides => {
+      return prevSlides.map(s => {
+        if (s.id === id) {
+          const updated = { ...s, ...updates }
+          if (updates.layout === 'section' && updated.imageUrl) {
+            updated.imageUrl = ''
+          }
+          return updated
         }
-        return updated
-      }
-      return s
+        return s
+      })
     })
-    
-    // Debounced history save
+
+    // Debounced history save: use latest state from ref when timeout fires (state may have changed by then)
     if (updateSlideTimeoutRef.current) {
       clearTimeout(updateSlideTimeoutRef.current)
     }
     updateSlideTimeoutRef.current = setTimeout(() => {
-      const updatedChapters = chapters.map(ch => ch.id === currentChapterId ? { ...ch, slides: updatedSlides } : ch)
-      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
-    }, 1000)
-    
-    setSlides(updatedSlides)
-    
-    // Save to localStorage immediately
-    try {
-      const currentChapter = chapters.find(c => c.id === currentChapterId)
-      if (currentChapter) {
-        const updatedChapter = {
-          ...currentChapter,
-          slides: updatedSlides
-        }
-        const updatedChapters = chapters.map(ch => ch.id === currentChapterId ? updatedChapter : ch)
-        localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
+      const latest = latestStateRef.current
+      if (latest) {
+        saveToHistory({ ...latest })
       }
-    } catch (error) {
-      console.error('Error saving slide update:', error)
-    }
+    }, 1000)
   }
 
   const updateSlides = (newSlides) => {
@@ -1301,14 +1309,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           showMenu={true}
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
+          textAnimation={settings.textAnimation || 'none'}
           backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
           backgroundScaleTime={settings.backgroundScaleTime || 10}
-          lineHeight={settings.lineHeight || 1.4}
-          bulletLineHeight={settings.bulletLineHeight || 1.4}
+          lineHeight={settings.lineHeight ?? 1}
+          bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           recordSettings={recordSettings}
           isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
-          textStyleMode={settings.textStyleMode || 'standard'}
+          textStyleMode={settings.textStyleMode || 'fontPairing'}
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
         />
       </>
@@ -1450,45 +1459,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 style={{ display: 'none' }}
               />
               </div>
-            </div>
-            <div className="header-center">
-              <div className="header-mode-buttons">
-                <button
-                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-                  onClick={() => setMode('plan')}
-                  title="Plan"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span>Plan</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setMode('edit')}
-                  title="Edit"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  <span>Edit</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={() => setMode('present')}
-                  title="Present"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  <span>Present</span>
-                </button>
-              </div>
               {(mode === 'plan' || mode === 'edit') && (
                 <div className="header-chapters">
                   <div className="chapters-tabs">
@@ -1581,7 +1551,60 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
           )}
             </div>
+            <div className="header-center">
+              <div className="header-mode-buttons">
+                <button
+                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+                  onClick={() => setMode('plan')}
+                  title="Plan"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span>Plan</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+                  onClick={() => setMode('edit')}
+                  title="Edit"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+                  onClick={() => setMode('present')}
+                  title="Present"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  <span>Present</span>
+                </button>
+              </div>
+            </div>
             <div className="header-right">
+              <div className="header-icon-group">
+                <button 
+                  ref={recordButtonRef}
+                  className="btn-record-menu" 
+                  onClick={() => setShowRecordingOptions(true)}
+                  title="Record"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+              <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
                 <button
                   className="btn-icon-header btn-undo"
@@ -1635,34 +1658,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
-                <button 
-                  ref={transitionButtonRef}
-                  className="btn-icon-header btn-transitions" 
-                  onClick={() => setShowTransitionOptions(true)} 
-                  title="Transitions & Animations"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </button>
-                <button 
-                  ref={recordButtonRef}
-                  className="btn-record-menu" 
-                  onClick={() => setShowRecordingOptions(true)}
-                  title="Record"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
                 <button
                   ref={colorButtonRef}
                   className={`btn-icon-header btn-colors ${showColorOptions ? 'active' : ''}`}
-                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }}
+                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
                   title="Colors"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1673,7 +1672,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <button
                   ref={typographyButtonRef}
                   className={`btn-icon-header btn-typography ${showTypographyOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false) }}
+                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
                   title="Typography"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1685,11 +1684,21 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <button
                   ref={textEffectsButtonRef}
                   className={`btn-icon-header btn-text-effects ${showTextEffectsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false) }}
+                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTransitionOptions(false) }}
                   title="Text Effects"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
+                  </svg>
+                </button>
+                <button 
+                  ref={transitionButtonRef}
+                  className={`btn-icon-header btn-transitions ${showTransitionOptions ? 'active' : ''}`}
+                  onClick={() => { setShowTransitionOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }} 
+                  title="Transitions & Animations"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 </button>
               </div>
@@ -1832,45 +1841,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   style={{ display: 'none' }}
                 />
               </div>
-            </div>
-            <div className="header-center">
-              <div className="header-mode-buttons">
-                <button
-                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-                  onClick={() => setMode('plan')}
-                  title="Plan"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span>Plan</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setMode('edit')}
-                  title="Edit"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  <span>Edit</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={() => setMode('present')}
-                  title="Present"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  <span>Present</span>
-                </button>
-              </div>
               {(mode === 'plan' || mode === 'edit') && (
                 <div className="header-chapters">
                   <div className="chapters-tabs">
@@ -1921,7 +1891,60 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           </div>
         )}
             </div>
+            <div className="header-center">
+              <div className="header-mode-buttons">
+                <button
+                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
+                  onClick={() => setMode('plan')}
+                  title="Plan"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span>Plan</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
+                  onClick={() => setMode('edit')}
+                  title="Edit"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
+                  onClick={() => setMode('present')}
+                  title="Present"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  <span>Present</span>
+                </button>
+              </div>
+            </div>
             <div className="header-right">
+              <div className="header-icon-group">
+                <button 
+                  ref={recordButtonRef}
+                  className="btn-record-menu" 
+                  onClick={() => setShowRecordingOptions(true)}
+                  title="Record"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+              <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
                 <button
                   className="btn-icon-header btn-undo"
@@ -1975,34 +1998,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
-                <button 
-                  ref={transitionButtonRef}
-                  className="btn-icon-header btn-transitions" 
-                  onClick={() => setShowTransitionOptions(true)} 
-                  title="Transitions & Animations"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </button>
-                <button 
-                  ref={recordButtonRef}
-                  className="btn-record-menu" 
-                  onClick={() => setShowRecordingOptions(true)}
-                  title="Record"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
                 <button
                   ref={colorButtonRef}
                   className={`btn-icon-header btn-colors ${showColorOptions ? 'active' : ''}`}
-                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }}
+                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
                   title="Colors"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2013,7 +2012,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <button
                   ref={typographyButtonRef}
                   className={`btn-icon-header btn-typography ${showTypographyOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false) }}
+                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
                   title="Typography"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2025,11 +2024,21 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <button
                   ref={textEffectsButtonRef}
                   className={`btn-icon-header btn-text-effects ${showTextEffectsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false) }}
+                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTransitionOptions(false) }}
                   title="Text Effects"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
+                  </svg>
+                </button>
+                <button 
+                  ref={transitionButtonRef}
+                  className={`btn-icon-header btn-transitions ${showTransitionOptions ? 'active' : ''}`}
+                  onClick={() => { setShowTransitionOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }} 
+                  title="Transitions & Animations"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 </button>
               </div>
@@ -2118,8 +2127,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           inlineBgColor={settings.inlineBgColor}
           inlineBgOpacity={settings.inlineBgOpacity}
           inlineBgPadding={settings.inlineBgPadding}
-          lineHeight={settings.lineHeight || 1.4}
-          bulletLineHeight={settings.bulletLineHeight || 1.4}
+          lineHeight={settings.lineHeight ?? 1}
+          bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           recordSettings={recordSettings}
         />

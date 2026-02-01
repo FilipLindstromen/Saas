@@ -96,34 +96,6 @@
   border-color: var(--accent);
 }
 
-.transition-options-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.transition-options-modal .btn-apply {
-  padding: 0.5rem 1.25rem;
-  background: var(--accent-gradient);
-  color: #ffffff;
-  border: none;
-  border-radius: var(--button-radius);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.transition-options-modal .btn-apply:hover {
-  filter: brightness(1.1);
-}
-
-.transition-options-modal .btn-apply:active {
-  transform: translateY(1px);
-}
-
 .transition-options-checkbox {
   display: flex;
   align-items: center;

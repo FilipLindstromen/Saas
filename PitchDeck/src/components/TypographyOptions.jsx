@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import './StyleDropdown.css'
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Oswald', 'Playfair Display', 'Merriweather', 'Source Sans Pro', 'Nunito', 'Ubuntu', 'Dancing Script', 'Bebas Neue']
-const SERIF_OPTIONS = ['Playfair Display', 'Merriweather', 'Lora', 'Crimson Text', 'Libre Baskerville', 'PT Serif', 'Source Serif Pro', 'EB Garamond', 'Cormorant Garamond', 'Bitter']
+export const SERIF_OPTIONS = [
+  'Playfair Display', 'Merriweather', 'Lora', 'Crimson Text', 'Libre Baskerville', 'PT Serif', 'Source Serif Pro',
+  'EB Garamond', 'Cormorant Garamond', 'Bitter', 'Noto Serif', 'Literata', 'Vollkorn', 'DM Serif Display', 'Fraunces',
+  'Roboto Serif', 'Alegreya', 'Young Serif', 'Newsreader', 'Instrument Serif', 'Spectral',
+  /* Script & handwritten */
+  'Dancing Script', 'Great Vibes', 'Sacramento', 'Pacifico', 'Allura', 'Lobster', 'Kaushan Script', 'Satisfy',
+  'Caveat', 'Parisienne', 'Cookie', 'Tangerine', 'Shadows Into Light', 'Patrick Hand', 'Caveat Brush', 'Indie Flower',
+  'Comfortaa', 'Quicksand', 'Handlee', 'Permanent Marker'
+]
 
 function stripSerifSpans(html) {
   if (!html || typeof html !== 'string') return html
@@ -45,8 +53,10 @@ function wrapPhrasesInSerif(html, phrases) {
 
 function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, slides = [], onUpdateSlide, openaiKey }) {
   const dropdownRef = useRef(null)
+  const serifListRef = useRef(null)
   const [isAutoSettingFonts, setIsAutoSettingFonts] = useState(false)
   const [autoSetError, setAutoSetError] = useState(null)
+  const [serifDropdownOpen, setSerifDropdownOpen] = useState(false)
 
   useEffect(() => {
     const updatePosition = () => {
@@ -71,8 +81,42 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     return () => window.removeEventListener('keydown', handleEscape)
   }, [onClose])
 
+  useEffect(() => {
+    if (!serifDropdownOpen) return
+    const handleClickOutside = (e) => {
+      if (serifListRef.current && !serifListRef.current.contains(e.target)) {
+        setSerifDropdownOpen(false)
+      }
+    }
+    const id = setTimeout(() => document.addEventListener('click', handleClickOutside), 0)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('click', handleClickOutside)
+    }
+  }, [serifDropdownOpen])
+
   const handleChange = (key, value) => {
     onUpdateSettings({ [key]: value })
+  }
+
+  const defaultTypographySettings = {
+    textStyleMode: 'fontPairing',
+    fontPairingSerifFont: 'Playfair Display',
+    fontFamily: 'Poppins',
+    defaultTextSize: 5,
+    h1Size: 7,
+    h2Size: 3.5,
+    h3Size: 2.5,
+    h1FontFamily: 'Poppins',
+    h2FontFamily: 'Poppins',
+    h3FontFamily: 'Oswald',
+    lineHeight: 1,
+    bulletLineHeight: 1,
+    bulletTextSize: 3
+  }
+
+  const handleResetStyling = () => {
+    onUpdateSettings(defaultTypographySettings)
   }
 
   const handleAutoSetFonts = async () => {
@@ -150,16 +194,84 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     }
   }
 
+  const handleResetAllFontsAndTextFields = () => {
+    if (!onUpdateSlide || !slides?.length) return
+    slides.forEach((slide) => {
+      const layout = slide.layout || 'default'
+      if (layout === 'bulletpoints') {
+        const lines = (slide.content || '').split('\n')
+        const newLines = lines.map((line) => getPlainText(line))
+        onUpdateSlide(slide.id, { content: newLines.join('\n') })
+      } else {
+        const newContent = getPlainText(slide.content || '').replace(/\n/g, '<br>')
+        const newSubtitle = getPlainText(slide.subtitle || '').replace(/\n/g, '<br>')
+        onUpdateSlide(slide.id, { content: newContent, subtitle: newSubtitle })
+      }
+    })
+  }
+
   return (
     <>
       <div className="style-dropdown-backdrop" onClick={onClose} />
       <div className="style-dropdown-panel" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
         <div className="style-dropdown-content">
-          <div className="style-dropdown-title">Typography</div>
+          <div className="style-dropdown-header-row">
+            <div className="style-dropdown-title">Typography</div>
+            <button
+              type="button"
+              className="style-dropdown-btn style-dropdown-btn-reset"
+              onClick={handleResetStyling}
+              title="Reset all typography settings to defaults"
+            >
+              Reset styling
+            </button>
+          </div>
+
+          {/* 1. Main font */}
+          <div className="style-dropdown-section-title">Main font</div>
           <div className="style-dropdown-field">
-            <label>Text Style Mode</label>
+            <label>Font family</label>
             <select
-              value={settings.textStyleMode || 'standard'}
+              value={settings.fontFamily || 'Inter'}
+              onChange={(e) => handleChange('fontFamily', e.target.value)}
+              className="style-dropdown-select"
+            >
+              {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
+            <div className="style-dropdown-sub-field">
+              <label>Size (rem)</label>
+              <input
+                type="number"
+                min="0.5"
+                max="10"
+                step="0.1"
+                value={settings.defaultTextSize !== undefined ? settings.defaultTextSize : 5}
+                onChange={(e) => handleChange('defaultTextSize', parseFloat(e.target.value) || 5)}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>Line height</label>
+              <input
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={settings.lineHeight !== undefined ? settings.lineHeight : 1.4}
+                onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1.4)}
+                className="style-dropdown-input"
+              />
+            </div>
+          </div>
+
+          {/* 2. Font pairing */}
+          <div className="style-dropdown-section-title">Font pairing</div>
+          <div className="style-dropdown-field">
+            <label>Text style mode</label>
+            <select
+              value={settings.textStyleMode || 'fontPairing'}
               onChange={(e) => handleChange('textStyleMode', e.target.value)}
               className="style-dropdown-select"
             >
@@ -170,15 +282,47 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
           </div>
           {settings.textStyleMode === 'fontPairing' && (
             <>
-              <div className="style-dropdown-field">
-                <label>Serif Font</label>
-                <select
-                  value={settings.fontPairingSerifFont || 'Playfair Display'}
-                  onChange={(e) => handleChange('fontPairingSerifFont', e.target.value)}
-                  className="style-dropdown-select"
-                >
-                  {SERIF_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+              <div className="style-dropdown-field" ref={serifListRef}>
+                <label>Pairing font</label>
+                <div className="font-preview-select-wrap">
+                  <button
+                    type="button"
+                    className="font-preview-select-trigger"
+                    onClick={(e) => { e.stopPropagation(); setSerifDropdownOpen(open => !open) }}
+                    aria-expanded={serifDropdownOpen}
+                    aria-haspopup="listbox"
+                  >
+                    <span
+                      className="font-preview-select-value"
+                      style={{ fontFamily: `"${settings.fontPairingSerifFont || 'Playfair Display'}", serif` }}
+                    >
+                      {settings.fontPairingSerifFont || 'Playfair Display'}
+                    </span>
+                  </button>
+                  {serifDropdownOpen && (
+                    <ul
+                      className="font-preview-select-list"
+                      role="listbox"
+                      aria-label="Pairing font"
+                    >
+                      {SERIF_OPTIONS.map(f => (
+                        <li
+                          key={f}
+                          role="option"
+                          aria-selected={f === (settings.fontPairingSerifFont || 'Playfair Display')}
+                          className="font-preview-select-option"
+                          style={{ fontFamily: `"${f}", serif` }}
+                          onClick={() => {
+                            handleChange('fontPairingSerifFont', f)
+                            setSerifDropdownOpen(false)
+                          }}
+                        >
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
               <div className="style-dropdown-field">
                 <button
@@ -196,80 +340,24 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               </div>
             </>
           )}
-          <div className="style-dropdown-field">
-            <label>Font Family</label>
-            <select
-              value={settings.fontFamily || 'Inter'}
-              onChange={(e) => handleChange('fontFamily', e.target.value)}
-              className="style-dropdown-select"
-            >
-              {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </div>
-          <div className="style-dropdown-field">
-            <label>Line Height</label>
-            <input
-              type="number"
-              min="0.5"
-              max="3"
-              step="0.1"
-              value={settings.lineHeight !== undefined ? settings.lineHeight : 1.4}
-              onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1.4)}
-              className="style-dropdown-input"
-            />
-          </div>
-          <div className="style-dropdown-field">
-            <label>Bullet Line Height</label>
-            <input
-              type="number"
-              min="0.5"
-              max="3"
-              step="0.1"
-              value={settings.bulletLineHeight !== undefined ? settings.bulletLineHeight : 1.4}
-              onChange={(e) => handleChange('bulletLineHeight', parseFloat(e.target.value) || 1.4)}
-              className="style-dropdown-input"
-            />
-          </div>
-          <div className="style-dropdown-field">
-            <label>Bullet Text Size (rem)</label>
-            <input
-              type="number"
-              min="0.5"
-              max="10"
-              step="0.1"
-              value={settings.bulletTextSize !== undefined ? settings.bulletTextSize : 3}
-              onChange={(e) => handleChange('bulletTextSize', parseFloat(e.target.value) || 3)}
-              className="style-dropdown-input"
-            />
-          </div>
-          <div className="style-dropdown-field">
-            <label>Default Text Size (rem)</label>
-            <input
-              type="number"
-              min="0.5"
-              max="10"
-              step="0.1"
-              value={settings.defaultTextSize !== undefined ? settings.defaultTextSize : 5}
-              onChange={(e) => handleChange('defaultTextSize', parseFloat(e.target.value) || 5)}
-              className="style-dropdown-input"
-            />
-          </div>
-          <div className="style-dropdown-title">Heading Sizes (rem)</div>
+
+          {/* 3. Headings */}
+          <div className="style-dropdown-section-title">Headings</div>
           <div className="style-dropdown-sub-fields">
             <div className="style-dropdown-sub-field">
-              <label>H1</label>
+              <label>H1 size</label>
               <input
                 type="number"
                 min="1"
                 max="10"
                 step="0.1"
                 value={settings.h1Size !== undefined ? settings.h1Size : 5}
-                onChange={(e) => handleChange('h1Size', parseFloat(e.target.value) || 5)}
+                onChange={(e) => handleChange('h1Size', parseFloat(e.target.value) || 7)}
                 className="style-dropdown-input"
               />
             </div>
             <div className="style-dropdown-sub-field">
-              <label>H2</label>
+              <label>H2 size</label>
               <input
                 type="number"
                 min="1"
@@ -281,7 +369,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               />
             </div>
             <div className="style-dropdown-sub-field">
-              <label>H3</label>
+              <label>H3 size</label>
               <input
                 type="number"
                 min="1"
@@ -293,12 +381,11 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               />
             </div>
           </div>
-          <div className="style-dropdown-title">Heading Fonts</div>
           <div className="style-dropdown-sub-fields">
             <div className="style-dropdown-sub-field" style={{ flex: 1 }}>
-              <label>H1</label>
+              <label>H1 font</label>
               <select
-                value={settings.h1FontFamily || settings.fontFamily || 'Inter'}
+                value={settings.h1FontFamily || settings.fontFamily || 'Poppins'}
                 onChange={(e) => handleChange('h1FontFamily', e.target.value)}
                 className="style-dropdown-select"
               >
@@ -306,7 +393,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               </select>
             </div>
             <div className="style-dropdown-sub-field" style={{ flex: 1 }}>
-              <label>H2</label>
+              <label>H2 font</label>
               <select
                 value={settings.h2FontFamily || settings.fontFamily || 'Inter'}
                 onChange={(e) => handleChange('h2FontFamily', e.target.value)}
@@ -316,15 +403,57 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               </select>
             </div>
             <div className="style-dropdown-sub-field" style={{ flex: 1 }}>
-              <label>H3</label>
+              <label>H3 font</label>
               <select
-                value={settings.h3FontFamily || settings.fontFamily || 'Inter'}
+                value={settings.h3FontFamily || settings.fontFamily || 'Oswald'}
                 onChange={(e) => handleChange('h3FontFamily', e.target.value)}
                 className="style-dropdown-select"
               >
                 {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* 4. Bullets */}
+          <div className="style-dropdown-section-title">Bullets</div>
+          <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
+            <div className="style-dropdown-sub-field">
+              <label>Line height</label>
+              <input
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={settings.bulletLineHeight !== undefined ? settings.bulletLineHeight : 1}
+                onChange={(e) => handleChange('bulletLineHeight', parseFloat(e.target.value) || 1)}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>Text size (rem)</label>
+              <input
+                type="number"
+                min="0.5"
+                max="10"
+                step="0.1"
+                value={settings.bulletTextSize !== undefined ? settings.bulletTextSize : 3}
+                onChange={(e) => handleChange('bulletTextSize', parseFloat(e.target.value) || 3)}
+                className="style-dropdown-input"
+              />
+            </div>
+          </div>
+
+          {/* 5. Reset content */}
+          <div className="style-dropdown-field" style={{ marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="style-dropdown-btn style-dropdown-btn-reset-fields"
+              onClick={handleResetAllFontsAndTextFields}
+              disabled={!slides?.length}
+              title="Remove all inline formatting (bold, italic, highlight, color, serif, headings) from every slide so text uses layout defaults"
+            >
+              Reset all fonts and text fields
+            </button>
           </div>
         </div>
       </div>

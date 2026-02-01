@@ -73,6 +73,24 @@ function ColorOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
               />
             </div>
           </div>
+          <div className="style-dropdown-field">
+            <label>Highlight / text background color</label>
+            <div className="style-dropdown-color-group">
+              <input
+                type="color"
+                value={settings.inlineBgColor || '#facc15'}
+                onChange={(e) => handleChange('inlineBgColor', e.target.value)}
+                className="style-dropdown-color-picker"
+              />
+              <input
+                type="text"
+                value={settings.inlineBgColor || '#facc15'}
+                onChange={(e) => handleChange('inlineBgColor', e.target.value)}
+                className="style-dropdown-input"
+                placeholder="#facc15"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </>

@@ -64,3 +64,110 @@
   margin: 0 4px;
   background: var(--border-subtle, rgba(255, 255, 255, 0.15));
 }
+
+.text-format-toolbar-color-wrap {
+  position: relative;
+}
+
+.text-format-toolbar-btn-color {
+  padding: 4px;
+}
+
+.text-format-toolbar-btn-color-icon {
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.text-format-toolbar-color-dropdown {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, -8px);
+  padding: 10px;
+  background: var(--bg-elevated, #2a2a2a);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--button-radius, 8px);
+  box-shadow: var(--shadow-lg, 0 4px 20px rgba(0, 0, 0, 0.4));
+  z-index: 1;
+  min-width: 180px;
+}
+
+.text-format-toolbar-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.text-format-toolbar-color-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.text-format-toolbar-color-swatch:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--accent, #f97316);
+}
+
+.text-format-toolbar-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.text-format-toolbar-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.text-format-toolbar-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.text-format-toolbar-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.text-format-toolbar-color-custom-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.text-format-toolbar-color-clear {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.text-format-toolbar-color-clear:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.text-format-toolbar-btn-clear {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.text-format-toolbar-btn-clear:hover {
+  color: var(--text-primary, #fff);
+  background: rgba(255, 255, 255, 0.1);
+}
