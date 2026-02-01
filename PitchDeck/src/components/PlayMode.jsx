@@ -173,7 +173,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   )
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', backgroundScaleAnimation = false, backgroundScaleTime = 10, lineHeight = 1.4, bulletLineHeight = 1.4, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', backgroundScaleAnimation = false, backgroundScaleTime = 10, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -627,6 +627,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           backgroundColor={backgroundColor}
           textColor={textColor}
           fontFamily={fontFamily}
+          defaultTextSize={defaultTextSize}
           h1Size={h1Size}
           h2Size={h2Size}
           h3Size={h3Size}
@@ -648,8 +649,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           inlineBgPadding={inlineBgPadding}
           lineHeight={lineHeight}
           bulletLineHeight={bulletLineHeight}
+          bulletTextSize={bulletTextSize}
           backgroundScaleAnimation={backgroundScaleAnimation}
           backgroundScaleTime={backgroundScaleTime}
+          textStyleMode={textStyleMode || 'standard'}
+          fontPairingSerifFont={fontPairingSerifFont || 'Playfair Display'}
         />
       </div>
       {/* Webcam overlay - outside slide transitions */}

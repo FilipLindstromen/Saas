@@ -1,13 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './TransitionOptions.css'
 
-function TransitionOptions({ settings, onUpdateSettings, onClose }) {
+function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
+  const panelRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
     textAnimation: settings?.textAnimation || 'none',
     backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
     backgroundScaleTime: settings?.backgroundScaleTime || 10
   })
+
+  useEffect(() => {
+    const updatePosition = () => {
+      if (buttonRef?.current && panelRef?.current) {
+        const buttonRect = buttonRef.current.getBoundingClientRect()
+        panelRef.current.style.top = `${buttonRect.bottom + 8}px`
+        panelRef.current.style.right = `${window.innerWidth - buttonRect.right}px`
+      }
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [buttonRef])
+
+  useEffect(() => {
+    const handleEscape = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [onClose])
 
   const handleChange = (key, value) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }))
@@ -22,7 +46,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose }) {
 
   return (
     <div className="transition-options-overlay" onClick={onClose}>
-      <div className="transition-options-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} className="transition-options-modal" onClick={(e) => e.stopPropagation()}>
         <div className="transition-options-header">
           <h2>Transition & Animation Options</h2>
         </div>

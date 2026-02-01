@@ -4,8 +4,8 @@
   left: 0;
   right: 0;
   height: 80px;
-  background: #000000;
-  border-top: 1px solid #2a2a2a;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -24,7 +24,7 @@
   cursor: pointer;
   padding: 0.75rem 1.5rem;
   transition: all 0.2s;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .menu-item:hover {
@@ -32,29 +32,29 @@
 }
 
 .menu-item.active {
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .menu-item.active .menu-icon {
-  background: #ffffff;
-  color: #000000;
+  background: var(--accent);
+  color: var(--text-primary);
 }
 
 .menu-icon {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   transition: all 0.2s;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .menu-item.active .menu-icon {
-  border-color: #ffffff;
+  border-color: var(--accent);
 }
 
 .menu-label {
@@ -65,7 +65,7 @@
 }
 
 .menu-arrow {
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 1.2rem;
   font-weight: 300;
 }

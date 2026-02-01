@@ -61,6 +61,7 @@
   align-items: flex-end;
   /* Position text in lower third: ~16.67% from bottom centers content in lower third */
   padding: 4% 0 16.67% 9%;
+  background: transparent;
 }
 
 .slide-content.bulletpoints {
@@ -75,6 +76,24 @@
   text-align: center;
   /* Centered: 3rem = 4% of width */
   padding: 4%;
+}
+
+/* Centered layout: wrap title + subtitle so the block is centered */
+.slide-text-centered-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+.slide-text-centered-wrapper .slide-text,
+.slide-text-centered-wrapper .slide-subtitle {
+  text-align: center;
+  width: 100%;
+  max-width: 85%;
+  box-sizing: border-box;
 }
 
 .slide-content.right {
@@ -104,132 +123,191 @@
   padding: 4% 0 16.67% 9%; /* Same positioning as default left layout */
 }
 
+/* Left with Video: same text position as default Left (9% left, 16.67% bottom); only the text area is narrower */
 .slide-content.left-video {
   align-items: flex-end;
-  /* Position text in lower third, but leave right third for video */
-  padding: 4% 33.33% 16.67% 9%;
+  justify-content: flex-start;
+  /* Same padding as default .slide-content so text starts at the same position as Left layout */
+  padding: 4% 0 16.67% 9%;
 }
 
-/* Webcam video styling */
-.slide-webcam {
-  position: absolute;
-  z-index: 5;
-  object-fit: cover;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 50%;
-  aspect-ratio: 1 / 1;
-}
-
-.slide-webcam.webcam-video-bottom-right {
-  position: absolute;
-  bottom: 4%;
-  right: 4%;
-  top: auto;
-  left: auto;
-  width: 20%;
-  height: auto;
-  min-width: 120px;
-  min-height: 120px;
-  /* Ensure consistent positioning in both edit and present modes */
-  z-index: 5;
-}
-
-.slide-webcam.webcam-video-bottom-left {
-  position: absolute;
-  bottom: 4%;
-  left: 4%;
-  top: auto;
-  right: auto;
-  width: 20%;
-  height: auto;
-  min-width: 120px;
-  min-height: 120px;
-  /* Ensure consistent positioning in both edit and present modes */
-  z-index: 5;
-}
-
-.slide-webcam.webcam-video-fullscreen {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-  /* Ensure consistent positioning in both edit and present modes */
-  z-index: 5;
-}
-
-.slide-webcam.webcam-video-right-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 33.33%;
-  height: 100%;
-  border-radius: 0;
-  aspect-ratio: auto;
-  /* Ensure consistent positioning in both edit and present modes */
-  z-index: 5;
-}
-
-.slide-webcam.play-mode:not(.webcam-video-fullscreen) {
-  border-radius: 50%;
-  clip-path: circle(50% at center);
-  -webkit-clip-path: circle(50% at center);
-}
-
-.slide-webcam.webcam-video-fullscreen.play-mode {
-  border-radius: 0;
-  clip-path: none;
-  -webkit-clip-path: none;
-}
-
-.slide-section-text {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-.slide-section-name {
-  /* 1.5rem = 24px at base 16px, which is 3.56% of 675px height */
-  /* Use percentage of slide height for consistent scaling */
-  font-size: 3.56%;
-  /* But percentage font-size is relative to parent, so use em instead */
-  /* 1.2rem relative to 1rem base = 1.2em (smaller) */
-  font-size: 1.2em;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.6);
-  text-align: center;
-  outline: none;
-  border: none;
-  pointer-events: auto;
-  cursor: text;
+.slide-content.right-video {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 4% 0 16.67% 9%;
 }
 
 .slide-text {
-  /* 4rem = 64px = 5.33% of 1200px width */
-  /* Use em units relative to slide's font-size, which scales with slide width */
-  font-size: 4em;
-  cursor: text;
+  color: inherit;
   font-weight: 700;
-  position: relative;
-  z-index: 20;
-  background: transparent;
-  border: none;
-  outline: none;
-  width: 100%;
-  resize: none;
-  overflow: hidden;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   line-height: 1.2;
   max-width: 66.67%;
   /* Color, fontFamily, and textShadow are set via inline style */
   outline: none;
   border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+/* Font Pairing Styles */
+.font-pairing-serif {
+  font-style: italic;
+  display: inline;
+}
+
+/* Dynamic Text Sizing */
+.text-dynamic-sizing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.text-dynamic-sizing .slide-text,
+.text-dynamic-sizing .slide-subtitle {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 8vw, 12rem) !important;
+  line-height: 1.1 !important;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* For dynamic sizing, we need to calculate the optimal font size */
+.slide-content .text-dynamic-sizing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+.slide-text.text-dynamic-sizing {
+  font-size: var(--dynamic-font-size, 4rem);
+  transition: font-size 0.3s ease;
+}
+
+.slide-text.centered {
+  text-align: center;
+  max-width: 100%;
+}
+
+.slide-text.right {
+  text-align: right;
+}
+
+/* Narrower text area only; same left position as default Left layout */
+.slide-text.left-video {
+  text-align: left;
+  max-width: 45%;
+}
+
+.slide-text:empty::before {
+  content: 'Click to edit';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-text[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-subtitle {
+  color: inherit;
+  font-weight: 400;
+  font-size: 0.6em;
+  line-height: 1.4;
+  margin-top: 0.5em;
+  max-width: 66.67%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  background: transparent;
+  border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+.slide-subtitle:empty::before {
+  content: 'Subtitle (optional)';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-subtitle[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-section-name {
+  color: inherit;
+  font-weight: 700;
+  font-size: 4rem;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+.slide-section-name:empty::before {
+  content: 'Section Name';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-section-name[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  width: 100%;
+  max-width: 66.67%;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  /* Bullet text size set via --slide-bullet-font-size (px) from Slide.jsx */
+  font-size: var(--slide-bullet-font-size, 1em);
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  resize: none;
+  overflow: visible;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
   pointer-events: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -268,216 +346,132 @@
 .slide-text mark,
 .slide-subtitle mark,
 .slide-bullet mark {
-  /* Highlight styling is applied inline via formatContentForDisplay */
-  /* This ensures the highlight color, opacity, padding, and border-radius are applied */
-  display: inline;
-  background-color: transparent;
+  /* Highlight styling is applied inline via formatContentForDisplay when enabled */
 }
 
-.slide-text mark[style],
-.slide-subtitle mark[style],
-.slide-bullet mark[style] {
-  /* When style attribute is present, use inline styles (higher specificity) */
-  display: inline;
-}
-
-.slide-text h1 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-text h2 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-text h3 {
-  font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-text.centered {
-  width: 95%;
-  max-width: 95%;
-  text-align: center;
-}
-
-.slide-text.right {
-  text-align: right;
-  max-width: 66.67%;
-}
-
-.slide-text.left-video {
-  font-size: 3em; /* Smaller text for left-video layout */
-}
-
-.slide-text-centered-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* 2rem = 32px = 2.67% of 1200px width */
-  gap: 2em;
-  width: 95%;
-  max-width: 95%;
-  pointer-events: auto;
-}
-
-.slide-subtitle {
-  /* 2rem = 32px = 2.67% of 1200px width */
-  font-size: 2em;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  line-height: 1.4;
-  opacity: 0.9;
-  width: 100%;
-  max-width: 100%;
-  text-align: center;
-  /* Color, fontFamily, and textShadow are set via inline style */
-  outline: none;
-  border: none;
-  pointer-events: auto;
-  cursor: text;
-}
-
-.slide-subtitle:focus {
-  outline: none;
-  border: none;
-}
-
-.slide-subtitle-placeholder:empty:before {
-  content: attr(data-placeholder);
-  color: rgba(255, 255, 255, 0.4);
-  pointer-events: none;
-}
-
-.slide-subtitle-placeholder:empty {
-  min-height: 1em;
-}
-
-.slide-subtitle strong {
-  font-weight: 600;
-}
-
-.slide-subtitle em {
-  font-style: italic;
-}
-
-.slide-subtitle h1 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-subtitle h2 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-subtitle h3 {
-  font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.slide-bullets {
-  display: flex;
-  flex-direction: column;
-  /* 2.5rem = 40px = 3.33% of 1200px width */
-  gap: 2.5em;
-  max-width: 66.67%;
-  pointer-events: auto;
+/* When text highlight is disabled, ensure no background on mark */
+.slide.no-text-highlight .slide-text mark,
+.slide.no-text-highlight .slide-subtitle mark,
+.slide.no-text-highlight .slide-bullet mark {
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
 }
 
 .slide-bullet {
   display: flex;
-  align-items: center;
-  /* 2rem = 32px = 2.67% of 1200px width */
-  gap: 0.8em;
-  /* 2.5rem = 40px = 3.33% of 1200px width */
-  font-size: 2.5em;
-  font-weight: 600;
-  /* line-height is set via inline style from Slide component (bulletLineHeight prop) */
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
-  /* Color, fontFamily, and textShadow are set via inline style from parent */
+  align-items: flex-start;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
 }
 
-.slide-bullet.visible {
-  opacity: 1;
-  transform: translateY(0);
+.slide-bullet:last-child {
+  margin-bottom: 0;
 }
 
+/* Present mode: hide bullets until revealed */
 .slide-bullet.hidden {
-  opacity: 0;
-  transform: translateY(20px);
+  display: none;
 }
 
-.bullet-marker {
-  /* Marker should be slightly larger than text but proportional */
+.slide-bullet::before {
+  content: '•';
   font-size: 1.2em;
-  color: #ffffff;
-  flex-shrink: 0;
   line-height: 1;
-  margin: 0;
-  /* Center align with text */
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1em;
 }
 
-.bullet-text {
+/* Bullet text (class is "bullet-text" in JSX) */
+.slide-bullet .bullet-text {
   flex: 1;
-  text-transform: none;
-  letter-spacing: normal;
-  outline: none;
+  min-width: 0;
+  color: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  background: transparent;
+  overflow: visible;
+}
+
+.slide-bullet-text {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  background: transparent;
+}
+
+.slide-webcam {
+  position: fixed;
+  z-index: 1000;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-secondary);
+}
+
+.slide-webcam.webcam-video-bottom-right {
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  height: 180px;
+}
+
+.slide-webcam.webcam-video-bottom-left {
+  bottom: 20px;
+  left: 20px;
+  width: 320px;
+  height: 180px;
+}
+
+.slide-webcam.webcam-video-right-panel {
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  width: 400px;
+  height: 225px;
+}
+
+.slide-webcam.webcam-video-fullscreen {
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+
+.slide-webcam.play-mode {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Font pairing context menu (edit mode, font pairing mode only) */
+.slide-font-pairing-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 160px;
+  padding: 4px 0;
+  background: var(--bg-secondary, #2a2a2a);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.slide-font-pairing-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
   border: none;
-  cursor: text;
-  /* Inherit font-size from parent (.slide-bullet) */
-  font-size: 1em;
+  background: none;
+  color: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
 }
 
-.bullet-text:focus {
-  outline: none;
-  border: none;
-}
-
-.bullet-text strong {
-  font-weight: 700;
-}
-
-.bullet-text em {
-  font-style: italic;
-}
-
-.bullet-text h1 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.bullet-text h2 {
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
-}
-
-.bullet-text h3 {
-  font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
-  display: block;
+.slide-font-pairing-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }

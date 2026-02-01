@@ -1,0 +1,182 @@
+/* Shared foldout panel style for Colors, Typography, Text Effects (like RecordingOptions) */
+.style-dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+}
+
+.style-dropdown-panel {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--card-radius);
+  min-width: 280px;
+  max-width: 380px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  z-index: 10001;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.style-dropdown-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.style-dropdown-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.style-dropdown-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.style-dropdown-field > label:not(.style-dropdown-checkbox) {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.style-dropdown-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.style-dropdown-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.style-dropdown-input,
+.style-dropdown-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.style-dropdown-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+.style-dropdown-input:focus,
+.style-dropdown-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.style-dropdown-color-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.style-dropdown-color-picker {
+  width: 40px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.style-dropdown-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.style-dropdown-color-picker::-webkit-color-swatch { border: none; border-radius: 5px; }
+.style-dropdown-color-picker::-moz-color-swatch { border: none; border-radius: 5px; }
+
+.style-dropdown-sub-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.style-dropdown-sub-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 80px;
+}
+
+.style-dropdown-sub-field label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.style-dropdown-range-value {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.style-dropdown-btn {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.style-dropdown-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.style-dropdown-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.style-dropdown-btn-auto-fonts {
+  margin-top: 0.25rem;
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+}
+
+.style-dropdown-btn-auto-fonts:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.style-dropdown-error {
+  font-size: 0.75rem;
+  color: var(--text-danger, #ef4444);
+  margin: 0.25rem 0 0;
+}

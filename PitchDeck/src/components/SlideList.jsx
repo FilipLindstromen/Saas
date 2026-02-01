@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react'
 import LayoutSelector from './LayoutSelector'
+import ContextMenu from './ContextMenu'
 import './SlideList.css'
 
-function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onReorder }) {
+function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [editingSubtitle, setEditingSubtitle] = useState(false)
@@ -10,14 +11,28 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
   const [textAreaRef, setTextAreaRef] = useState(null)
   const [subtitleTextAreaRef, setSubtitleTextAreaRef] = useState(null)
   const [foldedSections, setFoldedSections] = useState(new Set())
-  const [isFormatting, setIsFormatting] = useState(false)
   const [draggedId, setDraggedId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
+  const [contextMenu, setContextMenu] = useState(null)
   const dragStartTimeRef = useRef(null)
+
+  // Strip HTML to plain text so edit fields show readable text, not raw tags
+  const getPlainText = (content) => {
+    if (!content || typeof content !== 'string') return ''
+    return content
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+  }
 
   const handleEdit = (slide) => {
     setEditingId(slide.id)
-    setEditContent(slide.content)
+    setEditContent(getPlainText(slide.content))
     setEditSubtitle(slide.subtitle || '')
     setEditingSubtitle(false)
     // Also select the slide in the preview
@@ -41,29 +56,12 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
   }
 
   const handleBlur = (e) => {
-    // Don't close edit mode if we're in the middle of formatting
-    if (isFormatting) {
-      return
-    }
-    
     // Don't close edit mode if focus is moving to another input in the same edit session
-    // Use setTimeout to check if focus moved to subtitle/main textarea or formatting buttons
     setTimeout(() => {
-      // Check again if formatting is happening
-      if (isFormatting) {
-        return
-      }
-      
       const activeElement = document.activeElement
       const isFocusingSubtitle = activeElement === subtitleTextAreaRef
       const isFocusingMain = activeElement === textAreaRef
-      
-      // Check if the click was on a formatting button or toolbar
-      const isFormattingButton = activeElement?.closest('.format-btn') || 
-                                  activeElement?.closest('.formatting-toolbar')
-      
-      // Only close edit mode if focus is not on either textarea or formatting buttons
-      if (!isFocusingSubtitle && !isFocusingMain && !isFormattingButton) {
+      if (!isFocusingSubtitle && !isFocusingMain) {
         setEditingId(null)
         setEditingSubtitle(false)
       }
@@ -88,10 +86,10 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     // Allow Enter to create new lines naturally in textarea
     // Only handle Escape to exit edit mode
     if (e.key === 'Escape') {
-      // Revert to original content and exit edit mode
+      // Revert to original content (plain text) and exit edit mode
       const slide = slides.find(s => s.id === id)
       if (slide) {
-        setEditContent(slide.content)
+        setEditContent(getPlainText(slide.content))
       }
       setEditingId(null)
     }
@@ -105,77 +103,6 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
         : { layout: layoutId }
       onUpdate(selectedSlideId, updates)
     }
-  }
-
-  const applyFormatting = (tag, isSubtitle = false) => {
-    setIsFormatting(true)
-    
-    const ref = isSubtitle ? subtitleTextAreaRef : textAreaRef
-    const content = isSubtitle ? editSubtitle : editContent
-    const setContent = isSubtitle ? setEditSubtitle : setEditContent
-    
-    if (!ref) {
-      setIsFormatting(false)
-      return
-    }
-
-    const textarea = ref
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = content.substring(start, end)
-
-    // For heading tags, apply to entire field instead of selected text
-    if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
-      const headingProperty = isSubtitle ? 'subtitleHeadingLevel' : 'textHeadingLevel'
-      const currentHeading = slides.find(s => s.id === editingId)?.[headingProperty]
-      // Toggle: if already this heading, remove it; otherwise set it
-      const newHeading = currentHeading === tag ? null : tag
-      onUpdate(editingId, { [headingProperty]: newHeading })
-      setIsFormatting(false)
-      return
-    }
-
-    if (selectedText.length === 0) {
-      setIsFormatting(false)
-      return
-    }
-
-    const beforeText = content.substring(0, start)
-    const afterText = content.substring(end)
-    
-    let formattedText
-    if (tag === 'strong') {
-      formattedText = `<strong>${selectedText}</strong>`
-    } else if (tag === 'em') {
-      formattedText = `<em>${selectedText}</em>`
-    } else if (tag === 'mark') {
-      formattedText = `<mark>${selectedText}</mark>`
-    } else {
-      setIsFormatting(false)
-      return
-    }
-
-    const newContent = beforeText + formattedText + afterText
-    setContent(newContent)
-    
-    if (isSubtitle) {
-      onUpdate(editingId, { subtitle: newContent })
-    } else {
-      onUpdate(editingId, { content: newContent })
-    }
-
-    // Restore cursor position and focus after update
-    // Use requestAnimationFrame to ensure DOM is updated
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        if (textarea) {
-          const newCursorPos = start + formattedText.length
-          textarea.setSelectionRange(newCursorPos, newCursorPos)
-          textarea.focus()
-        }
-        setIsFormatting(false)
-      }, 0)
-    })
   }
 
   const toggleSectionFold = (sectionId) => {
@@ -237,24 +164,37 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     e.preventDefault()
     setDragOverId(null)
     
-    if (!draggedId || draggedId === targetSlideId || !onReorder) {
+    if (!draggedId || draggedId === targetSlideId) {
       setDraggedId(null)
       return
     }
 
-    const draggedIndex = slides.findIndex(s => s.id === draggedId)
-    const targetIndex = slides.findIndex(s => s.id === targetSlideId)
-    
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedId(null)
-      return
+    // Check if dropping on a chapter tab
+    const chapterTab = e.target.closest('.chapter-tab')
+    if (chapterTab && onMoveToChapter && chapters) {
+      const chapterId = parseInt(chapterTab.dataset.chapterId)
+      if (chapterId) {
+        onMoveToChapter(draggedId, chapterId)
+        setDraggedId(null)
+        return
+      }
     }
 
-    const newSlides = [...slides]
-    const [removed] = newSlides.splice(draggedIndex, 1)
-    newSlides.splice(targetIndex, 0, removed)
-    
-    onReorder(newSlides)
+    // Regular reorder within same chapter
+    if (onReorder) {
+      const draggedIndex = slides.findIndex(s => s.id === draggedId)
+      const targetIndex = slides.findIndex(s => s.id === targetSlideId)
+      
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDraggedId(null)
+        return
+      }
+
+      const newSlides = [...slides]
+      const [removed] = newSlides.splice(draggedIndex, 1)
+      newSlides.splice(targetIndex, 0, removed)
+      onReorder(newSlides)
+    }
     setDraggedId(null)
   }
 
@@ -265,6 +205,83 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
     setTimeout(() => {
       dragStartTimeRef.current = null
     }, 100)
+  }
+
+  const handleContextMenu = (e, slideId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, slideId })
+  }
+
+  const handleAddAfter = (slideId) => {
+    const slideIndex = slides.findIndex(s => s.id === slideId)
+    if (slideIndex !== -1 && onAdd) {
+      // Create new slide after current
+      const newId = Math.max(...slides.map(s => s.id), 0) + 1
+      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+      const newSlides = [...slides]
+      newSlides.splice(slideIndex + 1, 0, newSlide)
+      if (onReorder) {
+        onReorder(newSlides)
+      }
+      if (onSelect) {
+        onSelect(newId)
+      }
+    }
+  }
+
+  const handleAddBefore = (slideId) => {
+    const slideIndex = slides.findIndex(s => s.id === slideId)
+    if (slideIndex !== -1 && onAdd) {
+      // Create new slide before current
+      const newId = Math.max(...slides.map(s => s.id), 0) + 1
+      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+      const newSlides = [...slides]
+      newSlides.splice(slideIndex, 0, newSlide)
+      if (onReorder) {
+        onReorder(newSlides)
+      }
+      if (onSelect) {
+        onSelect(newId)
+      }
+    }
+  }
+
+  const handleSlideClick = (e, slideId) => {
+    // Handle multi-select with Ctrl/Cmd
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+    const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
+    
+    if (cmdOrCtrl) {
+      e.preventDefault()
+      setSelectedSlides(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(slideId)) {
+          newSet.delete(slideId)
+        } else {
+          newSet.add(slideId)
+        }
+        return newSet
+      })
+    } else if (e.shiftKey && selectedSlides.size > 0) {
+      // Range selection with Shift
+      e.preventDefault()
+      const currentIndex = slides.findIndex(s => s.id === slideId)
+      const selectedIndices = Array.from(selectedSlides).map(id => slides.findIndex(s => s.id === id)).filter(i => i !== -1)
+      const minIndex = Math.min(...selectedIndices, currentIndex)
+      const maxIndex = Math.max(...selectedIndices, currentIndex)
+      const newSet = new Set()
+      for (let i = minIndex; i <= maxIndex; i++) {
+        newSet.add(slides[i].id)
+      }
+      setSelectedSlides(newSet)
+    } else {
+      // Single selection
+      setSelectedSlides(new Set([slideId]))
+      if (onSelect) {
+        onSelect(slideId)
+      }
+    }
   }
 
   return (
@@ -366,15 +383,16 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', width: '100%' }}>
                 <div className="slide-item-number">{originalIndex + 1}</div>
                 <div
-                  className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''}`}
-                onClick={(e) => {
-                  // Don't select if we just finished dragging (within 200ms)
-                  const timeSinceDragStart = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : Infinity
-                  if (timeSinceDragStart > 200) {
-                    onSelect(slide.id)
-                  }
-                }}
-              >
+                  className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''} ${selectedSlides.has(slide.id) ? 'multi-selected' : ''}`}
+                  onClick={(e) => {
+                    // Don't select if we just finished dragging (within 200ms)
+                    const timeSinceDragStart = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : Infinity
+                    if (timeSinceDragStart > 200) {
+                      handleSlideClick(e, slide.id)
+                    }
+                  }}
+                  onContextMenu={(e) => handleContextMenu(e, slide.id)}
+                >
                 {slide.imageUrl && (
                   <div className="slide-item-thumbnail">
                     <img src={slide.imageUrl} alt={`Slide ${originalIndex + 1}`} />
@@ -383,281 +401,43 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
                 <div className="slide-item-main-content">
                 {isEditing ? (
                 <div className="slide-item-edit" onClick={(e) => e.stopPropagation()}>
-                  <div className="formatting-toolbar">
-                    <button
-                      type="button"
-                      className="format-btn"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('strong', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Bold (Ctrl+B)"
-                    >
-                      <strong>B</strong>
-                    </button>
-                    <button
-                      type="button"
-                      className="format-btn"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('em', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Italic (Ctrl+I)"
-                    >
-                      <em>I</em>
-                    </button>
-                    <button
-                      type="button"
-                      className="format-btn"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('mark', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Highlight text"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                        <path d="M3 20h18v2H3v-2z" opacity="0.3" />
-                        <path d="M5 18h14v-2H5v2z" />
-                        <path d="M7 16h10v-1H7v1z" />
-                        <path d="M9 14h6v-1H9v1z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h1' ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('h1', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Heading 1"
-                    >
-                      H1
-                    </button>
-                    <button
-                      type="button"
-                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h2' ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('h2', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Heading 2"
-                    >
-                      H2
-                    </button>
-                    <button
-                      type="button"
-                      className={`format-btn ${slides.find(s => s.id === slide.id)?.textHeadingLevel === 'h3' ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        applyFormatting('h3', false)
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title="Heading 3"
-                    >
-                      H3
-                    </button>
-                  </div>
                   <textarea
                     ref={(ref) => setTextAreaRef(ref)}
                     value={editContent}
                     onChange={(e) => handleChange(e, slide.id)}
                     onBlur={handleBlur}
                     onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
-                      // Handle keyboard shortcuts
-                      if (e.ctrlKey || e.metaKey) {
-                        if (e.key === 'b') {
-                          e.preventDefault()
-                          applyFormatting('strong', false)
-                          return
-                        }
-                        if (e.key === 'i') {
-                          e.preventDefault()
-                          applyFormatting('em', false)
-                          return
-                        }
-                      }
-                      handleKeyDown(e, slide.id)
-                    }}
+                    onKeyDown={(e) => handleKeyDown(e, slide.id)}
                     autoFocus
                     className="slide-edit-input"
                     placeholder="Main text"
                   />
                   {isCentered && (
-                    <>
-                      <div className="formatting-toolbar">
-                        <button
-                          type="button"
-                          className="format-btn"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('strong', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Bold (Ctrl+B)"
-                        >
-                          <strong>B</strong>
-                        </button>
-                        <button
-                          type="button"
-                          className="format-btn"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('em', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Italic (Ctrl+I)"
-                        >
-                          <em>I</em>
-                        </button>
-                        <button
-                          type="button"
-                          className="format-btn"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('mark', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Highlight text"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 2H2v9h9V2z" />
-                            <path d="M22 13h-9v9h9v-9z" />
-                            <path d="M11 13H2v9h9v-9z" />
-                            <path d="M22 2h-9v9h9V2z" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h1' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('h1', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Heading 1"
-                        >
-                          H1
-                        </button>
-                        <button
-                          type="button"
-                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h2' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('h2', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Heading 2"
-                        >
-                          H2
-                        </button>
-                        <button
-                          type="button"
-                          className={`format-btn ${slides.find(s => s.id === slide.id)?.subtitleHeadingLevel === 'h3' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            applyFormatting('h3', true)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title="Heading 3"
-                        >
-                          H3
-                        </button>
-                      </div>
-                      <textarea
-                        ref={(ref) => setSubtitleTextAreaRef(ref)}
-                        value={editSubtitle}
-                        onChange={(e) => handleSubtitleChange(e, slide.id)}
-                        onBlur={handleSubtitleBlur}
-                        onClick={(e) => e.stopPropagation()}
-                        onFocus={(e) => {
-                          e.stopPropagation()
-                          setEditingSubtitle(true)
-                        }}
-                        onKeyDown={(e) => {
-                          // Handle keyboard shortcuts
-                          if (e.ctrlKey || e.metaKey) {
-                            if (e.key === 'b') {
-                              e.preventDefault()
-                              applyFormatting('strong', true)
-                              return
-                            }
-                            if (e.key === 'i') {
-                              e.preventDefault()
-                              applyFormatting('em', true)
-                              return
-                            }
-                          }
-                          // Don't exit edit mode on Enter or Escape when editing subtitle
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            // Just blur the subtitle, don't exit edit mode
-                            return
-                          }
-                          if (e.key === 'Escape') {
-                            e.preventDefault()
-                            // Just blur the subtitle, don't exit edit mode
-                            subtitleTextAreaRef?.blur()
-                            return
-                          }
-                        }}
-                        className="slide-edit-input slide-edit-subtitle"
-                        placeholder="Subtitle (optional)"
-                      />
-                    </>
+                    <textarea
+                      ref={(ref) => setSubtitleTextAreaRef(ref)}
+                      value={editSubtitle}
+                      onChange={(e) => handleSubtitleChange(e, slide.id)}
+                      onBlur={handleSubtitleBlur}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => {
+                        e.stopPropagation()
+                        setEditingSubtitle(true)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          return
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          subtitleTextAreaRef?.blur()
+                          return
+                        }
+                        handleKeyDown(e, slide.id)
+                      }}
+                      className="slide-edit-input slide-edit-subtitle"
+                      placeholder="Subtitle (optional)"
+                    />
                   )}
                 </div>
               ) : (
@@ -712,6 +492,17 @@ function SlideList({ slides, selectedSlideId, onSelect, onAdd, onDelete, onDupli
           )
         })}
       </div>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onDuplicate={() => onDuplicate(contextMenu.slideId)}
+          onDelete={() => onDelete(contextMenu.slideId)}
+          onAddAfter={() => handleAddAfter(contextMenu.slideId)}
+          onAddBefore={() => handleAddBefore(contextMenu.slideId)}
+        />
+      )}
     </div>
   )
 }

@@ -2,7 +2,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #000000;
+  background: var(--bg-primary);
   overflow: visible;
   align-items: center;
   justify-content: flex-start;
@@ -43,10 +43,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
@@ -58,8 +58,8 @@
 }
 
 .plan-templates-toggle:hover {
-  background: #2a2a2a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .plan-generate-toggle {
@@ -67,10 +67,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
@@ -82,8 +82,8 @@
 }
 
 .plan-generate-toggle:hover {
-  background: #2a2a2a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .plan-generate-content {
@@ -161,10 +161,10 @@
 .plan-ramble-select {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
   cursor: pointer;
@@ -173,8 +173,9 @@
 
 .plan-ramble-select:focus {
   outline: none;
-  border-color: #4a9eff;
-  background: #2f2f2f;
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .plan-ramble-select:disabled {
@@ -211,10 +212,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
@@ -224,8 +225,8 @@
 }
 
 .plan-ramble-btn:hover:not(:disabled) {
-  background: #2a2a2a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .plan-ramble-btn:disabled {
@@ -256,10 +257,10 @@
 .plan-generate-input {
   width: 100%;
   padding: 0.75rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
   resize: vertical;
@@ -269,21 +270,22 @@
 
 .plan-generate-input:focus {
   outline: none;
-  border-color: #4a9eff;
-  background: #2f2f2f;
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .plan-generate-input::placeholder {
-  color: #888;
+  color: var(--text-tertiary);
 }
 
 .plan-generate-btn {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
@@ -291,8 +293,8 @@
 }
 
 .plan-generate-btn:hover:not(:disabled) {
-  background: #2a2a2a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .plan-generate-btn:disabled {
@@ -340,7 +342,7 @@
   right: 0;
   top: -2px;
   height: 2px;
-  background: #4a9eff;
+  background: var(--accent);
   z-index: 1;
 }
 
@@ -361,12 +363,12 @@
   border-radius: 4px;
   padding: 0.5rem 1rem;
   margin: 0.5rem 0;
-  background: #4a4a4a;
+  background: var(--bg-tertiary);
 }
 
 .plan-scene.plan-section:hover:not(.dragging) {
   opacity: 1;
-  background: #555555;
+  background: var(--bg-hover);
 }
 
 .plan-scene.plan-section .scene-text {
@@ -376,7 +378,7 @@
 
 .scene-number {
   font-size: 0.9rem;
-  color: #aaaaaa;
+  color: var(--text-tertiary);
   min-width: 80px;
   font-weight: 400;
   flex-shrink: 0;
@@ -385,13 +387,13 @@
 .scene-separator {
   width: 1px;
   height: 20px;
-  background: #333333;
+  background: var(--border-strong);
   flex-shrink: 0;
 }
 
 .scene-text {
   flex: 1;
-  color: #cccccc;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.5;
   font-weight: 300;
@@ -401,14 +403,14 @@
 
 .scene-text:empty::before {
   content: 'Click to edit...';
-  color: #666666;
+  color: var(--text-quaternary);
 }
 
 .scene-input {
   flex: 1;
   background: transparent;
-  border: 1px solid #333333;
-  color: #ffffff;
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 300;
   padding: 0.5rem;
@@ -421,7 +423,8 @@
 }
 
 .scene-input:focus {
-  border-color: #4a9eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 
@@ -434,9 +437,9 @@
 
 .add-scene-btn {
   padding: 0.75rem 1.5rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  color: #ffffff;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -446,6 +449,6 @@
 }
 
 .add-scene-btn:hover {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
