@@ -12,14 +12,15 @@
 }
 
 .record-options-modal {
-  background: #2a2a2a;
+  background: var(--bg-elevated);
   border-radius: 8px;
   width: 90%;
   max-width: 500px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-subtle);
 }
 
 .record-options-header {
@@ -27,12 +28,12 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .record-options-header h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 1.5rem;
   font-weight: 600;
 }
@@ -53,7 +54,7 @@
 
 .record-options-section h3 {
   margin: 0 0 1rem 0;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -69,7 +70,7 @@
 .record-options-field label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #cccccc;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -78,7 +79,7 @@
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
@@ -92,10 +93,10 @@
 .record-options-select {
   width: 100%;
   padding: 0.75rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -135,9 +136,9 @@
 
 .btn-secondary {
   padding: 0.75rem 1.5rem;
-  background: #3a3a3a;
-  color: #ffffff;
-  border: none;
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   font-size: 1rem;
   font-weight: 600;
@@ -146,13 +147,13 @@
 }
 
 .btn-secondary:hover {
-  background: #4a4a4a;
+  background: var(--bg-hover);
 }
 
 .btn-close {
   background: none;
   border: none;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 2rem;
   cursor: pointer;
   padding: 0;
@@ -166,5 +167,5 @@
 }
 
 .btn-close:hover {
-  background: #3a3a3a;
+  background: var(--bg-hover);
 }

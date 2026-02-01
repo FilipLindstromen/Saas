@@ -318,8 +318,8 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
               >
                 <div className="slide-item slide-item-section">
                   <div className="slide-item-content">
-                  <div className="slide-item-text slide-item-section-text">
-                    <div dangerouslySetInnerHTML={{ __html: slide.content || 'Section Name' }} />
+                  <div className="slide-item-text slide-item-section-text" style={{ whiteSpace: 'pre-line' }}>
+                    {getPlainText(slide.content || 'Section Name')}
                   </div>
                   <div className="slide-item-actions">
                     <button
@@ -448,13 +448,13 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
                       e.stopPropagation()
                       handleEdit(slide)
                     }}
+                    style={{ whiteSpace: 'pre-line' }}
                   >
-                    <div dangerouslySetInnerHTML={{ __html: slide.content || 'Empty slide' }} />
+                    <div>{getPlainText(slide.content || 'Empty slide')}</div>
                     {isCentered && slide.subtitle && (
-                      <div 
-                        className="slide-item-subtitle"
-                        dangerouslySetInnerHTML={{ __html: slide.subtitle }}
-                      />
+                      <div className="slide-item-subtitle">
+                        {getPlainText(slide.subtitle)}
+                      </div>
                     )}
                   </div>
                   <div className="slide-item-actions">

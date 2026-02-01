@@ -34,14 +34,11 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
   }, [onClose])
 
   const handleChange = (key, value) => {
-    setLocalSettings(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleApply = () => {
+    const next = { ...localSettings, [key]: value }
+    setLocalSettings(next)
     if (onUpdateSettings) {
-      onUpdateSettings({ ...settings, ...localSettings })
+      onUpdateSettings({ ...settings, ...next })
     }
-    onClose()
   }
 
   return (
@@ -72,9 +69,9 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
           </div>
 
           <div className="transition-options-section">
-            <h3>Text Animations</h3>
+            <h3>Text in &amp; out animations</h3>
             <div className="transition-options-field">
-              <label htmlFor="text-animation-select">Text Animation</label>
+              <label htmlFor="text-animation-select">Text animation</label>
               <select
                 id="text-animation-select"
                 value={localSettings.textAnimation}
@@ -82,14 +79,16 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
                 className="transition-options-select"
               >
                 <option value="none">None</option>
-                <option value="fade-in">Fade In</option>
-                <option value="slide-up">Slide Up</option>
-                <option value="slide-down">Slide Down</option>
-                <option value="slide-left">Slide Left</option>
-                <option value="slide-right">Slide Right</option>
-                <option value="zoom-in">Zoom In</option>
+                <option value="fade-in">Fade in</option>
+                <option value="fade-in-up">Fade in + slide up</option>
+                <option value="fade-in-down">Fade in + slide down</option>
+                <option value="slide-in-left">Slide in from right (-x)</option>
+                <option value="slide-in-right">Slide in from left (+x)</option>
                 <option value="typewriter">Typewriter</option>
-                <option value="bounce">Bounce</option>
+                <option value="zoom-in">Zoom in</option>
+                <option value="bounce-in">Bounce in</option>
+                <option value="words-fade-up">Words: fade + slide up (sequence)</option>
+                <option value="blur-in">Blur in</option>
               </select>
             </div>
           </div>
@@ -124,9 +123,6 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
               </div>
             )}
           </div>
-        </div>
-        <div className="transition-options-footer">
-          <button className="btn-apply" onClick={handleApply}>Apply</button>
         </div>
       </div>
     </div>

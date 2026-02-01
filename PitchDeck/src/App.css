@@ -52,6 +52,7 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
   --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.2);
+  --header-inset: 0 1px 0 rgba(0, 0, 0, 0.06) inset;
   --card-radius: 16px;
   --button-radius: 12px;
 }
@@ -96,6 +97,7 @@
   align-items: center;
   gap: 1rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
   height: 100%;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
@@ -187,8 +189,10 @@
 .header-chapters {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
+  justify-content: flex-start;
+  padding-left: 1rem;
+  margin-left: 0.25rem;
+  border-left: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
 }
 
 .header-right {
@@ -340,9 +344,9 @@
 }
 
 .chapter-tab-delete:hover {
-  color: #ff4444;
+  color: var(--accent-secondary);
   opacity: 1;
-  background: rgba(255, 68, 68, 0.1);
+  background: rgba(255, 71, 87, 0.15);
 }
 
 .chapter-tab-add {

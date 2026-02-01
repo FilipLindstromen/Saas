@@ -67,7 +67,7 @@
   gap: 0.5rem;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #cccccc;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -75,15 +75,15 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #4a9eff;
+  accent-color: var(--accent);
 }
 
 .webcam-select {
   padding: 0.5rem 1rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
   outline: none;
@@ -99,8 +99,8 @@
 }
 
 .webcam-select option {
-  background: #2a2a2a;
-  color: #ffffff;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .preview-header h3 {
@@ -248,47 +248,47 @@
 }
 
 .btn-upload-image {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .btn-swap-image {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .btn-select-images {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .btn-flip-image {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .btn-flip-image.active {
-  background: #ffffff;
-  color: #1a1a1a;
-  border-color: #ffffff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 .btn-flip-image.active svg {
-  stroke: #1a1a1a;
+  stroke: var(--text-primary);
 }
 
 .btn-flip-gradient {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .btn-flip-gradient.active {
-  background: #ffffff;
-  color: #1a1a1a;
-  border-color: #ffffff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 .btn-flip-gradient.active svg {
-  stroke: #1a1a1a;
+  stroke: var(--text-primary);
 }
 
 .btn-remove-image {
-  background: #2a2a2a;
+  background: var(--bg-active);
 }
 
 .preview-content {

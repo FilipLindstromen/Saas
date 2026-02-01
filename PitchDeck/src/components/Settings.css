@@ -126,10 +126,10 @@
 .settings-section-title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .settings-field {
@@ -144,16 +144,16 @@
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .settings-field input {
   width: 100%;
   padding: 0.75rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: 'Monaco', 'Courier New', monospace;
 }
@@ -173,7 +173,7 @@
 .color-picker-input {
   width: 50px;
   height: 40px;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   cursor: pointer;
   background: transparent;
@@ -198,10 +198,10 @@
 .color-text-input {
   flex: 1;
   padding: 0.75rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: 'Monaco', 'Courier New', monospace;
 }
@@ -215,10 +215,10 @@
 .settings-select {
   width: 100%;
   padding: 0.75rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   cursor: pointer;
   font-family: inherit;
@@ -231,8 +231,8 @@
 }
 
 .settings-select option {
-  background: #2a2a2a;
-  color: #ffffff;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .checkbox-label {
@@ -247,13 +247,13 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #4a9eff;
+  accent-color: var(--accent);
 }
 
 .settings-sub-fields {
   margin-top: 1rem;
   padding-left: 1.5rem;
-  border-left: 2px solid #3a3a3a;
+  border-left: 2px solid var(--border-default);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -267,14 +267,14 @@
 
 .settings-sub-field label {
   font-size: 0.85rem;
-  color: #aaa;
+  color: var(--text-tertiary);
   margin-bottom: 0;
 }
 
 .settings-sub-section-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #ccc;
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
   display: block;
 }
@@ -282,10 +282,10 @@
 .settings-number-input {
   width: 100%;
   padding: 0.5rem;
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
@@ -298,7 +298,7 @@
 .settings-range-input {
   width: 100%;
   height: 6px;
-  background: #3a3a3a;
+  background: var(--bg-tertiary);
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
@@ -310,20 +310,20 @@
   appearance: none;
   width: 16px;
   height: 16px;
-  background: #4a9eff;
+  background: var(--accent);
   border-radius: 50%;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .settings-range-input::-webkit-slider-thumb:hover {
-  background: #5aaeff;
+  background: var(--accent-hover);
 }
 
 .settings-range-input::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: #4a9eff;
+  background: var(--accent);
   border-radius: 50%;
   cursor: pointer;
   border: none;
@@ -331,19 +331,19 @@
 }
 
 .settings-range-input::-moz-range-thumb:hover {
-  background: #5aaeff;
+  background: var(--accent-hover);
 }
 
 .range-value {
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-tertiary);
   margin-left: 0.5rem;
 }
 
 .settings-hint {
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-tertiary);
   line-height: 1.4;
 }
 
@@ -361,14 +361,14 @@
   justify-content: flex-end;
   gap: 1rem;
   padding: 1.5rem;
-  border-top: 1px solid #3a3a3a;
+  border-top: 1px solid var(--border-default);
 }
 
 .btn-cancel {
   padding: 0.5rem 1.5rem;
-  background: #2a2a2a;
-  color: #ffffff;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -377,15 +377,15 @@
 }
 
 .btn-cancel:hover {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .btn-save {
   padding: 0.5rem 1.5rem;
-  background: #ffffff;
-  color: #1a1a1a;
-  border: 1px solid #ffffff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -394,6 +394,6 @@
 }
 
 .btn-save:hover {
-  background: #f0f0f0;
-  border-color: #f0f0f0;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }

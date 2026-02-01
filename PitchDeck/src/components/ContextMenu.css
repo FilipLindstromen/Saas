@@ -32,7 +32,7 @@
 }
 
 .context-menu-item.danger {
-  color: #ff4444;
+  color: var(--accent-secondary, #ff4757);
 }
 
 .context-menu-item.danger:hover {

@@ -51,7 +51,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -180,6 +180,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     // Strip HTML tags and check if there's actual text
     const textOnly = slide.subtitle.replace(/<[^>]*>/g, '').trim()
     return textOnly.length > 0
+  }
+
+  // Get plain text words from HTML (for words-fade-up animation)
+  const getWordsFromContent = (html) => {
+    if (!html || typeof html !== 'string') return []
+    const text = html
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return text ? text.split(' ').filter(Boolean) : []
   }
 
   const handleContentChange = (e) => {
@@ -341,12 +356,46 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         ? range.startContainer.parentElement
         : range.startContainer
       const serifActive = !!(startEl?.closest?.('.font-pairing-serif'))
+      const boldActive = document.queryCommandState('bold')
+      const italicActive = document.queryCommandState('italic')
+      const underlineActive = document.queryCommandState('underline')
+      const backgroundActive = !!(startEl?.closest?.('mark'))
+      // Explicit text color: walk up from selection start and use first inline style.color
+      let textColorActive = null
+      let colorEl = startEl
+      while (colorEl && colorEl.nodeType === Node.ELEMENT_NODE) {
+        if (colorEl.style?.color) {
+          textColorActive = colorEl.style.color
+          break
+        }
+        colorEl = colorEl.parentElement
+      }
+      // Block-level element for heading state (H1/H2/H3 or default), within the target container
+      const targetContainer = target.field === 'content' ? contentRef.current : target.field === 'subtitle' ? subtitleRef.current : null
+      let headingBlock = null
+      if (targetContainer) {
+        let blockEl = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer
+        while (blockEl && targetContainer.contains(blockEl)) {
+          if (blockEl.nodeType === Node.ELEMENT_NODE && ['H1', 'H2', 'H3', 'P', 'DIV'].includes(blockEl.tagName)) {
+            headingBlock = blockEl
+            break
+          }
+          blockEl = blockEl.parentElement
+        }
+      }
+      const headingActive = headingBlock && ['H1', 'H2', 'H3'].includes(headingBlock.tagName) ? headingBlock.tagName.toLowerCase() : null
       textFormatRangeRef.current = range.cloneRange()
       setTextFormatToolbar({
         x: rect.left + rect.width / 2,
         y: rect.top,
         target,
-        serifActive
+        serifActive,
+        boldActive,
+        italicActive,
+        underlineActive,
+        backgroundActive,
+        headingActive,
+        textColorActive
       })
     }
     const handleMouseUp = () => {
@@ -399,33 +448,70 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const applyItalic = useCallback(() => applyFormat(() => document.execCommand('italic', false, null)), [applyFormat])
   const applyUnderline = useCallback(() => applyFormat(() => document.execCommand('underline', false, null)), [applyFormat])
   const applyBackground = useCallback(() => {
-    applyFormat(() => {
-      const mark = document.createElement('mark')
-      const range = textFormatRangeRef.current
-      if (!range) return
-      try {
-        range.surroundContents(mark)
-      } catch (e) {
-        const fragment = range.extractContents()
-        mark.appendChild(fragment)
-        range.insertNode(mark)
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      const container = range.commonAncestorContainer
+      const startEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container
+      const markEl = startEl?.closest?.('mark')
+      if (markEl?.tagName === 'MARK') {
+        const parent = markEl.parentNode
+        while (markEl.firstChild) parent.insertBefore(markEl.firstChild, markEl)
+        parent.removeChild(markEl)
+      } else {
+        const mark = document.createElement('mark')
+        // Always set a visible highlight color so the toolbar action always shows feedback
+        const highlightRgb = textInlineBackground ? hexToRgb(inlineBgColor) : { r: 250, g: 204, b: 21 }
+        const opacity = textInlineBackground ? inlineBgOpacity : 0.4
+        mark.style.backgroundColor = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, ${opacity})`
+        mark.style.padding = `${inlineBgPadding}px`
+        mark.style.borderRadius = '4px'
+        try {
+          range.surroundContents(mark)
+        } catch (e) {
+          const fragment = range.extractContents()
+          mark.appendChild(fragment)
+          range.insertNode(mark)
+        }
       }
-    })
-  }, [applyFormat])
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding])
+  const getBlockElement = useCallback((range, container) => {
+    if (!container) return null
+    let node = range.startContainer
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement
+    while (node && container.contains(node)) {
+      if (node.nodeType === Node.ELEMENT_NODE && ['H1', 'H2', 'H3', 'P', 'DIV'].includes(node.tagName)) return node
+      node = node.parentElement
+    }
+    return null
+  }, [])
   const applyHeading = useCallback((tagName) => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const container = state.target.field === 'content' ? contentRef.current : state.target.field === 'subtitle' ? subtitleRef.current : null
+    if (!container) return
     applyFormat(() => {
       const range = textFormatRangeRef.current
       if (!range) return
-      try {
-        const fragment = range.extractContents()
-        const el = document.createElement(tagName)
-        el.appendChild(fragment)
-        range.insertNode(el)
-      } catch (e) {
-        document.execCommand('formatBlock', false, tagName)
-      }
+      const block = getBlockElement(range, container)
+      if (!block) return
+      const defaultTag = 'p'
+      const newTag = (block.tagName.toLowerCase() === tagName) ? defaultTag : tagName
+      const newEl = document.createElement(newTag)
+      while (block.firstChild) newEl.appendChild(block.firstChild)
+      block.parentNode.replaceChild(newEl, block)
     })
-  }, [applyFormat])
+  }, [applyFormat, getBlockElement, textFormatToolbar])
   const applyFontPairing = useCallback(() => {
     const state = textFormatToolbar
     if (!state?.target) return
@@ -454,6 +540,111 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           // ignore
         }
       }
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar])
+
+  // Unwrap span nodes that only have style.color (used when clearing text color)
+  const unwrapColorSpans = useCallback((node) => {
+    if (!node) return
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN') {
+      const style = node.getAttribute('style')
+      if (style && /^\s*color\s*:/.test(style.trim()) && !style.replace(/\s*color\s*:[^;]+;?/gi, '').trim()) {
+        const parent = node.parentNode
+        if (parent) {
+          while (node.firstChild) parent.insertBefore(node.firstChild, node)
+          parent.removeChild(node)
+          unwrapColorSpans(parent) // reprocess so nested color spans are also unwrapped
+        }
+        return
+      }
+    }
+    const children = Array.from(node.childNodes)
+    children.forEach((child) => unwrapColorSpans(child))
+  }, [])
+
+  const applyTextColor = useCallback((color) => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      if (color == null || color === '') {
+        const fragment = range.extractContents()
+        unwrapColorSpans(fragment)
+        range.insertNode(fragment)
+      } else {
+        const span = document.createElement('span')
+        span.style.color = color
+        try {
+          range.surroundContents(span)
+        } catch (e) {
+          const fragment = range.extractContents()
+          span.appendChild(fragment)
+          range.insertNode(span)
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar, unwrapColorSpans])
+
+  // Remove all inline/block formatting from selection and restore layout default
+  const applyClearFormatting = useCallback(() => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    // Range may be invalid if nodes were removed; ensure it has content
+    if (range.collapsed) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      const fragment = range.extractContents()
+      const isFormattingTag = (el) => {
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) return false
+        const tag = el.tagName.toLowerCase()
+        if (['b', 'strong', 'i', 'em', 'u', 'mark'].includes(tag)) return true
+        if (tag === 'span') {
+          if (el.classList?.contains('font-pairing-serif')) return true
+          const style = el.getAttribute('style')
+          if (style && /^\s*color\s*:/.test(style.trim()) && !style.replace(/\s*color\s*:[^;]+;?/gi, '').trim()) return true
+        }
+        return false
+      }
+      const unwrap = (el) => {
+        const parent = el.parentNode
+        if (!parent) return
+        while (el.firstChild) parent.insertBefore(el.firstChild, el)
+        parent.removeChild(el)
+      }
+      const cleanNode = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return
+        if (node.nodeType !== Node.ELEMENT_NODE) return
+        const tag = node.tagName ? node.tagName.toLowerCase() : ''
+        const children = Array.from(node.childNodes)
+        children.forEach(cleanNode)
+        if (isFormattingTag(node)) {
+          unwrap(node)
+          return
+        }
+        if (['h1', 'h2', 'h3'].includes(tag)) {
+          const p = document.createElement('p')
+          while (node.firstChild) p.appendChild(node.firstChild)
+          if (node.parentNode) node.parentNode.replaceChild(p, node)
+        }
+      }
+      cleanNode(fragment)
+      range.insertNode(fragment)
     } catch (e) {
       // ignore
     }
@@ -584,8 +775,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return fontFamily
     }
     
-    // Base text style
+    // Base text style (explicit color so slides always use current text color)
     const baseTextStyle = {
+      color: textColor,
       textShadow: textDropShadow 
         ? `${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}` 
         : undefined,
@@ -609,6 +801,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
+      const useWordsFadeUp = isPlayMode && textAnimation === 'words-fade-up'
+      const bulletWordOffsets = useWordsFadeUp ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getWordsFromContent(b).length); return acc }, [0]) : []
+      const getBulletStyle = (index) => {
+        const base = { pointerEvents: isEditable ? 'auto' : undefined, lineHeight: bulletLineHeight }
+        if (!isPlayMode || !textAnimation || textAnimation === 'none') return base
+        if (textAnimation === 'typewriter') {
+          return { ...base, animationDelay: `${0.3 + index * 1.4}s` }
+        }
+        return { ...base, animationDelay: `${index * 0.2}s` }
+      }
       return (
         <div key={`${slide.id}-bulletpoints`} className="slide-bullets" style={{ ...textStyle, pointerEvents: isEditable ? 'auto' : undefined }}>
           {bullets.map((bullet, index) => (
@@ -617,29 +819,36 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
               style={{ lineHeight: bulletLineHeight }}
             >
-              <span 
-                className="bullet-text"
-                style={{ 
-                  pointerEvents: isEditable ? 'auto' : undefined,
-                  lineHeight: bulletLineHeight
-                }}
-                contentEditable={isEditable}
-                suppressContentEditableWarning={true}
-                onBlur={(e) => handleBulletChange(index, e)}
-                onContextMenu={(e) => handleFontPairingContextMenu(e, 'bullet', index)}
-                onClick={(e) => {
-                  if (isEditable) {
-                    e.stopPropagation()
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    e.target.blur()
-                  }
-                }}
-                dangerouslySetInnerHTML={{ __html: bullet }}
-              />
+              {useWordsFadeUp ? (
+                <span className="bullet-text" style={{ lineHeight: bulletLineHeight }}>
+                  {getWordsFromContent(bullet).map((word, wi) => (
+                    <span key={wi} className="text-animation-word" style={{ animationDelay: `${(bulletWordOffsets[index] + wi) * 0.07}s` }}>
+                      {word}{' '}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span 
+                  className="bullet-text"
+                  style={getBulletStyle(index)}
+                  contentEditable={isEditable}
+                  suppressContentEditableWarning={true}
+                  onBlur={(e) => handleBulletChange(index, e)}
+                  onContextMenu={(e) => handleFontPairingContextMenu(e, 'bullet', index)}
+                  onClick={(e) => {
+                    if (isEditable) {
+                      e.stopPropagation()
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      e.target.blur()
+                    }
+                  }}
+                  dangerouslySetInnerHTML={{ __html: bullet }}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -688,16 +897,32 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'centered') {
       const subtitleHasContent = hasSubtitleContent()
-      
+      const useWordsFadeUp = isPlayMode && textAnimation === 'words-fade-up'
+      const words = useWordsFadeUp ? getWordsFromContent(slide.content || '') : []
+
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
           {isPlayMode ? (
-            <div 
-              ref={contentRef}
-              className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
-              style={textStyle}
-              dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
-            />
+            useWordsFadeUp ? (
+              <div
+                ref={contentRef}
+                className={`slide-text slide-text-words centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+                style={textStyle}
+              >
+                {words.map((word, i) => (
+                  <span key={i} className="text-animation-word" style={{ animationDelay: `${i * 0.07}s` }}>
+                    {word}{' '}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div 
+                ref={contentRef}
+                className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+                style={textStyle}
+                dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
+              />
+            )
           ) : isEditable ? (
             <div
               ref={contentRef}
@@ -787,8 +1012,23 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       )
     }
 
-    // For play mode, render as div with formatted content
+    // For play mode, render as div with formatted content (or word spans for words-fade-up)
     if (isPlayMode) {
+      if (textAnimation === 'words-fade-up') {
+        const words = getWordsFromContent(slide.content || '')
+        return (
+          <div
+            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+            style={textStyle}
+          >
+            {words.map((word, i) => (
+              <span key={i} className="text-animation-word" style={{ animationDelay: `${i * 0.07}s` }}>
+                {word}{' '}
+              </span>
+            ))}
+          </div>
+        )
+      }
       return (
         <div 
           className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
@@ -956,9 +1196,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [isDragging, handleImageMouseMove, handleImageMouseUp])
 
+  const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
+
   return (
     <div 
-      className={`slide ${!textInlineBackground ? 'no-text-highlight' : ''}`}
+      className={`slide ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass}`}
       ref={slideRef} 
       style={{ backgroundColor: backgroundColor, '--slide-base-font-size': `${defaultTextSize}rem` }}
       onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
@@ -1088,7 +1330,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         <TextFormatToolbar
           x={textFormatToolbar.x}
           y={textFormatToolbar.y}
+          boldActive={textFormatToolbar.boldActive}
+          italicActive={textFormatToolbar.italicActive}
+          underlineActive={textFormatToolbar.underlineActive}
+          backgroundActive={textFormatToolbar.backgroundActive}
+          headingActive={textFormatToolbar.headingActive}
           serifActive={textFormatToolbar.serifActive}
+          textColorActive={textFormatToolbar.textColorActive ?? null}
           onClose={closeTextFormatToolbar}
           onBold={applyBold}
           onItalic={applyItalic}
@@ -1098,6 +1346,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           onH2={() => applyHeading('h2')}
           onH3={() => applyHeading('h3')}
           onFontPairing={applyFontPairing}
+          onTextColor={applyTextColor}
+          onClearFormatting={applyClearFormatting}
         />
       )}
     </div>

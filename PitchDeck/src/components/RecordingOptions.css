@@ -40,7 +40,7 @@
 .recording-options-field > label:not(.recording-options-checkbox) {
   display: block;
   margin-bottom: 0.5rem;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-weight: 500;
 }
