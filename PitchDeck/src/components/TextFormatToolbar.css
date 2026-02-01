@@ -1,0 +1,66 @@
+.text-format-toolbar {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--bg-elevated, #2a2a2a);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--button-radius, 8px);
+  box-shadow: var(--shadow-lg, 0 4px 20px rgba(0, 0, 0, 0.4));
+  z-index: 10002;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.text-format-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.text-format-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #fff);
+}
+
+.text-format-toolbar-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.text-format-toolbar-btn-active {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--accent, #f97316);
+}
+
+.text-format-toolbar-btn-active:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.text-format-toolbar-btn svg {
+  flex-shrink: 0;
+}
+
+.text-format-toolbar-btn-text {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.text-format-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.15));
+}

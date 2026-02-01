@@ -15,13 +15,15 @@
 
 .settings-modal {
   background: var(--bg-elevated);
-  border-radius: 16px;
+  border-radius: var(--card-radius);
   width: 90%;
   max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
   border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .settings-header {
@@ -91,6 +93,8 @@
   color: var(--accent);
   border-bottom-color: var(--accent);
   background: transparent;
+  font-weight: 600;
+  border-bottom-width: 3px;
 }
 
 .settings-content {
@@ -156,7 +160,8 @@
 
 .settings-field input:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .color-input-group {
@@ -203,7 +208,8 @@
 
 .color-text-input:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .settings-select {
@@ -220,7 +226,8 @@
 
 .settings-select:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .settings-select option {
@@ -284,7 +291,8 @@
 
 .settings-number-input:focus {
   outline: none;
-  border-color: #4a9eff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .settings-range-input {
@@ -340,7 +348,7 @@
 }
 
 .settings-hint a {
-  color: #4a9eff;
+  color: var(--accent);
   text-decoration: none;
 }
 

@@ -1,7 +1,7 @@
 .layout-selector {
   padding: 1rem;
-  border-bottom: 1px solid #3a3a3a;
-  background: #252525;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
 }
 
 .layout-selector-header {
@@ -10,7 +10,7 @@
 
 .layout-selector-title {
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-tertiary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -37,8 +37,8 @@
 
 .layout-thumbnail-preview {
   aspect-ratio: 16 / 9;
-  background: #1a1a1a;
-  border: 2px solid #3a3a3a;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-default);
   border-radius: 6px;
   padding: 0.5rem;
   margin-bottom: 0.5rem;
@@ -49,17 +49,18 @@
 }
 
 .layout-thumbnail:hover .layout-thumbnail-preview {
-  border-color: #4a9eff;
+  border-color: var(--accent);
 }
 
 .layout-thumbnail.selected .layout-thumbnail-preview {
-  border-color: #4a9eff;
+  border-color: var(--accent);
   border-width: 3px;
-  background: #2a2a2a;
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
 }
 
 .layout-thumbnail.selected .layout-thumbnail-name {
-  color: #4a9eff;
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -73,7 +74,7 @@
 
 .layout-thumbnail-text-left {
   font-size: 0.5rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
   padding-left: 0.25rem;
@@ -81,7 +82,7 @@
 
 .layout-thumbnail-text-center {
   font-size: 0.5rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
@@ -90,7 +91,7 @@
 
 .layout-thumbnail-text-right {
   font-size: 0.5rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
   text-align: right;
@@ -108,13 +109,13 @@
 
 .layout-thumbnail-bullet {
   font-size: 0.4rem;
-  color: #fff;
+  color: var(--text-primary);
   text-align: left;
 }
 
 .layout-thumbnail-name {
   font-size: 0.75rem;
-  color: #ccc;
+  color: var(--text-secondary);
   text-align: center;
   font-weight: 500;
 }
@@ -125,7 +126,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .layout-thumbnail-left-video {
@@ -137,7 +138,7 @@
 
 .layout-thumbnail-text-left-small {
   font-size: 0.4rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
   text-transform: uppercase;
   padding-left: 0.25rem;
@@ -147,6 +148,6 @@
 .layout-thumbnail-video-panel {
   width: 33.33%;
   height: 100%;
-  background: #4a9eff;
+  background: var(--accent);
   opacity: 0.3;
 }

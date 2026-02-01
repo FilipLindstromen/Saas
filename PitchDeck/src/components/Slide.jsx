@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './Slide.css'
+import TextFormatToolbar from './TextFormatToolbar'
 
 // Webcam component - defined outside to avoid hooks issues
 function WebcamVideo({ cameraId, layout, isPlayMode }) {
@@ -50,7 +51,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10 }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -58,6 +59,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const subtitleRef = useRef(null)
   const isEditingContentRef = useRef(false)
   const isEditingSubtitleRef = useRef(false)
+  // Font pairing context menu: store selection so we can wrap/unwrap on menu action
+  const [fontPairingMenu, setFontPairingMenu] = useState(null)
+  const fontPairingRangeRef = useRef(null)
+  const fontPairingTargetRef = useRef(null) // { field: 'content'|'subtitle'|'bullet', bulletIndex?: number }
+
+  // Text format toolbar: show on text selection in edit mode
+  const [textFormatToolbar, setTextFormatToolbar] = useState(null) // { x, y, target: { field, bulletIndex? } }
+  const textFormatRangeRef = useRef(null)
 
   const layout = slide.layout || 'default'
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
@@ -83,14 +92,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const maxOpacity = gradientStrength
   const midOpacity = gradientStrength * 0.57 // ~0.4 when strength is 0.7
 
-  // Parse bullet points (one per line)
+  // Parse bullet points (one per line); deduplicate so we never show the same text twice (e.g. when switching layout/slides)
   const getBulletPoints = () => {
     if (layout !== 'bulletpoints') return []
-    return slide.content
+    const raw = (slide.content || '')
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => line.replace(/^[-•*]\s*/, '')) // Remove bullet markers if present
+    // Keep only first occurrence of each line so duplicated text from layout/slide switching never appears
+    const seen = new Set()
+    return raw.filter(line => {
+      if (seen.has(line)) return false
+      seen.add(line)
+      return true
+    })
   }
 
   // Convert line breaks to HTML breaks for display and apply text highlighting
@@ -104,7 +120,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     // Check if content contains HTML tags (including mark tags)
     const hasHtmlTags = content.includes('<') && content.includes('>')
     
-    // Apply highlight styling to <mark> tags if text highlighting is enabled
+    // Apply or remove highlight styling on <mark> tags based on setting
     if (textInlineBackground) {
       try {
         const rgb = hexToRgb(inlineBgColor)
@@ -125,6 +141,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       } catch (e) {
         console.error('Error applying highlight styling:', e)
       }
+    } else {
+      // When text highlight is disabled: strip background from <mark> so no box appears
+      content = content.replace(/<mark(\s[^>]*)?>/gi, (match, attrs = '') => {
+        const noHighlightStyle = 'style="background: none; padding: 0; border-radius: 0;"'
+        if (attrs && attrs.includes('style=')) {
+          return match.replace(/style\s*=\s*["'][^"']*["']/i, noHighlightStyle)
+        }
+        const spacing = attrs.trim() ? ' ' : ''
+        return `<mark ${noHighlightStyle}${spacing}${attrs}>`
+      })
     }
     
     // If content already contains HTML tags (from formatting or contentEditable), 
@@ -179,6 +205,262 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     isEditingSubtitleRef.current = true
   }
 
+  // Font pairing: only active in edit mode when textStyleMode is fontPairing
+  const isFontPairingEditable = !isPlayMode && onUpdate && textStyleMode === 'fontPairing'
+
+  const handleFontPairingContextMenu = (e, field, bulletIndex = null) => {
+    if (!isFontPairingEditable) return
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
+    e.preventDefault()
+    e.stopPropagation()
+    const range = sel.getRangeAt(0).cloneRange()
+    fontPairingRangeRef.current = range
+    fontPairingTargetRef.current = { field, bulletIndex }
+    setFontPairingMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const closeFontPairingMenu = () => {
+    setFontPairingMenu(null)
+    fontPairingRangeRef.current = null
+    fontPairingTargetRef.current = null
+  }
+
+  const applySerifToSelection = () => {
+    const range = fontPairingRangeRef.current
+    const target = fontPairingTargetRef.current
+    if (!range || !target || !onUpdate) return
+    try {
+      const span = document.createElement('span')
+      span.className = 'font-pairing-serif'
+      range.surroundContents(span)
+      syncFontPairingContentToState(target)
+    } catch (err) {
+      // surroundContents can fail if selection spans block boundaries; ignore
+    }
+    closeFontPairingMenu()
+  }
+
+  const removeSerifFromSelection = () => {
+    const range = fontPairingRangeRef.current
+    const target = fontPairingTargetRef.current
+    if (!range || !target || !onUpdate) return
+    try {
+      const container = range.commonAncestorContainer
+      const span = container.nodeType === Node.TEXT_NODE ? container.parentElement?.closest('.font-pairing-serif') : container.closest?.('.font-pairing-serif')
+      if (span && span.classList.contains('font-pairing-serif')) {
+        const parent = span.parentNode
+        while (span.firstChild) parent.insertBefore(span.firstChild, span)
+        parent.removeChild(span)
+        syncFontPairingContentToState(target)
+      }
+    } catch (err) {}
+    closeFontPairingMenu()
+  }
+
+  const syncFontPairingContentToState = (target) => {
+    if (!target || !onUpdate) return
+    if (target.field === 'content') {
+      if (contentRef.current) onUpdate({ content: contentRef.current.innerHTML })
+    } else if (target.field === 'subtitle') {
+      if (subtitleRef.current) onUpdate({ subtitle: subtitleRef.current.innerHTML })
+    } else if (target.field === 'bullet' && typeof target.bulletIndex === 'number') {
+      const bullets = (slide.content || '').split('\n').map(line => line.trim()).filter(Boolean).map(line => line.replace(/^[-•*]\s*/, ''))
+      const bulletEl = slideRef.current?.querySelector(`.slide-bullet:nth-child(${target.bulletIndex + 1}) .bullet-text`)
+      if (bulletEl && bullets[target.bulletIndex] !== undefined) {
+        bullets[target.bulletIndex] = bulletEl.innerHTML
+        onUpdate({ content: bullets.join('\n') })
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!fontPairingMenu) return
+    const handleClickOutside = (e) => {
+      if (e.target?.closest?.('.slide-font-pairing-menu')) return
+      closeFontPairingMenu()
+    }
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') closeFontPairingMenu()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [fontPairingMenu])
+
+  // Text format toolbar: detect selection inside slide text and show toolbar
+  const isEditableForToolbar = !isPlayMode && onUpdate
+  useEffect(() => {
+    if (!isEditableForToolbar || !slideRef.current) return
+    const checkSelection = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        setTextFormatToolbar(null)
+        return
+      }
+      const range = sel.getRangeAt(0)
+      const el = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+        ? range.commonAncestorContainer.parentElement
+        : range.commonAncestorContainer
+      if (!el || !slideRef.current.contains(el)) {
+        setTextFormatToolbar(null)
+        return
+      }
+      const textEl = el.closest('.slide-text, .slide-subtitle, .bullet-text, .slide-section-name')
+      if (!textEl) {
+        setTextFormatToolbar(null)
+        return
+      }
+      const rect = range.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) {
+        setTextFormatToolbar(null)
+        return
+      }
+      let target = null
+      if (contentRef.current && (textEl === contentRef.current || contentRef.current.contains(textEl))) {
+        target = { field: 'content' }
+      } else if (subtitleRef.current && (textEl === subtitleRef.current || subtitleRef.current.contains(textEl))) {
+        target = { field: 'subtitle' }
+      } else if (textEl.classList.contains('bullet-text')) {
+        const bullet = textEl.closest('.slide-bullet')
+        const list = bullet?.parentElement
+        const index = list ? Array.from(list.querySelectorAll('.slide-bullet')).indexOf(bullet) : -1
+        if (index >= 0) target = { field: 'bullet', bulletIndex: index }
+      } else if (textEl.classList.contains('slide-section-name')) {
+        target = { field: 'content' }
+      }
+      if (!target) {
+        setTextFormatToolbar(null)
+        return
+      }
+      // Check if selection is inside .font-pairing-serif (for Serif button toggle state)
+      const startEl = range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.parentElement
+        : range.startContainer
+      const serifActive = !!(startEl?.closest?.('.font-pairing-serif'))
+      textFormatRangeRef.current = range.cloneRange()
+      setTextFormatToolbar({
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+        target,
+        serifActive
+      })
+    }
+    const handleMouseUp = () => {
+      setTimeout(checkSelection, 10)
+    }
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [isEditableForToolbar])
+
+  // Sync content from target element to slide state (after applying a format)
+  const syncContentFromTarget = useCallback((target) => {
+    if (!target || !onUpdate) return
+    if (target.field === 'content') {
+      if (contentRef.current) onUpdate({ content: contentRef.current.innerHTML })
+    } else if (target.field === 'subtitle') {
+      if (subtitleRef.current) onUpdate({ subtitle: subtitleRef.current.innerHTML })
+    } else if (target.field === 'bullet' && typeof target.bulletIndex === 'number' && slideRef.current) {
+      const list = slideRef.current.querySelector('.slide-bullets')
+      if (!list) return
+      const bullets = Array.from(list.querySelectorAll('.slide-bullet')).map(
+        (b) => b.querySelector('.bullet-text')?.innerHTML ?? ''
+      )
+      onUpdate({ content: bullets.join('\n') })
+    }
+  }, [onUpdate])
+
+  const closeTextFormatToolbar = useCallback(() => {
+    setTextFormatToolbar(null)
+    textFormatRangeRef.current = null
+  }, [])
+
+  const applyFormat = useCallback((applyFn) => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      applyFn()
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar])
+
+  const applyBold = useCallback(() => applyFormat(() => document.execCommand('bold', false, null)), [applyFormat])
+  const applyItalic = useCallback(() => applyFormat(() => document.execCommand('italic', false, null)), [applyFormat])
+  const applyUnderline = useCallback(() => applyFormat(() => document.execCommand('underline', false, null)), [applyFormat])
+  const applyBackground = useCallback(() => {
+    applyFormat(() => {
+      const mark = document.createElement('mark')
+      const range = textFormatRangeRef.current
+      if (!range) return
+      try {
+        range.surroundContents(mark)
+      } catch (e) {
+        const fragment = range.extractContents()
+        mark.appendChild(fragment)
+        range.insertNode(mark)
+      }
+    })
+  }, [applyFormat])
+  const applyHeading = useCallback((tagName) => {
+    applyFormat(() => {
+      const range = textFormatRangeRef.current
+      if (!range) return
+      try {
+        const fragment = range.extractContents()
+        const el = document.createElement(tagName)
+        el.appendChild(fragment)
+        range.insertNode(el)
+      } catch (e) {
+        document.execCommand('formatBlock', false, tagName)
+      }
+    })
+  }, [applyFormat])
+  const applyFontPairing = useCallback(() => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      const container = range.commonAncestorContainer
+      const span = container.nodeType === Node.TEXT_NODE
+        ? container.parentElement?.closest('.font-pairing-serif')
+        : container.closest?.('.font-pairing-serif')
+      if (span?.classList?.contains('font-pairing-serif')) {
+        // Toggle off: unwrap serif
+        const parent = span.parentNode
+        while (span.firstChild) parent.insertBefore(span.firstChild, span)
+        parent.removeChild(span)
+      } else {
+        // Toggle on: wrap in serif span
+        const serifSpan = document.createElement('span')
+        serifSpan.className = 'font-pairing-serif'
+        try {
+          range.surroundContents(serifSpan)
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar])
+
   // Update contentEditable elements only when not being edited
   useEffect(() => {
     // Don't update if currently being edited or if element is focused
@@ -220,19 +502,24 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [slide.content, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding])
   
-  // Initialize content when element is first created or when slide changes
+  // Initialize content when element is first created, when slide changes, or when layout changes.
+  // When slide.id or layout changes, always sync content so text is never lost (e.g. when switching from Centered to Left Aligned).
+  // Clear editing refs first so we don't skip due to stale "editing" state.
   useEffect(() => {
-    if (contentRef.current && !isEditingContentRef.current && document.activeElement !== contentRef.current) {
-      const formattedContent = formatContentForDisplay(slide.content || '')
-      // Always set content when slide changes (by ID) to ensure it's synced
-      if (formattedContent) {
-        contentRef.current.innerHTML = formattedContent
-      } else if (!contentRef.current.innerHTML && !contentRef.current.textContent) {
-        // If empty, set empty string
-        contentRef.current.innerHTML = ''
-      }
+    if (!contentRef.current) return
+    // On slide or layout change, clear editing state so we always show the current slide's content
+    isEditingContentRef.current = false
+    isEditingSubtitleRef.current = false
+    const formattedContent = formatContentForDisplay(slide.content || '')
+    if (formattedContent) {
+      contentRef.current.innerHTML = formattedContent
+    } else {
+      contentRef.current.innerHTML = ''
     }
-  }, [slide.id, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding]) // Re-initialize when slide changes or highlight settings change
+    if (subtitleRef.current) {
+      subtitleRef.current.innerHTML = formatContentForDisplay(slide.subtitle || '')
+    }
+  }, [slide.id, layout, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, textStyleMode, fontPairingSerifFont]) // Re-initialize when slide or layout changes or highlight settings change
 
   useEffect(() => {
     if (!isEditingSubtitleRef.current && subtitleRef.current && slide.subtitle !== undefined) {
@@ -297,15 +584,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return fontFamily
     }
     
-    const textStyle = {
+    // Base text style
+    const baseTextStyle = {
       textShadow: textDropShadow 
         ? `${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}` 
         : undefined,
       fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
-      fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : undefined,
+      fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : `"${fontFamily}", sans-serif`,
       lineHeight: lineHeight,
       pointerEvents: isEditable ? 'auto' : undefined
     }
+    
+    // Apply dynamic sizing class if needed
+    const dynamicClass = textStyleMode === 'dynamic' ? 'text-dynamic-sizing' : ''
+    
+    const textStyle = baseTextStyle
     
     const subtitleStyle = {
       ...textStyle,
@@ -317,14 +610,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
       return (
-        <div className="slide-bullets" style={{ ...textStyle, pointerEvents: isEditable ? 'auto' : undefined }}>
+        <div key={`${slide.id}-bulletpoints`} className="slide-bullets" style={{ ...textStyle, pointerEvents: isEditable ? 'auto' : undefined }}>
           {bullets.map((bullet, index) => (
             <div
               key={index}
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
               style={{ lineHeight: bulletLineHeight }}
             >
-              <span className="bullet-marker">•</span>
               <span 
                 className="bullet-text"
                 style={{ 
@@ -334,6 +626,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
                 onBlur={(e) => handleBulletChange(index, e)}
+                onContextMenu={(e) => handleFontPairingContextMenu(e, 'bullet', index)}
                 onClick={(e) => {
                   if (isEditable) {
                     e.stopPropagation()
@@ -355,7 +648,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'section') {
       return (
-        <div className="slide-section-text">
+        <div key={slide.id} className="slide-section-text">
           <div 
             ref={contentRef}
             className={`slide-section-name ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
@@ -363,12 +656,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             contentEditable={isEditable}
             suppressContentEditableWarning={true}
             onBlur={handleContentChange}
-        onFocus={handleContentFocus}
-        onClick={(e) => {
-          if (isEditable) {
-            e.stopPropagation()
-          }
-        }}
+            onFocus={handleContentFocus}
+            onContextMenu={(e) => handleFontPairingContextMenu(e, 'content')}
+            onClick={(e) => {
+              if (isEditable) {
+                e.stopPropagation()
+              }
+            }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -394,23 +688,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'centered') {
       const subtitleHasContent = hasSubtitleContent()
-      const getPlainText = (content) => {
-        if (!content) return ''
-        return content
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/<BR\s*\/?>/gi, '\n')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/<[^>]*>/g, '')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-      }
-      const plainText = getPlainText(slide.content || '')
       
       return (
-        <div className="slide-text-centered-wrapper">
+        <div key={slide.id} className="slide-text-centered-wrapper">
           {isPlayMode ? (
             <div 
               ref={contentRef}
@@ -418,36 +698,25 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               style={textStyle}
               dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content) }}
             />
-          ) : (
-            <textarea
+          ) : isEditable ? (
+            <div
               ref={contentRef}
               className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
               style={textStyle}
-              value={plainText}
-              onChange={(e) => {
-                if (onUpdate && !isPlayMode) {
-                  isEditingContentRef.current = true
-                  const htmlContent = e.target.value.replace(/\n/g, '<br>')
-                  onUpdate({ content: htmlContent })
-                  e.target.style.height = 'auto'
-                  e.target.style.height = e.target.scrollHeight + 'px'
-                }
-              }}
+              contentEditable={true}
+              suppressContentEditableWarning={true}
+              onBlur={handleContentChange}
               onFocus={handleContentFocus}
-              onBlur={(e) => {
-                if (onUpdate && !isPlayMode) {
-                  isEditingContentRef.current = false
-                  const htmlContent = e.target.value.replace(/\n/g, '<br>')
-                  handleContentChange({ target: { innerHTML: htmlContent } })
-                }
-              }}
-              onClick={(e) => {
-                if (isEditable) {
-                  e.stopPropagation()
-                }
-              }}
-              readOnly={!isEditable}
-              rows={1}
+              onContextMenu={(e) => textStyleMode === 'fontPairing' && handleFontPairingContextMenu(e, 'content')}
+              onClick={(e) => e.stopPropagation()}
+              onInput={() => { isEditingContentRef.current = true }}
+            />
+          ) : (
+            <div 
+              ref={contentRef}
+              className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+              style={textStyle}
+              dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
             />
           )}
           {subtitleHasContent ? (
@@ -459,6 +728,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               suppressContentEditableWarning={true}
               onBlur={handleSubtitleChange}
               onFocus={handleSubtitleFocus}
+              onContextMenu={(e) => handleFontPairingContextMenu(e, 'subtitle')}
               onClick={(e) => {
                 if (isEditable) {
                   e.stopPropagation()
@@ -517,71 +787,36 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       )
     }
 
-    // Convert content to plain text for textarea (replace <br> with newlines)
-    const getPlainText = (content) => {
-      if (!content) return ''
-      // Convert HTML <br> tags to newlines
-      return content
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<BR\s*\/?>/gi, '\n')
-        .replace(/&nbsp;/g, ' ')
-        // Strip other HTML tags but keep text
-        .replace(/<[^>]*>/g, '')
-        // Decode HTML entities
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-    }
-    
-    const plainText = getPlainText(slide.content || '')
-    
     // For play mode, render as div with formatted content
     if (isPlayMode) {
       return (
         <div 
-          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
           style={textStyle}
           dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
         />
       )
     }
     
-    return (
-      <textarea
-        ref={contentRef}
-        className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
-        style={textStyle}
-        value={plainText}
-        onChange={(e) => {
-          if (onUpdate && !isPlayMode) {
-            isEditingContentRef.current = true
-            // Convert newlines to <br> for storage
-            const htmlContent = e.target.value.replace(/\n/g, '<br>')
-            onUpdate({ content: htmlContent })
-            // Auto-resize
-            e.target.style.height = 'auto'
-            e.target.style.height = e.target.scrollHeight + 'px'
-          }
-        }}
-        onFocus={handleContentFocus}
-        onBlur={(e) => {
-          if (onUpdate && !isPlayMode) {
-            isEditingContentRef.current = false
-            const htmlContent = e.target.value.replace(/\n/g, '<br>')
-            handleContentChange({ target: { innerHTML: htmlContent } })
-          }
-        }}
-        onClick={(e) => {
-          if (isEditable) {
-            e.stopPropagation()
-          }
-        }}
-        readOnly={!isEditable}
-        rows={1}
-      />
-    )
+    // In edit mode use contentEditable so user can select text and use format toolbar (bold, italic, etc.)
+    if (isEditable) {
+      return (
+        <div
+          ref={contentRef}
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+          style={textStyle}
+          contentEditable={true}
+          suppressContentEditableWarning={true}
+          onBlur={handleContentChange}
+          onFocus={handleContentFocus}
+          onContextMenu={(e) => textStyleMode === 'fontPairing' && handleFontPairingContextMenu(e, 'content')}
+          onClick={(e) => e.stopPropagation()}
+          onInput={() => { isEditingContentRef.current = true }}
+        />
+      )
+    }
+    
+    return null
   }
 
   // Get font family for each heading (fallback to main fontFamily if not set)
@@ -602,17 +837,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [imagePositionX, imagePositionY, isDragging])
 
-  // Set base font-size as percentage of slide width for consistent scaling
+  // Set base font-size as percentage of slide width for consistent scaling; respect defaultTextSize (rem)
   useEffect(() => {
     const updateFontSize = () => {
       if (slideRef.current) {
         const slideWidth = slideRef.current.offsetWidth
-        // At 1200px width (max-width in preview), we want 16px base font-size
-        // Calculate font-size that scales proportionally: (width / 1200) * 16
-        // This ensures the same relative size regardless of actual slide dimensions
+        // At 1200px width, base = defaultTextSize * 16px (e.g. 5rem -> 80px at 16px root); scales with slide width
         if (slideWidth > 0) {
-          const baseFontSize = (slideWidth / 1200) * 16
+          const baseFontSize = (slideWidth / 1200) * 16 * defaultTextSize
           slideRef.current.style.setProperty('--slide-base-font-size', `${baseFontSize}px`)
+          const bulletFontSize = (slideWidth / 1200) * 16 * bulletTextSize
+          slideRef.current.style.setProperty('--slide-bullet-font-size', `${bulletFontSize}px`)
         }
       }
     }
@@ -624,7 +859,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     
     // Update on resize (handles both preview and present mode resizing)
     const resizeObserver = new ResizeObserver(() => {
-      // Use requestAnimationFrame to ensure DOM has updated
       requestAnimationFrame(updateFontSize)
     })
     
@@ -632,13 +866,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       resizeObserver.observe(slideRef.current)
     }
     
-    // Also listen to window resize for present mode fullscreen changes
     const handleResize = () => {
       requestAnimationFrame(updateFontSize)
     }
     window.addEventListener('resize', handleResize)
     
-    // Update when entering/exiting fullscreen (for present mode)
     const handleFullscreenChange = () => {
       setTimeout(() => {
         requestAnimationFrame(updateFontSize)
@@ -652,7 +884,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [isPlayMode]) // Re-run when play mode changes
+  }, [isPlayMode, defaultTextSize, bulletTextSize]) // Re-run when play mode or text sizes change
 
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || !slide.imageUrl) return
@@ -726,9 +958,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   return (
     <div 
-      className="slide" 
+      className={`slide ${!textInlineBackground ? 'no-text-highlight' : ''}`}
       ref={slideRef} 
-      style={{ backgroundColor: backgroundColor }}
+      style={{ backgroundColor: backgroundColor, '--slide-base-font-size': `${defaultTextSize}rem` }}
       onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
     >
       <style>{`
@@ -767,6 +999,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .bullet-text h3 {
           font-size: ${h3Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+        }
+        .slide-content .font-pairing-serif,
+        .slide-subtitle .font-pairing-serif,
+        .bullet-text .font-pairing-serif,
+        .slide-section-name .font-pairing-serif {
+          font-family: "${fontPairingSerifFont}", serif !important;
+          display: inline;
         }
       `}</style>
       {slide.imageUrl && layout !== 'section' && (
@@ -830,6 +1069,36 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         >
           {renderContent()}
         </div>
+      )}
+      {fontPairingMenu && (
+        <div
+          className="slide-font-pairing-menu"
+          style={{ left: fontPairingMenu.x, top: fontPairingMenu.y }}
+          role="menu"
+        >
+          <button type="button" className="slide-font-pairing-menu-item" onClick={applySerifToSelection}>
+            Use serif font
+          </button>
+          <button type="button" className="slide-font-pairing-menu-item" onClick={removeSerifFromSelection}>
+            Remove serif font
+          </button>
+        </div>
+      )}
+      {textFormatToolbar && (
+        <TextFormatToolbar
+          x={textFormatToolbar.x}
+          y={textFormatToolbar.y}
+          serifActive={textFormatToolbar.serifActive}
+          onClose={closeTextFormatToolbar}
+          onBold={applyBold}
+          onItalic={applyItalic}
+          onUnderline={applyUnderline}
+          onBackground={applyBackground}
+          onH1={() => applyHeading('h1')}
+          onH2={() => applyHeading('h2')}
+          onH3={() => applyHeading('h3')}
+          onFontPairing={applyFontPairing}
+        />
       )}
     </div>
   )
