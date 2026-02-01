@@ -357,6 +357,13 @@ export default function EditView({
                   >
                     Swap image
                   </button>
+                  <button
+                    type="button"
+                    className="edit-view__side-btn edit-view__side-btn--secondary"
+                    onClick={() => onSentenceImageChange?.(activeSentence.sectionId, activeSentence.sentenceIndex, '')}
+                  >
+                    Delete image
+                  </button>
                 </div>
               </div>
             ) : (

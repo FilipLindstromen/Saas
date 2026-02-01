@@ -4,7 +4,9 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,13 +14,14 @@
 }
 
 .settings-modal {
-  background: #2a2a2a;
-  border-radius: 12px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
   width: 90%;
   max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-subtle);
 }
 
 .settings-header {
@@ -26,18 +29,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-header h2 {
   font-size: 1.5rem;
   font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .btn-close {
-  background: #2a2a2a;
-  color: #ffffff;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
@@ -46,43 +51,45 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  transition: all 0.2s;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   line-height: 1;
 }
 
 .btn-close:hover {
-  background: #3a3a3a;
-  border-color: #4a4a4a;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-tabs {
   display: flex;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 1.5rem;
 }
 
 .settings-tab {
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   background: transparent;
-  color: #888;
+  color: var(--text-tertiary);
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   margin-bottom: -1px;
 }
 
 .settings-tab:hover {
-  color: #fff;
-  background: #3a3a3a;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .settings-tab.active {
-  color: #4a9eff;
-  border-bottom-color: #4a9eff;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
   background: transparent;
 }
 
