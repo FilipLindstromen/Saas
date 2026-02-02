@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { exportTrimmedVideo } from '../utils/ffmpegExport'
 import './EditRecordingMode.css'
 
 function formatTime(seconds) {
@@ -11,8 +12,8 @@ function formatTime(seconds) {
 function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
   const fileInputRef = useRef(null)
   const videoRef = useRef(null)
-  const canvasRef = useRef(null)
   const fileUrlRef = useRef(null)
+  const rafRef = useRef(null)
   const [videoUrl, setVideoUrl] = useState(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -70,7 +71,7 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
     }
   }, [])
 
-  // Video metadata and time sync
+  // Video metadata
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoUrl) return
@@ -80,32 +81,48 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
       setDuration(safeDuration)
       setTrimEnd(safeDuration)
     }
-    const onTimeUpdate = () => setCurrentTime(video.currentTime)
-    const onEnded = () => setPlaying(false)
     video.addEventListener('loadedmetadata', onLoadedMetadata)
-    video.addEventListener('timeupdate', onTimeUpdate)
-    video.addEventListener('ended', onEnded)
-    return () => {
-      video.removeEventListener('loadedmetadata', onLoadedMetadata)
-      video.removeEventListener('timeupdate', onTimeUpdate)
-      video.removeEventListener('ended', onEnded)
-    }
+    return () => video.removeEventListener('loadedmetadata', onLoadedMetadata)
   }, [videoUrl])
 
-  // Play/pause
+  // Smooth playback: RAF loop to sync currentTime when playing (smoother than timeupdate)
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
+    const onEnded = () => setPlaying(false)
+    video.addEventListener('ended', onEnded)
+    return () => video.removeEventListener('ended', onEnded)
+  }, [videoUrl])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    let rafId = null
+    const tick = () => {
+      if (video.paused || video.ended) return
+      const t = video.currentTime
+      setCurrentTime(t)
+      if (Number.isFinite(trimEnd) && t >= trimEnd - 0.05) {
+        video.pause()
+        video.currentTime = Math.max(0, trimStart)
+        setPlaying(false)
+        return
+      }
+      rafId = requestAnimationFrame(tick)
+    }
     if (playing) {
-      if (Number.isFinite(trimEnd) && Number.isFinite(trimStart) && currentTime >= trimEnd - 0.1) {
-        const t = Math.max(0, trimStart)
-        if (Number.isFinite(t)) video.currentTime = t
+      if (Number.isFinite(trimEnd) && Number.isFinite(trimStart) && video.currentTime >= trimEnd - 0.1) {
+        video.currentTime = Math.max(0, trimStart)
       }
       video.play().catch(() => setPlaying(false))
+      rafId = requestAnimationFrame(tick)
     } else {
       video.pause()
     }
-  }, [playing, trimStart, trimEnd, currentTime])
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId)
+    }
+  }, [playing, trimStart, trimEnd])
 
   const togglePlay = () => setPlaying((p) => !p)
 
@@ -173,127 +190,43 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
   }, [trimStart, trimEnd, cutPoints, duration])
 
   const exportVideo = useCallback(async () => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || !videoUrl || duration <= 0) return
+    if (!videoUrl || duration <= 0) return
     const segments = getSegments()
     if (segments.length === 0) return
 
     setIsExporting(true)
-    setExportProgress('Preparing…')
+    setExportProgress('Loading video…')
 
-    const w = video.videoWidth
-    const h = video.videoHeight
-    if (!w || !h) {
-      setExportProgress('')
-      setIsExporting(false)
-      alert('Invalid video dimensions')
-      return
-    }
-
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      setIsExporting(false)
-      setExportProgress('')
-      return
-    }
-
-    let audioContext = null
-    let dest = null
+    let blob
     try {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      dest = audioContext.createMediaStreamDestination()
-      const source = audioContext.createMediaElementSource(video)
-      source.connect(dest)
+      blob = await fetch(videoUrl).then((r) => r.blob())
     } catch (e) {
-      alert('Audio context failed: ' + e.message)
-      setIsExporting(false)
       setExportProgress('')
+      setIsExporting(false)
+      alert('Could not load video for export: ' + (e?.message ?? 'Unknown error'))
       return
     }
 
-    const videoStream = canvas.captureStream(30)
-    const combinedStream = new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()])
-    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm'
-    const recorder = new MediaRecorder(combinedStream, {
-      mimeType: mime,
-      videoBitsPerSecond: 8000000,
-      audioBitsPerSecond: 192000
-    })
-    const chunks = []
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-
-    return new Promise((resolve, reject) => {
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: mime })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `edited-recording-${new Date().toISOString().split('T')[0]}.webm`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        setExportProgress('')
-        setIsExporting(false)
-        resolve()
-      }
-
-      recorder.start(100)
-
-      let segIndex = 0
-      function drawFrame() {
-        if (segIndex >= segments.length) {
-          setTimeout(() => {
-            try { recorder.stop() } catch (_) {}
-          }, 400)
-          return
-        }
-        const seg = segments[segIndex]
-        if (video.currentTime < seg.start) {
-          video.currentTime = seg.start
-        }
-        if (video.currentTime >= seg.end - 0.03) {
-          video.pause()
-          segIndex++
-          setExportProgress(segIndex < segments.length ? `Exporting segment ${segIndex + 1}/${segments.length}…` : 'Finalizing…')
-          drawFrame()
-          return
-        }
-        ctx.drawImage(video, 0, 0, w, h)
-        requestAnimationFrame(drawFrame)
-      }
-
-      async function runExport() {
-        video.pause()
-        for (let i = 0; i < segments.length; i++) {
-          setExportProgress(`Exporting segment ${i + 1}/${segments.length}…`)
-          video.currentTime = segments[i].start
-          await new Promise((r) => { video.onseeked = r })
-          await video.play()
-          await new Promise((resolve) => {
-            const tick = () => {
-              if (video.currentTime >= segments[i].end - 0.03) {
-                video.pause()
-                resolve()
-                return
-              }
-              ctx.drawImage(video, 0, 0, w, h)
-              requestAnimationFrame(tick)
-            }
-            requestAnimationFrame(tick)
-          })
-        }
-        setExportProgress('Finalizing…')
-        setTimeout(() => {
-          try { recorder.stop() } catch (_) {}
-        }, 500)
-      }
-
-      runExport()
-    })
+    try {
+      const result = await exportTrimmedVideo(blob, segments, {
+        onProgress: setExportProgress
+      })
+      const ext = result.type.includes('mp4') ? 'mp4' : 'webm'
+      const url = URL.createObjectURL(result)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `edited-recording-${new Date().toISOString().split('T')[0]}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('Export failed:', e)
+      alert('Export failed: ' + (e?.message ?? 'Unknown error'))
+    } finally {
+      setExportProgress('')
+      setIsExporting(false)
+    }
   }, [videoUrl, duration, getSegments])
 
   if (!videoUrl) {
@@ -351,9 +284,9 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
           <video
             ref={videoRef}
             src={videoUrl}
+            preload="auto"
             playsInline
             muted={false}
-            onLoadedMetadata={() => {}}
           />
         </div>
 
@@ -419,7 +352,6 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
         </div>
       </div>
 
-      <canvas ref={canvasRef} style={{ position: 'fixed', left: -9999, top: 0 }} />
     </div>
   )
 }
