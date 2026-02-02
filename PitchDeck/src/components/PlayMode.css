@@ -38,6 +38,11 @@
   filter: blur(0);
 }
 
+/* Video-only layout: slide container (and text overlay) must sit above webcam overlay (z-index 1000) */
+.play-slide-container-video-layout {
+  z-index: 1001;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

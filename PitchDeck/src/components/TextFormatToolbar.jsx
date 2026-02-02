@@ -83,9 +83,9 @@ function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, und
         </svg>
       </button>
       <div className="text-format-toolbar-divider" />
-      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h1' ? ' text-format-toolbar-btn-active' : ''}`} onClick={onH1} title={headingActive === 'h1' ? 'Remove H1 (default)' : 'Heading 1'}>H1</button>
-      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h2' ? ' text-format-toolbar-btn-active' : ''}`} onClick={onH2} title={headingActive === 'h2' ? 'Remove H2 (default)' : 'Heading 2'}>H2</button>
-      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h3' ? ' text-format-toolbar-btn-active' : ''}`} onClick={onH3} title={headingActive === 'h3' ? 'Remove H3 (default)' : 'Heading 3'}>H3</button>
+      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h1' ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onH1(); }} title={headingActive === 'h1' ? 'Remove H1 (default)' : 'Heading 1'}>H1</button>
+      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h2' ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onH2(); }} title={headingActive === 'h2' ? 'Remove H2 (default)' : 'Heading 2'}>H2</button>
+      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h3' ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onH3(); }} title={headingActive === 'h3' ? 'Remove H3 (default)' : 'Heading 3'}>H3</button>
       <div className="text-format-toolbar-divider" />
       {onTextColor && (
         <div className="text-format-toolbar-color-wrap">
@@ -131,7 +131,7 @@ function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, und
         </div>
       )}
       <div className="text-format-toolbar-divider" />
-      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${serifActive ? ' text-format-toolbar-btn-active' : ''}`} onClick={onFontPairing} title={serifActive ? 'Remove serif' : 'Use serif / font pairing'}>
+      <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${serifActive ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onFontPairing(); }} title={serifActive ? 'Remove serif' : 'Use serif / font pairing'}>
         Serif
       </button>
       {onClearFormatting && (

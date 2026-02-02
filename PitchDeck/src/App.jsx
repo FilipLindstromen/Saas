@@ -90,6 +90,7 @@ function App() {
   const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record'
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
   const [showRecordingOptions, setShowRecordingOptions] = useState(false)
   const [showColorOptions, setShowColorOptions] = useState(false)
   const [showTypographyOptions, setShowTypographyOptions] = useState(false)
@@ -161,11 +162,14 @@ function App() {
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
       textAnimation: localStorage.getItem('textAnimation') || 'none',
+      textAnimationUnit: localStorage.getItem('textAnimationUnit') || 'word',
       backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
       backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
+      backgroundScaleAmount: parseFloat(localStorage.getItem('backgroundScaleAmount')) || 20,
       lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1,
       bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1,
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
+      bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display'
     }
@@ -397,6 +401,7 @@ function App() {
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
     localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
+    localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1.4')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
@@ -1310,11 +1315,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
           textAnimation={settings.textAnimation || 'none'}
+          textAnimationUnit={settings.textAnimationUnit || 'word'}
           backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
           backgroundScaleTime={settings.backgroundScaleTime || 10}
+          backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
+          bulletGap={settings.bulletGap ?? 0.5}
           recordSettings={recordSettings}
           isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
           textStyleMode={settings.textStyleMode || 'fontPairing'}
@@ -1460,96 +1468,59 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               />
               </div>
               {(mode === 'plan' || mode === 'edit') && (
-                <div className="header-chapters">
-                  <div className="chapters-tabs">
-                {chapters.map((chapter) => (
-                  <div 
-                    key={chapter.id} 
-                    className={`chapter-tab ${currentChapterId === chapter.id ? 'active' : ''}`}
-                    data-chapter-id={chapter.id}
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      e.dataTransfer.dropEffect = 'move'
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      const slideId = parseInt(e.dataTransfer.getData('text/html'))
-                      if (slideId && slideId !== chapter.id) {
-                        // Move slide to this chapter
-                        const slide = slides.find(s => s.id === slideId)
-                        if (slide) {
-                          const currentChapter = chapters.find(c => c.id === currentChapterId)
-                          if (currentChapter) {
-                            const updatedCurrentChapter = {
-                              ...currentChapter,
-                              slides: currentChapter.slides.filter(s => s.id !== slideId)
-                            }
-                            const updatedTargetChapter = {
-                              ...chapter,
-                              slides: [...chapter.slides, slide]
-                            }
-                            const updatedChapters = chapters.map(c => {
-                              if (c.id === currentChapterId) return updatedCurrentChapter
-                              if (c.id === chapter.id) return updatedTargetChapter
-                              return c
-                            })
-                            setChapters(updatedChapters)
-                            localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
-                            // Update slides for current chapter
-                            if (currentChapterId === chapter.id) {
-                              setSlides(updatedTargetChapter.slides)
-                            } else {
-                              setSlides(updatedCurrentChapter.slides)
-                            }
-                          }
+                <div
+                  className="header-chapters"
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const slideId = parseInt(e.dataTransfer.getData('text/html'))
+                    if (slideId) {
+                      const slide = slides.find(s => s.id === slideId)
+                      const targetChapter = chapters.find(c => c.id === currentChapterId)
+                      if (slide && targetChapter && !targetChapter.slides.some(s => s.id === slideId)) {
+                        const sourceChapter = chapters.find(c => c.slides.some(s => s.id === slideId))
+                        if (sourceChapter) {
+                          const updatedSource = { ...sourceChapter, slides: sourceChapter.slides.filter(s => s.id !== slideId) }
+                          const updatedTarget = { ...targetChapter, slides: [...targetChapter.slides, slide] }
+                          const updatedChapters = chapters.map(c => {
+                            if (c.id === sourceChapter.id) return updatedSource
+                            if (c.id === currentChapterId) return updatedTarget
+                            return c
+                          })
+                          setChapters(updatedChapters)
+                          if (currentChapterId === sourceChapter.id) setSlides(updatedSource.slides)
                         }
                       }
-                    }}
-                  >
-                    <input
-                      type="text"
-                      className="chapter-tab-name"
-                      value={chapter.name}
-                      onChange={(e) => handleUpdateChapterName(chapter.id, e.target.value)}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setCurrentChapterId(chapter.id)
-                      }}
-                      onFocus={(e) => {
-                        e.stopPropagation()
-                        setCurrentChapterId(chapter.id)
-                      }}
-                    />
-                    {chapters.length > 1 && (
-                      <button
-                        className="chapter-tab-delete"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteChapter(chapter.id)
-                        }}
-                        title="Delete chapter"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  className="chapter-tab-add"
-                  onClick={handleAddChapter}
-                  title="Add chapter"
+                    }
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+                  <select
+                    className="chapter-dropdown"
+                    value={currentChapterId}
+                    onChange={(e) => setCurrentChapterId(parseInt(e.target.value, 10))}
+                    title="Chapter"
+                  >
+                    {chapters.map((chapter) => (
+                      <option key={chapter.id} value={chapter.id}>
+                        {chapter.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="chapter-tab-add"
+                    onClick={handleAddChapter}
+                    title="Add chapter"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
             <div className="header-center">
               <div className="header-mode-buttons">
@@ -1842,54 +1813,59 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 />
               </div>
               {(mode === 'plan' || mode === 'edit') && (
-                <div className="header-chapters">
-                  <div className="chapters-tabs">
-              {chapters.map((chapter) => (
-                <div key={chapter.id} className={`chapter-tab ${currentChapterId === chapter.id ? 'active' : ''}`}>
-                  <input
-                    type="text"
-                    className="chapter-tab-name"
-                    value={chapter.name}
-                    onChange={(e) => handleUpdateChapterName(chapter.id, e.target.value)}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setCurrentChapterId(chapter.id)
-                    }}
-                    onFocus={(e) => {
-                      e.stopPropagation()
-                      setCurrentChapterId(chapter.id)
-                    }}
-                  />
-                  {chapters.length > 1 && (
-                    <button
-                      className="chapter-tab-delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteChapter(chapter.id)
-                      }}
-                      title="Delete chapter"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  )}
+                <div
+                  className="header-chapters"
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const slideId = parseInt(e.dataTransfer.getData('text/html'))
+                    if (slideId) {
+                      const slide = slides.find(s => s.id === slideId)
+                      const targetChapter = chapters.find(c => c.id === currentChapterId)
+                      if (slide && targetChapter && !targetChapter.slides.some(s => s.id === slideId)) {
+                        const sourceChapter = chapters.find(c => c.slides.some(s => s.id === slideId))
+                        if (sourceChapter) {
+                          const updatedSource = { ...sourceChapter, slides: sourceChapter.slides.filter(s => s.id !== slideId) }
+                          const updatedTarget = { ...targetChapter, slides: [...targetChapter.slides, slide] }
+                          const updatedChapters = chapters.map(c => {
+                            if (c.id === sourceChapter.id) return updatedSource
+                            if (c.id === currentChapterId) return updatedTarget
+                            return c
+                          })
+                          setChapters(updatedChapters)
+                          if (currentChapterId === sourceChapter.id) setSlides(updatedSource.slides)
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <select
+                    className="chapter-dropdown"
+                    value={currentChapterId}
+                    onChange={(e) => setCurrentChapterId(parseInt(e.target.value, 10))}
+                    title="Chapter"
+                  >
+                    {chapters.map((chapter) => (
+                      <option key={chapter.id} value={chapter.id}>
+                        {chapter.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="chapter-tab-add"
+                    onClick={handleAddChapter}
+                    title="Add chapter"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
                 </div>
-              ))}
-              <button
-                className="chapter-tab-add"
-                onClick={handleAddChapter}
-                title="Add chapter"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
+              )}
             </div>
             <div className="header-center">
               <div className="header-mode-buttons">
@@ -2130,6 +2106,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
+          bulletGap={settings.bulletGap ?? 0.5}
           recordSettings={recordSettings}
         />
       </div>

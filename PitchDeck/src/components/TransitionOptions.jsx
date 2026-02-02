@@ -6,8 +6,10 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
     textAnimation: settings?.textAnimation || 'none',
+    textAnimationUnit: settings?.textAnimationUnit || 'word',
     backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
-    backgroundScaleTime: settings?.backgroundScaleTime || 10
+    backgroundScaleTime: settings?.backgroundScaleTime || 10,
+    backgroundScaleAmount: settings?.backgroundScaleAmount ?? 20
   })
 
   useEffect(() => {
@@ -91,6 +93,16 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
                 <option value="blur-in">Blur in</option>
               </select>
             </div>
+            <div className="transition-options-field">
+              <label className="transition-options-checkbox">
+                <input
+                  type="checkbox"
+                  checked={localSettings.textAnimationUnit === 'word'}
+                  onChange={(e) => handleChange('textAnimationUnit', e.target.checked ? 'word' : 'sentence')}
+                />
+                <span>Animate per word (uncheck for whole sentences)</span>
+              </label>
+            </div>
           </div>
 
           <div className="transition-options-section">
@@ -106,21 +118,38 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
               </label>
             </div>
             {localSettings.backgroundScaleAnimation && (
-              <div className="transition-options-field">
-                <label htmlFor="background-scale-time-slider">
-                  Scale Animation Duration: {localSettings.backgroundScaleTime}s
-                </label>
-                <input
-                  id="background-scale-time-slider"
-                  type="range"
-                  min="1"
-                  max="30"
-                  step="1"
-                  value={localSettings.backgroundScaleTime}
-                  onChange={(e) => handleChange('backgroundScaleTime', parseFloat(e.target.value))}
-                  className="transition-options-slider"
-                />
-              </div>
+              <>
+                <div className="transition-options-field">
+                  <label htmlFor="background-scale-time-slider">
+                    Scale Animation Duration: {localSettings.backgroundScaleTime}s
+                  </label>
+                  <input
+                    id="background-scale-time-slider"
+                    type="range"
+                    min="1"
+                    max="30"
+                    step="1"
+                    value={localSettings.backgroundScaleTime}
+                    onChange={(e) => handleChange('backgroundScaleTime', parseFloat(e.target.value))}
+                    className="transition-options-slider"
+                  />
+                </div>
+                <div className="transition-options-field">
+                  <label htmlFor="background-scale-amount-slider">
+                    Scale up by: {localSettings.backgroundScaleAmount}%
+                  </label>
+                  <input
+                    id="background-scale-amount-slider"
+                    type="range"
+                    min="5"
+                    max="100"
+                    step="5"
+                    value={localSettings.backgroundScaleAmount}
+                    onChange={(e) => handleChange('backgroundScaleAmount', parseFloat(e.target.value) || 20)}
+                    className="transition-options-slider"
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
