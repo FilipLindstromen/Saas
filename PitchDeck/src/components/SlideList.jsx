@@ -294,7 +294,15 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
       </div>
       <LayoutSelector 
         onSelectLayout={handleLayoutSelect} 
-        selectedLayout={slides.find(s => s.id === selectedSlideId)?.layout || 'default'} 
+        selectedLayout={slides.find(s => s.id === selectedSlideId)?.layout || 'default'}
+        cameraOverrideEnabled={slides.find(s => s.id === selectedSlideId)?.cameraOverrideEnabled ?? false}
+        cameraOverridePosition={slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'}
+        onCameraOverrideChange={(enabled) => {
+          if (selectedSlideId) onUpdate(selectedSlideId, { cameraOverrideEnabled: enabled, cameraOverridePosition: enabled ? (slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen') : undefined })
+        }}
+        onCameraOverridePositionSelect={(position) => {
+          if (selectedSlideId) onUpdate(selectedSlideId, { cameraOverridePosition: position })
+        }}
       />
       <div className="slide-list-items">
         {getVisibleSlides().map((slide, visibleIndex) => {

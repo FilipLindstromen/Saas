@@ -88,3 +88,91 @@
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
 }
 
+.recording-options-video-adj {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.recording-options-video-adj-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.recording-options-video-adj-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.recording-options-video-adj-label {
+  flex-shrink: 0;
+  width: 72px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.recording-options-video-adj-slider {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  outline: none;
+}
+
+.recording-options-video-adj-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg-elevated);
+}
+
+.recording-options-video-adj-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg-elevated);
+}
+
+.recording-options-video-adj-value {
+  flex-shrink: 0;
+  min-width: 40px;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.recording-options-video-adj-reset {
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.recording-options-video-adj-reset:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+

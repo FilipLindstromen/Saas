@@ -9,7 +9,11 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
     webcamSize: recordSettings?.webcamSize || 'large',
     selectedCameraId: recordSettings?.selectedCameraId || '',
     microphoneEnabled: recordSettings?.microphoneEnabled || false,
-    selectedMicrophoneId: recordSettings?.selectedMicrophoneId || ''
+    selectedMicrophoneId: recordSettings?.selectedMicrophoneId || '',
+    videoBrightness: typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1,
+    videoContrast: typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1,
+    videoSaturation: typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1,
+    videoHue: typeof recordSettings?.videoHue === 'number' ? recordSettings.videoHue : 0
   })
   const [availableCameras, setAvailableCameras] = useState([])
   const [availableMicrophones, setAvailableMicrophones] = useState([])
@@ -97,7 +101,11 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
       webcamSize: newSettings.webcamSize,
       selectedCameraId: newSettings.selectedCameraId,
       microphoneEnabled: newSettings.microphoneEnabled,
-      selectedMicrophoneId: newSettings.selectedMicrophoneId
+      selectedMicrophoneId: newSettings.selectedMicrophoneId,
+      videoBrightness: newSettings.videoBrightness,
+      videoContrast: newSettings.videoContrast,
+      videoSaturation: newSettings.videoSaturation,
+      videoHue: newSettings.videoHue
     }
     
     // Update global record settings immediately
@@ -170,6 +178,72 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               </select>
             </div>
           )}
+
+          <div className="recording-options-video-adj">
+            <div className="recording-options-video-adj-title">Video adjustments</div>
+            <div className="recording-options-video-adj-row">
+              <label className="recording-options-video-adj-label">Brightness</label>
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.05"
+                value={localSettings.videoBrightness}
+                onChange={(e) => handleChange('videoBrightness', parseFloat(e.target.value))}
+                className="recording-options-video-adj-slider"
+              />
+              <span className="recording-options-video-adj-value">{Math.round(localSettings.videoBrightness * 100)}%</span>
+            </div>
+            <div className="recording-options-video-adj-row">
+              <label className="recording-options-video-adj-label">Contrast</label>
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.05"
+                value={localSettings.videoContrast}
+                onChange={(e) => handleChange('videoContrast', parseFloat(e.target.value))}
+                className="recording-options-video-adj-slider"
+              />
+              <span className="recording-options-video-adj-value">{Math.round(localSettings.videoContrast * 100)}%</span>
+            </div>
+            <div className="recording-options-video-adj-row">
+              <label className="recording-options-video-adj-label">Saturation</label>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={localSettings.videoSaturation}
+                onChange={(e) => handleChange('videoSaturation', parseFloat(e.target.value))}
+                className="recording-options-video-adj-slider"
+              />
+              <span className="recording-options-video-adj-value">{Math.round(localSettings.videoSaturation * 100)}%</span>
+            </div>
+            <div className="recording-options-video-adj-row">
+              <label className="recording-options-video-adj-label">Hue</label>
+              <input
+                type="range"
+                min="-180"
+                max="180"
+                step="5"
+                value={localSettings.videoHue}
+                onChange={(e) => handleChange('videoHue', parseFloat(e.target.value))}
+                className="recording-options-video-adj-slider"
+              />
+              <span className="recording-options-video-adj-value">{localSettings.videoHue}°</span>
+            </div>
+            <button
+              type="button"
+              className="recording-options-video-adj-reset"
+              onClick={() => {
+                setLocalSettings(prev => ({ ...prev, videoBrightness: 1, videoContrast: 1, videoSaturation: 1, videoHue: 0 }))
+                onUpdateSettings?.({ ...recordSettings, videoBrightness: 1, videoContrast: 1, videoSaturation: 1, videoHue: 0 })
+              }}
+            >
+              Reset
+            </button>
+          </div>
               
           {localSettings.recordInPresentMode && (
             <>

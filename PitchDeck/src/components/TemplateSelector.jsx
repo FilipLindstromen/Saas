@@ -1855,7 +1855,7 @@ function TemplateSelector({ onLoadTemplate }) {
   const handleLoadTemplate = (templateKey) => {
     const template = templates[templateKey]
     if (template && window.confirm(`Load ${template.name} template? This will replace all current slides.`)) {
-      onLoadTemplate(template.slides)
+      onLoadTemplate(template.slides, templateKey)
     }
   }
 

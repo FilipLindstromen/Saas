@@ -2,12 +2,22 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import './PlayMode.css'
 
+// Build CSS filter string for video adjustments (brightness, contrast, saturation, hue)
+function getVideoFilterString(recordSettings) {
+  const b = typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1
+  const c = typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1
+  const s = typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1
+  const h = typeof recordSettings?.videoHue === 'number' ? recordSettings.videoHue : 0
+  return `brightness(${b}) contrast(${c}) saturate(${s}) hue-rotate(${h}deg)`
+}
+
 // Webcam overlay component - separate from slide transitions
-function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true }) {
+function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', recordSettings }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const containerRef = useRef(null)
   const prevLayoutRef = useRef(layout)
+  const prevOverrideRef = useRef({ cameraOverrideEnabled, cameraOverridePosition })
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight })
 
   // Update dimensions on resize
@@ -29,53 +39,49 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     }
   }
 
-  // Get webcam position based on layout
-  // Always use top/left positioning with explicit pixel values for smooth CSS transitions
+  // Get webcam position: when camera override is enabled use cameraOverridePosition; otherwise use layout
   const getWebcamPosition = () => {
-    if (layout === 'video') {
-      return { 
-        top: 0, 
-        left: 0, 
-        width: dimensions.width,
-        height: dimensions.height
-      }
-    }
-    
-    if (layout === 'left-video') {
-      // Full height on right third of slide
-      const rightPanelWidth = dimensions.width / 3
-      return {
-        top: 0,
-        left: dimensions.width - rightPanelWidth,
-        width: rightPanelWidth,
-        height: dimensions.height
-      }
-    }
-    
-    // Calculate webcam size in pixels
     const webcamWidth = dimensions.width * (webcamSize === 'small' ? 0.15 : webcamSize === 'medium' ? 0.20 : 0.25)
-    const webcamHeight = webcamWidth // Square aspect ratio
-    
-    // Calculate position from top-left for smooth transitions
-    const bottomOffset = dimensions.height * 0.04 // 4% from bottom
-    const sideOffset = dimensions.width * 0.04 // 4% from side
-    
-    if (layout === 'right') {
-      // Bottom-left: calculate top position
-      return { 
-        top: dimensions.height - bottomOffset - webcamHeight,
-        left: sideOffset,
-        width: webcamWidth,
-        height: webcamHeight
+    const webcamHeight = webcamWidth
+    const bottomOffset = dimensions.height * 0.04
+    const sideOffset = dimensions.width * 0.04
+
+    if (cameraOverrideEnabled) {
+      switch (cameraOverridePosition) {
+        case 'fullscreen':
+          return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, isCircle: false }
+        case 'left-third': {
+          const w = dimensions.width / 3
+          return { top: 0, left: 0, width: w, height: dimensions.height, isCircle: false }
+        }
+        case 'right-third': {
+          const w = dimensions.width / 3
+          return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, isCircle: false }
+        }
+        case 'circle-top-left':
+          return { top: bottomOffset, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
+        case 'circle-top-right':
+          return { top: bottomOffset, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
+        case 'circle-bottom-left':
+          return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
+        case 'circle-bottom-right':
+        default:
+          return { top: dimensions.height - bottomOffset - webcamHeight, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
       }
     }
-    // Default: bottom-right - calculate top and left positions
-    return { 
-      top: dimensions.height - bottomOffset - webcamHeight,
-      left: dimensions.width - sideOffset - webcamWidth,
-      width: webcamWidth,
-      height: webcamHeight
+
+    // Use layout when override is disabled
+    if (layout === 'video') {
+      return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, isCircle: false }
     }
+    if (layout === 'left-video') {
+      const w = dimensions.width / 3
+      return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, isCircle: false }
+    }
+    if (layout === 'right') {
+      return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
+    }
+    return { top: dimensions.height - bottomOffset - webcamHeight, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
   }
 
   useEffect(() => {
@@ -104,46 +110,42 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     }
   }, [cameraId, isVisible])
 
-  // Update transition when layout changes - ensure smooth transition
+  // Update transition when layout or camera override changes
   useEffect(() => {
-    if (prevLayoutRef.current !== layout && containerRef.current) {
-      // Use requestAnimationFrame to ensure the browser has rendered the current position
-      // before applying the new position, enabling smooth transitions in both directions
+    const overrideChanged = prevOverrideRef.current.cameraOverrideEnabled !== cameraOverrideEnabled ||
+      prevOverrideRef.current.cameraOverridePosition !== cameraOverridePosition
+    if ((prevLayoutRef.current !== layout || overrideChanged) && containerRef.current) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // Force a reflow to ensure the browser recognizes the current position
-          if (containerRef.current) {
-            containerRef.current.offsetHeight
-          }
+          if (containerRef.current) containerRef.current.offsetHeight
         })
       })
       prevLayoutRef.current = layout
+      prevOverrideRef.current = { cameraOverrideEnabled, cameraOverridePosition }
     }
-  }, [layout, dimensions])
+  }, [layout, dimensions, cameraOverrideEnabled, cameraOverridePosition])
 
   if (!isVisible || !cameraId) return null
 
   const size = getWebcamSize()
   const position = getWebcamPosition()
-  const isFullscreen = layout === 'video'
+  const useCircle = position.isCircle
+  const isFullscreen = position.width >= dimensions.width - 2 && position.height >= dimensions.height - 2
 
-  // Build style object with all properties explicitly set for smooth transitions
-  // Always use top/left positioning with explicit pixel values for seamless transitions
-  // This ensures CSS can smoothly interpolate between all values (small to big and vice versa)
   const style = {
     position: 'fixed',
     top: `${position.top}px`,
     left: `${position.left}px`,
     width: `${position.width}px`,
-    height: isFullscreen ? `${position.height}px` : `${position.height}px`, // Always use explicit height
+    height: `${position.height}px`,
     minWidth: isFullscreen ? '0' : size.minWidth,
     minHeight: isFullscreen ? '0' : size.minHeight,
     maxWidth: 'none',
     maxHeight: 'none',
-    aspectRatio: (isFullscreen || layout === 'left-video') ? 'auto' : '1 / 1',
-    borderRadius: (isFullscreen || layout === 'left-video') ? '0' : '50%',
-    clipPath: (isFullscreen || layout === 'left-video') ? 'none' : 'circle(50% at center)',
-    WebkitClipPath: (isFullscreen || layout === 'left-video') ? 'none' : 'circle(50% at center)',
+    aspectRatio: (isFullscreen || position.width !== position.height) ? 'auto' : '1 / 1',
+    borderRadius: useCircle ? '50%' : '0',
+    clipPath: useCircle ? 'circle(50% at center)' : 'none',
+    WebkitClipPath: useCircle ? 'circle(50% at center)' : 'none',
     zIndex: 1000,
     pointerEvents: 'none'
   }
@@ -173,7 +175,230 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   )
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
+// Transcribe video/audio blob with OpenAI Whisper (verbose_json for segment timestamps)
+async function transcribeWithWhisper(blob, openaiKey) {
+  const file = new File([blob], 'recording.webm', { type: blob.type || 'video/webm' })
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('model', 'whisper-1')
+  formData.append('response_format', 'verbose_json')
+  formData.append('timestamp_granularities[]', 'segment')
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${openaiKey}` },
+    body: formData
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error?.message || response.statusText)
+  }
+  const data = await response.json()
+  return (data.segments || []).map(s => ({ start: s.start, end: s.end, text: (s.text || '').trim() })).filter(s => s.text)
+}
+
+const CAPTION_SIZE_MULT = { small: 0.85, medium: 1, large: 1.2 }
+
+// Burn captions into video: play video, draw frames + caption text to canvas, record canvas + original audio
+function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Poppins', captionFontSize = 'medium', captionDropShadow = false) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob)
+    const video = document.createElement('video')
+    video.src = url
+    video.muted = false
+    video.playsInline = true
+    video.crossOrigin = 'anonymous'
+
+    const style = {
+      'bottom-black': { position: 'bottom', bg: 'rgba(0,0,0,0.85)', fg: '#ffffff', fontSize: 0.04, padding: 0.02 },
+      'bottom-white': { position: 'bottom', bg: 'rgba(255,255,255,0.9)', fg: '#111111', fontSize: 0.04, padding: 0.02 },
+      'top-black': { position: 'top', bg: 'rgba(0,0,0,0.85)', fg: '#ffffff', fontSize: 0.04, padding: 0.02 },
+      'top-white': { position: 'top', bg: 'rgba(255,255,255,0.9)', fg: '#111111', fontSize: 0.04, padding: 0.02 },
+      'white-outline': { position: 'bottom', bg: 'transparent', fg: '#ffffff', outline: true, fontSize: 0.045, padding: 0.01 },
+      'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', fontSize: 0.055, padding: 0.025 }
+    }
+    const opts = style[captionStyle] || style['bottom-black']
+    const sizeMult = CAPTION_SIZE_MULT[captionFontSize] ?? 1
+    const fontFamily = captionFont || 'Poppins'
+
+    function tryStartPipeline() {
+      let w = video.videoWidth
+      let h = video.videoHeight
+      if (!w || !h) return false
+      startPipeline(w, h)
+      return true
+    }
+
+    function startPipeline(w, h) {
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('Canvas not supported')); return }
+
+      let audioContext = null
+      let dest = null
+      let combinedStream = null
+      let recorder = null
+      const outputChunks = []
+
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        dest = audioContext.createMediaStreamDestination()
+        const source = audioContext.createMediaElementSource(video)
+        source.connect(dest)
+        const videoStream = canvas.captureStream(30)
+        combinedStream = new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()])
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm'
+        recorder = new MediaRecorder(combinedStream, { mimeType: mime, videoBitsPerSecond: 2500000 })
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) outputChunks.push(e.data) }
+        recorder.onstop = () => {
+          URL.revokeObjectURL(url)
+          const outBlob = new Blob(outputChunks, { type: mime })
+          resolve(outBlob)
+        }
+        recorder.start(100)
+      } catch (e) {
+        URL.revokeObjectURL(url)
+        reject(e)
+        return
+      }
+
+      function getSegmentAt(time) {
+        for (let i = 0; i < segments.length; i++) {
+          if (time >= segments[i].start && time <= segments[i].end) return segments[i].text
+        }
+        return null
+      }
+
+      function drawFrame() {
+        if (video.ended || video.readyState < 2) {
+          if (video.ended) {
+            try { recorder.stop() } catch (_) {}
+          }
+          return
+        }
+        ctx.drawImage(video, 0, 0, w, h)
+        const t = video.currentTime
+        const text = getSegmentAt(t)
+        if (text) {
+          const fontSize = Math.round(w * opts.fontSize * sizeMult)
+          ctx.font = `600 ${fontSize}px "${fontFamily}", sans-serif`
+          const lines = text.replace(/\n/g, ' ').match(/.{1,42}/g) || [text]
+          const lineHeight = fontSize * 1.2
+          const pad = Math.round(w * opts.padding)
+          let maxLineW = 0
+          lines.forEach((line) => {
+            const m = ctx.measureText(line)
+            if (m.width > maxLineW) maxLineW = m.width
+          })
+          const boxW = Math.round(maxLineW) + pad * 2
+          const boxH = lines.length * lineHeight + pad * 2
+          const y0 = h - boxH - Math.round(h * bottomMargin)
+          const x0 = (w - boxW) / 2
+          if (opts.bg !== 'transparent') {
+            ctx.fillStyle = opts.bg
+            if (ctx.roundRect) {
+              ctx.beginPath()
+              ctx.roundRect(x0, y0, boxW, boxH, 8)
+              ctx.fill()
+            } else {
+              ctx.fillRect(x0, y0, boxW, boxH)
+            }
+          }
+          ctx.fillStyle = opts.fg
+          if (opts.outline) {
+            ctx.strokeStyle = '#000'
+            ctx.lineWidth = Math.max(2, fontSize / 20)
+          }
+          if (captionDropShadow) {
+            ctx.shadowColor = 'rgba(0,0,0,0.8)'
+            ctx.shadowBlur = 4
+            ctx.shadowOffsetX = 1
+            ctx.shadowOffsetY = 1
+          }
+          lines.forEach((line, i) => {
+            const y = y0 + pad + (i + 1) * lineHeight
+            const metrics = ctx.measureText(line)
+            const x = (w - metrics.width) / 2
+            if (opts.outline) ctx.strokeText(line, x, y)
+            ctx.fillText(line, x, y)
+          })
+          if (captionDropShadow) {
+            ctx.shadowColor = 'transparent'
+            ctx.shadowBlur = 0
+            ctx.shadowOffsetX = 0
+            ctx.shadowOffsetY = 0
+          }
+        }
+      }
+
+      if (video.requestVideoFrameCallback) {
+        const tick = () => {
+          drawFrame()
+          if (!video.ended) video.requestVideoFrameCallback(tick)
+        }
+        video.requestVideoFrameCallback(tick)
+      } else {
+        const tick = () => {
+          drawFrame()
+          if (!video.ended) requestAnimationFrame(tick)
+        }
+        video.ontimeupdate = () => tick()
+      }
+
+      video.onended = () => {
+        setTimeout(() => { try { if (recorder && recorder.state !== 'inactive') recorder.stop() } catch (_) {} }, 200)
+      }
+
+      video.play().catch(e => {
+        URL.revokeObjectURL(url)
+        try { recorder.stop() } catch (_) {}
+        reject(e)
+      })
+    }
+
+    let pipelineStarted = false
+    video.onloadedmetadata = () => {
+      if (tryStartPipeline()) { pipelineStarted = true; return }
+      const retryOnce = () => {
+        if (pipelineStarted) return
+        if (tryStartPipeline()) {
+          pipelineStarted = true
+          video.removeEventListener('loadeddata', retryOnce)
+          video.removeEventListener('canplay', retryOnce)
+          return
+        }
+        video.removeEventListener('loadeddata', retryOnce)
+        video.removeEventListener('canplay', retryOnce)
+        URL.revokeObjectURL(url)
+        reject(new Error('Invalid video dimensions'))
+      }
+      video.addEventListener('loadeddata', retryOnce, { once: true })
+      video.addEventListener('canplay', retryOnce, { once: true })
+      setTimeout(() => {
+        if (pipelineStarted) return
+        if (video.videoWidth && video.videoHeight && tryStartPipeline()) {
+          pipelineStarted = true
+          video.removeEventListener('loadeddata', retryOnce)
+          video.removeEventListener('canplay', retryOnce)
+          return
+        }
+        video.removeEventListener('loadeddata', retryOnce)
+        video.removeEventListener('canplay', retryOnce)
+        URL.revokeObjectURL(url)
+        reject(new Error('Invalid video dimensions'))
+      }, 3000)
+    }
+
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Video failed to load'))
+    }
+  })
+}
+
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone, initialScreenStreamRef }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -194,6 +419,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
+  const [captionsProcessing, setCaptionsProcessing] = useState('idle') // 'idle', 'transcribing', 'burning'
   const mediaRecorderRef = useRef(null)
   const recordedChunksRef = useRef([])
   const screenStreamRef = useRef(null)
@@ -316,91 +542,75 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     setVisibleBulletIndex(-1)
   }, [currentIndex])
 
-  // Auto-enter fullscreen and start recording when entering record mode
+  // Auto-start recording when entering record mode (popup first, then fullscreen, then record)
   useEffect(() => {
     if (isRecording && recordingState === 'idle' && !isStartingRecordingRef.current) {
-      // Prevent multiple simultaneous calls
       isStartingRecordingRef.current = true
-      
-      // Request fullscreen first, then start recording
-      const enterFullscreenAndRecord = async () => {
-        try {
-          // Enter fullscreen first
-          if (!document.fullscreenElement) {
-            await document.documentElement.requestFullscreen()
-          }
-          
-          // Wait for fullscreen to be active before requesting screen share
-          // This ensures we're in fullscreen when the dialog appears
-          let attempts = 0
-          while (!document.fullscreenElement && attempts < 20) {
-            await new Promise(resolve => setTimeout(resolve, 50))
-            attempts++
-          }
-          
-          // Small additional delay to ensure fullscreen is fully active
-          await new Promise(resolve => setTimeout(resolve, 300))
-          
-          // Now start recording (this will show the screen share dialog)
-          // But we're already in fullscreen, so it won't exit
-          if (recordingState === 'idle' && !screenStreamRef.current) {
-            await startRecording()
-          } else {
-            isStartingRecordingRef.current = false
-          }
-        } catch (err) {
-          console.warn('Could not enter fullscreen or start recording:', err)
-          isStartingRecordingRef.current = false
-        }
-      }
-      
-      enterFullscreenAndRecord()
+      startRecording()
     } else if (!isRecording && recordingState === 'recording') {
       stopRecording()
       isStartingRecordingRef.current = false
     }
-    
-    // Cleanup on unmount
+  }, [isRecording, recordingState])
+
+  // Cleanup recorder and streams only on unmount (do not run when recordingState flips to 'recording' or we would stop the recording immediately)
+  useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach(track => track.stop())
+        screenStreamRef.current = null
       }
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop())
+        audioStreamRef.current = null
       }
       if (combinedStreamRef.current) {
         combinedStreamRef.current.getTracks().forEach(track => track.stop())
+        combinedStreamRef.current = null
       }
       isStartingRecordingRef.current = false
     }
-  }, [isRecording, recordingState])
+  }, [])
 
   const startRecording = async () => {
     try {
-      // Don't set recording state until we actually have the stream
-      // This prevents the effect from running multiple times
       recordedChunksRef.current = []
 
-      // Get screen capture - this will show the browser's native dialog
-      // We can't bypass this for security reasons, but we're already in fullscreen
-      // The dialog will appear, but we're already in fullscreen so it won't exit
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { 
-          mediaSource: 'screen',
-          displaySurface: 'monitor' // Prefer entire screen
-        },
-        audio: false
-      })
-      
-      // Only set recording state after we have the stream
-      setRecordingState('recording')
-      isStartingRecordingRef.current = false
-      screenStreamRef.current = screenStream
+      // Use stream from App (popup was shown when user clicked Present) or request it here.
+      let screenStream
+      if (initialScreenStreamRef?.current) {
+        screenStream = initialScreenStreamRef.current
+        screenStreamRef.current = screenStream
+      } else {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { mediaSource: 'screen', displaySurface: 'monitor' },
+          audio: false
+        })
+        screenStreamRef.current = screenStream
+      }
 
-      // Get audio if microphone is enabled
+      // 1. We're already in present mode (PlayMode). Enter fullscreen so the presentation is fullscreen.
+      if (!document.fullscreenElement) {
+        try {
+          await document.documentElement.requestFullscreen()
+        } catch (e) {
+          const msg = e?.message ?? ''
+          if (msg && !/user gesture|permissions check failed|requestfullscreen/i.test(msg)) {
+            console.warn('Could not enter fullscreen:', e)
+          }
+        }
+      }
+      let attempts = 0
+      while (!document.fullscreenElement && attempts < 40) {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        attempts++
+      }
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // 2. Get audio if microphone is enabled
       let audioStream = null
       if (recordSettings.microphoneEnabled && recordSettings.selectedMicrophoneId) {
         try {
@@ -424,7 +634,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       // Create MediaRecorder
       const options = {
         mimeType: 'video/webm;codecs=vp9,opus',
-        videoBitsPerSecond: 2500000
+        videoBitsPerSecond: 2500000,
+        audioBitsPerSecond: 128000
       }
       
       // Fallback to other codecs if vp9 is not supported
@@ -446,27 +657,58 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `presentation-recording-${new Date().toISOString().split('T')[0]}.webm`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-        
-        // Cleanup streams
+        const filename = `presentation-recording-${new Date().toISOString().split('T')[0]}.webm`
+
+        // Cleanup streams immediately so UI can show "Processing captions..." if needed
         if (screenStreamRef.current) {
           screenStreamRef.current.getTracks().forEach(track => track.stop())
+          screenStreamRef.current = null
         }
         if (audioStreamRef.current) {
           audioStreamRef.current.getTracks().forEach(track => track.stop())
+          audioStreamRef.current = null
         }
         if (combinedStreamRef.current) {
           combinedStreamRef.current.getTracks().forEach(track => track.stop())
+          combinedStreamRef.current = null
         }
-        
         setRecordingState('idle')
+
+        const doDownload = (resultBlob) => {
+          if (onRecordingDone && resultBlob) onRecordingDone(resultBlob)
+          const url = URL.createObjectURL(resultBlob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+        }
+
+        const captionsEnabled = recordSettings.captionsEnabled === true
+        const hasOpenAI = openaiKey && openaiKey.trim().length > 0
+
+        if (captionsEnabled && hasOpenAI) {
+          setCaptionsProcessing('transcribing')
+          transcribeWithWhisper(blob, openaiKey.trim())
+            .then((segments) => {
+              setCaptionsProcessing('burning')
+              return burnCaptionsIntoVideo(blob, segments, recordSettings.captionStyle || 'bottom-black', recordSettings.captionFont || 'Poppins', recordSettings.captionFontSize || 'medium', recordSettings.captionDropShadow === true)
+            })
+            .then((resultBlob) => {
+              doDownload(resultBlob)
+              setCaptionsProcessing('idle')
+            })
+            .catch((err) => {
+              console.error('Captions pipeline error:', err)
+              alert(`Captions failed: ${err.message}. Downloading recording without captions.`)
+              doDownload(blob)
+              setCaptionsProcessing('idle')
+            })
+        } else {
+          doDownload(blob)
+        }
       }
 
       // Handle screen share stop - don't exit fullscreen, just stop recording
@@ -479,7 +721,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         // The user can exit manually with ESC
       }
 
+      // Let the screen stream and fullscreen settle so frames are delivered (avoids black / 0-length)
+      await new Promise(resolve => setTimeout(resolve, 500))
       mediaRecorder.start(1000) // Collect data every second
+      isStartingRecordingRef.current = false
     } catch (error) {
       console.error('Error starting recording:', error)
       setRecordingState('idle')
@@ -499,6 +744,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        // End recording first so MediaRecorder stops properly and onstop runs (blob + download), then exit
+        if (recordingState === 'recording' || recordingState === 'stopping') {
+          stopRecording()
+        }
         if (document.fullscreenElement) {
           document.exitFullscreen()
         } else {
@@ -542,7 +791,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isTransitioning, onExit, nextSlide, prevSlide, isBulletSlide, visibleBulletIndex, bulletPoints.length])
+  }, [isTransitioning, onExit, nextSlide, prevSlide, isBulletSlide, visibleBulletIndex, bulletPoints.length, recordingState, stopRecording])
 
   const handleClick = (e) => {
     if (isTransitioning) return
@@ -570,14 +819,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Automatically enter fullscreen when component mounts
-  useEffect(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error('Error attempting to enable fullscreen:', err)
-      })
-    }
-  }, [])
+  // Fullscreen is entered only via user gesture: (1) after Share in recording flow (startRecording), or (2) toggle button. Do not auto-call on mount – browser would log "API can only be initiated by a user gesture".
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -596,8 +838,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error('Error attempting to enable fullscreen:', err)
+      document.documentElement.requestFullscreen().catch(() => {
+        // Ignore: browser may block (e.g. not in user gesture). Do not log – browser already shows a message.
       })
     } else {
       document.exitFullscreen()
@@ -621,6 +863,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       <div 
         key={slideKey}
         className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''}`}
+        style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 1001 } : undefined}
       >
         <Slide 
           slide={presentationSlides[currentIndex]} 
@@ -658,6 +901,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           textAnimationUnit={textAnimationUnit}
           textStyleMode={textStyleMode || 'standard'}
           fontPairingSerifFont={fontPairingSerifFont || 'Playfair Display'}
+          slideFormat={slideFormat}
         />
       </div>
       {/* Webcam overlay - outside slide transitions */}
@@ -667,7 +911,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           layout={currentSlideLayout}
           webcamSize={recordSettings.webcamSize || 'large'}
           isVisible={true}
+          cameraOverrideEnabled={currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
+          cameraOverridePosition={currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
+          recordSettings={recordSettings}
         />
+      )}
+      {captionsProcessing !== 'idle' && (
+        <div className="captions-processing-overlay">
+          <div className="captions-processing-content">
+            <span className="captions-processing-spinner" />
+            <span>{captionsProcessing === 'transcribing' ? 'Transcribing audio…' : 'Adding captions to video…'}</span>
+          </div>
+        </div>
       )}
       {!showMenu && (
         <div className="play-controls">
