@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
+import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
 
 // Build CSS filter string for video adjustments (brightness, contrast, saturation, hue)
@@ -398,7 +399,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone, initialScreenStreamRef }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -419,7 +420,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
-  const [captionsProcessing, setCaptionsProcessing] = useState('idle') // 'idle', 'transcribing', 'burning'
+  const [captionsProcessing, setCaptionsProcessing] = useState('idle') // 'idle', 'transcribing', 'burning', 'encoding'
   const mediaRecorderRef = useRef(null)
   const recordedChunksRef = useRef([])
   const screenStreamRef = useRef(null)
@@ -542,7 +543,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     setVisibleBulletIndex(-1)
   }, [currentIndex])
 
-  // Auto-start recording when entering record mode (popup first, then fullscreen, then record)
+  // Auto-start recording when entering record mode (stream from Record button, then start recorder)
   useEffect(() => {
     if (isRecording && recordingState === 'idle' && !isStartingRecordingRef.current) {
       isStartingRecordingRef.current = true
@@ -553,14 +554,17 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     }
   }, [isRecording, recordingState])
 
-  // Cleanup recorder and streams only on unmount (do not run when recordingState flips to 'recording' or we would stop the recording immediately)
+  // Cleanup only on unmount. Do NOT stop the screen stream if it came from App (initialScreenStreamRef) so it survives React double-mount and recording can start.
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
       if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach(track => track.stop())
+        const isAppOwned = initialScreenStreamRef?.current && screenStreamRef.current === initialScreenStreamRef.current
+        if (!isAppOwned) {
+          screenStreamRef.current.getTracks().forEach(track => track.stop())
+        }
         screenStreamRef.current = null
       }
       if (audioStreamRef.current) {
@@ -576,41 +580,25 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }, [])
 
   const startRecording = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') return
     try {
       recordedChunksRef.current = []
 
-      // Use stream from App (popup was shown when user clicked Present) or request it here.
-      let screenStream
-      if (initialScreenStreamRef?.current) {
-        screenStream = initialScreenStreamRef.current
-        screenStreamRef.current = screenStream
+      // Use stream from Record button only if it still has a live track (survives remount); otherwise get a new one
+      let displayStream
+      const appStream = initialScreenStreamRef?.current
+      const appVideoTracks = appStream?.getVideoTracks() ?? []
+      if (appStream && appVideoTracks.length > 0 && appVideoTracks[0].readyState === 'live') {
+        displayStream = appStream
       } else {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { mediaSource: 'screen', displaySurface: 'monitor' },
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
           audio: false
         })
-        screenStreamRef.current = screenStream
       }
+      screenStreamRef.current = displayStream
 
-      // 1. We're already in present mode (PlayMode). Enter fullscreen so the presentation is fullscreen.
-      if (!document.fullscreenElement) {
-        try {
-          await document.documentElement.requestFullscreen()
-        } catch (e) {
-          const msg = e?.message ?? ''
-          if (msg && !/user gesture|permissions check failed|requestfullscreen/i.test(msg)) {
-            console.warn('Could not enter fullscreen:', e)
-          }
-        }
-      }
-      let attempts = 0
-      while (!document.fullscreenElement && attempts < 40) {
-        await new Promise(resolve => setTimeout(resolve, 50))
-        attempts++
-      }
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // 2. Get audio if microphone is enabled
+      // Get microphone if enabled
       let audioStream = null
       if (recordSettings.microphoneEnabled && recordSettings.selectedMicrophoneId) {
         try {
@@ -623,43 +611,48 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }
       }
 
-      // Combine streams
-      const combinedStream = new MediaStream()
-      screenStream.getVideoTracks().forEach(track => combinedStream.addTrack(track))
+      // Combine video from display + optional mic audio
+      const streamToRecord = new MediaStream()
+      displayStream.getVideoTracks().forEach((t) => streamToRecord.addTrack(t))
       if (audioStream) {
-        audioStream.getAudioTracks().forEach(track => combinedStream.addTrack(track))
+        audioStream.getAudioTracks().forEach((t) => streamToRecord.addTrack(t))
       }
-      combinedStreamRef.current = combinedStream
+      combinedStreamRef.current = streamToRecord
 
-      // Create MediaRecorder
-      const options = {
-        mimeType: 'video/webm;codecs=vp9,opus',
+      // Standard MediaRecorder: pick first supported mimeType
+      const mimeTypes = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ]
+      const mimeType = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      const mediaRecorder = new MediaRecorder(streamToRecord, {
+        mimeType,
         videoBitsPerSecond: 2500000,
-        audioBitsPerSecond: 128000
-      }
-      
-      // Fallback to other codecs if vp9 is not supported
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = 'video/webm;codecs=vp8,opus'
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options.mimeType = 'video/webm'
-        }
-      }
-
-      const mediaRecorder = new MediaRecorder(combinedStream, options)
+        audioBitsPerSecond: audioStream ? 128000 : undefined
+      })
       mediaRecorderRef.current = mediaRecorder
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           recordedChunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
-        const filename = `presentation-recording-${new Date().toISOString().split('T')[0]}.webm`
+        const type = mediaRecorder.mimeType || 'video/webm'
+        const blob = new Blob(recordedChunksRef.current, { type })
+        const dateStr = new Date().toISOString().split('T')[0]
+        const webmFilename = `presentation-recording-${dateStr}.webm`
+        const mp4Filename = `presentation-recording-${dateStr}.mp4`
 
-        // Cleanup streams immediately so UI can show "Processing captions..." if needed
+        if (blob.size < 1000) {
+          setRecordingState('idle')
+          alert('Recording produced no data. Make sure you chose a screen/window to share and try again.')
+          return
+        }
+
+        // Cleanup streams immediately so UI can show processing overlay if needed
         if (screenStreamRef.current) {
           screenStreamRef.current.getTracks().forEach(track => track.stop())
           screenStreamRef.current = null
@@ -674,7 +667,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }
         setRecordingState('idle')
 
-        const doDownload = (resultBlob) => {
+        const doDownload = (resultBlob, filename) => {
           if (onRecordingDone && resultBlob) onRecordingDone(resultBlob)
           const url = URL.createObjectURL(resultBlob)
           const link = document.createElement('a')
@@ -684,6 +677,20 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           link.click()
           document.body.removeChild(link)
           URL.revokeObjectURL(url)
+        }
+
+        const runEncodingAndDownload = (resultBlob, fallbackFilename) => {
+          setCaptionsProcessing('encoding')
+          convertToMp4(resultBlob)
+            .then((mp4Blob) => {
+              doDownload(mp4Blob, mp4Filename)
+              setCaptionsProcessing('idle')
+            })
+            .catch((err) => {
+              console.error('FFmpeg encoding error:', err)
+              doDownload(resultBlob, fallbackFilename)
+              setCaptionsProcessing('idle')
+            })
         }
 
         const captionsEnabled = recordSettings.captionsEnabled === true
@@ -696,34 +703,30 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
               setCaptionsProcessing('burning')
               return burnCaptionsIntoVideo(blob, segments, recordSettings.captionStyle || 'bottom-black', recordSettings.captionFont || 'Poppins', recordSettings.captionFontSize || 'medium', recordSettings.captionDropShadow === true)
             })
-            .then((resultBlob) => {
-              doDownload(resultBlob)
-              setCaptionsProcessing('idle')
-            })
+            .then((resultBlob) => runEncodingAndDownload(resultBlob, webmFilename))
             .catch((err) => {
               console.error('Captions pipeline error:', err)
-              alert(`Captions failed: ${err.message}. Downloading recording without captions.`)
-              doDownload(blob)
-              setCaptionsProcessing('idle')
+              alert(`Captions failed: ${err.message}. Encoding recording without captions.`)
+              runEncodingAndDownload(blob, webmFilename)
             })
         } else {
-          doDownload(blob)
+          runEncodingAndDownload(blob, webmFilename)
         }
       }
 
-      // Handle screen share stop - don't exit fullscreen, just stop recording
-      screenStream.getVideoTracks()[0].onended = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          stopRecording()
+      const videoTracks = displayStream.getVideoTracks()
+      if (videoTracks.length > 0) {
+        videoTracks[0].onended = () => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            stopRecording()
+          }
+          isStartingRecordingRef.current = false
         }
-        isStartingRecordingRef.current = false
-        // Don't exit fullscreen when screen share stops
-        // The user can exit manually with ESC
       }
 
-      // Let the screen stream and fullscreen settle so frames are delivered (avoids black / 0-length)
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 200))
       mediaRecorder.start(1000) // Collect data every second
+      setRecordingState('recording')
       isStartingRecordingRef.current = false
     } catch (error) {
       console.error('Error starting recording:', error)
@@ -819,7 +822,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Fullscreen is entered only via user gesture: (1) after Share in recording flow (startRecording), or (2) toggle button. Do not auto-call on mount – browser would log "API can only be initiated by a user gesture".
+  // Present-only: auto-enter fullscreen on mount (user gesture from Present button). Record mode does not enter fullscreen.
+  useEffect(() => {
+    if (!isRecording && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }, [isRecording])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -920,7 +928,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         <div className="captions-processing-overlay">
           <div className="captions-processing-content">
             <span className="captions-processing-spinner" />
-            <span>{captionsProcessing === 'transcribing' ? 'Transcribing audio…' : 'Adding captions to video…'}</span>
+            <span>
+              {captionsProcessing === 'transcribing' && 'Transcribing audio…'}
+              {captionsProcessing === 'burning' && 'Adding captions to video…'}
+              {captionsProcessing === 'encoding' && 'Encoding to MP4…'}
+            </span>
           </div>
         </div>
       )}

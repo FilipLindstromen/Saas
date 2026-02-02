@@ -91,7 +91,12 @@ function App() {
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
   const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'edit-recording'
   const lastRecordingBlobRef = useRef(null)
-  const pendingScreenStreamRef = useRef(null) // stream from share popup; passed to PlayMode so it enters present + fullscreen + record
+  const [isRecordingInPlace, setIsRecordingInPlace] = useState(false)
+  const recordingMediaRecorderRef = useRef(null)
+  const recordingChunksRef = useRef([])
+  const recordingStreamRef = useRef(null)
+  const recordingAudioStreamRef = useRef(null)
+  const recordingAudioContextRef = useRef(null)
   const [editingVideoBlob, setEditingVideoBlob] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -1309,34 +1314,145 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
 
   const selectedSlide = slides.find(s => s.id === selectedSlideId)
 
-  // Present: with recording, show share popup first (from edit), then switch to present + fullscreen + record
-  const handlePresentClick = async () => {
-    if (recordSettings.recordInPresentMode) {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { mediaSource: 'screen', displaySurface: 'monitor' },
-          audio: false
-        })
-        pendingScreenStreamRef.current = stream
-        setMode('present')
-      } catch (e) {
-        if (e?.name !== 'NotAllowedError') console.warn('Screen share cancelled or failed:', e)
+  // Present: open present view and go fullscreen (one button, one action)
+  const handlePresentClick = () => {
+    setMode('present')
+  }
+
+  // Record: start screen recording in-place (no present mode, no fullscreen)
+  const handleRecordClick = async () => {
+    try {
+      recordingChunksRef.current = []
+
+      // Request microphone first (same user gesture) when enabled, so audio is ready before display picker
+      let audioStream = null
+      if (recordSettings.microphoneEnabled) {
+        const deviceId = recordSettings.selectedMicrophoneId
+        try {
+          if (deviceId) {
+            audioStream = await navigator.mediaDevices.getUserMedia({
+              audio: { deviceId: { exact: deviceId } }
+            })
+          }
+          if (!audioStream && deviceId) {
+            audioStream = await navigator.mediaDevices.getUserMedia({
+              audio: { deviceId: { ideal: deviceId } }
+            })
+          }
+          if (!audioStream) {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          }
+          if (audioStream) recordingAudioStreamRef.current = audioStream
+        } catch (e) {
+          console.warn('Could not access microphone:', e)
+        }
       }
-    } else {
-      setMode('present')
+
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      recordingStreamRef.current = displayStream
+
+      const streamToRecord = new MediaStream()
+      displayStream.getVideoTracks().forEach((t) => streamToRecord.addTrack(t))
+
+      // Route mic through Web Audio API so MediaRecorder reliably encodes audio (Chrome can drop raw getUserMedia audio when mixed with display video)
+      let audioTrackForRecorder = null
+      if (audioStream && audioStream.getAudioTracks().length > 0) {
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+          if (audioContext.state === 'suspended') await audioContext.resume()
+          const source = audioContext.createMediaStreamSource(audioStream)
+          const destination = audioContext.createMediaStreamDestination()
+          source.connect(destination)
+          const destTracks = destination.stream.getAudioTracks()
+          if (destTracks.length > 0) {
+            audioTrackForRecorder = destTracks[0]
+            recordingAudioContextRef.current = audioContext
+          }
+        } catch (e) {
+          console.warn('Web Audio fallback failed, using raw mic track:', e)
+          audioTrackForRecorder = audioStream.getAudioTracks()[0]
+        }
+        if (!audioTrackForRecorder) audioTrackForRecorder = audioStream.getAudioTracks()[0]
+        if (audioTrackForRecorder) streamToRecord.addTrack(audioTrackForRecorder)
+      }
+
+      const mimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      const mimeType = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      const hasAudio = streamToRecord.getAudioTracks().length > 0
+      const mediaRecorder = new MediaRecorder(streamToRecord, {
+        mimeType,
+        videoBitsPerSecond: 2500000,
+        audioBitsPerSecond: hasAudio ? 128000 : undefined
+      })
+      recordingMediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordingChunksRef.current.push(e.data)
+      }
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: mediaRecorder.mimeType || 'video/webm' })
+        if (recordingStreamRef.current) {
+          recordingStreamRef.current.getTracks().forEach((t) => t.stop())
+          recordingStreamRef.current = null
+        }
+        if (recordingAudioStreamRef.current) {
+          recordingAudioStreamRef.current.getTracks().forEach((t) => t.stop())
+          recordingAudioStreamRef.current = null
+        }
+        if (recordingAudioContextRef.current) {
+          recordingAudioContextRef.current.close().catch(() => {})
+          recordingAudioContextRef.current = null
+        }
+        recordingMediaRecorderRef.current = null
+        setIsRecordingInPlace(false)
+
+        if (blob.size < 1000) {
+          alert('Recording produced no data. Make sure you chose a screen/window to share.')
+          return
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0]
+        const webmFilename = `presentation-recording-${dateStr}.webm`
+
+        lastRecordingBlobRef.current = blob
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = webmFilename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      }
+
+      const track = displayStream.getVideoTracks()[0]
+      if (track) {
+        track.onended = () => {
+          if (recordingMediaRecorderRef.current?.state !== 'inactive') handleStopRecording()
+        }
+      }
+
+      mediaRecorder.start(1000)
+      setIsRecordingInPlace(true)
+    } catch (e) {
+      if (e?.name !== 'NotAllowedError') console.warn('Screen share cancelled or failed:', e)
+    }
+  }
+
+  const handleStopRecording = () => {
+    if (recordingMediaRecorderRef.current?.state !== 'inactive') {
+      recordingMediaRecorderRef.current.stop()
     }
   }
 
   // Present mode (fullscreen)
-  if (mode === 'present' || mode === 'record') {
+  if (mode === 'present') {
     return (
       <>
         <PlayMode 
           slides={slides} 
-          onExit={() => {
-            pendingScreenStreamRef.current = null
-            setMode('edit')
-          }} 
+          onExit={() => setMode('edit')} 
           backgroundColor={settings.backgroundColor} 
           textColor={settings.textColor} 
           fontFamily={settings.fontFamily}
@@ -1369,7 +1485,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
           recordSettings={recordSettings}
-          isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
+          isRecording={false}
           textStyleMode={settings.textStyleMode || 'fontPairing'}
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
           openaiKey={settings.openaiKey || ''}
@@ -1377,7 +1493,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           onRecordingDone={(blob) => {
             lastRecordingBlobRef.current = blob
           }}
-          initialScreenStreamRef={pendingScreenStreamRef}
         />
       </>
     )
@@ -1601,21 +1716,26 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Edit</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''} ${recordSettings.recordInPresentMode ? 'present-with-recording' : ''}`}
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
                   onClick={handlePresentClick}
-                  title={recordSettings.recordInPresentMode ? 'Present (recording enabled)' : 'Present'}
+                  title="Present (fullscreen)"
                 >
-                  {recordSettings.recordInPresentMode ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <circle cx="12" cy="12" r="3" fill="currentColor" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  )}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
                   <span>Present</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${isRecordingInPlace ? 'active' : ''} present-with-recording`}
+                  onClick={handleRecordClick}
+                  disabled={isRecordingInPlace}
+                  title="Record screen"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                  <span>Record</span>
                 </button>
                 <button
                   className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
@@ -1650,7 +1770,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   ref={recordButtonRef}
                   className="btn-record-menu" 
                   onClick={() => setShowRecordingOptions(true)}
-                  title="Record"
+                  title="Recording options"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
@@ -1997,21 +2117,26 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Edit</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''} ${recordSettings.recordInPresentMode ? 'present-with-recording' : ''}`}
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
                   onClick={handlePresentClick}
-                  title={recordSettings.recordInPresentMode ? 'Present (recording enabled)' : 'Present'}
+                  title="Present (fullscreen)"
                 >
-                  {recordSettings.recordInPresentMode ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <circle cx="12" cy="12" r="3" fill="currentColor" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  )}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
                   <span>Present</span>
+                </button>
+                <button
+                  className={`header-mode-btn ${isRecordingInPlace ? 'active' : ''} present-with-recording`}
+                  onClick={handleRecordClick}
+                  disabled={isRecordingInPlace}
+                  title="Record screen"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                  <span>Record</span>
                 </button>
                 <button
                   className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
@@ -2046,7 +2171,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   ref={recordButtonRef}
                   className="btn-record-menu" 
                   onClick={() => setShowRecordingOptions(true)}
-                  title="Record"
+                  title="Recording options"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
@@ -2266,6 +2391,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </>
         )}
       </div>
+      {isRecordingInPlace && (
+        <div className="recording-bar">
+          <span className="recording-bar-dot" />
+          <span className="recording-bar-text">Recording</span>
+          <button type="button" className="recording-bar-stop" onClick={handleStopRecording} title="Stop recording">
+            Stop
+          </button>
+        </div>
+      )}
       {showSettings && (
         <Settings
           settings={settings}
