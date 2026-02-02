@@ -3,7 +3,16 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings, analysisFolded = false, onToggleAnalysisFold }) {
+const CAPTION_PREVIEW_STYLES = {
+  'bottom-black': { position: 'bottom', bg: 'rgba(0,0,0,0.85)', fg: '#ffffff', outline: false },
+  'bottom-white': { position: 'bottom', bg: 'rgba(255,255,255,0.9)', fg: '#111111', outline: false },
+  'top-black': { position: 'top', bg: 'rgba(0,0,0,0.85)', fg: '#ffffff', outline: false },
+  'top-white': { position: 'top', bg: 'rgba(255,255,255,0.9)', fg: '#111111', outline: false },
+  'white-outline': { position: 'bottom', bg: 'transparent', fg: '#ffffff', outline: true },
+  'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
+}
+
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -297,37 +306,65 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         </div>
       </div>
       <div className="preview-content">
-        <Slide 
-          slide={slide} 
-          backgroundColor={backgroundColor} 
-          textColor={textColor} 
-          fontFamily={fontFamily}
-          defaultTextSize={defaultTextSize}
-          h1Size={h1Size}
-          h2Size={h2Size}
-          h3Size={h3Size}
-          h1FontFamily={h1FontFamily}
-          h2FontFamily={h2FontFamily}
-          h3FontFamily={h3FontFamily}
-          webcamEnabled={safeRecordSettings.webcamEnabled}
-          selectedCameraId={safeRecordSettings.selectedCameraId}
-          textDropShadow={textDropShadow}
-          shadowBlur={shadowBlur}
-          shadowOffsetX={shadowOffsetX}
-          shadowOffsetY={shadowOffsetY}
-          shadowColor={shadowColor}
-          textInlineBackground={textInlineBackground}
-          inlineBgColor={inlineBgColor}
-          inlineBgOpacity={inlineBgOpacity}
-          inlineBgPadding={inlineBgPadding}
-          lineHeight={lineHeight}
-          bulletLineHeight={bulletLineHeight}
-          bulletTextSize={bulletTextSize}
-          bulletGap={bulletGap}
-          onUpdate={onUpdate}
-          textStyleMode={settings.textStyleMode || 'standard'}
-          fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
-        />
+        <div className={`preview-slide-wrap ${safeRecordSettings.captionsEnabled ? 'has-caption-preview' : ''}`}>
+          <Slide 
+            slide={slide} 
+            backgroundColor={backgroundColor} 
+            textColor={textColor} 
+            fontFamily={fontFamily}
+            defaultTextSize={defaultTextSize}
+            h1Size={h1Size}
+            h2Size={h2Size}
+            h3Size={h3Size}
+            h1FontFamily={h1FontFamily}
+            h2FontFamily={h2FontFamily}
+            h3FontFamily={h3FontFamily}
+            webcamEnabled={safeRecordSettings.webcamEnabled}
+            selectedCameraId={safeRecordSettings.selectedCameraId}
+            videoBrightness={typeof safeRecordSettings.videoBrightness === 'number' ? safeRecordSettings.videoBrightness : 1}
+            videoContrast={typeof safeRecordSettings.videoContrast === 'number' ? safeRecordSettings.videoContrast : 1}
+            videoSaturation={typeof safeRecordSettings.videoSaturation === 'number' ? safeRecordSettings.videoSaturation : 1}
+            videoHue={typeof safeRecordSettings.videoHue === 'number' ? safeRecordSettings.videoHue : 0}
+            cameraOverrideEnabled={slide.cameraOverrideEnabled === true}
+            cameraOverridePosition={slide.cameraOverridePosition || 'fullscreen'}
+            textDropShadow={textDropShadow}
+            shadowBlur={shadowBlur}
+            shadowOffsetX={shadowOffsetX}
+            shadowOffsetY={shadowOffsetY}
+            shadowColor={shadowColor}
+            textInlineBackground={textInlineBackground}
+            inlineBgColor={inlineBgColor}
+            inlineBgOpacity={inlineBgOpacity}
+            inlineBgPadding={inlineBgPadding}
+            lineHeight={lineHeight}
+            bulletLineHeight={bulletLineHeight}
+            bulletTextSize={bulletTextSize}
+            bulletGap={bulletGap}
+            onUpdate={onUpdate}
+            textStyleMode={settings.textStyleMode || 'standard'}
+            fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
+            slideFormat={slideFormat}
+          />
+          {safeRecordSettings.captionsEnabled && (
+            <div className="caption-preview-in-slide">
+              <span
+                className={`caption-preview-bar caption-preview-size-${safeRecordSettings.captionFontSize || 'medium'}`}
+                style={{
+                  background: (CAPTION_PREVIEW_STYLES[safeRecordSettings.captionStyle] || CAPTION_PREVIEW_STYLES['bottom-black']).bg,
+                  color: (CAPTION_PREVIEW_STYLES[safeRecordSettings.captionStyle] || CAPTION_PREVIEW_STYLES['bottom-black']).fg,
+                  fontFamily: `${safeRecordSettings.captionFont || 'Poppins'}, sans-serif`,
+                  textShadow: (CAPTION_PREVIEW_STYLES[safeRecordSettings.captionStyle] || CAPTION_PREVIEW_STYLES['bottom-black']).outline
+                    ? '0 0 2px #000, 0 0 2px #000, 0 1px 2px #000'
+                    : safeRecordSettings.captionDropShadow
+                      ? '1px 1px 4px rgba(0,0,0,0.8)'
+                      : 'none'
+                }}
+              >
+                Sample caption
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       {slide.analysis && (
         <div className="preview-analysis">

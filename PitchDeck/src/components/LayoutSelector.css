@@ -18,14 +18,14 @@
 
 .layout-thumbnails {
   display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .layout-thumbnail {
-  flex: 1;
-  min-width: 80px;
-  max-width: 100px;
+  flex: 1 1 0;
+  min-width: 0;
   cursor: pointer;
   transition: transform 0.2s, opacity 0.2s;
 }
@@ -114,10 +114,13 @@
 }
 
 .layout-thumbnail-name {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-secondary);
   text-align: center;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .layout-thumbnail-video {
@@ -150,4 +153,73 @@
   height: 100%;
   background: var(--accent);
   opacity: 0.3;
+}
+
+.camera-override-row {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.camera-override-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+
+.camera-override-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.camera-override-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.camera-override-icons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.camera-override-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.camera-override-icon:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.camera-override-icon.selected {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+  color: var(--accent);
 }

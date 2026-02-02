@@ -2,8 +2,17 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
 
-// Webcam component - defined outside to avoid hooks issues
-function WebcamVideo({ cameraId, layout, isPlayMode }) {
+// Build CSS filter string for video adjustments (matches PlayMode)
+function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoHue = 0 }) {
+  const b = typeof videoBrightness === 'number' ? videoBrightness : 1
+  const c = typeof videoContrast === 'number' ? videoContrast : 1
+  const s = typeof videoSaturation === 'number' ? videoSaturation : 1
+  const h = typeof videoHue === 'number' ? videoHue : 0
+  return `brightness(${b}) contrast(${c}) saturate(${s}) hue-rotate(${h}deg)`
+}
+
+// Webcam component - defined outside to avoid hooks issues. Uses layout or camera override for position/scale.
+function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -34,11 +43,25 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   }, [cameraId])
 
   const getWebcamClass = () => {
+    if (cameraOverrideEnabled && cameraOverridePosition) {
+      switch (cameraOverridePosition) {
+        case 'fullscreen': return 'webcam-video-fullscreen'
+        case 'left-third': return 'webcam-video-left-third'
+        case 'right-third': return 'webcam-video-right-third'
+        case 'circle-top-left': return 'webcam-video-circle-top-left'
+        case 'circle-top-right': return 'webcam-video-circle-top-right'
+        case 'circle-bottom-left': return 'webcam-video-circle-bottom-left'
+        case 'circle-bottom-right': return 'webcam-video-circle-bottom-right'
+        default: return 'webcam-video-circle-bottom-right'
+      }
+    }
     if (layout === 'video') return 'webcam-video-fullscreen'
     if (layout === 'left-video') return 'webcam-video-right-panel'
     if (layout === 'right') return 'webcam-video-bottom-left'
     return 'webcam-video-bottom-right'
   }
+
+  const filter = getVideoFilterFromProps({ videoBrightness, videoContrast, videoSaturation, videoHue })
 
   return (
     <video
@@ -47,11 +70,12 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
       playsInline
       muted
       className={`slide-webcam ${getWebcamClass()} ${isPlayMode ? 'play-mode' : ''}`}
+      style={{ filter }}
     />
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -921,7 +945,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 <span 
                   className="bullet-text"
                   style={getBulletStyle(index)}
-                  contentEditable={isEditable}
+                  contentEditable={isEditable ? 'true' : 'false'}
                   suppressContentEditableWarning={true}
                   onBlur={(e) => handleBulletChange(index, e)}
                   onInput={(e) => { if (isEditable && onUpdate) handleBulletChange(index, e) }}
@@ -953,7 +977,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             ref={contentRef}
             className={`slide-section-name ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
             style={textStyle}
-            contentEditable={isEditable}
+            contentEditable={isEditable ? 'true' : 'false'}
             suppressContentEditableWarning={true}
             onBlur={handleContentChange}
             onFocus={handleContentFocus}
@@ -1022,7 +1046,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               ref={contentRef}
               className={`slide-text centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
               style={textStyle}
-              contentEditable={true}
+              contentEditable="true"
               suppressContentEditableWarning={true}
               onBlur={handleContentChange}
               onFocus={handleContentFocus}
@@ -1043,7 +1067,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               ref={subtitleRef}
               className={`slide-subtitle ${subtitleHeadingLevel ? `text-heading-${subtitleHeadingLevel}` : ''}`}
               style={subtitleStyle}
-              contentEditable={isEditable}
+              contentEditable={isEditable ? 'true' : 'false'}
               suppressContentEditableWarning={true}
               onBlur={handleSubtitleChange}
               onFocus={handleSubtitleFocus}
@@ -1072,7 +1096,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             <div 
               className="slide-subtitle slide-subtitle-placeholder"
               style={textStyle}
-              contentEditable={true}
+              contentEditable="true"
               suppressContentEditableWarning={true}
               onBlur={(e) => {
                 const text = e.target.textContent || e.target.innerText || ''
@@ -1143,7 +1167,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           ref={contentRef}
           className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
           style={textStyle}
-          contentEditable={true}
+          contentEditable="true"
           suppressContentEditableWarning={true}
           onBlur={handleContentChange}
           onFocus={handleContentFocus}
@@ -1297,11 +1321,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
 
   const slideBgColor = (layout === 'video' && isPlayMode) ? 'transparent' : backgroundColor
+  const aspectRatioValue = slideFormat === '1:1' ? '1/1' : slideFormat === '9:16' ? '9/16' : '16/9'
+  const formatClass = slideFormat === '1:1' ? 'slide-format-1-1' : slideFormat === '9:16' ? 'slide-format-9-16' : 'slide-format-16-9'
+  const slideStyle = {
+    backgroundColor: slideBgColor,
+    aspectRatio: aspectRatioValue,
+    '--slide-base-font-size': `${defaultTextSize}rem`,
+    '--slide-pairing-font': `"${fontPairingSerifFont}", serif`
+  }
   return (
     <div 
-      className={`slide ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass}`}
+      className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass}`}
       ref={slideRef} 
-      style={{ backgroundColor: slideBgColor, '--slide-base-font-size': `${defaultTextSize}rem`, '--slide-pairing-font': `"${fontPairingSerifFont}", serif` }}
+      style={slideStyle}
       onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
     >
       <style>{`
@@ -1384,6 +1416,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           cameraId={selectedCameraId}
           layout={layout}
           isPlayMode={isPlayMode}
+          videoBrightness={videoBrightness}
+          videoContrast={videoContrast}
+          videoSaturation={videoSaturation}
+          videoHue={videoHue}
+          cameraOverrideEnabled={cameraOverrideEnabled}
+          cameraOverridePosition={cameraOverridePosition}
         />
       )}
       {layout === 'video' ? (
@@ -1413,7 +1451,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           style={{ 
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,
-            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined
+            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined,
+            ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 1001 } : {})
           }}
         >
           {renderContent()}

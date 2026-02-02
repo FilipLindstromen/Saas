@@ -484,6 +484,77 @@
   border-radius: 0;
 }
 
+/* Camera override: circle corners */
+.slide-webcam.webcam-video-circle-top-left {
+  top: 4%;
+  left: 4%;
+  bottom: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-top-right {
+  top: 4%;
+  right: 4%;
+  bottom: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-bottom-left {
+  bottom: 4%;
+  left: 4%;
+  top: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-bottom-right {
+  bottom: 4%;
+  right: 4%;
+  top: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+/* Camera override: thirds */
+.slide-webcam.webcam-video-left-third {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.slide-webcam.webcam-video-right-third {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
 .slide-webcam.play-mode {
   border: 2px solid rgba(255, 255, 255, 0.2);
 }

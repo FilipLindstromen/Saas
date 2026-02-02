@@ -2,6 +2,85 @@ import { useState, useEffect, useRef } from 'react'
 import TemplateSelector from './TemplateSelector'
 import './PlanMode.css'
 
+// Section tips by template key; section name -> { about, performWell }
+const SECTION_TIPS = {
+  pas: {
+    'Problem': { about: 'Clearly define the pain point or challenge your audience faces. Use concrete examples and make it relatable so they nod along.', performWell: 'use one vivid example or stat that makes the problem feel urgent and personal.' },
+    'Agitate': { about: 'Deepen the problem: show consequences, missed opportunities, or how it gets worse if left unaddressed. Emotion here creates readiness for the solution.', performWell: 'add a short story or scenario that shows the cost of inaction.' },
+    'Solution': { about: 'Introduce your product, idea, or approach as the clear answer. Keep it simple and directly tied to the problem you just agitated.', performWell: 'state the one key benefit first, then support it with proof.' }
+  },
+  aida: {
+    'Attention': { about: 'Open with a hook: a surprising fact, question, or story that stops the audience from thinking about anything else.', performWell: 'lead with a single bold claim or question that demands a response.' },
+    'Interest': { about: 'Build curiosity by showing why this matters to them. Share relevant insights, trends, or implications that keep them engaged.', performWell: 'connect the hook to their world with one or two concrete details.' },
+    'Desire': { about: 'Create want: show the outcome, the transformation, or the benefit they’ll get. Make the future state tangible and desirable.', performWell: 'paint one clear “after” picture so they can see themselves in it.' },
+    'Action': { about: 'Tell them exactly what to do next. One clear call to action, with minimal friction, so they can act immediately.', performWell: 'give one primary CTA and one simple first step.' }
+  },
+  story: {
+    'The Scene': { about: 'Set the world and the main character (often the audience or a relatable proxy). Establish normalcy before the disruption.', performWell: 'use one specific detail that makes the scene feel real.' },
+    'The Problem': { about: 'Introduce the challenge or obstacle. The character wants something or must deal with something that’s in the way.', performWell: 'state the problem in one sentence the audience can repeat.' },
+    'Failed Attempts': { about: 'Show that the obvious fixes don’t work. This builds tension and makes the audience root for a real solution.', performWell: 'show one failed attempt that everyone can relate to.' },
+    'The Crisis': { about: 'Escalate to the lowest or most critical point. Stakes should feel as high as they can get.', performWell: 'one moment or line that makes the crisis feel unavoidable.' },
+    'The Insight': { about: 'The “aha” moment: a new way of seeing the situation or a key realization that unlocks the path forward.', performWell: 'phrase the insight as a single memorable line.' },
+    'The Solution': { about: 'The character takes action on the insight and things turn around. Show the solution working.', performWell: 'tie the solution directly to the insight in one clear beat.' },
+    'The New Life': { about: 'Describe the new normal after the change. The audience should see the reward of the journey.', performWell: 'contrast one “before” and “after” detail.' },
+    'The Lesson': { about: 'Spell out the takeaway for the audience. Make it explicit so they can apply it to their own situation.', performWell: 'end with one actionable lesson they can use today.' }
+  },
+  bab: {
+    'Before': { about: 'Describe the current state: where they are today, what’s not working, or what they’re missing. Be specific and relatable.', performWell: 'use one concrete before-state that your audience will recognise.' },
+    'After': { about: 'Paint the desired future: the outcome, the feeling, or the results they want. Make it vivid and achievable.', performWell: 'describe the after in one sentence that feels worth the effort.' },
+    'Bridge': { about: 'Show how to get from before to after. Your solution, steps, or method is the bridge—keep it clear and actionable.', performWell: 'name the one main step or change that makes the bridge work.' }
+  },
+  hookStoryAsk: {
+    'The Hook': { about: 'Grab attention in the first few seconds with a question, stat, or statement that demands a reaction.', performWell: 'open with one line that makes them lean in.' },
+    'The Story': { about: 'Tell a short, relevant story that illustrates the point and builds emotional connection. Keep it focused.', performWell: 'include one moment of tension or surprise in the story.' },
+    'The Ask': { about: 'Make your call to action explicit. What should they do, think, or feel when they leave?', performWell: 'give one clear, specific ask with a deadline or next step.' }
+  },
+  whatSoWhatNowWhat: {
+    'What': { about: 'Explain what it is: the topic, product, or situation. Stick to facts and clarity so everyone is on the same page.', performWell: 'define “what” in one sentence anyone can repeat.' },
+    'So What': { about: 'Explain why it matters: implications, stakes, or relevance to the audience. Connect the “what” to their world.', performWell: 'give one reason they should care, stated plainly.' },
+    'Now What': { about: 'Spell out what happens next: actions, decisions, or next steps. Be concrete so they know what to do.', performWell: 'list one to three clear next steps, with one primary action.' }
+  },
+  featuresBenefitsProof: {
+    'Features': { about: 'Present the main features or capabilities. Keep it factual and easy to scan.', performWell: 'lead with the one feature that differentiates you most.' },
+    'Benefits': { about: 'Translate features into outcomes: what the audience gains, feels, or achieves. Benefits answer “so what?”', performWell: 'tie each benefit to one concrete outcome they care about.' },
+    'Proof': { about: 'Back it up with evidence: data, testimonials, case studies, or demos. Proof turns belief into confidence.', performWell: 'use one strong proof point (number, quote, or example) per claim.' }
+  },
+  problemSolutionBenefits: {
+    'Problem': { about: 'Define the problem clearly and relatably. Make sure the audience sees themselves in it.', performWell: 'use one example or stat that makes the problem undeniable.' },
+    'Solution': { about: 'Present your solution as the direct answer to that problem. Keep the link between problem and solution obvious.', performWell: 'state how your solution fixes the problem in one sentence.' },
+    'Benefits': { about: 'Highlight the key benefits: what they gain, save, or avoid. Make the value tangible.', performWell: 'focus on the top one to three benefits that matter most to this audience.' }
+  },
+  heroJourney: {
+    'Ordinary World': { about: 'Show the hero (or audience) in their everyday context. Establish what “normal” looks like before the journey.', performWell: 'include one detail that makes the ordinary world feel familiar.' },
+    'Call to Adventure': { about: 'Introduce the challenge, opportunity, or inciting incident that disrupts the status quo.', performWell: 'make the call to adventure one clear moment or decision.' },
+    'Refusal of the Call': { about: 'Show hesitation or resistance. This makes the journey feel real and raises stakes.', performWell: 'name one specific fear or reason for refusal.' },
+    'Crossing the Threshold': { about: 'The commitment point: the hero steps into the new world and the journey truly begins.', performWell: 'show one concrete step that marks the crossing.' },
+    'Tests and Allies': { about: 'Obstacles and helpers along the way. Show progress, setbacks, and who (or what) helps.', performWell: 'highlight one test and one ally that matter most.' },
+    'Approach to the Inmost Cave': { about: 'Build toward the central challenge. Tension and preparation for the biggest obstacle.', performWell: 'create one moment of anticipation before the ordeal.' },
+    'Ordeal': { about: 'The major crisis or confrontation. The hero faces the core challenge and is tested to the limit.', performWell: 'make the ordeal one decisive moment or choice.' },
+    'Reward': { about: 'What the hero gains from surviving the ordeal: insight, tool, relationship, or clarity.', performWell: 'state the reward in one clear, tangible form.' },
+    'Return': { about: 'Bring the hero back to the ordinary world, changed. Show the return and reintegration.', performWell: 'show one way the ordinary world is different because of the journey.' }
+  },
+  learnPracticeApply: {
+    'Module Overview': { about: 'Set expectations: what they’ll learn, why it matters, and how the module is structured.', performWell: 'give one sentence that states the module’s main outcome.' },
+    'Learn': { about: 'Teach the core concepts and theory. Build understanding before practice.', performWell: 'anchor the section with one key concept or principle.' },
+    'Practice': { about: 'Guided exercises or activities so they can try the skill in a safe context.', performWell: 'include one practice task they can do in under five minutes.' },
+    'Apply': { about: 'Connect to real use: how they’ll use this in the real world or in a project.', performWell: 'give one concrete “apply this by…” instruction.' }
+  },
+  foundationBuildingMastery: {
+    'Module Introduction': { about: 'Introduce the module’s goal and how Foundation → Building → Mastery will take them there.', performWell: 'state the end-state skill or outcome in one sentence.' },
+    'Foundation': { about: 'Cover the essentials: the basics everyone needs before going deeper.', performWell: 'emphasise the one foundational idea they must not skip.' },
+    'Building': { about: 'Add intermediate skills and connections between concepts. They’re building on the foundation.', performWell: 'show one clear link between foundation and this level.' },
+    'Mastery': { about: 'Advanced techniques and confidence. They can perform at a high level and adapt.', performWell: 'define one “mastery” behaviour or outcome they can aim for.' }
+  },
+  problemSolutionImplementation: {
+    'Module Overview': { about: 'Frame the module around the problem you’ll solve and what they’ll be able to do by the end.', performWell: 'state the problem and the end-state in one sentence each.' },
+    'The Problem': { about: 'Spell out the specific challenge: what’s broken, missing, or difficult today.', performWell: 'use one example that makes the problem concrete.' },
+    'The Solution': { about: 'Present the approach, method, or solution that addresses the problem.', performWell: 'summarise the solution in one clear sentence.' },
+    'Implementation': { about: 'Step-by-step how to put the solution into practice. Make it doable and clear.', performWell: 'give one first step they can do immediately after the module.' }
+  }
+}
+
 function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
@@ -16,6 +95,13 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     // Load from localStorage on mount
     const saved = localStorage.getItem('pitchDeckSelectedTemplate')
     return saved ? JSON.parse(saved) : null
+  })
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckSelectedTemplateKey')
+    return saved || null
+  })
+  const [showSlideTips, setShowSlideTips] = useState(() => {
+    return localStorage.getItem('pitchDeckShowSlideTips') === 'true'
   })
   const [isRecording, setIsRecording] = useState(false)
   const [availableMicrophones, setAvailableMicrophones] = useState([])
@@ -45,6 +131,14 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   useEffect(() => {
     localStorage.setItem('pitchDeckSlideCount', slideCount)
   }, [slideCount])
+
+  useEffect(() => {
+    if (selectedTemplateKey) localStorage.setItem('pitchDeckSelectedTemplateKey', selectedTemplateKey)
+  }, [selectedTemplateKey])
+
+  useEffect(() => {
+    localStorage.setItem('pitchDeckShowSlideTips', String(showSlideTips))
+  }, [showSlideTips])
 
   // Load available microphones on mount
   useEffect(() => {
@@ -715,10 +809,10 @@ Example format:
             {showTemplates && (
               <div className="plan-templates-content">
                 <TemplateSelector 
-                  onLoadTemplate={(templateSlides) => {
-                    // Track which template was loaded by checking section names
+                  onLoadTemplate={(templateSlides, templateKey) => {
                     const sections = templateSlides.filter(s => s.layout === 'section')
                     setSelectedTemplate(sections.map(s => s.content))
+                    if (templateKey) setSelectedTemplateKey(templateKey)
                     onLoadTemplate(templateSlides)
                   }} 
                 />
@@ -838,7 +932,17 @@ Example format:
             )}
           </div>
         )}
-        <div className="plan-scenes-list">
+        <div className={`plan-scenes-list ${showSlideTips ? 'with-tips' : ''}`}>
+          <div className="plan-slide-tips-row">
+            <label className="plan-slide-tips-toggle">
+              <input
+                type="checkbox"
+                checked={showSlideTips}
+                onChange={(e) => setShowSlideTips(e.target.checked)}
+              />
+              <span>Slide tips</span>
+            </label>
+          </div>
         {slides.map((slide, index) => {
           // Remove HTML tags for display
           const tempDiv = document.createElement('div')
@@ -850,6 +954,10 @@ Example format:
           
           const isDragging = draggedId === slide.id
           const isDragOver = dragOverId === slide.id
+          
+          const sectionTip = isSection && selectedTemplateKey && SECTION_TIPS[selectedTemplateKey]
+            ? SECTION_TIPS[selectedTemplateKey][(slide.content || '').trim()]
+            : null
           
           return (
             <div 
@@ -891,6 +999,12 @@ Example format:
                     </span>
                   )) || 'Click to edit...'}
                 </span>
+              )}
+              {showSlideTips && sectionTip && (
+                <div className="scene-tips">
+                  <p className="scene-tips-about">{sectionTip.about}</p>
+                  <p className="scene-tips-perform">This will perform extra well if you {sectionTip.performWell}</p>
+                </div>
               )}
             </div>
           )

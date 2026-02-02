@@ -60,7 +60,7 @@ const LAYOUTS = [
   },
   {
     id: 'video',
-    name: 'Video Only',
+    name: 'Video Fullscreen',
     description: 'Full screen video/webcam',
     thumbnail: (
       <div className="layout-thumbnail-content">
@@ -75,7 +75,17 @@ const LAYOUTS = [
   }
 ]
 
-function LayoutSelector({ onSelectLayout, selectedLayout = 'default' }) {
+const CAMERA_OVERRIDE_POSITIONS = [
+  { id: 'fullscreen', title: 'Full screen', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" /><circle cx="12" cy="12" r="4" /></svg> },
+  { id: 'left-third', title: 'Left 1/3', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="8" height="22" rx="1" /><rect x="10" y="1" width="13" height="22" rx="1" opacity="0.3" /><circle cx="4" cy="12" r="3" /></svg> },
+  { id: 'right-third', title: 'Right 1/3', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="13" height="22" rx="1" opacity="0.3" /><rect x="15" y="1" width="8" height="22" rx="1" /><circle cx="20" cy="12" r="3" /></svg> },
+  { id: 'circle-bottom-left', title: 'Circle bottom left', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="6" cy="18" r="4" /></svg> },
+  { id: 'circle-bottom-right', title: 'Circle bottom right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="18" r="4" /></svg> },
+  { id: 'circle-top-left', title: 'Circle top left', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="6" cy="6" r="4" /></svg> },
+  { id: 'circle-top-right', title: 'Circle top right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="6" r="4" /></svg> }
+]
+
+function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect }) {
   return (
     <div className="layout-selector">
       <div className="layout-selector-header">
@@ -95,6 +105,31 @@ function LayoutSelector({ onSelectLayout, selectedLayout = 'default' }) {
             <div className="layout-thumbnail-name">{layout.name}</div>
           </div>
         ))}
+      </div>
+      <div className="camera-override-row">
+        <label className="camera-override-toggle">
+          <input
+            type="checkbox"
+            checked={!!cameraOverrideEnabled}
+            onChange={(e) => onCameraOverrideChange?.(e.target.checked)}
+          />
+          <span className="camera-override-label">Camera Override</span>
+        </label>
+        {cameraOverrideEnabled && (
+          <div className="camera-override-icons">
+            {CAMERA_OVERRIDE_POSITIONS.map((pos) => (
+              <button
+                key={pos.id}
+                type="button"
+                className={`camera-override-icon ${cameraOverridePosition === pos.id ? 'selected' : ''}`}
+                onClick={() => onCameraOverridePositionSelect?.(pos.id)}
+                title={pos.title}
+              >
+                {pos.icon}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

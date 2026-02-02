@@ -186,6 +186,37 @@
   justify-content: center;
 }
 
+.header-format-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.header-format-label {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.header-format-select {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 72px;
+}
+
+.header-format-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .header-chapters {
   display: flex;
   align-items: center;
@@ -430,6 +461,25 @@
   border: none;
   box-shadow: var(--shadow-sm);
   font-weight: 600;
+}
+
+/* Present button when recording is enabled: red with record icon */
+.header-mode-btn.present-with-recording {
+  background: var(--accent-secondary, #ff4757);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(255, 71, 87, 0.35);
+}
+
+.header-mode-btn.present-with-recording:hover {
+  background: #ff5c6c;
+  box-shadow: 0 2px 6px rgba(255, 71, 87, 0.45);
+}
+
+.header-mode-btn.present-with-recording.active {
+  background: var(--accent-secondary, #ff4757);
+  box-shadow: 0 2px 6px rgba(255, 71, 87, 0.45);
 }
 
 .header-mode-btn svg {
@@ -767,6 +817,17 @@
   background: var(--bg-primary);
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.app-content.edit-recording-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content.edit-recording-content > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Recent files dropdown */

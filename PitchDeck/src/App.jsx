@@ -5,12 +5,14 @@ import PlayMode from './components/PlayMode'
 import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
 import RecordingOptions from './components/RecordingOptions'
+import CaptionsOptions from './components/CaptionsOptions'
 import ColorOptions from './components/ColorOptions'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import TextEffectsOptions from './components/TextEffectsOptions'
 import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
+import EditRecordingMode from './components/EditRecordingMode'
 import './App.css'
 
 function App() {
@@ -87,11 +89,15 @@ function App() {
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record'
+  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'edit-recording'
+  const lastRecordingBlobRef = useRef(null)
+  const pendingScreenStreamRef = useRef(null) // stream from share popup; passed to PlayMode so it enters present + fullscreen + record
+  const [editingVideoBlob, setEditingVideoBlob] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
   const [showRecordingOptions, setShowRecordingOptions] = useState(false)
+  const [showCaptionsOptions, setShowCaptionsOptions] = useState(false)
   const [showColorOptions, setShowColorOptions] = useState(false)
   const [showTypographyOptions, setShowTypographyOptions] = useState(false)
   const [showTextEffectsOptions, setShowTextEffectsOptions] = useState(false)
@@ -182,7 +188,12 @@ function App() {
         const parsed = JSON.parse(saved)
         return {
           ...parsed,
-          webcamSize: parsed.webcamSize || 'large'
+          webcamSize: parsed.webcamSize || 'large',
+          captionsEnabled: parsed.captionsEnabled === true,
+          captionStyle: parsed.captionStyle || 'bottom-black',
+          captionFont: parsed.captionFont || 'Poppins',
+          captionFontSize: parsed.captionFontSize || 'medium',
+          captionDropShadow: parsed.captionDropShadow === true
         }
       } catch (e) {
         console.error('Error parsing record settings:', e)
@@ -194,10 +205,22 @@ function App() {
       webcamSize: 'large',
       selectedCameraId: '',
       microphoneEnabled: false,
-      selectedMicrophoneId: ''
+      selectedMicrophoneId: '',
+      captionsEnabled: false,
+      captionStyle: 'bottom-black',
+      captionFont: 'Poppins',
+      captionFontSize: 'medium',
+      captionDropShadow: false,
+      videoBrightness: 1,
+      videoContrast: 1,
+      videoSaturation: 1,
+      videoHue: 0,
+      cameraOverrideEnabled: false,
+      cameraOverridePosition: 'fullscreen'
     }
   })
   const recordButtonRef = useRef(null)
+  const captionsButtonRef = useRef(null)
   const colorButtonRef = useRef(null)
   const typographyButtonRef = useRef(null)
   const transitionButtonRef = useRef(null)
@@ -407,6 +430,7 @@ function App() {
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
+    if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
   }, [settings])
 
   // Save workspace data when it changes
@@ -735,7 +759,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
+  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showCaptionsOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
     // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
@@ -1285,13 +1309,34 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
 
   const selectedSlide = slides.find(s => s.id === selectedSlideId)
 
+  // Present: with recording, show share popup first (from edit), then switch to present + fullscreen + record
+  const handlePresentClick = async () => {
+    if (recordSettings.recordInPresentMode) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { mediaSource: 'screen', displaySurface: 'monitor' },
+          audio: false
+        })
+        pendingScreenStreamRef.current = stream
+        setMode('present')
+      } catch (e) {
+        if (e?.name !== 'NotAllowedError') console.warn('Screen share cancelled or failed:', e)
+      }
+    } else {
+      setMode('present')
+    }
+  }
+
   // Present mode (fullscreen)
   if (mode === 'present' || mode === 'record') {
     return (
       <>
         <PlayMode 
           slides={slides} 
-          onExit={() => setMode('edit')} 
+          onExit={() => {
+            pendingScreenStreamRef.current = null
+            setMode('edit')
+          }} 
           backgroundColor={settings.backgroundColor} 
           textColor={settings.textColor} 
           fontFamily={settings.fontFamily}
@@ -1327,6 +1372,12 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           isRecording={mode === 'record' || (mode === 'present' && recordSettings.recordInPresentMode)}
           textStyleMode={settings.textStyleMode || 'fontPairing'}
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
+          openaiKey={settings.openaiKey || ''}
+          slideFormat={settings.slideFormat || '16:9'}
+          onRecordingDone={(blob) => {
+            lastRecordingBlobRef.current = blob
+          }}
+          initialScreenStreamRef={pendingScreenStreamRef}
         />
       </>
     )
@@ -1550,15 +1601,47 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Edit</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={() => setMode('present')}
-                  title="Present"
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''} ${recordSettings.recordInPresentMode ? 'present-with-recording' : ''}`}
+                  onClick={handlePresentClick}
+                  title={recordSettings.recordInPresentMode ? 'Present (recording enabled)' : 'Present'}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
+                  {recordSettings.recordInPresentMode ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="3" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  )}
                   <span>Present</span>
                 </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
+                  onClick={() => setMode('edit-recording')}
+                  title="Edit recording"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  </svg>
+                  <span>Edit recording</span>
+                </button>
+              </div>
+              <div className="header-format-select-wrap">
+                <label htmlFor="header-slide-format" className="header-format-label">Format</label>
+                <select
+                  id="header-slide-format"
+                  className="header-format-select"
+                  value={settings.slideFormat || '16:9'}
+                  onChange={(e) => setSettings(prev => ({ ...prev, slideFormat: e.target.value }))}
+                  title="Slide aspect ratio"
+                >
+                  <option value="16:9">16:9</option>
+                  <option value="1:1">1:1</option>
+                  <option value="9:16">9:16</option>
+                </select>
               </div>
             </div>
             <div className="header-right">
@@ -1572,6 +1655,17 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                </button>
+                <button
+                  ref={captionsButtonRef}
+                  className={`btn-icon-header btn-captions ${showCaptionsOptions ? 'active' : ''}`}
+                  onClick={() => { setShowCaptionsOptions(true); setShowRecordingOptions(false) }}
+                  title="Captions"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 12h10M7 16h6M7 8h10" />
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
                   </svg>
                 </button>
               </div>
@@ -1726,6 +1820,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           }}
           onClose={() => setShowRecordingOptions(false)}
           buttonRef={recordButtonRef}
+        />
+      )}
+      {showCaptionsOptions && (
+        <CaptionsOptions
+          recordSettings={recordSettings}
+          onUpdateSettings={(updated) => setRecordSettings(updated)}
+          onClose={() => setShowCaptionsOptions(false)}
+          buttonRef={captionsButtonRef}
         />
       )}
       {showColorOptions && (
@@ -1895,15 +1997,47 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Edit</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={() => setMode('present')}
-                  title="Present"
+                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''} ${recordSettings.recordInPresentMode ? 'present-with-recording' : ''}`}
+                  onClick={handlePresentClick}
+                  title={recordSettings.recordInPresentMode ? 'Present (recording enabled)' : 'Present'}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
+                  {recordSettings.recordInPresentMode ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="3" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  )}
                   <span>Present</span>
                 </button>
+                <button
+                  className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
+                  onClick={() => setMode('edit-recording')}
+                  title="Edit recording"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  </svg>
+                  <span>Edit recording</span>
+                </button>
+              </div>
+              <div className="header-format-select-wrap">
+                <label htmlFor="header-slide-format" className="header-format-label">Format</label>
+                <select
+                  id="header-slide-format"
+                  className="header-format-select"
+                  value={settings.slideFormat || '16:9'}
+                  onChange={(e) => setSettings(prev => ({ ...prev, slideFormat: e.target.value }))}
+                  title="Slide aspect ratio"
+                >
+                  <option value="16:9">16:9</option>
+                  <option value="1:1">1:1</option>
+                  <option value="9:16">9:16</option>
+                </select>
               </div>
             </div>
             <div className="header-right">
@@ -1917,6 +2051,17 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                </button>
+                <button
+                  ref={captionsButtonRef}
+                  className={`btn-icon-header btn-captions ${showCaptionsOptions ? 'active' : ''}`}
+                  onClick={() => { setShowCaptionsOptions(true); setShowRecordingOptions(false) }}
+                  title="Captions"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 12h10M7 16h6M7 8h10" />
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
                   </svg>
                 </button>
               </div>
@@ -2053,34 +2198,43 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
           </div>
       </div>
-      <div className={`app-content ${isResizing ? 'resizing' : ''}`}>
-        <div 
-          ref={sidebarRef}
-          className="sidebar-container"
-          style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
-        >
-          <SlideList
-            slides={slides}
-            selectedSlideId={selectedSlideId}
-            selectedSlides={selectedSlides}
-            setSelectedSlides={setSelectedSlides}
-            onSelect={setSelectedSlideId}
-            onAdd={addSlide}
-            onDelete={deleteSlide}
-            onDuplicate={duplicateSlide}
-            onUpdate={updateSlide}
-            onReorder={updateSlides}
+      <div className={`app-content ${isResizing ? 'resizing' : ''} ${mode === 'edit-recording' ? 'edit-recording-content' : ''}`}>
+        {mode === 'edit-recording' ? (
+          <EditRecordingMode
+            videoBlob={lastRecordingBlobRef.current}
+            latestRecordingRef={lastRecordingBlobRef}
+            onExit={() => setMode('edit')}
           />
-        </div>
-        <div 
-          className="resize-handle"
-          onMouseDown={handleResizeStart}
-          style={{ cursor: 'col-resize' }}
-        />
-        <SlidePreview
+        ) : (
+          <>
+            <div 
+              ref={sidebarRef}
+              className="sidebar-container"
+              style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+            >
+              <SlideList
+                slides={slides}
+                selectedSlideId={selectedSlideId}
+                selectedSlides={selectedSlides}
+                setSelectedSlides={setSelectedSlides}
+                onSelect={setSelectedSlideId}
+                onAdd={addSlide}
+                onDelete={deleteSlide}
+                onDuplicate={duplicateSlide}
+                onUpdate={updateSlide}
+                onReorder={updateSlides}
+              />
+            </div>
+            <div 
+              className="resize-handle"
+              onMouseDown={handleResizeStart}
+              style={{ cursor: 'col-resize' }}
+            />
+            <SlidePreview
           slide={selectedSlide}
           onUpdate={(updates) => updateSlide(selectedSlideId, updates)}
           settings={settings}
+          slideFormat={settings.slideFormat || '16:9'}
           onUpdateSettings={setSettings}
           analysisFolded={analysisFolded}
           onToggleAnalysisFold={() => setAnalysisFolded(!analysisFolded)}
@@ -2109,6 +2263,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletGap={settings.bulletGap ?? 0.5}
           recordSettings={recordSettings}
         />
+            </>
+        )}
       </div>
       {showSettings && (
         <Settings
@@ -2125,6 +2281,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           }}
           onClose={() => setShowRecordingOptions(false)}
           buttonRef={recordButtonRef}
+        />
+      )}
+      {showCaptionsOptions && (
+        <CaptionsOptions
+          recordSettings={recordSettings}
+          onUpdateSettings={(updated) => setRecordSettings(updated)}
+          onClose={() => setShowCaptionsOptions(false)}
+          buttonRef={captionsButtonRef}
         />
       )}
       {showColorOptions && (
