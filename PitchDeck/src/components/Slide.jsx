@@ -51,7 +51,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode }) {
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, onUpdate, webcamEnabled = false, selectedCameraId = '', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -100,6 +100,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => line.replace(/^[-•*]\s*/, '')) // Remove bullet markers if present
+      .filter(line => {
+        // Strip HTML tags to get plain text; drop bullets that have no visible text
+        const plain = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim()
+        return plain.length > 0
+      })
     // Keep only first occurrence of each line so duplicated text from layout/slide switching never appears
     const seen = new Set()
     return raw.filter(line => {
@@ -116,6 +121,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     // First, convert literal <BR> or <br> text (case insensitive) to actual <br> tags
     // This handles cases where users type <BR> or <br> as text
     content = content.replace(/<BR\s*\/?>/gi, '<br>')
+    
+    // Normalize contentEditable line breaks: Chrome etc. use <div> for Enter, use <br> so editor and present mode match
+    content = content.replace(/<div[^>]*>\s*/gi, '<br>').replace(/<\/div>\s*/gi, '')
     
     // Check if content contains HTML tags (including mark tags)
     const hasHtmlTags = content.includes('<') && content.includes('>')
@@ -195,6 +203,69 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       .replace(/\s+/g, ' ')
       .trim()
     return text ? text.split(' ').filter(Boolean) : []
+  }
+
+  // Get words with serif flag and line-break markers so words-fade-up preserves line breaks in present mode
+  const getWordsWithFormatting = (html) => {
+    if (!html || typeof html !== 'string') return []
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const result = []
+      const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
+          if (!text) return
+          const serif = !!(node.parentElement?.closest?.('.font-pairing-serif'))
+          text.split(' ').filter(Boolean).forEach((word) => result.push({ word, serif }))
+          return
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName ? node.tagName.toLowerCase() : ''
+          if (tag === 'br' || tag === 'div') {
+            result.push({ lineBreak: true })
+            if (tag === 'div') node.childNodes.forEach(walk)
+            return
+          }
+          node.childNodes.forEach(walk)
+        }
+      }
+      walk(doc.body)
+      return result
+    } catch (e) {
+      return getWordsFromContent(html).map((word) => ({ word, serif: false }))
+    }
+  }
+
+  // Get sentences (with serif flag and line breaks) for sentence-level animation
+  const getSentencesWithFormatting = (html) => {
+    const words = getWordsWithFormatting(html)
+    const result = []
+    let sentence = []
+    for (const item of words) {
+      if (item.lineBreak) {
+        if (sentence.length) {
+          result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+          sentence = []
+        }
+        result.push({ lineBreak: true })
+        continue
+      }
+      sentence.push(item)
+      if (/[.!?]$/.test(item.word)) {
+        result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+        sentence = []
+      }
+    }
+    if (sentence.length) {
+      result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+    }
+    return result
+  }
+
+  // Chunks = words or sentences depending on textAnimationUnit (for staggered text animations)
+  const getChunksWithFormatting = (html, unit) => {
+    if (unit === 'sentence') return getSentencesWithFormatting(html)
+    return getWordsWithFormatting(html)
   }
 
   const handleContentChange = (e) => {
@@ -490,6 +561,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     let node = range.startContainer
     if (node.nodeType === Node.TEXT_NODE) node = node.parentElement
     while (node && container.contains(node)) {
+      if (node === container) return null // never treat the contentEditable root as the block
       if (node.nodeType === Node.ELEMENT_NODE && ['H1', 'H2', 'H3', 'P', 'DIV'].includes(node.tagName)) return node
       node = node.parentElement
     }
@@ -504,12 +576,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const range = textFormatRangeRef.current
       if (!range) return
       const block = getBlockElement(range, container)
-      if (!block) return
       const defaultTag = 'p'
-      const newTag = (block.tagName.toLowerCase() === tagName) ? defaultTag : tagName
-      const newEl = document.createElement(newTag)
-      while (block.firstChild) newEl.appendChild(block.firstChild)
-      block.parentNode.replaceChild(newEl, block)
+      if (block) {
+        const newTag = (block.tagName.toLowerCase() === tagName) ? defaultTag : tagName
+        const newEl = document.createElement(newTag)
+        while (block.firstChild) newEl.appendChild(block.firstChild)
+        block.parentNode.replaceChild(newEl, block)
+      } else {
+        // Flat content (no inner P/H1/H2/H3): wrap all container children in the new block
+        const newTag = tagName
+        const newEl = document.createElement(newTag)
+        while (container.firstChild) newEl.appendChild(container.firstChild)
+        container.appendChild(newEl)
+      }
     })
   }, [applyFormat, getBlockElement, textFormatToolbar])
   const applyFontPairing = useCallback(() => {
@@ -629,6 +708,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
       const cleanNode = (node) => {
         if (node.nodeType === Node.TEXT_NODE) return
+        // DocumentFragment: process children only (fragment has no tagName)
+        if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+          Array.from(node.childNodes).forEach(cleanNode)
+          return
+        }
         if (node.nodeType !== Node.ELEMENT_NODE) return
         const tag = node.tagName ? node.tagName.toLowerCase() : ''
         const children = Array.from(node.childNodes)
@@ -799,10 +883,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       pointerEvents: isEditable ? 'auto' : undefined
     }
 
+    const useChunkedText = isPlayMode && textAnimation && textAnimation !== 'none'
+    const chunkDelay = textAnimationUnit === 'word' ? 0.07 : 0.2
+
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
-      const useWordsFadeUp = isPlayMode && textAnimation === 'words-fade-up'
-      const bulletWordOffsets = useWordsFadeUp ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getWordsFromContent(b).length); return acc }, [0]) : []
+      const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, textAnimationUnit).length); return acc }, [0]) : []
       const getBulletStyle = (index) => {
         const base = { pointerEvents: isEditable ? 'auto' : undefined, lineHeight: bulletLineHeight }
         if (!isPlayMode || !textAnimation || textAnimation === 'none') return base
@@ -812,20 +898,24 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         return { ...base, animationDelay: `${index * 0.2}s` }
       }
       return (
-        <div key={`${slide.id}-bulletpoints`} className="slide-bullets" style={{ ...textStyle, pointerEvents: isEditable ? 'auto' : undefined }}>
+        <div key={`${slide.id}-bulletpoints`} className="slide-bullets" style={{ ...textStyle, '--slide-bullet-gap': `${bulletGap}rem`, pointerEvents: isEditable ? 'auto' : undefined }}>
           {bullets.map((bullet, index) => (
             <div
               key={index}
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
               style={{ lineHeight: bulletLineHeight }}
             >
-              {useWordsFadeUp ? (
-                <span className="bullet-text" style={{ lineHeight: bulletLineHeight }}>
-                  {getWordsFromContent(bullet).map((word, wi) => (
-                    <span key={wi} className="text-animation-word" style={{ animationDelay: `${(bulletWordOffsets[index] + wi) * 0.07}s` }}>
-                      {word}{' '}
-                    </span>
-                  ))}
+              {useChunkedText ? (
+                <span className="bullet-text slide-text-words" style={{ lineHeight: bulletLineHeight }}>
+                  {getChunksWithFormatting(bullet, textAnimationUnit).map((item, wi) =>
+                    item.lineBreak ? (
+                      <br key={wi} />
+                    ) : (
+                      <span key={wi} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${(bulletChunkOffsets[index] + wi) * chunkDelay}s` }}>
+                        {item.word != null ? item.word + ' ' : item.text}
+                      </span>
+                    )
+                  )}
                 </span>
               ) : (
                 <span 
@@ -834,6 +924,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                   contentEditable={isEditable}
                   suppressContentEditableWarning={true}
                   onBlur={(e) => handleBulletChange(index, e)}
+                  onInput={(e) => { if (isEditable && onUpdate) handleBulletChange(index, e) }}
                   onContextMenu={(e) => handleFontPairingContextMenu(e, 'bullet', index)}
                   onClick={(e) => {
                     if (isEditable) {
@@ -846,7 +937,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                       e.target.blur()
                     }
                   }}
-                  dangerouslySetInnerHTML={{ __html: bullet }}
+                  dangerouslySetInnerHTML={{ __html: formatContentForDisplay(bullet) }}
                 />
               )}
             </div>
@@ -897,23 +988,26 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     if (layout === 'centered') {
       const subtitleHasContent = hasSubtitleContent()
-      const useWordsFadeUp = isPlayMode && textAnimation === 'words-fade-up'
-      const words = useWordsFadeUp ? getWordsFromContent(slide.content || '') : []
+      const centeredChunks = useChunkedText ? getChunksWithFormatting(slide.content || '', textAnimationUnit) : []
 
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
           {isPlayMode ? (
-            useWordsFadeUp ? (
+            useChunkedText ? (
               <div
                 ref={contentRef}
                 className={`slide-text slide-text-words centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
                 style={textStyle}
               >
-                {words.map((word, i) => (
-                  <span key={i} className="text-animation-word" style={{ animationDelay: `${i * 0.07}s` }}>
-                    {word}{' '}
-                  </span>
-                ))}
+                {centeredChunks.map((item, i) =>
+                  item.lineBreak ? (
+                    <br key={i} />
+                  ) : (
+                    <span key={i} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${i * chunkDelay}s` }}>
+                      {item.word != null ? item.word + ' ' : item.text}
+                    </span>
+                  )
+                )}
               </div>
             ) : (
               <div 
@@ -1012,25 +1106,29 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       )
     }
 
-    // For play mode, render as div with formatted content (or word spans for words-fade-up)
+    // For play mode, render as div with formatted content (or chunk spans when text animation is on)
     if (isPlayMode) {
-      if (textAnimation === 'words-fade-up') {
-        const words = getWordsFromContent(slide.content || '')
+      if (useChunkedText) {
+        const chunks = getChunksWithFormatting(slide.content || '', textAnimationUnit)
         return (
           <div
             className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
             style={textStyle}
           >
-            {words.map((word, i) => (
-              <span key={i} className="text-animation-word" style={{ animationDelay: `${i * 0.07}s` }}>
-                {word}{' '}
-              </span>
-            ))}
+            {chunks.map((item, i) =>
+              item.lineBreak ? (
+                <br key={i} />
+              ) : (
+                <span key={i} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${i * chunkDelay}s` }}>
+                  {item.word != null ? item.word + ' ' : item.text}
+                </span>
+              )
+            )}
           </div>
         )
       }
       return (
-        <div 
+        <div
           className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
           style={textStyle}
           dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
@@ -1198,11 +1296,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
 
+  const slideBgColor = (layout === 'video' && isPlayMode) ? 'transparent' : backgroundColor
   return (
     <div 
       className={`slide ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass}`}
       ref={slideRef} 
-      style={{ backgroundColor: backgroundColor, '--slide-base-font-size': `${defaultTextSize}rem` }}
+      style={{ backgroundColor: slideBgColor, '--slide-base-font-size': `${defaultTextSize}rem`, '--slide-pairing-font': `"${fontPairingSerifFont}", serif` }}
       onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
     >
       <style>{`
@@ -1242,11 +1341,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h3Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
         }
-        .slide-content .font-pairing-serif,
-        .slide-subtitle .font-pairing-serif,
-        .bullet-text .font-pairing-serif,
-        .slide-section-name .font-pairing-serif {
-          font-family: "${fontPairingSerifFont}", serif !important;
+        .slide .slide-content .font-pairing-serif,
+        .slide .slide-subtitle .font-pairing-serif,
+        .slide .bullet-text .font-pairing-serif,
+        .slide .slide-section-name .font-pairing-serif {
+          font-family: var(--slide-pairing-font, "${fontPairingSerifFont}", serif) !important;
           display: inline;
         }
       `}</style>
@@ -1264,7 +1363,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             ...(isPlayMode && backgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
               '--initial-scale': `${imageScale * 100}%`,
-              '--final-scale': `${(imageScale * 100) + 20}%` // Always scale up by 20% from current scale
+              '--final-scale': `${(imageScale * 100) + (backgroundScaleAmount || 20)}%`
             } : {})
           }}
         />
@@ -1295,7 +1394,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               color: textColor,
               fontFamily: `"${fontFamily}", sans-serif`,
               zIndex: 1001, // Higher than webcam overlay (1000) to appear on top
-              position: 'relative'
+              ...(isPlayMode ? {
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none'
+              } : { position: 'relative' })
             }}
           >
             {renderContent()}
@@ -1306,7 +1412,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''}`}
           style={{ 
             color: textColor,
-            fontFamily: `"${fontFamily}", sans-serif`
+            fontFamily: `"${fontFamily}", sans-serif`,
+            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined
           }}
         >
           {renderContent()}

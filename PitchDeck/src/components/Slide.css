@@ -155,8 +155,9 @@
   background: transparent;
 }
 
-/* Font Pairing Styles */
+/* Font Pairing Styles - use variable from slide root so serif font applies in edit and present mode */
 .font-pairing-serif {
+  font-family: var(--slide-pairing-font, "Playfair Display", serif) !important;
   font-style: italic;
   display: inline;
 }
@@ -292,7 +293,7 @@
 .slide-bullets {
   display: flex;
   flex-direction: column;
-  gap: 0.5em;
+  gap: var(--slide-bullet-gap, 0.5em);
   width: 100%;
   max-width: 66.67%;
   list-style: none;
@@ -400,6 +401,18 @@
   /* Color, fontFamily, and textShadow are set via inline style */
   background: transparent;
   overflow: visible;
+  pointer-events: auto;
+}
+
+/* Ensure editable bullet text is focusable and shows outline in edit mode */
+.slide-bullet .bullet-text[contenteditable="true"] {
+  cursor: text;
+  outline: none;
+}
+
+.slide-bullet .bullet-text[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
 }
 
 .slide-bullet-text {
@@ -514,6 +527,14 @@
   animation-fill-mode: both;
 }
 
+/* Chunked text (word/sentence): shared duration/timing for all animation types */
+.slide[class*="text-animation-"] .slide-text .text-animation-word,
+.slide[class*="text-animation-"] .slide-bullet .bullet-text .text-animation-word {
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
 /* Words-fade-up: animate each word (staggered) */
 .slide.text-animation-words-fade-up .slide-text-words .text-animation-word,
 .slide.text-animation-words-fade-up .slide-bullet .bullet-text .text-animation-word {
@@ -532,10 +553,16 @@
 
 /* 1. Fade in */
 .slide.text-animation-fade-in .slide-content,
-.slide.text-animation-fade-in .slide-text,
+.slide.text-animation-fade-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in .slide-subtitle,
 .slide.text-animation-fade-in .slide-section-name,
-.slide.text-animation-fade-in .slide-bullet .bullet-text {
+.slide.text-animation-fade-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  animation-name: text-fade-in;
+}
+.slide.text-animation-fade-in .slide-text .text-animation-word,
+.slide.text-animation-fade-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   animation-name: text-fade-in;
 }
@@ -546,10 +573,17 @@
 
 /* 2. Fade in + slide up */
 .slide.text-animation-fade-in-up .slide-content,
-.slide.text-animation-fade-in-up .slide-text,
+.slide.text-animation-fade-in-up .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in-up .slide-subtitle,
 .slide.text-animation-fade-in-up .slide-section-name,
-.slide.text-animation-fade-in-up .slide-bullet .bullet-text {
+.slide.text-animation-fade-in-up .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(32px);
+  animation-name: text-fade-in-up;
+}
+.slide.text-animation-fade-in-up .slide-text .text-animation-word,
+.slide.text-animation-fade-in-up .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   transform: translateY(32px);
   animation-name: text-fade-in-up;
@@ -564,10 +598,17 @@
 
 /* 3. Fade in + slide down */
 .slide.text-animation-fade-in-down .slide-content,
-.slide.text-animation-fade-in-down .slide-text,
+.slide.text-animation-fade-in-down .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in-down .slide-subtitle,
 .slide.text-animation-fade-in-down .slide-section-name,
-.slide.text-animation-fade-in-down .slide-bullet .bullet-text {
+.slide.text-animation-fade-in-down .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(-32px);
+  animation-name: text-fade-in-down;
+}
+.slide.text-animation-fade-in-down .slide-text .text-animation-word,
+.slide.text-animation-fade-in-down .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   transform: translateY(-32px);
   animation-name: text-fade-in-down;
@@ -582,10 +623,17 @@
 
 /* 4. Slide in from right (-x) */
 .slide.text-animation-slide-in-left .slide-content,
-.slide.text-animation-slide-in-left .slide-text,
+.slide.text-animation-slide-in-left .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-slide-in-left .slide-subtitle,
 .slide.text-animation-slide-in-left .slide-section-name,
-.slide.text-animation-slide-in-left .slide-bullet .bullet-text {
+.slide.text-animation-slide-in-left .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateX(48px);
+  animation-name: text-slide-in-left;
+}
+.slide.text-animation-slide-in-left .slide-text .text-animation-word,
+.slide.text-animation-slide-in-left .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   transform: translateX(48px);
   animation-name: text-slide-in-left;
@@ -600,10 +648,17 @@
 
 /* 5. Slide in from left (+x) */
 .slide.text-animation-slide-in-right .slide-content,
-.slide.text-animation-slide-in-right .slide-text,
+.slide.text-animation-slide-in-right .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-slide-in-right .slide-subtitle,
 .slide.text-animation-slide-in-right .slide-section-name,
-.slide.text-animation-slide-in-right .slide-bullet .bullet-text {
+.slide.text-animation-slide-in-right .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateX(-48px);
+  animation-name: text-slide-in-right;
+}
+.slide.text-animation-slide-in-right .slide-text .text-animation-word,
+.slide.text-animation-slide-in-right .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   transform: translateX(-48px);
   animation-name: text-slide-in-right;
@@ -644,10 +699,17 @@
 
 /* 7. Zoom in */
 .slide.text-animation-zoom-in .slide-content,
-.slide.text-animation-zoom-in .slide-text,
+.slide.text-animation-zoom-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-zoom-in .slide-subtitle,
 .slide.text-animation-zoom-in .slide-section-name,
-.slide.text-animation-zoom-in .slide-bullet .bullet-text {
+.slide.text-animation-zoom-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: scale(0.85);
+  animation-name: text-zoom-in;
+}
+.slide.text-animation-zoom-in .slide-text .text-animation-word,
+.slide.text-animation-zoom-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   transform: scale(0.85);
   animation-name: text-zoom-in;
@@ -688,10 +750,17 @@
 
 /* 10. Blur in */
 .slide.text-animation-blur-in .slide-content,
-.slide.text-animation-blur-in .slide-text,
+.slide.text-animation-blur-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-blur-in .slide-subtitle,
 .slide.text-animation-blur-in .slide-section-name,
-.slide.text-animation-blur-in .slide-bullet .bullet-text {
+.slide.text-animation-blur-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  filter: blur(12px);
+  animation-name: text-blur-in;
+}
+.slide.text-animation-blur-in .slide-text .text-animation-word,
+.slide.text-animation-blur-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
   opacity: 0;
   filter: blur(12px);
   animation-name: text-blur-in;

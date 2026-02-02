@@ -3,7 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import './SlidePreview.css'
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, recordSettings, analysisFolded = false, onToggleAnalysisFold }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings, analysisFolded = false, onToggleAnalysisFold }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -323,6 +323,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           lineHeight={lineHeight}
           bulletLineHeight={bulletLineHeight}
           bulletTextSize={bulletTextSize}
+          bulletGap={bulletGap}
           onUpdate={onUpdate}
           textStyleMode={settings.textStyleMode || 'standard'}
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}

@@ -173,7 +173,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   )
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', backgroundScaleAnimation = false, backgroundScaleTime = 10, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }, isRecording = false, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display' }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -620,7 +620,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
       <div 
         key={slideKey}
-        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'}`}
+        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''}`}
       >
         <Slide 
           slide={presentationSlides[currentIndex]} 
@@ -650,9 +650,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           lineHeight={lineHeight}
           bulletLineHeight={bulletLineHeight}
           bulletTextSize={bulletTextSize}
+          bulletGap={bulletGap}
           backgroundScaleAnimation={backgroundScaleAnimation}
           backgroundScaleTime={backgroundScaleTime}
+          backgroundScaleAmount={backgroundScaleAmount}
           textAnimation={textAnimation}
+          textAnimationUnit={textAnimationUnit}
           textStyleMode={textStyleMode || 'standard'}
           fontPairingSerifFont={fontPairingSerifFont || 'Playfair Display'}
         />

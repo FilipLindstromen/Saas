@@ -22,6 +22,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [selectedMicrophone, setSelectedMicrophone] = useState(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [showGenerate, setShowGenerate] = useState(false)
+  const [slideCount, setSlideCount] = useState(() => localStorage.getItem('pitchDeckSlideCount') || '')
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
@@ -39,6 +40,11 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       localStorage.setItem('pitchDeckSelectedTemplate', JSON.stringify(selectedTemplate))
     }
   }, [selectedTemplate])
+
+  // Save slideCount to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('pitchDeckSlideCount', slideCount)
+  }, [slideCount])
 
   // Load available microphones on mount
   useEffect(() => {
@@ -441,7 +447,14 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
           subtitleHeadingLevel: null
         }
         
-        const finalSlides = [...updatedSlides, newSlide]
+        // Insert new slide directly after the one we're editing (not at the end)
+        const currentIndex = updatedSlides.findIndex(s => s.id === editingId)
+        const insertIndex = currentIndex >= 0 ? currentIndex + 1 : updatedSlides.length
+        const finalSlides = [
+          ...updatedSlides.slice(0, insertIndex),
+          newSlide,
+          ...updatedSlides.slice(insertIndex)
+        ]
         onUpdateSlides(finalSlides)
         
         // Move editing to new slide
@@ -566,6 +579,9 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     try {
       // Build prompt for OpenAI
       const sectionsList = sections.map(s => s.content).join(', ')
+      const slideCountRule = slideCount
+        ? `5. The total number of slides (excluding section headers) should be approximately ${slideCount}. Distribute them across the sections accordingly.`
+        : ''
       const prompt = `You are creating a presentation based on the following template structure with these sections: ${sectionsList}
 
 User input: ${generateInput}
@@ -577,6 +593,7 @@ Generate slide content for each section. Rules:
    - Second: A bullet points slide with the items (e.g., "Exercise", "Eat well", "Sleep well")
 3. For other content, create regular headline slides
 4. Match the number of slides to fit the template structure
+${slideCountRule ? '\n' + slideCountRule + '\n' : ''}
 
 Return a JSON array where each object has:
 - "section": the section name it belongs to
@@ -671,7 +688,6 @@ Example format:
 
       // Update slides
       onUpdateSlides(newSlides)
-      setGenerateInput('')
       alert(`Generated ${generatedSlides.length} slides based on your input!`)
     } catch (error) {
       console.error('Error generating slides:', error)
@@ -781,6 +797,26 @@ Example format:
                           </>
                         )}
                       </button>
+                    </div>
+                  </div>
+                  <div className="plan-generate-section plan-slide-count-row">
+                    <label className="plan-ramble-label">Number of slides</label>
+                    <div className="plan-ramble-select-wrapper">
+                      <select
+                        className="plan-ramble-select"
+                        value={slideCount}
+                        onChange={(e) => setSlideCount(e.target.value)}
+                        disabled={isGenerating}
+                      >
+                        <option value="">Not defined</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                      </select>
                     </div>
                   </div>
                   <textarea

@@ -112,7 +112,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     h3FontFamily: 'Oswald',
     lineHeight: 1,
     bulletLineHeight: 1,
-    bulletTextSize: 3
+    bulletTextSize: 3,
+    bulletGap: 0.5
   }
 
   const handleResetStyling = () => {
@@ -438,6 +439,18 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 step="0.1"
                 value={settings.bulletTextSize !== undefined ? settings.bulletTextSize : 3}
                 onChange={(e) => handleChange('bulletTextSize', parseFloat(e.target.value) || 3)}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>Spacing between (rem)</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={settings.bulletGap !== undefined ? settings.bulletGap : 0.5}
+                onChange={(e) => handleChange('bulletGap', parseFloat(e.target.value) ?? 0.5)}
                 className="style-dropdown-input"
               />
             </div>
