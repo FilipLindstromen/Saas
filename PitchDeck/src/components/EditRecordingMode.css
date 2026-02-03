@@ -58,6 +58,43 @@
   font-size: 1rem;
 }
 
+.edit-recording-empty-error {
+  color: var(--accent-secondary, #ff4757);
+  margin-bottom: 0.5rem !important;
+}
+
+.edit-recording-converting {
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.edit-recording-converting p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.edit-recording-progress-bar {
+  width: 100%;
+  max-width: 320px;
+  height: 8px;
+  background: var(--bg-tertiary, #2a2a2a);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.edit-recording-progress-fill {
+  height: 100%;
+  background: var(--accent, #ff6b35);
+  border-radius: 4px;
+  transition: width 0.15s ease;
+}
+
+.edit-recording-progress-pct {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .btn-load-video {
   padding: 0.75rem 1.5rem;
   background: var(--accent, #ff6b35);
@@ -86,12 +123,27 @@
   flex: 1;
   min-height: 200px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 1rem;
+  position: relative;
+}
+
+.edit-recording-load-error {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(220, 53, 69, 0.9);
+  color: #fff;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  z-index: 10;
 }
 
 .edit-recording-preview video {

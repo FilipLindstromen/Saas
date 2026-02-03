@@ -59,6 +59,43 @@
   min-height: 0;
 }
 
+.presentation-feedback-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.presentation-feedback-empty-msg {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.presentation-feedback-empty-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.presentation-feedback-btn-upload {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--button-radius);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.presentation-feedback-btn-upload:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .presentation-feedback-loading {
   display: flex;
   flex-direction: column;

@@ -15,6 +15,8 @@ import EditRecordingMode from './components/EditRecordingMode'
 import ProjectOverview from './components/ProjectOverview'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
+import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
+import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
 import './App.css'
 
@@ -94,6 +96,8 @@ function App() {
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
   const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'edit-recording'
   const lastRecordingBlobRef = useRef(null)
+  const analyzeVideoInputRef = useRef(null)
+  const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
   const [isRecordingInPlace, setIsRecordingInPlace] = useState(false)
   const recordingMediaRecorderRef = useRef(null)
   const recordingChunksRef = useRef([])
@@ -204,6 +208,11 @@ function App() {
       bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
+      contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 16.67,
+      defaultFontWeight: parseInt(localStorage.getItem('defaultFontWeight'), 10) || 700,
+      h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
+      h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
+      h3Weight: parseInt(localStorage.getItem('h3Weight'), 10) || 700,
       googleClientId: localStorage.getItem('googleClientId') || ''
     }
     return savedSettings
@@ -242,7 +251,12 @@ function App() {
       videoBrightness: 1,
       videoContrast: 1,
       videoSaturation: 1,
-      videoHue: 0,
+      videoShadows: 1,
+      videoMidtones: 1,
+      videoHighlights: 1,
+      videoShadowHue: 0,
+      videoMidHue: 0,
+      videoHighlightHue: 0,
       cameraOverrideEnabled: false,
       cameraOverridePosition: 'fullscreen',
       analyzeWithAI: false
@@ -353,6 +367,45 @@ function App() {
         setPresentationFeedback({ status: ERROR, errorMessage: err?.message || 'Analysis failed.' })
       }
     }
+  }, [settings.openaiKey, slides])
+
+  // Analyze video: use latest recording or uploaded file; run transcribe + feedback
+  const handleAnalyzeVideo = useCallback(() => {
+    if (lastRecordingBlobRef.current) {
+      if (analysisCallbackRef.current) analysisCallbackRef.current(lastRecordingBlobRef.current)
+      return
+    }
+    analyzeVideoInputRef.current?.click()
+  }, [])
+
+  const handleAnalyzeVideoFile = useCallback((e) => {
+    const file = e.target?.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const apiKey = settings.openaiKey
+    if (!apiKey) {
+      setPresentationFeedback({ status: ERROR, errorMessage: 'OpenAI API key not set. Add it in Settings to use AI feedback.' })
+      setShowPresentationFeedback(true)
+      return
+    }
+    setShowPresentationFeedback(true)
+    setPresentationFeedback({ status: LOADING })
+    const blob = file instanceof Blob ? file : new Blob([file])
+    const run = async () => {
+      try {
+        const transcript = await transcribeRecording(blob, apiKey)
+        const slideTitles = (slides || []).map((s) => {
+          const div = document.createElement('div')
+          div.innerHTML = s.content || ''
+          return (div.textContent || div.innerText || '').trim().slice(0, 120)
+        })
+        const feedback = await getPresentationFeedback(transcript, slideTitles, apiKey)
+        setPresentationFeedback({ status: DONE, transcript, feedback })
+      } catch (err) {
+        setPresentationFeedback({ status: ERROR, errorMessage: err?.message || 'Analysis failed.' })
+      }
+    }
+    run()
   }, [settings.openaiKey, slides])
 
   // Handle sidebar resize
@@ -517,6 +570,11 @@ function App() {
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
+    if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
+    if (settings.defaultFontWeight !== undefined) localStorage.setItem('defaultFontWeight', settings.defaultFontWeight.toString())
+    if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
+    if (settings.h2Weight !== undefined) localStorage.setItem('h2Weight', settings.h2Weight.toString())
+    if (settings.h3Weight !== undefined) localStorage.setItem('h3Weight', settings.h3Weight.toString())
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     if (settings.googleClientId !== undefined) localStorage.setItem('googleClientId', settings.googleClientId || '')
   }, [settings])
@@ -802,7 +860,6 @@ function App() {
           setShowSettings(false)
           if (showPresentationFeedback) {
             setShowPresentationFeedback(false)
-            setPresentationFeedback(null)
           }
         }
         return
@@ -1724,6 +1781,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         const webmFilename = `presentation-recording-${dateStr}.webm`
 
         lastRecordingBlobRef.current = blob
+        setLastRecordingBlobVersion((v) => v + 1)
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
@@ -1806,8 +1864,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
           openaiKey={settings.openaiKey || ''}
           slideFormat={settings.slideFormat || '16:9'}
+          contentBottomOffset={settings.contentBottomOffset ?? 16.67}
+          defaultFontWeight={settings.defaultFontWeight ?? 700}
+          h1Weight={settings.h1Weight ?? 700}
+          h2Weight={settings.h2Weight ?? 700}
+          h3Weight={settings.h3Weight ?? 700}
           onRecordingDone={(blob) => {
             lastRecordingBlobRef.current = blob
+            setLastRecordingBlobVersion((v) => v + 1)
           }}
         />
       </>
@@ -2095,6 +2159,30 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
                     <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
                   </svg>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header btn-view-feedback"
+                  onClick={() => setShowPresentationFeedback(true)}
+                  title="AI training feedback: view coach feedback from your recording"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="btn-tooltip">AI feedback</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={handleAnalyzeVideo}
+                  title={lastRecordingBlobRef.current ? "Analyze latest recorded video" : "Analyze video (upload or use latest recording)"}
+                  disabled={!settings.openaiKey}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  </svg>
+                  <span className="btn-tooltip">Analyze video</span>
                 </button>
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
@@ -2388,6 +2476,30 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
                   </svg>
                 </button>
+                <button
+                  type="button"
+                  className="btn-icon-header btn-view-feedback"
+                  onClick={() => setShowPresentationFeedback(true)}
+                  title="AI training feedback: view coach feedback from your recording"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="btn-tooltip">AI feedback</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={handleAnalyzeVideo}
+                  title={lastRecordingBlobRef.current ? "Analyze latest recorded video" : "Analyze video (upload or use latest recording)"}
+                  disabled={!settings.openaiKey}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  </svg>
+                  <span className="btn-tooltip">Analyze video</span>
+                </button>
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
@@ -2427,6 +2539,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
       <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'edit-recording' ? 'edit-recording-content' : ''}`}>
         {mode === 'edit-recording' ? (
           <EditRecordingMode
+            key={lastRecordingBlobVersion}
             videoBlob={lastRecordingBlobRef.current}
             latestRecordingRef={lastRecordingBlobRef}
             onExit={() => setMode('edit')}
@@ -2488,6 +2601,11 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
+          contentBottomOffset={settings.contentBottomOffset ?? 16.67}
+          defaultFontWeight={settings.defaultFontWeight ?? 700}
+          h1Weight={settings.h1Weight ?? 700}
+          h2Weight={settings.h2Weight ?? 700}
+          h3Weight={settings.h3Weight ?? 700}
           recordSettings={recordSettings}
         />
             </div>
@@ -2545,16 +2663,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           </button>
         </div>
       )}
-      {showPresentationFeedback && presentationFeedback && (
+      {showPresentationFeedback && (
         <PresentationFeedback
-          onClose={() => {
-            setShowPresentationFeedback(false)
-            setPresentationFeedback(null)
-          }}
-          status={presentationFeedback.status}
-          transcript={presentationFeedback.transcript}
-          feedback={presentationFeedback.feedback}
-          errorMessage={presentationFeedback.errorMessage}
+          onClose={() => setShowPresentationFeedback(false)}
+          status={presentationFeedback?.status}
+          transcript={presentationFeedback?.transcript}
+          feedback={presentationFeedback?.feedback}
+          errorMessage={presentationFeedback?.errorMessage}
+          onUploadVideo={() => analyzeVideoInputRef.current?.click()}
         />
       )}
       {showProjectOverview && (
@@ -2592,6 +2708,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         type="file"
         accept=".json,application/json"
         onChange={handleFileChange}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      />
+      <input
+        ref={analyzeVideoInputRef}
+        type="file"
+        accept="video/*,.webm,.mp4,.mov"
+        onChange={handleAnalyzeVideoFile}
         style={{ display: 'none' }}
         aria-hidden="true"
       />

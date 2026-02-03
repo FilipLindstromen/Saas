@@ -125,6 +125,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const lastEnterTimeRef = useRef(0)
 
   const isOverview = planView === 'overview' && chapters?.length && onUpdateChapterSlides
+  const currentChapter = (chapters || []).find(c => c.id === currentChapterId) || (chapters || [])[0]
   const getChapterForSlide = (slideId) => (chapters || []).find(c => c.slides.some(s => s.id === slideId))
   const getSlidesForContext = (slideIdOrChapterId) => {
     if (!isOverview) return slides
@@ -1187,6 +1188,7 @@ Example format:
         <div className="plan-slides-center">
           <div className="plan-slides-area plan-slides-card">
           <div className="plan-standard-column">
+            {planView === 'standard' && (
             <div className="plan-title-bar">
               <span className="plan-title-bar-icon" aria-hidden>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1197,28 +1199,29 @@ Example format:
                   <polyline points="10 9 9 9 8 9" />
                 </svg>
               </span>
-              {editingPlanTitle ? (
+              {currentChapter && editingChapterId === currentChapter.id ? (
                 <input
-                  ref={planTitleInputRef}
+                  ref={chapterNameInputRef}
                   type="text"
                   className="plan-title-bar-input"
-                  value={projectName || ''}
-                  onChange={(e) => onProjectNameChange?.(e.target.value)}
-                  onBlur={savePlanTitle}
-                  onKeyDown={handlePlanTitleKeyDown}
+                  value={editingChapterName}
+                  onChange={(e) => setEditingChapterName(e.target.value)}
+                  onBlur={saveChapterName}
+                  onKeyDown={handleChapterNameKeyDown}
                   onClick={(e) => e.stopPropagation()}
-                  placeholder="Presentation title"
+                  placeholder="Chapter title"
                 />
               ) : (
                 <span
                   className="plan-title-bar-text"
-                  onClick={onProjectNameChange ? startEditingPlanTitle : undefined}
-                  title={onProjectNameChange ? 'Click to edit title' : undefined}
+                  onClick={currentChapter && onUpdateChapterName ? () => startEditingChapterName(currentChapter) : undefined}
+                  title={currentChapter && onUpdateChapterName ? 'Click to edit chapter title' : undefined}
                 >
-                  {projectName?.trim() || 'Untitled presentation'}
+                  {currentChapter?.name?.trim() || 'Untitled chapter'}
                 </span>
               )}
             </div>
+            )}
             <div className={`plan-standard-row ${showSlideTips ? 'with-tips-panel' : ''}`}>
               {planView === 'overview' && chapters?.length ? (
                 <div className="plan-overview-scroll">

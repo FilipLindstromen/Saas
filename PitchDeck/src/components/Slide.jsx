@@ -1,18 +1,28 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
 
-// Build CSS filter string for video adjustments (matches PlayMode)
-function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoHue = 0 }) {
+// Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
+function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0 }) {
   const b = typeof videoBrightness === 'number' ? videoBrightness : 1
   const c = typeof videoContrast === 'number' ? videoContrast : 1
   const s = typeof videoSaturation === 'number' ? videoSaturation : 1
-  const h = typeof videoHue === 'number' ? videoHue : 0
-  return `brightness(${b}) contrast(${c}) saturate(${s}) hue-rotate(${h}deg)`
+  const sh = typeof videoShadows === 'number' ? videoShadows : 1
+  const m = typeof videoMidtones === 'number' ? videoMidtones : 1
+  const h = typeof videoHighlights === 'number' ? videoHighlights : 1
+  const shadowFactor = 1 + (sh - 1) * 0.4
+  const midtoneFactor = 1 + (m - 1) * 0.3
+  const highlightFactor = 1 + (h - 1) * 0.4
+  const brightness = b * shadowFactor * highlightFactor
+  const contrast = c * midtoneFactor
+  const hueDeg = [videoShadowHue, videoMidHue, videoHighlightHue].reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) / 3
+  const huePart = hueDeg !== 0 ? ` hue-rotate(${hueDeg}deg)` : ''
+  return `brightness(${brightness}) contrast(${contrast}) saturate(${s})${huePart}`
 }
 
 // Webcam component - defined outside to avoid hooks issues. Uses layout or camera override for position/scale.
-function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -61,7 +71,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
     return 'webcam-video-bottom-right'
   }
 
-  const filter = getVideoFilterFromProps({ videoBrightness, videoContrast, videoSaturation, videoHue })
+  const filter = getVideoFilterFromProps({ videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue })
 
   return (
     <video
@@ -75,7 +85,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 16.67, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -235,38 +245,39 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     return text ? text.split(' ').filter(Boolean) : []
   }
 
-  // Get words with serif flag and line-break markers so words-fade-up preserves line breaks in present mode
+  // Get words with serif flag, line-break markers, and block tag (h1/h2/h3) for present mode heading styling
   const getWordsWithFormatting = (html) => {
     if (!html || typeof html !== 'string') return []
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html')
       const result = []
-      const walk = (node) => {
+      const walk = (node, blockTag = null) => {
         if (node.nodeType === Node.TEXT_NODE) {
           const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
           if (!text) return
           const serif = !!(node.parentElement?.closest?.('.font-pairing-serif'))
-          text.split(' ').filter(Boolean).forEach((word) => result.push({ word, serif }))
+          text.split(' ').filter(Boolean).forEach((word) => result.push({ word, serif, blockTag }))
           return
         }
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tag = node.tagName ? node.tagName.toLowerCase() : ''
           if (tag === 'br' || tag === 'div') {
-            result.push({ lineBreak: true })
-            if (tag === 'div') node.childNodes.forEach(walk)
+            result.push({ lineBreak: true, blockTag })
+            if (tag === 'div') node.childNodes.forEach((n) => walk(n, blockTag))
             return
           }
-          node.childNodes.forEach(walk)
+          const childBlockTag = (tag === 'h1' || tag === 'h2' || tag === 'h3') ? tag : blockTag
+          node.childNodes.forEach((n) => walk(n, childBlockTag))
         }
       }
       walk(doc.body)
       return result
     } catch (e) {
-      return getWordsFromContent(html).map((word) => ({ word, serif: false }))
+      return getWordsFromContent(html).map((word) => ({ word, serif: false, blockTag: null }))
     }
   }
 
-  // Get sentences (with serif flag and line breaks) for sentence-level animation
+  // Get sentences (with serif flag, line breaks, blockTag) for sentence-level animation
   const getSentencesWithFormatting = (html) => {
     const words = getWordsWithFormatting(html)
     const result = []
@@ -274,20 +285,20 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     for (const item of words) {
       if (item.lineBreak) {
         if (sentence.length) {
-          result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+          result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif, blockTag: sentence[0].blockTag })
           sentence = []
         }
-        result.push({ lineBreak: true })
+        result.push({ lineBreak: true, blockTag: item.blockTag })
         continue
       }
       sentence.push(item)
       if (/[.!?]$/.test(item.word)) {
-        result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+        result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif, blockTag: sentence[0].blockTag })
         sentence = []
       }
     }
     if (sentence.length) {
-      result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif })
+      result.push({ text: sentence.map((s) => s.word).join(' ') + ' ', serif: sentence[0].serif, blockTag: sentence[0].blockTag })
     }
     return result
   }
@@ -296,6 +307,45 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const getChunksWithFormatting = (html, unit) => {
     if (unit === 'sentence') return getSentencesWithFormatting(html)
     return getWordsWithFormatting(html)
+  }
+
+  // Render chunked content with h1/h2/h3 wrappers so present-mode text animation preserves heading styling
+  const renderChunksWithHeadings = (chunks, chunkDelay, offset = 0) => {
+    const nodes = []
+    let currentTag = null
+    let group = []
+    let chunkIndex = offset
+    const flush = () => {
+      if (group.length === 0) return
+      const content = group.map((item, j) => (
+        <span key={nodes.length + j} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${(chunkIndex - group.length + j) * chunkDelay}s` }}>
+          {item.word != null ? item.word + ' ' : item.text}
+        </span>
+      ))
+      if (currentTag === 'h1' || currentTag === 'h2' || currentTag === 'h3') {
+        nodes.push(React.createElement(currentTag, { key: `block-${nodes.length}` }, content))
+      } else {
+        nodes.push(React.createElement(React.Fragment, { key: `block-${nodes.length}` }, ...content))
+      }
+      group = []
+    }
+    chunks.forEach((item, i) => {
+      if (item.lineBreak) {
+        flush()
+        currentTag = item.blockTag ?? null
+        nodes.push(<br key={`br-${i}`} />)
+        chunkIndex++
+        return
+      }
+      if (item.blockTag !== currentTag) {
+        flush()
+        currentTag = item.blockTag ?? null
+      }
+      group.push(item)
+      chunkIndex++
+    })
+    flush()
+    return nodes
   }
 
   const handleContentChange = (e) => {
@@ -430,23 +480,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         setTextFormatToolbar(null)
         return
       }
-      let rect = range.getBoundingClientRect()
-      if (rect.width === 0 && rect.height === 0) {
-        const fallbackEl = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-          ? range.commonAncestorContainer.parentElement
-          : range.commonAncestorContainer
-        if (fallbackEl && fallbackEl.getBoundingClientRect) {
-          rect = fallbackEl.getBoundingClientRect()
-        }
-        if (rect.width === 0 && rect.height === 0) {
-          const container = target.field === 'content' ? contentRef.current : target.field === 'subtitle' ? subtitleRef.current : null
-          if (container && container.getBoundingClientRect) rect = container.getBoundingClientRect()
-        }
-        if (rect.width === 0 && rect.height === 0) {
-          setTextFormatToolbar(null)
-          return
-        }
-      }
+      // Resolve target before rect fallback (fallback uses target to get container)
       let target = null
       if (contentRef.current && (textEl === contentRef.current || contentRef.current.contains(textEl))) {
         target = { field: 'content' }
@@ -463,6 +497,23 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       if (!target) {
         setTextFormatToolbar(null)
         return
+      }
+      let rect = range.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) {
+        const fallbackEl = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+          ? range.commonAncestorContainer.parentElement
+          : range.commonAncestorContainer
+        if (fallbackEl && fallbackEl.getBoundingClientRect) {
+          rect = fallbackEl.getBoundingClientRect()
+        }
+        if (rect.width === 0 && rect.height === 0) {
+          const container = target.field === 'content' ? contentRef.current : target.field === 'subtitle' ? subtitleRef.current : null
+          if (container && container.getBoundingClientRect) rect = container.getBoundingClientRect()
+        }
+        if (rect.width === 0 && rect.height === 0) {
+          setTextFormatToolbar(null)
+          return
+        }
       }
       // Check if selection is inside .font-pairing-serif (for Serif button toggle state)
       const startEl = range.startContainer.nodeType === Node.TEXT_NODE
@@ -511,19 +562,18 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         textColorActive
       })
     }
-    const handleMouseUp = () => {
-      setTimeout(checkSelection, 10)
-    }
+    const scheduleCheck = () => setTimeout(checkSelection, 10)
+    const handleMouseUp = scheduleCheck
     const handleKeyUp = (e) => {
-      if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
-        setTimeout(checkSelection, 10)
-      }
+      if (e.key === 'a' && (e.ctrlKey || e.metaKey)) scheduleCheck()
     }
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('keyup', handleKeyUp)
+    document.addEventListener('selectionchange', scheduleCheck)
     return () => {
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('keyup', handleKeyUp)
+      document.removeEventListener('selectionchange', scheduleCheck)
     }
   }, [isEditableForToolbar])
 
@@ -954,6 +1004,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
     
     // Base text style (explicit color so slides always use current text color)
+    const getHeadingWeight = (level) => {
+      if (level === 'h1') return h1Weight
+      if (level === 'h2') return h2Weight
+      if (level === 'h3') return h3Weight
+      return defaultFontWeight
+    }
     const baseTextStyle = {
       color: textColor,
       textShadow: textDropShadow 
@@ -961,6 +1017,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         : undefined,
       fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
       fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : `"${fontFamily}", sans-serif`,
+      fontWeight: textHeadingLevel ? getHeadingWeight(textHeadingLevel) : defaultFontWeight,
       lineHeight: lineHeight,
       pointerEvents: isEditable ? 'auto' : undefined
     }
@@ -1093,15 +1150,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 className={`slide-text slide-text-words centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
                 style={textStyle}
               >
-                {centeredChunks.map((item, i) =>
-                  item.lineBreak ? (
-                    <br key={i} />
-                  ) : (
-                    <span key={i} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${i * chunkDelay}s` }}>
-                      {item.word != null ? item.word + ' ' : item.text}
-                    </span>
-                  )
-                )}
+                {renderChunksWithHeadings(centeredChunks, chunkDelay)}
               </div>
             ) : (
               <div 
@@ -1206,24 +1255,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         const chunks = getChunksWithFormatting(slide.content || '', textAnimationUnit)
         return (
           <div
-            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
             style={textStyle}
           >
-            {chunks.map((item, i) =>
-              item.lineBreak ? (
-                <br key={i} />
-              ) : (
-                <span key={i} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${i * chunkDelay}s` }}>
-                  {item.word != null ? item.word + ' ' : item.text}
-                </span>
-              )
-            )}
+            {renderChunksWithHeadings(chunks, chunkDelay)}
           </div>
         )
       }
       return (
         <div
-          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
           style={textStyle}
           dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
         />
@@ -1235,7 +1276,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return (
         <div
           ref={contentRef}
-          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+          className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
           style={textStyle}
           contentEditable="true"
           suppressContentEditableWarning={true}
@@ -1397,59 +1438,111 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     backgroundColor: slideBgColor,
     aspectRatio: aspectRatioValue,
     '--slide-base-font-size': `${defaultTextSize}rem`,
-    '--slide-pairing-font': `"${fontPairingSerifFont}", serif`
+    '--slide-pairing-font': `"${fontPairingSerifFont}", serif`,
+    '--slide-content-bottom': `${contentBottomOffset}%`
   }
   return (
     <div 
-      className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass}`}
+      className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${isPlayMode ? 'play-mode' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
     >
       <style>{`
-        .slide-content h1 {
+        /* Default font weight for body text in slide content */
+        .slide .slide-content .slide-text,
+        .slide .slide-content-video .slide-text,
+        .slide .slide-subtitle,
+        .slide .bullet-text {
+          font-weight: ${defaultFontWeight} !important;
+        }
+        /* H1/H2/H3 in edit and present mode */
+        .slide .slide-content h1,
+        .slide .slide-content-video h1,
+        .slide.play-mode .slide-content h1,
+        .slide.play-mode .slide-content-video h1 {
           font-size: ${h1Size}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          font-weight: ${h1Weight} !important;
           line-height: ${lineHeight} !important;
         }
-        .slide-content h2 {
+        .slide .slide-content h2,
+        .slide .slide-content-video h2,
+        .slide.play-mode .slide-content h2,
+        .slide.play-mode .slide-content-video h2 {
           font-size: ${h2Size}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
           line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
-        .slide-content h3 {
+        .slide .slide-content h3,
+        .slide .slide-content-video h3,
+        .slide.play-mode .slide-content h3,
+        .slide.play-mode .slide-content-video h3 {
           font-size: ${h3Size}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          font-weight: ${h3Weight} !important;
           line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
-        .slide-subtitle h1 {
+        .slide .slide-subtitle h1,
+        .slide.play-mode .slide-subtitle h1 {
           font-size: ${h1Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          font-weight: ${h1Weight} !important;
           line-height: ${lineHeight} !important;
         }
-        .slide-subtitle h2 {
+        .slide .slide-subtitle h2,
+        .slide.play-mode .slide-subtitle h2 {
           font-size: ${h2Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
           line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
-        .slide-subtitle h3 {
+        .slide .slide-subtitle h3,
+        .slide.play-mode .slide-subtitle h3 {
           font-size: ${h3Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          font-weight: ${h3Weight} !important;
           line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
-        .bullet-text h1 {
+        /* Block-level H3: when subtitle/content has text-heading-h3 class (edit + present) */
+        .slide .slide-subtitle.text-heading-h3,
+        .slide .slide-text.text-heading-h3,
+        .slide.play-mode .slide-subtitle.text-heading-h3,
+        .slide.play-mode .slide-text.text-heading-h3 {
+          font-size: ${h3Size * 0.5}rem !important;
+          font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          font-weight: ${h3Weight} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+        }
+        .slide .slide-content .slide-text.text-heading-h3,
+        .slide .slide-content-video .slide-text.text-heading-h3,
+        .slide.play-mode .slide-content .slide-text.text-heading-h3,
+        .slide.play-mode .slide-content-video .slide-text.text-heading-h3 {
+          font-size: ${h3Size}rem !important;
+          font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          font-weight: ${h3Weight} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+        }
+        .slide .bullet-text h1,
+        .slide.play-mode .bullet-text h1 {
           font-size: ${h1Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          font-weight: ${h1Weight} !important;
           line-height: ${lineHeight} !important;
         }
-        .bullet-text h2 {
+        .slide .bullet-text h2,
+        .slide.play-mode .bullet-text h2 {
           font-size: ${h2Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
           line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
-        .bullet-text h3 {
+        .slide .bullet-text h3,
+        .slide.play-mode .bullet-text h3 {
           font-size: ${h3Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          font-weight: ${h3Weight} !important;
           line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
         .slide .slide-content .font-pairing-serif,
@@ -1479,7 +1572,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && (
+      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && layout !== 'right-video' && (
         <div 
           className="slide-gradient-overlay"
           style={{
@@ -1498,7 +1591,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           videoBrightness={videoBrightness}
           videoContrast={videoContrast}
           videoSaturation={videoSaturation}
-          videoHue={videoHue}
+          videoShadows={videoShadows}
+          videoMidtones={videoMidtones}
+          videoHighlights={videoHighlights}
+          videoShadowHue={videoShadowHue}
+          videoMidHue={videoMidHue}
+          videoHighlightHue={videoHighlightHue}
           cameraOverrideEnabled={cameraOverrideEnabled}
           cameraOverridePosition={cameraOverridePosition}
         />
@@ -1538,7 +1636,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         )
       ) : (
         <div 
-          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''}`}
+          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''}`}
           style={{ 
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,
@@ -1563,7 +1661,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           </button>
         </div>
       )}
-      {textFormatToolbar && (
+      {textFormatToolbar && createPortal(
         <TextFormatToolbar
           x={textFormatToolbar.x}
           y={textFormatToolbar.y}
@@ -1585,7 +1683,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           onFontPairing={applyFontPairing}
           onTextColor={applyTextColor}
           onClearFormatting={applyClearFormatting}
-        />
+        />,
+        document.body
       )}
     </div>
   )

@@ -115,7 +115,12 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     lineHeight: 1,
     bulletLineHeight: 1,
     bulletTextSize: 3,
-    bulletGap: 0.5
+    bulletGap: 0.5,
+    contentBottomOffset: 16.67,
+    defaultFontWeight: 700,
+    h1Weight: 700,
+    h2Weight: 700,
+    h3Weight: 700
   }
 
   const handleResetStyling = () => {
@@ -262,6 +267,19 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 value={settings.lineHeight !== undefined ? settings.lineHeight : 1.4}
                 onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1.4)}
                 className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>Font weight</label>
+              <input
+                type="number"
+                min="100"
+                max="900"
+                step="100"
+                value={settings.defaultFontWeight !== undefined ? settings.defaultFontWeight : 700}
+                onChange={(e) => handleChange('defaultFontWeight', Math.min(900, Math.max(100, parseInt(e.target.value, 10) || 700)))}
+                className="style-dropdown-input"
+                title="100–900 (e.g. 400 Normal, 700 Bold)"
               />
             </div>
           </div>
@@ -413,8 +431,62 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               </select>
             </div>
           </div>
+          <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
+            <div className="style-dropdown-sub-field">
+              <label>H1 weight</label>
+              <input
+                type="number"
+                min="100"
+                max="900"
+                step="100"
+                value={settings.h1Weight !== undefined ? settings.h1Weight : 700}
+                onChange={(e) => handleChange('h1Weight', Math.min(900, Math.max(100, parseInt(e.target.value, 10) || 700)))}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>H2 weight</label>
+              <input
+                type="number"
+                min="100"
+                max="900"
+                step="100"
+                value={settings.h2Weight !== undefined ? settings.h2Weight : 700}
+                onChange={(e) => handleChange('h2Weight', Math.min(900, Math.max(100, parseInt(e.target.value, 10) || 700)))}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>H3 weight</label>
+              <input
+                type="number"
+                min="100"
+                max="900"
+                step="100"
+                value={settings.h3Weight !== undefined ? settings.h3Weight : 700}
+                onChange={(e) => handleChange('h3Weight', Math.min(900, Math.max(100, parseInt(e.target.value, 10) || 700)))}
+                className="style-dropdown-input"
+              />
+            </div>
+          </div>
 
-          {/* 4. Bullets */}
+          {/* 4. Layout text position (left aligned, left video, right aligned, bullets) */}
+          <div className="style-dropdown-section-title">Layout text position</div>
+          <div className="style-dropdown-field">
+            <label>Distance from bottom (%)</label>
+            <input
+              type="number"
+              min="5"
+              max="30"
+              step="0.5"
+              value={settings.contentBottomOffset !== undefined ? settings.contentBottomOffset : 16.67}
+              onChange={(e) => handleChange('contentBottomOffset', parseFloat(e.target.value) ?? 16.67)}
+              className="style-dropdown-input"
+              title="How far from the bottom the text sits in left aligned, left video, right aligned and bullet layouts (edit + present)"
+            />
+          </div>
+
+          {/* 5. Bullets */}
           <div className="style-dropdown-section-title">Bullets</div>
           <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
             <div className="style-dropdown-sub-field">
@@ -455,7 +527,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
             </div>
           </div>
 
-          {/* 5. Reset content */}
+          {/* 6. Reset content */}
           <div className="style-dropdown-field" style={{ marginTop: '0.5rem' }}>
             <button
               type="button"

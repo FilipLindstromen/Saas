@@ -3,13 +3,25 @@ import Slide from './Slide'
 import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
 
-// Build CSS filter string for video adjustments (brightness, contrast, saturation, hue)
+// Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterString(recordSettings) {
   const b = typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1
   const c = typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1
   const s = typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1
-  const h = typeof recordSettings?.videoHue === 'number' ? recordSettings.videoHue : 0
-  return `brightness(${b}) contrast(${c}) saturate(${s}) hue-rotate(${h}deg)`
+  const sh = typeof recordSettings?.videoShadows === 'number' ? recordSettings.videoShadows : 1
+  const m = typeof recordSettings?.videoMidtones === 'number' ? recordSettings.videoMidtones : 1
+  const h = typeof recordSettings?.videoHighlights === 'number' ? recordSettings.videoHighlights : 1
+  const shadowFactor = 1 + (sh - 1) * 0.4
+  const midtoneFactor = 1 + (m - 1) * 0.3
+  const highlightFactor = 1 + (h - 1) * 0.4
+  const brightness = b * shadowFactor * highlightFactor
+  const contrast = c * midtoneFactor
+  const hueShadow = typeof recordSettings?.videoShadowHue === 'number' ? recordSettings.videoShadowHue : 0
+  const hueMid = typeof recordSettings?.videoMidHue === 'number' ? recordSettings.videoMidHue : 0
+  const hueHighlight = typeof recordSettings?.videoHighlightHue === 'number' ? recordSettings.videoHighlightHue : 0
+  const hueDeg = (hueShadow + hueMid + hueHighlight) / 3
+  const huePart = hueDeg !== 0 ? ` hue-rotate(${hueDeg}deg)` : ''
+  return `brightness(${brightness}) contrast(${contrast}) saturate(${s})${huePart}`
 }
 
 // Webcam overlay component - separate from slide transitions
@@ -78,6 +90,10 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     if (layout === 'left-video') {
       const w = dimensions.width / 3
       return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, isCircle: false }
+    }
+    if (layout === 'right-video') {
+      const w = dimensions.width / 3
+      return { top: 0, left: 0, width: w, height: dimensions.height, isCircle: false }
     }
     if (layout === 'right') {
       return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
@@ -170,7 +186,8 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          borderRadius: 'inherit'
+          borderRadius: 'inherit',
+          filter: getVideoFilterString(recordSettings)
         }}
       />
     </div>
@@ -400,7 +417,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 16.67, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -903,6 +920,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           bulletLineHeight={bulletLineHeight}
           bulletTextSize={bulletTextSize}
           bulletGap={bulletGap}
+          contentBottomOffset={contentBottomOffset}
+          defaultFontWeight={defaultFontWeight}
+          h1Weight={h1Weight}
+          h2Weight={h2Weight}
+          h3Weight={h3Weight}
           backgroundScaleAnimation={backgroundScaleAnimation}
           backgroundScaleTime={backgroundScaleTime}
           backgroundScaleAmount={backgroundScaleAmount}

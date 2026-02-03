@@ -12,7 +12,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 16.67, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -161,6 +161,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     <div className="slide-preview">
       <div className="preview-header">
         <div className="preview-header-left">
+          <h3>Preview</h3>
           <div className="preview-header-zoom">
             <label htmlFor="preview-zoom-slider">Zoom:</label>
             <input
@@ -176,7 +177,6 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             />
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
-          <h3>Preview</h3>
         </div>
         <div className="preview-header-actions">
           {(slide.layout || 'default') !== 'centered' && (slide.layout || 'default') !== 'right' && (
@@ -362,7 +362,12 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             videoBrightness={typeof safeRecordSettings.videoBrightness === 'number' ? safeRecordSettings.videoBrightness : 1}
             videoContrast={typeof safeRecordSettings.videoContrast === 'number' ? safeRecordSettings.videoContrast : 1}
             videoSaturation={typeof safeRecordSettings.videoSaturation === 'number' ? safeRecordSettings.videoSaturation : 1}
-            videoHue={typeof safeRecordSettings.videoHue === 'number' ? safeRecordSettings.videoHue : 0}
+            videoShadows={typeof safeRecordSettings.videoShadows === 'number' ? safeRecordSettings.videoShadows : 1}
+            videoMidtones={typeof safeRecordSettings.videoMidtones === 'number' ? safeRecordSettings.videoMidtones : 1}
+            videoHighlights={typeof safeRecordSettings.videoHighlights === 'number' ? safeRecordSettings.videoHighlights : 1}
+            videoShadowHue={typeof safeRecordSettings.videoShadowHue === 'number' ? safeRecordSettings.videoShadowHue : 0}
+            videoMidHue={typeof safeRecordSettings.videoMidHue === 'number' ? safeRecordSettings.videoMidHue : 0}
+            videoHighlightHue={typeof safeRecordSettings.videoHighlightHue === 'number' ? safeRecordSettings.videoHighlightHue : 0}
             cameraOverrideEnabled={slide.cameraOverrideEnabled === true}
             cameraOverridePosition={slide.cameraOverridePosition || 'fullscreen'}
             textDropShadow={textDropShadow}
@@ -378,6 +383,11 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             bulletLineHeight={bulletLineHeight}
             bulletTextSize={bulletTextSize}
             bulletGap={bulletGap}
+            contentBottomOffset={contentBottomOffset}
+            defaultFontWeight={defaultFontWeight}
+            h1Weight={h1Weight}
+            h2Weight={h2Weight}
+            h3Weight={h3Weight}
             onUpdate={onUpdate}
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}

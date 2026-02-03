@@ -23,15 +23,24 @@ async function getFFmpeg() {
   return loadPromise
 }
 
+function inputExtFromType(type) {
+  if (!type) return 'webm'
+  const t = type.toLowerCase()
+  if (t.includes('mp4')) return 'mp4'
+  if (t.includes('ogg')) return 'ogg'
+  return 'webm'
+}
+
 /**
- * Convert a video blob (e.g. WebM from MediaRecorder) to high-quality MP4.
- * @param {Blob} blob - Input video blob (WebM or similar)
+ * Convert a video blob (e.g. WebM, OGG) to high-quality MP4 for reliable playback.
+ * @param {Blob} blob - Input video blob (WebM, OGG, etc.)
  * @param {object} opts - { onProgress?: (p) => void }
  * @returns {Promise<Blob>} MP4 blob
  */
 export async function convertToMp4(blob, opts = {}) {
   const ffmpeg = await getFFmpeg()
-  const inputName = 'input.webm'
+  const ext = inputExtFromType(blob?.type)
+  const inputName = `input.${ext}`
   const outputName = 'output.mp4'
 
   const data = new Uint8Array(await blob.arrayBuffer())
