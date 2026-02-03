@@ -278,7 +278,7 @@ export async function resolveProjectImageUrls(data, folderHandle) {
         const file = await fileHandle.getFile()
         slide.imageUrl = URL.createObjectURL(file)
       } catch (e) {
-        console.warn('Could not resolve project image:', fullPath, e)
+        console.warn('Could not resolve project image:', path, e)
       }
     }
   }

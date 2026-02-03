@@ -48,11 +48,15 @@ function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, und
     }
   }, [x, y])
 
+  const TOOLBAR_GAP_ABOVE = 8
+  const TOOLBAR_HEIGHT = 48
+  const topAbove = y - TOOLBAR_HEIGHT - TOOLBAR_GAP_ABOVE
+
   return (
     <div
       ref={toolbarRef}
       className="text-format-toolbar"
-      style={{ left: `${x}px`, top: `${y - 44}px`, transform: 'translateX(-50%)' }}
+      style={{ left: `${x}px`, top: `${topAbove}px`, transform: 'translateX(-50%)' }}
       role="toolbar"
       aria-label="Text formatting"
     >
