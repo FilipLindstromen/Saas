@@ -95,14 +95,18 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     }
   }
 
+  const getIdsToUpdate = () => {
+    if (selectedSlides.size > 0) return Array.from(selectedSlides)
+    if (selectedSlideId) return [selectedSlideId]
+    return []
+  }
+
   const handleLayoutSelect = (layoutId) => {
-    if (selectedSlideId) {
-      // If switching to section layout, clear imageUrl
-      const updates = layoutId === 'section' 
-        ? { layout: layoutId, imageUrl: '' }
-        : { layout: layoutId }
-      onUpdate(selectedSlideId, updates)
-    }
+    const ids = getIdsToUpdate()
+    const updates = layoutId === 'section'
+      ? { layout: layoutId, imageUrl: '' }
+      : { layout: layoutId }
+    ids.forEach((id) => onUpdate(id, updates))
   }
 
   const toggleSectionFold = (sectionId) => {
@@ -298,10 +302,13 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
         cameraOverrideEnabled={slides.find(s => s.id === selectedSlideId)?.cameraOverrideEnabled ?? false}
         cameraOverridePosition={slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'}
         onCameraOverrideChange={(enabled) => {
-          if (selectedSlideId) onUpdate(selectedSlideId, { cameraOverrideEnabled: enabled, cameraOverridePosition: enabled ? (slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen') : undefined })
+          const ids = getIdsToUpdate()
+          const currentPos = slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'
+          ids.forEach((id) => onUpdate(id, { cameraOverrideEnabled: enabled, cameraOverridePosition: enabled ? currentPos : undefined }))
         }}
         onCameraOverridePositionSelect={(position) => {
-          if (selectedSlideId) onUpdate(selectedSlideId, { cameraOverridePosition: position })
+          const ids = getIdsToUpdate()
+          ids.forEach((id) => onUpdate(id, { cameraOverridePosition: position }))
         }}
       />
       <div className="slide-list-items">

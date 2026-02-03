@@ -168,8 +168,40 @@ export async function listFromProjectFolder() {
   return results
 }
 
+const IMAGES_SUBFOLDER = 'images'
+const SLIDE_IMAGE_PREFIX = 'slide'
+
+function isEmbeddedOrBlobUrl(url) {
+  return typeof url === 'string' && (url.startsWith('data:') || url.startsWith('blob:'))
+}
+
+function mimeToExt(mime) {
+  if (!mime || !mime.startsWith('image/')) return 'png'
+  const part = mime.split('/')[1] || ''
+  if (part === 'jpeg' || part === 'jpg') return 'jpg'
+  if (part === 'png' || part === 'gif' || part === 'webp' || part === 'avif') return part
+  return 'png'
+}
+
 /**
- * Save current project to the current project folder (no picker). Fails if no folder open.
+ * Fetch blob from data URL or blob URL.
+ * @param {string} url
+ * @returns {Promise<Blob>}
+ */
+async function urlToBlob(url) {
+  if (url.startsWith('data:')) {
+    const res = await fetch(url)
+    return res.blob()
+  }
+  if (url.startsWith('blob:')) {
+    const res = await fetch(url)
+    return res.blob()
+  }
+  throw new Error('Not a data or blob URL')
+}
+
+/**
+ * Save current project to the current project folder, copying custom (data/blob) images into an "images" subfolder and using relative paths in the JSON.
  * @param {() => object} getExportData
  * @param {string} projectName
  * @returns {Promise<{ path: string }>}
@@ -182,13 +214,75 @@ export async function saveToProjectFolder(getExportData, projectName) {
   const filename = (projectName && projectName.trim())
     ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
     : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+  const raw = getExportData()
+  const data = JSON.parse(JSON.stringify(raw))
+  const chapters = data.chapters || []
+  let imagesDirHandle = null
+  for (const chapter of chapters) {
+    const slides = chapter.slides || []
+    for (const slide of slides) {
+      const url = slide.imageUrl
+      if (!url || !isEmbeddedOrBlobUrl(url)) continue
+      try {
+        const blob = await urlToBlob(url)
+        const mime = blob.type || 'image/png'
+        const ext = mimeToExt(mime)
+        const imageFilename = `${SLIDE_IMAGE_PREFIX}-${chapter.id}-${slide.id}.${ext}`
+        const relativePath = `${IMAGES_SUBFOLDER}/${imageFilename}`
+        if (!imagesDirHandle) {
+          imagesDirHandle = await folder.handle.getDirectoryHandle(IMAGES_SUBFOLDER, { create: true })
+        }
+        const fileHandle = await imagesDirHandle.getFileHandle(imageFilename, { create: true })
+        const writable = await fileHandle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        slide.imageUrl = relativePath
+      } catch (e) {
+        console.warn('Could not save slide image to project folder:', e)
+      }
+    }
+  }
   const fileHandle = await folder.handle.getFileHandle(filename, { create: true })
   const writable = await fileHandle.createWritable()
-  const data = getExportData()
   const json = JSON.stringify(data, null, 2)
   await writable.write(json)
   await writable.close()
   return { path: filename }
+}
+
+/**
+ * Resolve relative image paths (images/...) in project data to object URLs by reading files from the project folder.
+ * @param {object} data - Parsed project JSON (will be deep-cloned and modified)
+ * @param {FileSystemDirectoryHandle} folderHandle - Project folder handle
+ * @returns {Promise<object>} Data with imageUrl replaced by object URLs where applicable
+ */
+export async function resolveProjectImageUrls(data, folderHandle) {
+  if (!data || !folderHandle) return data
+  const out = JSON.parse(JSON.stringify(data))
+  const chapters = out.chapters || []
+  let imagesDirHandle = null
+  for (const chapter of chapters) {
+    const slides = chapter.slides || []
+    for (const slide of slides) {
+      const url = slide.imageUrl
+      if (!url || typeof url !== 'string' || (!url.startsWith(IMAGES_SUBFOLDER + '/') && !url.startsWith('./' + IMAGES_SUBFOLDER))) continue
+      const path = url.replace(/^\.\/+/, '')
+      const filename = path.startsWith(IMAGES_SUBFOLDER + '/') ? path.slice((IMAGES_SUBFOLDER + '/').length) : path.replace(/^images\//, '')
+      const parts = [IMAGES_SUBFOLDER, filename]
+      try {
+        let dir = folderHandle
+        for (let i = 0; i < parts.length - 1; i++) {
+          dir = await dir.getDirectoryHandle(parts[i], { create: false })
+        }
+        const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: false })
+        const file = await fileHandle.getFile()
+        slide.imageUrl = URL.createObjectURL(file)
+      } catch (e) {
+        console.warn('Could not resolve project image:', fullPath, e)
+      }
+    }
+  }
+  return out
 }
 
 /** @deprecated Use openProjectFolder + saveToProjectFolder for direct save. */

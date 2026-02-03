@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import './StyleDropdown.css'
 
-function TextEffectsOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
+function TextEffectsOptions({ settings, onUpdateSettings, onClose, buttonRef, embedded }) {
   const dropdownRef = useRef(null)
 
   useEffect(() => {
+    if (embedded) return
     const updatePosition = () => {
       if (buttonRef?.current && dropdownRef?.current) {
         const buttonRect = buttonRef.current.getBoundingClientRect()
@@ -19,24 +20,22 @@ function TextEffectsOptions({ settings, onUpdateSettings, onClose, buttonRef }) 
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [buttonRef])
+  }, [buttonRef, embedded])
 
   useEffect(() => {
+    if (embedded) return
     const handleEscape = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const handleChange = (key, value) => {
     onUpdateSettings({ [key]: value })
   }
 
-  return (
-    <>
-      <div className="style-dropdown-backdrop" onClick={onClose} />
-      <div className="style-dropdown-panel" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
-        <div className="style-dropdown-content">
-          <div className="style-dropdown-title">Text Effects</div>
+  const content = (
+    <div className="style-dropdown-content">
+      <div className="style-dropdown-title">Text Effects</div>
           <div className="style-dropdown-field">
             <label className="style-dropdown-checkbox">
               <input
@@ -158,7 +157,15 @@ function TextEffectsOptions({ settings, onUpdateSettings, onClose, buttonRef }) 
               </div>
             )}
           </div>
-        </div>
+    </div>
+  )
+
+  if (embedded) return content
+  return (
+    <>
+      <div className="style-dropdown-backdrop" onClick={onClose} />
+      <div className="style-dropdown-panel" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
+        {content}
       </div>
     </>
   )

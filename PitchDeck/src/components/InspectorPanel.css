@@ -1,0 +1,76 @@
+.inspector-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.inspector-panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
+}
+
+.inspector-panel-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.inspector-panel-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.inspector-panel-tab.active {
+  background: var(--bg-active);
+  color: var(--accent);
+}
+
+.inspector-panel-tab svg {
+  flex-shrink: 0;
+}
+
+.inspector-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  min-height: 0;
+}
+
+/* Embedded option panels: no fixed positioning, fill inspector */
+.inspector-panel-content .recording-options-content,
+.inspector-panel-content .captions-options-content,
+.inspector-panel-content .style-dropdown-content,
+.inspector-panel-content .transition-options-content {
+  padding: 0;
+}
+
+.inspector-panel-content .transition-options-header {
+  display: none;
+}
+
+.inspector-panel-content .transition-options-modal {
+  position: static;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+

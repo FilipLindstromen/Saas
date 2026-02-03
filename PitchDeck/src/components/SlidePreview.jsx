@@ -17,7 +17,23 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
+  const [previewZoom, setPreviewZoom] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pitchDeckPreviewZoom')
+      if (saved) {
+        const v = parseFloat(saved)
+        if (v >= 0.5 && v <= 1.5) return v
+      }
+    } catch (e) {}
+    return 1
+  })
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckPreviewZoom', String(previewZoom))
+    } catch (e) {}
+  }, [previewZoom])
 
   const handleSelectImages = async () => {
     if (!settings.openaiKey || !settings.unsplashKey) {
@@ -145,6 +161,21 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     <div className="slide-preview">
       <div className="preview-header">
         <div className="preview-header-left">
+          <div className="preview-header-zoom">
+            <label htmlFor="preview-zoom-slider">Zoom:</label>
+            <input
+              id="preview-zoom-slider"
+              type="range"
+              min="0.5"
+              max="1.5"
+              step="0.1"
+              value={previewZoom}
+              onChange={(e) => setPreviewZoom(parseFloat(e.target.value))}
+              className="preview-zoom-slider"
+              title="Zoom in or out on the slide preview"
+            />
+            <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
+          </div>
           <h3>Preview</h3>
         </div>
         <div className="preview-header-actions">
@@ -306,7 +337,14 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         </div>
       </div>
       <div className="preview-content">
-        <div className={`preview-slide-wrap ${safeRecordSettings.captionsEnabled ? 'has-caption-preview' : ''}`}>
+        <div
+          className="preview-zoom-wrap"
+          style={{
+            transform: `scale(${previewZoom})`,
+            transformOrigin: 'center center'
+          }}
+        >
+          <div className={`preview-slide-wrap ${safeRecordSettings.captionsEnabled ? 'has-caption-preview' : ''}`}>
           <Slide 
             slide={slide} 
             backgroundColor={backgroundColor} 
@@ -364,6 +402,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
               </span>
             </div>
           )}
+        </div>
         </div>
       </div>
       {slide.analysis && (
