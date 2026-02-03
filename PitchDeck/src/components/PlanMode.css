@@ -180,6 +180,15 @@
   min-height: min-content;
 }
 
+/* Slide tips button at far right of screen (same position when tips panel open or closed) */
+.plan-slide-tips-anchor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+
 /* Middle slides area: fixed width and position so it doesn't move when sidebar or tips change */
 .plan-slides-area {
   flex: 0 0 1200px;
@@ -494,13 +503,72 @@
   cursor: not-allowed;
 }
 
-/* Standard Plan view: column with tips row (full width) + row (list | optional tips panel) */
+/* Standard Plan view: column with tips row (full width) + title bar + row (list | optional tips panel) */
 .plan-standard-column {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   width: 100%;
+}
+
+/* Title bar above slides list: same look as chapter header (light gray, rounded top, bold text) */
+.plan-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+  min-height: 2.5rem;
+  margin-bottom: 0;
+}
+
+.plan-title-bar-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-quaternary);
+}
+
+.plan-title-bar-text {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+  padding: 0.125rem 0;
+  border-radius: 4px;
+}
+
+.plan-title-bar-text:hover {
+  background: var(--bg-hover);
+}
+
+.plan-title-bar-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+}
+
+.plan-title-bar-input:focus {
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+}
+
+.plan-title-bar-input::placeholder {
+  color: var(--text-tertiary);
 }
 
 /* Slide tips checkbox row: full width, checkbox at far right */
@@ -673,6 +741,7 @@
 }
 
 .plan-slide-tips-toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
