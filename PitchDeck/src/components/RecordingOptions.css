@@ -37,6 +37,12 @@
   gap: 0.5rem;
 }
 
+.recording-options-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
 .recording-options-field > label:not(.recording-options-checkbox) {
   display: block;
   margin-bottom: 0.5rem;

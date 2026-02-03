@@ -103,6 +103,24 @@
   padding-bottom: 0.5rem;
 }
 
+.header-app-title {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0;
+  margin: 0 -0.25rem 0 0;
+  background: none;
+  border: none;
+  border-radius: var(--button-radius);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition: opacity 0.2s ease;
+}
+
+.header-app-title:hover {
+  opacity: 0.9;
+}
+
 .app-header h1 {
   font-size: 1.25rem;
   font-weight: 600;
@@ -408,6 +426,28 @@
   color: var(--accent-secondary);
   opacity: 1;
   background: rgba(255, 71, 87, 0.15);
+}
+
+.chapter-rename-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+}
+
+.chapter-rename-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .chapter-tab-add {
@@ -856,6 +896,18 @@
 .recording-bar-text {
   font-size: 0.9rem;
   color: var(--text-primary);
+}
+.recording-bar-analyze {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.recording-bar-analyze input {
+  cursor: pointer;
 }
 .recording-bar-stop {
   padding: 0.35rem 0.75rem;

@@ -1,0 +1,234 @@
+.presentation-feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 1rem;
+}
+
+.presentation-feedback-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-xl);
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.presentation-feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.presentation-feedback-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.presentation-feedback-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.presentation-feedback-close:hover {
+  color: var(--text-primary);
+}
+
+.presentation-feedback-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.presentation-feedback-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 180px;
+  color: var(--text-secondary);
+}
+
+.presentation-feedback-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: presentation-feedback-spin 0.8s linear infinite;
+}
+
+.presentation-feedback-loading-sub {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}
+
+@keyframes presentation-feedback-spin {
+  to { transform: rotate(360deg); }
+}
+
+.presentation-feedback-error {
+  color: var(--text-secondary);
+}
+
+.presentation-feedback-error-msg {
+  color: var(--accent-secondary);
+  margin: 0 0 0.5rem 0;
+}
+
+.presentation-feedback-hint {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.presentation-feedback-section {
+  margin-bottom: 1.25rem;
+}
+
+.presentation-feedback-section:last-child {
+  margin-bottom: 0;
+}
+
+.presentation-feedback-section h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.presentation-feedback-section p,
+.presentation-feedback-section ul {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.presentation-feedback-section ul {
+  padding-left: 1.25rem;
+}
+
+.presentation-feedback-section li {
+  margin-bottom: 0.35rem;
+}
+
+.presentation-feedback-by-slide {
+  margin-top: 1rem;
+}
+
+.presentation-feedback-by-slide-intro {
+  margin: 0 0 0.75rem 0 !important;
+  font-size: 0.85rem !important;
+  color: var(--text-tertiary) !important;
+}
+
+.presentation-feedback-slide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.presentation-feedback-slide-card {
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary, rgba(255,255,255,0.05));
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.presentation-feedback-slide-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.presentation-feedback-slide-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.presentation-feedback-slide-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.presentation-feedback-slide-what-worked,
+.presentation-feedback-slide-suggestion {
+  margin: 0.35rem 0 0 0 !important;
+  font-size: 0.85rem !important;
+  line-height: 1.45 !important;
+  color: var(--text-secondary) !important;
+}
+
+.presentation-feedback-slide-suggestion {
+  color: var(--text-secondary) !important;
+}
+
+.presentation-feedback-transcript .presentation-feedback-transcript-text {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.presentation-feedback-raw {
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: var(--button-radius);
+  overflow-x: auto;
+}
+
+.presentation-feedback-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.presentation-feedback-btn-close {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--button-radius);
+  cursor: pointer;
+}
+
+.presentation-feedback-btn-close:hover {
+  background: var(--accent-hover);
+}

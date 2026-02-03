@@ -61,6 +61,28 @@ function Settings({ settings, onUpdate, onClose }) {
                   </a>
                 </p>
               </div>
+              <div className="settings-field">
+                <label htmlFor="google-client-id">Google Client ID</label>
+                <input
+                  id="google-client-id"
+                  type="password"
+                  value={localSettings.googleClientId || ''}
+                  onChange={(e) => handleChange('googleClientId', e.target.value)}
+                  placeholder="xxxxx.apps.googleusercontent.com"
+                />
+                <p className="settings-hint">
+                  Required for saving and opening projects from Google Drive. Create an OAuth 2.0 Client ID (Web application) in the{' '}
+                  <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
+                    Google Cloud Console
+                  </a>
+                  . To fix &quot;redirect_uri_mismatch&quot;, add this exact URL in your OAuth client:
+                </p>
+                <p className="settings-origin-hint">
+                  <strong>Authorized JavaScript origins:</strong> add <code>{typeof window !== 'undefined' ? window.location.origin : 'https://your-app-url.com'}</code>
+                  <br />
+                  <strong>Authorized redirect URIs:</strong> add <code>{typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://your-app-url.com/'}</code>
+                </p>
+              </div>
             </>
           )}
         </div>

@@ -1,0 +1,44 @@
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.app-logo-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.app-logo-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.app-logo-wordmark {
+  color: inherit;
+}
+
+.app-logo-year {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/* When used as button (header-app-title) */
+button.header-app-title .app-logo {
+  cursor: pointer;
+}
+
+button.header-app-title .app-logo:hover .app-logo-icon,
+button.header-app-title .app-logo:hover .app-logo-year {
+  color: var(--accent-hover);
+}
