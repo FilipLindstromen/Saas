@@ -356,6 +356,25 @@
   text-decoration: underline;
 }
 
+.settings-origin-hint {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.settings-origin-hint code {
+  display: inline-block;
+  margin: 0.15rem 0;
+  padding: 0.2rem 0.4rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+  user-select: all;
+}
+
 .settings-footer {
   display: flex;
   justify-content: flex-end;

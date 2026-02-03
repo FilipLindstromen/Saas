@@ -86,7 +86,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   }
 
   useEffect(() => {
-    if (!cameraId || !isVisible) return
+    if (!cameraId || !isVisible || (cameraOverrideEnabled && cameraOverridePosition === 'disabled')) return
 
     const startStream = async () => {
       try {
@@ -109,7 +109,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
         streamRef.current.getTracks().forEach(track => track.stop())
       }
     }
-  }, [cameraId, isVisible])
+  }, [cameraId, isVisible, cameraOverrideEnabled, cameraOverridePosition])
 
   // Update transition when layout or camera override changes
   useEffect(() => {
@@ -127,6 +127,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   }, [layout, dimensions, cameraOverrideEnabled, cameraOverridePosition])
 
   if (!isVisible || !cameraId) return null
+  if (cameraOverrideEnabled && cameraOverridePosition === 'disabled') return null
 
   const size = getWebcamSize()
   const position = getWebcamPosition()

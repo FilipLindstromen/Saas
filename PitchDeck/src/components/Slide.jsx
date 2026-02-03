@@ -1411,7 +1411,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {webcamEnabled && selectedCameraId && (
+      {webcamEnabled && selectedCameraId && !(cameraOverrideEnabled && cameraOverridePosition === 'disabled') && (
         <WebcamVideo 
           cameraId={selectedCameraId}
           layout={layout}

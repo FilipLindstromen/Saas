@@ -105,7 +105,8 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
       videoBrightness: newSettings.videoBrightness,
       videoContrast: newSettings.videoContrast,
       videoSaturation: newSettings.videoSaturation,
-      videoHue: newSettings.videoHue
+      videoHue: newSettings.videoHue,
+      analyzeWithAI: newSettings.analyzeWithAI
     }
     
     // Update global record settings immediately
@@ -119,6 +120,17 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
       <div className="recording-options-backdrop" onClick={onClose} />
       <div className="recording-options-dropdown" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
         <div className="recording-options-content">
+          <div className="recording-options-field">
+            <label className="recording-options-checkbox">
+              <input
+                type="checkbox"
+                checked={localSettings.analyzeWithAI}
+                onChange={(e) => handleChange('analyzeWithAI', e.target.checked)}
+              />
+              <span>Training mode: get AI feedback after recording</span>
+            </label>
+            <p className="recording-options-hint">Transcribes your recording and gives coach-style feedback on content and pacing.</p>
+          </div>
           <div className="recording-options-field">
             <label className="recording-options-checkbox">
               <input

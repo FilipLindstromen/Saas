@@ -76,6 +76,7 @@ const LAYOUTS = [
 ]
 
 const CAMERA_OVERRIDE_POSITIONS = [
+  { id: 'disabled', title: 'Camera disabled', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="6" fill="currentColor" fillOpacity="0.3" /><line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" /></svg> },
   { id: 'fullscreen', title: 'Full screen', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" /><circle cx="12" cy="12" r="4" /></svg> },
   { id: 'left-third', title: 'Left 1/3', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="8" height="22" rx="1" /><rect x="10" y="1" width="13" height="22" rx="1" opacity="0.3" /><circle cx="4" cy="12" r="3" /></svg> },
   { id: 'right-third', title: 'Right 1/3', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="13" height="22" rx="1" opacity="0.3" /><rect x="15" y="1" width="8" height="22" rx="1" /><circle cx="20" cy="12" r="3" /></svg> },

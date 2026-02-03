@@ -13,6 +13,9 @@ import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
 import EditRecordingMode from './components/EditRecordingMode'
+import ProjectOverview from './components/ProjectOverview'
+import AppLogo from './components/AppLogo'
+import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
 import './App.css'
 
 function App() {
@@ -116,6 +119,12 @@ function App() {
     const saved = localStorage.getItem('appTheme')
     return saved || 'dark'
   })
+  const [showProjectOverview, setShowProjectOverview] = useState(false)
+  const [analyzeThisRecording, setAnalyzeThisRecording] = useState(false)
+  const analyzeAfterRecordingRef = useRef(false)
+  const analysisCallbackRef = useRef(null)
+  const [showPresentationFeedback, setShowPresentationFeedback] = useState(false)
+  const [presentationFeedback, setPresentationFeedback] = useState(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedSlides, setSelectedSlides] = useState(new Set())
@@ -182,7 +191,8 @@ function App() {
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
       bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
-      fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display'
+      fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
+      googleClientId: localStorage.getItem('googleClientId') || ''
     }
     return savedSettings
   })
@@ -198,7 +208,8 @@ function App() {
           captionStyle: parsed.captionStyle || 'bottom-black',
           captionFont: parsed.captionFont || 'Poppins',
           captionFontSize: parsed.captionFontSize || 'medium',
-          captionDropShadow: parsed.captionDropShadow === true
+          captionDropShadow: parsed.captionDropShadow === true,
+          analyzeWithAI: parsed.analyzeWithAI === true
         }
       } catch (e) {
         console.error('Error parsing record settings:', e)
@@ -221,7 +232,8 @@ function App() {
       videoSaturation: 1,
       videoHue: 0,
       cameraOverrideEnabled: false,
-      cameraOverridePosition: 'fullscreen'
+      cameraOverridePosition: 'fullscreen',
+      analyzeWithAI: false
     }
   })
   const recordButtonRef = useRef(null)
@@ -301,6 +313,32 @@ function App() {
       console.error('Error saving record settings:', error)
     }
   }, [recordSettings])
+
+  // Callback for post-recording analysis (transcribe + coach feedback)
+  useEffect(() => {
+    analysisCallbackRef.current = async (blob) => {
+      const apiKey = settings.openaiKey
+      if (!apiKey) {
+        setPresentationFeedback({ status: ERROR, errorMessage: 'OpenAI API key not set. Add it in Settings to use AI feedback.' })
+        setShowPresentationFeedback(true)
+        return
+      }
+      setShowPresentationFeedback(true)
+      setPresentationFeedback({ status: LOADING })
+      try {
+        const transcript = await transcribeRecording(blob, apiKey)
+        const slideTitles = (slides || []).map((s) => {
+          const div = document.createElement('div')
+          div.innerHTML = s.content || ''
+          return (div.textContent || div.innerText || '').trim().slice(0, 120)
+        })
+        const feedback = await getPresentationFeedback(transcript, slideTitles, apiKey)
+        setPresentationFeedback({ status: DONE, transcript, feedback })
+      } catch (err) {
+        setPresentationFeedback({ status: ERROR, errorMessage: err?.message || 'Analysis failed.' })
+      }
+    }
+  }, [settings.openaiKey, slides])
 
   // Handle sidebar resize
   const handleResizeStart = (e) => {
@@ -436,6 +474,7 @@ function App() {
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
+    if (settings.googleClientId !== undefined) localStorage.setItem('googleClientId', settings.googleClientId || '')
   }, [settings])
 
   // Save workspace data when it changes
@@ -543,13 +582,13 @@ function App() {
     if (nextState.analysisFolded !== undefined) setAnalysisFolded(nextState.analysisFolded)
   }, [history, historyIndex, slides, chapters, currentChapterId, selectedSlideId])
 
-  // Export all data to a file
-  const handleExportFile = useCallback(() => {
+  // Save to project folder when one is open, otherwise download to Downloads
+  const handleExportFile = useCallback(async () => {
     const exportData = {
       version: '1.0',
       chapters: chapters,
       currentChapterId: currentChapterId,
-      slides: slides, // Keep for backward compatibility
+      slides: slides,
       selectedSlideId: selectedSlideId,
       settings: settings,
       recordSettings: recordSettings,
@@ -558,31 +597,47 @@ function App() {
       exportedAt: new Date().toISOString()
     }
 
-    const dataStr = JSON.stringify(exportData, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement('a')
-    link.href = url
-    // Use project name for filename, or fallback to default
-    const filename = projectName.trim() 
+    const filename = projectName.trim()
       ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
       : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
 
-    // Add to recent files
     const fileInfo = {
       name: projectName.trim() || filename,
       path: filename,
       lastOpened: new Date().toISOString(),
       data: exportData
     }
+
+    try {
+      const folder = await getProjectFolder()
+      if (folder) {
+        await saveToProjectFolder(() => exportData, projectName)
+        setRecentFiles(prev => {
+          const filtered = prev.filter(f => f.path !== filename)
+          return [fileInfo, ...filtered].slice(0, 10)
+        })
+        localStorage.setItem('pitchDeckRecentFiles', JSON.stringify([fileInfo, ...recentFiles.filter(f => f.path !== filename)].slice(0, 10)))
+        return
+      }
+    } catch (e) {
+      console.warn('Save to project folder failed, falling back to download:', e)
+    }
+
+    // No project folder or save failed: download to Downloads folder
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
     setRecentFiles(prev => {
       const filtered = prev.filter(f => f.path !== filename)
-      return [fileInfo, ...filtered].slice(0, 10) // Keep last 10
+      return [fileInfo, ...filtered].slice(0, 10)
     })
     localStorage.setItem('pitchDeckRecentFiles', JSON.stringify([fileInfo, ...recentFiles.filter(f => f.path !== filename)].slice(0, 10)))
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName, recentFiles])
@@ -599,12 +654,14 @@ function App() {
 
   const deleteSlide = (id) => {
     if (slides.length === 1) return
-    setSlides(slides.filter(s => s.id !== id))
-    if (selectedSlideId === id) {
-      const index = slides.findIndex(s => s.id === id)
-      const newSelected = index > 0 ? slides[index - 1].id : slides[index + 1]?.id
-      setSelectedSlideId(newSelected)
-    }
+    const newSlides = slides.filter(s => s.id !== id)
+    const idx = slides.findIndex(s => s.id === id)
+    const newSelected = selectedSlideId === id ? (idx > 0 ? slides[idx - 1].id : newSlides[0]?.id) : selectedSlideId
+    const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
+    setSlides(newSlides)
+    setSelectedSlideId(newSelected)
+    setChapters(newChapters)
+    saveToHistory({ slides: newSlides, selectedSlideId: newSelected, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
 
   const duplicateSlide = (id) => {
@@ -650,7 +707,7 @@ function App() {
       }
 
       // Don't handle other shortcuts if modals are open
-      if (showShortcuts || showCommandPalette || showSettings || showRecordingOptions || showColorOptions || showTypographyOptions || showTextEffectsOptions || showTransitionOptions) {
+      if (showShortcuts || showCommandPalette || showSettings || showRecordingOptions || showColorOptions || showTypographyOptions || showTextEffectsOptions || showTransitionOptions || showPresentationFeedback) {
         if (e.key === 'Escape') {
           setShowShortcuts(false)
           setShowCommandPalette(false)
@@ -660,9 +717,15 @@ function App() {
           setShowTypographyOptions(false)
           setShowTextEffectsOptions(false)
           setShowTransitionOptions(false)
+          if (showPresentationFeedback) {
+            setShowPresentationFeedback(false)
+            setPresentationFeedback(null)
+          }
         }
         return
       }
+
+      if (showProjectOverview) return
 
       // Toggle analysis (Cmd/Ctrl + /)
       if (e.key === '/' && cmdOrCtrl && !isInputFocused) {
@@ -764,7 +827,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showCaptionsOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
+  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showCaptionsOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, showPresentationFeedback, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
     // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
@@ -795,7 +858,10 @@ function App() {
   }
 
   const updateSlides = (newSlides) => {
+    const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
+    setChapters(newChapters)
+    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
 
   // Chapter management functions
@@ -806,8 +872,10 @@ function App() {
       name: `Chapter ${newChapterId}`,
       slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
     }
-    setChapters([...chapters, newChapter])
+    const newChapters = [...chapters, newChapter]
+    setChapters(newChapters)
     setCurrentChapterId(newChapterId)
+    saveToHistory({ slides: newChapter.slides, selectedSlideId: 1, chapters: newChapters, currentChapterId: newChapterId, settings, recordSettings, analysisFolded })
   }
 
   const handleDeleteChapter = (chapterId) => {
@@ -817,24 +885,46 @@ function App() {
     }
     if (window.confirm('Are you sure you want to delete this chapter? All slides in this chapter will be lost.')) {
       const updatedChapters = chapters.filter(c => c.id !== chapterId)
+      const nextChapterId = currentChapterId === chapterId ? updatedChapters[0].id : currentChapterId
+      const nextSlides = currentChapterId === chapterId ? updatedChapters[0].slides : (chapters.find(c => c.id === currentChapterId)?.slides ?? slides)
+      const nextSelectedId = currentChapterId === chapterId ? (nextSlides[0]?.id ?? selectedSlideId) : selectedSlideId
       setChapters(updatedChapters)
-      // Switch to first remaining chapter
       if (currentChapterId === chapterId) {
-        setCurrentChapterId(updatedChapters[0].id)
+        setCurrentChapterId(nextChapterId)
+        setSlides(nextSlides)
+        setSelectedSlideId(nextSelectedId)
       }
+      saveToHistory({ slides: nextSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId: nextChapterId, settings, recordSettings, analysisFolded })
     }
   }
 
   const handleUpdateChapterName = (chapterId, newName) => {
-    setChapters(chapters.map(c => 
+    const updatedChapters = chapters.map(c =>
       c.id === chapterId ? { ...c, name: newName } : c
-    ))
+    )
+    setChapters(updatedChapters)
+    saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
 
-  // Create a new presentation (clear all slides)
-  const handleNewPresentation = () => {
-    if (window.confirm('Create a new presentation? This will clear all current slides.')) {
-      // Create a single empty slide
+  const getExportData = useCallback(() => ({
+    version: '1.0',
+    chapters,
+    currentChapterId,
+    slides,
+    selectedSlideId,
+    settings,
+    recordSettings,
+    sidebarWidth,
+    projectName,
+    exportedAt: new Date().toISOString()
+  }), [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
+
+  // Create a new presentation (clear all slides). If projectName is passed (from Projects modal), use it and skip confirm.
+  const handleNewPresentation = (projectNameFromModal) => {
+    const doCreate = () => {
+      if (projectNameFromModal != null && projectNameFromModal !== '') {
+        setProjectName(projectNameFromModal.trim())
+      }
       const newSlide = {
         id: 1,
         content: '',
@@ -863,6 +953,11 @@ function App() {
       localStorage.removeItem('pitchDeckChapters')
       localStorage.removeItem('pitchDeckCurrentChapterId')
     }
+    if (projectNameFromModal != null) {
+      doCreate()
+    } else if (window.confirm('Create a new presentation? This will clear all current slides.')) {
+      doCreate()
+    }
   }
 
   // Load a template
@@ -872,24 +967,77 @@ function App() {
       ...slide,
       id: index + 1
     }))
-    // Update current chapter's slides
-    setChapters(prevChapters => 
-      prevChapters.map(chapter => 
-        chapter.id === currentChapterId 
-          ? { ...chapter, slides: newSlides }
-          : chapter
-      )
+    const updatedChapters = chapters.map(chapter =>
+      chapter.id === currentChapterId ? { ...chapter, slides: newSlides } : chapter
     )
-    setSlides(newSlides)
-    // Select the first non-section slide, or first slide if all are sections
     const firstNonSection = newSlides.find(s => s.layout !== 'section')
-    setSelectedSlideId(firstNonSection ? firstNonSection.id : newSlides[0]?.id || null)
+    const nextSelectedId = firstNonSection ? firstNonSection.id : newSlides[0]?.id || null
+    setChapters(updatedChapters)
+    setSlides(newSlides)
+    setSelectedSlideId(nextSelectedId)
+    saveToHistory({ slides: newSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
 
   // Save project name to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('pitchDeckProjectName', projectName)
   }, [projectName])
+
+  // Load project data (from overview Open, or after file read). Same shape as export.
+  const loadProjectFromData = useCallback((importData) => {
+    if (!importData) return
+    if (importData.chapters && Array.isArray(importData.chapters)) {
+      setChapters(importData.chapters)
+      setCurrentChapterId(importData.currentChapterId || importData.chapters[0]?.id || 1)
+    } else if (importData.slides && Array.isArray(importData.slides)) {
+      const slidesWithLayout = importData.slides.map(slide => ({
+        ...slide,
+        layout: slide.layout || 'default',
+        gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+        flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+        backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+        gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+        subtitle: slide.subtitle || '',
+        imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+        imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+        imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+        textHeadingLevel: slide.textHeadingLevel || null,
+        subtitleHeadingLevel: slide.subtitleHeadingLevel || null
+      }))
+      setChapters([{ id: 1, name: 'Chapter 1', slides: slidesWithLayout }])
+      setCurrentChapterId(1)
+    } else return
+    const currentChapter = importData.chapters
+      ? importData.chapters.find(c => c.id === (importData.currentChapterId || importData.chapters[0]?.id))
+      : null
+    const slidesToLoad = currentChapter ? currentChapter.slides : (importData.slides || [])
+    const slidesWithLayout = slidesToLoad.map(slide => ({
+      ...slide,
+      layout: slide.layout || 'default',
+      gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+      flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+      backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+      gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+      subtitle: slide.subtitle || '',
+      imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+      imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+      imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+      textHeadingLevel: slide.textHeadingLevel || null,
+      subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
+      analysis: slide.analysis || null
+    }))
+    setSlides(slidesWithLayout)
+    const validSelectedId = slidesWithLayout.find(s => s.id === importData.selectedSlideId)
+      ? importData.selectedSlideId
+      : slidesWithLayout[0]?.id || 1
+    setSelectedSlideId(validSelectedId)
+    if (importData.settings) {
+      setSettings(prev => ({ ...prev, ...importData.settings }))
+    }
+    if (importData.sidebarWidth !== undefined) setSidebarWidth(importData.sidebarWidth)
+    if (importData.projectName !== undefined) setProjectName(importData.projectName)
+    if (importData.recordSettings) setRecordSettings(importData.recordSettings)
+  }, [])
 
   // Import data from a file
   const handleImportFile = () => {
@@ -1285,17 +1433,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         return { ...slide, analysis }
       })
 
+      const updatedChapters = currentChapter
+        ? chapters.map(ch => ch.id === currentChapterId ? { ...ch, slides: updatedSlides } : ch)
+        : chapters
       setSlides(updatedSlides)
+      setChapters(updatedChapters)
+      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
 
-      // Save to localStorage
       try {
-        const currentChapter = chapters.find(c => c.id === currentChapterId)
         if (currentChapter) {
-          const updatedChapter = {
-            ...currentChapter,
-            slides: updatedSlides
-          }
-          const updatedChapters = chapters.map(ch => ch.id === currentChapterId ? updatedChapter : ch)
           localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
         }
       } catch (error) {
@@ -1323,6 +1469,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
   const handleRecordClick = async () => {
     try {
       recordingChunksRef.current = []
+      const shouldAnalyze = recordSettings.analyzeWithAI ?? false
+      analyzeAfterRecordingRef.current = shouldAnalyze
+      setAnalyzeThisRecording(shouldAnalyze)
 
       // Request microphone first (same user gesture) when enabled, so audio is ready before display picker
       let audioStream = null
@@ -1424,6 +1573,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         link.click()
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
+
+        if (analyzeAfterRecordingRef.current && analysisCallbackRef.current) {
+          try {
+            analysisCallbackRef.current(blob)
+          } catch (e) {
+            console.error('Presentation analysis failed:', e)
+          }
+        }
       }
 
       const track = displayStream.getVideoTracks()[0]
@@ -1505,7 +1662,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         <div className="app-header">
           <div className="header-top-row">
             <div className="header-left">
-            <h1>Pitch Deck 2000</h1>
+            <button type="button" className="header-app-title" onClick={() => setShowProjectOverview(true)} title="Project overview">
+              <AppLogo />
+            </button>
             <div className="header-file-actions">
               {recentFiles.length > 0 && (
                 <div className="recent-files-dropdown">
@@ -1603,7 +1762,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
               </button>
-              <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
+              <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to project folder (or download)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
@@ -1656,8 +1815,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                             if (c.id === currentChapterId) return updatedTarget
                             return c
                           })
+                          const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
                           setChapters(updatedChapters)
-                          if (currentChapterId === sourceChapter.id) setSlides(updatedSource.slides)
+                          setSlides(newSlidesForView)
+                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
                         }
                       }
                     }
@@ -1666,7 +1827,18 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <select
                     className="chapter-dropdown"
                     value={currentChapterId}
-                    onChange={(e) => setCurrentChapterId(parseInt(e.target.value, 10))}
+                    onChange={(e) => {
+                      const nextId = parseInt(e.target.value, 10)
+                      const nextChapter = chapters.find(c => c.id === nextId)
+                      if (nextChapter) {
+                        const nextSlides = nextChapter.slides
+                        const nextSelected = nextSlides.some(s => s.id === selectedSlideId) ? selectedSlideId : (nextSlides[0]?.id ?? selectedSlideId)
+                        setCurrentChapterId(nextId)
+                        setSlides(nextSlides)
+                        setSelectedSlideId(nextSelected)
+                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings, analysisFolded })
+                      }
+                    }}
                     title="Chapter"
                   >
                     {chapters.map((chapter) => (
@@ -1675,6 +1847,24 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="chapter-rename-btn"
+                    onClick={() => {
+                      const currentChapter = chapters.find(c => c.id === currentChapterId)
+                      if (!currentChapter) return
+                      const newName = window.prompt('Rename chapter', currentChapter.name)
+                      if (newName != null && newName.trim() !== '') {
+                        handleUpdateChapterName(currentChapterId, newName.trim())
+                      }
+                    }}
+                    title="Rename chapter"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
                   <button
                     className="chapter-tab-add"
                     onClick={handleAddChapter}
@@ -1996,7 +2186,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         <div className="app-header">
           <div className="header-top-row">
             <div className="header-left">
-              <h1>Pitch Deck 2000</h1>
+              <button type="button" className="header-app-title" onClick={() => setShowProjectOverview(true)} title="Project overview">
+                <AppLogo />
+              </button>
               <div className="header-file-actions">
                 <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2004,7 +2196,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
                 </button>
-                <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to file">
+                <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to project folder (or download)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
@@ -2057,8 +2249,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                             if (c.id === currentChapterId) return updatedTarget
                             return c
                           })
+                          const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
                           setChapters(updatedChapters)
-                          if (currentChapterId === sourceChapter.id) setSlides(updatedSource.slides)
+                          setSlides(newSlidesForView)
+                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
                         }
                       }
                     }
@@ -2067,7 +2261,18 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <select
                     className="chapter-dropdown"
                     value={currentChapterId}
-                    onChange={(e) => setCurrentChapterId(parseInt(e.target.value, 10))}
+                    onChange={(e) => {
+                      const nextId = parseInt(e.target.value, 10)
+                      const nextChapter = chapters.find(c => c.id === nextId)
+                      if (nextChapter) {
+                        const nextSlides = nextChapter.slides
+                        const nextSelected = nextSlides.some(s => s.id === selectedSlideId) ? selectedSlideId : (nextSlides[0]?.id ?? selectedSlideId)
+                        setCurrentChapterId(nextId)
+                        setSlides(nextSlides)
+                        setSelectedSlideId(nextSelected)
+                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings, analysisFolded })
+                      }
+                    }}
                     title="Chapter"
                   >
                     {chapters.map((chapter) => (
@@ -2076,6 +2281,24 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="chapter-rename-btn"
+                    onClick={() => {
+                      const currentChapter = chapters.find(c => c.id === currentChapterId)
+                      if (!currentChapter) return
+                      const newName = window.prompt('Rename chapter', currentChapter.name)
+                      if (newName != null && newName.trim() !== '') {
+                        handleUpdateChapterName(currentChapterId, newName.trim())
+                      }
+                    }}
+                    title="Rename chapter"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
                   <button
                     className="chapter-tab-add"
                     onClick={handleAddChapter}
@@ -2395,10 +2618,46 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         <div className="recording-bar">
           <span className="recording-bar-dot" />
           <span className="recording-bar-text">Recording</span>
+          <label className="recording-bar-analyze">
+            <input
+              type="checkbox"
+              checked={analyzeThisRecording}
+              onChange={(e) => {
+                const v = e.target.checked
+                setAnalyzeThisRecording(v)
+                analyzeAfterRecordingRef.current = v
+                setRecordSettings((prev) => ({ ...prev, analyzeWithAI: v }))
+              }}
+            />
+            <span>Get AI feedback</span>
+          </label>
           <button type="button" className="recording-bar-stop" onClick={handleStopRecording} title="Stop recording">
             Stop
           </button>
         </div>
+      )}
+      {showPresentationFeedback && presentationFeedback && (
+        <PresentationFeedback
+          onClose={() => {
+            setShowPresentationFeedback(false)
+            setPresentationFeedback(null)
+          }}
+          status={presentationFeedback.status}
+          transcript={presentationFeedback.transcript}
+          feedback={presentationFeedback.feedback}
+          errorMessage={presentationFeedback.errorMessage}
+        />
+      )}
+      {showProjectOverview && (
+        <ProjectOverview
+          onClose={() => setShowProjectOverview(false)}
+          recentFiles={recentFiles}
+          getExportData={getExportData}
+          onLoadProject={loadProjectFromData}
+          onNewProject={handleNewPresentation}
+          projectName={projectName}
+          googleClientId={settings.googleClientId}
+        />
       )}
       {showSettings && (
         <Settings
