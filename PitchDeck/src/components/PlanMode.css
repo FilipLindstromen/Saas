@@ -22,6 +22,26 @@
   flex-shrink: 0;
 }
 
+/* Row directly under Plan/Overview tabs: title bar (left/center) + Slide tips (far right) */
+.plan-header-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0 2rem 0 0;
+  flex-shrink: 0;
+}
+
+.plan-header-row .plan-title-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-header-row .plan-slide-tips-anchor {
+  flex-shrink: 0;
+}
+
 .plan-view-btn {
   padding: 0.5rem 1rem;
   background: var(--bg-secondary);
@@ -189,15 +209,29 @@
   align-items: flex-start;
 }
 
-/* Middle slides area: fixed width and position so it doesn't move when sidebar or tips change */
+/* Wrapper to center the edit-slides card horizontally; takes remaining space */
+.plan-slides-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 1rem;
+}
+
+/* Edit slides card: centered, moderate width (not too wide), single gray card */
 .plan-slides-area {
-  flex: 0 0 1200px;
-  width: 1200px;
-  min-width: 1200px;
-  max-width: 1200px;
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* In Overview, use full width so columns can spread across the screen */
@@ -208,12 +242,9 @@
   max-width: none;
 }
 
-/* When Slide tips panel is shown, use full width so the tips panel sits at the far right of the screen */
+/* When Slide tips panel is shown, allow card to fit list + panel but still centered */
 .plan-slides-area:has(.with-tips-panel) {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  max-width: none;
+  max-width: 1060px;
 }
 
 .plan-templates-sidebar {

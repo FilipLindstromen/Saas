@@ -128,12 +128,24 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [recentFiles, setRecentFiles] = useState(() => {
-    const saved = localStorage.getItem('pitchDeckRecentFiles')
-    return saved ? JSON.parse(saved) : []
+    try {
+      const saved = localStorage.getItem('pitchDeckRecentFiles')
+      if (!saved) return []
+      const parsed = JSON.parse(saved)
+      return Array.isArray(parsed) ? parsed : []
+    } catch (e) {
+      return []
+    }
   })
   const [workspaces, setWorkspaces] = useState(() => {
-    const saved = localStorage.getItem('pitchDeckWorkspaces')
-    return saved ? JSON.parse(saved) : [{ id: 'default', name: 'Default Workspace' }]
+    try {
+      const saved = localStorage.getItem('pitchDeckWorkspaces')
+      if (!saved) return [{ id: 'default', name: 'Default Workspace' }]
+      const parsed = JSON.parse(saved)
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : [{ id: 'default', name: 'Default Workspace' }]
+    } catch (e) {
+      return [{ id: 'default', name: 'Default Workspace' }]
+    }
   })
   const [currentWorkspace, setCurrentWorkspace] = useState(() => {
     return localStorage.getItem('pitchDeckCurrentWorkspace') || 'default'
@@ -694,7 +706,6 @@ function App() {
           const filtered = prev.filter(f => f.path !== filename)
           return [fileInfo, ...filtered].slice(0, 10)
         })
-        localStorage.setItem('pitchDeckRecentFiles', JSON.stringify([fileInfo, ...recentFiles.filter(f => f.path !== filename)].slice(0, 10)))
         return
       }
     } catch (e) {
@@ -717,8 +728,7 @@ function App() {
       const filtered = prev.filter(f => f.path !== filename)
       return [fileInfo, ...filtered].slice(0, 10)
     })
-    localStorage.setItem('pitchDeckRecentFiles', JSON.stringify([fileInfo, ...recentFiles.filter(f => f.path !== filename)].slice(0, 10)))
-  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName, recentFiles])
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
@@ -1131,49 +1141,44 @@ function App() {
     localStorage.setItem('pitchDeckProjectName', projectName)
   }, [projectName])
 
+  // Normalize slide object with default layout and numeric props (shared for load/import).
+  const normalizeSlide = useCallback((slide) => ({
+    ...slide,
+    layout: slide.layout || 'default',
+    gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+    flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+    backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+    gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+    subtitle: slide.subtitle || '',
+    imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+    imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+    imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+    textHeadingLevel: slide.textHeadingLevel || null,
+    subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
+    analysis: slide.analysis != null ? slide.analysis : null
+  }), [])
+
   // Load project data (from overview Open, or after file read). Same shape as export.
   const loadProjectFromData = useCallback((importData) => {
     if (!importData) return
     if (importData.chapters && Array.isArray(importData.chapters)) {
-      setChapters(importData.chapters)
+      const normalizedChapters = importData.chapters.map(ch => ({
+        ...ch,
+        slides: (ch.slides || []).map(normalizeSlide)
+      }))
+      setChapters(normalizedChapters)
       setCurrentChapterId(importData.currentChapterId || importData.chapters[0]?.id || 1)
     } else if (importData.slides && Array.isArray(importData.slides)) {
-      const slidesWithLayout = importData.slides.map(slide => ({
-        ...slide,
-        layout: slide.layout || 'default',
-        gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
-        flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-        backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
-        gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
-        subtitle: slide.subtitle || '',
-        imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
-        imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-        imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
-        textHeadingLevel: slide.textHeadingLevel || null,
-        subtitleHeadingLevel: slide.subtitleHeadingLevel || null
-      }))
+      const slidesWithLayout = importData.slides.map(normalizeSlide)
       setChapters([{ id: 1, name: 'Chapter 1', slides: slidesWithLayout }])
       setCurrentChapterId(1)
     } else return
-    const currentChapter = importData.chapters
-      ? importData.chapters.find(c => c.id === (importData.currentChapterId || importData.chapters[0]?.id))
-      : null
-    const slidesToLoad = currentChapter ? currentChapter.slides : (importData.slides || [])
-    const slidesWithLayout = slidesToLoad.map(slide => ({
-      ...slide,
-      layout: slide.layout || 'default',
-      gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
-      flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-      backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
-      gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
-      subtitle: slide.subtitle || '',
-      imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
-      imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-      imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
-      textHeadingLevel: slide.textHeadingLevel || null,
-      subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-      analysis: slide.analysis || null
-    }))
+    const chaptersToUse = importData.chapters && Array.isArray(importData.chapters)
+      ? importData.chapters.map(ch => ({ ...ch, slides: (ch.slides || []).map(normalizeSlide) }))
+      : [{ id: 1, name: 'Chapter 1', slides: (importData.slides || []).map(normalizeSlide) }]
+    const currentChapter = chaptersToUse.find(c => c.id === (importData.currentChapterId || chaptersToUse[0]?.id))
+    const slidesToLoad = currentChapter ? currentChapter.slides : (importData.slides || []).map(normalizeSlide)
+    const slidesWithLayout = Array.isArray(slidesToLoad) ? slidesToLoad : []
     setSlides(slidesWithLayout)
     const validSelectedId = slidesWithLayout.find(s => s.id === importData.selectedSlideId)
       ? importData.selectedSlideId
@@ -1187,7 +1192,7 @@ function App() {
     if (importData.projectName !== undefined) setProjectName(importData.projectName)
     if (importData.recordSettings) setRecordSettings(importData.recordSettings)
     if (importData.analysisFolded !== undefined) setAnalysisFolded(importData.analysisFolded)
-  }, [])
+  }, [normalizeSlide])
 
   // Import data from a file
   const handleImportFile = () => {
@@ -1393,7 +1398,11 @@ function App() {
         })
 
         const data = await response.json()
-        const searchQuery = data.choices[0].message.content.trim().replace(/['"]/g, '')
+        if (!response.ok || !data.choices?.[0]?.message?.content) {
+          failCount++
+          continue
+        }
+        const searchQuery = String(data.choices[0].message.content).trim().replace(/['"]/g, '')
 
         // Search Unsplash for images
         const unsplashResponse = await fetch(
@@ -1406,9 +1415,9 @@ function App() {
         )
 
         const unsplashData = await unsplashResponse.json()
-        
-        if (unsplashData.results && unsplashData.results.length > 0) {
-          const imageUrl = unsplashData.results[0].urls.regular
+        const firstResult = unsplashData?.results?.[0]
+        const imageUrl = firstResult?.urls?.regular
+        if (imageUrl) {
           const slideIndex = updatedSlides.findIndex(s => s.id === slide.id)
           if (slideIndex !== -1) {
             updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], imageUrl, backgroundOpacity: 0.6 }
@@ -2124,7 +2133,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           </div>
         </div>
         <div className="app-content plan-mode-content">
-          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} projectName={projectName} onProjectNameChange={setProjectName} />
+          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} currentChapterId={currentChapterId} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} projectName={projectName} onProjectNameChange={setProjectName} />
         </div>
         {showProjectOverview && (
           <ProjectOverview

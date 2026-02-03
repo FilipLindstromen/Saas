@@ -430,10 +430,22 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         setTextFormatToolbar(null)
         return
       }
-      const rect = range.getBoundingClientRect()
+      let rect = range.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) {
-        setTextFormatToolbar(null)
-        return
+        const fallbackEl = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+          ? range.commonAncestorContainer.parentElement
+          : range.commonAncestorContainer
+        if (fallbackEl && fallbackEl.getBoundingClientRect) {
+          rect = fallbackEl.getBoundingClientRect()
+        }
+        if (rect.width === 0 && rect.height === 0) {
+          const container = target.field === 'content' ? contentRef.current : target.field === 'subtitle' ? subtitleRef.current : null
+          if (container && container.getBoundingClientRect) rect = container.getBoundingClientRect()
+        }
+        if (rect.width === 0 && rect.height === 0) {
+          setTextFormatToolbar(null)
+          return
+        }
       }
       let target = null
       if (contentRef.current && (textEl === contentRef.current || contentRef.current.contains(textEl))) {
@@ -502,8 +514,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     const handleMouseUp = () => {
       setTimeout(checkSelection, 10)
     }
+    const handleKeyUp = (e) => {
+      if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        setTimeout(checkSelection, 10)
+      }
+    }
     document.addEventListener('mouseup', handleMouseUp)
-    return () => document.removeEventListener('mouseup', handleMouseUp)
+    document.addEventListener('keyup', handleKeyUp)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('keyup', handleKeyUp)
+    }
   }, [isEditableForToolbar])
 
   // Sync content from target element to slide state (after applying a format)
@@ -600,27 +621,37 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const applyHeading = useCallback((tagName) => {
     const state = textFormatToolbar
     if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
     const container = state.target.field === 'content' ? contentRef.current : state.target.field === 'subtitle' ? subtitleRef.current : null
     if (!container) return
-    applyFormat(() => {
-      const range = textFormatRangeRef.current
-      if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
       const block = getBlockElement(range, container)
-      const defaultTag = 'p'
-      if (block) {
-        const newTag = (block.tagName.toLowerCase() === tagName) ? defaultTag : tagName
-        const newEl = document.createElement(newTag)
-        while (block.firstChild) newEl.appendChild(block.firstChild)
-        block.parentNode.replaceChild(newEl, block)
+      const currentTag = block ? block.tagName.toLowerCase() : null
+      const isTogglingOff = block && currentTag === tagName
+      if (isTogglingOff && range.toString().trim() === (block.textContent || '').trim()) {
+        const p = document.createElement('p')
+        while (block.firstChild) p.appendChild(block.firstChild)
+        if (block.parentNode) block.parentNode.replaceChild(p, block)
       } else {
-        // Flat content (no inner P/H1/H2/H3): wrap all container children in the new block
-        const newTag = tagName
-        const newEl = document.createElement(newTag)
-        while (container.firstChild) newEl.appendChild(container.firstChild)
-        container.appendChild(newEl)
+        const newEl = document.createElement(isTogglingOff ? 'p' : tagName)
+        try {
+          range.surroundContents(newEl)
+        } catch (e) {
+          const fragment = range.extractContents()
+          newEl.appendChild(fragment)
+          range.insertNode(newEl)
+        }
       }
-    })
-  }, [applyFormat, getBlockElement, textFormatToolbar])
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, getBlockElement, syncContentFromTarget, closeTextFormatToolbar])
   const applyFontPairing = useCallback(() => {
     const state = textFormatToolbar
     if (!state?.target) return
@@ -630,25 +661,35 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     sel.removeAllRanges()
     sel.addRange(range)
     try {
-      // Use selection start (same as serifActive) so we always find the correct span when toggling off
-      const startNode = range.startContainer
-      const startEl = startNode.nodeType === Node.TEXT_NODE ? startNode.parentElement : startNode
-      const span = startEl?.closest?.('.font-pairing-serif')
-      if (span?.classList?.contains('font-pairing-serif')) {
-        // Toggle off: unwrap serif
-        const parent = span.parentNode
-        if (parent) {
-          while (span.firstChild) parent.insertBefore(span.firstChild, span)
-          parent.removeChild(span)
+      const container = state.target.field === 'content' ? contentRef.current : state.target.field === 'subtitle' ? subtitleRef.current : null
+      if (!container) return
+      const allSerif = container.querySelectorAll('.font-pairing-serif')
+      const serifSpans = Array.from(allSerif).filter((el) => {
+        try {
+          return range.intersectsNode(el)
+        } catch (e) {
+          return false
         }
+      })
+      if (serifSpans.length > 0) {
+        const depth = (el) => { let d = 0; let p = el; while (p && p !== container) { d++; p = p.parentElement; } return d }
+        serifSpans.sort((a, b) => depth(b) - depth(a))
+        serifSpans.forEach((span) => {
+          const parent = span.parentNode
+          if (parent) {
+            while (span.firstChild) parent.insertBefore(span.firstChild, span)
+            parent.removeChild(span)
+          }
+        })
       } else {
-        // Toggle on: wrap in serif span
         const serifSpan = document.createElement('span')
         serifSpan.className = 'font-pairing-serif'
         try {
           range.surroundContents(serifSpan)
         } catch (e) {
-          // ignore
+          const fragment = range.extractContents()
+          serifSpan.appendChild(fragment)
+          range.insertNode(serifSpan)
         }
       }
     } catch (e) {
@@ -739,34 +780,48 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         }
         return false
       }
+      const depth = (node, root) => {
+        let d = 0
+        let n = node
+        while (n && n !== root) {
+          d++
+          n = n.parentNode
+        }
+        return d
+      }
+      const toProcess = []
+      const collect = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return
+        if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+          Array.from(node.childNodes).forEach(collect)
+          return
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return
+        Array.from(node.childNodes).forEach(collect)
+        const tag = node.tagName ? node.tagName.toLowerCase() : ''
+        if (isFormattingTag(node) || ['h1', 'h2', 'h3'].includes(tag)) {
+          toProcess.push(node)
+        }
+      }
+      collect(fragment)
+      toProcess.sort((a, b) => depth(b, fragment) - depth(a, fragment))
       const unwrap = (el) => {
         const parent = el.parentNode
         if (!parent) return
         while (el.firstChild) parent.insertBefore(el.firstChild, el)
         parent.removeChild(el)
       }
-      const cleanNode = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) return
-        // DocumentFragment: process children only (fragment has no tagName)
-        if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-          Array.from(node.childNodes).forEach(cleanNode)
-          return
-        }
-        if (node.nodeType !== Node.ELEMENT_NODE) return
+      toProcess.forEach((node) => {
+        if (!node.parentNode) return
         const tag = node.tagName ? node.tagName.toLowerCase() : ''
-        const children = Array.from(node.childNodes)
-        children.forEach(cleanNode)
-        if (isFormattingTag(node)) {
-          unwrap(node)
-          return
-        }
         if (['h1', 'h2', 'h3'].includes(tag)) {
           const p = document.createElement('p')
           while (node.firstChild) p.appendChild(node.firstChild)
           if (node.parentNode) node.parentNode.replaceChild(p, node)
+        } else if (isFormattingTag(node)) {
+          unwrap(node)
         }
-      }
-      cleanNode(fragment)
+      })
       range.insertNode(fragment)
     } catch (e) {
       // ignore
@@ -1355,38 +1410,47 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .slide-content h1 {
           font-size: ${h1Size}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          line-height: ${lineHeight} !important;
         }
         .slide-content h2 {
           font-size: ${h2Size}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
         .slide-content h3 {
           font-size: ${h3Size}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
         .slide-subtitle h1 {
           font-size: ${h1Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          line-height: ${lineHeight} !important;
         }
         .slide-subtitle h2 {
           font-size: ${h2Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
         .slide-subtitle h3 {
           font-size: ${h3Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
         .bullet-text h1 {
           font-size: ${h1Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
+          line-height: ${lineHeight} !important;
         }
         .bullet-text h2 {
           font-size: ${h2Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
         }
         .bullet-text h3 {
           font-size: ${h3Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
         }
         .slide .slide-content .font-pairing-serif,
         .slide .slide-subtitle .font-pairing-serif,
@@ -1437,6 +1501,18 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           videoHue={videoHue}
           cameraOverrideEnabled={cameraOverrideEnabled}
           cameraOverridePosition={cameraOverridePosition}
+        />
+      )}
+      {layout === 'video' && (
+        <div 
+          className="slide-gradient-overlay slide-gradient-overlay-video"
+          style={{
+            background: gradientFlipped
+              ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+              : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}
         />
       )}
       {layout === 'video' ? (
