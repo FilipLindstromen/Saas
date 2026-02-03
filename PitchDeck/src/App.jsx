@@ -2124,7 +2124,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           </div>
         </div>
         <div className="app-content plan-mode-content">
-          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} />
+          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} projectName={projectName} onProjectNameChange={setProjectName} />
         </div>
         {showProjectOverview && (
           <ProjectOverview

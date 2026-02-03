@@ -81,7 +81,7 @@ const SECTION_TIPS = {
   }
 }
 
-function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], onUpdateChapterSlides, onReorderChapters, onUpdateChapterName }) {
+function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange }) {
   const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
@@ -92,6 +92,9 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [editingChapterId, setEditingChapterId] = useState(null)
   const [editingChapterName, setEditingChapterName] = useState('')
   const chapterNameInputRef = useRef(null)
+  const [editingPlanTitle, setEditingPlanTitle] = useState(false)
+  const planTitleInputRef = useRef(null)
+  const planTitleBeforeEditRef = useRef('')
   const [generateInput, setGenerateInput] = useState(() => {
     // Load from localStorage on mount
     return localStorage.getItem('pitchDeckGenerateInput') || ''
@@ -423,12 +426,12 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
 
   const handleAddScene = (chapterId) => {
     if (editingId !== null) {
-      const editChapter = getChapterForSlide(editingId)
-      const editSlides = editChapter ? editChapter.slides : slides
+      const contextKey = editingContextKey()
+      const editSlides = getSlidesForContext(contextKey)
       const updatedSlides = editSlides.map(slide =>
         slide.id === editingId ? { ...slide, content: editContent } : slide
       )
-      applyUpdate(editingId, updatedSlides)
+      applyUpdate(contextKey, updatedSlides)
     }
     const newId = maxSlideId() + 1
     const newSlide = {
@@ -459,12 +462,12 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
 
   const handleAddSection = (chapterId) => {
     if (editingId !== null) {
-      const editChapter = getChapterForSlide(editingId)
-      const editSlides = editChapter ? editChapter.slides : slides
+      const contextKey = editingContextKey()
+      const editSlides = getSlidesForContext(contextKey)
       const updatedSlides = editSlides.map(slide =>
         slide.id === editingId ? { ...slide, content: editContent } : slide
       )
-      applyUpdate(editingId, updatedSlides)
+      applyUpdate(contextKey, updatedSlides)
     }
     const newId = maxSlideId() + 1
     const newSection = {
@@ -493,7 +496,12 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     setEditContent('Section Name')
   }
 
-  const handleSceneClick = (slide) => {
+  const handleSceneClick = (slide, chapterId) => {
+    if (isOverview && chapterId != null) {
+      setEditingChapterId(chapterId)
+    } else {
+      setEditingChapterId(null)
+    }
     setEditingId(slide.id)
     // Remove HTML tags for editing
     const tempDiv = document.createElement('div')
@@ -511,21 +519,23 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     
     // Auto-save on every change
     if (editingId !== null) {
-      const contextSlides = getSlidesForContext(editingId)
+      const contextKey = editingContextKey()
+      const contextSlides = getSlidesForContext(contextKey)
       const updatedSlides = contextSlides.map(slide =>
         slide.id === editingId ? { ...slide, content: newContent } : slide
       )
-      applyUpdate(editingId, updatedSlides)
+      applyUpdate(contextKey, updatedSlides)
     }
   }
 
   const handleBlur = () => {
     if (editingId !== null) {
-      const contextSlides = getSlidesForContext(editingId)
+      const contextKey = editingContextKey()
+      const contextSlides = getSlidesForContext(contextKey)
       const updatedSlides = contextSlides.map(slide =>
         slide.id === editingId ? { ...slide, content: editContent } : slide
       )
-      applyUpdate(editingId, updatedSlides)
+      applyUpdate(contextKey, updatedSlides)
       setEditingId(null)
       setEditContent('')
     }
@@ -549,7 +559,8 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       // Double Enter: if Enter pressed twice quickly OR if content ends with newline and we're at the end
       if ((timeSinceLastEnter < 500 && endsWithNewline) || (isAtEnd && endsWithNewline && textAfterCursor === '')) {
         e.preventDefault()
-        const contextSlides = getSlidesForContext(editingId)
+        const contextKey = editingContextKey()
+        const contextSlides = getSlidesForContext(contextKey)
         const contentForCurrentSlide = textBeforeCursor.slice(0, -1)
         const contentForNewSlide = textAfterCursor.trim()
         const updatedSlides = contextSlides.map(slide =>
@@ -579,7 +590,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
           newSlide,
           ...updatedSlides.slice(insertIndex)
         ]
-        applyUpdate(editingId, finalSlides)
+        applyUpdate(contextKey, finalSlides)
         setEditingId(newId)
         setEditContent(contentForNewSlide)
         setTimeout(() => {
@@ -594,29 +605,34 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       }
     } else if (e.key === 'Escape') {
       if (editingId !== null) {
-        const contextSlides = getSlidesForContext(editingId)
+        const contextKey = editingContextKey()
+        const contextSlides = getSlidesForContext(contextKey)
         const updatedSlides = contextSlides.map(slide =>
           slide.id === editingId ? { ...slide, content: editContent } : slide
         )
-        applyUpdate(editingId, updatedSlides)
+        applyUpdate(contextKey, updatedSlides)
       }
       setEditingId(null)
       setEditContent('')
     }
   }
 
-  const handleDelete = (slideId, e) => {
+  const handleDelete = (slideId, e, chapterId) => {
     e.stopPropagation()
-    const contextSlides = getSlidesForContext(slideId)
+    const contextKey = (isOverview && chapterId != null) ? chapterId : slideId
+    const contextSlides = getSlidesForContext(contextKey)
     if (contextSlides.length > 1) {
-      applyUpdate(slideId, contextSlides.filter(s => s.id !== slideId))
+      applyUpdate(contextKey, contextSlides.filter(s => s.id !== slideId))
     }
   }
 
-  const handleDragStart = (e, slideId) => {
+  const handleDragStart = (e, slideId, chapterId) => {
     if (editingId === slideId) {
       e.preventDefault()
       return
+    }
+    if (isOverview && chapterId != null) {
+      setDraggedChapterId(chapterId)
     }
     setDraggedId(slideId)
     e.dataTransfer.effectAllowed = 'move'
@@ -635,7 +651,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     setDragOverId(null)
   }
 
-  const handleDrop = (e, targetSlideId) => {
+  const handleDrop = (e, targetSlideId, chapterId) => {
     e.preventDefault()
     setDragOverId(null)
     
@@ -645,16 +661,18 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     }
 
     if (editingId !== null) {
-      const contextSlides = getSlidesForContext(editingId)
+      const contextKey = editingContextKey()
+      const contextSlides = getSlidesForContext(contextKey)
       const savedSlides = contextSlides.map(slide =>
         slide.id === editingId ? { ...slide, content: editContent } : slide
       )
-      applyUpdate(editingId, savedSlides)
+      applyUpdate(contextKey, savedSlides)
       setEditingId(null)
       setEditContent('')
     }
 
-    const contextSlides = getSlidesForContext(draggedId)
+    const dragContextKey = (isOverview && draggedChapterId != null) ? draggedChapterId : draggedId
+    const contextSlides = getSlidesForContext(dragContextKey)
     const draggedIndex = contextSlides.findIndex(s => s.id === draggedId)
     const targetIndex = contextSlides.findIndex(s => s.id === targetSlideId)
     
@@ -667,12 +685,13 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     const [draggedSlide] = newSlides.splice(draggedIndex, 1)
     newSlides.splice(targetIndex, 0, draggedSlide)
     
-    applyUpdate(draggedId, newSlides)
+    applyUpdate(dragContextKey, newSlides)
     setDraggedId(null)
   }
 
   const handleDragEnd = () => {
     setDraggedId(null)
+    setDraggedChapterId(null)
     setDragOverId(null)
   }
 
@@ -723,6 +742,38 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       chapterNameInputRef.current.select()
     }
   }, [editingChapterId])
+
+  useEffect(() => {
+    if (editingPlanTitle && planTitleInputRef.current) {
+      planTitleInputRef.current.focus()
+      planTitleInputRef.current.select()
+    }
+  }, [editingPlanTitle])
+
+  const startEditingPlanTitle = () => {
+    if (!onProjectNameChange) return
+    planTitleBeforeEditRef.current = projectName || ''
+    setEditingPlanTitle(true)
+  }
+
+  const savePlanTitle = () => {
+    if (onProjectNameChange) {
+      const trimmed = (projectName || '').trim()
+      onProjectNameChange(trimmed !== '' ? trimmed : planTitleBeforeEditRef.current)
+    }
+    setEditingPlanTitle(false)
+  }
+
+  const handlePlanTitleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      savePlanTitle()
+    } else if (e.key === 'Escape') {
+      if (onProjectNameChange) onProjectNameChange(planTitleBeforeEditRef.current)
+      setEditingPlanTitle(false)
+      planTitleInputRef.current?.blur()
+    }
+  }
 
   const startEditingChapterName = (chapter) => {
     setEditingChapterId(chapter.id)
@@ -891,12 +942,16 @@ Example format:
     }
   }
 
-  const renderSceneRows = (slidesForList) =>
+  const editingContextKey = () => (isOverview && editingChapterId != null ? editingChapterId : editingId)
+
+  const renderSceneRows = (slidesForList, chapterId) =>
     slidesForList.map((slide, index) => {
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = slide.content || ''
       const displayText = tempDiv.textContent || tempDiv.innerText || ''
-      const isEditing = editingId === slide.id
+      const isEditing = (chapterId != null && isOverview)
+        ? (editingChapterId === chapterId && editingId === slide.id)
+        : (editingId === slide.id)
       const isSection = slide.layout === 'section'
       const isDragging = draggedId === slide.id
       const isDragOver = dragOverId === slide.id
@@ -905,12 +960,12 @@ Example format:
           key={slide.id}
           className={`plan-scene ${isSection ? 'plan-section' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
           draggable={!isEditing}
-          onDragStart={(e) => handleDragStart(e, slide.id)}
+          onDragStart={(e) => handleDragStart(e, slide.id, chapterId)}
           onDragOver={(e) => handleDragOver(e, slide.id)}
           onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, slide.id)}
+          onDrop={(e) => handleDrop(e, slide.id, chapterId)}
           onDragEnd={handleDragEnd}
-          onClick={() => !isEditing && handleSceneClick(slide)}
+          onClick={() => !isEditing && handleSceneClick(slide, chapterId)}
         >
           <span className="scene-number">{isSection ? 'Section' : `Slide ${index + 1}`}</span>
           <div className="scene-separator" />
@@ -937,7 +992,7 @@ Example format:
             <button
               type="button"
               className="plan-scene-delete"
-              onClick={(e) => handleDelete(slide.id, e)}
+              onClick={(e) => handleDelete(slide.id, e, chapterId)}
               title={isSection ? 'Delete section' : 'Delete slide'}
               aria-label={isSection ? 'Delete section' : 'Delete slide'}
             >
@@ -1161,7 +1216,7 @@ Example format:
                   )}
                 </div>
                 <div className={`plan-scenes-list plan-overview-column-list ${showSlideTips ? 'with-tips' : ''}`}>
-                  {renderSceneRows(chapter.slides)}
+                  {renderSceneRows(chapter.slides, chapter.id)}
                   <div className="add-buttons-container">
                     <button type="button" className="add-scene-btn" onClick={() => handleAddScene(chapter.id)}>
                       + Add slide
@@ -1176,19 +1231,37 @@ Example format:
           </div>
         ) : (
           <div className="plan-standard-column">
-            <div className="plan-slide-tips-row plan-slide-tips-row-full">
-              <label className="plan-slide-tips-toggle">
-                <input
-                  type="checkbox"
-                  checked={showSlideTips}
-                  onChange={(e) => setShowSlideTips(e.target.checked)}
-                  className="plan-slide-tips-checkbox"
-                />
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18h6M9 14h6M9 6h.01M9 10h.01M15 10V6a2 2 0 0 0-2-2H11a2 2 0 0 0-2 2v4M12 22c-3 0-5-1.5-5-4v-2h10v2c0 2.5-2 4-5 4z" />
+            <div className="plan-title-bar">
+              <span className="plan-title-bar-icon" aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
                 </svg>
-                <span>Slide tips</span>
-              </label>
+              </span>
+              {editingPlanTitle ? (
+                <input
+                  ref={planTitleInputRef}
+                  type="text"
+                  className="plan-title-bar-input"
+                  value={projectName || ''}
+                  onChange={(e) => onProjectNameChange?.(e.target.value)}
+                  onBlur={savePlanTitle}
+                  onKeyDown={handlePlanTitleKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Presentation title"
+                />
+              ) : (
+                <span
+                  className="plan-title-bar-text"
+                  onClick={onProjectNameChange ? startEditingPlanTitle : undefined}
+                  title={onProjectNameChange ? 'Click to edit title' : undefined}
+                >
+                  {projectName?.trim() || 'Untitled presentation'}
+                </span>
+              )}
             </div>
             <div className={`plan-standard-row ${showSlideTips ? 'with-tips-panel' : ''}`}>
               {showSlideTips && (
@@ -1227,6 +1300,20 @@ Example format:
             </div>
           </div>
         )}
+        </div>
+        <div className="plan-slide-tips-anchor">
+          <label className="plan-slide-tips-toggle">
+            <input
+              type="checkbox"
+              checked={showSlideTips}
+              onChange={(e) => setShowSlideTips(e.target.checked)}
+              className="plan-slide-tips-checkbox"
+            />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18h6M9 14h6M9 6h.01M9 10h.01M15 10V6a2 2 0 0 0-2-2H11a2 2 0 0 0-2 2v4M12 22c-3 0-5-1.5-5-4v-2h10v2c0 2.5-2 4-5 4z" />
+            </svg>
+            <span>Slide tips</span>
+          </label>
         </div>
       </div>
     </div>
