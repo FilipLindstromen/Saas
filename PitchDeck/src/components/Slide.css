@@ -59,15 +59,14 @@
   height: 100%;
   display: flex;
   align-items: flex-end;
-  /* Position text in lower third: ~16.67% from bottom centers content in lower third */
-  padding: 4% 0 16.67% 9%;
+  /* Bottom offset from typography setting (--slide-content-bottom); applies in edit + present */
+  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
   background: transparent;
 }
 
 .slide-content.bulletpoints {
   align-items: flex-end;
-  /* Position bullet points in lower third: ~16.67% from bottom centers content in lower third */
-  padding: 4% 0 16.67% 9%;
+  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
 }
 
 .slide-content.centered {
@@ -99,8 +98,8 @@
 .slide-content.right {
   align-items: flex-end;
   justify-content: flex-end;
-  /* Position text in lower third: ~16.67% from bottom centers content in lower third */
-  padding: 4% 9% 16.67% 0;
+  /* Position text in lower third; minus 1.4em moves text down by ~1 line */
+  padding: 4% 9% calc(16.67% - 1.4em) 0;
 }
 
 .slide-content.section {
@@ -114,27 +113,47 @@
   display: none;
 }
 
+/* Present mode: ensure content position matches edit mode for all layouts */
+.play-mode .slide .slide-content:not(.centered):not(.section) {
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+.play-mode .slide .slide-content.right,
+.play-mode .slide .slide-content.right-video {
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+.play-mode .slide .slide-content.centered,
+.play-mode .slide .slide-content.section {
+  justify-content: center;
+  align-items: center;
+}
+.play-mode .slide .slide-content-video {
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
 .slide-content-video {
-  /* Text overlay for video layout - appears on top of video */
+  /* Text overlay for video layout - uses same bottom offset as typography setting */
   position: relative;
   z-index: 1001;
   display: flex;
   align-items: flex-end;
-  padding: 4% 0 16.67% 9%; /* Same positioning as default left layout */
+  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
 }
 
-/* Left with Video: same text position as default Left (9% left, 16.67% bottom); only the text area is narrower */
+/* Left with Video: same bottom offset as typography setting; only the text area is narrower */
 .slide-content.left-video {
   align-items: flex-end;
   justify-content: flex-start;
-  /* Same padding as default .slide-content so text starts at the same position as Left layout */
-  padding: 4% 0 16.67% 9%;
+  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
 }
 
+/* Right with Video: text on right, video panel on left; same bottom offset as typography setting */
 .slide-content.right-video {
   align-items: flex-end;
   justify-content: flex-end;
-  padding: 4% 0 16.67% 9%;
+  padding: 4% 9% var(--slide-content-bottom, 16.67%) 0;
 }
 
 .slide-text {
@@ -214,6 +233,12 @@
 /* Narrower text area only; same left position as default Left layout */
 .slide-text.left-video {
   text-align: left;
+  max-width: 45%;
+}
+
+/* Right with Video: text on right, narrower text area */
+.slide-text.right-video {
+  text-align: right;
   max-width: 45%;
 }
 
@@ -343,6 +368,32 @@
   font-style: italic;
 }
 
+/* H1/H2/H3 in content: block display so heading sizes from Slide.jsx apply in edit and present mode */
+.slide-content h1,
+.slide-content-video h1,
+.slide-content h2,
+.slide-content-video h2,
+.slide-content h3,
+.slide-content-video h3,
+.slide-subtitle h1,
+.slide-subtitle h2,
+.slide-subtitle h3,
+.bullet-text h1,
+.bullet-text h2,
+.bullet-text h3 {
+  display: block;
+  font-weight: 700;
+  margin: 0.25em 0;
+}
+
+.slide-content h1,
+.slide-content-video h1 { margin-top: 0; }
+/* Slight space below H3 so the next line isn’t too tight */
+.slide-content h3,
+.slide-content-video h3,
+.slide-subtitle h3,
+.bullet-text h3 { margin-bottom: 0.2em; }
+
 .slide-text mark,
 .slide-subtitle mark,
 .slide-bullet mark {
@@ -465,6 +516,19 @@
   right: 0;
   bottom: 0;
   left: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.slide-webcam.webcam-video-left-panel {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: auto;
   width: 33.33%;
   height: 100%;
   min-width: 0;

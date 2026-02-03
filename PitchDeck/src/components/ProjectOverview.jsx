@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   isLocalFolderSupported,
   openProjectFolder,
@@ -16,6 +16,20 @@ import {
   readFromDrive
 } from '../services/projectStorage'
 import './ProjectOverview.css'
+
+/** Get the first background image URL from a project's chapters/slides (first slide with imageUrl). */
+function getFirstSlideImageUrl(data) {
+  if (!data?.chapters) return null
+  for (const ch of data.chapters) {
+    const slides = ch?.slides || []
+    for (const slide of slides) {
+      if (slide?.imageUrl && typeof slide.imageUrl === 'string' && slide.imageUrl.trim()) {
+        return slide.imageUrl
+      }
+    }
+  }
+  return null
+}
 
 function ProjectOverview({
   onClose,
@@ -37,6 +51,8 @@ function ProjectOverview({
   const [newProjectName, setNewProjectName] = useState('')
   const [showRenameProjectOverlay, setShowRenameProjectOverlay] = useState(false)
   const [renameProjectValue, setRenameProjectValue] = useState('')
+  const [thumbnails, setThumbnails] = useState({}) // project id -> thumbnail URL (object URL or data URL)
+  const thumbnailUrlsRef = useRef(new Set()) // track object URLs we created so we can revoke on cleanup
 
   // Restore project folder on mount and list its files
   useEffect(() => {
@@ -55,6 +71,63 @@ function ProjectOverview({
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
+
+  // Load thumbnails (first background image) for local and drive projects
+  useEffect(() => {
+    const localList = localFolderName != null ? localProjects : []
+    const driveList = driveToken != null ? driveProjects : []
+    if (localList.length === 0 && driveList.length === 0) {
+      setThumbnails({})
+      return
+    }
+    let cancelled = false
+    thumbnailUrlsRef.current = new Set()
+
+    const loadLocalThumbnails = async () => {
+      const folder = await getProjectFolder()
+      if (!folder?.handle || cancelled) return
+      for (const p of localList) {
+        if (cancelled) break
+        try {
+          const data = await readFromFileHandle(p.handle)
+          const resolved = await resolveProjectImageUrls(data, folder.handle)
+          const url = getFirstSlideImageUrl(resolved)
+          if (cancelled) {
+            if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
+            break
+          }
+          if (url?.startsWith('blob:')) thumbnailUrlsRef.current.add(url)
+          setThumbnails((prev) => ({ ...prev, [`local-${p.name}`]: url || null }))
+        } catch (_) {
+          if (!cancelled) setThumbnails((prev) => ({ ...prev, [`local-${p.name}`]: null }))
+        }
+      }
+    }
+
+    const loadDriveThumbnails = async () => {
+      if (!driveToken || cancelled) return
+      for (const p of driveList) {
+        if (cancelled) break
+        try {
+          const data = await readFromDrive(driveToken, p.id)
+          const url = getFirstSlideImageUrl(data)
+          if (cancelled) break
+          setThumbnails((prev) => ({ ...prev, [`drive-${p.id}`]: url || null }))
+        } catch (_) {
+          if (!cancelled) setThumbnails((prev) => ({ ...prev, [`drive-${p.id}`]: null }))
+        }
+      }
+    }
+
+    loadLocalThumbnails().then(() => loadDriveThumbnails())
+
+    return () => {
+      cancelled = true
+      thumbnailUrlsRef.current.forEach((u) => URL.revokeObjectURL(u))
+      thumbnailUrlsRef.current = new Set()
+      setThumbnails({})
+    }
+  }, [localFolderName, localProjects, driveToken, driveProjects])
 
   const hasFolderOrDrive = localFolderName != null || driveToken != null
   const recentOnlyWhenNoFolder = localFolderName == null && driveToken != null
@@ -291,8 +364,8 @@ function ProjectOverview({
               onClick={() => setSelectedProject(proj)}
             >
               <div className="project-overview-card-thumb">
-                {proj.data?.chapters?.[0]?.slides?.[0]?.imageUrl ? (
-                  <img src={proj.data.chapters[0].slides[0].imageUrl} alt="" />
+                {(thumbnails[proj.id] ?? getFirstSlideImageUrl(proj.data)) ? (
+                  <img src={thumbnails[proj.id] ?? getFirstSlideImageUrl(proj.data)} alt="" />
                 ) : (
                   <div className="project-overview-card-placeholder" />
                 )}

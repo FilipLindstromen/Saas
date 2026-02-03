@@ -70,6 +70,16 @@
 .plan-mode.plan-view-overview .plan-layout {
   max-width: 100%;
   width: 100%;
+  min-height: 0;
+}
+
+/* Overview: let the content fill the whole work area (no centering, no empty side space) */
+.plan-mode.plan-view-overview .plan-slides-center {
+  justify-content: stretch;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
 }
 
 .plan-overview-scroll {
@@ -79,6 +89,8 @@
   gap: 1.5rem;
   overflow: auto;
   min-height: 0;
+  min-width: 100%;
+  width: 100%;
   padding: 0 1rem 1rem;
   align-items: flex-start;
   justify-content: flex-start;
@@ -177,6 +189,21 @@
   border-radius: 8px;
 }
 
+/* In Overview, standard column and row fill the area so the scroll does too */
+.plan-mode.plan-view-overview .plan-standard-column {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-mode.plan-view-overview .plan-standard-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .plan-overview-column-list {
   flex: 1;
   min-height: 200px;
@@ -195,7 +222,7 @@
   width: 100%;
   flex: 1;
   gap: 2rem;
-  padding: 0 2rem 0 0;
+  padding: 0 2rem;
   align-items: flex-start;
   min-height: min-content;
 }
@@ -219,7 +246,7 @@
   padding: 0 1rem;
 }
 
-/* Edit slides card: centered, moderate width (not too wide), single gray card */
+/* Edit slides card: centered, moderate width; no solid background so it matches the page */
 .plan-slides-area {
   flex: 0 1 auto;
   width: 100%;
@@ -228,18 +255,19 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* In Overview, use full width so columns can spread across the screen */
+/* In Overview, use full width so columns fill the whole work area */
 .plan-mode.plan-view-overview .plan-slides-area {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   width: 100%;
-  min-width: 0;
+  min-width: 100%;
   max-width: none;
+  align-self: stretch;
 }
 
 /* When Slide tips panel is shown, allow card to fit list + panel but still centered */
@@ -250,15 +278,16 @@
 .plan-templates-sidebar {
   display: flex;
   flex-direction: column;
-  flex: 0 0 400px;
-  width: 400px;
-  min-width: 400px;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   padding-left: 1rem;
   overflow: visible;
   align-items: flex-start;
 }
 
 .plan-templates-sidebar.expanded {
+  flex: 0 0 400px;
   width: 400px;
   min-width: 400px;
 }

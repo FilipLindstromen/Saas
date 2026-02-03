@@ -243,34 +243,33 @@
 }
 
 .play-mode .slide {
-  /* Aspect ratio and dimensions set per format below; default 16:9 */
+  /* Fill viewport so content padding/position matches edit mode (same % of viewport) */
   border-radius: 0;
   box-shadow: none;
   position: relative;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  /* Override format aspect-ratio so slide fills viewport; padding % then matches edit */
+  aspect-ratio: auto !important;
 }
 
-.play-mode .slide.slide-format-16-9 {
-  width: min(100vw, calc(100vh * 16 / 9));
-  height: min(100vh, calc(100vw * 9 / 16));
-  max-width: min(100vw, calc(100vh * 16 / 9));
-  max-height: min(100vh, calc(100vw * 9 / 16));
-  aspect-ratio: 16 / 9;
-}
-
-.play-mode .slide.slide-format-1-1 {
-  width: min(100vw, 100vh);
-  height: min(100vh, 100vw);
-  max-width: min(100vw, 100vh);
-  max-height: min(100vh, 100vw);
-  aspect-ratio: 1 / 1;
-}
-
+.play-mode .slide.slide-format-16-9,
+.play-mode .slide.slide-format-1-1,
 .play-mode .slide.slide-format-9-16 {
-  width: min(100vw, calc(100vh * 9 / 16));
-  height: min(100vh, calc(100vw * 16 / 9));
-  max-width: min(100vw, calc(100vh * 9 / 16));
-  max-height: min(100vh, calc(100vw * 16 / 9));
-  aspect-ratio: 9 / 16;
+  /* Same as .play-mode .slide: fill container for consistent content positioning */
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: auto !important;
+}
+
+/* Background covers when slide fills viewport so content position matches edit mode */
+.play-mode .slide .slide-background {
+  background-size: cover !important;
+  background-position: center !important;
 }
 
 /* Ensure webcam positioning is identical in present mode */

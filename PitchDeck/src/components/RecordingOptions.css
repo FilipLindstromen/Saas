@@ -111,6 +111,10 @@
   margin-bottom: 0.25rem;
 }
 
+.recording-options-video-adj-title-sub {
+  margin-top: 0.75rem;
+}
+
 .recording-options-video-adj-row {
   display: flex;
   align-items: center;

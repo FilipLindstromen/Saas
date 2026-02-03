@@ -4,10 +4,11 @@ const LOADING = 'loading'
 const DONE = 'done'
 const ERROR = 'error'
 
-function PresentationFeedback({ onClose, status, transcript, feedback, errorMessage }) {
+function PresentationFeedback({ onClose, status, transcript, feedback, errorMessage, onUploadVideo }) {
   const isLoading = status === LOADING
   const isError = status === ERROR
   const isDone = status === DONE
+  const isEmpty = !isLoading && !isError && !isDone
 
   return (
     <div className="presentation-feedback-backdrop" onClick={onClose}>
@@ -18,6 +19,18 @@ function PresentationFeedback({ onClose, status, transcript, feedback, errorMess
             ×
           </button>
         </div>
+
+        {isEmpty && (
+          <div className="presentation-feedback-body presentation-feedback-empty">
+            <p className="presentation-feedback-empty-msg">No feedback yet.</p>
+            <p className="presentation-feedback-empty-hint">Record your presentation in Present mode with <strong>Get AI feedback</strong> enabled in the recording bar to receive coach-style feedback on your content and pacing.</p>
+            {onUploadVideo && (
+              <button type="button" className="presentation-feedback-btn-upload" onClick={onUploadVideo}>
+                Upload video
+              </button>
+            )}
+          </div>
+        )}
 
         {isLoading && (
           <div className="presentation-feedback-body presentation-feedback-loading">
