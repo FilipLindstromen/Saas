@@ -138,6 +138,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     })
   }
 
+  // Strip trailing line breaks (no text after them) so they don't show in edit or present mode
+  const stripTrailingLineBreaks = (s) => {
+    if (!s || typeof s !== 'string') return s
+    return s.replace(/(<br\s*\/?>\s*)+$/gi, '').replace(/\n+$/, '')
+  }
+
   // Convert line breaks to HTML breaks for display and apply text highlighting
   const formatContentForDisplay = (content) => {
     if (!content) return ''
@@ -188,8 +194,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     // If content already contains HTML tags (from formatting or contentEditable), 
     // convert \n to <br> within the HTML and preserve all HTML tags
     if (hasHtmlTags) {
-      // Replace \n with <br> but preserve existing HTML structure
-      return content.replace(/\n/g, '<br>')
+      content = content.replace(/\n/g, '<br>')
+      return stripTrailingLineBreaks(content)
     }
     
     // For plain text content, we need to escape HTML but preserve <br> tags
@@ -203,7 +209,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       .replace(/\n/g, brPlaceholder)  // Convert newlines to placeholder
       .replace(new RegExp(brPlaceholder, 'g'), '<br>')  // Restore <br> tags
     
-    return content
+    return stripTrailingLineBreaks(content)
   }
 
   // Check if subtitle has actual text content (strips HTML tags)
@@ -624,15 +630,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     sel.removeAllRanges()
     sel.addRange(range)
     try {
-      const container = range.commonAncestorContainer
-      const span = container.nodeType === Node.TEXT_NODE
-        ? container.parentElement?.closest('.font-pairing-serif')
-        : container.closest?.('.font-pairing-serif')
+      // Use selection start (same as serifActive) so we always find the correct span when toggling off
+      const startNode = range.startContainer
+      const startEl = startNode.nodeType === Node.TEXT_NODE ? startNode.parentElement : startNode
+      const span = startEl?.closest?.('.font-pairing-serif')
       if (span?.classList?.contains('font-pairing-serif')) {
         // Toggle off: unwrap serif
         const parent = span.parentNode
-        while (span.firstChild) parent.insertBefore(span.firstChild, span)
-        parent.removeChild(span)
+        if (parent) {
+          while (span.firstChild) parent.insertBefore(span.firstChild, span)
+          parent.removeChild(span)
+        }
       } else {
         // Toggle on: wrap in serif span
         const serifSpan = document.createElement('span')
@@ -704,14 +712,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const applyClearFormatting = useCallback(() => {
     const state = textFormatToolbar
     if (!state?.target) return
-    const range = textFormatRangeRef.current
+    let range = textFormatRangeRef.current
     if (!range) return
-    // Range may be invalid if nodes were removed; ensure it has content
-    if (range.collapsed) return
+    const targetEl = state.target.field === 'content' ? contentRef.current : state.target.field === 'subtitle' ? subtitleRef.current : null
+    if (!targetEl) return
     const sel = window.getSelection()
     sel.removeAllRanges()
     sel.addRange(range)
     try {
+      // If selection is collapsed, expand to entire target so "reset" clears the whole field
+      if (range.collapsed) {
+        range = document.createRange()
+        range.selectNodeContents(targetEl)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
       const fragment = range.extractContents()
       const isFormattingTag = (el) => {
         if (!el || el.nodeType !== Node.ELEMENT_NODE) return false

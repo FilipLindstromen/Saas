@@ -9,6 +9,7 @@ import {
   renameProjectInFolder,
   deleteFileFromProjectFolder,
   readFromFileHandle,
+  resolveProjectImageUrls,
   connectGoogleDrive,
   listDriveProjects,
   saveToDrive,
@@ -55,23 +56,29 @@ function ProjectOverview({
     return () => { cancelled = true }
   }, [])
 
-  const allProjects = [
-    ...recentFiles.map((f) => ({
-      type: 'recent',
-      id: `recent-${f.path}`,
-      name: f.name || f.path,
-      data: f.data,
-      modifiedTime: f.lastOpened
-    })),
-    ...localProjects.map((p) => ({ type: 'local', id: `local-${p.name}`, name: p.name, handle: p.handle })),
-    ...driveProjects.map((p) => ({
-      type: 'drive',
-      id: `drive-${p.id}`,
-      driveId: p.id,
-      name: p.name,
-      modifiedTime: p.modifiedTime
-    }))
-  ]
+  const hasFolderOrDrive = localFolderName != null || driveToken != null
+  const recentOnlyWhenNoFolder = localFolderName == null && driveToken != null
+  const allProjects = !hasFolderOrDrive
+    ? []
+    : [
+        ...(recentOnlyWhenNoFolder
+          ? recentFiles.map((f) => ({
+              type: 'recent',
+              id: `recent-${f.path}`,
+              name: f.name || f.path,
+              data: f.data,
+              modifiedTime: f.lastOpened
+            }))
+          : []),
+        ...localProjects.map((p) => ({ type: 'local', id: `local-${p.name}`, name: p.name, handle: p.handle })),
+        ...driveProjects.map((p) => ({
+          type: 'drive',
+          id: `drive-${p.id}`,
+          driveId: p.id,
+          name: p.name,
+          modifiedTime: p.modifiedTime
+        }))
+      ]
 
   const handleOpenProjectFolder = async () => {
     setError('')
@@ -178,7 +185,11 @@ function ProjectOverview({
       }
       if (selectedProject.type === 'local' && selectedProject.handle) {
         const data = await readFromFileHandle(selectedProject.handle)
-        onLoadProject(data)
+        const folder = await getProjectFolder()
+        const resolvedData = folder?.handle
+          ? await resolveProjectImageUrls(data, folder.handle)
+          : data
+        onLoadProject(resolvedData)
         onClose()
         return
       }

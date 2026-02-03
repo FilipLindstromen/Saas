@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './RecordingOptions.css'
 
-function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef }) {
+function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef, embedded }) {
   const dropdownRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     recordInPresentMode: recordSettings?.recordInPresentMode !== undefined ? recordSettings.recordInPresentMode : false,
@@ -22,38 +22,35 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
     loadDevices()
   }, [])
 
-  // Position dropdown relative to button
+  // Position dropdown relative to button (skip when embedded)
   useEffect(() => {
+    if (embedded) return
     const updatePosition = () => {
       if (buttonRef?.current && dropdownRef?.current) {
         const buttonRect = buttonRef.current.getBoundingClientRect()
         const dropdown = dropdownRef.current
-        
         dropdown.style.top = `${buttonRect.bottom + 8}px`
         dropdown.style.right = `${window.innerWidth - buttonRect.right}px`
       }
     }
-    
     updatePosition()
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
-    
     return () => {
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [buttonRef])
+  }, [buttonRef, embedded])
 
-  // Close on escape key
+  // Close on escape key (skip when embedded)
   useEffect(() => {
+    if (embedded) return
     const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
+      if (e.key === 'Escape') onClose?.()
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const loadDevices = async () => {
     try {
@@ -115,11 +112,8 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
     }
   }
 
-  return (
-    <>
-      <div className="recording-options-backdrop" onClick={onClose} />
-      <div className="recording-options-dropdown" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
-        <div className="recording-options-content">
+  const content = (
+    <div className="recording-options-content">
           <div className="recording-options-field">
             <label className="recording-options-checkbox">
               <input
@@ -141,6 +135,43 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               <span>Enable Recording</span>
             </label>
           </div>
+
+          {localSettings.recordInPresentMode && (
+            <>
+              <div className="recording-options-field">
+                <label className="recording-options-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={localSettings.microphoneEnabled}
+                    onChange={(e) => handleChange('microphoneEnabled', e.target.checked)}
+                  />
+                  <span>Enable Microphone</span>
+                </label>
+              </div>
+              
+              {localSettings.microphoneEnabled && (
+                <div className="recording-options-field">
+                  <label htmlFor="recording-microphone-select">Microphone</label>
+                  <select
+                    id="recording-microphone-select"
+                    value={localSettings.selectedMicrophoneId || ''}
+                    onChange={(e) => handleChange('selectedMicrophoneId', e.target.value)}
+                    className="recording-options-select"
+                  >
+                    {availableMicrophones.length === 0 ? (
+                      <option value="">Default microphone</option>
+                    ) : (
+                      availableMicrophones.map((microphone) => (
+                        <option key={microphone.deviceId} value={microphone.deviceId}>
+                          {microphone.label || `Microphone ${microphone.deviceId.slice(0, 8)}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
           
           <div className="recording-options-field">
             <label className="recording-options-checkbox">
@@ -256,44 +287,17 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               Reset
             </button>
           </div>
-              
-          {localSettings.recordInPresentMode && (
-            <>
-              <div className="recording-options-field">
-                <label className="recording-options-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={localSettings.microphoneEnabled}
-                    onChange={(e) => handleChange('microphoneEnabled', e.target.checked)}
-                  />
-                  <span>Enable Microphone</span>
-                </label>
-              </div>
-              
-              {localSettings.microphoneEnabled && (
-                <div className="recording-options-field">
-                  <label htmlFor="recording-microphone-select">Microphone</label>
-                  <select
-                    id="recording-microphone-select"
-                    value={localSettings.selectedMicrophoneId || ''}
-                    onChange={(e) => handleChange('selectedMicrophoneId', e.target.value)}
-                    className="recording-options-select"
-                  >
-                    {availableMicrophones.length === 0 ? (
-                      <option value="">Default microphone</option>
-                    ) : (
-                      availableMicrophones.map((microphone) => (
-                        <option key={microphone.deviceId} value={microphone.deviceId}>
-                          {microphone.label || `Microphone ${microphone.deviceId.slice(0, 8)}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+    </div>
+  )
+
+  if (embedded) {
+    return content
+  }
+  return (
+    <>
+      <div className="recording-options-backdrop" onClick={onClose} />
+      <div className="recording-options-dropdown" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
+        {content}
       </div>
     </>
   )

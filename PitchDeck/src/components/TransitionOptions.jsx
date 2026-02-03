@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './TransitionOptions.css'
 
-function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
+function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, embedded }) {
   const panelRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
@@ -13,6 +13,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
   })
 
   useEffect(() => {
+    if (embedded) return
     const updatePosition = () => {
       if (buttonRef?.current && panelRef?.current) {
         const buttonRect = buttonRef.current.getBoundingClientRect()
@@ -27,13 +28,14 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [buttonRef])
+  }, [buttonRef, embedded])
 
   useEffect(() => {
+    if (embedded) return
     const handleEscape = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const handleChange = (key, value) => {
     const next = { ...localSettings, [key]: value }
@@ -43,13 +45,8 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
     }
   }
 
-  return (
-    <div className="transition-options-overlay" onClick={onClose}>
-      <div ref={panelRef} className="transition-options-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="transition-options-header">
-          <h2>Transition & Animation Options</h2>
-        </div>
-        <div className="transition-options-content">
+  const content = (
+    <div className="transition-options-content">
           <div className="transition-options-section">
             <h3>Slide Transitions</h3>
             <div className="transition-options-field">
@@ -152,7 +149,17 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef }) {
               </>
             )}
           </div>
+    </div>
+  )
+
+  if (embedded) return content
+  return (
+    <div className="transition-options-overlay" onClick={onClose}>
+      <div ref={panelRef} className="transition-options-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="transition-options-header">
+          <h2>Transition & Animation Options</h2>
         </div>
+        {content}
       </div>
     </div>
   )

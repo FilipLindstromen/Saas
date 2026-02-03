@@ -840,6 +840,13 @@
   background: transparent;
 }
 
+.inspector-panel-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .app-content.resizing {
   cursor: col-resize;
   user-select: none;
@@ -868,6 +875,14 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+
+.main-preview-area {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Recording bar (in-place recording, no present mode) */

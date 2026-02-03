@@ -5,7 +5,6 @@ import PlayMode from './components/PlayMode'
 import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
 import RecordingOptions from './components/RecordingOptions'
-import CaptionsOptions from './components/CaptionsOptions'
 import ColorOptions from './components/ColorOptions'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import TextEffectsOptions from './components/TextEffectsOptions'
@@ -15,6 +14,7 @@ import CommandPalette from './components/CommandPalette'
 import EditRecordingMode from './components/EditRecordingMode'
 import ProjectOverview from './components/ProjectOverview'
 import AppLogo from './components/AppLogo'
+import InspectorPanel from './components/InspectorPanel'
 import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
 import './App.css'
 
@@ -104,12 +104,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
-  const [showRecordingOptions, setShowRecordingOptions] = useState(false)
-  const [showCaptionsOptions, setShowCaptionsOptions] = useState(false)
-  const [showColorOptions, setShowColorOptions] = useState(false)
-  const [showTypographyOptions, setShowTypographyOptions] = useState(false)
-  const [showTextEffectsOptions, setShowTextEffectsOptions] = useState(false)
-  const [showTransitionOptions, setShowTransitionOptions] = useState(false)
+  const [inspectorTab, setInspectorTab] = useState('recording')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisFolded, setAnalysisFolded] = useState(() => {
     const saved = localStorage.getItem('analysisFolded')
@@ -150,10 +145,15 @@ function App() {
     const saved = localStorage.getItem('sidebarWidth')
     return saved ? parseInt(saved, 10) : 350
   })
+  const [inspectorWidth, setInspectorWidth] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckInspectorWidth')
+    return saved ? parseInt(saved, 10) : 320
+  })
   const [projectName, setProjectName] = useState(() => {
     return localStorage.getItem('pitchDeckProjectName') || ''
   })
   const [isResizing, setIsResizing] = useState(false)
+  const [isResizingInspector, setIsResizingInspector] = useState(false)
   const sidebarRef = useRef(null)
   const updateSlideTimeoutRef = useRef(null)
   const latestStateRef = useRef(null)
@@ -236,12 +236,6 @@ function App() {
       analyzeWithAI: false
     }
   })
-  const recordButtonRef = useRef(null)
-  const captionsButtonRef = useRef(null)
-  const colorButtonRef = useRef(null)
-  const typographyButtonRef = useRef(null)
-  const transitionButtonRef = useRef(null)
-  const textEffectsButtonRef = useRef(null)
 
   // Update current chapter's slides when slides change
   useEffect(() => {
@@ -305,6 +299,15 @@ function App() {
     }
   }, [sidebarWidth])
 
+  // Save inspector width to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckInspectorWidth', inspectorWidth.toString())
+    } catch (error) {
+      console.error('Error saving inspector width:', error)
+    }
+  }, [inspectorWidth])
+
   // Save recordSettings to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -346,6 +349,12 @@ function App() {
     setIsResizing(true)
   }
 
+  // Handle inspector (right panel) resize
+  const handleInspectorResizeStart = (e) => {
+    e.preventDefault()
+    setIsResizingInspector(true)
+  }
+
   useEffect(() => {
     const handleResizeMove = (e) => {
       if (!isResizing) return
@@ -368,6 +377,29 @@ function App() {
       }
     }
   }, [isResizing])
+
+  useEffect(() => {
+    const handleInspectorResizeMove = (e) => {
+      if (!isResizingInspector) return
+      // Inspector width = distance from mouse to right edge of viewport
+      const newWidth = window.innerWidth - e.clientX
+      const constrainedWidth = Math.max(280, Math.min(600, newWidth))
+      setInspectorWidth(constrainedWidth)
+    }
+
+    const handleInspectorResizeEnd = () => {
+      setIsResizingInspector(false)
+    }
+
+    if (isResizingInspector) {
+      window.addEventListener('mousemove', handleInspectorResizeMove)
+      window.addEventListener('mouseup', handleInspectorResizeEnd)
+      return () => {
+        window.removeEventListener('mousemove', handleInspectorResizeMove)
+        window.removeEventListener('mouseup', handleInspectorResizeEnd)
+      }
+    }
+  }, [isResizingInspector])
 
   // Load Google Fonts
   useEffect(() => {
@@ -489,6 +521,52 @@ function App() {
       localStorage.setItem(`pitchDeckWorkspace_${currentWorkspace}`, JSON.stringify(workspaceData))
     }
   }, [currentWorkspace, chapters, currentChapterId, settings, projectName])
+
+  // Auto-save to project folder after any edit (planning, editing, naming, settings, etc.) — debounced
+  const autoSaveTimeoutRef = useRef(null)
+  const exportDataRef = useRef(null)
+  useEffect(() => {
+    exportDataRef.current = {
+      chapters,
+      currentChapterId,
+      slides,
+      selectedSlideId,
+      settings,
+      recordSettings,
+      sidebarWidth,
+      inspectorWidth,
+      projectName,
+      analysisFolded
+    }
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded])
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      autoSaveTimeoutRef.current = null
+      const data = exportDataRef.current
+      if (!data) return
+      const exportData = {
+        version: '1.0',
+        ...data,
+        exportedAt: new Date().toISOString()
+      }
+      try {
+        const folder = await getProjectFolder()
+        if (folder) {
+          setIsSaving(true)
+          await saveToProjectFolder(() => exportData, data.projectName)
+          setLastSaved(new Date())
+        }
+      } catch (e) {
+        console.warn('Auto-save to project folder failed:', e)
+      } finally {
+        setIsSaving(false)
+      }
+    }, 1500)
+    return () => {
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
+    }
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded])
 
   // Save recent files
   useEffect(() => {
@@ -707,16 +785,11 @@ function App() {
       }
 
       // Don't handle other shortcuts if modals are open
-      if (showShortcuts || showCommandPalette || showSettings || showRecordingOptions || showColorOptions || showTypographyOptions || showTextEffectsOptions || showTransitionOptions || showPresentationFeedback) {
+      if (showShortcuts || showCommandPalette || showSettings || showPresentationFeedback) {
         if (e.key === 'Escape') {
           setShowShortcuts(false)
           setShowCommandPalette(false)
           setShowSettings(false)
-          setShowRecordingOptions(false)
-          setShowColorOptions(false)
-          setShowTypographyOptions(false)
-          setShowTextEffectsOptions(false)
-          setShowTransitionOptions(false)
           if (showPresentationFeedback) {
             setShowPresentationFeedback(false)
             setPresentationFeedback(null)
@@ -827,7 +900,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showRecordingOptions, showCaptionsOptions, showColorOptions, showTypographyOptions, showTextEffectsOptions, showTransitionOptions, showPresentationFeedback, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
+  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showPresentationFeedback, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
     // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
@@ -862,6 +935,36 @@ function App() {
     setSlides(newSlides)
     setChapters(newChapters)
     saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
+  }
+
+  const updateChapterSlides = (chapterId, newSlides) => {
+    const newChapters = chapters.map(c => c.id === chapterId ? { ...c, slides: newSlides } : c)
+    setChapters(newChapters)
+    if (currentChapterId === chapterId) {
+      setSlides(newSlides)
+    }
+    saveToHistory({
+      slides: currentChapterId === chapterId ? newSlides : slides,
+      selectedSlideId,
+      chapters: newChapters,
+      currentChapterId,
+      settings,
+      recordSettings,
+      analysisFolded
+    })
+  }
+
+  const reorderChapters = (newOrderedChapters) => {
+    setChapters(newOrderedChapters)
+    saveToHistory({
+      slides,
+      selectedSlideId,
+      chapters: newOrderedChapters,
+      currentChapterId,
+      settings,
+      recordSettings,
+      analysisFolded
+    })
   }
 
   // Chapter management functions
@@ -906,18 +1009,63 @@ function App() {
     saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
 
-  const getExportData = useCallback(() => ({
-    version: '1.0',
-    chapters,
-    currentChapterId,
-    slides,
-    selectedSlideId,
-    settings,
-    recordSettings,
-    sidebarWidth,
-    projectName,
-    exportedAt: new Date().toISOString()
-  }), [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
+  const defaultSlideShape = useCallback(() => ({
+    content: '',
+    subtitle: '',
+    imageUrl: '',
+    layout: 'default',
+    gradientStrength: 0.7,
+    flipHorizontal: false,
+    backgroundOpacity: 0.6,
+    gradientFlipped: false,
+    imageScale: 1.0,
+    imagePositionX: 50,
+    imagePositionY: 50,
+    textHeadingLevel: null,
+    subtitleHeadingLevel: null,
+    analysis: null
+  }), [])
+
+  const getExportData = useCallback(() => {
+    const normalizeSlide = (slide) => ({
+      ...defaultSlideShape(),
+      ...slide,
+      id: slide.id,
+      content: slide.content ?? '',
+      subtitle: slide.subtitle ?? '',
+      imageUrl: slide.imageUrl ?? '',
+      layout: slide.layout ?? 'default',
+      gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+      flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+      backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+      gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+      imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+      imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+      imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+      textHeadingLevel: slide.textHeadingLevel ?? null,
+      subtitleHeadingLevel: slide.subtitleHeadingLevel ?? null,
+      analysis: slide.analysis ?? null
+    })
+    const normalizedChapters = (chapters || []).map(ch => ({
+      id: ch.id,
+      name: ch.name ?? `Chapter ${ch.id}`,
+      slides: (ch.slides || []).map(normalizeSlide)
+    }))
+    return {
+      version: '1.0',
+      chapters: normalizedChapters,
+      currentChapterId,
+      slides: (slides || []).map(normalizeSlide),
+      selectedSlideId,
+      settings: { ...settings },
+      recordSettings: { ...recordSettings },
+      sidebarWidth,
+      inspectorWidth,
+      projectName,
+      analysisFolded,
+      exportedAt: new Date().toISOString()
+    }
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded, defaultSlideShape])
 
   // Create a new presentation (clear all slides). If projectName is passed (from Projects modal), use it and skip confirm.
   const handleNewPresentation = (projectNameFromModal) => {
@@ -1035,8 +1183,10 @@ function App() {
       setSettings(prev => ({ ...prev, ...importData.settings }))
     }
     if (importData.sidebarWidth !== undefined) setSidebarWidth(importData.sidebarWidth)
+    if (importData.inspectorWidth !== undefined) setInspectorWidth(importData.inspectorWidth)
     if (importData.projectName !== undefined) setProjectName(importData.projectName)
     if (importData.recordSettings) setRecordSettings(importData.recordSettings)
+    if (importData.analysisFolded !== undefined) setAnalysisFolded(importData.analysisFolded)
   }, [])
 
   // Import data from a file
@@ -1145,9 +1295,9 @@ function App() {
           setSidebarWidth(importData.sidebarWidth)
         }
 
-        // Load sidebar width if provided
-        if (importData.sidebarWidth !== undefined) {
-          setSidebarWidth(importData.sidebarWidth)
+        // Load inspector width if provided
+        if (importData.inspectorWidth !== undefined) {
+          setInspectorWidth(importData.inspectorWidth)
         }
 
         // Load project name if provided
@@ -1666,47 +1816,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               <AppLogo />
             </button>
             <div className="header-file-actions">
-              {recentFiles.length > 0 && (
-                <div className="recent-files-dropdown">
-                  <button className="btn-icon-header btn-recent" title="Recent files">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                  </button>
-                  <div className="recent-files-menu">
-                    {recentFiles.map((file, index) => (
-                      <button
-                        key={index}
-                        className="recent-file-item"
-                        onClick={() => {
-                          // Load the file data
-                          const importData = file.data
-                          if (importData.chapters && Array.isArray(importData.chapters)) {
-                            setChapters(importData.chapters)
-                            setCurrentChapterId(importData.currentChapterId || importData.chapters[0]?.id || 1)
-                          }
-                          if (importData.settings) {
-                            setSettings(prev => ({ ...prev, ...importData.settings }))
-                          }
-                          if (importData.projectName) {
-                            setProjectName(importData.projectName)
-                          }
-                          // Update recent files
-                          setRecentFiles(prev => {
-                            const filtered = prev.filter(f => f.path !== file.path)
-                            return [{ ...file, lastOpened: new Date().toISOString() }, ...filtered].slice(0, 10)
-                          })
-                          localStorage.setItem('pitchDeckRecentFiles', JSON.stringify([{ ...file, lastOpened: new Date().toISOString() }, ...recentFiles.filter(f => f.path !== file.path)].slice(0, 10)))
-                        }}
-                      >
-                        <span className="recent-file-name">{file.name}</span>
-                        <span className="recent-file-date">{new Date(file.lastOpened).toLocaleDateString()}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               {workspaces.length > 1 && (
                 <div className="workspace-switcher">
                   <button className="btn-icon-header btn-workspace" title="Switch workspace">
@@ -1756,26 +1865,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   </div>
                 </div>
               )}
-              <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-              <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to project folder (or download)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </button>
-              <button className="btn-icon-header btn-import" onClick={handleImportFile} title="Load from file">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                  <polyline points="12 11 12 17" />
-                  <line x1="9" y1="14" x2="15" y2="14" />
-                </svg>
-              </button>
               <input
                 type="text"
                 className="project-name-input"
@@ -1783,13 +1872,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 title="Project name (used when saving files)"
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
               />
               </div>
               {(mode === 'plan' || mode === 'edit') && (
@@ -1956,31 +2038,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
             <div className="header-right">
               <div className="header-icon-group">
-                <button 
-                  ref={recordButtonRef}
-                  className="btn-record-menu" 
-                  onClick={() => setShowRecordingOptions(true)}
-                  title="Recording options"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                </button>
-                <button
-                  ref={captionsButtonRef}
-                  className={`btn-icon-header btn-captions ${showCaptionsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowCaptionsOptions(true); setShowRecordingOptions(false) }}
-                  title="Captions"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 12h10M7 16h6M7 8h10" />
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
                 <button
                   className="btn-icon-header btn-undo"
                   onClick={undo}
@@ -2028,52 +2085,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />
                     <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
                     <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
-                <button
-                  ref={colorButtonRef}
-                  className={`btn-icon-header btn-colors ${showColorOptions ? 'active' : ''}`}
-                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
-                  title="Colors"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                </button>
-                <button
-                  ref={typographyButtonRef}
-                  className={`btn-icon-header btn-typography ${showTypographyOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
-                  title="Typography"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7" />
-                    <line x1="9" y1="20" x2="15" y2="20" />
-                    <line x1="12" y1="4" x2="12" y2="20" />
-                  </svg>
-                </button>
-                <button
-                  ref={textEffectsButtonRef}
-                  className={`btn-icon-header btn-text-effects ${showTextEffectsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTransitionOptions(false) }}
-                  title="Text Effects"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                  </svg>
-                </button>
-                <button 
-                  ref={transitionButtonRef}
-                  className={`btn-icon-header btn-transitions ${showTransitionOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTransitionOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }} 
-                  title="Transitions & Animations"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 </button>
               </div>
@@ -2113,8 +2124,19 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           </div>
         </div>
         <div className="app-content plan-mode-content">
-          <PlanMode slides={slides} onUpdateSlides={updateSlides} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} />
+          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} />
         </div>
+        {showProjectOverview && (
+          <ProjectOverview
+            onClose={() => setShowProjectOverview(false)}
+            recentFiles={recentFiles}
+            getExportData={getExportData}
+            onLoadProject={loadProjectFromData}
+            onNewProject={handleNewPresentation}
+            projectName={projectName}
+            googleClientId={settings.googleClientId}
+          />
+        )}
         {showSettings && (
           <Settings
             settings={settings}
@@ -2122,61 +2144,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             onClose={() => setShowSettings(false)}
           />
         )}
-      {showRecordingOptions && (
-        <RecordingOptions
-          recordSettings={recordSettings}
-          onUpdateSettings={(updatedSettings) => {
-            setRecordSettings(updatedSettings)
-          }}
-          onClose={() => setShowRecordingOptions(false)}
-          buttonRef={recordButtonRef}
-        />
-      )}
-      {showCaptionsOptions && (
-        <CaptionsOptions
-          recordSettings={recordSettings}
-          onUpdateSettings={(updated) => setRecordSettings(updated)}
-          onClose={() => setShowCaptionsOptions(false)}
-          buttonRef={captionsButtonRef}
-        />
-      )}
-      {showColorOptions && (
-        <ColorOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowColorOptions(false)}
-          buttonRef={colorButtonRef}
-        />
-      )}
-      {showTypographyOptions && (
-        <TypographyOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowTypographyOptions(false)}
-          buttonRef={typographyButtonRef}
-          slides={slides}
-          onUpdateSlide={updateSlide}
-          openaiKey={settings.openaiKey}
-        />
-      )}
-      {showTextEffectsOptions && (
-        <TextEffectsOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowTextEffectsOptions(false)}
-          buttonRef={textEffectsButtonRef}
-        />
-      )}
-      {showTransitionOptions && (
-        <TransitionOptions
-          settings={settings}
-          onUpdateSettings={(updatedSettings) => {
-            setSettings(updatedSettings)
-          }}
-          onClose={() => setShowTransitionOptions(false)}
-          buttonRef={transitionButtonRef}
-        />
-      )}
     </div>
   )
 }
@@ -2190,26 +2157,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 <AppLogo />
               </button>
               <div className="header-file-actions">
-                <button className="btn-icon-header btn-new" onClick={handleNewPresentation} title="New presentation">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-                </button>
-                <button className="btn-icon-header btn-export" onClick={handleExportFile} title="Save to project folder (or download)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-                </button>
-                <button className="btn-icon-header btn-import" onClick={handleImportFile} title="Load from file">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                <polyline points="12 11 12 17" />
-                <line x1="9" y1="14" x2="15" y2="14" />
-              </svg>
-                </button>
                 <input
                   type="text"
                   className="project-name-input"
@@ -2217,13 +2164,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   title="Project name (used when saving files)"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
                 />
               </div>
               {(mode === 'plan' || mode === 'edit') && (
@@ -2390,31 +2330,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
             <div className="header-right">
               <div className="header-icon-group">
-                <button 
-                  ref={recordButtonRef}
-                  className="btn-record-menu" 
-                  onClick={() => setShowRecordingOptions(true)}
-                  title="Recording options"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                </button>
-                <button
-                  ref={captionsButtonRef}
-                  className={`btn-icon-header btn-captions ${showCaptionsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowCaptionsOptions(true); setShowRecordingOptions(false) }}
-                  title="Captions"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 12h10M7 16h6M7 8h10" />
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
                 <button
                   className="btn-icon-header btn-undo"
                   onClick={undo}
@@ -2467,52 +2382,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
-                <button
-                  ref={colorButtonRef}
-                  className={`btn-icon-header btn-colors ${showColorOptions ? 'active' : ''}`}
-                  onClick={() => { setShowColorOptions(true); setShowTypographyOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
-                  title="Colors"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                </button>
-                <button
-                  ref={typographyButtonRef}
-                  className={`btn-icon-header btn-typography ${showTypographyOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTypographyOptions(true); setShowColorOptions(false); setShowTextEffectsOptions(false); setShowTransitionOptions(false) }}
-                  title="Typography"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7" />
-                    <line x1="9" y1="20" x2="15" y2="20" />
-                    <line x1="12" y1="4" x2="12" y2="20" />
-                  </svg>
-                </button>
-                <button
-                  ref={textEffectsButtonRef}
-                  className={`btn-icon-header btn-text-effects ${showTextEffectsOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTextEffectsOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTransitionOptions(false) }}
-                  title="Text Effects"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-                  </svg>
-                </button>
-                <button 
-                  ref={transitionButtonRef}
-                  className={`btn-icon-header btn-transitions ${showTransitionOptions ? 'active' : ''}`}
-                  onClick={() => { setShowTransitionOptions(true); setShowColorOptions(false); setShowTypographyOptions(false); setShowTextEffectsOptions(false) }} 
-                  title="Transitions & Animations"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
                 <button 
                   className="btn-icon-header btn-theme-toggle" 
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
@@ -2546,7 +2415,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
           </div>
       </div>
-      <div className={`app-content ${isResizing ? 'resizing' : ''} ${mode === 'edit-recording' ? 'edit-recording-content' : ''}`}>
+      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'edit-recording' ? 'edit-recording-content' : ''}`}>
         {mode === 'edit-recording' ? (
           <EditRecordingMode
             videoBlob={lastRecordingBlobRef.current}
@@ -2578,6 +2447,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               onMouseDown={handleResizeStart}
               style={{ cursor: 'col-resize' }}
             />
+            <div className="main-preview-area">
             <SlidePreview
           slide={selectedSlide}
           onUpdate={(updates) => updateSlide(selectedSlideId, updates)}
@@ -2611,6 +2481,36 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletGap={settings.bulletGap ?? 0.5}
           recordSettings={recordSettings}
         />
+            </div>
+            {(mode === 'plan' || mode === 'edit') && (
+              <>
+                <div
+                  className="resize-handle resize-handle-inspector"
+                  onMouseDown={handleInspectorResizeStart}
+                  style={{ cursor: 'col-resize' }}
+                  title="Drag to resize inspector"
+                />
+                <div
+                  className="inspector-panel-wrapper"
+                  style={{
+                    width: `${inspectorWidth}px`,
+                    minWidth: `${inspectorWidth}px`,
+                    maxWidth: `${inspectorWidth}px`
+                  }}
+                >
+                  <InspectorPanel
+                    activeTab={inspectorTab}
+                    onTabChange={setInspectorTab}
+                    recordSettings={recordSettings}
+                    onUpdateRecordSettings={(updated) => setRecordSettings(updated)}
+                    settings={settings}
+                    onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
+                    slides={slides}
+                    onUpdateSlide={updateSlide}
+                  />
+                </div>
+              </>
+            )}
             </>
         )}
       </div>
@@ -2666,61 +2566,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           onClose={() => setShowSettings(false)}
         />
       )}
-      {showRecordingOptions && (
-        <RecordingOptions
-          recordSettings={recordSettings}
-          onUpdateSettings={(updatedSettings) => {
-            setRecordSettings(updatedSettings)
-          }}
-          onClose={() => setShowRecordingOptions(false)}
-          buttonRef={recordButtonRef}
-        />
-      )}
-      {showCaptionsOptions && (
-        <CaptionsOptions
-          recordSettings={recordSettings}
-          onUpdateSettings={(updated) => setRecordSettings(updated)}
-          onClose={() => setShowCaptionsOptions(false)}
-          buttonRef={captionsButtonRef}
-        />
-      )}
-      {showColorOptions && (
-        <ColorOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowColorOptions(false)}
-          buttonRef={colorButtonRef}
-        />
-      )}
-      {showTypographyOptions && (
-        <TypographyOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowTypographyOptions(false)}
-          buttonRef={typographyButtonRef}
-          slides={slides}
-          onUpdateSlide={updateSlide}
-          openaiKey={settings.openaiKey}
-        />
-      )}
-      {showTextEffectsOptions && (
-        <TextEffectsOptions
-          settings={settings}
-          onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
-          onClose={() => setShowTextEffectsOptions(false)}
-          buttonRef={textEffectsButtonRef}
-        />
-      )}
-      {showTransitionOptions && (
-        <TransitionOptions
-          settings={settings}
-          onUpdateSettings={(updatedSettings) => {
-            setSettings(updatedSettings)
-          }}
-          onClose={() => setShowTransitionOptions(false)}
-          buttonRef={transitionButtonRef}
-        />
-      )}
       {showShortcuts && (
         <ShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
@@ -2733,6 +2578,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           currentChapterId={currentChapterId}
         />
       )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      />
       {/* Auto-save indicator */}
       {isSaving && (
         <div className="auto-save-indicator">

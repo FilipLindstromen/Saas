@@ -55,7 +55,7 @@ function CaptionStylePreview({ style, font, fontSize, dropShadow, selected, onSe
   )
 }
 
-function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef }) {
+function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef, embedded }) {
   const dropdownRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     captionsEnabled: recordSettings?.captionsEnabled === true,
@@ -76,6 +76,7 @@ function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef 
   }, [recordSettings?.captionsEnabled, recordSettings?.captionStyle, recordSettings?.captionFont, recordSettings?.captionFontSize, recordSettings?.captionDropShadow])
 
   useEffect(() => {
+    if (embedded) return
     const updatePosition = () => {
       if (buttonRef?.current && dropdownRef?.current) {
         const buttonRect = buttonRef.current.getBoundingClientRect()
@@ -90,13 +91,14 @@ function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef 
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [buttonRef])
+  }, [buttonRef, embedded])
 
   useEffect(() => {
-    const handleEscape = (e) => { if (e.key === 'Escape') onClose() }
+    if (embedded) return
+    const handleEscape = (e) => { if (e.key === 'Escape') onClose?.() }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const handleChange = (key, value) => {
     const newSettings = { ...localSettings, [key]: value }
@@ -113,12 +115,9 @@ function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef 
     }
   }
 
-  return (
-    <>
-      <div className="captions-options-backdrop" onClick={onClose} />
-      <div className="captions-options-dropdown" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
-        <div className="captions-options-content">
-          <h3 className="captions-options-title">Video captions</h3>
+  const content = (
+    <div className="captions-options-content">
+      <h3 className="captions-options-title">Video captions</h3>
           <p className="captions-options-desc">When enabled, the recorded video is sent to OpenAI for transcription, then captions are burned into the video before export. Requires OpenAI API key in Settings.</p>
           <div className="captions-options-field">
             <label className="captions-options-checkbox">
@@ -186,7 +185,15 @@ function CaptionsOptions({ recordSettings, onClose, onUpdateSettings, buttonRef 
               </div>
             </>
           )}
-        </div>
+    </div>
+  )
+
+  if (embedded) return content
+  return (
+    <>
+      <div className="captions-options-backdrop" onClick={onClose} />
+      <div className="captions-options-dropdown" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
+        {content}
       </div>
     </>
   )
