@@ -85,7 +85,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 16.67, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -102,7 +102,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const [textFormatToolbar, setTextFormatToolbar] = useState(null) // { x, y, target: { field, bulletIndex? } }
   const textFormatRangeRef = useRef(null)
 
-  const layout = slide.layout || 'default'
+  const layout = slide.layout === 'title' ? 'centered' : (slide.layout || 'default')
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
   const backgroundOpacity = slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6
   const gradientFlipped = slide.gradientFlipped !== undefined ? slide.gradientFlipped : false
@@ -120,16 +120,23 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     } : { r: 26, g: 26, b: 26 } // Default dark grey
   }
 
-  const rgb = hexToRgb(backgroundColor)
-  
+  const slideBgColor = (layout === 'video' && isPlayMode)
+    ? 'transparent'
+    : (slide.backgroundColorOverride && slide.backgroundColorOverrideValue)
+      ? slide.backgroundColorOverrideValue
+      : backgroundColor
+  const rgb = hexToRgb(slideBgColor === 'transparent' ? backgroundColor : slideBgColor)
+
   // Calculate gradient opacity based on strength (0-1)
   const maxOpacity = gradientStrength
   const midOpacity = gradientStrength * 0.57 // ~0.4 when strength is 0.7
 
-  // Parse bullet points (one per line); deduplicate so we never show the same text twice (e.g. when switching layout/slides)
+  // Parse bullet points (one per line); support both \n and <br> as separators so HTML renders correctly
   const getBulletPoints = () => {
     if (layout !== 'bulletpoints') return []
-    const raw = (slide.content || '')
+    // Normalize <br> to newlines so "A<br>B<br>C" and "A\nB\nC" both yield multiple bullets
+    const normalized = (slide.content || '').replace(/<br\s*\/?>/gi, '\n')
+    const raw = normalized
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
@@ -523,6 +530,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const boldActive = document.queryCommandState('bold')
       const italicActive = document.queryCommandState('italic')
       const underlineActive = document.queryCommandState('underline')
+      const strikethroughActive = document.queryCommandState('strikeThrough')
       const backgroundActive = !!(startEl?.closest?.('mark'))
       // Explicit text color: walk up from selection start and use first inline style.color
       let textColorActive = null
@@ -557,6 +565,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         boldActive,
         italicActive,
         underlineActive,
+        strikethroughActive,
         backgroundActive,
         headingActive,
         textColorActive
@@ -619,6 +628,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const applyBold = useCallback(() => applyFormat(() => document.execCommand('bold', false, null)), [applyFormat])
   const applyItalic = useCallback(() => applyFormat(() => document.execCommand('italic', false, null)), [applyFormat])
   const applyUnderline = useCallback(() => applyFormat(() => document.execCommand('underline', false, null)), [applyFormat])
+  const applyStrikethrough = useCallback(() => applyFormat(() => document.execCommand('strikeThrough', false, null)), [applyFormat])
   const applyBackground = useCallback(() => {
     const state = textFormatToolbar
     if (!state?.target) return
@@ -1038,10 +1048,34 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     const chunkDelay = textAnimationUnit === 'word' ? 0.07 : 0.2
 
     if (layout === 'bulletpoints') {
+      // Edit mode: single text field (one line per bullet)
+      if (isEditable) {
+        return (
+          <div key={`${slide.id}-bulletpoints-edit`} className="slide-bullets slide-bullets-single-field" style={{ ...textStyle, '--slide-bullet-gap': `${bulletGap}rem` }}>
+            <textarea
+              ref={contentRef}
+              className="slide-bullets-textarea"
+              value={(() => {
+                const c = slide.content || ''
+                return c
+                  .replace(/<br\s*\/?>/gi, '\n')
+                  .replace(/<[^>]*>/g, '')
+                  .replace(/&nbsp;/gi, ' ')
+              })()}
+              onChange={(e) => onUpdate && onUpdate({ content: e.target.value })}
+              onFocus={handleContentFocus}
+              placeholder="One bullet per line..."
+              style={{ lineHeight: bulletLineHeight, resize: 'none' }}
+              spellCheck={true}
+            />
+          </div>
+        )
+      }
+      // View / play mode: list of bullets (with optional showBullets, animations)
       const bullets = getBulletPoints()
       const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, textAnimationUnit).length); return acc }, [0]) : []
       const getBulletStyle = (index) => {
-        const base = { pointerEvents: isEditable ? 'auto' : undefined, lineHeight: bulletLineHeight }
+        const base = { pointerEvents: undefined, lineHeight: bulletLineHeight }
         if (!isPlayMode || !textAnimation || textAnimation === 'none') return base
         if (textAnimation === 'typewriter') {
           return { ...base, animationDelay: `${0.3 + index * 1.4}s` }
@@ -1049,7 +1083,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         return { ...base, animationDelay: `${index * 0.2}s` }
       }
       return (
-        <div key={`${slide.id}-bulletpoints`} className="slide-bullets" style={{ ...textStyle, '--slide-bullet-gap': `${bulletGap}rem`, pointerEvents: isEditable ? 'auto' : undefined }}>
+        <div key={`${slide.id}-bulletpoints`} className={`slide-bullets${!showBullets ? ' bullets-hidden' : ''}`} style={{ ...textStyle, '--slide-bullet-gap': `${bulletGap}rem` }}>
           {bullets.map((bullet, index) => (
             <div
               key={index}
@@ -1069,27 +1103,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                   )}
                 </span>
               ) : (
-                <span 
+                <span
                   className="bullet-text"
                   style={getBulletStyle(index)}
-                  contentEditable={isEditable ? 'true' : 'false'}
-                  suppressContentEditableWarning={true}
-                  onBlur={(e) => handleBulletChange(index, e)}
-                  onInput={(e) => { if (isEditable && onUpdate) handleBulletChange(index, e) }}
-                  onContextMenu={(e) => handleFontPairingContextMenu(e, 'bullet', index)}
-                  onClick={(e) => {
-                    if (isEditable) {
-                      e.stopPropagation()
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      e.target.blur()
-                    }
-                  }}
-                  dangerouslySetInnerHTML={{ __html: formatContentForDisplay(bullet) }}
-                />
+                >
+                  <span dangerouslySetInnerHTML={{ __html: formatContentForDisplay(bullet) }} />
+                </span>
               )}
             </div>
           ))}
@@ -1431,7 +1450,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
 
-  const slideBgColor = (layout === 'video' && isPlayMode) ? 'transparent' : backgroundColor
   const aspectRatioValue = slideFormat === '1:1' ? '1/1' : slideFormat === '9:16' ? '9/16' : '16/9'
   const formatClass = slideFormat === '1:1' ? 'slide-format-1-1' : slideFormat === '9:16' ? 'slide-format-9-16' : 'slide-format-16-9'
   const slideStyle = {
@@ -1668,6 +1686,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           boldActive={textFormatToolbar.boldActive}
           italicActive={textFormatToolbar.italicActive}
           underlineActive={textFormatToolbar.underlineActive}
+          strikethroughActive={textFormatToolbar.strikethroughActive}
           backgroundActive={textFormatToolbar.backgroundActive}
           headingActive={textFormatToolbar.headingActive}
           serifActive={textFormatToolbar.serifActive}
@@ -1676,6 +1695,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           onBold={applyBold}
           onItalic={applyItalic}
           onUnderline={applyUnderline}
+          onStrikethrough={applyStrikethrough}
           onBackground={applyBackground}
           onH1={() => applyHeading('h1')}
           onH2={() => applyHeading('h2')}

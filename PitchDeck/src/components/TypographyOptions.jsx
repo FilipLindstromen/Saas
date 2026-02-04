@@ -105,8 +105,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     textStyleMode: 'fontPairing',
     fontPairingSerifFont: 'Playfair Display',
     fontFamily: 'Poppins',
-    defaultTextSize: 5,
-    h1Size: 7,
+    defaultTextSize: 4,
+    h1Size: 10,
     h2Size: 3.5,
     h3Size: 2.5,
     h1FontFamily: 'Poppins',
@@ -116,7 +116,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     bulletLineHeight: 1,
     bulletTextSize: 3,
     bulletGap: 0.5,
-    contentBottomOffset: 16.67,
+    contentBottomOffset: 12,
     defaultFontWeight: 700,
     h1Weight: 700,
     h2Weight: 700,
@@ -221,7 +221,6 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
   const content = (
     <div className="style-dropdown-content">
       <div className="style-dropdown-header-row">
-            <div className="style-dropdown-title">Typography</div>
             <button
               type="button"
               className="style-dropdown-btn style-dropdown-btn-reset"
@@ -233,7 +232,6 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
           </div>
 
           {/* 1. Main font */}
-          <div className="style-dropdown-section-title">Main font</div>
           <div className="style-dropdown-field">
             <label>Font family</label>
             <select
@@ -252,8 +250,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 min="0.5"
                 max="10"
                 step="0.1"
-                value={settings.defaultTextSize !== undefined ? settings.defaultTextSize : 5}
-                onChange={(e) => handleChange('defaultTextSize', parseFloat(e.target.value) || 5)}
+                value={settings.defaultTextSize !== undefined ? settings.defaultTextSize : 4}
+                onChange={(e) => handleChange('defaultTextSize', parseFloat(e.target.value) || 4)}
                 className="style-dropdown-input"
               />
             </div>
@@ -264,8 +262,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 min="0.5"
                 max="3"
                 step="0.1"
-                value={settings.lineHeight !== undefined ? settings.lineHeight : 1.4}
-                onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1.4)}
+                value={settings.lineHeight !== undefined ? settings.lineHeight : 1}
+                onChange={(e) => handleChange('lineHeight', parseFloat(e.target.value) || 1)}
                 className="style-dropdown-input"
               />
             </div>
@@ -285,7 +283,6 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
           </div>
 
           {/* 2. Font pairing */}
-          <div className="style-dropdown-section-title">Font pairing</div>
           <div className="style-dropdown-field">
             <label>Text style mode</label>
             <select
@@ -360,7 +357,6 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
           )}
 
           {/* 3. Headings */}
-          <div className="style-dropdown-section-title">Headings</div>
           <div className="style-dropdown-sub-fields">
             <div className="style-dropdown-sub-field">
               <label>H1 size</label>
@@ -471,7 +467,6 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
           </div>
 
           {/* 4. Layout text position (left aligned, left video, right aligned, bullets) */}
-          <div className="style-dropdown-section-title">Layout text position</div>
           <div className="style-dropdown-field">
             <label>Distance from bottom (%)</label>
             <input
@@ -479,8 +474,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               min="5"
               max="30"
               step="0.5"
-              value={settings.contentBottomOffset !== undefined ? settings.contentBottomOffset : 16.67}
-              onChange={(e) => handleChange('contentBottomOffset', parseFloat(e.target.value) ?? 16.67)}
+              value={settings.contentBottomOffset !== undefined ? settings.contentBottomOffset : 12}
+              onChange={(e) => handleChange('contentBottomOffset', parseFloat(e.target.value) ?? 12)}
               className="style-dropdown-input"
               title="How far from the bottom the text sits in left aligned, left video, right aligned and bullet layouts (edit + present)"
             />
@@ -488,6 +483,16 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
 
           {/* 5. Bullets */}
           <div className="style-dropdown-section-title">Bullets</div>
+          <div className="style-dropdown-field" style={{ marginBottom: '0.25rem' }}>
+            <label className="style-dropdown-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.showBullets !== false}
+                onChange={(e) => handleChange('showBullets', e.target.checked)}
+              />
+              <span>Show bullets</span>
+            </label>
+          </div>
           <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
             <div className="style-dropdown-sub-field">
               <label>Line height</label>

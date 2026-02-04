@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { convertToMp4, exportTrimmedVideo } from '../utils/ffmpegExport'
+import { exportTrimmedVideo } from '../utils/ffmpegExport'
 import './EditRecordingMode.css'
 
 function formatTime(seconds) {
@@ -9,19 +9,11 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-/** Returns true if the blob is likely playable natively in a video element (MP4 H.264). */
-function isNativePlayable(blob) {
-  if (!blob?.type) return false
-  const t = blob.type.toLowerCase()
-  return t.includes('mp4') || t === 'video/mp4'
-}
-
 function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
   const fileInputRef = useRef(null)
   const videoRef = useRef(null)
   const fileUrlRef = useRef(null)
   const playbackBlobRef = useRef(null)
-  const prepareCancelRef = useRef(false)
   const [videoUrl, setVideoUrl] = useState(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -32,8 +24,6 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [loadError, setLoadError] = useState(null)
-  const [prepareStatus, setPrepareStatus] = useState('idle') // 'idle' | 'converting' | 'ready' | 'error'
-  const [convertProgress, setConvertProgress] = useState(0)
   const timelineRef = useRef(null)
 
   const revokeUrl = useCallback(() => {
@@ -43,10 +33,9 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
     }
   }, [])
 
-  /** Prepare a video for playback: use MP4 as-is, transcode WebM/others to MP4 via FFmpeg. */
-  const prepareVideo = useCallback(async (blob) => {
+  /** Use the blob directly for playback (no FFmpeg conversion). WebM/MP4/OGG play in modern browsers. */
+  const loadBlob = useCallback((blob) => {
     if (!blob) return
-    prepareCancelRef.current = false
     setLoadError(null)
     revokeUrl()
     setVideoUrl(null)
@@ -56,47 +45,19 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
     setTrimEnd(0)
     playbackBlobRef.current = null
 
-    if (isNativePlayable(blob)) {
-      const url = URL.createObjectURL(blob)
-      fileUrlRef.current = url
-      playbackBlobRef.current = blob
-      setVideoUrl(url)
-      setPrepareStatus('ready')
-      return
-    }
-
-    setPrepareStatus('converting')
-    setConvertProgress(0)
-    try {
-      const mp4Blob = await convertToMp4(blob, {
-        onProgress: (p) => { if (!prepareCancelRef.current) setConvertProgress(p) }
-      })
-      if (prepareCancelRef.current) return
-      const url = URL.createObjectURL(mp4Blob)
-      fileUrlRef.current = url
-      playbackBlobRef.current = mp4Blob
-      setVideoUrl(url)
-      setPrepareStatus('ready')
-    } catch (e) {
-      if (prepareCancelRef.current) return
-      setLoadError(e?.message ?? 'Conversion failed.')
-      setPrepareStatus('error')
-    } finally {
-      setConvertProgress(0)
-    }
+    const url = URL.createObjectURL(blob)
+    fileUrlRef.current = url
+    playbackBlobRef.current = blob
+    setVideoUrl(url)
   }, [revokeUrl])
 
-  // When entering with a recording/blob, prepare it (transcode to MP4 if needed)
+  // When entering with a recording/blob, or when user loads a file, use it directly
   useEffect(() => {
     const blob = latestRecordingRef?.current ?? videoBlob
     if (blob) {
-      prepareVideo(blob)
-      return () => {
-        prepareCancelRef.current = true
-        revokeUrl()
-      }
+      loadBlob(blob)
+      return () => revokeUrl()
     } else {
-      prepareCancelRef.current = true
       revokeUrl()
       setVideoUrl(null)
       setDuration(0)
@@ -104,9 +65,8 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
       setTrimStart(0)
       setTrimEnd(0)
       setCutPoints([])
-      setPrepareStatus('idle')
     }
-  }, [latestRecordingRef, videoBlob, prepareVideo, revokeUrl])
+  }, [latestRecordingRef, videoBlob, loadBlob, revokeUrl])
 
   useEffect(() => {
     return () => revokeUrl()
@@ -278,25 +238,6 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
     }
   }, [duration, getSegments])
 
-  // Converting: show progress
-  if (prepareStatus === 'converting') {
-    return (
-      <div className="edit-recording-mode">
-        <div className="edit-recording-header">
-          <h1 className="edit-recording-title">Edit recording</h1>
-          <button type="button" className="btn-exit-edit-recording" onClick={onExit}>Exit</button>
-        </div>
-        <div className="edit-recording-empty edit-recording-converting">
-          <p>Preparing video for playback with FFmpeg…</p>
-          <div className="edit-recording-progress-bar">
-            <div className="edit-recording-progress-fill" style={{ width: `${Math.round(convertProgress * 100)}%` }} />
-          </div>
-          <span className="edit-recording-progress-pct">{Math.round(convertProgress * 100)}%</span>
-        </div>
-      </div>
-    )
-  }
-
   // No video loaded
   if (!videoUrl) {
     return (
@@ -315,7 +256,7 @@ function EditRecordingMode({ videoBlob, latestRecordingRef, onExit }) {
             style={{ display: 'none' }}
             onChange={(e) => {
               const file = e.target.files?.[0]
-              if (file) prepareVideo(file)
+              if (file) loadBlob(file)
               e.target.value = ''
             }}
           />
