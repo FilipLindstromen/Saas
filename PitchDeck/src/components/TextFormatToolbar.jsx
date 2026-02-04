@@ -6,7 +6,7 @@ const TEXT_COLOR_SWATCHES = [
   '#78716c', '#a8a29e', '#f87171', '#fb923c', '#facc15', '#4ade80', '#22d3ee', '#60a5fa', '#a78bfa', '#f472b6'
 ]
 
-function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, underlineActive = false, backgroundActive = false, headingActive = null, serifActive = false, textColorActive = null, onClose, onBold, onItalic, onUnderline, onBackground, onH1, onH2, onH3, onFontPairing, onTextColor, onClearFormatting }) {
+function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, underlineActive = false, strikethroughActive = false, backgroundActive = false, headingActive = null, serifActive = false, textColorActive = null, onClose, onBold, onItalic, onUnderline, onStrikethrough, onBackground, onH1, onH2, onH3, onFontPairing, onTextColor, onClearFormatting }) {
   const toolbarRef = useRef(null)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const colorInputRef = useRef(null)
@@ -79,6 +79,13 @@ function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, und
           <line x1="4" y1="21" x2="20" y2="21" />
         </svg>
       </button>
+      {onStrikethrough && (
+        <button type="button" className={`text-format-toolbar-btn${strikethroughActive ? ' text-format-toolbar-btn-active' : ''}`} onClick={onStrikethrough} title="Strikethrough">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="4" y1="12" x2="20" y2="12" />
+          </svg>
+        </button>
+      )}
       <div className="text-format-toolbar-divider" />
       <button type="button" className={`text-format-toolbar-btn${backgroundActive ? ' text-format-toolbar-btn-active' : ''}`} onClick={onBackground} title={backgroundActive ? 'Remove highlight' : 'Highlight / background'}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

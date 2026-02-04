@@ -12,7 +12,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 5, h1Size = 5, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1.4, bulletLineHeight = 1.4, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 16.67, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -179,6 +179,48 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           </div>
         </div>
         <div className="preview-header-actions">
+          <div className="gradient-control preview-bg-color-override">
+            <label htmlFor="slide-bg-color-override-check">Bg color:</label>
+            <label className="preview-bg-color-override-toggle" htmlFor="slide-bg-color-override-check">
+              <input
+                id="slide-bg-color-override-check"
+                type="checkbox"
+                checked={!!slide.backgroundColorOverride}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  onUpdate(on
+                    ? { backgroundColorOverride: true, backgroundColorOverrideValue: slide.backgroundColorOverrideValue || backgroundColor }
+                    : { backgroundColorOverride: false }
+                  )
+                }}
+              />
+            </label>
+            {slide.backgroundColorOverride && (
+              <>
+                <input
+                  type="color"
+                  className="preview-bg-color-picker"
+                  value={(slide.backgroundColorOverrideValue || backgroundColor).slice(0, 7)}
+                  onChange={(e) => onUpdate({ backgroundColorOverrideValue: e.target.value })}
+                  title="Background color"
+                />
+                <input
+                  type="text"
+                  className="preview-bg-color-hex"
+                  value={(slide.backgroundColorOverrideValue || backgroundColor).replace(/^#?/, '#')}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(v) || /^[0-9A-Fa-f]{0,6}$/.test(v)) {
+                      const hex = v.startsWith('#') ? v : `#${v}`
+                      if (hex.length === 7) onUpdate({ backgroundColorOverrideValue: hex })
+                    }
+                  }}
+                  placeholder="#1a1a1a"
+                  title="Hex color"
+                />
+              </>
+            )}
+          </div>
           {(slide.layout || 'default') !== 'centered' && (slide.layout || 'default') !== 'right' && (
             <>
               <button
@@ -384,6 +426,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             bulletTextSize={bulletTextSize}
             bulletGap={bulletGap}
             contentBottomOffset={contentBottomOffset}
+            showBullets={showBullets}
             defaultFontWeight={defaultFontWeight}
             h1Weight={h1Weight}
             h2Weight={h2Weight}

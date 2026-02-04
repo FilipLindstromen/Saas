@@ -208,12 +208,13 @@ function App() {
       bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
-      contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 16.67,
+      contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 12,
       defaultFontWeight: parseInt(localStorage.getItem('defaultFontWeight'), 10) || 700,
       h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
       h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
       h3Weight: parseInt(localStorage.getItem('h3Weight'), 10) || 700,
-      googleClientId: localStorage.getItem('googleClientId') || ''
+      googleClientId: localStorage.getItem('googleClientId') || '',
+      showBullets: localStorage.getItem('showBullets') !== 'false'
     }
     return savedSettings
   })
@@ -565,12 +566,13 @@ function App() {
     localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
     localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
     localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
-    localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1.4')
-    localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1.4')
+    localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1')
+    localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
     if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
+    localStorage.setItem('showBullets', settings.showBullets !== false ? 'true' : 'false')
     if (settings.defaultFontWeight !== undefined) localStorage.setItem('defaultFontWeight', settings.defaultFontWeight.toString())
     if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
     if (settings.h2Weight !== undefined) localStorage.setItem('h2Weight', settings.h2Weight.toString())
@@ -1090,7 +1092,9 @@ function App() {
     imagePositionY: 50,
     textHeadingLevel: null,
     subtitleHeadingLevel: null,
-    analysis: null
+    analysis: null,
+    backgroundColorOverride: false,
+    backgroundColorOverrideValue: undefined
   }), [])
 
   const getExportData = useCallback(() => {
@@ -1212,7 +1216,9 @@ function App() {
     imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
     textHeadingLevel: slide.textHeadingLevel || null,
     subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-    analysis: slide.analysis != null ? slide.analysis : null
+    analysis: slide.analysis != null ? slide.analysis : null,
+    backgroundColorOverride: slide.backgroundColorOverride === true,
+    backgroundColorOverrideValue: slide.backgroundColorOverrideValue ?? undefined
   }), [])
 
   // Load project data (from overview Open, or after file read). Same shape as export.
@@ -1864,7 +1870,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
           openaiKey={settings.openaiKey || ''}
           slideFormat={settings.slideFormat || '16:9'}
-          contentBottomOffset={settings.contentBottomOffset ?? 16.67}
+          contentBottomOffset={settings.contentBottomOffset ?? 12}
+          showBullets={settings.showBullets !== false}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}
@@ -2601,7 +2608,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
-          contentBottomOffset={settings.contentBottomOffset ?? 16.67}
+          contentBottomOffset={settings.contentBottomOffset ?? 12}
+          showBullets={settings.showBullets !== false}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}

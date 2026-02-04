@@ -198,6 +198,53 @@
   white-space: nowrap;
 }
 
+.preview-bg-color-override {
+  flex-wrap: wrap;
+}
+
+.preview-bg-color-override-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.preview-bg-color-override-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.preview-bg-color-picker {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.preview-bg-color-hex {
+  width: 72px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  outline: none;
+}
+
+.preview-bg-color-hex:focus {
+  border-color: var(--accent);
+}
+
 .preview-header .gradient-slider {
   width: 120px;
   height: 6px;

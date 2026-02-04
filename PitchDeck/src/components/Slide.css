@@ -60,13 +60,13 @@
   display: flex;
   align-items: flex-end;
   /* Bottom offset from typography setting (--slide-content-bottom); applies in edit + present */
-  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
   background: transparent;
 }
 
 .slide-content.bulletpoints {
   align-items: flex-end;
-  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
 }
 
 .slide-content.centered {
@@ -99,7 +99,7 @@
   align-items: flex-end;
   justify-content: flex-end;
   /* Position text in lower third; minus 1.4em moves text down by ~1 line */
-  padding: 4% 9% calc(16.67% - 1.4em) 0;
+  padding: 4% 9% calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
 }
 
 .slide-content.section {
@@ -139,21 +139,21 @@
   z-index: 1001;
   display: flex;
   align-items: flex-end;
-  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
 }
 
 /* Left with Video: same bottom offset as typography setting; only the text area is narrower */
 .slide-content.left-video {
   align-items: flex-end;
   justify-content: flex-start;
-  padding: 4% 0 var(--slide-content-bottom, 16.67%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
 }
 
 /* Right with Video: text on right, video panel on left; same bottom offset as typography setting */
 .slide-content.right-video {
   align-items: flex-end;
   justify-content: flex-end;
-  padding: 4% 9% var(--slide-content-bottom, 16.67%) 0;
+  padding: 4% 9% var(--slide-content-bottom, 12%) 0;
 }
 
 .slide-text {
@@ -342,6 +342,35 @@
   margin: 0;
 }
 
+/* Single text field for bulletpoints in edit mode */
+.slide-bullets-single-field {
+  max-width: 66.67%;
+  min-height: 6em;
+}
+
+.slide-bullets-textarea {
+  width: 100%;
+  min-height: 8em;
+  padding: 0.5em 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slide-bullets-textarea::placeholder {
+  opacity: 0.5;
+}
+
 /* Heading styles override default font-size and font-family when applied */
 .slide-text.text-heading-h1,
 .slide-text.text-heading-h2,
@@ -366,6 +395,15 @@
 
 .slide-text em {
   font-style: italic;
+}
+
+.slide-text s,
+.slide-text strike,
+.slide-subtitle s,
+.slide-subtitle strike,
+.bullet-text s,
+.bullet-text strike {
+  text-decoration: line-through;
 }
 
 /* H1/H2/H3 in content: block display so heading sizes from Slide.jsx apply in edit and present mode */
@@ -440,6 +478,12 @@
 
 .play-mode .slide-bullet::before {
   margin-top: 0;
+}
+
+/* Hide bullet marker when "Show bullets" is off (text only) */
+.slide-bullets.bullets-hidden .slide-bullet::before {
+  content: none;
+  display: none;
 }
 
 /* Bullet text (class is "bullet-text" in JSX) */
