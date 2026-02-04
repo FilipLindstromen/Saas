@@ -434,7 +434,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
-  const [visibleLineIndex, setVisibleLineIndex] = useState(-1)
+  const [visibleLineIndex, setVisibleLineIndex] = useState(0)
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
   
   // Recording state
@@ -469,10 +469,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }
   const contentLineCount = !isBulletSlide && currentSlide ? getContentLineCount(currentSlide) : 0
 
-  // Reset line/bullet reveal when changing slides
+  // Reset line/bullet reveal when changing slides (start with first line visible for line reveal)
   useEffect(() => {
     setVisibleBulletIndex(-1)
-    setVisibleLineIndex(-1)
+    setVisibleLineIndex(0)
   }, [currentIndex])
 
   // Get transition duration based on style
