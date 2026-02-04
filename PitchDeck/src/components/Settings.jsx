@@ -62,6 +62,38 @@ function Settings({ settings, onUpdate, onClose }) {
                 </p>
               </div>
               <div className="settings-field">
+                <label htmlFor="pexels-key">Pexels API Key</label>
+                <input
+                  id="pexels-key"
+                  type="password"
+                  value={localSettings.pexelsKey || ''}
+                  onChange={(e) => handleChange('pexelsKey', e.target.value)}
+                  placeholder="Your Pexels API Key"
+                />
+                <p className="settings-hint">
+                  For video backgrounds. Get a free key at{' '}
+                  <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer">
+                    pexels.com/api
+                  </a>
+                </p>
+              </div>
+              <div className="settings-field">
+                <label htmlFor="pixabay-key">Pixabay API Key</label>
+                <input
+                  id="pixabay-key"
+                  type="password"
+                  value={localSettings.pixabayKey || ''}
+                  onChange={(e) => handleChange('pixabayKey', e.target.value)}
+                  placeholder="Your Pixabay API Key"
+                />
+                <p className="settings-hint">
+                  For more free video backgrounds. Get a free key at{' '}
+                  <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer">
+                    pixabay.com/api/docs
+                  </a>
+                </p>
+              </div>
+              <div className="settings-field">
                 <label htmlFor="google-client-id">Google Client ID</label>
                 <input
                   id="google-client-id"

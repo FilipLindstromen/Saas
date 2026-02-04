@@ -11,7 +11,7 @@ import TextEffectsOptions from './components/TextEffectsOptions'
 import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
-import EditRecordingMode from './components/EditRecordingMode'
+import VideoEditingMode from './components/VideoEditingMode'
 import ProjectOverview from './components/ProjectOverview'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
@@ -39,6 +39,7 @@ function App() {
             backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
             gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
             subtitle: slide.subtitle || '',
+            backgroundVideoUrl: slide.backgroundVideoUrl ?? '',
             imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
             imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
             imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
@@ -58,7 +59,7 @@ function App() {
     
     // Default template if no saved data
     return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
+      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
       selectedId: 1
     }
   }
@@ -94,7 +95,7 @@ function App() {
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'edit-recording'
+  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'video-editing'
   const lastRecordingBlobRef = useRef(null)
   const analyzeVideoInputRef = useRef(null)
   const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
@@ -209,11 +210,14 @@ function App() {
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
       contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 12,
+      contentEdgeOffset: parseFloat(localStorage.getItem('contentEdgeOffset')) || 9,
       defaultFontWeight: parseInt(localStorage.getItem('defaultFontWeight'), 10) || 700,
       h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
       h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
       h3Weight: parseInt(localStorage.getItem('h3Weight'), 10) || 700,
       googleClientId: localStorage.getItem('googleClientId') || '',
+      pexelsKey: localStorage.getItem('pexelsKey') || '',
+      pixabayKey: localStorage.getItem('pixabayKey') || '',
       showBullets: localStorage.getItem('showBullets') !== 'false'
     }
     return savedSettings
@@ -583,6 +587,7 @@ function App() {
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
     if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
+    if (settings.contentEdgeOffset !== undefined) localStorage.setItem('contentEdgeOffset', settings.contentEdgeOffset.toString())
     localStorage.setItem('showBullets', settings.showBullets !== false ? 'true' : 'false')
     if (settings.defaultFontWeight !== undefined) localStorage.setItem('defaultFontWeight', settings.defaultFontWeight.toString())
     if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
@@ -590,6 +595,8 @@ function App() {
     if (settings.h3Weight !== undefined) localStorage.setItem('h3Weight', settings.h3Weight.toString())
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     if (settings.googleClientId !== undefined) localStorage.setItem('googleClientId', settings.googleClientId || '')
+    if (settings.pexelsKey !== undefined) localStorage.setItem('pexelsKey', settings.pexelsKey || '')
+    if (settings.pixabayKey !== undefined) localStorage.setItem('pixabayKey', settings.pixabayKey || '')
   }, [settings])
 
   // Save workspace data when it changes
@@ -803,7 +810,7 @@ function App() {
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
-    const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+    const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
     const newSlides = [...slides, newSlide]
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
@@ -1053,7 +1060,7 @@ function App() {
     const newChapter = {
       id: newChapterId,
       name: `Chapter ${newChapterId}`,
-      slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
+      slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
     }
     const newChapters = [...chapters, newChapter]
     setChapters(newChapters)
@@ -1093,6 +1100,7 @@ function App() {
     content: '',
     subtitle: '',
     imageUrl: '',
+    backgroundVideoUrl: '',
     layout: 'default',
     gradientStrength: 0.7,
     flipHorizontal: false,
@@ -1116,6 +1124,7 @@ function App() {
       content: slide.content ?? '',
       subtitle: slide.subtitle ?? '',
       imageUrl: slide.imageUrl ?? '',
+      backgroundVideoUrl: slide.backgroundVideoUrl ?? '',
       layout: slide.layout ?? 'default',
       gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
       flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
@@ -1160,6 +1169,7 @@ function App() {
         content: '',
         subtitle: '',
         imageUrl: '',
+        backgroundVideoUrl: '',
         layout: 'default',
         gradientStrength: 0.7,
         flipHorizontal: false,
@@ -1882,6 +1892,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           openaiKey={settings.openaiKey || ''}
           slideFormat={settings.slideFormat || '16:9'}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
+          contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           showBullets={settings.showBullets !== false}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
@@ -2101,15 +2112,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Record</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
-                  onClick={() => setMode('edit-recording')}
-                  title="Edit recording"
+                  className={`header-mode-btn ${mode === 'video-editing' ? 'active' : ''}`}
+                  onClick={() => setMode('video-editing')}
+                  title="Video editing"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="23 7 16 12 23 17 23 7" />
                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                   </svg>
-                  <span>Edit recording</span>
+                  <span>Video editing</span>
                 </button>
               </div>
               <div className="header-format-select-wrap">
@@ -2417,15 +2428,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Record</span>
                 </button>
                 <button
-                  className={`header-mode-btn ${mode === 'edit-recording' ? 'active' : ''}`}
-                  onClick={() => setMode('edit-recording')}
-                  title="Edit recording"
+                  className={`header-mode-btn ${mode === 'video-editing' ? 'active' : ''}`}
+                  onClick={() => setMode('video-editing')}
+                  title="Video editing"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="23 7 16 12 23 17 23 7" />
                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                   </svg>
-                  <span>Edit recording</span>
+                  <span>Video editing</span>
                 </button>
               </div>
               <div className="header-format-select-wrap">
@@ -2554,13 +2565,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             </div>
           </div>
       </div>
-      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'edit-recording' ? 'edit-recording-content' : ''}`}>
-        {mode === 'edit-recording' ? (
-          <EditRecordingMode
+      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'video-editing' ? 'video-editing-content' : ''}`}>
+        {mode === 'video-editing' ? (
+          <VideoEditingMode
             key={lastRecordingBlobVersion}
             videoBlob={lastRecordingBlobRef.current}
             latestRecordingRef={lastRecordingBlobRef}
             onExit={() => setMode('edit')}
+            openaiKey={settings.openaiKey}
           />
         ) : (
           <>
@@ -2620,6 +2632,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
+          contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           showBullets={settings.showBullets !== false}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}

@@ -96,6 +96,9 @@ function InspectorPanel({
             slide={selectedSlide}
             onUpdate={handleSlideUpdate}
             backgroundColor={backgroundColor}
+            contentEdgeOffset={settings.contentEdgeOffset ?? 9}
+            contentBottomOffset={settings.contentBottomOffset ?? 12}
+            onUpdateSettings={onUpdateSettings}
           />
         )}
         {activeTab === 'recording' && (

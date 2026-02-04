@@ -866,12 +866,12 @@
   overflow-x: hidden;
 }
 
-.app-content.edit-recording-content {
+.app-content.video-editing-content {
   display: flex;
   flex-direction: column;
 }
 
-.app-content.edit-recording-content > * {
+.app-content.video-editing-content > * {
   flex: 1;
   min-width: 0;
   min-height: 0;

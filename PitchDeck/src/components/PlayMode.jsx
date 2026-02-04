@@ -417,7 +417,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -462,10 +462,17 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
   const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
 
-  // Content line count for non-bullet slides (split by newline and <br>)
+  // Content line count for non-bullet slides (must match Slide getContentLines: <div>, <p>, <br> → newline)
   const getContentLineCount = (slide) => {
-    if (!slide?.content) return 0
-    return (slide.content.replace(/<br\s*\/?>/gi, '\n').split('\n')).length
+    if (!slide?.content) return 1
+    const normalized = (slide.content + '')
+      .replace(/<div[^>]*>\s*/gi, '\n')
+      .replace(/<\/div>\s*/gi, '\n')
+      .replace(/<p[^>]*>\s*/gi, '\n')
+      .replace(/<\/p>\s*/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+    const lines = normalized.split('\n')
+    return Math.max(1, lines.length)
   }
   const contentLineCount = !isBulletSlide && currentSlide ? getContentLineCount(currentSlide) : 0
 
@@ -943,6 +950,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           bulletTextSize={bulletTextSize}
           bulletGap={bulletGap}
           contentBottomOffset={contentBottomOffset}
+          contentEdgeOffset={contentEdgeOffset}
           showBullets={showBullets}
           defaultFontWeight={defaultFontWeight}
           h1Weight={h1Weight}

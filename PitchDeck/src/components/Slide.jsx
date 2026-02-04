@@ -31,10 +31,15 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
 
     const startStream = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        let stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: cameraId } }
-        })
-        if (videoRef.current) {
+        }).catch(() => null)
+        if (!stream && cameraId) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { ideal: cameraId } }
+          }).catch(() => null)
+        }
+        if (stream && videoRef.current) {
           videoRef.current.srcObject = stream
           streamRef.current = stream
         }
@@ -85,7 +90,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -101,6 +106,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   // Text format toolbar: show on text selection in edit mode
   const [textFormatToolbar, setTextFormatToolbar] = useState(null) // { x, y, target: { field, bulletIndex? } }
   const textFormatRangeRef = useRef(null)
+  const backgroundVideoRef = useRef(null)
+  const backgroundVideoBlobUrlRef = useRef(null) // so we can revoke on cleanup
+  // Resolved blob URL for cross-origin video (avoids COEP blocking Pexels/Pixabay)
+  const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
 
   const layout = slide.layout === 'title' ? 'centered' : (slide.layout || 'default')
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
@@ -109,6 +118,76 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const imageScale = slide.imageScale !== undefined ? slide.imageScale : 1.0
   const imagePositionX = slide.imagePositionX !== undefined ? slide.imagePositionX : 50
   const imagePositionY = slide.imagePositionY !== undefined ? slide.imagePositionY : 50
+
+  // Fetch cross-origin video to blob URL so <video> loads same-origin (avoids COEP block)
+  useEffect(() => {
+    const url = slide.backgroundVideoUrl
+    if (!url || layout === 'section') {
+      if (backgroundVideoBlobUrlRef.current) {
+        URL.revokeObjectURL(backgroundVideoBlobUrlRef.current)
+        backgroundVideoBlobUrlRef.current = null
+      }
+      setBackgroundVideoSrc(null)
+      return
+    }
+    const isExternal = url.startsWith('http://') || url.startsWith('https://')
+    if (!isExternal) {
+      setBackgroundVideoSrc(url)
+      return
+    }
+    let cancelled = false
+    if (backgroundVideoBlobUrlRef.current) {
+      URL.revokeObjectURL(backgroundVideoBlobUrlRef.current)
+      backgroundVideoBlobUrlRef.current = null
+    }
+    fetch(url, { mode: 'cors', credentials: 'omit' })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText)
+        return res.blob()
+      })
+      .then((blob) => {
+        if (cancelled) return
+        const blobUrl = URL.createObjectURL(blob)
+        backgroundVideoBlobUrlRef.current = blobUrl
+        setBackgroundVideoSrc(blobUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setBackgroundVideoSrc(null)
+      })
+    return () => {
+      cancelled = true
+      if (backgroundVideoBlobUrlRef.current) {
+        URL.revokeObjectURL(backgroundVideoBlobUrlRef.current)
+        backgroundVideoBlobUrlRef.current = null
+      }
+      setBackgroundVideoSrc(null)
+    }
+  }, [slide.backgroundVideoUrl, layout])
+
+  // Ensure background video plays in both edit preview and present mode
+  useEffect(() => {
+    if (!slide.backgroundVideoUrl || layout === 'section') return
+    const el = backgroundVideoRef.current
+    const play = () => {
+      const video = backgroundVideoRef.current
+      if (video) video.play().catch(() => {})
+    }
+    if (el) {
+      if (el.readyState >= 2) play()
+      else {
+        el.addEventListener('loadeddata', play, { once: true })
+        el.addEventListener('canplay', play, { once: true })
+      }
+    }
+    const t = setTimeout(play, 100)
+    return () => {
+      clearTimeout(t)
+      if (el) {
+        el.removeEventListener('loadeddata', play)
+        el.removeEventListener('canplay', play)
+      }
+    }
+  }, [slide.backgroundVideoUrl, layout, backgroundVideoSrc])
 
   // Convert hex color to RGB
   const hexToRgb = (hex) => {
@@ -155,8 +234,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     })
   }
 
-  // Split content into lines (for "show one line at a time" in play mode)
-  const getContentLines = (content) => (content || '').replace(/<br\s*\/?>/gi, '\n').split('\n')
+  // Split content into lines (for "show one line at a time" in play mode).
+  // Normalize contentEditable line breaks: <div>, <p>, <br> become newlines so each line is one "reveal" step.
+  const getContentLines = (content) => {
+    if (!content) return ['']
+    const normalized = (content + '')
+      .replace(/<div[^>]*>\s*/gi, '\n')
+      .replace(/<\/div>\s*/gi, '\n')
+      .replace(/<p[^>]*>\s*/gi, '\n')
+      .replace(/<\/p>\s*/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+    const lines = normalized.split('\n')
+    return lines.length ? lines : ['']
+  }
 
   // Strip trailing line breaks (no text after them) so they don't show in edit or present mode
   const stripTrailingLineBreaks = (s) => {
@@ -1283,8 +1373,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     // For play mode, render as div with formatted content (or chunk spans when text animation is on)
+    // When "show one line at a time" is on (visibleLineIndex !== null), always use line-by-line reveal
     if (isPlayMode) {
-      if (visibleLineIndex !== null && !useChunkedText) {
+      if (visibleLineIndex !== null) {
         const lines = getContentLines(slide.content || '')
         return (
           <div
@@ -1411,7 +1502,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }, [isPlayMode, defaultTextSize, bulletTextSize]) // Re-run when play mode or text sizes change
 
   const handleImageMouseDown = (e) => {
-    if (!onUpdate || isPlayMode || !slide.imageUrl) return
+    if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl)) return
     // Only start dragging if clicking directly on the background, not on text content
     // Check if the click is on a text element (these have pointerEvents: auto)
     const target = e.target
@@ -1442,7 +1533,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }
 
   const handleImageMouseMove = useCallback((e) => {
-    if (!isDragging || !onUpdate || isPlayMode || !slide.imageUrl) return
+    if (!isDragging || !onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl)) return
     e.preventDefault()
     const rect = slideRef.current?.getBoundingClientRect()
     if (rect) {
@@ -1456,10 +1547,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       
       setCurrentPosition({ x: newX, y: newY })
     }
-  }, [isDragging, dragStart, onUpdate, isPlayMode, slide.imageUrl])
+  }, [isDragging, dragStart, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl])
 
   const handleImageMouseUp = useCallback(() => {
-    if (isDragging && onUpdate && !isPlayMode && slide.imageUrl) {
+    if (isDragging && onUpdate && !isPlayMode && (slide.imageUrl || slide.backgroundVideoUrl)) {
       // Save the final position when releasing
       onUpdate({ 
         imagePositionX: currentPosition.x, 
@@ -1467,7 +1558,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       })
     }
     setIsDragging(false)
-  }, [isDragging, currentPosition, onUpdate, isPlayMode, slide.imageUrl])
+  }, [isDragging, currentPosition, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl])
 
   useEffect(() => {
     if (isDragging) {
@@ -1489,14 +1580,15 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     aspectRatio: aspectRatioValue,
     '--slide-base-font-size': `${defaultTextSize}rem`,
     '--slide-pairing-font': `"${fontPairingSerifFont}", serif`,
-    '--slide-content-bottom': `${contentBottomOffset}%`
+    '--slide-content-bottom': `${contentBottomOffset}%`,
+    '--slide-content-edge': `${contentEdgeOffset}%`
   }
   return (
     <div 
-      className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${isPlayMode ? 'play-mode' : ''}`}
+      className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''}`}
       ref={slideRef} 
       style={slideStyle}
-      onMouseDown={(!isPlayMode && onUpdate && slide.imageUrl) ? handleImageMouseDown : undefined}
+      onMouseDown={(!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl)) ? handleImageMouseDown : undefined}
     >
       <style>{`
         /* Default font weight for body text in slide content */
@@ -1603,7 +1695,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           display: inline;
         }
       `}</style>
-      {slide.imageUrl && layout !== 'section' && (
+      {/* 1. Background image (z-index 0) - behind video */}
+      {slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
           className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
@@ -1622,14 +1715,54 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && layout !== 'right-video' && (
+      {/* 2. Background video (z-index 1) - in front of image, behind gradient and content; same scale/position as image */}
+      {slide.backgroundVideoUrl && layout !== 'section' && (() => {
+        const raw = slide.backgroundVideoUrl
+        const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
+        const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
+        const videoEditable = !isPlayMode && onUpdate
+        return (
+          <div
+            className={`slide-background slide-background-video ${videoEditable ? 'editable' : ''}`}
+            aria-hidden="true"
+            style={{
+              pointerEvents: videoEditable ? 'auto' : 'none',
+              cursor: videoEditable ? 'move' : undefined
+            }}
+          >
+            <video
+              ref={(el) => {
+                backgroundVideoRef.current = el
+                if (el) el.play().catch(() => {})
+              }}
+              src={videoSrc}
+              crossOrigin={isExternal ? 'anonymous' : undefined}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              className="slide-background-video-el"
+              style={{
+                objectFit: 'cover',
+                objectPosition: `${currentPosition.x}% ${currentPosition.y}%`,
+                transform: `${slide.flipHorizontal ? 'scaleX(-1) ' : ''}scale(${imageScale})`,
+                transformOrigin: `${currentPosition.x}% ${currentPosition.y}%`,
+                width: '100%',
+                height: '100%'
+              }}
+            />
+          </div>
+        )
+      })()}
+      {layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && layout !== 'right-video' && (slide.imageUrl || slide.backgroundVideoUrl) && (
         <div 
           className="slide-gradient-overlay"
           style={{
             background: gradientFlipped
               ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
               : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
-            pointerEvents: (!isPlayMode && onUpdate && slide.imageUrl) ? 'none' : 'auto'
+            pointerEvents: (!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl)) ? 'none' : 'auto'
           }}
         />
       )}
@@ -1686,7 +1819,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         )
       ) : (
         <div 
-          className={`slide-content ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''}`}
+          className={`slide-content ${layout === 'default' ? 'default' : ''} ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''}`}
           style={{ 
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,

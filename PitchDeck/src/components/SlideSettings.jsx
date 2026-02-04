@@ -1,6 +1,6 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a' }) {
+function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, onUpdateSettings }) {
   if (!slide) {
     return (
       <div className="slide-settings-empty">
@@ -126,7 +126,7 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a' }) {
               <span className="slide-settings-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6) * 100)}%</span>
             </div>
           </div>
-          {slide.imageUrl && (
+          {(slide.imageUrl || slide.backgroundVideoUrl) && (
             <>
               <div className="slide-settings-field slide-settings-row">
                 <button
@@ -170,6 +170,39 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a' }) {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {onUpdateSettings && (
+        <div className="slide-settings-section">
+          <div className="slide-settings-field">
+            <label htmlFor="slide-settings-edge">Distance from edge (%)</label>
+            <input
+              id="slide-settings-edge"
+              type="number"
+              min="2"
+              max="25"
+              step="0.5"
+              value={contentEdgeOffset}
+              onChange={(e) => onUpdateSettings({ contentEdgeOffset: parseFloat(e.target.value) ?? 9 })}
+              className="slide-settings-input"
+              title="Horizontal distance from left/right edge for all slides"
+            />
+          </div>
+          <div className="slide-settings-field">
+            <label htmlFor="slide-settings-bottom">Distance from bottom (%)</label>
+            <input
+              id="slide-settings-bottom"
+              type="number"
+              min="5"
+              max="30"
+              step="0.5"
+              value={contentBottomOffset}
+              onChange={(e) => onUpdateSettings({ contentBottomOffset: parseFloat(e.target.value) ?? 12 })}
+              className="slide-settings-input"
+              title="How far from the bottom the text sits (all slides)"
+            />
+          </div>
         </div>
       )}
     </div>

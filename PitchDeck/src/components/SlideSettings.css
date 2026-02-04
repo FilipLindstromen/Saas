@@ -74,6 +74,21 @@
   border-color: var(--accent);
 }
 
+.slide-settings-input {
+  width: 4rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  outline: none;
+}
+
+.slide-settings-input:focus {
+  border-color: var(--accent);
+}
+
 .slide-settings-row {
   flex-wrap: nowrap;
 }
