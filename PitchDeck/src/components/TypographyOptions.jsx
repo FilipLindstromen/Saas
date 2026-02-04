@@ -117,6 +117,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     bulletTextSize: 3,
     bulletGap: 0.5,
     contentBottomOffset: 12,
+    contentEdgeOffset: 9,
     defaultFontWeight: 700,
     h1Weight: 700,
     h2Weight: 700,
@@ -466,22 +467,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
             </div>
           </div>
 
-          {/* 4. Layout text position (left aligned, left video, right aligned, bullets) */}
-          <div className="style-dropdown-field">
-            <label>Distance from bottom (%)</label>
-            <input
-              type="number"
-              min="5"
-              max="30"
-              step="0.5"
-              value={settings.contentBottomOffset !== undefined ? settings.contentBottomOffset : 12}
-              onChange={(e) => handleChange('contentBottomOffset', parseFloat(e.target.value) ?? 12)}
-              className="style-dropdown-input"
-              title="How far from the bottom the text sits in left aligned, left video, right aligned and bullet layouts (edit + present)"
-            />
-          </div>
-
-          {/* 5. Bullets */}
+          {/* 4. Bullets */}
           <div className="style-dropdown-section-title">Bullets</div>
           <div className="style-dropdown-field" style={{ marginBottom: '0.25rem' }}>
             <label className="style-dropdown-checkbox">

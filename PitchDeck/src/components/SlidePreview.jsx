@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Slide from './Slide'
 import ImagePicker from './ImagePicker'
+import VideoPicker from './VideoPicker'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -12,11 +13,12 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
+  const [showVideoPicker, setShowVideoPicker] = useState(false)
   const [previewZoom, setPreviewZoom] = useState(() => {
     try {
       const saved = localStorage.getItem('pitchDeckPreviewZoom')
@@ -157,6 +159,15 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     onUpdate({ imageUrl: '' })
   }
 
+  const handleVideoBackgroundSelect = (videoUrl) => {
+    onUpdate({ backgroundVideoUrl: videoUrl || '' })
+    setShowVideoPicker(false)
+  }
+
+  const handleRemoveVideoBackground = () => {
+    onUpdate({ backgroundVideoUrl: '' })
+  }
+
   return (
     <div className="slide-preview">
       <div className="preview-header">
@@ -235,6 +246,18 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                 )}
                 <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Auto select image'}</span>
               </button>
+              <button
+                className="btn-icon btn-video-background"
+                onClick={() => setShowVideoPicker(true)}
+                disabled={!(settings.pexelsKey && settings.pexelsKey.trim()) && !(settings.pixabayKey && settings.pixabayKey.trim())}
+                title="Video background"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                </svg>
+                <span className="btn-tooltip">Video background</span>
+              </button>
               {slide.imageUrl && (
                 <>
                   <button
@@ -249,6 +272,21 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                     <span className="btn-tooltip">Remove Image</span>
                   </button>
                 </>
+              )}
+              {slide.backgroundVideoUrl && (
+                <button
+                  className="btn-icon btn-remove-video"
+                  onClick={handleRemoveVideoBackground}
+                  title="Remove video background"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                  </svg>
+                  <span className="btn-tooltip">Remove video</span>
+                </button>
               )}
             </>
           )}
@@ -302,6 +340,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             bulletTextSize={bulletTextSize}
             bulletGap={bulletGap}
             contentBottomOffset={contentBottomOffset}
+            contentEdgeOffset={contentEdgeOffset}
             showBullets={showBullets}
             defaultFontWeight={defaultFontWeight}
             h1Weight={h1Weight}
@@ -353,6 +392,12 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
           )}
         </div>
       )}
+      <VideoPicker
+        isOpen={showVideoPicker}
+        onClose={() => setShowVideoPicker(false)}
+        onSelect={handleVideoBackgroundSelect}
+        settings={settings}
+      />
       <ImagePicker
         isOpen={showImagePicker}
         onClose={() => setShowImagePicker(false)}

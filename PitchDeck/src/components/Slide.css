@@ -29,6 +29,51 @@
   pointer-events: auto;
 }
 
+/* Video sits above background color and background image, below gradient and content */
+.slide-background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.slide-background-video-el {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
+}
+
+/* Left with Video: image/video panel on the right, full height and flush to right edge */
+.slide.layout-left-video .slide-background:not(.slide-background-video),
+.slide.layout-left-video .slide-background.slide-background-video {
+  left: auto;
+  right: 0;
+  width: 55%;
+}
+.slide.layout-left-video .slide-background-video-el {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Right with Video: image/video panel on the left, full height and flush to left edge */
+.slide.layout-right-video .slide-background:not(.slide-background-video),
+.slide.layout-right-video .slide-background.slide-background-video {
+  left: 0;
+  right: auto;
+  width: 55%;
+}
+.slide.layout-right-video .slide-background-video-el {
+  object-fit: cover;
+  object-position: center;
+}
+
 .slide-background.background-scale-animation {
   animation: backgroundScale var(--scale-duration, 10s) linear forwards;
   animation-fill-mode: forwards;
@@ -43,13 +88,14 @@
   }
 }
 
+/* Gradient above video/image for text readability; below content and webcam */
 .slide-gradient-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
+  z-index: 2;
   /* Gradient is now set dynamically via inline style */
 }
 
@@ -59,31 +105,32 @@
   height: 100%;
   display: flex;
   align-items: flex-end;
-  /* Bottom offset from typography setting (--slide-content-bottom); applies in edit + present */
-  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
+  /* Bottom and edge from typography (--slide-content-bottom, --slide-content-edge); centered uses only padding */
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
   background: transparent;
 }
 
 .slide-content.bulletpoints {
   align-items: flex-end;
-  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
 }
 
 .slide-content.centered {
   justify-content: center;
   align-items: center;
   text-align: center;
-  /* Centered: 3rem = 4% of width */
+  /* Centered: same padding all sides, no distance-from-edge setting */
   padding: 4%;
 }
 
-/* Centered layout: wrap title + subtitle so the block is centered */
+/* Centered layout: wrap title + subtitle; fill height so title is vertically centered when no subtitle */
 .slide-text-centered-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 100%;
   text-align: center;
 }
 
@@ -99,7 +146,7 @@
   align-items: flex-end;
   justify-content: flex-end;
   /* Position text in lower third; minus 1.4em moves text down by ~1 line */
-  padding: 4% 9% calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
+  padding: 4% var(--slide-content-edge, 9%) calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
 }
 
 .slide-content.section {
@@ -113,47 +160,67 @@
   display: none;
 }
 
-/* Present mode: ensure content position matches edit mode for all layouts */
+/* Present mode: ensure content position matches edit mode (same distance from edge/bottom) */
 .play-mode .slide .slide-content:not(.centered):not(.section) {
   justify-content: flex-start;
   align-items: flex-end;
+  /* Explicit padding so --slide-content-edge and --slide-content-bottom apply in present mode */
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+/* Left-aligned (default) layout in present mode: force full width and left padding so text stays left */
+.play-mode .slide .slide-content.default {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+  padding-top: 4%;
+  padding-bottom: var(--slide-content-bottom, 12%);
 }
 .play-mode .slide .slide-content.right,
 .play-mode .slide .slide-content.right-video {
   justify-content: flex-end;
   align-items: flex-end;
+  padding: 4% var(--slide-content-edge, 9%) calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
+}
+.play-mode .slide .slide-content.right-video {
+  padding: 4% var(--slide-content-edge, 9%) var(--slide-content-bottom, 12%) 0;
 }
 .play-mode .slide .slide-content.centered,
 .play-mode .slide .slide-content.section {
   justify-content: center;
   align-items: center;
+  padding: 4%;
 }
-.play-mode .slide .slide-content-video {
+.play-mode .slide .slide-content-video,
+.play-mode .slide .slide-content.left-video {
   justify-content: flex-start;
   align-items: flex-end;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
 }
 
 .slide-content-video {
-  /* Text overlay for video layout - uses same bottom offset as typography setting */
+  /* Text overlay for video layout - uses typography bottom and edge */
   position: relative;
   z-index: 1001;
   display: flex;
   align-items: flex-end;
-  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
 }
 
-/* Left with Video: same bottom offset as typography setting; only the text area is narrower */
+/* Left with Video: typography bottom and edge; text area is narrower */
 .slide-content.left-video {
   align-items: flex-end;
   justify-content: flex-start;
-  padding: 4% 0 var(--slide-content-bottom, 12%) 9%;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
 }
 
-/* Right with Video: text on right, video panel on left; same bottom offset as typography setting */
+/* Right with Video: text on right, video panel on left */
 .slide-content.right-video {
   align-items: flex-end;
   justify-content: flex-end;
-  padding: 4% 9% var(--slide-content-bottom, 12%) 0;
+  padding: 4% var(--slide-content-edge, 9%) var(--slide-content-bottom, 12%) 0;
 }
 
 .slide-text {
