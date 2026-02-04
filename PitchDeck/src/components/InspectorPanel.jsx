@@ -4,9 +4,11 @@ import ColorOptions from './ColorOptions'
 import TypographyOptions from './TypographyOptions'
 import TextEffectsOptions from './TextEffectsOptions'
 import TransitionOptions from './TransitionOptions'
+import SlideSettings from './SlideSettings'
 import './InspectorPanel.css'
 
 const TABS = [
+  { id: 'slide', label: 'Slide settings', icon: 'slide' },
   { id: 'recording', label: 'Recording options', icon: 'recording' },
   { id: 'captions', label: 'Captions', icon: 'captions' },
   { id: 'typography', label: 'Typography', icon: 'typography' },
@@ -23,8 +25,15 @@ function InspectorPanel({
   settings,
   onUpdateSettings,
   slides,
-  onUpdateSlide
+  onUpdateSlide,
+  selectedSlide,
+  selectedSlideId,
+  backgroundColor
 }) {
+  const handleSlideUpdate = (updates) => {
+    if (selectedSlideId != null && onUpdateSlide) onUpdateSlide(selectedSlideId, updates)
+  }
+
   return (
     <div className="inspector-panel">
       <div className="inspector-panel-tabs">
@@ -36,6 +45,13 @@ function InspectorPanel({
             onClick={() => onTabChange(tab.id)}
             title={tab.label}
           >
+            {tab.icon === 'slide' && (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+              </svg>
+            )}
             {tab.icon === 'recording' && (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -75,6 +91,13 @@ function InspectorPanel({
         ))}
       </div>
       <div className="inspector-panel-content">
+        {activeTab === 'slide' && (
+          <SlideSettings
+            slide={selectedSlide}
+            onUpdate={handleSlideUpdate}
+            backgroundColor={backgroundColor}
+          />
+        )}
         {activeTab === 'recording' && (
           <RecordingOptions
             recordSettings={recordSettings}

@@ -108,7 +108,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
-  const [inspectorTab, setInspectorTab] = useState('recording')
+  const [inspectorTab, setInspectorTab] = useState('slide')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisFolded, setAnalysisFolded] = useState(() => {
     const saved = localStorage.getItem('analysisFolded')
@@ -316,6 +316,17 @@ function App() {
       console.error('Error saving selected slide ID:', error)
     }
   }, [selectedSlideId])
+
+  // Switch to slide settings tab when user selects a different slide (edit/plan mode)
+  const prevSelectedSlideIdRef = useRef(selectedSlideId)
+  useEffect(() => {
+    if ((mode === 'edit' || mode === 'plan') && selectedSlideId != null && prevSelectedSlideIdRef.current !== selectedSlideId) {
+      setInspectorTab('slide')
+      prevSelectedSlideIdRef.current = selectedSlideId
+    } else {
+      prevSelectedSlideIdRef.current = selectedSlideId
+    }
+  }, [mode, selectedSlideId])
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -2642,6 +2653,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     onUpdateSettings={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
                     slides={slides}
                     onUpdateSlide={updateSlide}
+                    selectedSlide={selectedSlide}
+                    selectedSlideId={selectedSlideId}
+                    backgroundColor={settings.backgroundColor}
                   />
                 </div>
               </>

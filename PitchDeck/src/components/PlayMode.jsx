@@ -434,6 +434,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
+  const [visibleLineIndex, setVisibleLineIndex] = useState(-1)
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
   
   // Recording state
@@ -459,6 +460,20 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlide = presentationSlides[currentIndex]
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
+  const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
+
+  // Content line count for non-bullet slides (split by newline and <br>)
+  const getContentLineCount = (slide) => {
+    if (!slide?.content) return 0
+    return (slide.content.replace(/<br\s*\/?>/gi, '\n').split('\n')).length
+  }
+  const contentLineCount = !isBulletSlide && currentSlide ? getContentLineCount(currentSlide) : 0
+
+  // Reset line/bullet reveal when changing slides
+  useEffect(() => {
+    setVisibleBulletIndex(-1)
+    setVisibleLineIndex(-1)
+  }, [currentIndex])
 
   // Get transition duration based on style
   const getTransitionDuration = (style) => {
@@ -777,33 +792,37 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         return
       } else if ((e.key === 'ArrowRight' || e.key === ' ') && !isTransitioning) {
         e.preventDefault()
-        // If it's a bullet slide and not all bullets are visible, show next bullet
-        if (isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
+        if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
           setVisibleBulletIndex(prev => prev + 1)
+        } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex < contentLineCount - 1) {
+          setVisibleLineIndex(prev => prev + 1)
         } else {
           nextSlide()
         }
       } else if (e.key === 'ArrowLeft' && !isTransitioning) {
         e.preventDefault()
-        // If it's a bullet slide and some bullets are visible, hide last bullet
-        if (isBulletSlide && visibleBulletIndex >= 0) {
+        if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex >= 0) {
           setVisibleBulletIndex(prev => prev - 1)
+        } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex >= 0) {
+          setVisibleLineIndex(prev => prev - 1)
         } else {
           prevSlide()
         }
       } else if (e.key === 'ArrowDown' && !isTransitioning) {
         e.preventDefault()
-        // If it's a bullet slide and not all bullets are visible, show next bullet
-        if (isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
+        if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
           setVisibleBulletIndex(prev => prev + 1)
+        } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex < contentLineCount - 1) {
+          setVisibleLineIndex(prev => prev + 1)
         } else {
           nextSlide()
         }
       } else if (e.key === 'ArrowUp' && !isTransitioning) {
         e.preventDefault()
-        // If it's a bullet slide and some bullets are visible, hide last bullet
-        if (isBulletSlide && visibleBulletIndex >= 0) {
+        if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex >= 0) {
           setVisibleBulletIndex(prev => prev - 1)
+        } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex >= 0) {
+          setVisibleLineIndex(prev => prev - 1)
         } else {
           prevSlide()
         }
@@ -812,7 +831,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isTransitioning, onExit, nextSlide, prevSlide, isBulletSlide, visibleBulletIndex, bulletPoints.length, recordingState, stopRecording])
+  }, [isTransitioning, onExit, nextSlide, prevSlide, isBulletSlide, revealOneLineAtATime, visibleBulletIndex, visibleLineIndex, bulletPoints.length, contentLineCount, recordingState, stopRecording])
 
   const handleClick = (e) => {
     if (isTransitioning) return
@@ -822,16 +841,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     const width = rect.width
     
     if (clickX > width / 2) {
-      // Right side: next bullet or next slide
-      if (isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
+      if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
         setVisibleBulletIndex(prev => prev + 1)
+      } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex < contentLineCount - 1) {
+        setVisibleLineIndex(prev => prev + 1)
       } else {
         nextSlide()
       }
     } else {
-      // Left side: previous bullet or previous slide
-      if (isBulletSlide && visibleBulletIndex >= 0) {
+      if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex >= 0) {
         setVisibleBulletIndex(prev => prev - 1)
+      } else if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex >= 0) {
+        setVisibleLineIndex(prev => prev - 1)
       } else {
         prevSlide()
       }
@@ -904,7 +925,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           h2FontFamily={h2FontFamily}
           h3FontFamily={h3FontFamily}
           isPlayMode={true}
-          visibleBulletIndex={visibleBulletIndex}
+          visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
+          visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           textDropShadow={textDropShadow}
           shadowBlur={shadowBlur}
           shadowOffsetX={shadowOffsetX}

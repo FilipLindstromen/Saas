@@ -85,7 +85,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -154,6 +154,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return true
     })
   }
+
+  // Split content into lines (for "show one line at a time" in play mode)
+  const getContentLines = (content) => (content || '').replace(/<br\s*\/?>/gi, '\n').split('\n')
 
   // Strip trailing line breaks (no text after them) so they don't show in edit or present mode
   const stripTrailingLineBreaks = (s) => {
@@ -1171,6 +1174,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               >
                 {renderChunksWithHeadings(centeredChunks, chunkDelay)}
               </div>
+            ) : visibleLineIndex !== null ? (
+              <div className={`slide-text slide-reveal-lines centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`} style={textStyle}>
+                {getContentLines(slide.content || '').map((line, i) => (
+                  <div
+                    key={i}
+                    className={`slide-reveal-line ${i > visibleLineIndex ? 'slide-reveal-line-hidden' : ''}`}
+                    style={textStyle}
+                    dangerouslySetInnerHTML={{ __html: formatContentForDisplay(line) }}
+                  />
+                ))}
+              </div>
             ) : (
               <div 
                 ref={contentRef}
@@ -1270,6 +1284,24 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     // For play mode, render as div with formatted content (or chunk spans when text animation is on)
     if (isPlayMode) {
+      if (visibleLineIndex !== null && !useChunkedText) {
+        const lines = getContentLines(slide.content || '')
+        return (
+          <div
+            className={`slide-text slide-reveal-lines ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+            style={textStyle}
+          >
+            {lines.map((line, i) => (
+              <div
+                key={i}
+                className={`slide-reveal-line ${i > visibleLineIndex ? 'slide-reveal-line-hidden' : ''}`}
+                style={textStyle}
+                dangerouslySetInnerHTML={{ __html: formatContentForDisplay(line) }}
+              />
+            ))}
+          </div>
+        )
+      }
       if (useChunkedText) {
         const chunks = getChunksWithFormatting(slide.content || '', textAnimationUnit)
         return (

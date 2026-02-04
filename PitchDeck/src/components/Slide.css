@@ -463,6 +463,14 @@
   display: none;
 }
 
+/* One line at a time reveal (play mode) */
+.slide-reveal-line {
+  display: block;
+}
+.slide-reveal-line-hidden {
+  display: none;
+}
+
 /* Present mode: top-align bullet with text (edit mode keeps bottom alignment above) */
 .play-mode .slide-bullet {
   align-items: flex-start;
