@@ -266,11 +266,8 @@
   aspect-ratio: auto !important;
 }
 
-/* Background covers when slide fills viewport so content position matches edit mode */
-.play-mode .slide .slide-background {
-  background-size: cover !important;
-  background-position: center !important;
-}
+/* Do not override .slide-background here: scale and position come from Slide.jsx inline styles
+   (imageScale, imagePositionX/Y) so they match edit mode in present mode. */
 
 /* Ensure webcam positioning is identical in present mode */
 .play-mode .slide .slide-webcam {

@@ -128,6 +128,8 @@ function InspectorPanel({
             onUpdateSettings={onUpdateSettings}
             slides={slides}
             onUpdateSlide={onUpdateSlide}
+            selectedSlideId={selectedSlideId}
+            selectedSlide={selectedSlide}
             openaiKey={settings.openaiKey}
             embedded
           />

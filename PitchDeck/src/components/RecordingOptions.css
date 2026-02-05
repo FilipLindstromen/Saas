@@ -94,6 +94,18 @@
   box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
 }
 
+.recording-options-output-section {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recording-options-output-section .recording-options-video-adj-title {
+  margin-bottom: 0;
+}
+
 .recording-options-video-adj {
   padding-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
