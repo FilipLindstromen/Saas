@@ -10,6 +10,9 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
     selectedCameraId: recordSettings?.selectedCameraId || '',
     microphoneEnabled: recordSettings?.microphoneEnabled || false,
     selectedMicrophoneId: recordSettings?.selectedMicrophoneId || '',
+    recordingFileFormat: recordSettings?.recordingFileFormat || 'webm-vp9',
+    recordingResolution: recordSettings?.recordingResolution || '1080p',
+    recordingQuality: recordSettings?.recordingQuality || 'high',
     videoBrightness: typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1,
     videoContrast: typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1,
     videoSaturation: typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1,
@@ -104,6 +107,9 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
       selectedCameraId: newSettings.selectedCameraId,
       microphoneEnabled: newSettings.microphoneEnabled,
       selectedMicrophoneId: newSettings.selectedMicrophoneId,
+      recordingFileFormat: newSettings.recordingFileFormat,
+      recordingResolution: newSettings.recordingResolution,
+      recordingQuality: newSettings.recordingQuality,
       videoBrightness: newSettings.videoBrightness,
       videoContrast: newSettings.videoContrast,
       videoSaturation: newSettings.videoSaturation,
@@ -216,6 +222,50 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               </select>
             </div>
           )}
+
+          <div className="recording-options-output-section">
+            <div className="recording-options-video-adj-title">Recording output</div>
+            <div className="recording-options-field">
+              <label htmlFor="recording-format-select">File format</label>
+              <select
+                id="recording-format-select"
+                value={localSettings.recordingFileFormat || 'webm-vp9'}
+                onChange={(e) => handleChange('recordingFileFormat', e.target.value)}
+                className="recording-options-select"
+              >
+                <option value="webm-vp9">WebM (VP9)</option>
+                <option value="webm-vp8">WebM (VP8)</option>
+                <option value="webm">WebM (browser default)</option>
+              </select>
+            </div>
+            <div className="recording-options-field">
+              <label htmlFor="recording-resolution-select">Resolution</label>
+              <select
+                id="recording-resolution-select"
+                value={localSettings.recordingResolution || '1080p'}
+                onChange={(e) => handleChange('recordingResolution', e.target.value)}
+                className="recording-options-select"
+              >
+                <option value="original">Original (share resolution)</option>
+                <option value="1080p">1080p (1920×1080)</option>
+                <option value="720p">720p (1280×720)</option>
+                <option value="480p">480p (854×480)</option>
+              </select>
+            </div>
+            <div className="recording-options-field">
+              <label htmlFor="recording-quality-select">Quality</label>
+              <select
+                id="recording-quality-select"
+                value={localSettings.recordingQuality || 'high'}
+                onChange={(e) => handleChange('recordingQuality', e.target.value)}
+                className="recording-options-select"
+              >
+                <option value="low">Low (~1 Mbps)</option>
+                <option value="medium">Medium (~2.5 Mbps)</option>
+                <option value="high">High (~5 Mbps)</option>
+              </select>
+            </div>
+          </div>
 
           <div className="recording-options-video-adj">
             <div className="recording-options-video-adj-title">Video adjustments</div>

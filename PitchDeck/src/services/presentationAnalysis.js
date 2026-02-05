@@ -28,6 +28,82 @@ export async function transcribeRecording(blob, apiKey) {
 }
 
 /**
+ * Transcribe with segment-level timestamps (same as record-mode captions).
+ * Sends the blob directly to Whisper with verbose_json + timestamp_granularities[]: 'segment'.
+ * @param {Blob} blob - Audio or video blob (WebM, MP4, etc.)
+ * @param {string} apiKey - OpenAI API key
+ * @returns {Promise<{ text: string, segments: Array<{ start: number, end: number, text: string }> }>}
+ */
+export async function transcribeWithSegments(blob, apiKey) {
+  const formData = new FormData()
+  formData.append('file', blob, blob.name || 'recording.webm')
+  formData.append('model', 'whisper-1')
+  formData.append('response_format', 'verbose_json')
+  formData.append('timestamp_granularities[]', 'segment')
+
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message || res.statusText || 'Transcription failed')
+  }
+
+  const data = await res.json()
+  const segments = (data.segments || []).map((s) => ({
+    start: Number(s.start) ?? 0,
+    end: Number(s.end) ?? 0,
+    text: String(s.text || '').trim(),
+  })).filter((s) => s.text.length > 0)
+  const text = (data.text || '').trim() || segments.map((s) => s.text).join(' ')
+  return { text, segments }
+}
+
+/**
+ * Transcribe with word-level timestamps (OpenAI Whisper verbose_json + timestamp_granularities word).
+ * Sends the blob directly to the API (no client-side extraction). Max 25MB.
+ * @param {Blob} blob - Audio or video blob (WebM, MP4, etc.; Whisper uses audio track)
+ * @param {string} apiKey - OpenAI API key
+ * @returns {Promise<{ text: string, words: Array<{ word: string, start: number, end: number }> }>}
+ */
+export async function transcribeWithWordTimestamps(blob, apiKey) {
+  const formData = new FormData()
+  formData.append('file', blob, blob.name || 'audio.webm')
+  formData.append('model', 'whisper-1')
+  formData.append('response_format', 'verbose_json')
+  formData.append('timestamp_granularities[]', 'word')
+
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message || res.statusText || 'Transcription failed')
+  }
+
+  const data = await res.json()
+  const words = (data.words && Array.isArray(data.words))
+    ? data.words.map((w) => ({
+        word: String(w.word || '').trim(),
+        start: Number(w.start) ?? 0,
+        end: Number(w.end) ?? 0,
+      })).filter((w) => w.word.length > 0)
+    : []
+  const text = (data.text || '').trim() || words.map((w) => w.word).join(' ')
+  return { text, words }
+}
+
+/**
  * Get presentation coaching feedback from OpenAI (overall + per-slide).
  * @param {string} transcript - Full transcript from Whisper
  * @param {string[]} slideTitles - List of slide titles/headings for context

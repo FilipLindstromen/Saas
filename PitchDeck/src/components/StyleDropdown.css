@@ -85,6 +85,49 @@
   color: var(--text-primary);
 }
 
+.style-dropdown-casing-row {
+  margin-bottom: 0.25rem;
+}
+
+.style-dropdown-casing-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.style-dropdown-casing-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.style-dropdown-casing-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.style-dropdown-casing-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.style-dropdown-casing-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .style-dropdown-checkbox {
   display: flex;
   align-items: center;

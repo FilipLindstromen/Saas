@@ -631,8 +631,16 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       if (appStream && appVideoTracks.length > 0 && appVideoTracks[0].readyState === 'live') {
         displayStream = appStream
       } else {
+        const resolution = recordSettings?.recordingResolution || '1080p'
+        const videoConstraint = resolution === 'original'
+          ? true
+          : resolution === '1080p'
+            ? { width: { ideal: 1920 }, height: { ideal: 1080 } }
+            : resolution === '720p'
+              ? { width: { ideal: 1280 }, height: { ideal: 720 } }
+              : { width: { ideal: 854 }, height: { ideal: 480 } }
         displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: videoConstraint,
           audio: false
         })
       }
@@ -659,16 +667,20 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       }
       combinedStreamRef.current = streamToRecord
 
-      // Standard MediaRecorder: pick first supported mimeType
-      const mimeTypes = [
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm'
-      ]
-      const mimeType = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      // Use recording output settings (format + quality)
+      const format = recordSettings?.recordingFileFormat || 'webm-vp9'
+      const formatCandidates =
+        format === 'webm-vp9'
+          ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+          : format === 'webm-vp8'
+            ? ['video/webm;codecs=vp8,opus', 'video/webm']
+            : ['video/webm']
+      const mimeType = formatCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      const quality = recordSettings?.recordingQuality || 'high'
+      const videoBitsPerSecond = quality === 'low' ? 1000000 : quality === 'medium' ? 2500000 : 5000000
       const mediaRecorder = new MediaRecorder(streamToRecord, {
         mimeType,
-        videoBitsPerSecond: 2500000,
+        videoBitsPerSecond,
         audioBitsPerSecond: audioStream ? 128000 : undefined
       })
       mediaRecorderRef.current = mediaRecorder

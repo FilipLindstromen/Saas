@@ -1,9 +1,48 @@
 /**
- * FFmpeg.wasm: convert WebM (or other) blob to high-quality MP4 in the browser.
- * Requires SharedArrayBuffer (COOP/COEP headers in dev server).
+ * FFmpeg: client (WASM) or server. Set VITE_FFMPEG_API_URL to use server-side FFmpeg for faster results.
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg'
+
+export function getFfmpegApiBase() {
+  const url = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FFMPEG_API_URL
+  return (url && String(url).trim()) || ''
+}
+
+async function serverExtractAudio(baseUrl, blob, opts = {}) {
+  const report = (msg) => opts.onProgress?.(msg)
+  report?.('Uploading…')
+  const form = new FormData()
+  form.append('video', blob, blob.name || 'video.webm')
+  const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/extract-audio`, { method: 'POST', body: form })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || res.statusText || 'Server failed')
+  }
+  report?.('Done')
+  return res.blob()
+}
+
+async function serverExportVideo(baseUrl, blob, segments, opts = {}) {
+  const report = (msg) => opts.onProgress?.(msg)
+  report?.('Uploading…')
+  const form = new FormData()
+  form.append('video', blob, blob.name || 'video.webm')
+  form.append('segments', JSON.stringify(segments))
+  form.append('format', opts.format || 'mp4')
+  form.append('quality', opts.quality || 'high')
+  form.append('resolution', opts.resolution || 'original')
+  if (opts.captions && (opts.captions.segments?.length > 0 || (opts.captions.transcript && opts.captions.duration))) {
+    form.append('captions', JSON.stringify(opts.captions))
+  }
+  const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/export-video`, { method: 'POST', body: form })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || res.statusText || 'Server failed')
+  }
+  report?.('Done')
+  return res.blob()
+}
 
 let ffmpegInstance = null
 let loadPromise = null
@@ -23,9 +62,9 @@ async function getFFmpeg() {
   return loadPromise
 }
 
-/** Call when entering video editing so FFmpeg is ready when user clicks Transcribe. */
+/** Preload client FFmpeg only when server is not configured (avoids loading WASM when using server). */
 export function preloadFFmpeg() {
-  getFFmpeg().catch(() => {})
+  if (!getFfmpegApiBase()) getFFmpeg().catch(() => {})
 }
 
 function inputExtFromType(type) {
@@ -90,33 +129,15 @@ export async function convertToMp4(blob, opts = {}) {
   return outBlob
 }
 
-/**
- * Build ASS subtitle content from transcript text, spread evenly over duration.
- * @param {string} transcript - Plain text transcript
- * @param {number} durationSeconds - Total video duration in seconds
- * @param {'bottom-black'|'bottom-white'|'top-black'|'white-outline'} style - Caption style
- * @returns {string} ASS file content
- */
-function buildAssFromTranscript(transcript, durationSeconds, style) {
-  const t = (transcript || '').trim()
-  if (!t || durationSeconds <= 0) return ''
+const toAssTime = (sec) => {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  return `${h}:${String(m).padStart(2, '0')}:${String(Math.floor(s)).padStart(2, '0')}.${String(Math.round((s % 1) * 100)).padStart(2, '0')}`
+}
 
-  // Split into phrases: by sentence (. ? !) or newline, then trim and filter empty
-  const raw = t.replace(/\r\n/g, '\n').split(/\n|[.!?]+/)
-  const phrases = raw.map((s) => s.trim()).filter(Boolean)
-  if (phrases.length === 0) return ''
-
-  const total = Math.max(1, durationSeconds)
-  const step = total / phrases.length
-  const toAssTime = (sec) => {
-    const h = Math.floor(sec / 3600)
-    const m = Math.floor((sec % 3600) / 60)
-    const s = sec % 60
-    return `${h}:${String(m).padStart(2, '0')}:${String(Math.floor(s)).padStart(2, '0')}.${String(Math.round((s % 1) * 100)).padStart(2, '0')}`
-  }
-
-  // ASS colours: &HAABBGGRR. White &H00FFFFFF, Black &H00000000, semi-black &H80000000, semi-white &H80FFFFFF
-  const alignmentNum = style === 'top-black' ? 8 : 2 // 2 = bottom center, 8 = top center
+function getAssStyleAndHeader(style) {
+  const alignmentNum = style === 'top-black' ? 8 : 2
   let primaryColour = '&H00FFFFFF'
   let backColour = '&H80000000'
   let outlineColour = '&H00000000'
@@ -132,7 +153,7 @@ function buildAssFromTranscript(transcript, durationSeconds, style) {
   }
   const marginV = 30
   const styleLine = `Style: Default,Arial,28,${primaryColour},&H000000FF,${outlineColour},${backColour},-1,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},${alignmentNum},10,10,${marginV},1`
-  const header = `[Script Info]
+  return `[Script Info]
 Title: Burned captions
 ScriptType: v4.00+
 PlayResX: 384
@@ -146,7 +167,48 @@ ${styleLine}
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `
+}
 
+/**
+ * Build ASS from segments (Descript-style: one line per segment with correct output timeline).
+ * @param {Array<{ start: number, end: number, text: string }>} segments - In export order; output times are cumulative.
+ * @param {'bottom-black'|'bottom-white'|'top-black'|'white-outline'} style
+ * @returns {string} ASS file content
+ */
+function buildAssFromSegments(segments, style) {
+  if (!Array.isArray(segments) || segments.length === 0) return ''
+  const header = getAssStyleAndHeader(style || 'bottom-black')
+  let outTime = 0
+  const lines = segments.map((seg) => {
+    const duration = Math.max(0.01, (seg.end || 0) - (seg.start || 0))
+    const start = outTime
+    const end = outTime + duration
+    outTime = end
+    const text = (seg.text || '').replace(/\r/g, '').replace(/\n/g, '\\N').trim()
+    if (!text) return null
+    return `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Default,,0,0,0,,${text}`
+  }).filter(Boolean)
+  return lines.length ? header + lines.join('\n') : ''
+}
+
+/**
+ * Build ASS subtitle content from transcript text, spread evenly over duration.
+ * @param {string} transcript - Plain text transcript
+ * @param {number} durationSeconds - Total video duration in seconds
+ * @param {'bottom-black'|'bottom-white'|'top-black'|'white-outline'} style - Caption style
+ * @returns {string} ASS file content
+ */
+function buildAssFromTranscript(transcript, durationSeconds, style) {
+  const t = (transcript || '').trim()
+  if (!t || durationSeconds <= 0) return ''
+
+  const raw = t.replace(/\r\n/g, '\n').split(/\n|[.!?]+/)
+  const phrases = raw.map((s) => s.trim()).filter(Boolean)
+  if (phrases.length === 0) return ''
+
+  const total = Math.max(1, durationSeconds)
+  const step = total / phrases.length
+  const header = getAssStyleAndHeader(style || 'bottom-black')
   const lines = phrases.map((text, i) => {
     const start = i * step
     const end = (i + 1) * step
@@ -160,11 +222,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
  * Export trimmed/cut video using FFmpeg: extract segments, concat, optionally burn captions.
  * @param {Blob} blob - Input video blob (WebM or MP4)
  * @param {Array<{ start: number, end: number }>} segments - Time ranges in seconds
- * @param {object} opts - { onProgress?: (msg) => void, captions?: { transcript: string, duration: number, style: string } }
+ * @param {object} opts - { onProgress?: (msg) => void, captions?: { transcript?: string, duration?: number, segments?: Array<{ start, end, text }>, style: string } }
  * @returns {Promise<Blob>} Output video blob
  */
 export async function exportTrimmedVideo(blob, segments, opts = {}) {
   const report = (msg) => opts.onProgress?.(msg)
+  const base = getFfmpegApiBase()
+  if (base) return serverExportVideo(base, blob, segments, opts)
   const ffmpeg = await getFFmpeg()
   const isMp4 = blob.type.includes('mp4')
   const ext = isMp4 ? 'mp4' : 'webm'
@@ -214,9 +278,13 @@ export async function exportTrimmedVideo(blob, segments, opts = {}) {
   ])
 
   let finalBlob
-  if (captions?.transcript?.trim() && typeof captions.duration === 'number' && captions.duration > 0) {
-    const assContent = buildAssFromTranscript(captions.transcript.trim(), captions.duration, captions.style || 'bottom-black')
-    if (assContent) {
+  const captionSegments = Array.isArray(captions?.segments) && captions.segments.length > 0
+  const captionTranscript = captions?.transcript?.trim() && typeof captions.duration === 'number' && captions.duration > 0
+  if (captionSegments || captionTranscript) {
+    const assContent = captionSegments
+      ? buildAssFromSegments(captions.segments, captions.style || 'bottom-black')
+      : buildAssFromTranscript(captions.transcript.trim(), captions.duration, captions.style || 'bottom-black')
+    if (assContent && assContent.length > 0) {
       report?.('Burning captions…')
       await ffmpeg.writeFile('captions.ass', new TextEncoder().encode(assContent))
       const captionsName = 'captions.ass'
@@ -267,7 +335,13 @@ export const WHISPER_MAX_BYTES = 25 * 1024 * 1024
  */
 export async function extractAudioForWhisper(blob, opts = {}) {
   const report = (msg) => opts.onProgress?.(msg)
-  report?.('Loading FFmpeg…')
+  const base = getFfmpegApiBase()
+  if (base && blob.size > WHISPER_MAX_BYTES) return serverExtractAudio(base, blob, opts)
+  if (blob.size > WHISPER_MAX_BYTES) {
+    throw new Error(
+      'Video is over 25 MB. Start the FFmpeg server (npm run server) and add VITE_FFMPEG_API_URL=http://localhost:3030 to your .env file to transcribe.'
+    )
+  }
   const ffmpeg = await getFFmpeg()
   const ext = inputExtFromType(blob?.type)
   const inputName = `input.${ext}`

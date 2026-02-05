@@ -18,6 +18,7 @@ import InspectorPanel from './components/InspectorPanel'
 import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
+import { preloadFFmpeg } from './utils/ffmpegExport'
 import './App.css'
 
 function App() {
@@ -230,6 +231,9 @@ function App() {
         return {
           ...parsed,
           webcamSize: parsed.webcamSize || 'large',
+          recordingFileFormat: parsed.recordingFileFormat || 'webm-vp9',
+          recordingResolution: parsed.recordingResolution || '1080p',
+          recordingQuality: parsed.recordingQuality || 'high',
           captionsEnabled: parsed.captionsEnabled === true,
           captionStyle: parsed.captionStyle || 'bottom-black',
           captionFont: parsed.captionFont || 'Poppins',
@@ -248,6 +252,9 @@ function App() {
       selectedCameraId: '',
       microphoneEnabled: false,
       selectedMicrophoneId: '',
+      recordingFileFormat: 'webm-vp9',
+      recordingResolution: '1080p',
+      recordingQuality: 'high',
       captionsEnabled: false,
       captionStyle: 'bottom-black',
       captionFont: 'Poppins',
@@ -267,6 +274,11 @@ function App() {
       analyzeWithAI: false
     }
   })
+
+  // Preload FFmpeg on app load so it's ready when user opens video editing (Transcribe/Export)
+  useEffect(() => {
+    preloadFFmpeg()
+  }, [])
 
   // Update current chapter's slides when slides change
   useEffect(() => {
@@ -1740,7 +1752,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         }
       }
 
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      const resolution = recordSettings.recordingResolution || '1080p'
+      const videoConstraint = resolution === 'original'
+        ? true
+        : resolution === '1080p'
+          ? { width: { ideal: 1920 }, height: { ideal: 1080 } }
+          : resolution === '720p'
+            ? { width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { width: { ideal: 854 }, height: { ideal: 480 } }
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraint, audio: false })
       recordingStreamRef.current = displayStream
 
       const streamToRecord = new MediaStream()
@@ -1768,12 +1788,20 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         if (audioTrackForRecorder) streamToRecord.addTrack(audioTrackForRecorder)
       }
 
-      const mimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-      const mimeType = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      const format = recordSettings.recordingFileFormat || 'webm-vp9'
+      const formatCandidates =
+        format === 'webm-vp9'
+          ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+          : format === 'webm-vp8'
+            ? ['video/webm;codecs=vp8,opus', 'video/webm']
+            : ['video/webm']
+      const mimeType = formatCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || 'video/webm'
+      const quality = recordSettings.recordingQuality || 'high'
+      const videoBitsPerSecond = quality === 'low' ? 1000000 : quality === 'medium' ? 2500000 : 5000000
       const hasAudio = streamToRecord.getAudioTracks().length > 0
       const mediaRecorder = new MediaRecorder(streamToRecord, {
         mimeType,
-        videoBitsPerSecond: 2500000,
+        videoBitsPerSecond,
         audioBitsPerSecond: hasAudio ? 128000 : undefined
       })
       recordingMediaRecorderRef.current = mediaRecorder

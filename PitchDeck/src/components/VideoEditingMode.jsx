@@ -1,7 +1,34 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { transcribeRecording } from '../services/presentationAnalysis'
-import { exportTrimmedVideo, convertToMp4 } from '../utils/ffmpegExport'
+import { transcribeWithSegments } from '../services/presentationAnalysis'
+import { exportTrimmedVideo, extractAudioForWhisper, WHISPER_MAX_BYTES, preloadFFmpeg, getFfmpegApiBase } from '../utils/ffmpegExport'
 import './VideoEditingMode.css'
+
+function wordId() {
+  return `w_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+/** Merge consecutive words into segments for export/captions (fewer clips). */
+function wordsToSegments(words) {
+  if (!words.length) return []
+  const out = []
+  let start = words[0].start
+  let end = words[0].end
+  let text = words[0].word
+  for (let i = 1; i < words.length; i++) {
+    const w = words[i]
+    if (w.start <= end + 0.15) {
+      end = w.end
+      text += ' ' + w.word
+    } else {
+      out.push({ start, end, text })
+      start = w.start
+      end = w.end
+      text = w.word
+    }
+  }
+  out.push({ start, end, text })
+  return out
+}
 
 function formatTime(seconds) {
   if (seconds == null || !Number.isFinite(seconds)) return '0:00'
@@ -16,17 +43,21 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
   const fileUrlRef = useRef(null)
   const playbackBlobRef = useRef(null)
   const [videoUrl, setVideoUrl] = useState(null)
+  const [fileSize, setFileSize] = useState(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [loadError, setLoadError] = useState(null)
   const timelineRef = useRef(null)
 
-  // Left panel: transcription (transcribeStatus shows "Compressing…" / "Transcribing…" on the button)
-  const [transcript, setTranscript] = useState('')
+  // Left panel: word-level transcript (edit by cutting/moving words → clips)
+  const [words, setWords] = useState([])
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeStatus, setTranscribeStatus] = useState('')
   const [transcribeError, setTranscribeError] = useState(null)
+  const [currentWordIndex, setCurrentWordIndex] = useState(null)
+  const [draggingWordId, setDraggingWordId] = useState(null)
+  const dragOverWordIdRef = useRef(null)
 
   // Resizable panels (px)
   const [leftPanelWidth, setLeftPanelWidth] = useState(320)
@@ -38,6 +69,9 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
   const [studioSound, setStudioSound] = useState(false)
   const [addCaptions, setAddCaptions] = useState(false)
   const [captionStyle, setCaptionStyle] = useState('bottom-black')
+  const [exportFormat, setExportFormat] = useState('mp4')
+  const [exportQuality, setExportQuality] = useState('high')
+  const [exportResolution, setExportResolution] = useState('original')
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
 
@@ -54,14 +88,16 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     revokeUrl()
     setVideoUrl(null)
     setDuration(0)
-    setTranscript('')
+    setWords([])
     setTranscribeError(null)
+    setCurrentWordIndex(null)
     playbackBlobRef.current = null
 
     const url = URL.createObjectURL(blob)
     fileUrlRef.current = url
     playbackBlobRef.current = blob
     setVideoUrl(url)
+    setFileSize(blob.size)
   }, [revokeUrl])
 
   useEffect(() => {
@@ -72,13 +108,19 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     } else {
       revokeUrl()
       setVideoUrl(null)
+      setFileSize(null)
       setDuration(0)
       setCurrentTime(0)
-      setTranscript('')
+      setWords([])
     }
   }, [latestRecordingRef, videoBlob, loadBlob, revokeUrl])
 
   useEffect(() => () => revokeUrl(), [revokeUrl])
+
+  // Preload FFmpeg as soon as video editing is open so it's ready before Transcribe/Export
+  useEffect(() => {
+    preloadFFmpeg()
+  }, [])
 
   const applyDuration = useCallback(() => {
     const video = videoRef.current
@@ -87,25 +129,55 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     if (Number.isFinite(d) && d > 0 && !Number.isNaN(d)) setDuration(d)
   }, [])
 
+  const discoveredDurationRef = useRef(false)
+  useEffect(() => {
+    discoveredDurationRef.current = false
+  }, [videoUrl])
+
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoUrl) return
     setLoadError(null)
     const onMeta = () => applyDuration()
     const onTimeUpdate = () => applyDuration()
+
+    const discoverWebMDuration = () => {
+      if (discoveredDurationRef.current) return
+      const d = video.duration
+      const suspicious = !Number.isFinite(d) || d <= 0 || Number.isNaN(d) || d < 2
+      if (!suspicious) return
+      discoveredDurationRef.current = true
+      const onSeeked = () => {
+        video.removeEventListener('seeked', onSeeked)
+        const realEnd = video.currentTime
+        if (Number.isFinite(realEnd) && realEnd > 0) {
+          setDuration(realEnd)
+          setCurrentTime(0)
+          video.currentTime = 0
+        }
+      }
+      video.addEventListener('seeked', onSeeked)
+      video.currentTime = 86400
+    }
+
+    const onLoadedMeta = () => {
+      onMeta()
+      discoverWebMDuration()
+    }
+
     const onError = () => {
       const err = video.error
       const msg = err?.message || (err?.code === 4 ? 'Video format or codec not supported.' : 'Video failed to load.')
       setLoadError(msg)
     }
-    video.addEventListener('loadedmetadata', onMeta)
+    video.addEventListener('loadedmetadata', onLoadedMeta)
     video.addEventListener('durationchange', onMeta)
     video.addEventListener('canplay', onMeta)
     video.addEventListener('loadeddata', onMeta)
     video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('error', onError)
     return () => {
-      video.removeEventListener('loadedmetadata', onMeta)
+      video.removeEventListener('loadedmetadata', onLoadedMeta)
       video.removeEventListener('durationchange', onMeta)
       video.removeEventListener('canplay', onMeta)
       video.removeEventListener('loadeddata', onMeta)
@@ -122,27 +194,57 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     return () => video.removeEventListener('ended', onEnded)
   }, [videoUrl])
 
+  // Sync current word highlight when currentTime changes while paused (e.g. timeline click)
+  useEffect(() => {
+    if (words.length === 0 || playing) return
+    const idx = words.findIndex((w) => currentTime >= w.start && currentTime < w.end)
+    setCurrentWordIndex((prev) => (idx >= 0 ? idx : prev === null ? 0 : prev))
+  }, [currentTime, playing, words])
+
+  // Word-based playback: jump to next word when current word ends
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     let rafId = null
+    const useWords = words.length > 0
     const tick = () => {
       if (video.paused || video.ended) return
       const t = video.currentTime
       setCurrentTime(t)
-      // Some sources (e.g. WebM from MediaRecorder) only report duration after playback starts
       const d = video.duration
       if (Number.isFinite(d) && d > 0 && !Number.isNaN(d)) setDuration(d)
+      if (useWords && currentWordIndex != null && currentWordIndex < words.length) {
+        const w = words[currentWordIndex]
+        if (w && t >= w.end - 0.05) {
+          const next = currentWordIndex + 1
+          if (next < words.length) {
+            setCurrentWordIndex(next)
+            video.currentTime = words[next].start
+          } else {
+            setPlaying(false)
+          }
+        }
+      }
       rafId = requestAnimationFrame(tick)
     }
     if (playing) {
+      if (useWords && words.length > 0) {
+        let idx = currentWordIndex
+        if (idx == null || idx < 0 || idx >= words.length) {
+          const t = video.currentTime
+          idx = words.findIndex((w) => t >= w.start && t < w.end)
+          if (idx < 0) idx = 0
+          setCurrentWordIndex(idx)
+        }
+        video.currentTime = words[idx].start
+      }
       video.play().catch(() => setPlaying(false))
       rafId = requestAnimationFrame(tick)
     } else {
       video.pause()
     }
     return () => { if (rafId != null) cancelAnimationFrame(rafId) }
-  }, [playing])
+  }, [playing, words, currentWordIndex])
 
   const togglePlay = () => setPlaying((p) => !p)
 
@@ -153,6 +255,79 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     if (Number.isFinite(duration) && duration > 0) t = Math.max(0, Math.min(duration, t))
     video.currentTime = t
     setCurrentTime(t)
+    if (words.length > 0) {
+      const idx = words.findIndex((w) => t >= w.start && t < w.end)
+      setCurrentWordIndex(idx >= 0 ? idx : null)
+    }
+  }
+
+  const seekToWord = (word, index) => {
+    seekTo(word.start)
+    setCurrentWordIndex(index)
+  }
+
+  const deleteWord = (id) => {
+    setWords((prev) => prev.filter((w) => w.id !== id))
+    setCurrentWordIndex((prev) => {
+      if (prev == null) return null
+      const idx = words.findIndex((w) => w.id === id)
+      if (idx < 0) return prev
+      if (prev === idx) return Math.max(0, prev - 1)
+      if (prev > idx) return prev - 1
+      return prev
+    })
+  }
+
+  const moveWord = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= words.length) return
+    setWords((prev) => {
+      const next = [...prev]
+      const [removed] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, removed)
+      return next
+    })
+    setCurrentWordIndex((prev) => {
+      if (prev == null) return null
+      if (prev === fromIndex) return toIndex
+      if (fromIndex < toIndex) {
+        if (prev > fromIndex && prev <= toIndex) return prev - 1
+        return prev
+      }
+      if (fromIndex > toIndex) {
+        if (prev >= toIndex && prev < fromIndex) return prev + 1
+        return prev
+      }
+      return prev
+    })
+  }
+
+  const handleWordDragStart = (e, id) => {
+    if (e.button !== 0) return
+    setDraggingWordId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+
+  const handleWordDragOver = (e, id) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    dragOverWordIdRef.current = id
+  }
+
+  const handleWordDrop = (e, dropId) => {
+    e.preventDefault()
+    const fromId = draggingWordId ?? e.dataTransfer.getData('text/plain')
+    setDraggingWordId(null)
+    dragOverWordIdRef.current = null
+    if (!fromId || fromId === dropId) return
+    const fromIdx = words.findIndex((w) => w.id === fromId)
+    const toIdx = words.findIndex((w) => w.id === dropId)
+    if (fromIdx >= 0 && toIdx >= 0) moveWord(fromIdx, toIdx)
+  }
+
+  const handleWordDragEnd = () => {
+    setDraggingWordId(null)
+    dragOverWordIdRef.current = null
   }
 
   const handleTimelineClick = (e) => {
@@ -164,71 +339,8 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     seekTo(pct * effective)
   }
 
-  const WHISPER_MAX_BYTES = 25 * 1024 * 1024 // 25 MB API limit
-
-  /** Extract audio from video using browser APIs (no FFmpeg). Returns an audio blob, usually much smaller. */
-  const extractAudioFromVideo = useCallback((videoBlob, onProgress) => {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(videoBlob)
-      const video = document.createElement('video')
-      video.muted = true
-      video.preload = 'auto'
-      video.playsInline = true
-      video.src = url
-
-      const cleanup = () => {
-        URL.revokeObjectURL(url)
-        video.src = ''
-        video.load()
-      }
-
-      video.onerror = () => {
-        cleanup()
-        reject(new Error('Video failed to load for audio extraction.'))
-      }
-
-      video.onloadedmetadata = () => {
-        const stream = video.captureStream?.() ?? video.mozCaptureStream?.()
-        if (!stream) {
-          cleanup()
-          reject(new Error('Audio extraction not supported in this browser.'))
-          return
-        }
-        const audioTracks = stream.getAudioTracks()
-        if (!audioTracks.length) {
-          cleanup()
-          reject(new Error('No audio track in video.'))
-          return
-        }
-        const audioStream = new MediaStream(audioTracks)
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
-        const recorder = new MediaRecorder(audioStream)
-        const chunks = []
-        recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
-        recorder.onstop = () => {
-          cleanup()
-          const audioBlob = new Blob(chunks, { type: mimeType })
-          resolve(audioBlob)
-        }
-        recorder.start(2000)
-        if (onProgress) onProgress('Extracting audio…')
-        video.play().catch((err) => {
-          try { recorder.stop() } catch (_) {}
-          cleanup()
-          reject(new Error('Could not play video for audio extraction.'))
-        })
-        video.onended = () => recorder.stop()
-        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 300
-        setTimeout(() => {
-          if (recorder.state === 'recording') {
-            recorder.stop()
-          }
-        }, Math.min(duration * 1000 * 1.5, 5 * 60 * 1000))
-      }
-
-      video.load()
-    })
-  }, [])
+  const OVER_25_MB_NO_SERVER_MSG = 'Video is over 25 MB. Start the FFmpeg server (npm run server) and add VITE_FFMPEG_API_URL=http://localhost:3030 to your .env file to transcribe.'
+  const COMPRESSION_FAILED_MSG = 'File is too large. Please use a shorter audio file or enable the FFmpeg server.'
 
   const handleTranscribe = async () => {
     const blob = playbackBlobRef.current
@@ -239,36 +351,55 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     setIsTranscribing(true)
     setTranscribeError(null)
     setTranscribeStatus('')
+
     try {
       let audioBlob = blob
+
       if (blob.size > WHISPER_MAX_BYTES) {
-        setTranscribeStatus('Extracting audio…')
-        const extracted = await Promise.race([
-          extractAudioFromVideo(blob, setTranscribeStatus),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Audio extraction is taking too long. Try a shorter clip.')), 5 * 60 * 1000)
-          )
-        ])
-        if (extracted.size > WHISPER_MAX_BYTES) {
-          const mb = (extracted.size / (1024 * 1024)).toFixed(1)
-          setTranscribeError(`Audio is still too large (${mb} MB). Try a shorter clip.`)
+        if (!getFfmpegApiBase()) {
+          setTranscribeError(OVER_25_MB_NO_SERVER_MSG)
           return
         }
-        const ext = extracted.type?.includes('webm') ? 'webm' : 'mp4'
-        audioBlob = new File([extracted], `audio.${ext}`, { type: extracted.type || 'audio/webm' })
-        setTranscribeStatus('Transcribing…')
-      } else {
-        setTranscribeStatus('Transcribing…')
+        setTranscribeStatus('Uploading to server…')
+        let extracted
+        try {
+          extracted = await Promise.race([
+            extractAudioForWhisper(blob, { onProgress: setTranscribeStatus }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Audio preparation is taking too long. Try a shorter clip.')), 5 * 60 * 1000)
+            )
+          ])
+        } catch (compressErr) {
+          setTranscribeError(COMPRESSION_FAILED_MSG)
+          return
+        }
+
+        if (extracted.size > WHISPER_MAX_BYTES) {
+          setTranscribeError(COMPRESSION_FAILED_MSG)
+          return
+        }
+        audioBlob = new File([extracted], 'audio.mp3', { type: extracted.type || 'audio/mpeg' })
       }
-      const text = await Promise.race([
-        transcribeRecording(audioBlob, openaiKey.trim()),
+
+      setTranscribeStatus('Transcribing…')
+      const { segments: rawSegments } = await Promise.race([
+        transcribeWithSegments(audioBlob, openaiKey.trim()),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Transcription is taking too long. Try again.')), 60000)
         )
       ])
-      setTranscript(text || '')
+      const withIds = (rawSegments || []).map((s) => ({
+        id: wordId(),
+        word: (s.text || '').trim(),
+        start: Number(s.start) ?? 0,
+        end: Number(s.end) ?? 0,
+      })).filter((w) => w.word.length > 0)
+      setWords(withIds)
+      setCurrentWordIndex(null)
     } catch (e) {
-      setTranscribeError(e?.message || 'Transcription failed.')
+      const msg = e?.message || 'Transcription failed.'
+      const isLargeNoServer = playbackBlobRef.current?.size > WHISPER_MAX_BYTES && !getFfmpegApiBase()
+      setTranscribeError(isLargeNoServer ? OVER_25_MB_NO_SERVER_MSG : msg)
     } finally {
       setIsTranscribing(false)
       setTranscribeStatus('')
@@ -313,22 +444,42 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
 
   const handleExport = useCallback(async () => {
     const blob = playbackBlobRef.current
-    if (!blob || duration <= 0) return
-    if (addCaptions && !transcript?.trim()) {
-      alert('Add captions is enabled but the transcript is empty. Transcribe the video first or disable captions.')
+    if (!blob) {
+      alert('No video loaded. Load or record a video first.')
+      return
+    }
+    const effectiveDuration = Number.isFinite(duration) && duration > 0
+      ? duration
+      : (videoRef.current && Number.isFinite(videoRef.current.duration) && videoRef.current.duration > 0
+        ? videoRef.current.duration
+        : 0)
+    if (effectiveDuration <= 0) {
+      alert('Video duration is not ready. Play the video once, then try Export again.')
+      return
+    }
+    const merged = words.length > 0 ? wordsToSegments(words) : []
+    const exportSegments = merged.length > 0
+      ? merged.map((s) => ({ start: s.start, end: s.end }))
+      : [{ start: 0, end: effectiveDuration }]
+    if (addCaptions && merged.length === 0) {
+      alert('Add captions is enabled but there are no segments. Transcribe the video first or disable captions.')
       return
     }
     setIsExporting(true)
     setExportProgress('Preparing…')
     try {
-      const segments = [{ start: 0, end: duration }]
-      setExportProgress('Exporting with FFmpeg…')
-      const exportOpts = { onProgress: setExportProgress }
-      if (addCaptions && transcript?.trim()) {
-        exportOpts.captions = { transcript: transcript.trim(), duration, style: captionStyle }
+      setExportProgress(getFfmpegApiBase() ? 'Uploading…' : 'Exporting with FFmpeg…')
+      const exportOpts = {
+        onProgress: setExportProgress,
+        format: exportFormat,
+        quality: exportQuality,
+        resolution: exportResolution,
       }
-      const result = await exportTrimmedVideo(blob, segments, exportOpts)
-      const ext = result.type?.includes('mp4') ? 'mp4' : 'webm'
+      if (addCaptions && merged.length > 0) {
+        exportOpts.captions = { segments: merged, style: captionStyle }
+      }
+      const result = await exportTrimmedVideo(blob, exportSegments, exportOpts)
+      const ext = (getFfmpegApiBase() ? exportFormat : result.type?.includes('mp4') ? 'mp4' : 'webm')
       const url = URL.createObjectURL(result)
       const a = document.createElement('a')
       a.href = url
@@ -345,7 +496,7 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     }
     setExportProgress('')
     setIsExporting(false)
-  }, [duration, addCaptions, transcript, captionStyle])
+  }, [duration, addCaptions, words, captionStyle, exportFormat, exportQuality, exportResolution])
 
   if (!videoUrl) {
     return (
@@ -388,30 +539,62 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
       </header>
 
       <div className="video-editing-layout">
-        {/* Left panel: Transcription */}
+        {/* Left panel: word-level transcript (edit by cutting/moving words → clips) */}
         <aside className="video-editing-panel video-editing-panel-left" style={{ width: leftPanelWidth }}>
-          <h2 className="video-editing-panel-title">Transcription</h2>
-          <p className="video-editing-panel-desc">Transcribe this video with OpenAI Whisper.</p>
+          <h2 className="video-editing-panel-title">Transcript</h2>
+          <p className="video-editing-panel-desc">Transcribe with segments (same as record-mode captions). Click to seek, delete to cut, drag to reorder. OpenAI Whisper limit: 25 MB.</p>
+          {fileSize != null && (
+            <p className="video-editing-file-size" aria-live="polite">
+              Video: {(fileSize / (1024 * 1024)).toFixed(1)} MB
+              {fileSize > WHISPER_MAX_BYTES && (
+                <span className="video-editing-file-size-note"> — will compress or use server</span>
+              )}
+            </p>
+          )}
           <button
             type="button"
             className="video-editing-btn-primary"
             onClick={handleTranscribe}
             disabled={isTranscribing || !openaiKey?.trim()}
           >
-            {isTranscribing ? (transcribeStatus || 'Transcribing…') : 'Transcribe with OpenAI'}
+            {isTranscribing ? (transcribeStatus || 'Transcribing…') : 'Transcribe video'}
           </button>
+          {getFfmpegApiBase() && (
+            <p className="video-editing-server-hint">Using FFmpeg server — no browser load</p>
+          )}
           {transcribeError && <p className="video-editing-error" role="alert">{transcribeError}</p>}
-          {transcript && (
-            <div className="video-editing-transcript">
-              <label className="video-editing-transcript-label">Transcript</label>
-              <textarea
-                className="video-editing-transcript-text"
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                readOnly={false}
-                rows={12}
-                placeholder="Transcript will appear here…"
-              />
+          {words.length > 0 && (
+            <div className="video-editing-segments">
+              <label className="video-editing-transcript-label">Segments — click to seek, delete to cut, drag to reorder</label>
+              <div className="video-editing-segment-list video-editing-word-list" role="list">
+                {words.map((w, index) => (
+                  <div
+                    key={w.id}
+                    role="listitem"
+                    className={`video-editing-segment video-editing-word ${currentWordIndex === index ? 'video-editing-segment-current' : ''} ${draggingWordId === w.id ? 'video-editing-segment-dragging' : ''}`}
+                    onClick={() => seekToWord(w, index)}
+                    draggable
+                    onDragStart={(e) => handleWordDragStart(e, w.id)}
+                    onDragOver={(e) => handleWordDragOver(e, w.id)}
+                    onDrop={(e) => handleWordDrop(e, w.id)}
+                    onDragEnd={handleWordDragEnd}
+                    onDragLeave={() => { dragOverWordIdRef.current = null }}
+                  >
+                    <span className="video-editing-segment-drag" aria-hidden title="Drag to reorder">⋮⋮</span>
+                    <span className="video-editing-segment-text">{w.word}</span>
+                    <span className="video-editing-segment-time">{formatTime(w.start)} – {formatTime(w.end)}</span>
+                    <button
+                      type="button"
+                      className="video-editing-segment-delete"
+                      onClick={(e) => { e.stopPropagation(); deleteWord(w.id) }}
+                      title="Remove word (cut from video)"
+                      aria-label={`Remove word: ${w.word}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </aside>
@@ -522,7 +705,46 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
                 <option value="white-outline">White outline</option>
               </select>
             )}
-            <p className="video-editing-setting-hint">Burn captions from transcript into the video (requires transcript).</p>
+            <p className="video-editing-setting-hint">Burn captions from segments into the video (transcribe first).</p>
+          </div>
+
+          <div className="video-editing-setting">
+            <label className="video-editing-label">Export format</label>
+            <select
+              className="video-editing-select"
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+            >
+              <option value="mp4">MP4 (H.264)</option>
+              <option value="webm">WebM (VP9)</option>
+            </select>
+          </div>
+
+          <div className="video-editing-setting">
+            <label className="video-editing-label">Quality</label>
+            <select
+              className="video-editing-select"
+              value={exportQuality}
+              onChange={(e) => setExportQuality(e.target.value)}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low (smaller file)</option>
+            </select>
+          </div>
+
+          <div className="video-editing-setting">
+            <label className="video-editing-label">Resolution</label>
+            <select
+              className="video-editing-select"
+              value={exportResolution}
+              onChange={(e) => setExportResolution(e.target.value)}
+            >
+              <option value="original">Original</option>
+              <option value="1080">1080p</option>
+              <option value="720">720p</option>
+              <option value="480">480p</option>
+            </select>
           </div>
 
           <div className="video-editing-setting video-editing-export">
@@ -532,9 +754,11 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
               onClick={handleExport}
               disabled={isExporting}
             >
-              {isExporting ? exportProgress || 'Exporting…' : 'Export video (FFmpeg)'}
+              {isExporting ? exportProgress || 'Exporting…' : getFfmpegApiBase() ? 'Export video (server)' : 'Export video (FFmpeg)'}
             </button>
-            <p className="video-editing-setting-hint">Export as WebM/MP4 using FFmpeg in the browser.</p>
+            <p className="video-editing-setting-hint">
+              {getFfmpegApiBase() ? 'Export using server-side FFmpeg (format, quality, resolution applied).' : 'Export as WebM/MP4 in the browser. Set VITE_FFMPEG_API_URL for server export with options.'}
+            </p>
           </div>
         </aside>
       </div>

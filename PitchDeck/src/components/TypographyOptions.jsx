@@ -51,7 +51,20 @@ function wrapPhrasesInSerif(html, phrases) {
   return result
 }
 
-function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, slides = [], onUpdateSlide, openaiKey, embedded }) {
+function toSentenceCase(str) {
+  if (!str || typeof str !== 'string') return str
+  const s = str.trim().toLowerCase()
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
+}
+
+function toTitleCase(str) {
+  if (!str || typeof str !== 'string') return str
+  return str
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, slides = [], onUpdateSlide, selectedSlideId, selectedSlide, openaiKey, embedded }) {
   const dropdownRef = useRef(null)
   const serifListRef = useRef(null)
   const [isAutoSettingFonts, setIsAutoSettingFonts] = useState(false)
@@ -219,6 +232,23 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     })
   }
 
+  const applyTextCasing = (mode) => {
+    if (selectedSlideId == null || !onUpdateSlide || !selectedSlide) return
+    const transform = mode === 'uppercase' ? (s) => (s || '').toUpperCase() : mode === 'sentence' ? toSentenceCase : toTitleCase
+    const layout = selectedSlide.layout || 'default'
+    if (layout === 'bulletpoints') {
+      const lines = (selectedSlide.content || '').split('\n').map((l) => l.trim()).filter(Boolean)
+      const transformed = lines.map((line) => transform(getPlainText(line)))
+      onUpdateSlide(selectedSlideId, { content: transformed.join('\n') })
+    } else {
+      const contentPlain = getPlainText(selectedSlide.content || '')
+      const subtitlePlain = getPlainText(selectedSlide.subtitle || '')
+      const newContent = transform(contentPlain).replace(/\n/g, '<br>')
+      const newSubtitle = subtitlePlain ? transform(subtitlePlain).replace(/\n/g, '<br>') : ''
+      onUpdateSlide(selectedSlideId, { content: newContent, subtitle: newSubtitle })
+    }
+  }
+
   const content = (
     <div className="style-dropdown-content">
       <div className="style-dropdown-header-row">
@@ -280,6 +310,39 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 className="style-dropdown-input"
                 title="100–900 (e.g. 400 Normal, 700 Bold)"
               />
+            </div>
+          </div>
+
+          <div className="style-dropdown-field style-dropdown-casing-row">
+            <label className="style-dropdown-casing-label">Text casing</label>
+            <div className="style-dropdown-casing-buttons">
+              <button
+                type="button"
+                className="style-dropdown-btn style-dropdown-casing-btn"
+                onClick={() => applyTextCasing('uppercase')}
+                disabled={selectedSlideId == null}
+                title="Apply ALL CAPS to selected slide text"
+              >
+                CAPS
+              </button>
+              <button
+                type="button"
+                className="style-dropdown-btn style-dropdown-casing-btn"
+                onClick={() => applyTextCasing('sentence')}
+                disabled={selectedSlideId == null}
+                title="Capitalize first letter only"
+              >
+                Caps on first letter
+              </button>
+              <button
+                type="button"
+                className="style-dropdown-btn style-dropdown-casing-btn"
+                onClick={() => applyTextCasing('title')}
+                disabled={selectedSlideId == null}
+                title="Capitalize first letter of every word"
+              >
+                Caps On Every Word
+              </button>
             </div>
           </div>
 
