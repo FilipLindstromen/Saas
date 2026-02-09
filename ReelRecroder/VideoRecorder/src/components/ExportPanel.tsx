@@ -6,6 +6,8 @@ import {
   uploadVideoToYouTube,
   setYouTubeThumbnail,
 } from '../services/youtubeUpload'
+import type { ExportFormat } from '../utils/exportWithColorAdjustments'
+import { exportVideoForDownload, getVideoDurationFromBlob } from '../utils/exportWithColorAdjustments'
 import styles from './ExportPanel.module.css'
 
 interface ExportPanelProps {
@@ -15,6 +17,8 @@ interface ExportPanelProps {
   aspectRatio: string
   width: number
   height: number
+  exportFormat: ExportFormat
+  onExportFormatChange: (format: ExportFormat) => void
   youtubeTitle: string
   onYoutubeTitleChange: (v: string) => void
   youtubeCaption: string
@@ -29,6 +33,8 @@ export function ExportPanel({
   aspectRatio,
   width,
   height,
+  exportFormat,
+  onExportFormatChange,
   youtubeTitle,
   onYoutubeTitleChange,
   youtubeCaption,
@@ -59,14 +65,24 @@ export function ExportPanel({
     (colorBrightness !== 100 || colorContrast !== 100 || colorSaturation !== 100)
   const needsExport = hasOverlaysToBurn || hasTrim || hasColor
 
-  const getExportBlob = async (): Promise<Blob> => {
+  const getExportBlob = async (): Promise<{ blob: Blob; extension: ExportFormat }> => {
     if (!videoBlob) throw new Error('No video')
-    if (!needsExport) return videoBlob
-    return exportVideoForDownload(videoBlob, {
+    if (!needsExport) return { blob: videoBlob, extension: 'webm' }
+    let resolvedDuration = sourceDuration
+    if (resolvedDuration == null || resolvedDuration <= 0 || !Number.isFinite(resolvedDuration)) {
+      try {
+        resolvedDuration = await getVideoDurationFromBlob(videoBlob)
+      } catch (e) {
+        throw new Error('Could not read video duration. Try playing the video in Edit mode first, then export again.')
+      }
+    }
+    const result = await exportVideoForDownload(videoBlob, {
       width,
       height,
+      sourceDuration: resolvedDuration,
       trimStart: trimEndProp != null ? trimStartProp : undefined,
-      trimEnd: trimEndProp ?? sourceDuration,
+      trimEnd: trimEndProp ?? resolvedDuration ?? undefined,
+      exportFormat,
       overlays,
       overlayTextAnimation,
       defaultFontFamily,
@@ -76,15 +92,16 @@ export function ExportPanel({
       colorContrast: colorAdjustmentsEnabled ? colorContrast : 100,
       colorSaturation: colorAdjustmentsEnabled ? colorSaturation : 100,
     })
+    return result
   }
 
   const handleDownload = async () => {
     if (!videoBlob) return
-    const filename = `recording_${aspectRatio.replace(':', '-')}_${width}x${height}.webm`
     if (needsExport) {
       setDownloadPreparing(true)
       try {
-        const blob = await getExportBlob()
+        const { blob, extension } = await getExportBlob()
+        const filename = `recording_${aspectRatio.replace(':', '-')}_${width}x${height}.${extension}`
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -96,11 +113,14 @@ export function ExportPanel({
       } finally {
         setDownloadPreparing(false)
       }
-    } else if (downloadUrl) {
-      const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = filename
-      a.click()
+    } else {
+      const filename = `recording_${aspectRatio.replace(':', '-')}_${width}x${height}.webm`
+      if (downloadUrl) {
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = filename
+        a.click()
+      }
     }
   }
 
@@ -151,9 +171,21 @@ export function ExportPanel({
             <h3 className={styles.sectionTitle}>Export settings</h3>
             <p className={styles.settingsRow}>
               <span className={styles.label}>Format</span>
-              <span>{aspectRatio} · {width}×{height} · WebM</span>
+              <select
+                className={styles.formatSelect}
+                value={exportFormat}
+                onChange={(e) => onExportFormatChange(e.target.value as ExportFormat)}
+                aria-label="Export format"
+              >
+                <option value="webm">WebM</option>
+                <option value="mp4">MP4</option>
+              </select>
             </p>
-            <p className={styles.hint}>Resolution and aspect ratio are set in Video settings.</p>
+            <p className={styles.settingsRow}>
+              <span className={styles.label}>Resolution</span>
+              <span>{aspectRatio} · {width}×{height}</span>
+            </p>
+            <p className={styles.hint}>Resolution and aspect ratio are set in Video settings. MP4 is used only if your browser supports it; otherwise WebM is used.</p>
           </section>
 
           <section className={styles.section}>
