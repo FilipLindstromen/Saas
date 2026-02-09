@@ -1,0 +1,272 @@
+/* Apple Vision Pro–style: extremely rounded, soft embossed cards */
+.postit {
+  position: absolute;
+  width: var(--postit-width, 280px);
+  min-height: var(--postit-min-height, 96px);
+  border-radius: 28px;
+  padding: 16px 18px 18px;
+  padding-top: 22px;
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease;
+  box-shadow:
+    -5px -5px 12px rgba(255, 255, 255, 0.95),
+    5px 5px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.postit:active {
+  cursor: grabbing;
+}
+
+.postit--selected {
+  box-shadow:
+    -5px -5px 12px rgba(255, 255, 255, 0.95),
+    5px 5px 12px rgba(0, 0, 0, 0.04),
+    0 0 0 2px var(--postit-pin, #3b82f6);
+}
+
+.postit--connect-source {
+  box-shadow:
+    -5px -5px 12px rgba(255, 255, 255, 0.95),
+    5px 5px 12px rgba(0, 0, 0, 0.04),
+    0 0 0 2px var(--postit-pin);
+}
+
+/* Central debossed circular element (pin) */
+.postit-pin {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #e8ecf0, #f0f4f8);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.06),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.98),
+    0 1px 2px rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.postit-text {
+  flex: 1;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #1f2937;
+  word-break: break-word;
+  white-space: pre-wrap;
+  min-height: 1.5em;
+  font-weight: 400;
+}
+
+.postit-text:first-line {
+  font-weight: 600;
+  color: #111827;
+}
+
+.postit--dark .postit-text {
+  color: #e5e7eb;
+}
+
+.postit--dark .postit-text:first-line {
+  color: #f3f4f6;
+}
+
+.postit--dark {
+  box-shadow:
+    -5px -5px 12px rgba(255, 255, 255, 0.03),
+    5px 5px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.postit--dark .postit-pin {
+  background: linear-gradient(145deg, #374151, #4b5563);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.35),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.04);
+}
+
+/* Connector bubbles: only visible when Connect mode is on */
+.postit-connector {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: crosshair;
+  background: #3b82f6;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.5);
+  z-index: 2;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.postit-connector:hover {
+  transform: scale(1.2);
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.6);
+}
+
+.postit-connector--top {
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.postit-connector--top:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.postit-connector--right {
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+}
+
+.postit-connector--right:hover {
+  transform: translate(50%, -50%) scale(1.2);
+}
+
+.postit-connector--bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.postit-connector--bottom:hover {
+  transform: translate(-50%, 50%) scale(1.2);
+}
+
+.postit-connector--left {
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.postit-connector--left:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* Icon area: top-center, line-art style */
+.postit-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.15s ease, color 0.15s ease;
+  position: relative;
+}
+
+.postit-icon-wrap:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1f2937;
+}
+
+.postit--dark .postit-icon-wrap {
+  color: #9ca3af;
+}
+
+.postit--dark .postit-icon-wrap:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+}
+
+.postit-icon {
+  font-size: 28px;
+  width: 1em;
+  height: 1em;
+  display: block;
+  line-height: 1;
+  color: inherit;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+  font-style: normal;
+  letter-spacing: normal;
+  white-space: nowrap;
+  word-wrap: normal;
+}
+
+.postit-icon-placeholder {
+  font-size: 20px;
+  font-weight: 300;
+  opacity: 0.6;
+}
+
+.postit-icon-picker {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  z-index: 100;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.postit--dark .postit-icon-picker {
+  background: #25282e;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.postit-icon-picker-item {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.postit-icon-picker-item:hover,
+.postit-icon-picker-item.active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.postit--dark .postit-icon-picker-item:hover,
+.postit--dark .postit-icon-picker-item.active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.postit-icon-picker-glyph {
+  font-size: 20px;
+  width: 1em;
+  height: 1em;
+  display: block;
+  line-height: 1;
+  color: inherit;
+}
+
+.postit-icon-none {
+  font-size: 14px;
+  opacity: 0.7;
+}

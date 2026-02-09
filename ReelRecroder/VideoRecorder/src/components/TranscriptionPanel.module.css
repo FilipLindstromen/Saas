@@ -1,0 +1,116 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 16px;
+  width: 280px;
+  flex-shrink: 0;
+  max-height: 75vh;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.transcribeRow {
+  margin-bottom: 10px;
+}
+
+.transcribeBtn {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.transcribeBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.transcribeBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 12px;
+}
+
+.textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.textarea::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+}
+
+.textarea::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.timeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timeBtn {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.timeBtn:hover {
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.timeBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-primary);
+}

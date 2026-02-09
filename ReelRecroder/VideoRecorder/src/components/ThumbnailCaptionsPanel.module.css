@@ -1,0 +1,345 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow: auto;
+}
+
+.embedded {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.embedded .panel {
+  max-width: none;
+  max-height: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bodyThreeCol,
+.bodyThreeColEmbed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.bodyThreeColEmbed {
+  flex: 1;
+  min-height: 0;
+}
+
+.embedded .bodyThreeColEmbed {
+  flex: 1;
+  min-height: 0;
+}
+
+.bodyColEdit,
+.bodyColPreview,
+.bodyColCaptions {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.previewSection {
+  width: 100%;
+}
+
+.embedded .previewWrap {
+  max-width: none;
+}
+
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 1400px;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+
+.thumbSection,
+.captionSection {
+  margin-bottom: 24px;
+}
+
+.thumbSection:last-child,
+.captionSection:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.thumbRow {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.previewWrap {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.videoBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbText {
+  position: absolute;
+  display: inline-block;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.thumbText:active {
+  cursor: grabbing;
+}
+
+.thumbTextContent {
+  display: inline-block;
+}
+
+.resizeHandle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  touch-action: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.resizeHandle:hover {
+  filter: brightness(1.15);
+}
+
+.thumbTextSelected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bodyColEdit .thumbSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.slider {
+  width: 100%;
+  max-width: 200px;
+}
+
+.sliderValue,
+.timeValue {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.btn,
+.btnPrimary,
+.removeTextBtn,
+.captionGenBtn {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.btn:hover,
+.btnPrimary:hover,
+.captionGenBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  margin-top: 8px;
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.1);
+}
+
+.removeTextBtn {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.removeTextBtn:hover {
+  color: var(--danger);
+}
+
+.captionGenBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.captionGenBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+}
+
+.input,
+.select {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.select {
+  cursor: pointer;
+}
+
+.textarea {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.doneHint {
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin: 0;
+}
+
+.uploadSection {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.error {
+  font-size: 0.85rem;
+  color: var(--danger);
+  margin: 0 0 8px;
+}
+
+.success {
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin: 0 0 8px;
+}

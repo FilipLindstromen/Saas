@@ -1,0 +1,260 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 320px;
+  max-width: 420px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+}
+
+.body {
+  padding: 20px;
+}
+
+.label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.hint {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.input {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.oauthSetup {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.oauthTitle {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.oauthSteps {
+  margin: 0 0 10px;
+  padding-left: 1.2rem;
+}
+
+.oauthSteps li {
+  margin-bottom: 4px;
+}
+
+.oauthSteps code {
+  padding: 1px 4px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+
+.originRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.originCode {
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+  border: 1px solid var(--border);
+}
+
+.copyOriginBtn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.copyOriginBtn:hover {
+  filter: brightness(1.1);
+}
+
+.originNote {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.originNote code {
+  padding: 1px 4px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+
+.youtubeSection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.youtubeConnected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.youtubeChannelName {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.connectBtn,
+.disconnectBtn {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.connectBtn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+}
+
+.connectBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.connectBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.disconnectBtn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.disconnectBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.youtubeSection .error {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.cancelBtn,
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.cancelBtn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.cancelBtn:hover {
+  border-color: var(--text-muted);
+}
+
+.saveBtn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+}
+
+.saveBtn:hover {
+  background: var(--accent-hover);
+}

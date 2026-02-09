@@ -1,0 +1,483 @@
+import { useState } from 'react'
+import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, ResolutionOption, VideoSourceKind } from '../types'
+import type { MediaDeviceInfo } from '../hooks/useMediaDevices'
+import { FONT_OPTIONS } from '../constants/fonts'
+import { OverlayEditor } from './OverlayEditor'
+import { SourceSelectors } from './SourceSelectors'
+import { OptionsBar } from './OptionsBar'
+import type { CaptionSegment } from '../services/captions'
+import { IconTrash, IconVideo, IconLayers, IconCursor, IconType, IconColor } from './Icons'
+import { CaptionBurnIn } from './CaptionBurnIn'
+import styles from './InspectorPanel.module.css'
+
+const TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'fade-slide-left', label: 'Fade + slide left' },
+  { value: 'fade-slide-right', label: 'Fade + slide right' },
+  { value: 'fade-slide-up', label: 'Fade + slide up' },
+  { value: 'fade-slide-down', label: 'Fade + slide down' },
+]
+
+export type InspectorTabId = 'video' | 'color' | 'overlays' | 'current' | 'captions'
+
+interface InspectorPanelProps {
+  /** Controlled active tab; when set, parent can open e.g. Video tab from header button */
+  activeTab?: InspectorTabId
+  onTabChange?: (tab: InspectorTabId) => void
+  overlayTextAnimation: OverlayTextAnimation
+  onOverlayTextAnimationChange: (anim: OverlayTextAnimation) => void
+  defaultFontFamily?: string
+  onDefaultFontFamilyChange?: (font: string) => void
+  defaultSecondaryFont?: string
+  onDefaultSecondaryFontChange?: (font: string) => void
+  defaultBold?: boolean
+  onDefaultBoldChange?: (bold: boolean) => void
+  burnOverlaysIntoExport: boolean
+  onBurnOverlaysIntoExportChange: (value: boolean) => void
+  flipVideo: boolean
+  onFlipVideoChange: (value: boolean) => void
+  selectedOverlay: OverlayItem | null
+  onOverlayUpdate: (patch: Partial<OverlayItem>) => void
+  onOverlayRemove: (id: string) => void
+  onDeselectOverlay: () => void
+  /* Video tab (sources, format & quality) */
+  videoDevices?: MediaDeviceInfo[]
+  audioDevices?: MediaDeviceInfo[]
+  videoKind?: VideoSourceKind
+  onVideoKindChange?: (k: VideoSourceKind) => void
+  videoDeviceId?: string
+  onVideoDeviceIdChange?: (id: string) => void
+  audioDeviceId?: string
+  onAudioDeviceIdChange?: (id: string) => void
+  videoError?: string | null
+  aspectRatio?: AspectRatio
+  onAspectRatioChange?: (a: AspectRatio) => void
+  resolutions?: ResolutionOption[]
+  resolutionIndex?: number
+  onResolutionIndexChange?: (i: number) => void
+  quality?: QualityPreset
+  onQualityChange?: (q: QualityPreset) => void
+  studioQuality?: boolean
+  onStudioQualityChange?: (v: boolean) => void
+  portraitFillHeight?: boolean
+  onPortraitFillHeightChange?: (v: boolean) => void
+  /* Captions tab (burn-in styling + transcribe/burn) */
+  videoBlob?: Blob | null
+  onBurnedBlob?: (blob: Blob) => void
+  captionStyle?: CaptionStyle
+  onCaptionStyleChange?: (style: CaptionStyle) => void
+  captionFontSizePercent?: number
+  onCaptionFontSizePercentChange?: (percent: number) => void
+  captionY?: number
+  onCaptionYChange?: (y: number) => void
+  captionSegments?: CaptionSegment[] | null
+  onTranscriptionDone?: (segments: CaptionSegment[]) => void
+  openaiApiKey?: string
+}
+
+export function InspectorPanel({
+  activeTab: controlledTab,
+  onTabChange,
+  overlayTextAnimation,
+  onOverlayTextAnimationChange,
+  defaultFontFamily = 'Oswald',
+  onDefaultFontFamilyChange = () => {},
+  defaultSecondaryFont = 'Playfair Display',
+  onDefaultSecondaryFontChange = () => {},
+  defaultBold = false,
+  onDefaultBoldChange = () => {},
+  burnOverlaysIntoExport,
+  onBurnOverlaysIntoExportChange,
+  flipVideo = false,
+  onFlipVideoChange = () => {},
+  selectedOverlay,
+  onOverlayUpdate,
+  onOverlayRemove,
+  onDeselectOverlay,
+  videoDevices = [],
+  audioDevices = [],
+  videoKind = 'camera',
+  onVideoKindChange,
+  videoDeviceId = '',
+  onVideoDeviceIdChange,
+  audioDeviceId = '',
+  onAudioDeviceIdChange,
+  videoError = null,
+  aspectRatio = '16:9',
+  onAspectRatioChange,
+  resolutions = [],
+  resolutionIndex = 0,
+  onResolutionIndexChange,
+  quality = 'high',
+  onQualityChange,
+  studioQuality = false,
+  onStudioQualityChange,
+  portraitFillHeight = false,
+  onPortraitFillHeightChange,
+  colorAdjustmentsEnabled = false,
+  onColorAdjustmentsEnabledChange = () => {},
+  colorBrightness = 100,
+  onColorBrightnessChange = () => {},
+  colorContrast = 100,
+  onColorContrastChange = () => {},
+  colorSaturation = 100,
+  onColorSaturationChange = () => {},
+  videoBlob = null,
+  onBurnedBlob = () => {},
+  captionStyle,
+  onCaptionStyleChange = () => {},
+  captionFontSizePercent,
+  onCaptionFontSizePercentChange = () => {},
+  captionY,
+  onCaptionYChange = () => {},
+  captionSegments = null,
+  onTranscriptionDone = () => {},
+  openaiApiKey,
+  videoWidth = 1280,
+  videoHeight = 720,
+}: InspectorPanelProps) {
+  const [internalTab, setInternalTab] = useState<InspectorTabId>('current')
+  const activeTab = controlledTab ?? internalTab
+  const setActiveTab = (tab: InspectorTabId) => {
+    if (onTabChange) onTabChange(tab)
+    else setInternalTab(tab)
+  }
+  const tabTitle =
+    activeTab === 'video'
+      ? 'Video settings'
+      : activeTab === 'color'
+        ? 'Camera color'
+        : activeTab === 'current'
+          ? (selectedOverlay ? 'Current object' : 'Select an overlay on the timeline')
+          : activeTab === 'captions'
+            ? 'Caption style'
+            : 'Global overlay settings'
+
+  const hasVideoSettings =
+    onVideoKindChange &&
+    onVideoDeviceIdChange &&
+    onAudioDeviceIdChange &&
+    onAspectRatioChange &&
+    onResolutionIndexChange &&
+    onQualityChange &&
+    onStudioQualityChange &&
+    onPortraitFillHeightChange
+
+  return (
+    <aside className={styles.panel} aria-label="Inspector">
+      <h2 className={styles.title}>Inspector</h2>
+      <p className={styles.subtitle}>{tabTitle}</p>
+
+      <div className={styles.tabList} role="tablist" aria-label="Setting categories">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'current'}
+          aria-label="Current object"
+          id="inspector-tab-current"
+          className={styles.tab}
+          onClick={() => setActiveTab('current')}
+        >
+          <IconCursor />
+        </button>
+        {hasVideoSettings && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'video'}
+            aria-label="Video settings"
+            id="inspector-tab-video"
+            className={styles.tab}
+            onClick={() => setActiveTab('video')}
+          >
+            <IconVideo />
+          </button>
+        )}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'color'}
+          aria-label="Camera color"
+          id="inspector-tab-color"
+          className={styles.tab}
+          onClick={() => setActiveTab('color')}
+        >
+          <IconColor />
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'overlays'}
+          aria-label="Overlays"
+          id="inspector-tab-overlays"
+          className={styles.tab}
+          onClick={() => setActiveTab('overlays')}
+        >
+          <IconLayers />
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'captions'}
+          aria-label="Caption style"
+          id="inspector-tab-captions"
+          className={styles.tab}
+          onClick={() => setActiveTab('captions')}
+        >
+          <IconType />
+        </button>
+      </div>
+
+      {activeTab === 'video' && hasVideoSettings && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-video">
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Sources</h3>
+            <SourceSelectors
+              videoDevices={videoDevices}
+              audioDevices={audioDevices}
+              videoKind={videoKind}
+              onVideoKindChange={onVideoKindChange}
+              videoDeviceId={videoDeviceId}
+              onVideoDeviceIdChange={onVideoDeviceIdChange}
+              audioDeviceId={audioDeviceId}
+              onAudioDeviceIdChange={onAudioDeviceIdChange}
+              error={videoError}
+            />
+          </section>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Format & quality</h3>
+            <OptionsBar
+              aspectRatio={aspectRatio}
+              onAspectRatioChange={onAspectRatioChange}
+              resolutions={resolutions}
+              resolutionIndex={resolutionIndex}
+              onResolutionIndexChange={onResolutionIndexChange}
+              quality={quality}
+              onQualityChange={onQualityChange}
+              studioQuality={studioQuality}
+              onStudioQualityChange={onStudioQualityChange}
+            />
+            {(aspectRatio === '9:16' || aspectRatio === '1:1') && (
+              <label className={styles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={portraitFillHeight}
+                  onChange={(e) => onPortraitFillHeightChange(e.target.checked)}
+                  aria-label="Fill screen height"
+                />
+                <span>Fill screen height (scale video to full height, crop sides)</span>
+              </label>
+            )}
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={flipVideo}
+                onChange={(e) => onFlipVideoChange(e.target.checked)}
+                aria-label="Flip video horizontally"
+              />
+              <span>Flip video</span>
+            </label>
+            <p className={styles.hint}>Mirror the video horizontally in preview and recording.</p>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'captions' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-captions">
+          {videoBlob ? (
+            <CaptionBurnIn
+              videoBlob={videoBlob}
+              onBurnedBlob={onBurnedBlob}
+              width={videoWidth}
+              height={videoHeight}
+              openaiApiKey={openaiApiKey}
+              captionStyle={captionStyle}
+              captionFontSizePercent={captionFontSizePercent}
+              captionY={captionY}
+              onCaptionStyleChange={onCaptionStyleChange}
+              onCaptionFontSizePercentChange={onCaptionFontSizePercentChange}
+              onCaptionYChange={onCaptionYChange}
+              captionSegments={captionSegments ?? null}
+              onTranscriptionDone={onTranscriptionDone}
+            />
+          ) : (
+            <p className={styles.hint}>Record a video and switch to Edit to use burn-in captions (transcribe and style).</p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'current' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-current">
+          {selectedOverlay ? (
+            <section className={styles.section}>
+              <div className={styles.selectedOverlayBar}>
+                <span className={styles.sectionTitle}>Current object</span>
+                <div className={styles.selectedOverlayActions}>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    onClick={() => {
+                      onOverlayRemove(selectedOverlay.id)
+                      onDeselectOverlay()
+                    }}
+                    title="Remove from timeline"
+                    aria-label="Remove from timeline"
+                  >
+                    <IconTrash />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.textBtn}
+                    onClick={onDeselectOverlay}
+                  >
+                    Deselect
+                  </button>
+                </div>
+              </div>
+              <OverlayEditor
+                overlay={selectedOverlay}
+                onUpdate={(patch) => onOverlayUpdate(patch)}
+                onClose={onDeselectOverlay}
+                onRemove={() => {
+                  onOverlayRemove(selectedOverlay.id)
+                  onDeselectOverlay()
+                }}
+                embedded
+              />
+            </section>
+          ) : (
+            <p className={styles.hint}>Select a text or image overlay on the timeline to edit it here.</p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'color' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-color">
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Camera color</h3>
+            <p className={styles.hint}>Preview and export only. Never recorded in the raw file. Turn off when recording, then on again for export if desired.</p>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={colorAdjustmentsEnabled ?? false}
+                onChange={(e) => onColorAdjustmentsEnabledChange(e.target.checked)}
+                aria-label="Use color adjustments in preview and export"
+              />
+              <span>Use color adjustments</span>
+            </label>
+            {(colorAdjustmentsEnabled ?? false) && (
+              <>
+                <label className={styles.label}>Brightness {colorBrightness ?? 100}%</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={colorBrightness ?? 100}
+                  onChange={(e) => onColorBrightnessChange(Number(e.target.value))}
+                  aria-label="Brightness"
+                />
+                <label className={styles.label}>Contrast {colorContrast ?? 100}%</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={colorContrast ?? 100}
+                  onChange={(e) => onColorContrastChange(Number(e.target.value))}
+                  aria-label="Contrast"
+                />
+                <label className={styles.label}>Saturation {colorSaturation ?? 100}%</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={colorSaturation ?? 100}
+                  onChange={(e) => onColorSaturationChange(Number(e.target.value))}
+                  aria-label="Saturation"
+                />
+              </>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'overlays' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-overlays">
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Recording & export</h3>
+        <label className={styles.checkRow}>
+          <input
+            type="checkbox"
+            checked={burnOverlaysIntoExport}
+            onChange={(e) => onBurnOverlaysIntoExportChange(e.target.checked)}
+            aria-label="Burn overlays into recording and export"
+          />
+          <span>Burn into recording / export</span>
+        </label>
+        <p className={styles.hint}>When unchecked, overlays are preview-only and will not appear in the recorded or exported video.</p>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Text animation</h3>
+        <p className={styles.hint}>In/out animation applied to all text overlays</p>
+        <select
+          className={styles.select}
+          value={overlayTextAnimation}
+          onChange={(e) => onOverlayTextAnimationChange(e.target.value as OverlayTextAnimation)}
+          aria-label="Text animation style"
+        >
+          {TEXT_ANIMATION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Global fonts</h3>
+        <p className={styles.hint}>Default fonts and style for text overlays</p>
+        <label className={styles.checkRow}>
+          <input
+            type="checkbox"
+            checked={defaultBold ?? false}
+            onChange={(e) => onDefaultBoldChange(e.target.checked)}
+            aria-label="Bold by default"
+          />
+          <span>Bold by default</span>
+        </label>
+        <label className={styles.label}>Main font</label>
+        <select
+          className={styles.select}
+          value={defaultFontFamily}
+          onChange={(e) => onDefaultFontFamilyChange(e.target.value)}
+          aria-label="Default main font"
+        >
+          {FONT_OPTIONS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <label className={styles.label}>Secondary font</label>
+        <select
+          className={styles.select}
+          value={defaultSecondaryFont ?? 'Playfair Display'}
+          onChange={(e) => onDefaultSecondaryFontChange(e.target.value)}
+          aria-label="Default secondary font"
+        >
+          {FONT_OPTIONS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </section>
+        </div>
+      )}
+    </aside>
+  )
+}

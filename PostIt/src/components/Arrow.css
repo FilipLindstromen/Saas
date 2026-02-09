@@ -1,0 +1,56 @@
+.arrow-group {
+  cursor: default;
+  pointer-events: all;
+}
+
+.arrow-path {
+  stroke-dasharray: 4 4;
+  animation: arrow-dash 0.5s linear infinite;
+  pointer-events: none;
+}
+
+.arrow-hit {
+  cursor: pointer;
+}
+
+.arrow-path--light {
+  stroke: #9ca3af;
+}
+
+.arrow-path--dark {
+  stroke: #6b7280;
+}
+
+@keyframes arrow-dash {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+
+.arrow-delete {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.arrow-delete-circle {
+  fill: #fff;
+  stroke: #ef4444;
+  stroke-width: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.arrow-delete:hover .arrow-delete-circle {
+  fill: #fef2f2;
+  stroke: #dc2626;
+}
+
+.arrow-delete-x {
+  stroke: #ef4444;
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.arrow-delete:hover .arrow-delete-x {
+  stroke: #dc2626;
+}

@@ -219,7 +219,9 @@ function App() {
       googleClientId: localStorage.getItem('googleClientId') || '',
       pexelsKey: localStorage.getItem('pexelsKey') || '',
       pixabayKey: localStorage.getItem('pixabayKey') || '',
-      showBullets: localStorage.getItem('showBullets') !== 'false'
+      showBullets: localStorage.getItem('showBullets') !== 'false',
+      autoAdvance: localStorage.getItem('autoAdvance') === 'true',
+      autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5
     }
     return savedSettings
   })
@@ -606,6 +608,8 @@ function App() {
     if (settings.h2Weight !== undefined) localStorage.setItem('h2Weight', settings.h2Weight.toString())
     if (settings.h3Weight !== undefined) localStorage.setItem('h3Weight', settings.h3Weight.toString())
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
+    localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
+    localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
     if (settings.googleClientId !== undefined) localStorage.setItem('googleClientId', settings.googleClientId || '')
     if (settings.pexelsKey !== undefined) localStorage.setItem('pexelsKey', settings.pexelsKey || '')
     if (settings.pixabayKey !== undefined) localStorage.setItem('pixabayKey', settings.pixabayKey || '')
@@ -1922,6 +1926,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           showBullets={settings.showBullets !== false}
+          autoAdvance={settings.autoAdvance === true}
+          autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}
@@ -2662,6 +2668,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           showBullets={settings.showBullets !== false}
+          autoAdvance={settings.autoAdvance === true}
+          autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}

@@ -9,7 +9,9 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
     textAnimationUnit: settings?.textAnimationUnit || 'word',
     backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
     backgroundScaleTime: settings?.backgroundScaleTime || 10,
-    backgroundScaleAmount: settings?.backgroundScaleAmount ?? 20
+    backgroundScaleAmount: settings?.backgroundScaleAmount ?? 20,
+    autoAdvance: settings?.autoAdvance === true,
+    autoAdvanceDurationSeconds: settings?.autoAdvanceDurationSeconds ?? 5
   })
 
   useEffect(() => {
@@ -47,6 +49,39 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
 
   const content = (
     <div className="transition-options-content">
+          <div className="transition-options-section">
+            <h3>Auto-advance (Presentation)</h3>
+            <div className="transition-options-field">
+              <label className="transition-options-checkbox">
+                <input
+                  type="checkbox"
+                  checked={localSettings.autoAdvance}
+                  onChange={(e) => handleChange('autoAdvance', e.target.checked)}
+                />
+                <span>Auto-advance slides (don&apos;t require clicking next)</span>
+              </label>
+            </div>
+            {localSettings.autoAdvance && (
+              <div className="transition-options-field">
+                <label htmlFor="auto-advance-duration">Time on each slide (seconds)</label>
+                <select
+                  id="auto-advance-duration"
+                  value={localSettings.autoAdvanceDurationSeconds}
+                  onChange={(e) => handleChange('autoAdvanceDurationSeconds', parseFloat(e.target.value))}
+                  className="transition-options-select"
+                >
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                  <option value={30}>30</option>
+                  <option value={60}>60</option>
+                </select>
+              </div>
+            )}
+          </div>
+
           <div className="transition-options-section">
             <h3>Slide Transitions</h3>
             <div className="transition-options-field">

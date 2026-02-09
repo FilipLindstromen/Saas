@@ -90,7 +90,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -164,9 +164,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [slide.backgroundVideoUrl, layout])
 
-  // Ensure background video plays in both edit preview and present mode
+  // Ensure background video plays in both edit preview and present mode (skip play when isPreload so preload slides only buffer)
   useEffect(() => {
-    if (!slide.backgroundVideoUrl || layout === 'section') return
+    if (!slide.backgroundVideoUrl || layout === 'section' || isPreload) return
     const el = backgroundVideoRef.current
     const play = () => {
       const video = backgroundVideoRef.current
@@ -187,7 +187,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         el.removeEventListener('canplay', play)
       }
     }
-  }, [slide.backgroundVideoUrl, layout, backgroundVideoSrc])
+  }, [slide.backgroundVideoUrl, layout, backgroundVideoSrc, isPreload])
 
   // Convert hex color to RGB
   const hexToRgb = (hex) => {
@@ -1733,11 +1733,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             <video
               ref={(el) => {
                 backgroundVideoRef.current = el
-                if (el) el.play().catch(() => {})
+                if (el && !isPreload) el.play().catch(() => {})
               }}
               src={videoSrc}
               crossOrigin={isExternal ? 'anonymous' : undefined}
-              autoPlay
+              autoPlay={!isPreload}
               loop
               muted
               playsInline

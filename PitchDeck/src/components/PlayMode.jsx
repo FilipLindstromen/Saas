@@ -218,6 +218,9 @@ async function transcribeWithWhisper(blob, openaiKey) {
 
 const CAPTION_SIZE_MULT = { small: 0.85, medium: 1, large: 1.2 }
 
+// How many slides ahead to preload (video buffers so they play immediately when entering)
+const PRELOAD_AHEAD = 2
+
 // Burn captions into video: play video, draw frames + caption text to canvas, record canvas + original audio
 function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Poppins', captionFontSize = 'medium', captionDropShadow = false) {
   return new Promise((resolve, reject) => {
@@ -417,7 +420,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -582,6 +585,16 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   useEffect(() => {
     setVisibleBulletIndex(-1)
   }, [currentIndex])
+
+  // Auto-advance timer: after duration on each slide, go to next (unless on last slide or transitioning)
+  useEffect(() => {
+    if (!autoAdvance || isTransitioning || currentIndex >= presentationSlides.length - 1) return
+    const durationMs = Math.max(1000, (autoAdvanceDurationSeconds || 5) * 1000)
+    const timer = setTimeout(() => {
+      nextSlide()
+    }, durationMs)
+    return () => clearTimeout(timer)
+  }, [autoAdvance, autoAdvanceDurationSeconds, currentIndex, isTransitioning, presentationSlides.length, nextSlide])
 
   // Auto-start recording when entering record mode (stream from Record button, then start recorder)
   useEffect(() => {
@@ -924,6 +937,51 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlideLayout = currentSlide?.layout || 'default'
   const nextSlideLayout = presentationSlides[currentIndex + 1]?.layout || currentSlideLayout
 
+  // Common Slide props (shared by visible and preload slides)
+  const commonSlideProps = {
+    backgroundColor,
+    textColor,
+    fontFamily,
+    defaultTextSize,
+    h1Size,
+    h2Size,
+    h3Size,
+    h1FontFamily,
+    h2FontFamily,
+    h3FontFamily,
+    isPlayMode: true,
+    textDropShadow,
+    shadowBlur,
+    shadowOffsetX,
+    shadowOffsetY,
+    shadowColor,
+    webcamEnabled: false,
+    selectedCameraId: '',
+    textInlineBackground,
+    inlineBgColor,
+    inlineBgOpacity,
+    inlineBgPadding,
+    lineHeight,
+    bulletLineHeight,
+    bulletTextSize,
+    bulletGap,
+    contentBottomOffset,
+    contentEdgeOffset,
+    showBullets,
+    defaultFontWeight,
+    h1Weight,
+    h2Weight,
+    h3Weight,
+    backgroundScaleAnimation,
+    backgroundScaleTime,
+    backgroundScaleAmount,
+    textAnimation,
+    textAnimationUnit,
+    textStyleMode: textStyleMode || 'standard',
+    fontPairingSerifFont: fontPairingSerifFont || 'Playfair Display',
+    slideFormat
+  }
+
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
       <div 
@@ -933,50 +991,29 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       >
         <Slide 
           slide={presentationSlides[currentIndex]} 
-          backgroundColor={backgroundColor}
-          textColor={textColor}
-          fontFamily={fontFamily}
-          defaultTextSize={defaultTextSize}
-          h1Size={h1Size}
-          h2Size={h2Size}
-          h3Size={h3Size}
-          h1FontFamily={h1FontFamily}
-          h2FontFamily={h2FontFamily}
-          h3FontFamily={h3FontFamily}
-          isPlayMode={true}
+          {...commonSlideProps}
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
-          textDropShadow={textDropShadow}
-          shadowBlur={shadowBlur}
-          shadowOffsetX={shadowOffsetX}
-          webcamEnabled={false}
-          selectedCameraId=""
-          shadowOffsetY={shadowOffsetY}
-          shadowColor={shadowColor}
-          textInlineBackground={textInlineBackground}
-          inlineBgColor={inlineBgColor}
-          inlineBgOpacity={inlineBgOpacity}
-          inlineBgPadding={inlineBgPadding}
-          lineHeight={lineHeight}
-          bulletLineHeight={bulletLineHeight}
-          bulletTextSize={bulletTextSize}
-          bulletGap={bulletGap}
-          contentBottomOffset={contentBottomOffset}
-          contentEdgeOffset={contentEdgeOffset}
-          showBullets={showBullets}
-          defaultFontWeight={defaultFontWeight}
-          h1Weight={h1Weight}
-          h2Weight={h2Weight}
-          h3Weight={h3Weight}
-          backgroundScaleAnimation={backgroundScaleAnimation}
-          backgroundScaleTime={backgroundScaleTime}
-          backgroundScaleAmount={backgroundScaleAmount}
-          textAnimation={textAnimation}
-          textAnimationUnit={textAnimationUnit}
-          textStyleMode={textStyleMode || 'standard'}
-          fontPairingSerifFont={fontPairingSerifFont || 'Playfair Display'}
-          slideFormat={slideFormat}
+          isPreload={false}
         />
+      </div>
+      {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory) */}
+      <div className="play-preload-zone" aria-hidden="true">
+        {Array.from({ length: PRELOAD_AHEAD }, (_, i) => currentIndex + i + 1).map((idx) => {
+          const preloadSlide = presentationSlides[idx]
+          if (!preloadSlide) return null
+          return (
+            <div key={preloadSlide.id} className="play-preload-slide">
+              <Slide
+                slide={preloadSlide}
+                {...commonSlideProps}
+                visibleBulletIndex={-1}
+                visibleLineIndex={null}
+                isPreload={true}
+              />
+            </div>
+          )
+        })}
       </div>
       {/* Webcam overlay - outside slide transitions */}
       {recordSettings.webcamEnabled && recordSettings.selectedCameraId && (
@@ -1006,6 +1043,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         <div className="play-controls">
           <div className="play-slide-indicator">
             {currentIndex + 1} / {presentationSlides.length}
+            {autoAdvance && (
+              <span className="play-auto-advance-badge" title={`Auto-advancing every ${autoAdvanceDurationSeconds}s`}>
+                Auto · {autoAdvanceDurationSeconds}s
+              </span>
+            )}
           </div>
           {isRecording && recordingState === 'recording' && (
             <div className="recording-indicator">

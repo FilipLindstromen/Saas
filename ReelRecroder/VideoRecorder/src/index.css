@@ -1,0 +1,51 @@
+:root {
+  --bg-primary: #0f0f12;
+  --bg-secondary: #18181c;
+  --bg-tertiary: #222228;
+  --bg-elevated: #2a2a32;
+  --border: #3a3a44;
+  --text-primary: #f0f0f4;
+  --text-secondary: #a0a0ac;
+  --text-muted: #6a6a76;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+a {
+  color: var(--accent);
+}
