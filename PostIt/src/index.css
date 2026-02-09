@@ -1,0 +1,346 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Apple Vision Pro–style: very light canvas, minimal menu, soft neumorphic */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f5f7;
+}
+
+.app--dark {
+  background: #17181c;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: #fafafa;
+  flex-shrink: 0;
+  border-radius: 0 0 20px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.app--dark .app-header {
+  background: #1e2025;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.app-header-left,
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.app-logo {
+  font-weight: 700;
+  font-size: 1.35rem;
+  color: #1a1a1a;
+  margin-right: 24px;
+  letter-spacing: -0.03em;
+}
+
+.app--dark .app-logo {
+  color: #fafafa;
+}
+
+/* Nav: text-link style, smaller, lighter gray */
+.app-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+  color: #374151;
+}
+
+.app--dark .app-btn {
+  color: #9ca3af;
+}
+
+.app--dark .app-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+}
+
+.app-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.app-btn-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-btn.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+.app--dark .app-btn.active {
+  background: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
+}
+
+/* Primary CTA: pill, solid blue (e.g. "Find Me" style) */
+.app-btn-cta {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 9999px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+  transition: box-shadow 0.2s ease, background 0.15s ease;
+}
+
+.app-btn-cta:hover {
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.app--dark .app-btn-cta {
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app--dark .app-btn-cta:hover {
+  background: #3b82f6;
+}
+
+/* Theme toggle: pill, solid blue, top-right */
+.app-btn-theme {
+  font-size: 0.95rem;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+  transition: box-shadow 0.2s ease, background 0.15s ease;
+}
+
+.app-btn-theme:hover {
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.app--dark .app-btn-theme {
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app--dark .app-btn-theme:hover {
+  background: #3b82f6;
+}
+
+.app-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.app--dark .app-dropdown {
+  background: #25282e;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.app-dropdown-pages {
+  left: 0;
+}
+
+.app-header-right .app-dropdown-fonts {
+  left: auto;
+  right: 0;
+}
+
+.app-dropdown-templates {
+  min-width: 260px;
+}
+
+.app-dropdown-fonts {
+  min-width: 160px;
+}
+
+.app-dropdown-item {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.app--dark .app-dropdown-item {
+  color: #e5e7eb;
+}
+
+.app-dropdown-item:hover,
+.app-dropdown-item.active {
+  background: rgba(0, 0, 0, 0.04);
+  color: #111827;
+  border-radius: 10px;
+}
+
+.app--dark .app-dropdown-item:hover,
+.app--dark .app-dropdown-item.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f9fafb;
+}
+
+.app-dropdown-desc {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.app--dark .app-dropdown-desc {
+  color: #9ca3af;
+}
+
+.app-connect-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 50;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.app--dark .app-connect-hint {
+  background: #25282e;
+  color: #e5e7eb;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.app-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.app-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.app--dark .app-modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.app--dark .app-modal {
+  background: #25282e;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.app-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.app--dark .app-modal-title {
+  color: #f9fafb;
+}
+
+.app-modal-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.app--dark .app-modal-desc {
+  color: #9ca3af;
+}
+
+.app-modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fafafa;
+}
+
+.app--dark .app-modal-input {
+  background: #1e2025;
+  border-color: #475569;
+  color: #e5e7eb;
+}
+
+.app-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}

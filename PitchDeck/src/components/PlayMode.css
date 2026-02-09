@@ -43,6 +43,29 @@
   z-index: 1001;
 }
 
+/* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory) */
+.play-preload-zone {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.play-preload-slide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Camera override: text stays in front of webcam overlay */
 .play-slide-container-camera-override {
   z-index: 1001;
@@ -408,11 +431,20 @@
 }
 
 .play-slide-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   background: rgba(0, 0, 0, 0.6);
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-size: 0.9rem;
   color: #fff;
+}
+
+.play-auto-advance-badge {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  color: #a0e0a0;
 }
 
 /* Webcam overlay - separate from slide transitions */

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversation Animator Pro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <span class="theme-icon">🌙</span>
+    </button>
+    
+    <!-- Hamburger Menu -->
+    <button class="hamburger-menu" id="hamburger-btn" aria-label="Menu">
+        <span class="hamburger-icon">☰</span>
+    </button>
+    
+    <!-- Overlay Menu -->
+    <div class="overlay" id="menu-overlay">
+        <div class="overlay-content">
+            <button class="close-overlay" id="close-overlay">×</button>
+            <h2 id="overlay-title">Menu</h2>
+            <div id="overlay-body"></div>
+        </div>
+    </div>
+    
+    <div class="app-container">
+        <div class="app-header">
+            <h1>📱 Conversation Animator Pro</h1>
+            <p class="subtitle">Create stunning iOS-style message animations</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- Left Panel: Controls -->
+            <div class="control-panel">
+                <div class="quick-actions">
+                    <button class="action-btn primary" id="profile-menu-btn">
+                        <span class="btn-icon">👤</span>
+                        <span class="btn-text">Profile</span>
+                    </button>
+                    <button class="action-btn secondary" id="save-load-menu-btn">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text">Save/Load</span>
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">📝</span>
+                        <h3>Import Conversation</h3>
+                    </div>
+                    <textarea id="import-text" placeholder="Paste your conversation here...&#10;Format: Me: message / Name: message"></textarea>
+                    <button class="btn-primary" id="import-btn">
+                        <span>📥</span> Import
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">🎨</span>
+                        <h3>Background</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="bg-type">
+                            <option value="color">Color</option>
+                            <option value="image">Image</option>
+                            <option value="video">Video</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="bg-color-group">
+                        <label>Color</label>
+                        <input type="color" id="bg-color" value="#000000">
+                    </div>
+                    <div class="form-group" id="bg-image-group" style="display: none;">
+                        <label>Image</label>
+                        <input type="file" id="bg-image" accept="image/*">
+                    </div>
+                    <div class="form-group" id="bg-video-group" style="display: none;">
+                        <label>Video</label>
+                        <input type="file" id="bg-video" accept="video/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Background Music</label>
+                        <input type="file" id="bg-music" accept="audio/*">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">🔊</span>
+                        <h3>Sound Effects</h3>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="sound-effects" checked>
+                            <span>Enable Sound Effects</span>
+                        </label>
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Typing</span>
+                            <span class="slider-value" id="typing-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="typing-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Send</span>
+                            <span class="slider-value" id="send-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="send-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Receive</span>
+                            <span class="slider-value" id="receive-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="receive-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">⏱️</span>
+                        <h3>Timing</h3>
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Sender Delay</span>
+                            <span class="slider-value" id="sender-delay-value">1000ms</span>
+                        </label>
+                        <input type="range" id="sender-delay" min="100" max="5000" step="100" value="1000">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Receiver Delay</span>
+                            <span class="slider-value" id="receiver-delay-value">1500ms</span>
+                        </label>
+                        <input type="range" id="receiver-delay" min="100" max="5000" step="100" value="1500">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Base Typing Time</span>
+                            <span class="slider-value" id="typing-delay-value">500ms</span>
+                        </label>
+                        <input type="range" id="typing-delay" min="100" max="2000" step="100" value="500">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Time per Character</span>
+                            <span class="slider-value" id="typing-per-char-value">30ms</span>
+                        </label>
+                        <input type="range" id="typing-per-char" min="0" max="100" step="5" value="30">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Typing Speed</span>
+                            <span class="slider-value" id="typing-speed-value">50ms</span>
+                        </label>
+                        <input type="range" id="typing-speed" min="10" max="200" step="10" value="50">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">💬</span>
+                        <h3>Messages</h3>
+                    </div>
+                    <div id="messages-script"></div>
+                    <button class="btn-primary" id="add-message-btn">
+                        <span>➕</span> Add Message
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Preview -->
+            <div class="preview-panel">
+                <div class="preview-container">
+                    <div class="phone-wrapper">
+                        <div class="phone-screen" id="phone-screen">
+                            <div class="status-bar">
+                                <span class="time">14:47</span>
+                                <div class="status-icons">
+                                    <span class="signal">●●●●</span>
+                                    <span class="wifi">📶</span>
+                                    <span class="battery">🔋</span>
+                                </div>
+                            </div>
+                            <div class="chat-header">
+                                <div class="back-button">‹ <span class="back-count">147</span></div>
+                                <div class="profile-info">
+                                    <img id="header-profile-pic" src="" alt="" class="profile-pic">
+                                    <div class="profile-name" id="header-profile-name">My Brain</div>
+                                </div>
+                            </div>
+                            <div class="chat-background" id="chat-background">
+                                <video id="bg-video-element" loop muted style="display: none;"></video>
+                            </div>
+                            <div class="chat-messages" id="chat-messages"></div>
+                            <div class="imessage-input-bar">
+                                <span class="input-icon">+</span>
+                                <div class="imessage-input" id="imessage-input"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-actions">
+                        <button class="btn-large btn-preview" id="preview-btn">
+                            <span>▶️</span> Preview Animation
+                        </button>
+                        <button class="btn-large btn-export" id="export-btn">
+                            <span>📹</span> Export Video
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hidden elements -->
+    <input type="text" id="profile-name" value="My Brain" style="display:none;">
+    <input type="file" id="profile-picture" accept="image/*" style="display:none;">
+    <input type="number" id="message-count" value="147" style="display:none;">
+    <input type="text" id="save-name" style="display:none;">
+    <select id="saved-conversations" style="display:none;"></select>
+    
+    <audio id="bg-music-element" loop style="display: none;"></audio>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.0.0-rc.5/dist/html2canvas.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
