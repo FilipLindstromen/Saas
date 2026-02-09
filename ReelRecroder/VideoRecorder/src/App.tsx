@@ -5,6 +5,7 @@ import { useRecorder } from './hooks/useRecorder'
 import { getResolutionsForAspect, QUALITY_OPTIONS } from './constants'
 import { loadVideoRecorderState, saveVideoRecorderState } from './utils/persistence'
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
+import type { ParsedLUT } from './utils/colorLut'
 import { exportVideoForDownload } from './utils/exportWithColorAdjustments'
 import { RecordPreview } from './components/RecordPreview'
 import { Timeline } from './components/Timeline'
@@ -64,6 +65,7 @@ export default function App() {
   const [colorBrightness, setColorBrightness] = useState(() => initialState?.colorBrightness ?? 100)
   const [colorContrast, setColorContrast] = useState(() => initialState?.colorContrast ?? 100)
   const [colorSaturation, setColorSaturation] = useState(() => initialState?.colorSaturation ?? 100)
+  const [colorLut, setColorLut] = useState<ParsedLUT | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [openaiApiKey, setOpenaiApiKey] = useState(() => getStoredOpenAIKey())
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
@@ -89,6 +91,7 @@ export default function App() {
   const [safeZoneType, setSafeZoneType] = useState<SafeZoneType>(() => (initialState?.safeZoneType as SafeZoneType) ?? 'youtube-9:16')
   const [safeZoneVisible, setSafeZoneVisible] = useState(() => initialState?.safeZoneVisible ?? false)
   const [exportPanelOpen, setExportPanelOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('webm')
   const [downloadPreparing, setDownloadPreparing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
@@ -347,6 +350,7 @@ export default function App() {
         const blob = await exportVideoForDownload(recordedBlob, {
           width,
           height,
+          sourceDuration: duration ?? undefined,
           trimStart: videoTrimEnd != null ? videoTrimStart : undefined,
           trimEnd: videoTrimEnd ?? (duration ?? undefined),
           overlays,
@@ -633,39 +637,6 @@ export default function App() {
     </div>
   )
 
-  const renderPlaybackBar = () => (
-    <div className={styles.playbackBar}>
-      <button
-        type="button"
-        className={styles.playBtn}
-        onClick={() => {
-          const v = previewVideoRef.current
-          if (!v) return
-          if (v.paused) {
-            const p = v.play()
-            if (p && typeof p.catch === 'function') p.catch(() => {})
-          } else {
-            v.pause()
-          }
-        }}
-        title="Play / Pause"
-        aria-label="Play / Pause"
-      >
-        <IconPlay />
-      </button>
-      <button
-        type="button"
-        className={styles.downloadBtn}
-        title={downloadPreparing ? 'Preparing…' : `Download ${aspectRatio} ${width}×${height}`}
-        aria-label={downloadPreparing ? 'Preparing download' : 'Download recording'}
-        disabled={!recordedBlob || downloadPreparing}
-        onClick={handleDownloadWithColor}
-      >
-        <IconDownload />
-      </button>
-    </div>
-  )
-
   return (
     <div className={styles.app}>
       <header className={styles.header}>
@@ -788,6 +759,8 @@ export default function App() {
           aspectRatio={aspectRatio}
           width={width}
           height={height}
+          exportFormat={exportFormat}
+          onExportFormatChange={setExportFormat}
           youtubeTitle={youtubeTitle}
           onYoutubeTitleChange={setYoutubeTitle}
           youtubeCaption={youtubeCaption}
@@ -862,7 +835,6 @@ export default function App() {
           ) : (
             <>
               {renderPreviewRow()}
-              {mode === 'edit' && recordedBlob && renderPlaybackBar()}
             </>
           )}
         </div>

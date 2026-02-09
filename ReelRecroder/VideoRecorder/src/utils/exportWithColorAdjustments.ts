@@ -5,16 +5,89 @@ import { drawOverlays } from './canvasCapture'
  * Re-encode a video blob with CSS-like color adjustments (brightness, contrast, saturation).
  * Used for export when "Use color adjustments" is on; raw recording is never modified.
  */
-function getSupportedMimeType(): string {
-  const types = [
+export type ExportFormat = 'webm' | 'mp4'
+
+function getSupportedMimeType(preferFormat: ExportFormat): { mimeType: string; extension: ExportFormat } {
+  if (preferFormat === 'mp4') {
+    const mp4Types = [
+      'video/mp4;codecs=avc1.64003E,mp4a.40.2',
+      'video/mp4;codecs=avc1,aac',
+      'video/mp4',
+    ]
+    for (const t of mp4Types) {
+      if (MediaRecorder.isTypeSupported(t)) return { mimeType: t, extension: 'mp4' }
+    }
+  }
+  const webmTypes = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
   ]
-  for (const t of types) {
-    if (MediaRecorder.isTypeSupported(t)) return t
+  for (const t of webmTypes) {
+    if (MediaRecorder.isTypeSupported(t)) return { mimeType: t, extension: 'webm' }
   }
-  return 'video/webm'
+  return { mimeType: 'video/webm', extension: 'webm' }
+}
+
+/**
+ * Resolve video duration (seconds) from a blob by loading it. Use when the video element
+ * in the export pipeline might not report duration (e.g. some WebM in blob URLs).
+ */
+export function getVideoDurationFromBlob(blob: Blob): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    const url = URL.createObjectURL(blob)
+    video.src = url
+    let settled = false
+    const cleanup = () => {
+      video.removeEventListener('loadedmetadata', onReady)
+      video.removeEventListener('loadeddata', onReady)
+      video.removeEventListener('durationchange', onDuration)
+      video.removeEventListener('error', onError)
+      URL.revokeObjectURL(url)
+    }
+    const onError = () => {
+      if (!settled) {
+        settled = true
+        cleanup()
+        reject(new Error('Could not load video to read duration'))
+      }
+    }
+    const onDuration = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0 && !settled) {
+        settled = true
+        cleanup()
+        resolve(video.duration)
+      }
+    }
+    const onReady = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0 && !settled) {
+        settled = true
+        cleanup()
+        resolve(video.duration)
+        return
+      }
+      video.addEventListener('durationchange', onDuration)
+    }
+    video.addEventListener('loadedmetadata', onReady, { once: true })
+    video.addEventListener('loadeddata', onReady, { once: true })
+    video.addEventListener('error', onError, { once: true })
+    video.load()
+    setTimeout(() => {
+      if (settled) return
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        settled = true
+        cleanup()
+        resolve(video.duration)
+      } else {
+        settled = true
+        cleanup()
+        reject(new Error('Could not read video duration'))
+      }
+    }, 5000)
+  })
 }
 
 export interface ColorAdjustments {
@@ -84,7 +157,7 @@ export function exportVideoWithColorAdjustments(
       audioTracks.forEach((t) => combinedStream.addTrack(t))
       stream = combinedStream
 
-      const mimeType = getSupportedMimeType()
+      const { mimeType } = getSupportedMimeType('webm')
       try {
         recorder = new MediaRecorder(combinedStream, {
           mimeType,
@@ -163,10 +236,14 @@ export function exportVideoWithColorAdjustments(
 export interface ExportForDownloadOptions {
   width: number
   height: number
+  /** Known duration of the source video (seconds). Used when the video element does not report duration yet (e.g. some WebM). */
+  sourceDuration?: number
   /** Start time in source video (seconds) */
   trimStart?: number
   /** End time in source video (seconds); export runs until this */
   trimEnd?: number
+  /** Preferred container format; MP4 is used only if the browser supports it */
+  exportFormat?: ExportFormat
   overlays?: OverlayItem[]
   overlayTextAnimation?: OverlayTextAnimation
   defaultFontFamily?: string
@@ -209,8 +286,10 @@ export function exportVideoForDownload(
   const {
     width,
     height,
+    sourceDuration: optSourceDuration,
     trimStart: optTrimStart,
     trimEnd: optTrimEnd,
+    exportFormat: preferFormat = 'webm',
     overlays = [],
     overlayTextAnimation = 'none',
     defaultFontFamily = 'Oswald',
@@ -231,7 +310,7 @@ export function exportVideoForDownload(
       : 'none'
 
   return preloadOverlayImages(overlaysToBurn).then((preloadedImages) => {
-    return new Promise<Blob>((resolve, reject) => {
+    return new Promise<{ blob: Blob; extension: ExportFormat }>((resolve, reject) => {
       const video = document.createElement('video')
       video.muted = false
       video.playsInline = true
@@ -265,8 +344,9 @@ export function exportVideoForDownload(
       }
 
       const tryStartExport = () => {
-        const duration = video.duration
-        if (!Number.isFinite(duration) || duration <= 0) return false
+        const fromVideo = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null
+        const duration = fromVideo ?? (optSourceDuration != null && Number.isFinite(optSourceDuration) && optSourceDuration > 0 ? optSourceDuration : null)
+        if (duration == null || duration <= 0) return false
         const trimStart = optTrimStart ?? 0
         const trimEnd = optTrimEnd ?? duration
         video.currentTime = trimStart
@@ -278,7 +358,7 @@ export function exportVideoForDownload(
         videoStream.getAudioTracks().forEach((t) => combinedStream.addTrack(t))
         stream = combinedStream
 
-        const mimeType = getSupportedMimeType()
+        const { mimeType, extension } = getSupportedMimeType(preferFormat)
         try {
           recorder = new MediaRecorder(combinedStream, {
             mimeType,
@@ -297,7 +377,7 @@ export function exportVideoForDownload(
         recorder.onstop = () => {
           cleanup()
           if (chunks.length) {
-            resolve(new Blob(chunks, { type: mimeType }))
+            resolve({ blob: new Blob(chunks, { type: mimeType }), extension })
           } else {
             reject(new Error('Export produced no data'))
           }
@@ -345,24 +425,39 @@ export function exportVideoForDownload(
         return true
       }
 
+      let durationTimeoutId: ReturnType<typeof setTimeout> | null = null
+      const clearDurationTimeout = () => {
+        if (durationTimeoutId != null) {
+          clearTimeout(durationTimeoutId)
+          durationTimeoutId = null
+        }
+      }
+      const onDurationChange = () => {
+        video.removeEventListener('durationchange', onDurationChange)
+        if (tryStartExport()) {
+          clearDurationTimeout()
+          return
+        }
+        cleanup()
+        reject(new Error('Invalid video duration'))
+      }
       const onReady = () => {
         if (tryStartExport()) return
-        const onDurationChange = () => {
-          video.removeEventListener('durationchange', onDurationChange)
-          if (!tryStartExport()) {
-            cleanup()
-            reject(new Error('Invalid video duration'))
-          }
-        }
         video.addEventListener('durationchange', onDurationChange)
-        setTimeout(() => {
+        durationTimeoutId = setTimeout(() => {
+          durationTimeoutId = null
           if (recorder) return
           video.removeEventListener('durationchange', onDurationChange)
           cleanup()
-          reject(new Error('Invalid video duration'))
-        }, 3000)
+          reject(new Error('Invalid video duration. The video may not have loaded in time; try again or use a shorter clip.'))
+        }, 8000)
       }
-      video.addEventListener('loadedmetadata', onReady, { once: true })
+      const onReadyOnce = () => {
+        if (tryStartExport()) return
+        onReady()
+      }
+      video.addEventListener('loadedmetadata', onReadyOnce, { once: true })
+      video.addEventListener('loadeddata', onReadyOnce, { once: true })
       video.load()
     })
   })

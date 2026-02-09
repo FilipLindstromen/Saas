@@ -80,6 +80,16 @@
   margin-right: 8px;
 }
 
+.formatSelect {
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 .label {
   display: block;
   font-size: 0.85rem;

@@ -208,6 +208,8 @@ const CAPTION_FONT = 'Oswald'
 
 export interface CaptionOptions {
   style: CaptionStyle
+  /** In/out animation for the caption block (same options as overlay text) */
+  textAnimation?: OverlayTextAnimation
   /** Font size in pixels (used if fontSizePercent not set) */
   fontSize?: number
   /** Font size as % of width (e.g. 2 = 2%); overrides fontSize when set */
@@ -242,6 +244,19 @@ export function drawCaptionStyle(
   const segment = segments.find((s) => currentTime >= s.start && currentTime <= s.end)
   if (!segment) return
 
+  const textAnimation = options.textAnimation ?? 'none'
+  const { inProgress, outProgress, opacity } = getTextAnimationProgress(currentTime, segment.start, segment.end)
+  const { offsetX, offsetY } = getTextAnimationOffset(
+    textAnimation,
+    width,
+    height,
+    currentTime,
+    segment.start,
+    segment.end,
+    inProgress,
+    outProgress
+  )
+
   const { displayText, words } = getCaptionDisplay(segment, currentTime)
   const hasWordTiming = words.length > 0
 
@@ -255,6 +270,10 @@ export function drawCaptionStyle(
   const lineHeight = Math.round(fontSize * 1.4)
   const maxWidth = width - pad * 2
   ctx.save()
+  if (textAnimation !== 'none') {
+    ctx.globalAlpha = opacity
+    ctx.translate(offsetX, offsetY)
+  }
   ctx.textAlign = 'center'
 
   if (style === 'lower-third') {
