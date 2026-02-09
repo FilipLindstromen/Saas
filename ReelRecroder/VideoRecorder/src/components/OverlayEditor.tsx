@@ -36,7 +36,7 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded =
   const [fontSizeInput, setFontSizeInput] = useState<string>('')
   const [fontSizeInputFocused, setFontSizeInputFocused] = useState(false)
 
-  const fontSizePct = overlay?.fontSizePercent ?? (overlay ? (overlay.fontSize ?? 24) / 1280 * 100 : 2.2)
+  const fontSizePct = overlay?.fontSizePercent ?? (overlay ? (overlay.fontSize ?? 24) / 1280 * 100 : 10)
   useEffect(() => {
     if (!fontSizeInputFocused) setFontSizeInput('')
   }, [fontSizeInputFocused, fontSizePct])

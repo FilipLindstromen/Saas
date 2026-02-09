@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, ResolutionOption, VideoSourceKind } from '../types'
+import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, ResolutionOption, SafeZoneType, VideoSourceKind } from '../types'
 import type { MediaDeviceInfo } from '../hooks/useMediaDevices'
 import { FONT_OPTIONS } from '../constants/fonts'
 import { OverlayEditor } from './OverlayEditor'
 import { SourceSelectors } from './SourceSelectors'
 import { OptionsBar } from './OptionsBar'
 import type { CaptionSegment } from '../services/captions'
-import { IconTrash, IconVideo, IconLayers, IconCursor, IconType, IconColor } from './Icons'
+import { IconTrash, IconVideo, IconLayers, IconCursor, IconType, IconColor, IconSafeZone } from './Icons'
 import { CaptionBurnIn } from './CaptionBurnIn'
 import styles from './InspectorPanel.module.css'
 
@@ -74,6 +74,11 @@ interface InspectorPanelProps {
   captionSegments?: CaptionSegment[] | null
   onTranscriptionDone?: (segments: CaptionSegment[]) => void
   openaiApiKey?: string
+  /* Safe-zones tab (preview overlay only, not exported) */
+  safeZoneType?: SafeZoneType
+  onSafeZoneTypeChange?: (t: SafeZoneType) => void
+  safeZoneVisible?: boolean
+  onSafeZoneVisibleChange?: (v: boolean) => void
 }
 
 export function InspectorPanel({
@@ -136,6 +141,10 @@ export function InspectorPanel({
   openaiApiKey,
   videoWidth = 1280,
   videoHeight = 720,
+  safeZoneType = 'youtube-9:16',
+  onSafeZoneTypeChange = () => {},
+  safeZoneVisible = false,
+  onSafeZoneVisibleChange = () => {},
 }: InspectorPanelProps) {
   const [internalTab, setInternalTab] = useState<InspectorTabId>('current')
   const activeTab = controlledTab ?? internalTab
@@ -152,7 +161,9 @@ export function InspectorPanel({
           ? (selectedOverlay ? 'Current object' : 'Select an overlay on the timeline')
           : activeTab === 'captions'
             ? 'Caption style'
-            : 'Global overlay settings'
+            : activeTab === 'safezones'
+              ? 'Safe zones'
+              : 'Global overlay settings'
 
   const hasVideoSettings =
     onVideoKindChange &&
@@ -226,6 +237,17 @@ export function InspectorPanel({
           onClick={() => setActiveTab('captions')}
         >
           <IconType />
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'safezones'}
+          aria-label="Safe zones"
+          id="inspector-tab-safezones"
+          className={styles.tab}
+          onClick={() => setActiveTab('safezones')}
+        >
+          <IconSafeZone />
         </button>
       </div>
 
@@ -400,6 +422,37 @@ export function InspectorPanel({
                 />
               </>
             )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'safezones' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-safezones">
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Safe zones</h3>
+            <p className={styles.hint}>Overlay guide on the preview only. Not included in recording or export.</p>
+            <label className={styles.label}>Preset</label>
+            <select
+              className={styles.select}
+              value={safeZoneType ?? 'youtube-9:16'}
+              onChange={(e) => onSafeZoneTypeChange?.(e.target.value as SafeZoneType)}
+              aria-label="Safe zone preset"
+            >
+              <option value="youtube-9:16">YouTube (9:16 portrait)</option>
+              <option value="youtube-16:9">YouTube (16:9 landscape)</option>
+              <option value="youtube-1:1">YouTube (1:1 square)</option>
+              <option value="tiktok">TikTok</option>
+              <option value="instagram">Instagram</option>
+            </select>
+            <label className={styles.checkRow} style={{ marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={safeZoneVisible ?? false}
+                onChange={(e) => onSafeZoneVisibleChange?.(e.target.checked)}
+                aria-label="Show safe zone overlay"
+              />
+              <span>Show safe zone</span>
+            </label>
           </section>
         </div>
       )}

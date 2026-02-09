@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, VideoSourceKind } from './types'
+import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, SafeZoneType, VideoSourceKind } from './types'
 import { useMediaDevices } from './hooks/useMediaDevices'
 import { useRecorder } from './hooks/useRecorder'
 import { getResolutionsForAspect, QUALITY_OPTIONS } from './constants'
@@ -79,17 +79,26 @@ export default function App() {
   const [videoTrimEnd, setVideoTrimEnd] = useState<number | null>(null)
   const [thumbnailPanelOpen, setThumbnailPanelOpen] = useState(false)
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null)
+  const [thumbnailSeekTime, setThumbnailSeekTime] = useState(() => initialState?.thumbnailSeekTime ?? 0)
+  const [thumbnailTexts, setThumbnailTexts] = useState<{ id: string; text: string; x: number; y: number; fontSizePercent: number; fontFamily?: string }[]>(() => initialState?.thumbnailTexts ?? [])
+  const [thumbnailWebcamDataUrl, setThumbnailWebcamDataUrl] = useState<string | null>(() => initialState?.thumbnailWebcamDataUrl ?? null)
+  const [thumbnailGeneratedDataUrl, setThumbnailGeneratedDataUrl] = useState<string | null>(() => initialState?.thumbnailGeneratedDataUrl ?? null)
   const [youtubeCaption, setYoutubeCaption] = useState('')
   const [youtubeTitle, setYoutubeTitle] = useState('')
-  const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('current')
+  const [inspectorTab, setInspectorTab] = useState<InspectorTabId>(() => (initialState?.inspectorTab as InspectorTabId) ?? 'current')
+  const [safeZoneType, setSafeZoneType] = useState<SafeZoneType>(() => (initialState?.safeZoneType as SafeZoneType) ?? 'youtube-9:16')
+  const [safeZoneVisible, setSafeZoneVisible] = useState(() => initialState?.safeZoneVisible ?? false)
   const [exportPanelOpen, setExportPanelOpen] = useState(false)
   const [downloadPreparing, setDownloadPreparing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement | null>(null)
+  const userHasTrimmedVideoRef = useRef(false)
   const [timelineResize, setTimelineResize] = useState<{ startY: number; startHeight: number } | null>(null)
   const [inspectorWidth, setInspectorWidth] = useState(() => initialState?.inspectorWidth ?? 280)
   const [inspectorResize, setInspectorResize] = useState<{ startX: number; startWidth: number } | null>(null)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const allResolutions = useMemo(() => getResolutionsForAspect(aspectRatio), [aspectRatio])
   const resolutions = useMemo(() => {
@@ -206,12 +215,15 @@ export default function App() {
       })
       setVideoTrimStart(0)
       setVideoTrimEnd(null)
+      userHasTrimmedVideoRef.current = false
       setThumbnailBlob(null)
+      setThumbnailGeneratedDataUrl(null)
       setThumbnailPanelOpen(false)
       return
     }
     setVideoTrimStart(0)
     setVideoTrimEnd(null)
+    userHasTrimmedVideoRef.current = false
     setDuration(0)
     setUserTimelineDuration(null)
     const url = URL.createObjectURL(recordedBlob)
@@ -225,6 +237,35 @@ export default function App() {
     setVideoTrimStart(0)
     setVideoTrimEnd(duration)
   }, [recordedBlob, duration, videoTrimEnd])
+
+  // Restore thumbnail blob from persisted data URL (e.g. after page load)
+  useEffect(() => {
+    if (!thumbnailGeneratedDataUrl || thumbnailBlob != null) return
+    const dataUrl = thumbnailGeneratedDataUrl
+    fetch(dataUrl)
+      .then((r) => r.blob())
+      .then((blob) => setThumbnailBlob(blob))
+      .catch(() => {})
+  }, [thumbnailGeneratedDataUrl, thumbnailBlob])
+
+  useEffect(() => {
+    if (countdown === null) return
+    countdownTimeoutRef.current = setTimeout(() => {
+      countdownTimeoutRef.current = null
+      if (countdown > 1) {
+        setCountdown(countdown - 1)
+      } else {
+        setCountdown(null)
+        startRecording()
+      }
+    }, 1000)
+    return () => {
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current)
+        countdownTimeoutRef.current = null
+      }
+    }
+  }, [countdown, startRecording])
 
   useEffect(() => {
     saveVideoRecorderState({
@@ -243,6 +284,10 @@ export default function App() {
       captionPreviewCaptionY,
       userTimelineDuration,
       timelineHeight,
+      inspectorWidth,
+      inspectorTab,
+      safeZoneType,
+      safeZoneVisible,
       defaultFontFamily,
       defaultSecondaryFont,
       defaultBold,
@@ -252,8 +297,26 @@ export default function App() {
       colorBrightness,
       colorContrast,
       colorSaturation,
+      thumbnailSeekTime,
+      thumbnailTexts,
+      thumbnailWebcamDataUrl,
+      thumbnailGeneratedDataUrl,
     })
-  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation])
+  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl])
+
+  const handleThumbnailChange = useCallback((blob: Blob | null, dataUrl?: string | null) => {
+    setThumbnailBlob(blob)
+    setThumbnailGeneratedDataUrl(dataUrl ?? null)
+  }, [])
+
+  const handleThumbnailStateChange = useCallback(
+    (state: { seekTime: number; texts: { id: string; text: string; x: number; y: number; fontSizePercent: number; fontFamily?: string }[]; webcamImageUrl: string | null }) => {
+      setThumbnailSeekTime(state.seekTime)
+      setThumbnailTexts(state.texts)
+      setThumbnailWebcamDataUrl(state.webcamImageUrl)
+    },
+    []
+  )
 
   const handleTimelineResizeMove = useCallback(
     (e: PointerEvent) => {
@@ -433,7 +496,7 @@ export default function App() {
       type,
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
-      ...(type === 'text' ? { text: 'New text', fontSizePercent: 2.2, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
+      ...(type === 'text' ? { text: 'New text', fontSizePercent: 10, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
     }
     setOverlays((prev) => [...prev, item])
     setSelectedOverlayId(item.id)
@@ -469,6 +532,7 @@ export default function App() {
   }, [selectedOverlayId, overlays, recordedBlob, currentTime, previewTime])
 
   const handleVideoClipTrimChange = useCallback((trimStart: number, trimEnd: number) => {
+    userHasTrimmedVideoRef.current = true
     setVideoTrimStart(trimStart)
     setVideoTrimEnd(trimEnd)
     const newDuration = trimEnd - trimStart
@@ -517,6 +581,11 @@ export default function App() {
         <div
           className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''}`}
         >
+          {countdown != null && (
+            <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
+              <span className={styles.countdownNumber}>{countdown}</span>
+            </div>
+          )}
           <RecordPreview
             videoStream={videoStream}
             width={width}
@@ -620,10 +689,14 @@ export default function App() {
             <button
               type="button"
               role="tab"
-              aria-selected={mode === 'edit'}
+              aria-selected={mode === 'edit' && !thumbnailPanelOpen && !exportPanelOpen}
               aria-label="Edit"
-              className={mode === 'edit' ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => setMode('edit')}
+              className={mode === 'edit' && !thumbnailPanelOpen && !exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
+              onClick={() => {
+                setMode('edit')
+                setThumbnailPanelOpen(false)
+                setExportPanelOpen(false)
+              }}
               disabled={!recordedBlob}
               title={!recordedBlob ? 'Record first to edit' : 'Edit recording'}
             >
@@ -633,7 +706,10 @@ export default function App() {
               type="button"
               aria-label="Thumbnail & Captions"
               className={thumbnailPanelOpen ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => setThumbnailPanelOpen((p) => !p)}
+              onClick={() => {
+                setThumbnailPanelOpen((p) => !p)
+                if (!thumbnailPanelOpen) setExportPanelOpen(false)
+              }}
               disabled={!recordedBlob}
               title={!recordedBlob ? 'Record first' : 'Thumbnail & YouTube description'}
               aria-pressed={thumbnailPanelOpen}
@@ -644,7 +720,10 @@ export default function App() {
               type="button"
               aria-label="Export"
               className={exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => setExportPanelOpen((p) => !p)}
+              onClick={() => {
+                setExportPanelOpen((p) => !p)
+                if (!exportPanelOpen) setThumbnailPanelOpen(false)
+              }}
               disabled={!recordedBlob}
               title={!recordedBlob ? 'Record first to export' : 'Export, download, publish to YouTube'}
               aria-pressed={exportPanelOpen}
@@ -654,37 +733,32 @@ export default function App() {
           </div>
         </div>
         <div className={styles.headerCenter}>
+          {/* Spacer so headerRight stays right; record + timer are in overlay */}
+        </div>
+        <div className={styles.headerCenterOverlay}>
+          <button
+            type="button"
+            className={countdown != null ? styles.recordStopToggleStop : isRecording ? styles.recordStopToggleStop : styles.recordStopToggleRecord}
+            disabled={!videoStream && !isRecording && countdown == null}
+            onClick={
+              countdown != null
+                ? () => setCountdown(null)
+                : isRecording
+                  ? stopRecording
+                  : () => setCountdown(3)
+            }
+            title={countdown != null ? 'Cancel countdown' : isRecording ? 'Stop recording' : 'Start recording'}
+            aria-label={countdown != null ? 'Cancel countdown' : isRecording ? 'Stop recording' : 'Start recording'}
+          >
+            {countdown != null ? <span className={styles.countdownCancelLabel}>Cancel</span> : isRecording ? <IconStop /> : <IconRecord />}
+          </button>
           <div className={styles.recordTimer} role="timer" aria-live="polite" aria-label={isRecording ? `Recording time ${Math.floor(recordElapsedSeconds / 60)}:${String(recordElapsedSeconds % 60).padStart(2, '0')}` : 'Recording time'}>
             {isRecording && <span className={styles.recordTimerDot} aria-hidden />}
             {Math.floor(recordElapsedSeconds / 60)}:{String(recordElapsedSeconds % 60).padStart(2, '0')}
           </div>
-          <button
-            type="button"
-            className={isRecording ? styles.recordStopToggleStop : styles.recordStopToggleRecord}
-            disabled={!videoStream && !isRecording}
-            onClick={isRecording ? stopRecording : startRecording}
-            title={isRecording ? 'Stop recording' : 'Start recording'}
-            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-          >
-            {isRecording ? <IconStop /> : <IconRecord />}
-          </button>
           {recordError && <span className={styles.headerError}>{recordError}</span>}
         </div>
         <div className={styles.headerRight}>
-          <button
-            type="button"
-            className={styles.settingsBtn}
-            onClick={() => setInspectorTab('video')}
-            title="Video settings (sources, format & quality)"
-            aria-label="Video settings"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3v18" />
-              <path d="m8 7 4-4 4 4" />
-              <path d="m8 17 4 4 4-4" />
-              <circle cx="12" cy="12" r="2.5" />
-            </svg>
-          </button>
           <button
             type="button"
             className={styles.settingsBtn}
@@ -775,9 +849,15 @@ export default function App() {
               youtubeCaption={youtubeCaption}
               onYoutubeCaptionChange={setYoutubeCaption}
               thumbnailBlob={thumbnailBlob}
-              onThumbnailChange={setThumbnailBlob}
+              onThumbnailChange={handleThumbnailChange}
               onClose={() => setThumbnailPanelOpen(false)}
+              videoDeviceId={videoDeviceId}
+              flipVideo={flipVideo}
               embedded
+              initialSeekTime={thumbnailSeekTime}
+              initialTexts={thumbnailTexts}
+              initialWebcamImageUrl={thumbnailWebcamDataUrl}
+              onThumbnailStateChange={handleThumbnailStateChange}
             />
           ) : (
             <>
@@ -933,6 +1013,10 @@ export default function App() {
             openaiApiKey={openaiApiKey}
             videoWidth={width}
             videoHeight={height}
+            safeZoneType={safeZoneType}
+            onSafeZoneTypeChange={setSafeZoneType}
+            safeZoneVisible={safeZoneVisible}
+            onSafeZoneVisibleChange={setSafeZoneVisible}
           />
         </div>
       </div>

@@ -1,10 +1,41 @@
 import { useRef, useEffect, useState } from 'react'
-import type { CaptionStyle, OverlayItem, OverlayTextAnimation } from '../types'
+import type { CaptionStyle, OverlayItem, OverlayTextAnimation, SafeZoneType } from '../types'
 import { drawOverlays, drawCaptionStyle, getCaptionBlockRect } from '../utils/canvasCapture'
 import type { CaptionSegment } from '../services/captions'
 import styles from './RecordPreview.module.css'
 
 const CAPTION_SAMPLE_SEGMENT: CaptionSegment = { start: 0, end: 1, text: 'Sample caption text' }
+
+/** Action safe (outer) and title safe (inner) as fraction of canvas size, centered */
+const SAFE_ZONE_PRESETS: Record<SafeZoneType, { action: number; title: number }> = {
+  'youtube-9:16': { action: 0.95, title: 0.9 },
+  'youtube-16:9': { action: 0.95, title: 0.9 },
+  'youtube-1:1': { action: 0.95, title: 0.9 },
+  tiktok: { action: 0.93, title: 0.85 },
+  instagram: { action: 0.95, title: 0.88 },
+}
+
+function drawSafeZoneOverlay(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  type: SafeZoneType
+) {
+  const { action, title } = SAFE_ZONE_PRESETS[type]
+  const drawRect = (size: number, color: string, lineDash: number[] = []) => {
+    const sw = w * size
+    const sh = h * size
+    const x = (w - sw) / 2
+    const y = (h - sh) / 2
+    ctx.strokeStyle = color
+    ctx.lineWidth = Math.max(1, Math.min(w, h) / 400)
+    if (lineDash.length) ctx.setLineDash(lineDash)
+    ctx.strokeRect(x, y, sw, sh)
+    if (lineDash.length) ctx.setLineDash([])
+  }
+  drawRect(action, 'rgba(0, 255, 100, 0.7)', [4, 4])
+  drawRect(title, 'rgba(255, 200, 0, 0.8)', [2, 2])
+}
 
 interface RecordPreviewProps {
   videoStream: MediaStream | null
@@ -51,6 +82,8 @@ interface RecordPreviewProps {
   isPreviewPlaying?: boolean
   /** Called when the recorded video playback reaches the end */
   onPlaybackEnd?: () => void
+  /** Safe zone overlay (preview only, never in recording or export) */
+  safeZone?: { type: SafeZoneType; visible: boolean }
 }
 
 export function RecordPreview({
@@ -86,6 +119,7 @@ export function RecordPreview({
   colorSaturation = 100,
   isPreviewPlaying = false,
   onPlaybackEnd,
+  safeZone,
 }: RecordPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
@@ -121,12 +155,16 @@ export function RecordPreview({
     video.srcObject = null
     video.src = playbackUrl
     video.load()
-    const onLoaded = () => {
+    const reportDuration = () => {
       const d = video.duration
-      onDurationChange(Number.isFinite(d) && d >= 0 ? d : 0)
+      if (Number.isFinite(d) && d >= 0) onDurationChange(d)
     }
-    video.addEventListener('loadedmetadata', onLoaded)
-    return () => video.removeEventListener('loadedmetadata', onLoaded)
+    video.addEventListener('loadedmetadata', reportDuration)
+    video.addEventListener('durationchange', reportDuration)
+    return () => {
+      video.removeEventListener('loadedmetadata', reportDuration)
+      video.removeEventListener('durationchange', reportDuration)
+    }
   }, [playbackUrl, onDurationChange])
 
   // Time update and pause-at-trim-end: separate effect so we don't reload video when callbacks/trim change
@@ -250,8 +288,17 @@ export function RecordPreview({
       isRecording && !burnOverlaysIntoExport ? [] : overlays
     const draw = () => {
       if (isPlayback && video && video.readyState >= 2) {
-        drawVideoFit(video)
         const sourceTime = video.currentTime
+        const isInsideVideoClip =
+          videoTrimStart == null || videoTrimEnd == null
+            ? true
+            : sourceTime >= videoTrimStart && sourceTime < videoTrimEnd - 0.02
+        if (isInsideVideoClip) {
+          drawVideoFit(video)
+        } else {
+          ctx.fillStyle = '#000'
+          ctx.fillRect(0, 0, width, height)
+        }
         const timelineTime =
           videoTrimStart != null && videoTrimEnd != null
             ? Math.min(Math.max(0, sourceTime - videoTrimStart), videoTrimEnd - videoTrimStart)
@@ -265,7 +312,6 @@ export function RecordPreview({
         if (captionPreview) {
           const segments =
             captionSegments && captionSegments.length > 0 ? captionSegments : [CAPTION_SAMPLE_SEGMENT]
-          const captionTime = video.currentTime
           drawCaptionStyle(
             ctx,
             width,
@@ -296,13 +342,16 @@ export function RecordPreview({
         ctx.textBaseline = 'middle'
         ctx.fillText('Select video source and start', width / 2, height / 2)
       }
+      if (!isRecording && safeZone?.visible) {
+        drawSafeZoneOverlay(ctx, width, height, safeZone.type)
+      }
       rafRef.current = requestAnimationFrame(draw)
     }
 
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {

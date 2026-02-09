@@ -39,10 +39,19 @@ interface ThumbnailCaptionsPanelProps {
   youtubeCaption: string
   onYoutubeCaptionChange: (value: string) => void
   thumbnailBlob: Blob | null
-  onThumbnailChange: (blob: Blob | null) => void
+  onThumbnailChange: (blob: Blob | null, dataUrl?: string | null) => void
   onClose: () => void
+  /** Camera device ID from Inspector; used for Capture photo so it matches the selected source */
+  videoDeviceId?: string
+  /** When true, mirror the video horizontally in preview and in the captured photo (matches Inspector "Flip video") */
+  flipVideo?: boolean
   /** When true, render in work area without modal overlay */
   embedded?: boolean
+  /** Persisted thumbnail state (restored from browser storage) */
+  initialSeekTime?: number
+  initialTexts?: ThumbnailTextItem[]
+  initialWebcamImageUrl?: string | null
+  onThumbnailStateChange?: (state: { seekTime: number; texts: ThumbnailTextItem[]; webcamImageUrl: string | null }) => void
 }
 
 export function ThumbnailCaptionsPanel({
@@ -58,16 +67,23 @@ export function ThumbnailCaptionsPanel({
   thumbnailBlob,
   onThumbnailChange,
   onClose,
+  videoDeviceId,
+  flipVideo = false,
   embedded = false,
+  initialSeekTime = 0,
+  initialTexts = [],
+  initialWebcamImageUrl = null,
+  onThumbnailStateChange,
 }: ThumbnailCaptionsPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const webcamVideoRef = useRef<HTMLVideoElement>(null)
   const webcamStreamRef = useRef<MediaStream | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [seekTime, setSeekTime] = useState(0)
+  const [seekTime, setSeekTime] = useState(initialSeekTime)
   const [duration, setDuration] = useState(0)
-  const [texts, setTexts] = useState<ThumbnailTextItem[]>([])
+  const [texts, setTexts] = useState<ThumbnailTextItem[]>(initialTexts)
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+  const [webcamImageUrl, setWebcamImageUrl] = useState<string | null>(initialWebcamImageUrl ?? null)
   const [captionGenerating, setCaptionGenerating] = useState(false)
   const [captionError, setCaptionError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -79,7 +95,6 @@ export function ThumbnailCaptionsPanel({
     startY: number
     startFontSizePercent: number
   } | null>(null)
-  const [webcamImageUrl, setWebcamImageUrl] = useState<string | null>(null)
   const [webcamLive, setWebcamLive] = useState(false)
   const [webcamError, setWebcamError] = useState<string | null>(null)
   const [previewWidth, setPreviewWidth] = useState(0)
@@ -140,6 +155,14 @@ export function ThumbnailCaptionsPanel({
     return () => ro.disconnect()
   }, [])
 
+  useEffect(() => {
+    onThumbnailStateChange?.({
+      seekTime,
+      texts,
+      webcamImageUrl,
+    })
+  }, [seekTime, texts, webcamImageUrl, onThumbnailStateChange])
+
   const addText = useCallback(() => {
     const item: ThumbnailTextItem = {
       id: generateId(),
@@ -165,8 +188,11 @@ export function ThumbnailCaptionsPanel({
   const startWebcam = useCallback(async () => {
     setWebcamError(null)
     try {
+      const videoConstraints: MediaTrackConstraints = videoDeviceId
+        ? { deviceId: { exact: videoDeviceId }, width: { ideal: thumbWidth }, height: { ideal: thumbHeight } }
+        : { width: { ideal: thumbWidth }, height: { ideal: thumbHeight }, facingMode: 'user' }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: thumbWidth }, height: { ideal: thumbHeight }, facingMode: 'user' },
+        video: videoConstraints,
         audio: false,
       })
       if (webcamStreamRef.current) {
@@ -178,7 +204,7 @@ export function ThumbnailCaptionsPanel({
     } catch (e) {
       setWebcamError(e instanceof Error ? e.message : 'Could not access webcam')
     }
-  }, [thumbWidth, thumbHeight])
+  }, [thumbWidth, thumbHeight, videoDeviceId])
 
   const captureWebcamPhoto = useCallback(() => {
     const v = webcamVideoRef.current
@@ -189,13 +215,18 @@ export function ThumbnailCaptionsPanel({
     canvas.height = v.videoHeight
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    if (flipVideo) {
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+    }
     ctx.drawImage(v, 0, 0)
+    if (flipVideo) ctx.setTransform(1, 0, 0, 1, 0, 0)
     const dataUrl = canvas.toDataURL('image/png')
     setWebcamImageUrl(dataUrl)
     setWebcamLive(false)
     stream.getTracks().forEach((t) => t.stop())
     webcamStreamRef.current = null
-  }, [])
+  }, [flipVideo])
 
   const clearWebcamPhoto = useCallback(() => {
     setWebcamImageUrl(null)
@@ -308,9 +339,10 @@ export function ThumbnailCaptionsPanel({
       img.onload = () => {
         ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight)
         drawTextsOnCanvas(ctx)
+        const dataUrl = canvas.toDataURL('image/png')
         canvas.toBlob(
           (blob) => {
-            if (blob) onThumbnailChange(blob)
+            if (blob) onThumbnailChange(blob, dataUrl)
           },
           'image/png',
           0.95
@@ -325,9 +357,10 @@ export function ThumbnailCaptionsPanel({
     if (!video || video.readyState < 2) return
     ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight)
     drawTextsOnCanvas(ctx)
+    const dataUrl = canvas.toDataURL('image/png')
     canvas.toBlob(
       (blob) => {
-        if (blob) onThumbnailChange(blob)
+        if (blob) onThumbnailChange(blob, dataUrl)
       },
       'image/png',
       0.95
@@ -513,7 +546,14 @@ export function ThumbnailCaptionsPanel({
                 {webcamImageUrl ? (
                   <img src={webcamImageUrl} alt="Thumbnail" className={styles.videoBg} />
                 ) : webcamLive ? (
-                  <video ref={webcamVideoRef} muted playsInline autoPlay className={styles.videoBg} />
+                  <video
+                    ref={webcamVideoRef}
+                    muted
+                    playsInline
+                    autoPlay
+                    className={styles.videoBg}
+                    style={flipVideo ? { transform: 'scaleX(-1)' } : undefined}
+                  />
                 ) : (
                   <video
                     ref={videoRef}

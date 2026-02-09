@@ -71,13 +71,9 @@ export function exportVideoWithColorAdjustments(
       reject(new Error('Failed to load video'))
     }
 
-    video.onloadeddata = () => {
+    const tryStart = (): boolean => {
       const duration = video.duration
-      if (!isFinite(duration) || duration <= 0) {
-        cleanup()
-        reject(new Error('Invalid video duration'))
-        return
-      }
+      if (!Number.isFinite(duration) || duration <= 0) return false
 
       const videoStream = video.captureStream()
       const canvasStream = canvas.captureStream(30)
@@ -98,7 +94,7 @@ export function exportVideoWithColorAdjustments(
       } catch (e) {
         cleanup()
         reject(e)
-        return
+        return false
       }
 
       recorder.ondataavailable = (e) => {
@@ -140,8 +136,26 @@ export function exportVideoWithColorAdjustments(
         reject(e)
       })
       rafId = requestAnimationFrame(draw)
+      return true
     }
-
+    const onReady = () => {
+      if (tryStart()) return
+      const onDurationChange = () => {
+        video.removeEventListener('durationchange', onDurationChange)
+        if (!tryStart()) {
+          cleanup()
+          reject(new Error('Invalid video duration'))
+        }
+      }
+      video.addEventListener('durationchange', onDurationChange)
+      setTimeout(() => {
+        if (recorder) return
+        video.removeEventListener('durationchange', onDurationChange)
+        cleanup()
+        reject(new Error('Invalid video duration'))
+      }, 3000)
+    }
+    video.addEventListener('loadedmetadata', onReady, { once: true })
     video.load()
   })
 }
@@ -250,13 +264,9 @@ export function exportVideoForDownload(
         reject(new Error('Failed to load video'))
       }
 
-      video.onloadeddata = () => {
+      const tryStartExport = () => {
         const duration = video.duration
-        if (!isFinite(duration) || duration <= 0) {
-          cleanup()
-          reject(new Error('Invalid video duration'))
-          return
-        }
+        if (!Number.isFinite(duration) || duration <= 0) return false
         const trimStart = optTrimStart ?? 0
         const trimEnd = optTrimEnd ?? duration
         video.currentTime = trimStart
@@ -332,8 +342,27 @@ export function exportVideoForDownload(
           reject(e)
         })
         rafId = requestAnimationFrame(draw)
+        return true
       }
 
+      const onReady = () => {
+        if (tryStartExport()) return
+        const onDurationChange = () => {
+          video.removeEventListener('durationchange', onDurationChange)
+          if (!tryStartExport()) {
+            cleanup()
+            reject(new Error('Invalid video duration'))
+          }
+        }
+        video.addEventListener('durationchange', onDurationChange)
+        setTimeout(() => {
+          if (recorder) return
+          video.removeEventListener('durationchange', onDurationChange)
+          cleanup()
+          reject(new Error('Invalid video duration'))
+        }, 3000)
+      }
+      video.addEventListener('loadedmetadata', onReady, { once: true })
       video.load()
     })
   })

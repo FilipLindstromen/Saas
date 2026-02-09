@@ -6,6 +6,9 @@ const TEXT_ANIMATIONS: OverlayTextAnimation[] = ['none', 'fade', 'fade-slide-lef
 
 const CAPTION_STYLES: CaptionStyle[] = ['lower-third', 'centered-subtitle', 'karaoke', 'minimal', 'bold-block']
 
+const VALID_INSPECTOR_TABS = ['current', 'video', 'color', 'overlays', 'captions', 'safezones'] as const
+const VALID_SAFE_ZONE_TYPES = ['youtube-9:16', 'youtube-16:9', 'youtube-1:1', 'tiktok', 'instagram'] as const
+
 export interface PersistedState {
   videoKind: VideoSourceKind
   videoDeviceId: string
@@ -26,6 +29,11 @@ export interface PersistedState {
   timelineHeight: number
   /** Inspector panel width in px (resizable by user) */
   inspectorWidth: number
+  /** Last active Inspector tab */
+  inspectorTab: string
+  /** Safe zone preset and visibility */
+  safeZoneType: string
+  safeZoneVisible: boolean
   defaultFontFamily: string
   defaultSecondaryFont: string
   defaultBold: boolean
@@ -39,6 +47,14 @@ export interface PersistedState {
   colorBrightness: number
   colorContrast: number
   colorSaturation: number
+  /** Thumbnail mode: video frame time when using video as source */
+  thumbnailSeekTime: number
+  /** Thumbnail mode: text overlays (content, position, size) */
+  thumbnailTexts: { id: string; text: string; x: number; y: number; fontSizePercent: number; fontFamily?: string }[]
+  /** Thumbnail mode: captured webcam image as data URL, or null when using video frame */
+  thumbnailWebcamDataUrl: string | null
+  /** Thumbnail mode: generated thumbnail image (with text burned in) as data URL for YouTube */
+  thumbnailGeneratedDataUrl: string | null
 }
 
 const defaults: PersistedState = {
@@ -57,11 +73,23 @@ const defaults: PersistedState = {
   captionPreviewCaptionY: 0.85,
   userTimelineDuration: null,
   timelineHeight: 220,
+  inspectorWidth: 280,
+  inspectorTab: 'current',
+  safeZoneType: 'youtube-9:16',
+  safeZoneVisible: false,
   defaultFontFamily: 'Oswald',
   defaultSecondaryFont: 'Playfair Display',
   defaultBold: false,
   burnOverlaysIntoExport: true,
   flipVideo: false,
+  colorAdjustmentsEnabled: false,
+  colorBrightness: 100,
+  colorContrast: 100,
+  colorSaturation: 100,
+  thumbnailSeekTime: 0,
+  thumbnailTexts: [],
+  thumbnailWebcamDataUrl: null,
+  thumbnailGeneratedDataUrl: null,
 }
 
 function normalizeOverlayItem(raw: unknown): OverlayItem | null {
@@ -122,6 +150,29 @@ function normalizeOverlayItem(raw: unknown): OverlayItem | null {
   return overlay
 }
 
+type PersistedThumbnailTextItem = PersistedState['thumbnailTexts'][number]
+
+function normalizeThumbnailTextItem(raw: unknown): PersistedThumbnailTextItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const item = raw as Record<string, unknown>
+  const id = typeof item.id === 'string' ? item.id : ''
+  const text = typeof item.text === 'string' ? item.text : ''
+  const x = typeof item.x === 'number' && Number.isFinite(item.x) ? item.x : 0
+  const y = typeof item.y === 'number' && Number.isFinite(item.y) ? item.y : 0
+  const fontSizePercent = typeof item.fontSizePercent === 'number' && Number.isFinite(item.fontSizePercent)
+    ? Math.max(0, Math.min(100, item.fontSizePercent))
+    : 10
+  if (!id) return null
+  return {
+    id,
+    text,
+    x: Math.max(0, Math.min(1, x)),
+    y: Math.max(0, Math.min(1, y)),
+    fontSizePercent,
+    fontFamily: typeof item.fontFamily === 'string' ? item.fontFamily : undefined,
+  }
+}
+
 function validateState(raw: unknown): PersistedState | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -168,6 +219,9 @@ function validateState(raw: unknown): PersistedState | null {
       typeof o.inspectorWidth === 'number' && Number.isFinite(o.inspectorWidth) && o.inspectorWidth >= 200 && o.inspectorWidth <= 560
         ? o.inspectorWidth
         : defaults.inspectorWidth,
+    inspectorTab: typeof o.inspectorTab === 'string' && VALID_INSPECTOR_TABS.includes(o.inspectorTab as (typeof VALID_INSPECTOR_TABS)[number]) ? o.inspectorTab : defaults.inspectorTab,
+    safeZoneType: typeof o.safeZoneType === 'string' && VALID_SAFE_ZONE_TYPES.includes(o.safeZoneType as (typeof VALID_SAFE_ZONE_TYPES)[number]) ? o.safeZoneType : defaults.safeZoneType,
+    safeZoneVisible: typeof o.safeZoneVisible === 'boolean' ? o.safeZoneVisible : defaults.safeZoneVisible,
     defaultFontFamily: typeof o.defaultFontFamily === 'string' && o.defaultFontFamily.trim() ? o.defaultFontFamily : defaults.defaultFontFamily,
     defaultSecondaryFont: typeof o.defaultSecondaryFont === 'string' && o.defaultSecondaryFont.trim() ? o.defaultSecondaryFont : defaults.defaultSecondaryFont,
     defaultBold: typeof o.defaultBold === 'boolean' ? o.defaultBold : defaults.defaultBold,
@@ -177,6 +231,21 @@ function validateState(raw: unknown): PersistedState | null {
     colorBrightness: typeof o.colorBrightness === 'number' && Number.isFinite(o.colorBrightness) ? Math.max(0, Math.min(200, o.colorBrightness)) : defaults.colorBrightness,
     colorContrast: typeof o.colorContrast === 'number' && Number.isFinite(o.colorContrast) ? Math.max(0, Math.min(200, o.colorContrast)) : defaults.colorContrast,
     colorSaturation: typeof o.colorSaturation === 'number' && Number.isFinite(o.colorSaturation) ? Math.max(0, Math.min(200, o.colorSaturation)) : defaults.colorSaturation,
+    thumbnailSeekTime:
+      typeof o.thumbnailSeekTime === 'number' && Number.isFinite(o.thumbnailSeekTime) && o.thumbnailSeekTime >= 0
+        ? o.thumbnailSeekTime
+        : defaults.thumbnailSeekTime,
+    thumbnailTexts: Array.isArray(o.thumbnailTexts)
+      ? o.thumbnailTexts.map(normalizeThumbnailTextItem).filter((x): x is PersistedThumbnailTextItem => x != null)
+      : defaults.thumbnailTexts,
+    thumbnailWebcamDataUrl:
+      o.thumbnailWebcamDataUrl == null || (typeof o.thumbnailWebcamDataUrl === 'string' && o.thumbnailWebcamDataUrl.startsWith('data:'))
+        ? (o.thumbnailWebcamDataUrl as string | null) ?? defaults.thumbnailWebcamDataUrl
+        : defaults.thumbnailWebcamDataUrl,
+    thumbnailGeneratedDataUrl:
+      o.thumbnailGeneratedDataUrl == null || (typeof o.thumbnailGeneratedDataUrl === 'string' && o.thumbnailGeneratedDataUrl.startsWith('data:'))
+        ? (o.thumbnailGeneratedDataUrl as string | null) ?? defaults.thumbnailGeneratedDataUrl
+        : defaults.thumbnailGeneratedDataUrl,
   }
 }
 
