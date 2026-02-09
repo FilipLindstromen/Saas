@@ -49,6 +49,14 @@ export interface OverlayItem {
   burnIntoExport?: boolean
 }
 
+/** Safe zone preset for overlay guide (preview only, not exported) */
+export type SafeZoneType =
+  | 'youtube-9:16'
+  | 'youtube-16:9'
+  | 'youtube-1:1'
+  | 'tiktok'
+  | 'instagram'
+
 /** Global in/out animation for all text overlays */
 export type OverlayTextAnimation =
   | 'none'

@@ -38,15 +38,52 @@
 
 .headerCenter {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
   min-width: 0;
 }
 
-.headerCenter .headerError {
-  margin: 0;
+/* Overlay so time can be centered in the full header; record button to the left of time */
+.headerCenterOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.headerCenterOverlay > * {
+  pointer-events: auto;
+}
+
+.headerCenterOverlay .recordStopToggleRecord,
+.headerCenterOverlay .recordStopToggleStop {
+  position: absolute;
+  right: 50%;
+  margin-right: 12px;
+  transform: translateX(-100%);
+}
+
+.headerCenterOverlay .recordTimer {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.headerCenterOverlay .headerError {
+  position: absolute;
+  left: 50%;
+  margin-left: 76px;
+  transform: translateX(0);
+  margin-top: 0;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.header {
+  position: relative;
 }
 
 .recordStopToggleRecord,
@@ -474,8 +511,34 @@
 }
 
 .previewWrap {
+  position: relative;
   width: 100%;
   max-width: 100%;
+}
+
+.countdownOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.countdownNumber {
+  font-size: clamp(72px, 20vw, 180px);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.countdownCancelLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 /* When portrait or square, cap preview height so the page doesn't need to scroll; fill width */

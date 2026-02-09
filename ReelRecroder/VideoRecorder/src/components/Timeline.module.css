@@ -544,6 +544,59 @@
   pointer-events: none;
 }
 
+.inOutMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  transform: translateX(-50%);
+  cursor: ew-resize;
+  padding: 0 10px;
+  margin-left: -10px;
+  touch-action: none;
+  z-index: 9;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.inOutMarkerLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.inOutMarker[data-marker="in"] .inOutMarkerLine {
+  background: #22c55e;
+}
+
+.inOutMarker[data-marker="in"] .inOutMarkerLabel {
+  color: #22c55e;
+}
+
+.inOutMarker[data-marker="out"] .inOutMarkerLine {
+  background: #ef4444;
+}
+
+.inOutMarker[data-marker="out"] .inOutMarkerLabel {
+  color: #ef4444;
+}
+
+.inOutMarkerLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .durationHandle {
   position: absolute;
   top: -6px;

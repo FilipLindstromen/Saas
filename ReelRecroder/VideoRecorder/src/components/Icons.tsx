@@ -218,3 +218,12 @@ export function IconColor(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export function IconSafeZone(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)} aria-hidden viewBox="0 0 24 24">
+      <rect x="2" y="2" width="20" height="20" rx="1" />
+      <rect x="5" y="5" width="14" height="14" rx="1" strokeDasharray="2 1" />
+    </svg>
+  )
+}

@@ -86,6 +86,49 @@ export function Timeline({
   const [durationEditing, setDurationEditing] = useState(false)
   const [durationInputValue, setDurationInputValue] = useState('')
   const durationInputRef = useRef<HTMLInputElement>(null)
+  const [inOutMarkerDrag, setInOutMarkerDrag] = useState<'in' | 'out' | null>(null)
+  const inOutMarkerDragRef = useRef<{ kind: 'in' | 'out'; rect: DOMRect } | null>(null)
+  const videoClipTrimRef = useRef(videoClipTrim)
+  videoClipTrimRef.current = videoClipTrim
+
+  const handleInOutMarkerPointerDown = useCallback(
+    (e: React.PointerEvent, kind: 'in' | 'out') => {
+      if (!videoClipTrim || !onVideoClipTrimChange || !rulerRef.current) return
+      e.preventDefault()
+      e.stopPropagation()
+      setInOutMarkerDrag(kind)
+      inOutMarkerDragRef.current = { kind, rect: rulerRef.current.getBoundingClientRect() }
+      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+    },
+    [videoClipTrim, onVideoClipTrimChange]
+  )
+
+  const handleInOutMarkerPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const state = inOutMarkerDragRef.current
+      const trim = videoClipTrimRef.current
+      if (!state || !trim || !onVideoClipTrimChange || !videoSourceDuration) return
+      const { rect } = state
+      const x = e.clientX - rect.left
+      const t = Math.max(0, Math.min(videoSourceDuration, (x / rect.width) * safeDuration))
+      if (state.kind === 'in') {
+        const newStart = Math.max(0, Math.min(trim.trimEnd - MIN_CLIP_DURATION, t))
+        onVideoClipTrimChange(newStart, trim.trimEnd)
+      } else {
+        const newEnd = Math.max(trim.trimStart + MIN_CLIP_DURATION, Math.min(videoSourceDuration, t))
+        onVideoClipTrimChange(trim.trimStart, newEnd)
+      }
+    },
+    [onVideoClipTrimChange, videoSourceDuration, safeDuration]
+  )
+
+  const handleInOutMarkerPointerUp = useCallback((e: React.PointerEvent) => {
+    if (inOutMarkerDragRef.current) {
+      ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+      setInOutMarkerDrag(null)
+      inOutMarkerDragRef.current = null
+    }
+  }, [])
 
   const handleRulerClick = useCallback(
     (e: React.MouseEvent) => {
@@ -429,7 +472,10 @@ export function Timeline({
       <div className={styles.rulerAndTracksWrap}>
         <div
           className={styles.playhead}
-          style={{ left: `${(safeCurrentTime / Math.max(safeDuration, 0.001)) * 100}%` }}
+          style={{
+            /* Center playhead on time: left is set to time position + 13px so that translateX(-50%) places center correctly */
+            left: `calc(72px + (100% - 72px) * ${safeCurrentTime / Math.max(safeDuration, 0.001)} + 13px)`,
+          }}
           role="slider"
           aria-label="Seek"
           aria-valuemin={0}
@@ -455,6 +501,43 @@ export function Timeline({
           <span className={styles.playheadTriangle} aria-hidden />
         </div>
 
+        {videoClipTrim && onVideoClipTrimChange && videoSourceDuration > 0 && (
+          <>
+            <div
+              className={styles.inOutMarker}
+              data-marker="in"
+              style={{
+                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimStart / Math.max(safeDuration, 0.001))} + 13px)`,
+              }}
+              onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'in')}
+              onPointerMove={handleInOutMarkerPointerMove}
+              onPointerUp={handleInOutMarkerPointerUp}
+              onPointerLeave={handleInOutMarkerPointerUp}
+              title="Export start (drag to adjust)"
+              aria-label="In point – export start"
+            >
+              <span className={styles.inOutMarkerLine} aria-hidden />
+              <span className={styles.inOutMarkerLabel}>In</span>
+            </div>
+            <div
+              className={styles.inOutMarker}
+              data-marker="out"
+              style={{
+                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimEnd / Math.max(safeDuration, 0.001))} + 13px)`,
+              }}
+              onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'out')}
+              onPointerMove={handleInOutMarkerPointerMove}
+              onPointerUp={handleInOutMarkerPointerUp}
+              onPointerLeave={handleInOutMarkerPointerUp}
+              title="Export end (drag to adjust)"
+              aria-label="Out point – export end"
+            >
+              <span className={styles.inOutMarkerLine} aria-hidden />
+              <span className={styles.inOutMarkerLabel}>Out</span>
+            </div>
+          </>
+        )}
+
         <div className={styles.rulerSection}>
           <div className={styles.rulerLabels} aria-hidden> </div>
           <div
@@ -466,19 +549,24 @@ export function Timeline({
           >
           <div className={styles.rulerTicks}>
             {(() => {
-              const step = safeDuration <= 60 ? 5 : safeDuration <= 120 ? 10 : safeDuration <= 300 ? 15 : 30
-              const labelStep = Math.max(step, 5)
+              const tickStep = 0.5
               const ticks: number[] = []
-              for (let t = 0; t <= safeDuration; t += step) ticks.push(t)
-              return ticks.map((t) => (
-                <div
-                  key={t}
-                  className={t % labelStep === 0 ? styles.rulerTickMajor : styles.rulerTickMinor}
-                  style={{ left: `${(t / Math.max(safeDuration, 0.001)) * 100}%` }}
-                >
-                  {t % labelStep === 0 && <span className={styles.rulerTickLabel}>{formatTime(t)}</span>}
-                </div>
-              ))
+              for (let t = 0; t <= safeDuration; t += tickStep) ticks.push(t)
+              const labelStep =
+                safeDuration <= 10 ? 1 : safeDuration <= 30 ? 2 : safeDuration <= 60 ? 5 : 10
+              return ticks.map((t) => {
+                const isWholeSecond = t % 1 === 0
+                const showLabel = isWholeSecond && (labelStep <= 1 || t % labelStep === 0)
+                return (
+                  <div
+                    key={t}
+                    className={isWholeSecond ? styles.rulerTickMajor : styles.rulerTickMinor}
+                    style={{ left: `${(t / Math.max(safeDuration, 0.001)) * 100}%` }}
+                  >
+                    {showLabel && <span className={styles.rulerTickLabel}>{formatTime(t)}</span>}
+                  </div>
+                )
+              })
             })()}
           </div>
           <div className={styles.timeRuler}>
