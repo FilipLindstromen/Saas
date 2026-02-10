@@ -65,9 +65,7 @@ select option {
 
 select option:hover {
   background-color: #374151 !important;
-}
-
-/* Override browser default blue focus/selection */
+}/* Override browser default blue focus/selection */
 select:focus {
   outline: none;
   border-color: #6b7280 !important;
@@ -78,10 +76,7 @@ select:focus {
 *::selection {
   background-color: #4b5563 !important;
   color: white !important;
-}
-
-*::-moz-selection {
+}*::-moz-selection {
   background-color: #4b5563 !important;
   color: white !important;
 }
-

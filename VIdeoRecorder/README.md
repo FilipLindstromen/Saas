@@ -56,11 +56,7 @@ For other browsers, project management features may not be available.
 - Electron (for desktop app)
 - File System Access API (for project management)
 
-## Production Build
-
-For production builds, see [PRODUCTION.md](./PRODUCTION.md) and [BUILD.md](./BUILD.md) for detailed instructions.
-
-### Quick Production Build
+## Production BuildFor production builds, see [PRODUCTION.md](./PRODUCTION.md) and [BUILD.md](./BUILD.md) for detailed instructions.### Quick Production Build
 ```bash
 npm run build:prod
 ```
@@ -69,4 +65,3 @@ npm run build:prod
 ```bash
 npm run electron:build
 ```
-
