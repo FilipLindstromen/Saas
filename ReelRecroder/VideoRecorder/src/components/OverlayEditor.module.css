@@ -134,6 +134,34 @@
   color: var(--text-secondary);
 }
 
+.serviceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.serviceBtn {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.serviceBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hint {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .imagePreview {
   margin-bottom: 10px;
 }

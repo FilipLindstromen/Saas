@@ -5,6 +5,7 @@ import {
   getYouTubeAccessToken,
   uploadVideoToYouTube,
   setYouTubeThumbnail,
+  postYouTubeComment,
 } from '../services/youtubeUpload'
 import type { AspectRatio } from '../types'
 import { FONT_OPTIONS } from '../constants/fonts'
@@ -24,20 +25,30 @@ export interface ThumbnailTextItem {
 const MIN_FONT_PCT = 2
 const MAX_FONT_PCT = 50
 
+export type YouTubePublishMode = 'now-public' | 'now-unlisted' | 'draft' | 'schedule'
+
 function generateId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
 interface ThumbnailCaptionsPanelProps {
+  /** When empty or missing, no video frame option; use webcam or text only */
   videoUrl: string
-  videoBlob: Blob
+  /** When missing, Upload to YouTube is hidden */
+  videoBlob?: Blob
   aspectRatio: AspectRatio
+  /** Width/height from Inspector (Format & quality). Thumbnail and preview use these so they match the set aspect ratio and resolution. */
+  width: number
+  height: number
   captionSegments: CaptionSegment[] | null
   openaiApiKey?: string
   youtubeTitle: string
   onYoutubeTitleChange: (value: string) => void
   youtubeCaption: string
   onYoutubeCaptionChange: (value: string) => void
+  /** First comment to post on the video after it is published (YouTube API: commentThreads.insert) */
+  youtubeFirstComment?: string
+  onYoutubeFirstCommentChange?: (value: string) => void
   thumbnailBlob: Blob | null
   onThumbnailChange: (blob: Blob | null, dataUrl?: string | null) => void
   onClose: () => void
@@ -45,6 +56,11 @@ interface ThumbnailCaptionsPanelProps {
   videoDeviceId?: string
   /** When true, mirror the video horizontally in preview and in the captured photo (matches Inspector "Flip video") */
   flipVideo?: boolean
+  /** Apply Inspector color adjustments when capturing webcam photo (brightness, contrast, saturation) */
+  colorAdjustmentsEnabled?: boolean
+  colorBrightness?: number
+  colorContrast?: number
+  colorSaturation?: number
   /** When true, render in work area without modal overlay */
   embedded?: boolean
   /** Persisted thumbnail state (restored from browser storage) */
@@ -58,6 +74,8 @@ export function ThumbnailCaptionsPanel({
   videoUrl,
   videoBlob,
   aspectRatio,
+  width: thumbWidth,
+  height: thumbHeight,
   captionSegments,
   openaiApiKey,
   youtubeTitle,
@@ -69,6 +87,10 @@ export function ThumbnailCaptionsPanel({
   onClose,
   videoDeviceId,
   flipVideo = false,
+  colorAdjustmentsEnabled = false,
+  colorBrightness = 100,
+  colorContrast = 100,
+  colorSaturation = 100,
   embedded = false,
   initialSeekTime = 0,
   initialTexts = [],
@@ -98,13 +120,17 @@ export function ThumbnailCaptionsPanel({
   const [webcamLive, setWebcamLive] = useState(false)
   const [webcamError, setWebcamError] = useState<string | null>(null)
   const [previewWidth, setPreviewWidth] = useState(0)
+  const [previewScale, setPreviewScale] = useState(100) // 25–200%, scales preview size, keeps aspect ratio
+  const [thumbnailBrightness, setThumbnailBrightness] = useState(100)
+  const [thumbnailContrast, setThumbnailContrast] = useState(100)
+  const [thumbnailSaturation, setThumbnailSaturation] = useState(100)
+  const [youtubePublishMode, setYoutubePublishMode] = useState<YouTubePublishMode>('draft')
+  const [youtubeScheduleDatetime, setYoutubeScheduleDatetime] = useState<string>('') // datetime-local value for schedule
 
-  const isPortrait = aspectRatio === '9:16'
-  const isSquare = aspectRatio === '1:1'
-  const thumbWidth = isPortrait ? 1080 : isSquare ? 1080 : 1920
-  const thumbHeight = isPortrait ? 1920 : isSquare ? 1080 : 1080
+  const hasVideo = !!videoUrl?.trim()
 
   useEffect(() => {
+    if (!hasVideo) return
     const v = videoRef.current
     if (!v) return
     const onLoaded = () => {
@@ -114,13 +140,14 @@ export function ThumbnailCaptionsPanel({
     v.addEventListener('loadedmetadata', onLoaded)
     if (v.duration && isFinite(v.duration)) onLoaded()
     return () => v.removeEventListener('loadedmetadata', onLoaded)
-  }, [videoUrl])
+  }, [videoUrl, hasVideo])
 
   useEffect(() => {
+    if (!hasVideo) return
     const v = videoRef.current
     if (!v) return
     v.currentTime = seekTime
-  }, [seekTime, videoUrl])
+  }, [seekTime, videoUrl, hasVideo])
 
   useEffect(() => {
     const stream = webcamStreamRef.current
@@ -326,6 +353,11 @@ export function ThumbnailCaptionsPanel({
     [texts, thumbWidth, thumbHeight]
   )
 
+  const thumbnailColorFilter =
+    thumbnailBrightness !== 100 || thumbnailContrast !== 100 || thumbnailSaturation !== 100
+      ? `brightness(${thumbnailBrightness}%) contrast(${thumbnailContrast}%) saturate(${thumbnailSaturation}%)`
+      : 'none'
+
   const generateThumbnail = useCallback(() => {
     const canvas = document.createElement('canvas')
     canvas.width = thumbWidth
@@ -337,7 +369,9 @@ export function ThumbnailCaptionsPanel({
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
+        if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
         ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight)
+        ctx.filter = 'none'
         drawTextsOnCanvas(ctx)
         const dataUrl = canvas.toDataURL('image/png')
         canvas.toBlob(
@@ -353,9 +387,15 @@ export function ThumbnailCaptionsPanel({
       return
     }
 
+    if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
     const video = videoRef.current
-    if (!video || video.readyState < 2) return
-    ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight)
+    if (video && video.readyState >= 2) {
+      ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight)
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, thumbWidth, thumbHeight)
+    }
+    ctx.filter = 'none'
     drawTextsOnCanvas(ctx)
     const dataUrl = canvas.toDataURL('image/png')
     canvas.toBlob(
@@ -365,7 +405,7 @@ export function ThumbnailCaptionsPanel({
       'image/png',
       0.95
     )
-  }, [texts, thumbWidth, thumbHeight, webcamImageUrl, drawTextsOnCanvas, onThumbnailChange])
+  }, [texts, thumbWidth, thumbHeight, webcamImageUrl, thumbnailColorFilter, drawTextsOnCanvas, onThumbnailChange])
 
   const generateCaption = useCallback(async () => {
     if (!captionSegments || captionSegments.length === 0) {
@@ -390,27 +430,48 @@ export function ThumbnailCaptionsPanel({
       setUploadError('Add your Google Client ID in Settings to upload to YouTube.')
       return
     }
+    if (youtubePublishMode === 'schedule' && !youtubeScheduleDatetime.trim()) {
+      setUploadError('Set a date and time for scheduled publish.')
+      return
+    }
     const title = youtubeTitle.trim() || 'My video'
     setUploadError(null)
     setUploadSuccess(null)
     setUploading(true)
     try {
       const token = await getYouTubeAccessToken(clientId)
+      const privacyStatus =
+        youtubePublishMode === 'now-public'
+          ? 'public'
+          : youtubePublishMode === 'now-unlisted'
+            ? 'unlisted'
+            : 'private'
+      const publishAt =
+        youtubePublishMode === 'schedule' && youtubeScheduleDatetime.trim()
+          ? new Date(youtubeScheduleDatetime.trim()).toISOString()
+          : undefined
       const videoId = await uploadVideoToYouTube(token, videoBlob, {
         title,
         description: youtubeCaption.trim(),
-        privacyStatus: 'private',
+        privacyStatus,
+        publishAt,
       })
       if (thumbnailBlob) {
         await setYouTubeThumbnail(token, videoId, thumbnailBlob)
       }
-      setUploadSuccess(`Uploaded! Video ID: ${videoId}. Check your YouTube Studio.`)
+      const msg =
+        publishAt
+          ? `Scheduled! Video ID: ${videoId}. It will publish at ${new Date(publishAt).toLocaleString()}.`
+          : youtubePublishMode === 'draft'
+            ? `Saved as draft. Video ID: ${videoId}. Check YouTube Studio to publish.`
+            : `Uploaded! Video ID: ${videoId}. Check your YouTube Studio.`
+      setUploadSuccess(msg)
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : 'Upload failed')
     } finally {
       setUploading(false)
     }
-  }, [videoBlob, youtubeTitle, youtubeCaption, thumbnailBlob])
+  }, [videoBlob, youtubeTitle, youtubeCaption, thumbnailBlob, youtubePublishMode, youtubeScheduleDatetime])
 
   const selectedText = texts.find((t) => t.id === selectedTextId)
 
@@ -429,22 +490,29 @@ export function ThumbnailCaptionsPanel({
             <section className={styles.thumbSection}>
               <h3 className={styles.sectionTitle}>Thumbnail</h3>
               <p className={styles.hint}>
-                Choose a frame (seek), add text and position it in the preview. Thumbnail is {thumbWidth}×{thumbHeight} ({aspectRatio}).
+                Choose a frame (seek), add text and position it in the preview. Thumbnail uses the aspect ratio set in the Inspector (Format & quality): {aspectRatio} — {thumbWidth}×{thumbHeight}.
               </p>
               {webcamError && <p className={styles.error}>{webcamError}</p>}
               {!webcamLive && !webcamImageUrl && (
                 <>
-                  <label className={styles.label}>Frame time</label>
-                  <input
-                    type="range"
-                    className={styles.slider}
-                    min={0}
-                    max={duration || 1}
-                    step={0.1}
-                    value={seekTime}
-                    onChange={(e) => setSeekTime(Number(e.target.value))}
-                  />
-                  <span className={styles.timeValue}>{seekTime.toFixed(1)}s</span>
+                  {hasVideo && (
+                    <>
+                      <label className={styles.label}>Frame time</label>
+                      <input
+                        type="range"
+                        className={styles.slider}
+                        min={0}
+                        max={duration || 1}
+                        step={0.1}
+                        value={seekTime}
+                        onChange={(e) => setSeekTime(Number(e.target.value))}
+                      />
+                      <span className={styles.timeValue}>{seekTime.toFixed(1)}s</span>
+                    </>
+                  )}
+                  {!hasVideo && (
+                    <p className={styles.hint}>No recording yet. Use webcam or add text to create a thumbnail.</p>
+                  )}
                   <button type="button" className={styles.btn} onClick={startWebcam}>
                     Take photo with webcam
                   </button>
@@ -460,11 +528,54 @@ export function ThumbnailCaptionsPanel({
                   </button>
                 </>
               )}
-              {webcamImageUrl && (
+              {webcamImageUrl && hasVideo && (
                 <button type="button" className={styles.btn} onClick={clearWebcamPhoto}>
                   Use video frame instead
                 </button>
               )}
+              <div className={styles.thumbColorRow}>
+                <label className={styles.label}>Thumbnail color</label>
+                <p className={styles.hint}>Adjust after capture; applied when you generate the thumbnail.</p>
+              </div>
+              <div className={styles.sliderRow}>
+                <label className={styles.label}>Brightness</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={thumbnailBrightness}
+                  onChange={(e) => setThumbnailBrightness(Number(e.target.value))}
+                  aria-label="Thumbnail brightness"
+                />
+                <span className={styles.sliderValue}>{thumbnailBrightness}%</span>
+              </div>
+              <div className={styles.sliderRow}>
+                <label className={styles.label}>Contrast</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={thumbnailContrast}
+                  onChange={(e) => setThumbnailContrast(Number(e.target.value))}
+                  aria-label="Thumbnail contrast"
+                />
+                <span className={styles.sliderValue}>{thumbnailContrast}%</span>
+              </div>
+              <div className={styles.sliderRow}>
+                <label className={styles.label}>Saturation</label>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={200}
+                  value={thumbnailSaturation}
+                  onChange={(e) => setThumbnailSaturation(Number(e.target.value))}
+                  aria-label="Thumbnail saturation"
+                />
+                <span className={styles.sliderValue}>{thumbnailSaturation}%</span>
+              </div>
               <button type="button" className={styles.btn} onClick={addText}>
                 Add text
               </button>
@@ -513,57 +624,95 @@ export function ThumbnailCaptionsPanel({
                 <p className={styles.doneHint}>Thumbnail saved. It will be used when you upload to YouTube.</p>
               )}
             </section>
-            <section className={styles.uploadSection}>
-              <h3 className={styles.sectionTitle}>Upload to YouTube</h3>
-              <p className={styles.hint}>
-                Upload the current video to your YouTube channel. Add your Google Client ID in Settings first. Videos upload as private by default.
-              </p>
-              {uploadError && <p className={styles.error}>{uploadError}</p>}
-              {uploadSuccess && <p className={styles.success}>{uploadSuccess}</p>}
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                onClick={handleUploadToYouTube}
-                disabled={uploading}
-              >
-                {uploading ? 'Uploading…' : 'Upload to YouTube'}
-              </button>
-            </section>
           </div>
 
           {/* Column 2: Preview (video/image + draggable text) */}
           <div className={styles.bodyColPreview}>
             <section className={styles.previewSection}>
               <h3 className={styles.sectionTitle}>Preview</h3>
-              <div
-                ref={containerRef}
-                className={styles.previewWrap}
-                style={{ aspectRatio: `${thumbWidth} / ${thumbHeight}` }}
-                onPointerMove={handlePointerMove}
+              <div className={styles.previewScaleRow}>
+                <label className={styles.label} htmlFor="preview-scale">Scale</label>
+                <input
+                  id="preview-scale"
+                  type="range"
+                  className={styles.slider}
+                  min={25}
+                  max={200}
+                  step={5}
+                  value={previewScale}
+                  onChange={(e) => setPreviewScale(Number(e.target.value))}
+                  aria-label="Preview scale"
+                />
+                <span className={styles.sliderValue}>{previewScale}%</span>
+              </div>
+              <div className={styles.previewScaleContainer}>
+                <div
+                  ref={containerRef}
+                  className={styles.previewWrap}
+                  style={(() => {
+                    const maxW = 400
+                    const maxH = 520
+                    const ratio = thumbWidth / thumbHeight
+                    let baseW: number
+                    let baseH: number
+                    if (thumbHeight >= thumbWidth) {
+                      baseH = maxH
+                      baseW = maxH * ratio
+                    } else {
+                      baseW = maxW
+                      baseH = maxW / ratio
+                    }
+                    if (baseW > maxW) {
+                      baseW = maxW
+                      baseH = maxW / ratio
+                    }
+                    if (baseH > maxH) {
+                      baseH = maxH
+                      baseW = maxH * ratio
+                    }
+                    const scale = previewScale / 100
+                    return {
+                      width: baseW * scale,
+                      height: baseH * scale,
+                      maxWidth: '100%',
+                    }
+                  })()}
+                  onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerLeave={handlePointerUp}
-              >
-                {webcamImageUrl ? (
-                  <img src={webcamImageUrl} alt="Thumbnail" className={styles.videoBg} />
-                ) : webcamLive ? (
-                  <video
-                    ref={webcamVideoRef}
-                    muted
-                    playsInline
-                    autoPlay
-                    className={styles.videoBg}
-                    style={flipVideo ? { transform: 'scaleX(-1)' } : undefined}
-                  />
-                ) : (
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    muted
-                    playsInline
-                    preload="metadata"
-                    className={styles.videoBg}
-                  />
-                )}
+                >
+                <div
+                  className={styles.videoBg}
+                  style={{
+                    ...((thumbnailBrightness !== 100 || thumbnailContrast !== 100 || thumbnailSaturation !== 100)
+                      ? { filter: `brightness(${thumbnailBrightness}%) contrast(${thumbnailContrast}%) saturate(${thumbnailSaturation}%)` }
+                      : {}),
+                  }}
+                >
+                  {webcamImageUrl ? (
+                    <img src={webcamImageUrl} alt="Thumbnail" className={styles.videoBgImg} />
+                  ) : webcamLive ? (
+                    <video
+                      ref={webcamVideoRef}
+                      muted
+                      playsInline
+                      autoPlay
+                      className={styles.videoBgImg}
+                      style={flipVideo ? { transform: 'scaleX(-1)' } : undefined}
+                    />
+                  ) : hasVideo ? (
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className={styles.videoBgImg}
+                    />
+                  ) : (
+                    <div className={styles.videoBgImg} style={{ background: '#000', width: '100%', height: '100%' }} aria-hidden />
+                  )}
+                </div>
                 {texts.map((t) => {
                   const fontSizePx = previewWidth > 0 ? (previewWidth * t.fontSizePercent) / 100 : 24
                   const isSelected = selectedTextId === t.id
@@ -593,6 +742,7 @@ export function ThumbnailCaptionsPanel({
                     </div>
                   )
                 })}
+              </div>
               </div>
             </section>
           </div>
@@ -635,6 +785,49 @@ export function ThumbnailCaptionsPanel({
                 rows={10}
               />
             </section>
+            {videoBlob && (
+              <section className={styles.uploadSection}>
+                <h3 className={styles.sectionTitle}>Upload to YouTube</h3>
+                <p className={styles.hint}>
+                  Upload the current video to your YouTube channel. Add your Google Client ID in Settings first. Choose when to publish.
+                </p>
+                <label className={styles.label}>Publish</label>
+                <select
+                  className={styles.select}
+                  value={youtubePublishMode}
+                  onChange={(e) => setYoutubePublishMode(e.target.value as YouTubePublishMode)}
+                  aria-label="When to publish"
+                >
+                  <option value="now-public">Publish now (public)</option>
+                  <option value="now-unlisted">Publish now (unlisted)</option>
+                  <option value="draft">Save as draft (private)</option>
+                  <option value="schedule">Schedule</option>
+                </select>
+                {youtubePublishMode === 'schedule' && (
+                  <>
+                    <label className={styles.label}>Publish at (your local time)</label>
+                    <input
+                      type="datetime-local"
+                      className={styles.input}
+                      value={youtubeScheduleDatetime}
+                      onChange={(e) => setYoutubeScheduleDatetime(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
+                      aria-label="Scheduled publish date and time"
+                    />
+                  </>
+                )}
+                {uploadError && <p className={styles.error}>{uploadError}</p>}
+                {uploadSuccess && <p className={styles.success}>{uploadSuccess}</p>}
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={handleUploadToYouTube}
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading…' : 'Upload to YouTube'}
+                </button>
+              </section>
+            )}
           </div>
         </div>
       </div>

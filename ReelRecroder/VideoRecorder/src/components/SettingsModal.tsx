@@ -7,6 +7,10 @@ const OPENAI_KEY_STORAGE = 'videoRecorder_openaiApiKey'
 const GOOGLE_CLIENT_ID_STORAGE = 'videoRecorder_googleClientId'
 const YOUTUBE_CHANNEL_ID_STORAGE = 'videoRecorder_youtubeChannelId'
 const YOUTUBE_CHANNEL_TITLE_STORAGE = 'videoRecorder_youtubeChannelTitle'
+const UNSPLASH_ACCESS_KEY_STORAGE = 'videoRecorder_unsplashAccessKey'
+const PEXELS_API_KEY_STORAGE = 'videoRecorder_pexelsApiKey'
+const PIXABAY_API_KEY_STORAGE = 'videoRecorder_pixabayApiKey'
+const GIPHY_API_KEY_STORAGE = 'videoRecorder_giphyApiKey'
 
 export function getStoredOpenAIKey(): string {
   if (typeof window === 'undefined' || !window.localStorage) return ''
@@ -54,6 +58,62 @@ function setStoredYouTubeChannel(channel: { id: string; title: string } | null):
   }
 }
 
+export function getStoredUnsplashAccessKey(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return ''
+  return window.localStorage.getItem(UNSPLASH_ACCESS_KEY_STORAGE) ?? ''
+}
+
+export function setStoredUnsplashAccessKey(value: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  if (value) {
+    window.localStorage.setItem(UNSPLASH_ACCESS_KEY_STORAGE, value.trim())
+  } else {
+    window.localStorage.removeItem(UNSPLASH_ACCESS_KEY_STORAGE)
+  }
+}
+
+export function getStoredPexelsApiKey(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return ''
+  return window.localStorage.getItem(PEXELS_API_KEY_STORAGE) ?? ''
+}
+
+export function setStoredPexelsApiKey(value: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  if (value) {
+    window.localStorage.setItem(PEXELS_API_KEY_STORAGE, value.trim())
+  } else {
+    window.localStorage.removeItem(PEXELS_API_KEY_STORAGE)
+  }
+}
+
+export function getStoredPixabayApiKey(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return ''
+  return window.localStorage.getItem(PIXABAY_API_KEY_STORAGE) ?? ''
+}
+
+export function setStoredPixabayApiKey(value: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  if (value) {
+    window.localStorage.setItem(PIXABAY_API_KEY_STORAGE, value.trim())
+  } else {
+    window.localStorage.removeItem(PIXABAY_API_KEY_STORAGE)
+  }
+}
+
+export function getStoredGiphyApiKey(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return ''
+  return window.localStorage.getItem(GIPHY_API_KEY_STORAGE) ?? ''
+}
+
+export function setStoredGiphyApiKey(value: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  if (value) {
+    window.localStorage.setItem(GIPHY_API_KEY_STORAGE, value.trim())
+  } else {
+    window.localStorage.removeItem(GIPHY_API_KEY_STORAGE)
+  }
+}
+
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
@@ -63,6 +123,10 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModalProps) {
   const [apiKey, setApiKey] = useState('')
   const [googleClientId, setGoogleClientId] = useState('')
+  const [unsplashAccessKey, setUnsplashAccessKey] = useState('')
+  const [pexelsApiKey, setPexelsApiKey] = useState('')
+  const [pixabayApiKey, setPixabayApiKey] = useState('')
+  const [giphyApiKey, setGiphyApiKey] = useState('')
   const [youtubeChannel, setYoutubeChannel] = useState<{ id: string; title: string } | null>(null)
   const [youtubeConnecting, setYoutubeConnecting] = useState(false)
   const [youtubeError, setYoutubeError] = useState<string | null>(null)
@@ -82,6 +146,9 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
     if (isOpen) {
       setApiKey(getStoredOpenAIKey())
       setGoogleClientId(getStoredGoogleClientId())
+      setUnsplashAccessKey(getStoredUnsplashAccessKey())
+      setPexelsApiKey(getStoredPexelsApiKey())
+      setPixabayApiKey(getStoredPixabayApiKey())
       setYoutubeChannel(getStoredYouTubeChannel())
       setYoutubeError(null)
     }
@@ -121,6 +188,10 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
   const handleSave = () => {
     setStoredOpenAIKey(apiKey.trim())
     setStoredGoogleClientId(googleClientId)
+    setStoredUnsplashAccessKey(unsplashAccessKey)
+    setStoredPexelsApiKey(pexelsApiKey)
+    setStoredPixabayApiKey(pixabayApiKey)
+    setStoredGiphyApiKey(giphyApiKey)
     onApiKeyChange(apiKey.trim())
     onClose()
   }
@@ -159,6 +230,54 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
             value={googleClientId}
             onChange={(e) => setGoogleClientId(e.target.value)}
             placeholder="xxxxx.apps.googleusercontent.com"
+            autoComplete="off"
+          />
+          <label className={styles.label}>
+            Unsplash Access Key (for image overlays)
+            <span className={styles.hint}>Optional. From unsplash.com/developers. Used when adding images from Unsplash in the timeline.</span>
+          </label>
+          <input
+            type="password"
+            className={styles.input}
+            value={unsplashAccessKey}
+            onChange={(e) => setUnsplashAccessKey(e.target.value)}
+            placeholder="Your Unsplash Access Key"
+            autoComplete="off"
+          />
+          <label className={styles.label}>
+            Pexels API key (for stock video overlays)
+            <span className={styles.hint}>Optional. From pexels.com/api. Used when adding stock videos from Pexels.</span>
+          </label>
+          <input
+            type="password"
+            className={styles.input}
+            value={pexelsApiKey}
+            onChange={(e) => setPexelsApiKey(e.target.value)}
+            placeholder="Your Pexels API key"
+            autoComplete="off"
+          />
+          <label className={styles.label}>
+            Pixabay API key (for stock video overlays)
+            <span className={styles.hint}>Optional. From pixabay.com/api/docs. Used when adding stock videos from Pixabay.</span>
+          </label>
+          <input
+            type="password"
+            className={styles.input}
+            value={pixabayApiKey}
+            onChange={(e) => setPixabayApiKey(e.target.value)}
+            placeholder="Your Pixabay API key"
+            autoComplete="off"
+          />
+          <label className={styles.label}>
+            GIPHY API key (for animated stickers)
+            <span className={styles.hint}>Optional. From developers.giphy.com. Used when adding animated stickers from GIPHY.</span>
+          </label>
+          <input
+            type="password"
+            className={styles.input}
+            value={giphyApiKey}
+            onChange={(e) => setGiphyApiKey(e.target.value)}
+            placeholder="Your GIPHY API key"
             autoComplete="off"
           />
           <div className={styles.oauthSetup} aria-label="OAuth redirect_uri_mismatch fix">

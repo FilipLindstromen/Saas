@@ -43,6 +43,8 @@ interface InspectorPanelProps {
   onOverlayUpdate: (patch: Partial<OverlayItem>) => void
   onOverlayRemove: (id: string) => void
   onDeselectOverlay: () => void
+  /** When set, show "Save to library" in overlay editor */
+  onSaveOverlayToLibrary?: (overlay: OverlayItem) => void
   /* Video tab (sources, format & quality) */
   videoDevices?: MediaDeviceInfo[]
   audioDevices?: MediaDeviceInfo[]
@@ -83,6 +85,11 @@ interface InspectorPanelProps {
   onSafeZoneTypeChange?: (t: SafeZoneType) => void
   safeZoneVisible?: boolean
   onSafeZoneVisibleChange?: (v: boolean) => void
+  /* Background music (mixed into export) */
+  musicBlob?: Blob | null
+  onMusicBlobChange?: (blob: Blob | null) => void
+  musicVolume?: number
+  onMusicVolumeChange?: (v: number) => void
 }
 
 export function InspectorPanel({
@@ -104,6 +111,7 @@ export function InspectorPanel({
   onOverlayUpdate,
   onOverlayRemove,
   onDeselectOverlay,
+  onSaveOverlayToLibrary,
   videoDevices = [],
   audioDevices = [],
   videoKind = 'camera',
@@ -151,6 +159,10 @@ export function InspectorPanel({
   onSafeZoneTypeChange = () => {},
   safeZoneVisible = false,
   onSafeZoneVisibleChange = () => {},
+  musicBlob = null,
+  onMusicBlobChange,
+  musicVolume = 50,
+  onMusicVolumeChange = () => {},
 }: InspectorPanelProps) {
   const [internalTab, setInternalTab] = useState<InspectorTabId>('current')
   const activeTab = controlledTab ?? internalTab
@@ -308,6 +320,46 @@ export function InspectorPanel({
             </label>
             <p className={styles.hint}>Mirror the video horizontally in preview and recording.</p>
           </section>
+          {onMusicBlobChange && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Background music</h3>
+              <p className={styles.hint}>Add a music track to mix with the video audio when exporting. Optional.</p>
+              <label className={styles.label}>Music file</label>
+              <input
+                type="file"
+                accept="audio/*"
+                className={styles.fileInput}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  onMusicBlobChange(f ? f : null)
+                  e.target.value = ''
+                }}
+                aria-label="Choose music file"
+              />
+              {musicBlob && (
+                <>
+                  <p className={styles.hint}>Music added. Set volume below.</p>
+                  <label className={styles.label}>Music volume: {musicVolume}%</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={musicVolume}
+                    onChange={(e) => onMusicVolumeChange(Number(e.target.value))}
+                    className={styles.slider}
+                    aria-label="Music volume"
+                  />
+                  <button
+                    type="button"
+                    className={styles.textBtn}
+                    onClick={() => onMusicBlobChange(null)}
+                  >
+                    Remove music
+                  </button>
+                </>
+              )}
+            </section>
+          )}
         </div>
       )}
 
@@ -371,6 +423,7 @@ export function InspectorPanel({
                   onOverlayRemove(selectedOverlay.id)
                   onDeselectOverlay()
                 }}
+                onSaveToLibrary={onSaveOverlayToLibrary ? () => onSaveOverlayToLibrary(selectedOverlay) : undefined}
                 embedded
               />
             </section>

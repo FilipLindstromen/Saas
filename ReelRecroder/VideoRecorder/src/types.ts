@@ -12,7 +12,7 @@ export type QualityPreset = 'draft' | 'medium' | 'high' | 'max'
 
 export interface OverlayItem {
   id: string
-  type: 'text' | 'image'
+  type: 'text' | 'image' | 'video'
   startTime: number
   endTime: number
   // text
@@ -36,6 +36,8 @@ export interface OverlayItem {
   y?: number
   // image (aspect ratio preserved via naturalWidth/naturalHeight + imageScale)
   imageDataUrl?: string
+  /** URL for image or animated GIF (e.g. from GIPHY); used when imageDataUrl not set */
+  imageUrl?: string
   /** Intrinsic dimensions, set when image is chosen */
   naturalWidth?: number
   naturalHeight?: number
@@ -45,8 +47,19 @@ export interface OverlayItem {
   imageWidth?: number
   /** @deprecated use naturalWidth/naturalHeight + imageScale */
   imageHeight?: number
+  // video (stock video from Pexels/Pixabay; layout uses naturalWidth/naturalHeight + imageScale, x, y)
+  videoUrl?: string
   /** When true (default), overlay is drawn during recording and included in the exported file. When false, preview-only. */
   burnIntoExport?: boolean
+}
+
+/** Saved overlay template for the clip library (no id, startTime, endTime). */
+export type LibraryClipPayload = Omit<OverlayItem, 'id' | 'startTime' | 'endTime'>
+
+export interface LibraryClip {
+  libraryId: string
+  name: string
+  payload: LibraryClipPayload
 }
 
 /** Safe zone preset for overlay guide (preview only, not exported) */

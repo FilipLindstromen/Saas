@@ -1,6 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import type { OverlayItem } from '../types'
 import { IconX, IconType, IconTrash } from './Icons'
+import { UnsplashPicker } from './UnsplashPicker'
+import { StockVideoPicker } from './StockVideoPicker'
+import { AnimatedStickerPicker } from './AnimatedStickerPicker'
+import { getStoredUnsplashAccessKey, getStoredPexelsApiKey, getStoredPixabayApiKey, getStoredGiphyApiKey } from './SettingsModal'
 import styles from './OverlayEditor.module.css'
 
 interface OverlayEditorProps {
@@ -9,6 +13,8 @@ interface OverlayEditorProps {
   onClose: () => void
   /** When set, show a button to remove this overlay from the timeline */
   onRemove?: () => void
+  /** When set, show "Save to library" to save this overlay to the clip library */
+  onSaveToLibrary?: () => void
   /** When true, render only the form content (no wrap/header); for use inside Inspector */
   embedded?: boolean
 }
@@ -31,10 +37,13 @@ function mergeRanges(ranges: { start: number; end: number }[]): { start: number;
 const FONT_SIZE_PCT_MIN = 0.5
 const FONT_SIZE_PCT_MAX = 15
 
-export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded = false }: OverlayEditorProps) {
+export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLibrary, embedded = false }: OverlayEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [fontSizeInput, setFontSizeInput] = useState<string>('')
   const [fontSizeInputFocused, setFontSizeInputFocused] = useState(false)
+  const [unsplashPickerOpen, setUnsplashPickerOpen] = useState(false)
+  const [giphyPickerOpen, setGiphyPickerOpen] = useState(false) // GIPHY picker visibility
+  const [stockVideoSource, setStockVideoSource] = useState<'pexels' | 'pixabay' | null>(null)
 
   const fontSizePct = overlay?.fontSizePercent ?? (overlay ? (overlay.fontSize ?? 24) / 1280 * 100 : 10)
   useEffect(() => {
@@ -212,6 +221,47 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded =
           </div>
         </>
       )}
+      {overlay.type === 'video' && (
+        <>
+          <label className={styles.label}>Video overlay</label>
+          {overlay.videoUrl && (
+            <p className={styles.hint}>Stock video from Pexels or Pixabay. Replace using the buttons below.</p>
+          )}
+          <div className={styles.serviceRow}>
+            <button type="button" className={styles.serviceBtn} onClick={() => setStockVideoSource('pexels')} title="Set or replace video from Pexels">
+              From Pexels
+            </button>
+            <button type="button" className={styles.serviceBtn} onClick={() => setStockVideoSource('pixabay')} title="Set or replace video from Pixabay">
+              From Pixabay
+            </button>
+          </div>
+          {stockVideoSource && (
+            <StockVideoPicker
+              isOpen
+              onClose={() => setStockVideoSource(null)}
+              source={stockVideoSource}
+              apiKey={stockVideoSource === 'pexels' ? getStoredPexelsApiKey() : getStoredPixabayApiKey()}
+              onSelect={(videoUrl, width, height) => {
+                onUpdate({ videoUrl, naturalWidth: width, naturalHeight: height, imageScale: 1 })
+                setStockVideoSource(null)
+              }}
+            />
+          )}
+          <label className={styles.label}>Scale</label>
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              className={styles.slider}
+              min={10}
+              max={200}
+              value={Math.round((overlay.imageScale ?? 1) * 100)}
+              onChange={(e) => onUpdate({ imageScale: Number(e.target.value) / 100 })}
+              aria-label="Video scale"
+            />
+            <span className={styles.sliderValue}>{Math.round((overlay.imageScale ?? 1) * 100)}%</span>
+          </div>
+        </>
+      )}
       {overlay.type === 'image' && (
         <>
           <label className={styles.label}>Image</label>
@@ -219,6 +269,13 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded =
             <div className={styles.imagePreview}>
               <img src={overlay.imageDataUrl} alt="Overlay" />
               <button type="button" className={styles.removeImg} onClick={() => onUpdate({ imageDataUrl: undefined })} title="Remove image" aria-label="Remove image">
+                <IconTrash />
+              </button>
+            </div>
+          ) : overlay.imageUrl ? (
+            <div className={styles.imagePreview}>
+              <img src={overlay.imageUrl} alt="Animated sticker" />
+              <button type="button" className={styles.removeImg} onClick={() => onUpdate({ imageUrl: undefined, naturalWidth: undefined, naturalHeight: undefined })} title="Remove animated sticker" aria-label="Remove animated sticker">
                 <IconTrash />
               </button>
             </div>
@@ -249,7 +306,33 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded =
               }}
             />
           )}
-          {overlay.imageDataUrl && (
+          <div className={styles.serviceRow}>
+            <button type="button" className={styles.serviceBtn} onClick={() => setUnsplashPickerOpen(true)} title="Set or replace image from Unsplash">
+              From Unsplash
+            </button>
+            <button type="button" className={styles.serviceBtn} onClick={() => setGiphyPickerOpen(true)} title="Set or replace image from GIPHY (animated GIF)">
+              From GIPHY
+            </button>
+          </div>
+          <UnsplashPicker
+            isOpen={unsplashPickerOpen}
+            onClose={() => setUnsplashPickerOpen(false)}
+            accessKey={getStoredUnsplashAccessKey()}
+            onSelect={(imageDataUrl, naturalWidth, naturalHeight) => {
+              onUpdate({ imageDataUrl, naturalWidth, naturalHeight, imageScale: 1, imageUrl: undefined })
+              setUnsplashPickerOpen(false)
+            }}
+          />
+          <AnimatedStickerPicker
+            isOpen={giphyPickerOpen}
+            onClose={() => setGiphyPickerOpen(false)}
+            apiKey={getStoredGiphyApiKey()}
+            onSelect={(imageUrl, naturalWidth, naturalHeight) => {
+              onUpdate({ imageUrl, naturalWidth, naturalHeight, imageScale: 1, imageDataUrl: undefined })
+              setGiphyPickerOpen(false)
+            }}
+          />
+          {(overlay.imageDataUrl || overlay.imageUrl) && (
             <>
               <label className={styles.label}>Scale</label>
               <div className={styles.sliderRow}>
@@ -267,6 +350,13 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, embedded =
             </>
           )}
         </>
+      )}
+      {onSaveToLibrary && (
+        <div className={styles.serviceRow}>
+          <button type="button" className={styles.serviceBtn} onClick={onSaveToLibrary} title="Save this overlay to the clip library">
+            Save to library
+          </button>
+        </div>
       )}
     </>
   )
