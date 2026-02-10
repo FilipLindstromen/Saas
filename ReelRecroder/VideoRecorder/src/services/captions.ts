@@ -100,6 +100,7 @@ export async function transcribeAudioFromVideo(
   formData.append('model', 'whisper-1')
   formData.append('response_format', 'verbose_json')
   formData.append('timestamp_granularities[]', 'segment')
+  formData.append('timestamp_granularities[]', 'word')
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',

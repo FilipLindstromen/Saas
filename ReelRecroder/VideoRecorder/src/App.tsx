@@ -1,13 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, SafeZoneType, VideoSourceKind } from './types'
+import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, SafeZoneType, VideoSourceKind, LibraryClip } from './types'
 import { useMediaDevices } from './hooks/useMediaDevices'
 import { useRecorder } from './hooks/useRecorder'
 import { getResolutionsForAspect, QUALITY_OPTIONS } from './constants'
 import { loadVideoRecorderState, saveVideoRecorderState } from './utils/persistence'
 import { getClipLibrary, saveClipToLibrary, removeClipFromLibrary, generateLibraryId } from './utils/clipLibrary'
+import { saveRecording, loadRecording, clearRecording } from './utils/recordingStorage'
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
 import type { ParsedLUT } from './utils/colorLut'
-import { exportVideoForDownload } from './utils/exportWithColorAdjustments'
+import { exportVideoForDownload, type ExportFormat } from './utils/exportWithColorAdjustments'
 import { RecordPreview } from './components/RecordPreview'
 import { Timeline } from './components/Timeline'
 import { TranscriptionPanel } from './components/TranscriptionPanel'
@@ -108,6 +109,13 @@ export default function App() {
   const [inspectorWidth, setInspectorWidth] = useState(() => initialState?.inspectorWidth ?? 280)
   const [inspectorResize, setInspectorResize] = useState<{ startX: number; startWidth: number } | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
+  const [isRestoring, setIsRestoring] = useState(true)
+
+  /* Audio state */
+  const [videoVolume, setVideoVolume] = useState(() => initialState?.videoVolume ?? 100)
+  const [noiseRemovalEnabled, setNoiseRemovalEnabled] = useState(() => initialState?.noiseRemovalEnabled ?? false)
+  const [noiseRemovalAmount, setNoiseRemovalAmount] = useState(() => initialState?.noiseRemovalAmount ?? 50)
+
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const allResolutions = useMemo(() => getResolutionsForAspect(aspectRatio), [aspectRatio])
@@ -231,15 +239,27 @@ export default function App() {
       setThumbnailPanelOpen(false)
       return
     }
-    setVideoTrimStart(0)
-    setVideoTrimEnd(null)
-    userHasTrimmedVideoRef.current = false
-    setDuration(0)
-    setUserTimelineDuration(null)
+    // Logic for new recording setup
+    if (!isRestoring) {
+      setVideoTrimStart(0)
+      setVideoTrimEnd(null)
+      userHasTrimmedVideoRef.current = false
+      // Only reset duration if not restoring (handled in restore effect)
+      // Actually duration is set by restore effect, but this effect runs on dependency change.
+      // If we are just setting recordedBlob from restore, we don't want to reset userTimelineDuration etc immediately if we can avoid it,
+      // but the original code resets them.
+      // Let's modify: if restoring, we might want to keep existing state?
+      // But for now, let's just let it reset transient UI state.
+      // setDuration(0) // This would clear the duration we just restored!
+      if (duration === 0) setDuration(0) // Only reset if it looks like a fresh record?
+      // Actually, standard behavior:
+      setUserTimelineDuration(null)
+    }
+
     const url = URL.createObjectURL(recordedBlob)
     setDownloadUrl(url)
     return () => URL.revokeObjectURL(url)
-  }, [recordedBlob])
+  }, [recordedBlob, isRestoring])
 
   // Initialize video trim when we get duration from the recorded video
   useEffect(() => {
@@ -248,6 +268,34 @@ export default function App() {
     setVideoTrimEnd(duration)
   }, [recordedBlob, duration, videoTrimEnd])
 
+  // Load persisted recording on mount
+  useEffect(() => {
+    async function restore() {
+      try {
+        const saved = await loadRecording()
+        if (saved?.blob) {
+          setRecordedBlob(saved.blob)
+          if (saved.duration) setDuration(saved.duration)
+        }
+      } catch (e) {
+        console.error('Failed to restore recording', e)
+      } finally {
+        setIsRestoring(false)
+      }
+    }
+    restore()
+  }, [])
+
+  // Save or clear recording when it changes
+  useEffect(() => {
+    if (isRestoring) return
+    if (recordedBlob) {
+      saveRecording(recordedBlob, duration)
+    } else {
+      clearRecording()
+    }
+  }, [recordedBlob, duration, isRestoring])
+
   // Restore thumbnail blob from persisted data URL (e.g. after page load)
   useEffect(() => {
     if (!thumbnailGeneratedDataUrl || thumbnailBlob != null) return
@@ -255,7 +303,7 @@ export default function App() {
     fetch(dataUrl)
       .then((r) => r.blob())
       .then((blob) => setThumbnailBlob(blob))
-      .catch(() => {})
+      .catch(() => { })
   }, [thumbnailGeneratedDataUrl, thumbnailBlob])
 
   useEffect(() => {
@@ -652,6 +700,7 @@ export default function App() {
             onOverlayEdit={handleEditOverlay}
             portraitFillHeight={portraitFillHeight}
             overlayTextAnimation={overlayTextAnimation}
+            videoVolume={videoVolume}
             defaultFontFamily={defaultFontFamily}
             defaultSecondaryFont={defaultSecondaryFont}
             defaultBold={defaultBold}
@@ -664,10 +713,10 @@ export default function App() {
             captionPreview={
               recordedBlob
                 ? {
-                    style: captionPreviewStyle,
-                    fontSizePercent: captionPreviewFontSizePercent,
-                    captionY: captionPreviewCaptionY,
-                  }
+                  style: captionPreviewStyle,
+                  fontSizePercent: captionPreviewFontSizePercent,
+                  captionY: captionPreviewCaptionY,
+                }
                 : undefined
             }
             captionSegments={recordedBlob ? captionSegments : undefined}
@@ -820,6 +869,9 @@ export default function App() {
           colorSaturation={colorSaturation}
           musicBlob={musicBlob}
           musicVolume={musicVolume}
+          videoVolume={videoVolume}
+          noiseRemovalEnabled={noiseRemovalEnabled}
+          noiseRemovalAmount={noiseRemovalAmount}
         />
       )}
 
@@ -882,110 +934,110 @@ export default function App() {
         }}
       >
         <div className={styles.main}>
-        <div className={styles.content}>
-          {thumbnailPanelOpen ? (
-            <ThumbnailCaptionsPanel
-              videoUrl={downloadUrl ?? ''}
-              videoBlob={recordedBlob ?? undefined}
-              aspectRatio={aspectRatio}
-              width={width}
-              height={height}
-              captionSegments={captionSegments}
-              openaiApiKey={openaiApiKey}
-              youtubeTitle={youtubeTitle}
-              onYoutubeTitleChange={setYoutubeTitle}
-              youtubeCaption={youtubeCaption}
-              onYoutubeCaptionChange={setYoutubeCaption}
-              thumbnailBlob={thumbnailBlob}
-              onThumbnailChange={handleThumbnailChange}
-              onClose={() => setThumbnailPanelOpen(false)}
-              videoDeviceId={videoDeviceId}
-              flipVideo={flipVideo}
-              colorAdjustmentsEnabled={colorAdjustmentsEnabled}
-              colorBrightness={colorBrightness}
-              colorContrast={colorContrast}
-              colorSaturation={colorSaturation}
-              embedded
-              initialSeekTime={thumbnailSeekTime}
-              initialTexts={thumbnailTexts}
-              initialWebcamImageUrl={thumbnailWebcamDataUrl}
-              onThumbnailStateChange={handleThumbnailStateChange}
-            />
-          ) : (
-            <>
-              {renderPreviewRow()}
-            </>
-          )}
-        </div>
+          <div className={styles.content}>
+            {thumbnailPanelOpen ? (
+              <ThumbnailCaptionsPanel
+                videoUrl={downloadUrl ?? ''}
+                videoBlob={recordedBlob ?? undefined}
+                aspectRatio={aspectRatio}
+                width={width}
+                height={height}
+                captionSegments={captionSegments}
+                openaiApiKey={openaiApiKey}
+                youtubeTitle={youtubeTitle}
+                onYoutubeTitleChange={setYoutubeTitle}
+                youtubeCaption={youtubeCaption}
+                onYoutubeCaptionChange={setYoutubeCaption}
+                thumbnailBlob={thumbnailBlob}
+                onThumbnailChange={handleThumbnailChange}
+                onClose={() => setThumbnailPanelOpen(false)}
+                videoDeviceId={videoDeviceId}
+                flipVideo={flipVideo}
+                colorAdjustmentsEnabled={colorAdjustmentsEnabled}
+                colorBrightness={colorBrightness}
+                colorContrast={colorContrast}
+                colorSaturation={colorSaturation}
+                embedded
+                initialSeekTime={thumbnailSeekTime}
+                initialTexts={thumbnailTexts}
+                initialWebcamImageUrl={thumbnailWebcamDataUrl}
+                onThumbnailStateChange={handleThumbnailStateChange}
+              />
+            ) : (
+              <>
+                {renderPreviewRow()}
+              </>
+            )}
+          </div>
         </div>
 
         {!thumbnailPanelOpen && (
-        <div
-          className={styles.globalTimeline}
-          style={{ height: timelineHeight }}
-        >
           <div
-            className={styles.timelineResizeHandle}
-            onPointerDown={(e) => {
-              e.preventDefault()
-              setTimelineResize({ startY: e.clientY, startHeight: timelineHeight })
-              ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
-            }}
-            onPointerUp={(e) => {
-              ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
-              handleTimelineResizeEnd()
-            }}
-            role="slider"
-            aria-label="Resize timeline height"
-            aria-valuemin={120}
-            aria-valuemax={600}
-            aria-valuenow={timelineHeight}
-          />
-          <div className={styles.timelineInner}>
-            <Timeline
-            overlays={overlays}
-            duration={timelineDuration}
-            currentTime={safeDisplayTime}
-            onSeek={(t) => {
-              if (recordedBlob) {
-                const trimLen = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
-                const timelineTime = Math.min(Math.max(0, t), trimLen)
-                const sourceTime = videoTrimStart + timelineTime
-                setSeekTime(sourceTime)
-                setCurrentTime(timelineTime)
-                setTimeout(() => setSeekTime(null), 150)
-              } else {
-                setPreviewTime(t)
-              }
-            }}
-            onAddOverlay={handleAddOverlay}
-            onEditOverlay={handleEditOverlay}
-            onRemoveOverlay={handleRemoveOverlay}
-            onSelectOverlay={setSelectedOverlayId}
-            selectedId={selectedOverlayId}
-            onDurationChange={handleTimelineDurationChange}
-            overlayTextAnimation={overlayTextAnimation}
-            onOverlayTextAnimationChange={setOverlayTextAnimation}
-            isPreviewPlaying={isPreviewPlaying}
-            onPreviewPlayToggle={() => {
-              if (recordedBlob) {
-                setIsPreviewPlaying((p) => !p)
-              } else {
-                if (!isPreviewPlaying && previewTime >= timelineDuration - 0.05) setPreviewTime(0)
-                setIsPreviewPlaying((p) => !p)
-              }
-            }}
-            onSplitClip={handleSplitClipAtPlayhead}
-            videoClipTrim={
-              recordedBlob
-                ? { trimStart: videoTrimStart, trimEnd: videoTrimEnd ?? sourceDuration ?? 1 }
-                : undefined
-            }
-            videoSourceDuration={recordedBlob ? Math.max(sourceDuration, 0.01) : undefined}
-            onVideoClipTrimChange={recordedBlob ? handleVideoClipTrimChange : undefined}
-          />
+            className={styles.globalTimeline}
+            style={{ height: timelineHeight }}
+          >
+            <div
+              className={styles.timelineResizeHandle}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                setTimelineResize({ startY: e.clientY, startHeight: timelineHeight })
+                  ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+              }}
+              onPointerUp={(e) => {
+                ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+                handleTimelineResizeEnd()
+              }}
+              role="slider"
+              aria-label="Resize timeline height"
+              aria-valuemin={120}
+              aria-valuemax={600}
+              aria-valuenow={timelineHeight}
+            />
+            <div className={styles.timelineInner}>
+              <Timeline
+                overlays={overlays}
+                duration={timelineDuration}
+                currentTime={safeDisplayTime}
+                onSeek={(t) => {
+                  if (recordedBlob) {
+                    const trimLen = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
+                    const timelineTime = Math.min(Math.max(0, t), trimLen)
+                    const sourceTime = videoTrimStart + timelineTime
+                    setSeekTime(sourceTime)
+                    setCurrentTime(timelineTime)
+                    setTimeout(() => setSeekTime(null), 150)
+                  } else {
+                    setPreviewTime(t)
+                  }
+                }}
+                onAddOverlay={handleAddOverlay}
+                onEditOverlay={handleEditOverlay}
+                onRemoveOverlay={handleRemoveOverlay}
+                onSelectOverlay={setSelectedOverlayId}
+                selectedId={selectedOverlayId}
+                onDurationChange={handleTimelineDurationChange}
+                overlayTextAnimation={overlayTextAnimation}
+                onOverlayTextAnimationChange={setOverlayTextAnimation}
+                isPreviewPlaying={isPreviewPlaying}
+                onPreviewPlayToggle={() => {
+                  if (recordedBlob) {
+                    setIsPreviewPlaying((p) => !p)
+                  } else {
+                    if (!isPreviewPlaying && previewTime >= timelineDuration - 0.05) setPreviewTime(0)
+                    setIsPreviewPlaying((p) => !p)
+                  }
+                }}
+                onSplitClip={handleSplitClipAtPlayhead}
+                videoClipTrim={
+                  recordedBlob
+                    ? { trimStart: videoTrimStart, trimEnd: videoTrimEnd ?? sourceDuration ?? 1 }
+                    : undefined
+                }
+                videoSourceDuration={recordedBlob ? Math.max(sourceDuration, 0.01) : undefined}
+                onVideoClipTrimChange={recordedBlob ? handleVideoClipTrimChange : undefined}
+              />
+            </div>
           </div>
-        </div>
         )}
       </div>
 
@@ -998,7 +1050,7 @@ export default function App() {
           onPointerDown={(e) => {
             e.preventDefault()
             setInspectorResize({ startX: e.clientX, startWidth: inspectorWidth })
-            ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+              ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
           }}
           role="separator"
           aria-label="Resize inspector"
@@ -1068,6 +1120,12 @@ export default function App() {
             onMusicBlobChange={setMusicBlob}
             musicVolume={musicVolume}
             onMusicVolumeChange={setMusicVolume}
+            videoVolume={videoVolume}
+            onVideoVolumeChange={setVideoVolume}
+            noiseRemovalEnabled={noiseRemovalEnabled}
+            onNoiseRemovalEnabledChange={setNoiseRemovalEnabled}
+            noiseRemovalAmount={noiseRemovalAmount}
+            onNoiseRemovalAmountChange={setNoiseRemovalAmount}
             safeZoneType={safeZoneType}
             onSafeZoneTypeChange={setSafeZoneType}
             safeZoneVisible={safeZoneVisible}
