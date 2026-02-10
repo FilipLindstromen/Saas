@@ -21,7 +21,7 @@ const TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] =
   { value: 'fade-slide-down', label: 'Fade + slide down' },
 ]
 
-export type InspectorTabId = 'video' | 'audio' | 'color' | 'overlays' | 'current' | 'captions'
+export type InspectorTabId = 'video' | 'audio' | 'color' | 'overlays' | 'current' | 'captions' | 'safezones'
 
 interface InspectorPanelProps {
   /** Controlled active tab; when set, parent can open e.g. Video tab from header button */
@@ -57,6 +57,8 @@ interface InspectorPanelProps {
   videoError?: string | null
   aspectRatio?: AspectRatio
   onAspectRatioChange?: (a: AspectRatio) => void
+  videoWidth?: number
+  videoHeight?: number
   resolutions?: ResolutionOption[]
   resolutionIndex?: number
   onResolutionIndexChange?: (i: number) => void
@@ -67,10 +69,15 @@ interface InspectorPanelProps {
   portraitFillHeight?: boolean
   onPortraitFillHeightChange?: (v: boolean) => void
   colorLut?: ParsedLUT | null
-  colorLut?: ParsedLUT | null
   onColorLutChange?: (lut: ParsedLUT | null) => void
   colorAdjustmentsEnabled?: boolean
   onColorAdjustmentsEnabledChange?: (v: boolean) => void
+  colorBrightness?: number
+  onColorBrightnessChange?: (v: number) => void
+  colorContrast?: number
+  onColorContrastChange?: (v: number) => void
+  colorSaturation?: number
+  onColorSaturationChange?: (v: number) => void
   /* Captions tab (burn-in styling + transcribe/burn) */
   videoBlob?: Blob | null
   onBurnedBlob?: (blob: Blob) => void

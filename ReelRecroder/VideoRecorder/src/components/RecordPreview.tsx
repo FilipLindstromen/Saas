@@ -143,7 +143,6 @@ interface RecordPreviewProps {
   onCaptionYChange?: (y: number) => void
   /** When true and not recording, show preview with these color adjustments (never baked into recording) */
   colorAdjustmentsEnabled?: boolean
-  isRecording?: boolean
   colorBrightness?: number
   colorContrast?: number
   colorSaturation?: number
@@ -155,6 +154,7 @@ interface RecordPreviewProps {
   safeZone?: { type: SafeZoneType; visible: boolean }
   videoVolume?: number
   selectedOverlayId?: string | null
+  onOverlayEdit?: (id: string, patch: Partial<OverlayItem>) => void
 }
 
 export function RecordPreview({
