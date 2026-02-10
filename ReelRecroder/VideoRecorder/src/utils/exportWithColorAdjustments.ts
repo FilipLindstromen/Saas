@@ -252,23 +252,53 @@ export interface ExportForDownloadOptions {
   colorBrightness?: number
   colorContrast?: number
   colorSaturation?: number
+  /** Optional background music; mixed with video audio during export */
+  musicBlob?: Blob | null
+  /** Music volume 0–100 when musicBlob is set */
+  musicVolume?: number
 }
 
-/** Preload all image overlays so they are ready for drawing during export. */
+/** Preload all image overlays (data URL or URL) so they are ready for drawing during export. */
 function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTMLImageElement>> {
-  const imageOverlays = overlays.filter((o) => o.type === 'image' && o.imageDataUrl)
+  const imageOverlays = overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl))
   if (imageOverlays.length === 0) return Promise.resolve(new Map())
   const map = new Map<string, HTMLImageElement>()
   const promises = imageOverlays.map(
     (o) =>
       new Promise<void>((resolve, reject) => {
         const img = new Image()
+        img.crossOrigin = 'anonymous'
         img.onload = () => {
           map.set(o.id, img)
           resolve()
         }
         img.onerror = () => reject(new Error(`Failed to load overlay image ${o.id}`))
-        img.src = o.imageDataUrl!
+        img.src = o.imageDataUrl ?? o.imageUrl!
+      })
+  )
+  return Promise.all(promises).then(() => map)
+}
+
+/** Preload all video overlays so they are ready for drawing during export. */
+function preloadOverlayVideos(overlays: OverlayItem[]): Promise<Map<string, HTMLVideoElement>> {
+  const videoOverlays = overlays.filter((o) => o.type === 'video' && o.videoUrl)
+  if (videoOverlays.length === 0) return Promise.resolve(new Map())
+  const map = new Map<string, HTMLVideoElement>()
+  const promises = videoOverlays.map(
+    (o) =>
+      new Promise<void>((resolve, reject) => {
+        const el = document.createElement('video')
+        el.muted = true
+        el.playsInline = true
+        el.preload = 'auto'
+        el.crossOrigin = 'anonymous'
+        el.onloadedmetadata = () => {
+          map.set(o.id, el)
+          resolve()
+        }
+        el.onerror = () => reject(new Error(`Failed to load overlay video ${o.id}`))
+        el.src = o.videoUrl!
+        el.load()
       })
   )
   return Promise.all(promises).then(() => map)
@@ -298,6 +328,8 @@ export function exportVideoForDownload(
     colorBrightness = 100,
     colorContrast = 100,
     colorSaturation = 100,
+    musicBlob,
+    musicVolume = 50,
   } = options
 
   const overlaysToBurn = overlays.filter((o) => o.burnIntoExport !== false)
@@ -309,7 +341,10 @@ export function exportVideoForDownload(
       ? `brightness(${colorBrightness}%) contrast(${colorContrast}%) saturate(${colorSaturation}%)`
       : 'none'
 
-  return preloadOverlayImages(overlaysToBurn).then((preloadedImages) => {
+  return Promise.all([
+    preloadOverlayImages(overlaysToBurn),
+    preloadOverlayVideos(overlaysToBurn),
+  ]).then(([preloadedImages, preloadedVideos]) => {
     return new Promise<{ blob: Blob; extension: ExportFormat }>((resolve, reject) => {
       const video = document.createElement('video')
       video.muted = false
@@ -351,11 +386,27 @@ export function exportVideoForDownload(
         const trimEnd = optTrimEnd ?? duration
         video.currentTime = trimStart
 
-        const videoStream = video.captureStream()
         const canvasStream = canvas.captureStream(30)
         const combinedStream = new MediaStream()
         combinedStream.addTrack(canvasStream.getVideoTracks()[0])
-        videoStream.getAudioTracks().forEach((t) => combinedStream.addTrack(t))
+
+        if (musicBuffer) {
+          const audioCtx = new AudioContext()
+          const videoSource = audioCtx.createMediaElementSource(video)
+          const musicSource = audioCtx.createBufferSource()
+          musicSource.buffer = musicBuffer
+          musicSource.loop = true
+          const musicGain = audioCtx.createGain()
+          musicGain.gain.value = Math.max(0, Math.min(1, (musicVolume ?? 50) / 100))
+          const dest = audioCtx.createMediaStreamDestination()
+          videoSource.connect(dest)
+          musicSource.connect(musicGain)
+          musicGain.connect(dest)
+          musicSource.start(0)
+          dest.stream.getAudioTracks().forEach((t) => combinedStream.addTrack(t))
+        } else {
+          video.captureStream().getAudioTracks().forEach((t) => combinedStream.addTrack(t))
+        }
         stream = combinedStream
 
         const { mimeType, extension } = getSupportedMimeType(preferFormat)
@@ -405,12 +456,20 @@ export function exportVideoForDownload(
             }
             const timelineTime = srcTime - trimStart
             if (hasOverlays) {
+              overlaysToBurn.filter((o) => o.type === 'video' && o.videoUrl).forEach((o) => {
+                const v = preloadedVideos.get(o.id)
+                if (v && timelineTime >= o.startTime && timelineTime <= o.endTime) {
+                  const local = Math.max(0, Math.min(o.endTime - o.startTime, timelineTime - o.startTime))
+                  if (Math.abs(v.currentTime - local) > 0.05) v.currentTime = local
+                }
+              })
               drawOverlays(ctx, width, height, overlaysToBurn, timelineTime, {
                 textAnimation: overlayTextAnimation,
                 defaultFontFamily,
                 defaultSecondaryFont,
                 defaultBold,
                 preloadedImages,
+                preloadedVideos,
               })
             }
           }

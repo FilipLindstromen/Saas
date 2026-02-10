@@ -58,7 +58,10 @@ export function getYouTubeAccessToken(clientId: string): Promise<string> {
 export interface YouTubeUploadOptions {
   title: string
   description: string
+  /** Default 'private'. Use 'public' or 'unlisted' for immediate publish. */
   privacyStatus?: 'public' | 'private' | 'unlisted'
+  /** RFC 3339 datetime when to publish. When set, video is private until this time. */
+  publishAt?: string
 }
 
 export async function uploadVideoToYouTube(
@@ -66,16 +69,16 @@ export async function uploadVideoToYouTube(
   videoBlob: Blob,
   options: YouTubeUploadOptions
 ): Promise<string> {
-  const { title, description, privacyStatus = 'private' } = options
+  const { title, description, privacyStatus = 'private', publishAt } = options
+  const status: { privacyStatus: string; publishAt?: string } = { privacyStatus }
+  if (publishAt) status.publishAt = publishAt
   const metadata = {
     snippet: {
       title,
       description,
       categoryId: '22', // People & Blogs
     },
-    status: {
-      privacyStatus,
-    },
+    status,
   }
 
   const initRes = await fetch(
@@ -158,5 +161,37 @@ export async function setYouTubeThumbnail(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.error?.message || res.statusText || 'Thumbnail upload failed')
+  }
+}
+
+/** Post a top-level comment on a video as the authenticated channel. Call after the video is uploaded/published. */
+export async function postYouTubeComment(
+  accessToken: string,
+  videoId: string,
+  text: string
+): Promise<void> {
+  const res = await fetch(
+    'https://www.googleapis.com/youtube/v3/commentThreads?part=snippet',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        snippet: {
+          videoId,
+          topLevelComment: {
+            snippet: {
+              textOriginal: text,
+            },
+          },
+        },
+      }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message || res.statusText || 'Failed to post comment')
   }
 }

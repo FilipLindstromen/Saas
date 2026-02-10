@@ -85,6 +85,10 @@ export interface DrawOverlaysOptions {
   defaultFontFamily?: string
   defaultSecondaryFont?: string
   defaultBold?: boolean
+  /** Preloaded image elements for image overlays (avoids creating new Image() each frame) */
+  preloadedImages?: Map<string, HTMLImageElement>
+  /** Preloaded video elements for video overlays; caller must set currentTime before each draw */
+  preloadedVideos?: Map<string, HTMLVideoElement>
 }
 
 export function drawOverlays(
@@ -181,11 +185,12 @@ export function drawOverlays(
       }
       ctx.restore()
     }
-    if (o.type === 'image' && o.imageDataUrl) {
+    if (o.type === 'image' && (o.imageDataUrl || o.imageUrl)) {
       const img = options.preloadedImages?.get(o.id)
       const imgToUse = img ?? (() => {
         const im = new Image()
-        im.src = o.imageDataUrl!
+        im.crossOrigin = 'anonymous'
+        im.src = o.imageDataUrl ?? o.imageUrl!
         return im
       })()
       if (imgToUse.complete && imgToUse.naturalWidth) {
@@ -199,6 +204,17 @@ export function drawOverlays(
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
         ctx.drawImage(imgToUse, x, y, w, h)
+      }
+    }
+    if (o.type === 'video' && o.videoUrl) {
+      const video = options.preloadedVideos?.get(o.id)
+      if (video && video.readyState >= 2) {
+        const scale = o.imageScale ?? 1
+        const w = (o.naturalWidth ?? video.videoWidth) * scale
+        const h = (o.naturalHeight ?? video.videoHeight) * scale
+        const x = ((o.x ?? 0.5) * width) - w / 2
+        const y = ((o.y ?? 0.5) * height) - h / 2
+        ctx.drawImage(video, x, y, w, h)
       }
     }
   }

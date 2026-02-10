@@ -66,10 +66,19 @@
   background: var(--bg-elevated);
 }
 
-.toolbarBtn svg {
+.toolbarBtn svg,
+.toolbarBtn .stickerIcon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.stickerIcon {
+  line-height: 1;
 }
 
 .btn {

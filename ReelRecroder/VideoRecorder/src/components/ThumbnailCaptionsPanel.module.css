@@ -60,6 +60,27 @@
   width: 100%;
 }
 
+.previewScaleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.previewScaleRow .slider {
+  flex: 1;
+  min-width: 80px;
+  max-width: 180px;
+}
+
+.previewScaleContainer {
+  overflow: auto;
+  max-height: min(70vh, 600px);
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
 .embedded .previewWrap {
   max-width: none;
 }
@@ -146,16 +167,21 @@
 
 .previewWrap {
   position: relative;
-  width: 100%;
-  max-width: 400px;
-  /* Cap height so preview fits on screen without scrolling (aspect-ratio then shrinks width) */
-  max-height: min(55vh, 520px);
+  /* Width/height set inline from component so aspect ratio is correct for both portrait and landscape */
+  max-width: 100%;
   background: #000;
   border-radius: var(--radius);
   overflow: hidden;
 }
 
 .videoBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.videoBgImg {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -219,6 +245,31 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   margin-bottom: 2px;
+}
+
+.thumbColorRow {
+  margin-top: 8px;
+}
+
+.thumbColorRow .hint {
+  margin-bottom: 4px;
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.sliderRow .label {
+  margin-bottom: 0;
+  min-width: 72px;
+}
+
+.sliderRow .slider {
+  flex: 1;
+  min-width: 0;
 }
 
 .slider {

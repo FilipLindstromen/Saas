@@ -37,6 +37,75 @@ function drawSafeZoneOverlay(
   drawRect(title, 'rgba(255, 200, 0, 0.8)', [2, 2])
 }
 
+const RESIZE_HANDLE_SIZE = 16
+const SELECTION_STROKE = 2
+const MIN_FONT_SIZE_PCT = 0.5
+const MAX_FONT_SIZE_PCT = 20
+const MIN_IMAGE_SCALE = 0.1
+const MAX_IMAGE_SCALE = 3
+
+/** Get canvas rect (x, y, w, h) for an overlay for selection/resize hit-test and drawing. */
+function getOverlayRect(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  o: OverlayItem,
+  defaultFontFamily?: string,
+  defaultBold?: boolean
+): { x: number; y: number; w: number; h: number } | null {
+  if (o.type === 'text' && o.text) {
+    const size = o.fontSizePercent != null
+      ? (width * o.fontSizePercent) / 100
+      : ((o.fontSize ?? 24) * width) / 1280
+    const boldPrefix = (defaultBold ?? false) ? 'bold ' : ''
+    ctx.font = `${boldPrefix}${size}px "${defaultFontFamily ?? 'Oswald'}", sans-serif`
+    const lineHeight = size * 1.2
+    const lines = o.text.split('\n')
+    let w = 0
+    for (const line of lines) {
+      w = Math.max(w, ctx.measureText(line).width)
+    }
+    const h = lines.length * lineHeight
+    const x = (o.x ?? 0.1) * width
+    const y = (o.y ?? 0.1) * height
+    return { x, y, w, h }
+  }
+  if (o.type === 'image' && (o.imageDataUrl || o.imageUrl || o.naturalWidth)) {
+    const scale = o.imageScale ?? 1
+    const w = o.naturalWidth != null && o.naturalHeight != null
+      ? o.naturalWidth * scale
+      : (o.imageWidth ?? 200)
+    const h = o.naturalHeight != null && o.naturalWidth != null
+      ? o.naturalHeight * scale
+      : (o.imageHeight ?? 200)
+    const x = (o.x ?? 0.5) * width - w / 2
+    const y = (o.y ?? 0.5) * height - h / 2
+    return { x, y, w, h }
+  }
+  if (o.type === 'video' && o.videoUrl) {
+    const scale = o.imageScale ?? 1
+    const w = (o.naturalWidth ?? 1920) * scale
+    const h = (o.naturalHeight ?? 1080) * scale
+    const x = (o.x ?? 0.5) * width - w / 2
+    const y = (o.y ?? 0.5) * height - h / 2
+    return { x, y, w, h }
+  }
+  return null
+}
+
+function drawSelectionAndHandle(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number }
+) {
+  ctx.strokeStyle = '#5b8def'
+  ctx.lineWidth = SELECTION_STROKE
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
+  const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
+  const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
+  ctx.fillStyle = '#5b8def'
+  ctx.fillRect(handleX, handleY, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
+}
+
 interface RecordPreviewProps {
   videoStream: MediaStream | null
   width: number
@@ -103,6 +172,8 @@ export function RecordPreview({
   videoTrimEnd,
   videoRef: externalVideoRef,
   onOverlayMove,
+  selectedOverlayId = null,
+  onOverlayEdit,
   portraitFillHeight = false,
   overlayTextAnimation = 'none',
   defaultFontFamily = 'Oswald',
@@ -126,13 +197,22 @@ export function RecordPreview({
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
   const startTimeRef = useRef(0)
   const rafRef = useRef<number>(0)
+  const overlayVideoRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  const overlayImageRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [dragState, setDragState] = useState<{
     overlayId: string
     offsetX: number
     offsetY: number
   } | null>(null)
+  const [resizeState, setResizeState] = useState<{
+    overlayId: string
+    startX: number
+    startY: number
+    startValue: number
+    kind: 'fontSize' | 'scale'
+  } | null>(null)
   const [captionDrag, setCaptionDrag] = useState(false)
-  const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing'>('default')
+  const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize'>('default')
 
   // Playback mode: show recorded video
   useEffect(() => {
@@ -244,6 +324,48 @@ export function RecordPreview({
     }
   }, [videoStream, playbackUrl, recordedBlob])
 
+  // Keep video elements for video overlays (create/remove when overlays change)
+  useEffect(() => {
+    const map = overlayVideoRef.current
+    const videoOverlayIds = new Set(overlays.filter((o) => o.type === 'video' && o.videoUrl).map((o) => o.id))
+    for (const id of map.keys()) {
+      if (!videoOverlayIds.has(id)) {
+        map.delete(id)
+      }
+    }
+    for (const o of overlays) {
+      if (o.type === 'video' && o.videoUrl && !map.has(o.id)) {
+        const el = document.createElement('video')
+        el.muted = true
+        el.playsInline = true
+        el.preload = 'metadata'
+        el.crossOrigin = 'anonymous'
+        el.src = o.videoUrl
+        el.load()
+        map.set(o.id, el)
+      }
+    }
+  }, [overlays])
+
+  // Keep image elements for image overlays (data URL or URL; needed for animated GIFs)
+  useEffect(() => {
+    const map = overlayImageRef.current
+    const imageOverlayIds = new Set(
+      overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl)).map((o) => o.id)
+    )
+    for (const id of map.keys()) {
+      if (!imageOverlayIds.has(id)) map.delete(id)
+    }
+    for (const o of overlays) {
+      if (o.type !== 'image' || (!o.imageDataUrl && !o.imageUrl)) continue
+      if (map.has(o.id)) continue
+      const el = new Image()
+      el.crossOrigin = 'anonymous'
+      el.src = o.imageDataUrl ?? o.imageUrl!
+      map.set(o.id, el)
+    }
+  }, [overlays])
+
   // Draw loop: either live video or playback video + overlays onto canvas
   useEffect(() => {
     const canvas = canvasRef.current
@@ -303,12 +425,29 @@ export function RecordPreview({
           videoTrimStart != null && videoTrimEnd != null
             ? Math.min(Math.max(0, sourceTime - videoTrimStart), videoTrimEnd - videoTrimStart)
             : sourceTime
+        const videoMap = overlayVideoRef.current
+        overlaysToDraw.filter((o) => o.type === 'video' && o.videoUrl).forEach((o) => {
+          const v = videoMap.get(o.id)
+          if (v && timelineTime >= o.startTime && timelineTime <= o.endTime) {
+            const local = Math.max(0, Math.min(o.endTime - o.startTime, timelineTime - o.startTime))
+            if (Math.abs(v.currentTime - local) > 0.1) v.currentTime = local
+          }
+        })
         drawOverlays(ctx, width, height, overlaysToDraw, timelineTime, {
           textAnimation: overlayTextAnimation,
           defaultFontFamily: defaultFontFamily ?? 'Oswald',
           defaultSecondaryFont: defaultSecondaryFont ?? 'Playfair Display',
           defaultBold: defaultBold ?? false,
+          preloadedImages: overlayImageRef.current,
+          preloadedVideos: videoMap,
         })
+        if (!isRecording && selectedOverlayId) {
+          const sel = overlaysToDraw.find((o) => o.id === selectedOverlayId)
+          if (sel && timelineTime >= sel.startTime && timelineTime <= sel.endTime) {
+            const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+            if (rect) drawSelectionAndHandle(ctx, rect)
+          }
+        }
         if (captionPreview) {
           const segments =
             captionSegments && captionSegments.length > 0 ? captionSegments : [CAPTION_SAMPLE_SEGMENT]
@@ -326,11 +465,21 @@ export function RecordPreview({
         if (video.readyState >= 2) {
           drawVideoFit(video)
           const t = isRecording ? performance.now() / 1000 - startTimeRef.current : displayTime
+          const videoMap = overlayVideoRef.current
+          overlaysToDraw.filter((o) => o.type === 'video' && o.videoUrl).forEach((o) => {
+            const v = videoMap.get(o.id)
+            if (v && t >= o.startTime && t <= o.endTime) {
+              const local = Math.max(0, Math.min(o.endTime - o.startTime, t - o.startTime))
+              if (Math.abs(v.currentTime - local) > 0.1) v.currentTime = local
+            }
+          })
           drawOverlays(ctx, width, height, overlaysToDraw, t, {
             textAnimation: overlayTextAnimation,
             defaultFontFamily: defaultFontFamily ?? 'Oswald',
             defaultSecondaryFont: defaultSecondaryFont ?? 'Playfair Display',
             defaultBold: defaultBold ?? false,
+            preloadedImages: overlayImageRef.current,
+            preloadedVideos: videoMap,
           })
         }
       } else {
@@ -351,7 +500,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {
@@ -377,13 +526,30 @@ export function RecordPreview({
     }
   }
 
-  type HitResult = { type: 'overlay'; id: string; offsetX: number; offsetY: number } | { type: 'caption' } | null
+  type HitResult =
+    | { type: 'overlay'; id: string; offsetX: number; offsetY: number }
+    | { type: 'resize'; id: string }
+    | { type: 'caption' }
+    | null
 
   const hitTest = (canvasX: number, canvasY: number): HitResult => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return null
     const active = overlays.filter((o) => displayTime >= o.startTime && displayTime <= o.endTime)
+    if (selectedOverlayId && onOverlayEdit) {
+      const sel = active.find((o) => o.id === selectedOverlayId)
+      if (sel) {
+        const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+        if (rect) {
+          const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
+          const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
+          if (canvasX >= handleX && canvasX <= rect.x + rect.w && canvasY >= handleY && canvasY <= rect.y + rect.h) {
+            return { type: 'resize', id: sel.id }
+          }
+        }
+      }
+    }
     for (const o of active) {
       if (o.type === 'text' && o.text) {
         const size = o.fontSizePercent != null
@@ -412,6 +578,16 @@ export function RecordPreview({
         const h = o.naturalHeight != null && o.naturalWidth != null
           ? o.naturalHeight * scale
           : (o.imageHeight ?? 200)
+        const x = (o.x ?? 0.5) * width - w / 2
+        const y = (o.y ?? 0.5) * height - h / 2
+        if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
+          return { type: 'overlay', id: o.id, offsetX: canvasX - (x + w / 2), offsetY: canvasY - (y + h / 2) }
+        }
+      }
+      if (o.type === 'video' && o.videoUrl) {
+        const scale = o.imageScale ?? 1
+        const w = (o.naturalWidth ?? 1920) * scale
+        const h = (o.naturalHeight ?? 1080) * scale
         const x = (o.x ?? 0.5) * width - w / 2
         const y = (o.y ?? 0.5) * height - h / 2
         if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
@@ -449,6 +625,25 @@ export function RecordPreview({
       ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
+    if (hit?.type === 'resize' && onOverlayEdit && !isRecording) {
+      e.preventDefault()
+      const o = overlays.find((ov) => ov.id === hit.id)
+      if (!o) return
+      const startValue =
+        o.type === 'text'
+          ? (o.fontSizePercent ?? ((o.fontSize ?? 24) / 1280) * 100)
+          : (o.imageScale ?? 1)
+      setResizeState({
+        overlayId: hit.id,
+        startX: x,
+        startY: y,
+        startValue,
+        kind: o.type === 'text' ? 'fontSize' : 'scale',
+      })
+      setCursor('nwse-resize')
+      ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+      return
+    }
     if (hit?.type === 'overlay' && onOverlayMove && !isRecording) {
       e.preventDefault()
       setDragState({ overlayId: hit.id, offsetX: hit.offsetX, offsetY: hit.offsetY })
@@ -464,6 +659,21 @@ export function RecordPreview({
       onCaptionYChange(newY)
       return
     }
+    if (resizeState && onOverlayEdit) {
+      const deltaX = x - resizeState.startX
+      const deltaY = y - resizeState.startY
+      const sensitivity = 0.012
+      const delta = (deltaX + deltaY) * sensitivity
+      let newValue = resizeState.startValue + delta
+      if (resizeState.kind === 'fontSize') {
+        newValue = Math.max(MIN_FONT_SIZE_PCT, Math.min(MAX_FONT_SIZE_PCT, newValue))
+        onOverlayEdit(resizeState.overlayId, { fontSizePercent: newValue })
+      } else {
+        newValue = Math.max(MIN_IMAGE_SCALE, Math.min(MAX_IMAGE_SCALE, newValue))
+        onOverlayEdit(resizeState.overlayId, { imageScale: newValue })
+      }
+      return
+    }
     if (dragState && onOverlayMove) {
       const nx = (x - dragState.offsetX) / width
       const ny = (y - dragState.offsetY) / height
@@ -473,23 +683,26 @@ export function RecordPreview({
     }
     const hit = hitTest(x, y)
     if (hit?.type === 'caption' && onCaptionYChange) setCursor('grab')
+    else if (hit?.type === 'resize' && !isRecording && onOverlayEdit) setCursor('nwse-resize')
     else if (hit?.type === 'overlay' && !isRecording && onOverlayMove) setCursor('grab')
     else setCursor('default')
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (captionDrag || dragState) {
+    if (captionDrag || dragState || resizeState) {
       ;(e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
       setCaptionDrag(false)
       setDragState(null)
+      setResizeState(null)
       setCursor('default')
     }
   }
 
   const handlePointerLeave = () => {
-    if (captionDrag || dragState) {
+    if (captionDrag || dragState || resizeState) {
       setCaptionDrag(false)
       setDragState(null)
+      setResizeState(null)
     }
     setCursor('default')
   }

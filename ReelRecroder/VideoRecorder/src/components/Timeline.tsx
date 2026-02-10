@@ -1,6 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import type { OverlayItem, OverlayTextAnimation } from '../types'
 import { IconType, IconImage, IconPlay, IconPause, IconSplit, IconVideo } from './Icons'
+import { StickerPicker } from './StickerPicker'
+import { AnimatedStickerPicker } from './AnimatedStickerPicker'
+import { SubscribePicker } from './SubscribePicker'
+import { getStoredGiphyApiKey } from './SettingsModal'
 import styles from './Timeline.module.css'
 
 const MIN_CLIP_DURATION = 0.5
@@ -20,7 +24,7 @@ interface TimelineProps {
   duration: number
   currentTime: number
   onSeek?: (time: number) => void
-  onAddOverlay: (type: 'text' | 'image') => void
+  onAddOverlay: (type: 'text' | 'image' | 'video', initialPatch?: Partial<OverlayItem>) => void
   onEditOverlay: (id: string, patch: Partial<OverlayItem>) => void
   onRemoveOverlay: (id: string) => void
   onSelectOverlay: (id: string | null) => void
@@ -86,6 +90,10 @@ export function Timeline({
   const [durationEditing, setDurationEditing] = useState(false)
   const [durationInputValue, setDurationInputValue] = useState('')
   const durationInputRef = useRef<HTMLInputElement>(null)
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
+  const [subscribePickerOpen, setSubscribePickerOpen] = useState(false)
+  const [animatedStickerPickerOpen, setAnimatedStickerPickerOpen] = useState(false)
+  const [animatedStickerInitialQuery, setAnimatedStickerInitialQuery] = useState<string | undefined>(undefined)
   const [inOutMarkerDrag, setInOutMarkerDrag] = useState<'in' | 'out' | null>(null)
   const inOutMarkerDragRef = useRef<{ kind: 'in' | 'out'; rect: DOMRect } | null>(null)
   const videoClipTrimRef = useRef(videoClipTrim)
@@ -371,6 +379,7 @@ export function Timeline({
 
   const textOverlays = overlays.filter((o) => o.type === 'text')
   const imageOverlays = overlays.filter((o) => o.type === 'image')
+  const videoOverlays = overlays.filter((o) => o.type === 'video')
 
   const selectedOverlayForSplit = selectedId ? overlays.find((x) => x.id === selectedId) : null
   const canSplit = !!(
@@ -404,6 +413,78 @@ export function Timeline({
         <button type="button" className={styles.toolbarBtn} onClick={() => onAddOverlay('image')} title="Add image overlay" aria-label="Add image overlay">
           <IconImage />
           <span>Image</span>
+        </button>
+        <button type="button" className={styles.toolbarBtn} onClick={() => setStickerPickerOpen(true)} title="Add sticker" aria-label="Add sticker">
+          <span className={styles.stickerIcon}>✱</span>
+          <span>Sticker</span>
+        </button>
+        <StickerPicker
+          isOpen={stickerPickerOpen}
+          onClose={() => setStickerPickerOpen(false)}
+          onSelect={(imageDataUrl, naturalWidth, naturalHeight) => {
+            onAddOverlay('image', {
+              imageDataUrl,
+              naturalWidth,
+              naturalHeight,
+              imageScale: 1,
+              x: 0.5,
+              y: 0.5,
+              burnIntoExport: true,
+            })
+            setStickerPickerOpen(false)
+          }}
+        />
+        <button type="button" className={styles.toolbarBtn} onClick={() => setSubscribePickerOpen(true)} title="Add YouTube subscribe button" aria-label="Add YouTube subscribe button">
+          <span className={styles.stickerIcon}>▶</span>
+          <span>Subscribe</span>
+        </button>
+        <SubscribePicker
+          isOpen={subscribePickerOpen}
+          onClose={() => setSubscribePickerOpen(false)}
+          onAddStatic={(imageDataUrl, naturalWidth, naturalHeight) => {
+            onAddOverlay('image', {
+              imageDataUrl,
+              naturalWidth,
+              naturalHeight,
+              imageScale: 1,
+              x: 0.5,
+              y: 0.5,
+              burnIntoExport: true,
+            })
+            setSubscribePickerOpen(false)
+          }}
+          onOpenAnimated={() => {
+            setSubscribePickerOpen(false)
+            setAnimatedStickerInitialQuery('youtube subscribe')
+            setAnimatedStickerPickerOpen(true)
+          }}
+        />
+        <button type="button" className={styles.toolbarBtn} onClick={() => { setAnimatedStickerInitialQuery(undefined); setAnimatedStickerPickerOpen(true) }} title="Add animated sticker (GIPHY)" aria-label="Add animated sticker">
+          <span className={styles.stickerIcon}>G</span>
+          <span>Animated</span>
+        </button>
+        <AnimatedStickerPicker
+          isOpen={animatedStickerPickerOpen}
+          onClose={() => { setAnimatedStickerPickerOpen(false); setAnimatedStickerInitialQuery(undefined) }}
+          apiKey={getStoredGiphyApiKey()}
+          initialQuery={animatedStickerInitialQuery}
+          onSelect={(imageUrl, naturalWidth, naturalHeight) => {
+            onAddOverlay('image', {
+              imageUrl,
+              naturalWidth,
+              naturalHeight,
+              imageScale: 1,
+              x: 0.5,
+              y: 0.5,
+              burnIntoExport: true,
+            })
+            setAnimatedStickerPickerOpen(false)
+            setAnimatedStickerInitialQuery(undefined)
+          }}
+        />
+        <button type="button" className={styles.toolbarBtn} onClick={() => onAddOverlay('video', { imageScale: 1, x: 0.5, y: 0.5, burnIntoExport: true })} title="Add video overlay (set source in Inspector: Pexels or Pixabay)" aria-label="Add video overlay">
+          <IconVideo />
+          <span>Video</span>
         </button>
         <div className={styles.toolbarSpacer} />
         {onPreviewPlayToggle && (
@@ -661,6 +742,46 @@ export function Timeline({
                   <span className={styles.clipSegmentBody} title="Drag to move">
                     <IconImage className={styles.clipIcon} />
                     <span className={styles.clipLabel}>Image</span>
+                  </span>
+                  <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                </div>
+              </div>
+            </div>
+          ))}
+          {videoOverlays.map((o) => (
+            <div key={o.id} className={styles.clipsStripRow}>
+              <span className={styles.stripLabel}>Video</span>
+              <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
+                <div
+                  data-clip-segment
+                  className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
+                  style={{
+                    left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
+                    width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
+                  }}
+                  title={`Video ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
+                  onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
+                  onPointerDown={(e) => {
+                    const el = e.target as HTMLElement
+                    const edge = el.getAttribute?.('data-edge')
+                    const forceMode: ClipDragMode | undefined =
+                      edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
+                    handleClipPointerDown(e, o, forceMode)
+                    const seg = el.closest('[data-clip-segment]') as HTMLElement | null
+                    seg?.setPointerCapture(e.pointerId)
+                  }}
+                  onPointerMove={handleClipPointerMove}
+                  onPointerUp={handleClipPointerUp}
+                  onPointerLeave={handleClipPointerUp}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Video clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
+                >
+                  <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                  <span className={styles.clipSegmentBody} title="Drag to move">
+                    <IconVideo className={styles.clipIcon} />
+                    <span className={styles.clipLabel}>Video</span>
                   </span>
                   <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
                 </div>

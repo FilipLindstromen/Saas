@@ -24,6 +24,8 @@ interface ExportPanelProps {
   youtubeCaption: string
   onYoutubeCaptionChange: (v: string) => void
   thumbnailBlob: Blob | null
+  musicBlob?: Blob | null
+  musicVolume?: number
 }
 
 export function ExportPanel({
@@ -91,6 +93,8 @@ export function ExportPanel({
       colorBrightness: colorAdjustmentsEnabled ? colorBrightness : 100,
       colorContrast: colorAdjustmentsEnabled ? colorContrast : 100,
       colorSaturation: colorAdjustmentsEnabled ? colorSaturation : 100,
+      musicBlob: musicBlob ?? undefined,
+      musicVolume,
     })
     return result
   }

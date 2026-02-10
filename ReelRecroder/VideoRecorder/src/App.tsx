@@ -4,6 +4,7 @@ import { useMediaDevices } from './hooks/useMediaDevices'
 import { useRecorder } from './hooks/useRecorder'
 import { getResolutionsForAspect, QUALITY_OPTIONS } from './constants'
 import { loadVideoRecorderState, saveVideoRecorderState } from './utils/persistence'
+import { getClipLibrary, saveClipToLibrary, removeClipFromLibrary, generateLibraryId } from './utils/clipLibrary'
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
 import type { ParsedLUT } from './utils/colorLut'
 import { exportVideoForDownload } from './utils/exportWithColorAdjustments'
@@ -13,11 +14,12 @@ import { TranscriptionPanel } from './components/TranscriptionPanel'
 import { ThumbnailCaptionsPanel } from './components/ThumbnailCaptionsPanel'
 import { ExportPanel } from './components/ExportPanel'
 import { InspectorPanel, type InspectorTabId } from './components/InspectorPanel'
+import { ClipLibraryPanel } from './components/ClipLibraryPanel'
 import { VideoSettingsModal } from './components/VideoSettingsModal'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
-import { IconRecord, IconStop, IconPlay, IconDownload, IconEdit, IconThumbnail, IconExport } from './components/Icons'
+import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport } from './components/Icons'
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
@@ -87,11 +89,16 @@ export default function App() {
   const [thumbnailGeneratedDataUrl, setThumbnailGeneratedDataUrl] = useState<string | null>(() => initialState?.thumbnailGeneratedDataUrl ?? null)
   const [youtubeCaption, setYoutubeCaption] = useState('')
   const [youtubeTitle, setYoutubeTitle] = useState('')
+  const [clipLibrary, setClipLibrary] = useState<LibraryClip[]>(() => getClipLibrary())
+  type LeftPanelTabId = 'transcription' | 'clips'
+  const [leftPanelTab, setLeftPanelTab] = useState<LeftPanelTabId>('transcription')
   const [inspectorTab, setInspectorTab] = useState<InspectorTabId>(() => (initialState?.inspectorTab as InspectorTabId) ?? 'current')
   const [safeZoneType, setSafeZoneType] = useState<SafeZoneType>(() => (initialState?.safeZoneType as SafeZoneType) ?? 'youtube-9:16')
   const [safeZoneVisible, setSafeZoneVisible] = useState(() => initialState?.safeZoneVisible ?? false)
   const [exportPanelOpen, setExportPanelOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState<ExportFormat>('webm')
+  const [musicBlob, setMusicBlob] = useState<Blob | null>(null)
+  const [musicVolume, setMusicVolume] = useState(50)
   const [downloadPreparing, setDownloadPreparing] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
@@ -347,7 +354,7 @@ export default function App() {
     if (needsExport) {
       setDownloadPreparing(true)
       try {
-        const blob = await exportVideoForDownload(recordedBlob, {
+        const result = await exportVideoForDownload(recordedBlob, {
           width,
           height,
           sourceDuration: duration ?? undefined,
@@ -361,7 +368,10 @@ export default function App() {
           colorBrightness: colorAdjustmentsEnabled ? colorBrightness : 100,
           colorContrast: colorAdjustmentsEnabled ? colorContrast : 100,
           colorSaturation: colorAdjustmentsEnabled ? colorSaturation : 100,
+          musicBlob: musicBlob ?? undefined,
+          musicVolume,
         })
+        const blob = result && typeof result === 'object' && 'blob' in result ? result.blob : result
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -493,7 +503,7 @@ export default function App() {
     }
   }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality])
 
-  const handleAddOverlay = useCallback((type: 'text' | 'image') => {
+  const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video', initialPatch?: Partial<OverlayItem>) => {
     const start = displayTime
     const item: OverlayItem = {
       id: generateId(),
@@ -501,10 +511,39 @@ export default function App() {
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
       ...(type === 'text' ? { text: 'New text', fontSizePercent: 10, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
+      ...initialPatch,
     }
     setOverlays((prev) => [...prev, item])
     setSelectedOverlayId(item.id)
   }, [displayTime, timelineDuration, defaultFontFamily, defaultSecondaryFont])
+
+  const handleAddOverlayFromLibrary = useCallback((clip: LibraryClip) => {
+    const start = displayTime
+    const item: OverlayItem = {
+      id: generateId(),
+      type: clip.payload.type,
+      startTime: start,
+      endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
+      ...clip.payload,
+    }
+    setOverlays((prev) => [...prev, item])
+    setSelectedOverlayId(item.id)
+  }, [displayTime, timelineDuration])
+
+  const handleSaveOverlayToLibrary = useCallback((overlay: OverlayItem) => {
+    const name = window.prompt('Name for this clip')
+    const trimmed = name?.trim()
+    if (!trimmed) return
+    const { id: _id, startTime: _s, endTime: _e, ...payload } = overlay
+    const clip: LibraryClip = { libraryId: generateLibraryId(), name: trimmed, payload }
+    saveClipToLibrary(clip)
+    setClipLibrary(getClipLibrary())
+  }, [])
+
+  const handleRemoveFromClipLibrary = useCallback((libraryId: string) => {
+    removeClipFromLibrary(libraryId)
+    setClipLibrary(getClipLibrary())
+  }, [])
 
   const handleEditOverlay = useCallback((id: string, patch: Partial<OverlayItem>) => {
     setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
@@ -609,6 +648,8 @@ export default function App() {
             onPlaybackEnd={mode === 'edit' && recordedBlob ? () => setIsPreviewPlaying(false) : undefined}
             videoRef={previewVideoRef}
             onOverlayMove={(id, x, y) => handleEditOverlay(id, { x, y })}
+            selectedOverlayId={selectedOverlayId}
+            onOverlayEdit={handleEditOverlay}
             portraitFillHeight={portraitFillHeight}
             overlayTextAnimation={overlayTextAnimation}
             defaultFontFamily={defaultFontFamily}
@@ -681,8 +722,7 @@ export default function App() {
                 setThumbnailPanelOpen((p) => !p)
                 if (!thumbnailPanelOpen) setExportPanelOpen(false)
               }}
-              disabled={!recordedBlob}
-              title={!recordedBlob ? 'Record first' : 'Thumbnail & YouTube description'}
+              title="Thumbnail & YouTube description (webcam or record first for video frame)"
               aria-pressed={thumbnailPanelOpen}
             >
               <IconThumbnail />
@@ -778,26 +818,59 @@ export default function App() {
           colorBrightness={colorBrightness}
           colorContrast={colorContrast}
           colorSaturation={colorSaturation}
+          musicBlob={musicBlob}
+          musicVolume={musicVolume}
         />
       )}
 
       {mode === 'edit' && recordedBlob && !thumbnailPanelOpen && (
-        <div className={styles.leftPanel} aria-label="Transcription">
-          <TranscriptionPanel
-            segments={captionSegments ?? []}
-            onSegmentsChange={setCaptionSegments}
-            currentTime={currentTime}
-            onSeek={(sourceTime) => {
-              setSeekTime(sourceTime)
-              setCurrentTime(
-                videoTrimEnd != null ? sourceTime - videoTrimStart : sourceTime
-              )
-              setTimeout(() => setSeekTime(null), 150)
-            }}
-            onTranscribe={handleTranscribe}
-            isTranscribing={isTranscribing}
-            transcribeError={transcribeError}
-          />
+        <div className={styles.leftPanel} aria-label="Left panel">
+          <div className={styles.leftPanelTabs} role="tablist" aria-label="Left panel tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftPanelTab === 'transcription'}
+              className={leftPanelTab === 'transcription' ? styles.leftPanelTabActive : styles.leftPanelTab}
+              onClick={() => setLeftPanelTab('transcription')}
+            >
+              Transcription
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftPanelTab === 'clips'}
+              className={leftPanelTab === 'clips' ? styles.leftPanelTabActive : styles.leftPanelTab}
+              onClick={() => setLeftPanelTab('clips')}
+            >
+              Clip library
+            </button>
+          </div>
+          <div className={styles.leftPanelContent}>
+            {leftPanelTab === 'transcription' && (
+              <TranscriptionPanel
+                segments={captionSegments ?? []}
+                onSegmentsChange={setCaptionSegments}
+                currentTime={currentTime}
+                onSeek={(sourceTime) => {
+                  setSeekTime(sourceTime)
+                  setCurrentTime(
+                    videoTrimEnd != null ? sourceTime - videoTrimStart : sourceTime
+                  )
+                  setTimeout(() => setSeekTime(null), 150)
+                }}
+                onTranscribe={handleTranscribe}
+                isTranscribing={isTranscribing}
+                transcribeError={transcribeError}
+              />
+            )}
+            {leftPanelTab === 'clips' && (
+              <ClipLibraryPanel
+                clips={clipLibrary}
+                onAddToTimeline={handleAddOverlayFromLibrary}
+                onRemove={handleRemoveFromClipLibrary}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -810,11 +883,13 @@ export default function App() {
       >
         <div className={styles.main}>
         <div className={styles.content}>
-          {thumbnailPanelOpen && recordedBlob && downloadUrl ? (
+          {thumbnailPanelOpen ? (
             <ThumbnailCaptionsPanel
-              videoUrl={downloadUrl}
-              videoBlob={recordedBlob}
+              videoUrl={downloadUrl ?? ''}
+              videoBlob={recordedBlob ?? undefined}
               aspectRatio={aspectRatio}
+              width={width}
+              height={height}
               captionSegments={captionSegments}
               openaiApiKey={openaiApiKey}
               youtubeTitle={youtubeTitle}
@@ -826,6 +901,10 @@ export default function App() {
               onClose={() => setThumbnailPanelOpen(false)}
               videoDeviceId={videoDeviceId}
               flipVideo={flipVideo}
+              colorAdjustmentsEnabled={colorAdjustmentsEnabled}
+              colorBrightness={colorBrightness}
+              colorContrast={colorContrast}
+              colorSaturation={colorSaturation}
               embedded
               initialSeekTime={thumbnailSeekTime}
               initialTexts={thumbnailTexts}
@@ -985,6 +1064,10 @@ export default function App() {
             openaiApiKey={openaiApiKey}
             videoWidth={width}
             videoHeight={height}
+            musicBlob={musicBlob}
+            onMusicBlobChange={setMusicBlob}
+            musicVolume={musicVolume}
+            onMusicVolumeChange={setMusicVolume}
             safeZoneType={safeZoneType}
             onSafeZoneTypeChange={setSafeZoneType}
             safeZoneVisible={safeZoneVisible}
