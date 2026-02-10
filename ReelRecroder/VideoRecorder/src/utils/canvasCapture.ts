@@ -65,7 +65,7 @@ function roundRect(
   r: number
 ) {
   if (typeof (ctx as CanvasRenderingContext2D & { roundRect?: unknown }).roundRect === 'function') {
-    ;(ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(x, y, w, h, r)
+    ; (ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(x, y, w, h, r)
     return
   }
   ctx.moveTo(x + r, y)
@@ -237,9 +237,27 @@ export interface CaptionOptions {
 /** For word-level timing: text to show at currentTime (words that have started) and words for karaoke. */
 function getCaptionDisplay(
   segment: CaptionSegment,
-  currentTime: number
-): { displayText: string; words: CaptionWord[] } {
+  currentTime: number,
+  wordByWord: boolean = false
+): { displayText: string; words: CaptionWord[]; currentWord?: CaptionWord } {
   const words = segment.words
+
+  // Word-by-word mode requires word-level timestamps
+  if (wordByWord) {
+    if (!words || words.length === 0) {
+      // No word-level data - show nothing (user needs to re-transcribe)
+      return { displayText: '', words: [] }
+    }
+    // Show only the current word (word being spoken right now)
+    const currentWord = words.find((w) => currentTime >= w.start && currentTime < w.end)
+    return {
+      displayText: currentWord?.word ?? '',
+      words,
+      currentWord
+    }
+  }
+
+  // Default modes: show all words that have started, or segment text if no word data
   if (!words || words.length === 0) {
     return { displayText: segment.text, words: [] }
   }
@@ -273,7 +291,7 @@ export function drawCaptionStyle(
     outProgress
   )
 
-  const { displayText, words } = getCaptionDisplay(segment, currentTime)
+  const { displayText, words } = getCaptionDisplay(segment, currentTime, style === 'word-by-word')
   const hasWordTiming = words.length > 0
 
   const fontSize =
@@ -292,7 +310,18 @@ export function drawCaptionStyle(
   }
   ctx.textAlign = 'center'
 
-  if (style === 'lower-third') {
+  if (style === 'word-by-word') {
+    // Show only the current word, large and bold
+    ctx.font = `bold ${fontSize}px "${CAPTION_FONT}", sans-serif`
+    ctx.fillStyle = '#fff'
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = Math.max(3, fontSize / 8)
+    ctx.textBaseline = 'middle'
+    if (displayText) {
+      ctx.strokeText(displayText, width / 2, centerY)
+      ctx.fillText(displayText, width / 2, centerY)
+    }
+  } else if (style === 'lower-third') {
     ctx.font = `bold ${fontSize}px "${CAPTION_FONT}", sans-serif`
     const lines = wrapText(ctx, displayText, maxWidth)
     const boxH = lines.length * lineHeight + pad * 2

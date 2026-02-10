@@ -85,3 +85,5 @@ export type CaptionStyle =
   | 'karaoke'
   | 'minimal'
   | 'bold-block'
+  | 'word-by-word'
+

@@ -153,6 +153,8 @@ interface RecordPreviewProps {
   onPlaybackEnd?: () => void
   /** Safe zone overlay (preview only, never in recording or export) */
   safeZone?: { type: SafeZoneType; visible: boolean }
+  videoVolume?: number
+  selectedOverlayId?: string | null
 }
 
 export function RecordPreview({
@@ -191,11 +193,18 @@ export function RecordPreview({
   isPreviewPlaying = false,
   onPlaybackEnd,
   safeZone,
+  videoVolume = 100,
 }: RecordPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
   const startTimeRef = useRef(0)
+
+  useEffect(() => {
+    if (internalVideoRef.current) {
+      internalVideoRef.current.volume = videoVolume / 100
+    }
+  }, [videoVolume])
   const rafRef = useRef<number>(0)
   const overlayVideoRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const overlayImageRef = useRef<Map<string, HTMLImageElement>>(new Map())
@@ -286,7 +295,7 @@ export function RecordPreview({
     const video = internalVideoRef.current
     if (!playbackUrl || !video) return
     if (isPreviewPlaying) {
-      video.play().catch(() => {})
+      video.play().catch(() => { })
     } else {
       video.pause()
     }
@@ -317,7 +326,7 @@ export function RecordPreview({
       const vTrack = videoStream.getVideoTracks()[0]
       if (vTrack) {
         video.srcObject = new MediaStream([vTrack])
-        video.play().catch(() => {})
+        video.play().catch(() => { })
       }
     } else {
       video.srcObject = null
@@ -348,21 +357,39 @@ export function RecordPreview({
   }, [overlays])
 
   // Keep image elements for image overlays (data URL or URL; needed for animated GIFs)
+  // Use actual DOM elements so GIFs animate (HTMLImageElement doesn't animate when drawn to canvas)
   useEffect(() => {
     const map = overlayImageRef.current
     const imageOverlayIds = new Set(
       overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl)).map((o) => o.id)
     )
+    // Remove elements that are no longer in overlays
     for (const id of map.keys()) {
-      if (!imageOverlayIds.has(id)) map.delete(id)
+      if (!imageOverlayIds.has(id)) {
+        const el = map.get(id)
+        if (el && el.parentNode) el.parentNode.removeChild(el)
+        map.delete(id)
+      }
     }
+    // Create new DOM img elements for new overlays
     for (const o of overlays) {
       if (o.type !== 'image' || (!o.imageDataUrl && !o.imageUrl)) continue
       if (map.has(o.id)) continue
-      const el = new Image()
+      const el = document.createElement('img')
       el.crossOrigin = 'anonymous'
+      el.style.position = 'absolute'
+      el.style.left = '-9999px'
+      el.style.pointerEvents = 'none'
       el.src = o.imageDataUrl ?? o.imageUrl!
+      document.body.appendChild(el)
       map.set(o.id, el)
+    }
+    // Cleanup on unmount
+    return () => {
+      for (const el of map.values()) {
+        if (el.parentNode) el.parentNode.removeChild(el)
+      }
+      map.clear()
     }
   }, [overlays])
 
@@ -622,7 +649,7 @@ export function RecordPreview({
       e.preventDefault()
       setCaptionDrag(true)
       setCursor('grabbing')
-      ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
     if (hit?.type === 'resize' && onOverlayEdit && !isRecording) {
@@ -641,14 +668,14 @@ export function RecordPreview({
         kind: o.type === 'text' ? 'fontSize' : 'scale',
       })
       setCursor('nwse-resize')
-      ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
     if (hit?.type === 'overlay' && onOverlayMove && !isRecording) {
       e.preventDefault()
       setDragState({ overlayId: hit.id, offsetX: hit.offsetX, offsetY: hit.offsetY })
       setCursor('grabbing')
-      ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
     }
   }
 
@@ -690,7 +717,7 @@ export function RecordPreview({
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (captionDrag || dragState || resizeState) {
-      ;(e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
+      ; (e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
       setCaptionDrag(false)
       setDragState(null)
       setResizeState(null)
@@ -711,8 +738,8 @@ export function RecordPreview({
   const filterStyle =
     showColorFilter && ((colorBrightness ?? 100) !== 100 || (colorContrast ?? 100) !== 100 || (colorSaturation ?? 100) !== 100)
       ? {
-          filter: `brightness(${colorBrightness ?? 100}%) contrast(${colorContrast ?? 100}%) saturate(${colorSaturation ?? 100}%)`,
-        }
+        filter: `brightness(${colorBrightness ?? 100}%) contrast(${colorContrast ?? 100}%) saturate(${colorSaturation ?? 100}%)`,
+      }
       : undefined
 
   return (
@@ -737,7 +764,7 @@ export function RecordPreview({
           if (externalVideoRef) (externalVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el
         }}
         className={styles.hiddenVideo}
-        muted
+        muted={isRecording}
         playsInline
         style={{ display: 'none' }}
       />

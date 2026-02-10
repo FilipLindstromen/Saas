@@ -58,6 +58,7 @@ export const CAPTION_STYLES: { value: CaptionStyle; label: string }[] = [
   { value: 'lower-third', label: 'Lower third' },
   { value: 'centered-subtitle', label: 'Centered subtitle' },
   { value: 'karaoke', label: 'Karaoke highlight' },
+  { value: 'word-by-word', label: 'Word-by-word' },
   { value: 'minimal', label: 'Minimal' },
   { value: 'bold-block', label: 'Bold block' },
 ]

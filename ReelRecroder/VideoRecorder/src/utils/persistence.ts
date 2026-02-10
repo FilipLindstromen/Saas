@@ -55,6 +55,9 @@ export interface PersistedState {
   thumbnailWebcamDataUrl: string | null
   /** Thumbnail mode: generated thumbnail image (with text burned in) as data URL for YouTube */
   thumbnailGeneratedDataUrl: string | null
+  videoVolume: number
+  noiseRemovalEnabled: boolean
+  noiseRemovalAmount: number
 }
 
 const defaults: PersistedState = {
@@ -90,6 +93,9 @@ const defaults: PersistedState = {
   thumbnailTexts: [],
   thumbnailWebcamDataUrl: null,
   thumbnailGeneratedDataUrl: null,
+  videoVolume: 100,
+  noiseRemovalEnabled: false,
+  noiseRemovalAmount: 50,
 }
 
 function normalizeOverlayItem(raw: unknown): OverlayItem | null {
@@ -248,6 +254,9 @@ function validateState(raw: unknown): PersistedState | null {
       o.thumbnailGeneratedDataUrl == null || (typeof o.thumbnailGeneratedDataUrl === 'string' && o.thumbnailGeneratedDataUrl.startsWith('data:'))
         ? (o.thumbnailGeneratedDataUrl as string | null) ?? defaults.thumbnailGeneratedDataUrl
         : defaults.thumbnailGeneratedDataUrl,
+    videoVolume: typeof o.videoVolume === 'number' && Number.isFinite(o.videoVolume) ? Math.max(0, Math.min(100, o.videoVolume)) : defaults.videoVolume,
+    noiseRemovalEnabled: typeof o.noiseRemovalEnabled === 'boolean' ? o.noiseRemovalEnabled : defaults.noiseRemovalEnabled,
+    noiseRemovalAmount: typeof o.noiseRemovalAmount === 'number' && Number.isFinite(o.noiseRemovalAmount) ? Math.max(0, Math.min(100, o.noiseRemovalAmount)) : defaults.noiseRemovalAmount,
   }
 }
 

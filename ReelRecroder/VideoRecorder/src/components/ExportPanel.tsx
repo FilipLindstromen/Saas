@@ -8,6 +8,8 @@ import {
 } from '../services/youtubeUpload'
 import type { ExportFormat } from '../utils/exportWithColorAdjustments'
 import { exportVideoForDownload, getVideoDurationFromBlob } from '../utils/exportWithColorAdjustments'
+import type { OverlayItem, OverlayTextAnimation, CaptionStyle } from '../types'
+import type { CaptionSegment } from '../services/captions'
 import styles from './ExportPanel.module.css'
 
 interface ExportPanelProps {
@@ -26,6 +28,27 @@ interface ExportPanelProps {
   thumbnailBlob: Blob | null
   musicBlob?: Blob | null
   musicVolume?: number
+  videoVolume?: number
+  noiseRemovalEnabled?: boolean
+  noiseRemovalAmount?: number
+  overlays?: OverlayItem[]
+  overlayTextAnimation?: OverlayTextAnimation
+  defaultFontFamily?: string
+  defaultSecondaryFont?: string
+  defaultBold?: boolean
+  trimStart?: number
+  trimEnd?: number
+  sourceDuration?: number
+  colorAdjustmentsEnabled?: boolean
+  colorBrightness?: number
+  colorContrast?: number
+  colorSaturation?: number
+  captionSegments?: CaptionSegment[] | null
+  captionStyle?: CaptionStyle
+  captionFontSizePercent?: number
+  captionY?: number
+  onExportStart?: () => void
+  onExportEnd?: () => void
 }
 
 export function ExportPanel({
@@ -42,18 +65,29 @@ export function ExportPanel({
   youtubeCaption,
   onYoutubeCaptionChange,
   thumbnailBlob,
+  musicBlob,
+  musicVolume = 50,
+  videoVolume = 100,
+  noiseRemovalEnabled = false,
+  noiseRemovalAmount = 50,
   overlays = [],
   overlayTextAnimation = 'none',
   defaultFontFamily = 'Oswald',
   defaultSecondaryFont = 'Playfair Display',
   defaultBold = false,
-  trimStart: trimStartProp,
+  trimStart: trimStartProp = 0,
   trimEnd: trimEndProp,
   sourceDuration,
   colorAdjustmentsEnabled = false,
   colorBrightness = 100,
   colorContrast = 100,
   colorSaturation = 100,
+  captionSegments,
+  captionStyle,
+  captionFontSizePercent,
+  captionY,
+  onExportStart,
+  onExportEnd,
 }: ExportPanelProps) {
   const [uploading, setUploading] = useState(false)
   const [downloadPreparing, setDownloadPreparing] = useState(false)
@@ -61,42 +95,65 @@ export function ExportPanel({
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const hasOverlaysToBurn = overlays.some((o) => o.burnIntoExport !== false)
-  const hasTrim = trimEndProp != null
+  const hasTrim = trimEndProp != null || trimStartProp > 0
   const hasColor =
     colorAdjustmentsEnabled &&
     (colorBrightness !== 100 || colorContrast !== 100 || colorSaturation !== 100)
-  const needsExport = hasOverlaysToBurn || hasTrim || hasColor
+  const hasAudioAdjustments = musicBlob || videoVolume !== 100 || noiseRemovalEnabled
+
+  const needsExport = hasOverlaysToBurn || hasTrim || hasColor || hasAudioAdjustments || captionSegments
 
   const getExportBlob = async (): Promise<{ blob: Blob; extension: ExportFormat }> => {
     if (!videoBlob) throw new Error('No video')
     if (!needsExport) return { blob: videoBlob, extension: 'webm' }
+
+    if (onExportStart) onExportStart()
+
     let resolvedDuration = sourceDuration
     if (resolvedDuration == null || resolvedDuration <= 0 || !Number.isFinite(resolvedDuration)) {
       try {
         resolvedDuration = await getVideoDurationFromBlob(videoBlob)
       } catch (e) {
-        throw new Error('Could not read video duration. Try playing the video in Edit mode first, then export again.')
+        console.warn('Could not detect duration from blob', e)
+        // Fallback or let exportVideoForDownload handle it if possible
+        resolvedDuration = 10
       }
     }
-    const result = await exportVideoForDownload(videoBlob, {
-      width,
-      height,
-      sourceDuration: resolvedDuration,
-      trimStart: trimEndProp != null ? trimStartProp : undefined,
-      trimEnd: trimEndProp ?? resolvedDuration ?? undefined,
-      exportFormat,
-      overlays,
-      overlayTextAnimation,
-      defaultFontFamily,
-      defaultSecondaryFont,
-      defaultBold,
-      colorBrightness: colorAdjustmentsEnabled ? colorBrightness : 100,
-      colorContrast: colorAdjustmentsEnabled ? colorContrast : 100,
-      colorSaturation: colorAdjustmentsEnabled ? colorSaturation : 100,
-      musicBlob: musicBlob ?? undefined,
-      musicVolume,
-    })
-    return result
+
+    try {
+      const result = await exportVideoForDownload(videoBlob, {
+        width,
+        height,
+        sourceDuration: resolvedDuration || 0,
+        trimStart: trimStartProp,
+        trimEnd: trimEndProp ?? resolvedDuration,
+        exportFormat,
+        overlays,
+        overlayTextAnimation,
+        defaultFontFamily,
+        defaultSecondaryFont,
+        defaultBold,
+        colorBrightness: colorAdjustmentsEnabled ? colorBrightness : 100,
+        colorContrast: colorAdjustmentsEnabled ? colorContrast : 100,
+        colorSaturation: colorAdjustmentsEnabled ? colorSaturation : 100,
+        musicBlob: musicBlob ?? undefined,
+        musicVolume,
+        videoVolume,
+        // TODO: Pass noise removal params once supported in export utils
+        captionSegments: captionSegments ?? undefined, // Ensure null becomes undefined
+        captionStyle,
+        captionFontSizePercent,
+        captionY,
+      }, (progress) => {
+        // We could expose this progress up if needed
+      })
+
+      if (onExportEnd) onExportEnd()
+      return { blob: result, extension: exportFormat }
+    } catch (err) {
+      if (onExportEnd) onExportEnd()
+      throw err
+    }
   }
 
   const handleDownload = async () => {
@@ -143,7 +200,7 @@ export function ExportPanel({
     setUploadSuccess(null)
     setUploading(true)
     try {
-      const blobToUpload = await getExportBlob()
+      const { blob: blobToUpload } = await getExportBlob()
       const token = await getYouTubeAccessToken(clientId)
       const videoId = await uploadVideoToYouTube(token, blobToUpload, {
         title,

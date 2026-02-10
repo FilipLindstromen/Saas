@@ -84,7 +84,7 @@ export function CaptionBurnIn({
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect()
     const y = (e.clientY - rect.top) / rect.height
     setCaptionY(Math.max(0, Math.min(1, y)))
-    ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+      ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
   }
   const handlePreviewPointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current) return
@@ -94,7 +94,7 @@ export function CaptionBurnIn({
   }
   const handlePreviewPointerUp = (e: React.PointerEvent) => {
     dragRef.current = false
-    ;(e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
+      ; (e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
   }
 
   async function handleTranscribe() {
@@ -162,6 +162,11 @@ export function CaptionBurnIn({
           ))}
         </select>
       </div>
+      {style === 'word-by-word' && captionSegments && captionSegments.length > 0 && !captionSegments[0].words && (
+        <p className={styles.warning} style={{ fontSize: '12px', color: '#ff9800', marginTop: '4px' }}>
+          ⚠️ Word-by-word requires word-level timestamps. Please re-transcribe to enable this feature.
+        </p>
+      )}
       <div className={styles.sliderBlock}>
         <label className={styles.label}>Caption size (% of width)</label>
         <div className={styles.sliderRow}>

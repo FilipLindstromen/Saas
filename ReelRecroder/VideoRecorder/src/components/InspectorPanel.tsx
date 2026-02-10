@@ -6,7 +6,7 @@ import { OverlayEditor } from './OverlayEditor'
 import { SourceSelectors } from './SourceSelectors'
 import { OptionsBar } from './OptionsBar'
 import type { CaptionSegment } from '../services/captions'
-import { IconTrash, IconVideo, IconLayers, IconCursor, IconType, IconColor, IconSafeZone } from './Icons'
+import { IconTrash, IconVideo, IconAudio, IconLayers, IconCursor, IconType, IconColor, IconSafeZone } from './Icons'
 import { CaptionBurnIn } from './CaptionBurnIn'
 import type { ParsedLUT } from '../utils/colorLut'
 import { parseCubeLUT } from '../utils/colorLut'
@@ -21,7 +21,7 @@ const TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] =
   { value: 'fade-slide-down', label: 'Fade + slide down' },
 ]
 
-export type InspectorTabId = 'video' | 'color' | 'overlays' | 'current' | 'captions'
+export type InspectorTabId = 'video' | 'audio' | 'color' | 'overlays' | 'current' | 'captions'
 
 interface InspectorPanelProps {
   /** Controlled active tab; when set, parent can open e.g. Video tab from header button */
@@ -67,7 +67,10 @@ interface InspectorPanelProps {
   portraitFillHeight?: boolean
   onPortraitFillHeightChange?: (v: boolean) => void
   colorLut?: ParsedLUT | null
+  colorLut?: ParsedLUT | null
   onColorLutChange?: (lut: ParsedLUT | null) => void
+  colorAdjustmentsEnabled?: boolean
+  onColorAdjustmentsEnabledChange?: (v: boolean) => void
   /* Captions tab (burn-in styling + transcribe/burn) */
   videoBlob?: Blob | null
   onBurnedBlob?: (blob: Blob) => void
@@ -85,11 +88,17 @@ interface InspectorPanelProps {
   onSafeZoneTypeChange?: (t: SafeZoneType) => void
   safeZoneVisible?: boolean
   onSafeZoneVisibleChange?: (v: boolean) => void
-  /* Background music (mixed into export) */
+  /* Audio tab (video volume, background music, noise removal) */
+  videoVolume?: number
+  onVideoVolumeChange?: (v: number) => void
   musicBlob?: Blob | null
   onMusicBlobChange?: (blob: Blob | null) => void
   musicVolume?: number
   onMusicVolumeChange?: (v: number) => void
+  noiseRemovalEnabled?: boolean
+  onNoiseRemovalEnabledChange?: (v: boolean) => void
+  noiseRemovalAmount?: number
+  onNoiseRemovalAmountChange?: (v: number) => void
 }
 
 export function InspectorPanel({
@@ -98,15 +107,15 @@ export function InspectorPanel({
   overlayTextAnimation,
   onOverlayTextAnimationChange,
   defaultFontFamily = 'Oswald',
-  onDefaultFontFamilyChange = () => {},
+  onDefaultFontFamilyChange = () => { },
   defaultSecondaryFont = 'Playfair Display',
-  onDefaultSecondaryFontChange = () => {},
+  onDefaultSecondaryFontChange = () => { },
   defaultBold = false,
-  onDefaultBoldChange = () => {},
+  onDefaultBoldChange = () => { },
   burnOverlaysIntoExport,
   onBurnOverlaysIntoExportChange,
   flipVideo = false,
-  onFlipVideoChange = () => {},
+  onFlipVideoChange = () => { },
   selectedOverlay,
   onOverlayUpdate,
   onOverlayRemove,
@@ -133,36 +142,42 @@ export function InspectorPanel({
   portraitFillHeight = false,
   onPortraitFillHeightChange,
   colorAdjustmentsEnabled = false,
-  onColorAdjustmentsEnabledChange = () => {},
+  onColorAdjustmentsEnabledChange = () => { },
   colorBrightness = 100,
-  onColorBrightnessChange = () => {},
+  onColorBrightnessChange = () => { },
   colorContrast = 100,
-  onColorContrastChange = () => {},
+  onColorContrastChange = () => { },
   colorSaturation = 100,
-  onColorSaturationChange = () => {},
+  onColorSaturationChange = () => { },
   colorLut = null,
-  onColorLutChange = () => {},
+  onColorLutChange = () => { },
   videoBlob = null,
-  onBurnedBlob = () => {},
+  onBurnedBlob = () => { },
   captionStyle,
-  onCaptionStyleChange = () => {},
+  onCaptionStyleChange = () => { },
   captionFontSizePercent,
-  onCaptionFontSizePercentChange = () => {},
+  onCaptionFontSizePercentChange = () => { },
   captionY,
-  onCaptionYChange = () => {},
+  onCaptionYChange = () => { },
   captionSegments = null,
-  onTranscriptionDone = () => {},
+  onTranscriptionDone = () => { },
   openaiApiKey,
   videoWidth = 1280,
   videoHeight = 720,
   safeZoneType = 'youtube-9:16',
-  onSafeZoneTypeChange = () => {},
+  onSafeZoneTypeChange = () => { },
   safeZoneVisible = false,
-  onSafeZoneVisibleChange = () => {},
+  onSafeZoneVisibleChange = () => { },
   musicBlob = null,
   onMusicBlobChange,
   musicVolume = 50,
-  onMusicVolumeChange = () => {},
+  onMusicVolumeChange = () => { },
+  videoVolume = 100,
+  onVideoVolumeChange = () => { },
+  noiseRemovalEnabled = false,
+  onNoiseRemovalEnabledChange = () => { },
+  noiseRemovalAmount = 50,
+  onNoiseRemovalAmountChange = () => { },
 }: InspectorPanelProps) {
   const [internalTab, setInternalTab] = useState<InspectorTabId>('current')
   const activeTab = controlledTab ?? internalTab
@@ -173,15 +188,17 @@ export function InspectorPanel({
   const tabTitle =
     activeTab === 'video'
       ? 'Video settings'
-      : activeTab === 'color'
-        ? 'Camera color'
-        : activeTab === 'current'
-          ? (selectedOverlay ? 'Current object' : 'Select an overlay on the timeline')
-          : activeTab === 'captions'
-            ? 'Caption style'
-            : activeTab === 'safezones'
-              ? 'Safe zones'
-              : 'Global overlay settings'
+      : activeTab === 'audio'
+        ? 'Audio settings'
+        : activeTab === 'color'
+          ? 'Camera color'
+          : activeTab === 'current'
+            ? (selectedOverlay ? 'Current object' : 'Select an overlay on the timeline')
+            : activeTab === 'captions'
+              ? 'Caption style'
+              : activeTab === 'safezones'
+                ? 'Safe zones'
+                : 'Global overlay settings'
 
   const hasVideoSettings =
     onVideoKindChange &&
@@ -223,6 +240,17 @@ export function InspectorPanel({
             <IconVideo />
           </button>
         )}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'audio'}
+          aria-label="Audio settings"
+          id="inspector-tab-audio"
+          className={styles.tab}
+          onClick={() => setActiveTab('audio')}
+        >
+          <IconAudio />
+        </button>
         <button
           type="button"
           role="tab"
@@ -320,6 +348,26 @@ export function InspectorPanel({
             </label>
             <p className={styles.hint}>Mirror the video horizontally in preview and recording.</p>
           </section>
+        </div>
+      )}
+
+      {activeTab === 'audio' && (
+        <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-audio">
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Video volume</h3>
+            <p className={styles.hint}>Adjust the volume of the recorded video audio.</p>
+            <label className={styles.label}>Volume: {videoVolume}%</label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={videoVolume}
+              onChange={(e) => onVideoVolumeChange(Number(e.target.value))}
+              className={styles.slider}
+              aria-label="Video volume"
+            />
+          </section>
+
           {onMusicBlobChange && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Background music</h3>
@@ -360,6 +408,34 @@ export function InspectorPanel({
               )}
             </section>
           )}
+
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Noise removal</h3>
+            <p className={styles.hint}>Remove background noise from the recorded audio. Applied during export.</p>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={noiseRemovalEnabled}
+                onChange={(e) => onNoiseRemovalEnabledChange(e.target.checked)}
+                aria-label="Enable noise removal"
+              />
+              <span>Enable noise removal</span>
+            </label>
+            {noiseRemovalEnabled && (
+              <>
+                <label className={styles.label}>Noise reduction amount: {noiseRemovalAmount}%</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={noiseRemovalAmount}
+                  onChange={(e) => onNoiseRemovalAmountChange(Number(e.target.value))}
+                  className={styles.slider}
+                  aria-label="Noise reduction amount"
+                />
+              </>
+            )}
+          </section>
         </div>
       )}
 
@@ -561,76 +637,76 @@ export function InspectorPanel({
 
       {activeTab === 'overlays' && (
         <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-overlays">
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Recording & export</h3>
-        <label className={styles.checkRow}>
-          <input
-            type="checkbox"
-            checked={burnOverlaysIntoExport}
-            onChange={(e) => onBurnOverlaysIntoExportChange(e.target.checked)}
-            aria-label="Burn overlays into recording and export"
-          />
-          <span>Burn into recording / export</span>
-        </label>
-        <p className={styles.hint}>When unchecked, overlays are preview-only and will not appear in the recorded or exported video.</p>
-      </section>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Recording & export</h3>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={burnOverlaysIntoExport}
+                onChange={(e) => onBurnOverlaysIntoExportChange(e.target.checked)}
+                aria-label="Burn overlays into recording and export"
+              />
+              <span>Burn into recording / export</span>
+            </label>
+            <p className={styles.hint}>When unchecked, overlays are preview-only and will not appear in the recorded or exported video.</p>
+          </section>
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Text animation</h3>
-        <p className={styles.hint}>In/out animation applied to all text overlays</p>
-        <select
-          className={styles.select}
-          value={overlayTextAnimation}
-          onChange={(e) => onOverlayTextAnimationChange(e.target.value as OverlayTextAnimation)}
-          aria-label="Text animation style"
-        >
-          {TEXT_ANIMATION_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </section>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Text animation</h3>
+            <p className={styles.hint}>In/out animation applied to all text overlays</p>
+            <select
+              className={styles.select}
+              value={overlayTextAnimation}
+              onChange={(e) => onOverlayTextAnimationChange(e.target.value as OverlayTextAnimation)}
+              aria-label="Text animation style"
+            >
+              {TEXT_ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </section>
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Global fonts</h3>
-        <p className={styles.hint}>Default fonts and style for text overlays</p>
-        <label className={styles.checkRow}>
-          <input
-            type="checkbox"
-            checked={defaultBold ?? false}
-            onChange={(e) => onDefaultBoldChange(e.target.checked)}
-            aria-label="Bold by default"
-          />
-          <span>Bold by default</span>
-        </label>
-        <label className={styles.label}>Main font</label>
-        <select
-          className={styles.select}
-          value={defaultFontFamily}
-          onChange={(e) => onDefaultFontFamilyChange(e.target.value)}
-          aria-label="Default main font"
-        >
-          {FONT_OPTIONS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <label className={styles.label}>Secondary font</label>
-        <select
-          className={styles.select}
-          value={defaultSecondaryFont ?? 'Playfair Display'}
-          onChange={(e) => onDefaultSecondaryFontChange(e.target.value)}
-          aria-label="Default secondary font"
-        >
-          {FONT_OPTIONS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      </section>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Global fonts</h3>
+            <p className={styles.hint}>Default fonts and style for text overlays</p>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={defaultBold ?? false}
+                onChange={(e) => onDefaultBoldChange(e.target.checked)}
+                aria-label="Bold by default"
+              />
+              <span>Bold by default</span>
+            </label>
+            <label className={styles.label}>Main font</label>
+            <select
+              className={styles.select}
+              value={defaultFontFamily}
+              onChange={(e) => onDefaultFontFamilyChange(e.target.value)}
+              aria-label="Default main font"
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <label className={styles.label}>Secondary font</label>
+            <select
+              className={styles.select}
+              value={defaultSecondaryFont ?? 'Playfair Display'}
+              onChange={(e) => onDefaultSecondaryFontChange(e.target.value)}
+              aria-label="Default secondary font"
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </section>
         </div>
       )}
     </aside>
