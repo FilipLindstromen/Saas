@@ -359,8 +359,11 @@ export default function App() {
       thumbnailTexts,
       thumbnailWebcamDataUrl,
       thumbnailGeneratedDataUrl,
+      videoVolume,
+      noiseRemovalEnabled,
+      noiseRemovalAmount,
     })
-  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl])
+  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount])
 
   const handleThumbnailChange = useCallback((blob: Blob | null, dataUrl?: string | null) => {
     setThumbnailBlob(blob)
