@@ -8,7 +8,7 @@ import { getClipLibrary, saveClipToLibrary, removeClipFromLibrary, generateLibra
 import { saveRecording, loadRecording, clearRecording } from './utils/recordingStorage'
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
 import type { ParsedLUT } from './utils/colorLut'
-import { exportVideoForDownload, type ExportFormat } from './utils/exportWithColorAdjustments'
+import { exportVideoForDownload, getVideoDurationFromBlob, type ExportFormat } from './utils/exportWithColorAdjustments'
 import { RecordPreview } from './components/RecordPreview'
 import { Timeline } from './components/Timeline'
 import { TranscriptionPanel } from './components/TranscriptionPanel'
@@ -19,7 +19,7 @@ import { ClipLibraryPanel } from './components/ClipLibraryPanel'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
-import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport, IconTrash } from './components/Icons'
+import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
@@ -76,10 +76,11 @@ export default function App() {
   const [captionPreviewCaptionY, setCaptionPreviewCaptionY] = useState(() => initialState?.captionPreviewCaptionY ?? 0.85)
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [captionSegments, setCaptionSegments] = useState<CaptionSegment[] | null>(null)
-  const [mode, setMode] = useState<'record' | 'edit'>('record')
   /** Trim range of the recorded video (source seconds). Timeline shows trimEnd - trimStart. */
   const [videoTrimStart, setVideoTrimStart] = useState(0)
   const [videoTrimEnd, setVideoTrimEnd] = useState<number | null>(null)
+  /** Video clip segments for split support. When null/empty, we use videoTrimStart/End. */
+  const [videoClipSegments, setVideoClipSegments] = useState<{ trimStart: number; trimEnd: number }[] | null>(null)
   const [thumbnailPanelOpen, setThumbnailPanelOpen] = useState(false)
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null)
   const [thumbnailSeekTime, setThumbnailSeekTime] = useState(() => initialState?.thumbnailSeekTime ?? 0)
@@ -108,6 +109,8 @@ export default function App() {
   const [inspectorResize, setInspectorResize] = useState<{ startX: number; startWidth: number } | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isRestoring, setIsRestoring] = useState(true)
+  /** In edit mode: show recording (playback) or live webcam in preview */
+  const [editPreviewSource, setEditPreviewSource] = useState<'recording' | 'webcam'>('recording')
 
   /* Audio state */
   const [videoVolume, setVideoVolume] = useState(() => initialState?.videoVolume ?? 100)
@@ -115,6 +118,7 @@ export default function App() {
   const [noiseRemovalAmount, setNoiseRemovalAmount] = useState(() => initialState?.noiseRemovalAmount ?? 50)
 
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipUserTimelineDurationResetRef = useRef(false)
 
   const allResolutions = useMemo(() => getResolutionsForAspect(aspectRatio), [aspectRatio])
   const resolutions = useMemo(() => {
@@ -145,6 +149,7 @@ export default function App() {
     if (!isRecording) {
       setRecordElapsedSeconds(0)
       setIsPreviewPlaying(false)
+      setEditPreviewSource('recording')
       return
     }
     // Auto-play timeline when recording starts
@@ -158,17 +163,21 @@ export default function App() {
   }, [isRecording])
 
   const isPlayback = !!recordedBlob
+  const showLiveStream =
+    (editPreviewSource === 'webcam' && !!videoStream) ||
+    (isRecording && !!videoStream) ||
+    (!recordedBlob && !!videoStream)
 
-  useEffect(() => {
-    if (recordedBlob && !isRecording) setMode('edit')
-  }, [recordedBlob, isRecording])
-  const displayTime = isPlayback ? currentTime : previewTime
+  const displayTime = showLiveStream ? previewTime : currentTime
   const safeDisplayTime = Number.isFinite(displayTime) && displayTime >= 0 ? displayTime : 0
   const computedTimelineDuration = Math.max(60, ...overlays.map((o) => o.endTime), 1)
   const sourceDuration = duration
   const trimmedDuration = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
+  // When we have a trim, timeline shows only the trimmed region (0 to trimmedDuration) so the end is on the right
+  // Ensure we never show 0 - use at least 1s or source duration when available
+  const effectiveTrimmed = trimmedDuration > 0 ? trimmedDuration : Math.max(sourceDuration || 0, 1)
   const timelineDuration = isPlayback
-    ? (userTimelineDuration ?? Math.max(sourceDuration || 0, trimmedDuration || 1, 1))
+    ? (userTimelineDuration ?? (videoTrimEnd != null ? effectiveTrimmed : Math.max(sourceDuration || 0, 1)))
     : (userTimelineDuration ?? computedTimelineDuration)
 
   const handleTimelineDurationChange = useCallback((seconds: number) => {
@@ -179,8 +188,9 @@ export default function App() {
   const previewTimeRef = useRef(0)
   previewTimeRef.current = previewTime
   useEffect(() => {
-    // Playback ticking runs when manually playing OR when recording
-    if ((!isPreviewPlaying && !isRecording) || recordedBlob) return
+    // Playback ticking: advance previewTime when playing/recording AND showing webcam (or no recording)
+    // When showing recorded video, we use currentTime from the video instead
+    if ((!isPreviewPlaying && !isRecording) || !showLiveStream) return
     const startWall = performance.now()
     const startTime = previewTimeRef.current
     let rafId = 0
@@ -200,7 +210,7 @@ export default function App() {
     }
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [isPreviewPlaying, isRecording, recordedBlob, timelineDuration])
+  }, [isPreviewPlaying, isRecording, showLiveStream, timelineDuration])
 
   useEffect(() => {
     if (videoDevices.length && !videoDeviceId) setVideoDeviceId(videoDevices[0].deviceId)
@@ -239,27 +249,24 @@ export default function App() {
       })
       setVideoTrimStart(0)
       setVideoTrimEnd(null)
+      setVideoClipSegments(null)
       userHasTrimmedVideoRef.current = false
       setThumbnailBlob(null)
       setThumbnailGeneratedDataUrl(null)
       setThumbnailPanelOpen(false)
       return
     }
-    // Logic for new recording setup
+    // Logic for new recording setup (don't run when restoring - preserves persisted userTimelineDuration)
     if (!isRestoring) {
       setVideoTrimStart(0)
       setVideoTrimEnd(null)
+      setVideoClipSegments(null)
       userHasTrimmedVideoRef.current = false
-      // Only reset duration if not restoring (handled in restore effect)
-      // Actually duration is set by restore effect, but this effect runs on dependency change.
-      // If we are just setting recordedBlob from restore, we don't want to reset userTimelineDuration etc immediately if we can avoid it,
-      // but the original code resets them.
-      // Let's modify: if restoring, we might want to keep existing state?
-      // But for now, let's just let it reset transient UI state.
-      // setDuration(0) // This would clear the duration we just restored!
-      if (duration === 0) setDuration(0) // Only reset if it looks like a fresh record?
-      // Actually, standard behavior:
-      setUserTimelineDuration(null)
+      if (duration === 0) setDuration(0)
+      if (!skipUserTimelineDurationResetRef.current) {
+        setUserTimelineDuration(null)
+      }
+      skipUserTimelineDurationResetRef.current = false
     }
 
     const url = URL.createObjectURL(recordedBlob)
@@ -267,11 +274,29 @@ export default function App() {
     return () => URL.revokeObjectURL(url)
   }, [recordedBlob, isRestoring])
 
+  // Fallback: when we have a recording but duration is still 0, try to get it from the blob
+  // If that fails, use persisted userTimelineDuration so the UI doesn't stay at 0
+  useEffect(() => {
+    if (!recordedBlob || (duration != null && duration > 0)) return
+    let cancelled = false
+    getVideoDurationFromBlob(recordedBlob)
+      .then((d) => {
+        if (!cancelled && d > 0) setDuration(d)
+      })
+      .catch(() => {
+        if (!cancelled && userTimelineDuration != null && userTimelineDuration >= 1 && userTimelineDuration <= 600) {
+          setDuration(userTimelineDuration)
+        }
+      })
+    return () => { cancelled = true }
+  }, [recordedBlob, duration, userTimelineDuration])
+
   // Initialize video trim when we get duration from the recorded video
   useEffect(() => {
     if (!recordedBlob || !Number.isFinite(duration) || duration <= 0 || videoTrimEnd !== null) return
     setVideoTrimStart(0)
     setVideoTrimEnd(duration)
+    setVideoClipSegments(null)
   }, [recordedBlob, duration, videoTrimEnd])
 
   // Load persisted recording on mount
@@ -280,8 +305,24 @@ export default function App() {
       try {
         const saved = await loadRecording()
         if (saved?.blob) {
+          skipUserTimelineDurationResetRef.current = true
           setRecordedBlob(saved.blob)
-          if (saved.duration) setDuration(saved.duration)
+          const validDuration =
+            saved.duration != null &&
+            Number.isFinite(saved.duration) &&
+            saved.duration > 0
+          if (validDuration) {
+            setDuration(saved.duration)
+          } else {
+            const persisted = loadVideoRecorderState()
+            const fallback = persisted?.userTimelineDuration
+            if (fallback != null && fallback >= 1 && fallback <= 600) {
+              setDuration(fallback)
+            }
+            getVideoDurationFromBlob(saved.blob)
+              .then((d) => { if (d > 0) setDuration(d) })
+              .catch(() => {})
+          }
         }
       } catch (e) {
         console.error('Failed to restore recording', e)
@@ -600,6 +641,26 @@ export default function App() {
     if (selectedOverlayId === id) setSelectedOverlayId(null)
   }, [selectedOverlayId])
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const target = document.activeElement
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || (target as HTMLElement)?.isContentEditable) return
+      if (!selectedOverlayId) return
+      e.preventDefault()
+      if (selectedOverlayId === 'background') {
+        if (recordedBlob && window.confirm('Delete this recording?')) {
+          setRecordedBlob(null)
+          setSelectedOverlayId(null)
+        }
+      } else {
+        handleRemoveOverlay(selectedOverlayId)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedOverlayId, recordedBlob, handleRemoveOverlay])
+
   const handleSplitClipAtPlayhead = useCallback(() => {
     if (!selectedOverlayId) return
     const overlay = overlays.find((o) => o.id === selectedOverlayId)
@@ -620,11 +681,43 @@ export default function App() {
     setSelectedOverlayId(newId)
   }, [selectedOverlayId, overlays, recordedBlob, currentTime, previewTime])
 
-  const handleVideoClipTrimChange = useCallback((trimStart: number, trimEnd: number) => {
+  const handleVideoClipSplit = useCallback(() => {
+    if (!recordedBlob || videoTrimEnd == null) return
+    const sourceTime = videoTrimStart + currentTime
+    const segments = videoClipSegments ?? [{ trimStart: videoTrimStart, trimEnd: videoTrimEnd }]
+    const idx = segments.findIndex((s) => sourceTime > s.trimStart && sourceTime < s.trimEnd)
+    if (idx < 0) return
+    const seg = segments[idx]
+    const minLen = 0.5
+    if (sourceTime <= seg.trimStart + minLen || sourceTime >= seg.trimEnd - minLen) return
+    const next = [
+      ...segments.slice(0, idx),
+      { trimStart: seg.trimStart, trimEnd: sourceTime },
+      { trimStart: sourceTime, trimEnd: seg.trimEnd },
+      ...segments.slice(idx + 1),
+    ]
+    setVideoClipSegments(next)
+    setSelectedOverlayId('background')
+  }, [recordedBlob, videoTrimStart, videoTrimEnd, currentTime, videoClipSegments])
+
+  const handleVideoClipTrimChange = useCallback((trimStart: number, trimEnd: number, segmentIndex?: number) => {
     userHasTrimmedVideoRef.current = true
-    setVideoTrimStart(trimStart)
-    setVideoTrimEnd(trimEnd)
-    const newDuration = trimEnd - trimStart
+    let newDuration: number
+    if (videoClipSegments && segmentIndex != null) {
+      const nextSegments = [...videoClipSegments]
+      nextSegments[segmentIndex] = { trimStart, trimEnd }
+      setVideoClipSegments(nextSegments)
+      const newTrimStart = Math.min(...nextSegments.map((s) => s.trimStart))
+      const newTrimEnd = Math.max(...nextSegments.map((s) => s.trimEnd))
+      setVideoTrimStart(newTrimStart)
+      setVideoTrimEnd(newTrimEnd)
+      newDuration = newTrimEnd - newTrimStart
+    } else {
+      setVideoClipSegments(null)
+      setVideoTrimStart(trimStart)
+      setVideoTrimEnd(trimEnd)
+      newDuration = trimEnd - trimStart
+    }
     setCurrentTime((t) => Math.min(t, newDuration))
     const minClip = 0.5
     setOverlays((prev) =>
@@ -634,7 +727,7 @@ export default function App() {
         return { ...o, startTime, endTime }
       })
     )
-  }, [])
+  }, [videoClipSegments])
 
   const handleBurnedBlob = useCallback((blob: Blob) => {
     setRecordedBlob(blob)
@@ -668,12 +761,12 @@ export default function App() {
     setThumbnailBlob(null)
     setVideoTrimStart(0)
     setVideoTrimEnd(null)
+    setVideoClipSegments(null)
     userHasTrimmedVideoRef.current = false
     setUserTimelineDuration(null)
     setDuration(0)
     setCurrentTime(0)
     setSeekTime(null)
-    setMode('record')
     setSelectedOverlayId(null)
     setThumbnailTexts([])
     setThumbnailWebcamDataUrl(null)
@@ -713,14 +806,19 @@ export default function App() {
             recordedBlob={recordedBlob}
             onCaptureStream={setCanvasStream}
             onDurationChange={setDuration}
-            onTimeUpdate={setCurrentTime}
+            onTimeUpdate={(time) => {
+              if (videoTrimEnd != null) {
+                setCurrentTime(Math.max(0, Math.min(videoTrimEnd - videoTrimStart, time - videoTrimStart)))
+              } else {
+                setCurrentTime(time)
+              }
+            }}
             videoTrimStart={recordedBlob && videoTrimEnd != null ? videoTrimStart : undefined}
             videoTrimEnd={recordedBlob && videoTrimEnd != null ? videoTrimEnd : undefined}
             seekTime={seekTime}
-            isPreviewPlaying={mode === 'edit' && !!recordedBlob ? isPreviewPlaying : undefined}
-            onPlaybackEnd={mode === 'edit' && recordedBlob ? handlePlaybackEnd : undefined}
+            isPreviewPlaying={!!recordedBlob ? isPreviewPlaying : undefined}
+            onPlaybackEnd={recordedBlob ? handlePlaybackEnd : undefined}
             videoRef={previewVideoRef}
-            mode={mode}
             onOverlayMove={(id, x, y) => handleEditOverlay(id, { x, y })}
             selectedOverlayId={selectedOverlayId}
             onOverlayEdit={handleEditOverlay}
@@ -748,6 +846,7 @@ export default function App() {
             captionSegments={recordedBlob ? captionSegments : undefined}
             onCaptionYChange={recordedBlob ? setCaptionPreviewCaptionY : undefined}
             playbackUrl={downloadUrl}
+            editPreviewSource={editPreviewSource}
           />
         </div>
       </section>
@@ -762,31 +861,18 @@ export default function App() {
             <h1 className={styles.title}>ReelRecorder</h1>
             <p className={styles.subtitle}>Record with overlays and burn-in captions</p>
           </div>
-          <div className={styles.modeToggle} role="tablist" aria-label="Record, Edit, Thumbnail, Export">
+          <div className={styles.modeToggle} role="tablist" aria-label="Edit, Thumbnail, Export">
             <button
               type="button"
               role="tab"
-              aria-selected={mode === 'record'}
-              aria-label="Record"
-              className={mode === 'record' ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => setMode('record')}
-              title="Record"
-            >
-              <IconRecord />
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === 'edit' && !thumbnailPanelOpen && !exportPanelOpen}
+              aria-selected={!thumbnailPanelOpen && !exportPanelOpen}
               aria-label="Edit"
-              className={mode === 'edit' && !thumbnailPanelOpen && !exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
+              className={!thumbnailPanelOpen && !exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
               onClick={() => {
-                setMode('edit')
                 setThumbnailPanelOpen(false)
                 setExportPanelOpen(false)
               }}
-              disabled={!recordedBlob}
-              title={!recordedBlob ? 'Record first to edit' : 'Edit recording'}
+              title="Edit recording"
             >
               <IconEdit />
             </button>
@@ -823,6 +909,16 @@ export default function App() {
           {/* Spacer so headerRight stays right; record + timer are in overlay */}
         </div>
         <div className={styles.headerCenterOverlay}>
+          <button
+              type="button"
+              className={editPreviewSource === 'recording' ? styles.editPreviewSourceBtnActive : styles.editPreviewSourceBtn}
+              onClick={() => setEditPreviewSource((s) => (s === 'recording' ? 'webcam' : 'recording'))}
+              title={editPreviewSource === 'recording' ? 'Preview: recording. Click to use webcam.' : 'Preview: webcam. Click to use recording.'}
+              aria-label={editPreviewSource === 'recording' ? 'Use recording in preview' : 'Use webcam in preview'}
+              aria-pressed={editPreviewSource === 'webcam'}
+            >
+              {editPreviewSource === 'recording' ? <IconVideo /> : <IconCamera />}
+            </button>
           <button
             type="button"
             className={countdown != null ? styles.recordStopToggleStop : isRecording ? styles.recordStopToggleStop : styles.recordStopToggleRecord}
@@ -912,7 +1008,7 @@ export default function App() {
       )
       }
 
-      {mode === 'edit' && recordedBlob && !thumbnailPanelOpen && (
+      {recordedBlob && !thumbnailPanelOpen && (
         <div className={styles.leftPanel} aria-label="Left panel">
           <div className={styles.leftPanelTabs} role="tablist" aria-label="Left panel tabs">
             <button
@@ -967,7 +1063,7 @@ export default function App() {
         className={styles.body}
         style={{
           paddingRight: inspectorWidth,
-          paddingLeft: mode === 'edit' && recordedBlob && !thumbnailPanelOpen ? 320 : 0,
+          paddingLeft: recordedBlob && !thumbnailPanelOpen ? 320 : 0,
         }}
       >
         <div className={styles.main}>
@@ -1036,15 +1132,16 @@ export default function App() {
                 duration={timelineDuration}
                 currentTime={safeDisplayTime}
                 onSeek={(t) => {
-                  if (recordedBlob) {
+                  const clamped = Math.min(Math.max(0, t), timelineDuration)
+                  if (showLiveStream) {
+                    setPreviewTime(clamped)
+                  } else if (recordedBlob) {
                     const trimLen = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
                     const timelineTime = Math.min(Math.max(0, t), trimLen)
                     const sourceTime = videoTrimStart + timelineTime
                     setSeekTime(sourceTime)
                     setCurrentTime(timelineTime)
                     setTimeout(() => setSeekTime(null), 150)
-                  } else {
-                    setPreviewTime(t)
                   }
                 }}
                 onAddOverlay={handleAddOverlay}
@@ -1057,12 +1154,10 @@ export default function App() {
                 onOverlayTextAnimationChange={setOverlayTextAnimation}
                 isPreviewPlaying={isPreviewPlaying}
                 onPreviewPlayToggle={() => {
-                  if (recordedBlob) {
-                    setIsPreviewPlaying((p) => !p)
-                  } else {
-                    if (!isPreviewPlaying && previewTime >= timelineDuration - 0.05) setPreviewTime(0)
-                    setIsPreviewPlaying((p) => !p)
+                  if (showLiveStream && !isPreviewPlaying && previewTime >= timelineDuration - 0.05) {
+                    setPreviewTime(0)
                   }
+                  setIsPreviewPlaying((p) => !p)
                 }}
                 onSplitClip={handleSplitClipAtPlayhead}
                 videoClipTrim={
@@ -1072,6 +1167,8 @@ export default function App() {
                 }
                 videoSourceDuration={recordedBlob ? Math.max(sourceDuration, 0.01) : undefined}
                 onVideoClipTrimChange={recordedBlob ? handleVideoClipTrimChange : undefined}
+                onVideoClipSplit={recordedBlob ? handleVideoClipSplit : undefined}
+                videoClipSegments={recordedBlob && videoClipSegments ? videoClipSegments : undefined}
               />
             </div>
           </div>
@@ -1165,7 +1262,6 @@ export default function App() {
             onRemoveBackgroundClip={() => {
               setRecordedBlob(null)
               setSelectedOverlayId(null)
-              setMode('record')
             }}
             noiseRemovalEnabled={noiseRemovalEnabled}
             onNoiseRemovalEnabledChange={setNoiseRemovalEnabled}
@@ -1175,7 +1271,6 @@ export default function App() {
             onSafeZoneTypeChange={setSafeZoneType}
             safeZoneVisible={safeZoneVisible}
             onSafeZoneVisibleChange={setSafeZoneVisible}
-            mode={mode}
           />
         </div>
       </div>

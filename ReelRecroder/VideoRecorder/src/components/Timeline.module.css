@@ -446,6 +446,17 @@
 
 .clipSegmentVideo .clipSegmentEdge {
   cursor: ew-resize;
+  width: 14px;
+  min-width: 14px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.clipSegmentVideo.clipSegmentSelected .clipSegmentEdge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.clipSegmentVideo .clipSegmentEdge:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .clipSegmentVideo .clipSegmentBody {
@@ -560,10 +571,10 @@
   width: 0;
   transform: translateX(-50%);
   cursor: ew-resize;
-  padding: 0 10px;
-  margin-left: -10px;
+  padding: 0 14px;
+  margin-left: -14px;
   touch-action: none;
-  z-index: 9;
+  z-index: 11;
   pointer-events: auto;
   display: flex;
   align-items: flex-start;

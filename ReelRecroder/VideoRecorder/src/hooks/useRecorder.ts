@@ -36,7 +36,8 @@ export function useRecorder({
 
   const startRecording = useCallback(() => {
     setError(null)
-    setRecordedBlob(null)
+    // Don't clear recordedBlob here — keeps edit mode UI visible while recording.
+    // New blob replaces it when recording stops.
     chunksRef.current = []
     setIsRecording(true)
   }, [])

@@ -45,7 +45,7 @@ interface InspectorPanelProps {
   onDeselectOverlay: () => void
   selectedId: string | null
   onRemoveBackgroundClip?: () => void
-  mode: 'record' | 'edit'
+  mode?: 'record' | 'edit'
   /** When set, show "Save to library" in overlay editor */
   onSaveOverlayToLibrary?: (overlay: OverlayItem) => void
   /* Video tab (sources, format & quality) */
