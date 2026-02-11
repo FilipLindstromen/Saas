@@ -43,6 +43,9 @@ interface InspectorPanelProps {
   onOverlayUpdate: (patch: Partial<OverlayItem>) => void
   onOverlayRemove: (id: string) => void
   onDeselectOverlay: () => void
+  selectedId: string | null
+  onRemoveBackgroundClip?: () => void
+  mode: 'record' | 'edit'
   /** When set, show "Save to library" in overlay editor */
   onSaveOverlayToLibrary?: (overlay: OverlayItem) => void
   /* Video tab (sources, format & quality) */
@@ -185,6 +188,9 @@ export function InspectorPanel({
   onNoiseRemovalEnabledChange = () => { },
   noiseRemovalAmount = 50,
   onNoiseRemovalAmountChange = () => { },
+  mode,
+  selectedId,
+  onRemoveBackgroundClip,
 }: InspectorPanelProps) {
   const [internalTab, setInternalTab] = useState<InspectorTabId>('current')
   const activeTab = controlledTab ?? internalTab
@@ -330,8 +336,6 @@ export function InspectorPanel({
               onResolutionIndexChange={onResolutionIndexChange}
               quality={quality}
               onQualityChange={onQualityChange}
-              studioQuality={studioQuality}
-              onStudioQualityChange={onStudioQualityChange}
             />
             {(aspectRatio === '9:16' || aspectRatio === '1:1') && (
               <label className={styles.checkRow}>
@@ -375,25 +379,56 @@ export function InspectorPanel({
             />
           </section>
 
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>Studio quality</h3>
+            <p className={styles.hint}>Enhance speech with EQ, compression, and noise gating.</p>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={studioQuality}
+                onChange={(e) => onStudioQualityChange(e.target.checked)}
+              />
+              <span>Enable Studio Quality</span>
+            </label>
+          </section>
+
           {onMusicBlobChange && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Background music</h3>
               <p className={styles.hint}>Add a music track to mix with the video audio when exporting. Optional.</p>
-              <label className={styles.label}>Music file</label>
-              <input
-                type="file"
-                accept="audio/*"
-                className={styles.fileInput}
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  onMusicBlobChange(f ? f : null)
-                  e.target.value = ''
-                }}
-                aria-label="Choose music file"
-              />
-              {musicBlob && (
-                <>
-                  <p className={styles.hint}>Music added. Set volume below.</p>
+
+              {!musicBlob ? (
+                <div className={styles.fileUploadRow}>
+                  <label className={styles.fileBtn}>
+                    <IconAudio />
+                    <span>Add background music</span>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      className={styles.hiddenInput}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        onMusicBlobChange(f ? f : null)
+                        e.target.value = ''
+                      }}
+                      aria-label="Choose music file"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className={styles.musicControl}>
+                  <div className={styles.musicTrackInfo}>
+                    <IconAudio />
+                    <span>Music added</span>
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      onClick={() => onMusicBlobChange(null)}
+                      title="Remove music"
+                    >
+                      <IconTrash />
+                    </button>
+                  </div>
                   <label className={styles.label}>Music volume: {musicVolume}%</label>
                   <input
                     type="range"
@@ -411,7 +446,7 @@ export function InspectorPanel({
                   >
                     Remove music
                   </button>
-                </>
+                </div>
               )}
             </section>
           )}
@@ -472,7 +507,36 @@ export function InspectorPanel({
 
       {activeTab === 'current' && (
         <div className={styles.tabPanel} role="tabpanel" aria-labelledby="inspector-tab-current">
-          {selectedOverlay ? (
+          {selectedId === 'background' ? (
+            <section className={styles.section}>
+              <div className={styles.selectedOverlayBar}>
+                <span className={styles.sectionTitle}>Current object: Recording</span>
+                <div className={styles.selectedOverlayActions}>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    onClick={() => {
+                      if (window.confirm('Delete this recording?')) {
+                        onRemoveBackgroundClip?.()
+                      }
+                    }}
+                    title="Delete recording"
+                    aria-label="Delete recording"
+                  >
+                    <IconTrash />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.textBtn}
+                    onClick={onDeselectOverlay}
+                  >
+                    Deselect
+                  </button>
+                </div>
+              </div>
+              <p className={styles.hint}>The main video recording from your webcam or screen.</p>
+            </section>
+          ) : selectedOverlay ? (
             <section className={styles.section}>
               <div className={styles.selectedOverlayBar}>
                 <span className={styles.sectionTitle}>Current object</span>

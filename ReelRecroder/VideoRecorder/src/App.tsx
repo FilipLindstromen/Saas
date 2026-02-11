@@ -16,11 +16,10 @@ import { ThumbnailCaptionsPanel } from './components/ThumbnailCaptionsPanel'
 import { ExportPanel } from './components/ExportPanel'
 import { InspectorPanel, type InspectorTabId } from './components/InspectorPanel'
 import { ClipLibraryPanel } from './components/ClipLibraryPanel'
-import { VideoSettingsModal } from './components/VideoSettingsModal'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
-import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport } from './components/Icons'
+import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport, IconTrash } from './components/Icons'
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
@@ -55,7 +54,6 @@ export default function App() {
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [seekTime, setSeekTime] = useState<number | null>(null)
-  const [finalBlob, setFinalBlob] = useState<Blob | null>(null)
   const [previewTime, setPreviewTime] = useState(0)
   const [userTimelineDuration, setUserTimelineDuration] = useState<number | null>(() => initialState?.userTimelineDuration ?? null)
   const [timelineHeight, setTimelineHeight] = useState(() => initialState?.timelineHeight ?? 220)
@@ -146,8 +144,12 @@ export default function App() {
   useEffect(() => {
     if (!isRecording) {
       setRecordElapsedSeconds(0)
+      setIsPreviewPlaying(false)
       return
     }
+    // Auto-play timeline when recording starts
+    setIsPreviewPlaying(true)
+    setPreviewTime(0)
     recordStartTimeRef.current = Date.now()
     const id = setInterval(() => {
       setRecordElapsedSeconds(Math.floor((Date.now() - recordStartTimeRef.current) / 1000))
@@ -177,7 +179,8 @@ export default function App() {
   const previewTimeRef = useRef(0)
   previewTimeRef.current = previewTime
   useEffect(() => {
-    if (!isPreviewPlaying || recordedBlob) return
+    // Playback ticking runs when manually playing OR when recording
+    if ((!isPreviewPlaying && !isRecording) || recordedBlob) return
     const startWall = performance.now()
     const startTime = previewTimeRef.current
     let rafId = 0
@@ -186,7 +189,10 @@ export default function App() {
       const next = startTime + elapsed
       if (next >= timelineDuration) {
         setPreviewTime(timelineDuration)
-        setIsPreviewPlaying(false)
+        // If recording, we continue beyond duration? 
+        // Or stop recording? Usually stop recording.
+        // For now let's just loop or stay at end.
+        if (!isRecording) setIsPreviewPlaying(false)
         return
       }
       setPreviewTime(next)
@@ -194,7 +200,7 @@ export default function App() {
     }
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [isPreviewPlaying, recordedBlob, timelineDuration])
+  }, [isPreviewPlaying, isRecording, recordedBlob, timelineDuration])
 
   useEffect(() => {
     if (videoDevices.length && !videoDeviceId) setVideoDeviceId(videoDevices[0].deviceId)
@@ -571,25 +577,14 @@ export default function App() {
   const handleAddOverlayFromLibrary = useCallback((clip: LibraryClip) => {
     const start = displayTime
     const item: OverlayItem = {
+      ...clip.payload,
       id: generateId(),
-      type: clip.payload.type,
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
-      ...clip.payload,
     }
     setOverlays((prev) => [...prev, item])
     setSelectedOverlayId(item.id)
   }, [displayTime, timelineDuration])
-
-  const handleSaveOverlayToLibrary = useCallback((overlay: OverlayItem) => {
-    const name = window.prompt('Name for this clip')
-    const trimmed = name?.trim()
-    if (!trimmed) return
-    const { id: _id, startTime: _s, endTime: _e, ...payload } = overlay
-    const clip: LibraryClip = { libraryId: generateLibraryId(), name: trimmed, payload }
-    saveClipToLibrary(clip)
-    setClipLibrary(getClipLibrary())
-  }, [])
 
   const handleRemoveFromClipLibrary = useCallback((libraryId: string) => {
     removeClipFromLibrary(libraryId)
@@ -642,9 +637,8 @@ export default function App() {
   }, [])
 
   const handleBurnedBlob = useCallback((blob: Blob) => {
-    setFinalBlob(blob)
     setRecordedBlob(blob)
-  }, [])
+  }, [setRecordedBlob])
 
   const handleTranscribe = useCallback(async () => {
     if (!recordedBlob) return
@@ -659,6 +653,34 @@ export default function App() {
       setIsTranscribing(false)
     }
   }, [recordedBlob, openaiApiKey])
+
+  const handlePlaybackEnd = useCallback(() => {
+    setIsPreviewPlaying(false)
+  }, [])
+
+  const handleClearProject = useCallback(() => {
+    if (!window.confirm('Are you sure you want to clear the entire project? This will remove all recordings and overlays.')) return
+
+    setRecordedBlob(null)
+    setOverlays([])
+    setCaptionSegments(null)
+    setMusicBlob(null)
+    setThumbnailBlob(null)
+    setVideoTrimStart(0)
+    setVideoTrimEnd(null)
+    userHasTrimmedVideoRef.current = false
+    setUserTimelineDuration(null)
+    setDuration(0)
+    setCurrentTime(0)
+    setSeekTime(null)
+    setMode('record')
+    setSelectedOverlayId(null)
+    setThumbnailTexts([])
+    setThumbnailWebcamDataUrl(null)
+    setThumbnailGeneratedDataUrl(null)
+    setYoutubeCaption('')
+    setYoutubeTitle('')
+  }, [])
 
   const selectedOverlay = overlays.find((o) => o.id === selectedOverlayId) ?? null
 
@@ -696,8 +718,9 @@ export default function App() {
             videoTrimEnd={recordedBlob && videoTrimEnd != null ? videoTrimEnd : undefined}
             seekTime={seekTime}
             isPreviewPlaying={mode === 'edit' && !!recordedBlob ? isPreviewPlaying : undefined}
-            onPlaybackEnd={mode === 'edit' && recordedBlob ? () => setIsPreviewPlaying(false) : undefined}
+            onPlaybackEnd={mode === 'edit' && recordedBlob ? handlePlaybackEnd : undefined}
             videoRef={previewVideoRef}
+            mode={mode}
             onOverlayMove={(id, x, y) => handleEditOverlay(id, { x, y })}
             selectedOverlayId={selectedOverlayId}
             onOverlayEdit={handleEditOverlay}
@@ -724,6 +747,7 @@ export default function App() {
             }
             captionSegments={recordedBlob ? captionSegments : undefined}
             onCaptionYChange={recordedBlob ? setCaptionPreviewCaptionY : undefined}
+            playbackUrl={downloadUrl}
           />
         </div>
       </section>
@@ -731,7 +755,7 @@ export default function App() {
   )
 
   return (
-    <div className={styles.app}>
+    <div className={styles.app} >
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.titleBlock}>
@@ -824,6 +848,15 @@ export default function App() {
         <div className={styles.headerRight}>
           <button
             type="button"
+            className={styles.clearBtn}
+            onClick={handleClearProject}
+            title="Clear Project"
+            aria-label="Clear Project"
+          >
+            <IconTrash />
+          </button>
+          <button
+            type="button"
             className={styles.settingsBtn}
             onClick={() => setSettingsOpen(true)}
             title="Settings (API keys)"
@@ -876,7 +909,8 @@ export default function App() {
           noiseRemovalEnabled={noiseRemovalEnabled}
           noiseRemovalAmount={noiseRemovalAmount}
         />
-      )}
+      )
+      }
 
       {mode === 'edit' && recordedBlob && !thumbnailPanelOpen && (
         <div className={styles.leftPanel} aria-label="Left panel">
@@ -1098,6 +1132,8 @@ export default function App() {
             onStudioQualityChange={setStudioQuality}
             portraitFillHeight={portraitFillHeight}
             onPortraitFillHeightChange={setPortraitFillHeight}
+            colorLut={colorLut}
+            onColorLutChange={setColorLut}
             colorAdjustmentsEnabled={colorAdjustmentsEnabled}
             onColorAdjustmentsEnabledChange={setColorAdjustmentsEnabled}
             colorBrightness={colorBrightness}
@@ -1125,6 +1161,12 @@ export default function App() {
             onMusicVolumeChange={setMusicVolume}
             videoVolume={videoVolume}
             onVideoVolumeChange={setVideoVolume}
+            selectedId={selectedOverlayId}
+            onRemoveBackgroundClip={() => {
+              setRecordedBlob(null)
+              setSelectedOverlayId(null)
+              setMode('record')
+            }}
             noiseRemovalEnabled={noiseRemovalEnabled}
             onNoiseRemovalEnabledChange={setNoiseRemovalEnabled}
             noiseRemovalAmount={noiseRemovalAmount}
@@ -1133,9 +1175,10 @@ export default function App() {
             onSafeZoneTypeChange={setSafeZoneType}
             safeZoneVisible={safeZoneVisible}
             onSafeZoneVisibleChange={setSafeZoneVisible}
+            mode={mode}
           />
         </div>
       </div>
-    </div>
+    </div >
   )
 }

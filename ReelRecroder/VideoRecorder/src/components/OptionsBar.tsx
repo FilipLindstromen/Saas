@@ -10,8 +10,6 @@ interface OptionsBarProps {
   onResolutionIndexChange: (i: number) => void
   quality: QualityPreset
   onQualityChange: (q: QualityPreset) => void
-  studioQuality: boolean
-  onStudioQualityChange: (v: boolean) => void
 }
 
 export function OptionsBar({
@@ -22,8 +20,6 @@ export function OptionsBar({
   onResolutionIndexChange,
   quality,
   onQualityChange,
-  studioQuality,
-  onStudioQualityChange,
 }: OptionsBarProps) {
 
   return (
@@ -66,15 +62,6 @@ export function OptionsBar({
           ))}
         </select>
       </div>
-      <label className={styles.studioLabel}>
-        <input
-          type="checkbox"
-          checked={studioQuality}
-          onChange={(e) => onStudioQualityChange(e.target.checked)}
-          title="Remove noise and polish audio (high-pass, noise gate, compressor)"
-        />
-        <span>Studio quality audio</span>
-      </label>
     </div>
   )
 }
