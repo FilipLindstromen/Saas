@@ -58,6 +58,14 @@
   pointer-events: auto;
 }
 
+.headerCenterOverlay .editPreviewSourceBtn,
+.headerCenterOverlay .editPreviewSourceBtnActive {
+  position: absolute;
+  right: 50%;
+  margin-right: 68px;
+  transform: translateX(-100%);
+}
+
 .headerCenterOverlay .recordStopToggleRecord,
 .headerCenterOverlay .recordStopToggleStop {
   position: absolute;
@@ -112,6 +120,36 @@
 .recordStopToggleRecord:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.editPreviewSourceBtn,
+.editPreviewSourceBtnActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  background: var(--surface);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.editPreviewSourceBtn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.editPreviewSourceBtnActive {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.editPreviewSourceBtnActive:hover {
+  background: color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .recordStopToggleStop {

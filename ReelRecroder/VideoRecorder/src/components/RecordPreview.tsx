@@ -155,8 +155,9 @@ interface RecordPreviewProps {
   videoVolume?: number
   selectedOverlayId?: string | null
   onOverlayEdit?: (id: string, patch: Partial<OverlayItem>) => void
-  mode: 'record' | 'edit'
   playbackUrl?: string | null
+  /** In edit mode: show recording (playback) or live webcam. When 'webcam', preview uses videoStream. */
+  editPreviewSource?: 'recording' | 'webcam'
 }
 
 export function RecordPreview({
@@ -196,8 +197,8 @@ export function RecordPreview({
   onPlaybackEnd,
   safeZone,
   videoVolume = 100,
-  mode,
   playbackUrl,
+  editPreviewSource = 'recording',
 }: RecordPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
@@ -226,14 +227,27 @@ export function RecordPreview({
   const [captionDrag, setCaptionDrag] = useState(false)
   const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize'>('default')
 
-  // Playback mode: show recorded video (only in Edit mode)
+  // Effective "show recording": only when editPreviewSource is 'recording' (or no webcam when 'webcam')
+  // When isRecording, always show webcam (we're recording it); don't show playback.
+  const showRecordingInEdit =
+    !isRecording &&
+    (editPreviewSource === 'recording' || (editPreviewSource === 'webcam' && !videoStream))
+  // Effective "show live stream": webcam when recording, edit mode webcam, or pre-record (no blob yet)
+  const showLiveStream =
+    (editPreviewSource === 'webcam' && !!videoStream) ||
+    (isRecording && !!videoStream) ||
+    (!recordedBlob && !!videoStream)
+
+  // Playback mode: show recorded video (only in Edit mode when showing recording)
   useEffect(() => {
     const video = internalVideoRef.current
     if (!video) return
 
-    if (mode === 'record' || !playbackUrl) {
-      video.src = ''
-      video.srcObject = null
+    if (!showRecordingInEdit || !playbackUrl) {
+      if (editPreviewSource === 'recording') {
+        video.src = ''
+        video.srcObject = null
+      }
       return
     }
 
@@ -251,12 +265,12 @@ export function RecordPreview({
       video.removeEventListener('loadedmetadata', onLoaded)
       video.removeEventListener('ended', onPlaybackEnd || (() => { }))
     }
-  }, [playbackUrl, onPlaybackEnd, onDurationChange, mode])
+  }, [playbackUrl, onPlaybackEnd, onDurationChange, showRecordingInEdit, editPreviewSource])
 
-  // Live mode: show camera stream (only in Record mode)
+  // Live mode: show camera stream (Record mode or Edit mode with webcam selected)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!video || mode !== 'record') return
+    if (!video || !showLiveStream) return
 
     if (videoStream) {
       if (video.srcObject !== videoStream) {
@@ -268,22 +282,22 @@ export function RecordPreview({
     }
 
     return () => {
-      // Don't clear srcObject immediately if it might be the same stream, 
+      // Don't clear srcObject immediately if it might be the same stream,
       // but if we switch modes, we definitely want to clear it.
     }
-  }, [videoStream, mode])
+  }, [videoStream, showLiveStream])
 
-  // Play/Pause control (only for playback in Edit mode)
+  // Play/Pause control (only for playback in Edit mode when showing recording)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!video || mode !== 'edit' || !playbackUrl) return
+    if (!video || !showRecordingInEdit || !playbackUrl) return
 
     if (isPreviewPlaying) {
       video.play().catch(() => { })
     } else {
       video.pause()
     }
-  }, [isPreviewPlaying, playbackUrl, mode])
+  }, [isPreviewPlaying, playbackUrl, showRecordingInEdit])
 
 
   // Volume control
@@ -293,15 +307,15 @@ export function RecordPreview({
     }
   }, [videoVolume])
 
-  // Seek control
+  // Seek control (only when showing recording in edit mode)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!video || seekTime == null || !playbackUrl) return
+    if (!video || seekTime == null || !playbackUrl || !showRecordingInEdit) return
     // Only seek if difference is significant to avoid stutter during playback updates
     if (Math.abs(video.currentTime - seekTime) > 0.1) {
       video.currentTime = seekTime
     }
-  }, [seekTime, playbackUrl])
+  }, [seekTime, playbackUrl, showRecordingInEdit])
 
   // Keep video elements for video overlays (create/remove when overlays change)
   useEffect(() => {
@@ -363,9 +377,8 @@ export function RecordPreview({
       if (video.readyState >= 2) {
         // Draw video frame
         ctx.save()
-        // Flip video only in record mode (live preview/recording)
-        // In edit mode, we show the recorded video as-is (which might already be flipped if recorded that way)
-        if (flipVideo && mode === 'record') {
+        // Flip video for live preview/recording (webcam or when recording)
+        if (flipVideo && (editPreviewSource === 'webcam' || isRecording)) {
           ctx.translate(width, 0)
           ctx.scale(-1, 1)
         }
@@ -412,17 +425,34 @@ export function RecordPreview({
           drawSafeZoneOverlay(ctx, width, height, safeZone.type)
         }
 
-        // Draw Overlays (Canvas)
-        // ONLY if recording (burned in) OR if not using DOM overlays.
-        if (isRecording && burnOverlaysIntoExport) {
-          drawOverlays(ctx, width, height, overlays, displayTime, {
+        // Draw overlays, texts, and captions – always on top of video (displayTime is timeline position)
+        const timeForOverlays = displayTime
+        drawOverlays(ctx, width, height, overlays, timeForOverlays, {
+          textAnimation: overlayTextAnimation,
+          defaultFontFamily,
+          defaultSecondaryFont,
+          defaultBold,
+          preloadedImages: overlayImageRef.current,
+          preloadedVideos: overlayVideoRef.current,
+        })
+        if (captionPreview && captionSegments && captionSegments.length > 0) {
+          const captionTime = showRecordingInEdit && videoTrimStart != null
+            ? timeForOverlays + videoTrimStart
+            : timeForOverlays
+          drawCaptionStyle(ctx, width, height, captionSegments, captionTime, captionPreview.style, {
+            fontSizePercent: captionPreview.fontSizePercent,
+            captionY: captionPreview.captionY,
             textAnimation: overlayTextAnimation,
-            defaultFontFamily,
-            defaultSecondaryFont,
-            defaultBold,
-            preloadedImages: overlayImageRef.current,
-            preloadedVideos: overlayVideoRef.current,
           })
+        }
+        // Draw selection border and resize handle when not recording
+        if (!isRecording && selectedOverlayId && onOverlayEdit) {
+          const active = overlays.filter((o) => timeForOverlays >= o.startTime && timeForOverlays <= o.endTime)
+          const sel = active.find((o) => o.id === selectedOverlayId)
+          if (sel) {
+            const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+            if (rect) drawSelectionAndHandle(ctx, rect)
+          }
         }
       } else {
         ctx.fillStyle = '#1a1a1e'
@@ -442,7 +472,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {
@@ -792,76 +822,7 @@ export function RecordPreview({
           onPointerCancel={handlePointerUp}
         />
 
-        {/* DOM Overlays Layer (Edit Mode) */}
-        {!isRecording && (
-          <div
-            className={styles.domOverlayLayer}
-            onPointerMove={handlePointerMoveDom}
-            onPointerUp={handlePointerUpDom}
-            onPointerLeave={handlePointerUpDom}
-          >
-            {overlays.map(overlay => {
-              // Visibility check based on playback time
-              const vTime = internalVideoRef.current?.currentTime || 0
-              const show = (vTime >= overlay.startTime) && (vTime < overlay.endTime)
-              if (!show) return null
-
-              const isSelected = overlay.id === selectedOverlayId
-              // Calculate positioning style
-              const left = `${(overlay.x ?? 0.5) * 100}%`
-              const top = `${(overlay.y ?? 0.5) * 100}%`
-
-              return (
-                <div
-                  key={overlay.id}
-                  className={`${styles.domOverlay} ${isSelected ? styles.selected : ''}`}
-                  style={{
-                    left,
-                    top,
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: isSelected ? 100 : 10
-                  }}
-                  onPointerDown={(e) => handleOverlayPointerDown(e, overlay.id)}
-                >
-                  {overlay.type === 'text' && (
-                    <div style={{
-                      fontFamily: overlay.fontFamily || defaultFontFamily,
-                      fontSize: `${(width * (overlay.fontSizePercent ?? 5)) / 100}px`,
-                      fontWeight: defaultBold ? 'bold' : 'normal',
-                      color: 'white',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                      whiteSpace: 'pre-wrap',
-                      textAlign: 'center',
-                      lineHeight: 1.2
-                    }}>
-                      {overlay.text}
-                    </div>
-                  )}
-                  {(overlay.type === 'image' || overlay.type === 'video') && (
-                    <img
-                      src={overlay.imageDataUrl || overlay.imageUrl || ''}
-                      alt=""
-                      draggable={false}
-                      style={{
-                        display: 'block',
-                        width: overlay.naturalWidth ? `${overlay.naturalWidth * (overlay.imageScale ?? 1)}px` : '200px',
-                        pointerEvents: 'none'
-                      }}
-                    />
-                  )}
-
-                  {/* Resize Handle */}
-                  {isSelected && (
-                    <div
-                      className={styles.resizeHandle}
-                      onPointerDown={(e) => handleResizePointerDown(e, overlay.id)}
-                    />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        {/* Overlays are drawn on canvas (always on top of video) – no DOM overlay layer needed */}
       </div>
 
       {isRecording && (

@@ -37,11 +37,15 @@ interface TimelineProps {
   onPreviewPlayToggle?: () => void
   /** When set (after recording), show the video as a clip on the bottom track; user can trim edges */
   videoClipTrim?: VideoClipTrim | null
+  /** When set, show multiple video clip segments (from split). Overrides videoClipTrim when present. */
+  videoClipSegments?: Array<{ trimStart: number; trimEnd: number }> | null
   /** Full length of the source video (seconds); used to clamp trim */
   videoSourceDuration?: number
-  onVideoClipTrimChange?: (trimStart: number, trimEnd: number) => void
+  onVideoClipTrimChange?: (trimStart: number, trimEnd: number, segmentIndex?: number) => void
   /** Split selected overlay clip at playhead */
   onSplitClip?: () => void
+  /** Split video clip at playhead (when video clip is selected) */
+  onVideoClipSplit?: () => void
 }
 
 export function Timeline({
@@ -60,9 +64,11 @@ export function Timeline({
   isPreviewPlaying = false,
   onPreviewPlayToggle,
   videoClipTrim,
+  videoClipSegments,
   videoSourceDuration = 0,
   onVideoClipTrimChange,
   onSplitClip,
+  onVideoClipSplit,
 }: TimelineProps) {
   const safeDuration = Number.isFinite(duration) && duration >= 0 ? duration : 0
   const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? Math.min(currentTime, safeDuration) : 0
@@ -78,6 +84,7 @@ export function Timeline({
     startTrimStart: number
     startTrimEnd: number
     rect: DOMRect
+    segmentIndex: number
   } | null>(null)
   const [clipDrag, setClipDrag] = useState<{
     id: string
@@ -106,7 +113,7 @@ export function Timeline({
       e.stopPropagation()
       setInOutMarkerDrag(kind)
       inOutMarkerDragRef.current = { kind, rect: rulerRef.current.getBoundingClientRect() }
-        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     },
     [videoClipTrim, onVideoClipTrimChange]
   )
@@ -117,13 +124,16 @@ export function Timeline({
       const trim = videoClipTrimRef.current
       if (!state || !trim || !onVideoClipTrimChange || !videoSourceDuration) return
       const { rect } = state
-      const x = e.clientX - rect.left
-      const t = Math.max(0, Math.min(videoSourceDuration, (x / rect.width) * safeDuration))
+      if (rect.width <= 0) return
+      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left))
+      // Timeline shows 0..safeDuration (trimmed region); map to source time trimStart..trimEnd
+      const t = (x / rect.width) * safeDuration
+      const sourceTime = trim.trimStart + t
       if (state.kind === 'in') {
-        const newStart = Math.max(0, Math.min(trim.trimEnd - MIN_CLIP_DURATION, t))
+        const newStart = Math.max(0, Math.min(trim.trimEnd - MIN_CLIP_DURATION, sourceTime))
         onVideoClipTrimChange(newStart, trim.trimEnd)
       } else {
-        const newEnd = Math.max(trim.trimStart + MIN_CLIP_DURATION, Math.min(videoSourceDuration, t))
+        const newEnd = Math.max(trim.trimStart + MIN_CLIP_DURATION, Math.min(videoSourceDuration, sourceTime))
         onVideoClipTrimChange(trim.trimStart, newEnd)
       }
     },
@@ -132,7 +142,9 @@ export function Timeline({
 
   const handleInOutMarkerPointerUp = useCallback((e: React.PointerEvent) => {
     if (inOutMarkerDragRef.current) {
-      ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+      try {
+        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+      } catch (_) { /* already released */ }
       setInOutMarkerDrag(null)
       inOutMarkerDragRef.current = null
     }
@@ -311,44 +323,48 @@ export function Timeline({
     [clipDrag]
   )
 
+  const videoSegments = videoClipSegments ?? (videoClipTrim ? [videoClipTrim] : [])
+
   const handleVideoClipPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>, mode: 'resizeStart' | 'resizeEnd' | 'move') => {
+    (e: React.PointerEvent<HTMLDivElement>, mode: 'resizeStart' | 'resizeEnd' | 'move', segmentIndex: number, seg: { trimStart: number; trimEnd: number }) => {
       e.preventDefault()
       e.stopPropagation()
       const strip = videoStripRef.current
-      if (!strip || !videoClipTrim || !onVideoClipTrimChange) return
+      if (!strip || !onVideoClipTrimChange) return
       const stripRect = strip.getBoundingClientRect()
       setVideoClipDrag({
         mode,
         startX: e.clientX,
-        startTrimStart: videoClipTrim.trimStart,
-        startTrimEnd: videoClipTrim.trimEnd,
+        startTrimStart: seg.trimStart,
+        startTrimEnd: seg.trimEnd,
         rect: stripRect,
+        segmentIndex,
       })
         ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
-    [videoClipTrim, onVideoClipTrimChange]
+    [onVideoClipTrimChange]
   )
 
   const handleVideoClipPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!videoClipDrag || !onVideoClipTrimChange || !videoSourceDuration) return
-      const { rect } = videoClipDrag
+      const { rect, segmentIndex } = videoClipDrag
       const clipLen = videoClipDrag.startTrimEnd - videoClipDrag.startTrimStart
       const deltaPx = e.clientX - videoClipDrag.startX
       const deltaT = (deltaPx / rect.width) * clipLen
+      const passSegmentIndex = videoSegments.length > 1 ? segmentIndex : undefined
       if (videoClipDrag.mode === 'resizeStart') {
         const newTrimStart = Math.max(
           0,
           Math.min(videoClipDrag.startTrimEnd - MIN_CLIP_DURATION, videoClipDrag.startTrimStart + deltaT)
         )
-        onVideoClipTrimChange(newTrimStart, videoClipDrag.startTrimEnd)
+        onVideoClipTrimChange(newTrimStart, videoClipDrag.startTrimEnd, passSegmentIndex)
       } else if (videoClipDrag.mode === 'resizeEnd') {
         const newTrimEnd = Math.min(
           videoSourceDuration,
           Math.max(videoClipDrag.startTrimStart + MIN_CLIP_DURATION, videoClipDrag.startTrimEnd + deltaT)
         )
-        onVideoClipTrimChange(videoClipDrag.startTrimStart, newTrimEnd)
+        onVideoClipTrimChange(videoClipDrag.startTrimStart, newTrimEnd, passSegmentIndex)
       } else {
         const newTrimStart = videoClipDrag.startTrimStart + deltaT
         const newTrimEnd = videoClipDrag.startTrimEnd + deltaT
@@ -361,10 +377,10 @@ export function Timeline({
           clampedEnd = videoSourceDuration
           clampedStart = videoSourceDuration - clipLen
         }
-        onVideoClipTrimChange(Math.max(0, clampedStart), Math.min(videoSourceDuration, clampedEnd))
+        onVideoClipTrimChange(Math.max(0, clampedStart), Math.min(videoSourceDuration, clampedEnd), passSegmentIndex)
       }
     },
-    [videoClipDrag, onVideoClipTrimChange, videoSourceDuration]
+    [videoClipDrag, onVideoClipTrimChange, videoSourceDuration, videoSegments.length]
   )
 
   const handleVideoClipPointerUp = useCallback(
@@ -381,25 +397,39 @@ export function Timeline({
   const imageOverlays = overlays.filter((o) => o.type === 'image')
   const videoOverlays = overlays.filter((o) => o.type === 'video')
 
-  const selectedOverlayForSplit = selectedId ? overlays.find((x) => x.id === selectedId) : null
-  const canSplit = !!(
-    selectedId &&
-    onSplitClip &&
+  const selectedOverlayForSplit = selectedId && selectedId !== 'background' ? overlays.find((x) => x.id === selectedId) : null
+  const canSplitOverlay = !!(
     selectedOverlayForSplit &&
+    onSplitClip &&
     safeCurrentTime > selectedOverlayForSplit.startTime + MIN_CLIP_DURATION &&
     safeCurrentTime < selectedOverlayForSplit.endTime - MIN_CLIP_DURATION
   )
+  const canSplitVideoClip = !!(
+    selectedId === 'background' &&
+    onVideoClipSplit &&
+    videoSegments.length > 0 &&
+    videoSourceDuration > 0 &&
+    safeCurrentTime > MIN_CLIP_DURATION &&
+    safeCurrentTime < safeDuration - MIN_CLIP_DURATION
+  )
+  const canSplit = canSplitOverlay || canSplitVideoClip
 
   return (
     <div className={styles.wrap}>
       <div className={styles.toolbar}>
-        {onSplitClip && (
+        {(onSplitClip || onVideoClipSplit) && (
           <button
             type="button"
             className={styles.toolbarBtn}
-            onClick={onSplitClip}
+            onClick={canSplitVideoClip ? onVideoClipSplit : onSplitClip}
             disabled={!canSplit}
-            title={canSplit ? 'Split selected clip at playhead' : 'Select a clip and position playhead inside it to split'}
+            title={
+              canSplit
+                ? 'Split selected clip at playhead'
+                : canSplitVideoClip
+                  ? 'Position playhead inside video clip to split'
+                  : 'Select a clip and position playhead inside it to split'
+            }
             aria-label="Split clip at playhead"
           >
             <IconSplit />
@@ -588,11 +618,12 @@ export function Timeline({
               className={styles.inOutMarker}
               data-marker="in"
               style={{
-                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimStart / Math.max(safeDuration, 0.001))})`,
+                left: `calc(72px + (100% - 72px) * 0)`,
               }}
               onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'in')}
               onPointerMove={handleInOutMarkerPointerMove}
               onPointerUp={handleInOutMarkerPointerUp}
+              onPointerCancel={handleInOutMarkerPointerUp}
               onPointerLeave={handleInOutMarkerPointerUp}
               title="Export start (drag to adjust)"
               aria-label="In point – export start"
@@ -604,11 +635,12 @@ export function Timeline({
               className={styles.inOutMarker}
               data-marker="out"
               style={{
-                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimEnd / Math.max(safeDuration, 0.001))})`,
+                left: `calc(72px + (100% - 72px) * 1)`,
               }}
               onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'out')}
               onPointerMove={handleInOutMarkerPointerMove}
               onPointerUp={handleInOutMarkerPointerUp}
+              onPointerCancel={handleInOutMarkerPointerUp}
               onPointerLeave={handleInOutMarkerPointerUp}
               title="Export end (drag to adjust)"
               aria-label="Out point – export end"
@@ -788,42 +820,46 @@ export function Timeline({
                 </div>
               </div>
             ))}
-            {videoClipTrim && (
+            {videoSegments.length > 0 && (
               <div className={styles.clipsStripRow}>
                 <span className={styles.stripLabelVideo}>Video</span>
                 <div ref={videoStripRef} className={styles.clipsStrip}>
-                  <div
-                    className={`${styles.clipSegment} ${styles.clipSegmentVideo} ${videoClipDrag ? styles.clipSegmentDragging : ''} ${selectedId === 'background' ? styles.clipSegmentSelected : ''}`}
-                    style={(() => {
-                      if (safeDuration <= 0) return { left: '0%', width: '100%' }
-                      const leftPct = (videoClipTrim.trimStart / safeDuration) * 100
-                      const widthPct = ((videoClipTrim.trimEnd - videoClipTrim.trimStart) / safeDuration) * 100
-                      const left = Math.max(0, Math.min(100, leftPct))
-                      const width = Math.max(0, Math.min(100 - left, widthPct))
-                      return { left: `${left}%`, width: `${width}%` }
-                    })()}
-                    title="Drag edges to trim, drag body to move. Click to select."
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSelectOverlay('background')
-                    }}
-                    onPointerDown={(e) => {
-                      const el = e.target as HTMLElement
-                      const edge = el.getAttribute?.('data-edge')
-                      const mode: 'resizeStart' | 'resizeEnd' | 'move' =
-                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : 'move'
-                      handleVideoClipPointerDown(e, mode)
-                        ; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
-                    }}
-                    onPointerMove={handleVideoClipPointerMove}
-                    onPointerUp={handleVideoClipPointerUp}
-                    onPointerLeave={handleVideoClipPointerUp}
-                    data-video-clip
-                  >
-                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
-                    <span className={styles.clipSegmentBody} title="Drag to move" />
-                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
-                  </div>
+                  {videoSegments.map((seg, idx) => {
+                    const firstStart = videoSegments[0].trimStart
+                    const leftPct = safeDuration > 0 ? ((seg.trimStart - firstStart) / safeDuration) * 100 : 0
+                    const widthPct = safeDuration > 0 ? ((seg.trimEnd - seg.trimStart) / safeDuration) * 100 : 100 / videoSegments.length
+                    return (
+                      <div
+                        key={idx}
+                        className={`${styles.clipSegment} ${styles.clipSegmentVideo} ${videoClipDrag?.segmentIndex === idx ? styles.clipSegmentDragging : ''} ${selectedId === 'background' ? styles.clipSegmentSelected : ''}`}
+                        style={{
+                          left: `${Math.max(0, Math.min(100, leftPct))}%`,
+                          width: `${Math.max(0, Math.min(100 - leftPct, widthPct))}%`,
+                        }}
+                        title="Drag edges to trim, drag body to move. Click to select."
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelectOverlay('background')
+                        }}
+                        onPointerDown={(e) => {
+                          const el = e.target as HTMLElement
+                          const edge = el.getAttribute?.('data-edge')
+                          const mode: 'resizeStart' | 'resizeEnd' | 'move' =
+                            edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : 'move'
+                          handleVideoClipPointerDown(e, mode, idx, seg)
+                            ; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+                        }}
+                        onPointerMove={handleVideoClipPointerMove}
+                        onPointerUp={handleVideoClipPointerUp}
+                        onPointerLeave={handleVideoClipPointerUp}
+                        data-video-clip
+                      >
+                        <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                        <span className={styles.clipSegmentBody} title="Drag to move" />
+                        <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
