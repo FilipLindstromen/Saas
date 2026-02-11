@@ -106,7 +106,7 @@ export function Timeline({
       e.stopPropagation()
       setInOutMarkerDrag(kind)
       inOutMarkerDragRef.current = { kind, rect: rulerRef.current.getBoundingClientRect() }
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
     [videoClipTrim, onVideoClipTrimChange]
   )
@@ -132,7 +132,7 @@ export function Timeline({
 
   const handleInOutMarkerPointerUp = useCallback((e: React.PointerEvent) => {
     if (inOutMarkerDragRef.current) {
-      ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+      ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
       setInOutMarkerDrag(null)
       inOutMarkerDragRef.current = null
     }
@@ -171,7 +171,7 @@ export function Timeline({
       e.preventDefault()
       e.stopPropagation()
       setPlayheadDrag({ rect: rulerRef.current.getBoundingClientRect() })
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
     [onSeek]
   )
@@ -190,7 +190,7 @@ export function Timeline({
   const handlePlayheadPointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (playheadDrag) {
-        ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setPlayheadDrag(null)
       }
     },
@@ -207,7 +207,7 @@ export function Timeline({
         startDuration: safeDuration,
         rect,
       })
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
     [onDurationChange, safeDuration]
   )
@@ -225,7 +225,7 @@ export function Timeline({
   const handlePointerUpDuration = useCallback(
     (e: React.PointerEvent) => {
       if (durationDrag) {
-        ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setDurationDrag(null)
       }
     },
@@ -263,7 +263,7 @@ export function Timeline({
         startEndTime: o.endTime,
         rect: stripRect,
       })
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
     [safeDuration, getClipDragMode]
   )
@@ -304,7 +304,7 @@ export function Timeline({
   const handleClipPointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (clipDrag) {
-        ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setClipDrag(null)
       }
     },
@@ -325,7 +325,7 @@ export function Timeline({
         startTrimEnd: videoClipTrim.trimEnd,
         rect: stripRect,
       })
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
     [videoClipTrim, onVideoClipTrimChange]
   )
@@ -370,7 +370,7 @@ export function Timeline({
   const handleVideoClipPointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (videoClipDrag) {
-        ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+        ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setVideoClipDrag(null)
       }
     },
@@ -555,7 +555,7 @@ export function Timeline({
           className={styles.playhead}
           style={{
             /* Center playhead on time: left is set to time position + 13px so that translateX(-50%) places center correctly */
-            left: `calc(72px + (100% - 72px) * ${safeCurrentTime / Math.max(safeDuration, 0.001)} + 13px)`,
+            left: `calc(72px + (100% - 72px) * ${safeCurrentTime / Math.max(safeDuration, 0.001)})`,
           }}
           role="slider"
           aria-label="Seek"
@@ -588,7 +588,7 @@ export function Timeline({
               className={styles.inOutMarker}
               data-marker="in"
               style={{
-                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimStart / Math.max(safeDuration, 0.001))} + 13px)`,
+                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimStart / Math.max(safeDuration, 0.001))})`,
               }}
               onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'in')}
               onPointerMove={handleInOutMarkerPointerMove}
@@ -604,7 +604,7 @@ export function Timeline({
               className={styles.inOutMarker}
               data-marker="out"
               style={{
-                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimEnd / Math.max(safeDuration, 0.001))} + 13px)`,
+                left: `calc(72px + (100% - 72px) * ${(videoClipTrim.trimEnd / Math.max(safeDuration, 0.001))})`,
               }}
               onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'out')}
               onPointerMove={handleInOutMarkerPointerMove}
@@ -628,203 +628,207 @@ export function Timeline({
             aria-label="Timeline ruler; click to seek"
             title="Click to seek to time"
           >
-          <div className={styles.rulerTicks}>
-            {(() => {
-              const tickStep = 0.5
-              const ticks: number[] = []
-              for (let t = 0; t <= safeDuration; t += tickStep) ticks.push(t)
-              const labelStep =
-                safeDuration <= 10 ? 1 : safeDuration <= 30 ? 2 : safeDuration <= 60 ? 5 : 10
-              return ticks.map((t) => {
-                const isWholeSecond = t % 1 === 0
-                const showLabel = isWholeSecond && (labelStep <= 1 || t % labelStep === 0)
-                return (
-                  <div
-                    key={t}
-                    className={isWholeSecond ? styles.rulerTickMajor : styles.rulerTickMinor}
-                    style={{ left: `${(t / Math.max(safeDuration, 0.001)) * 100}%` }}
-                  >
-                    {showLabel && <span className={styles.rulerTickLabel}>{formatTime(t)}</span>}
-                  </div>
-                )
-              })
-            })()}
+            <div className={styles.rulerTicks}>
+              {(() => {
+                const tickStep = 0.5
+                const ticks: number[] = []
+                for (let t = 0; t <= safeDuration; t += tickStep) ticks.push(t)
+                const labelStep =
+                  safeDuration <= 10 ? 1 : safeDuration <= 30 ? 2 : safeDuration <= 60 ? 5 : 10
+                return ticks.map((t) => {
+                  const isWholeSecond = t % 1 === 0
+                  const showLabel = isWholeSecond && (labelStep <= 1 || t % labelStep === 0)
+                  return (
+                    <div
+                      key={t}
+                      className={isWholeSecond ? styles.rulerTickMajor : styles.rulerTickMinor}
+                      style={{ left: `${(t / Math.max(safeDuration, 0.001)) * 100}%` }}
+                    >
+                      {showLabel && <span className={styles.rulerTickLabel}>{formatTime(t)}</span>}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+            <div className={styles.timeRuler}>
+              {onDurationChange && (
+                <div
+                  className={styles.durationHandle}
+                  title="Drag to set timeline length"
+                  aria-label="Drag to set timeline length"
+                  onPointerDown={handlePointerDownDuration}
+                  onPointerMove={handlePointerMoveDuration}
+                  onPointerUp={handlePointerUpDuration}
+                  onPointerLeave={handlePointerUpDuration}
+                />
+              )}
+            </div>
           </div>
-          <div className={styles.timeRuler}>
-            {onDurationChange && (
-              <div
-                className={styles.durationHandle}
-                title="Drag to set timeline length"
-                aria-label="Drag to set timeline length"
-                onPointerDown={handlePointerDownDuration}
-                onPointerMove={handlePointerMoveDuration}
-                onPointerUp={handlePointerUpDuration}
-                onPointerLeave={handlePointerUpDuration}
-              />
-            )}
-          </div>
-        </div>
         </div>
 
         <div className={styles.tracksSection}>
-        <div className={styles.clipsScroll}>
-          {textOverlays.map((o) => (
-            <div key={o.id} className={styles.clipsStripRow}>
-              <span className={styles.stripLabel} title="Text overlay">{o.text ? (o.text.slice(0, 12) + (o.text.length > 12 ? '…' : '')) : 'Text'}</span>
-              <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
-                <div
-                  data-clip-segment
-                  className={`${styles.clipSegment} ${styles.clipSegmentText} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
-                  style={{
-                    left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
-                    width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
-                  }}
-                  title={`${o.type === 'text' ? (o.text || 'Text') : 'Image'} ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
-                  onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
-                  onPointerDown={(e) => {
-                    const el = e.target as HTMLElement
-                    const edge = el.getAttribute?.('data-edge')
-                    const forceMode: ClipDragMode | undefined =
-                      edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
-                    handleClipPointerDown(e, o, forceMode)
-                    const seg = el.closest('[data-clip-segment]') as HTMLElement | null
-                    seg?.setPointerCapture(e.pointerId)
-                  }}
-                  onPointerMove={handleClipPointerMove}
-                  onPointerUp={handleClipPointerUp}
-                  onPointerLeave={handleClipPointerUp}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Clip: ${o.type === 'text' ? (o.text || 'Text') : 'Image'}, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds. Drag to move or trim.`}
-                >
-                  <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
-                  <span className={styles.clipSegmentBody} title="Drag to move">
-                    <IconType className={styles.clipIcon} />
-                    <span className={styles.clipLabel}>{o.text ? (o.text.slice(0, 28) + (o.text.length > 28 ? '…' : '')) : 'Text'}</span>
-                  </span>
-                  <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+          <div className={styles.clipsScroll}>
+            {textOverlays.map((o) => (
+              <div key={o.id} className={styles.clipsStripRow}>
+                <span className={styles.stripLabel} title="Text overlay">{o.text ? (o.text.slice(0, 12) + (o.text.length > 12 ? '…' : '')) : 'Text'}</span>
+                <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
+                  <div
+                    data-clip-segment
+                    className={`${styles.clipSegment} ${styles.clipSegmentText} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
+                    style={{
+                      left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
+                      width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
+                    }}
+                    title={`${o.type === 'text' ? (o.text || 'Text') : 'Image'} ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
+                    onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
+                    onPointerDown={(e) => {
+                      const el = e.target as HTMLElement
+                      const edge = el.getAttribute?.('data-edge')
+                      const forceMode: ClipDragMode | undefined =
+                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
+                      handleClipPointerDown(e, o, forceMode)
+                      const seg = el.closest('[data-clip-segment]') as HTMLElement | null
+                      seg?.setPointerCapture(e.pointerId)
+                    }}
+                    onPointerMove={handleClipPointerMove}
+                    onPointerUp={handleClipPointerUp}
+                    onPointerLeave={handleClipPointerUp}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Clip: ${o.type === 'text' ? (o.text || 'Text') : 'Image'}, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds. Drag to move or trim.`}
+                  >
+                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                    <span className={styles.clipSegmentBody} title="Drag to move">
+                      <IconType className={styles.clipIcon} />
+                      <span className={styles.clipLabel}>{o.text ? (o.text.slice(0, 28) + (o.text.length > 28 ? '…' : '')) : 'Text'}</span>
+                    </span>
+                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {imageOverlays.map((o) => (
-            <div key={o.id} className={styles.clipsStripRow}>
-              <span className={styles.stripLabel}>Image</span>
-              <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
-                <div
-                  data-clip-segment
-                  className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
-                  style={{
-                    left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
-                    width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
-                  }}
-                  title={`Image ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
-                  onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
-                  onPointerDown={(e) => {
-                    const el = e.target as HTMLElement
-                    const edge = el.getAttribute?.('data-edge')
-                    const forceMode: ClipDragMode | undefined =
-                      edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
-                    handleClipPointerDown(e, o, forceMode)
-                    const seg = el.closest('[data-clip-segment]') as HTMLElement | null
-                    seg?.setPointerCapture(e.pointerId)
-                  }}
-                  onPointerMove={handleClipPointerMove}
-                  onPointerUp={handleClipPointerUp}
-                  onPointerLeave={handleClipPointerUp}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Image clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
-                >
-                  <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
-                  <span className={styles.clipSegmentBody} title="Drag to move">
-                    <IconImage className={styles.clipIcon} />
-                    <span className={styles.clipLabel}>Image</span>
-                  </span>
-                  <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+            ))}
+            {imageOverlays.map((o) => (
+              <div key={o.id} className={styles.clipsStripRow}>
+                <span className={styles.stripLabel}>Image</span>
+                <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
+                  <div
+                    data-clip-segment
+                    className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
+                    style={{
+                      left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
+                      width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
+                    }}
+                    title={`Image ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
+                    onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
+                    onPointerDown={(e) => {
+                      const el = e.target as HTMLElement
+                      const edge = el.getAttribute?.('data-edge')
+                      const forceMode: ClipDragMode | undefined =
+                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
+                      handleClipPointerDown(e, o, forceMode)
+                      const seg = el.closest('[data-clip-segment]') as HTMLElement | null
+                      seg?.setPointerCapture(e.pointerId)
+                    }}
+                    onPointerMove={handleClipPointerMove}
+                    onPointerUp={handleClipPointerUp}
+                    onPointerLeave={handleClipPointerUp}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Image clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
+                  >
+                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                    <span className={styles.clipSegmentBody} title="Drag to move">
+                      <IconImage className={styles.clipIcon} />
+                      <span className={styles.clipLabel}>Image</span>
+                    </span>
+                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {videoOverlays.map((o) => (
-            <div key={o.id} className={styles.clipsStripRow}>
-              <span className={styles.stripLabel}>Video</span>
-              <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
-                <div
-                  data-clip-segment
-                  className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
-                  style={{
-                    left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
-                    width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
-                  }}
-                  title={`Video ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
-                  onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
-                  onPointerDown={(e) => {
-                    const el = e.target as HTMLElement
-                    const edge = el.getAttribute?.('data-edge')
-                    const forceMode: ClipDragMode | undefined =
-                      edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
-                    handleClipPointerDown(e, o, forceMode)
-                    const seg = el.closest('[data-clip-segment]') as HTMLElement | null
-                    seg?.setPointerCapture(e.pointerId)
-                  }}
-                  onPointerMove={handleClipPointerMove}
-                  onPointerUp={handleClipPointerUp}
-                  onPointerLeave={handleClipPointerUp}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Video clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
-                >
-                  <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
-                  <span className={styles.clipSegmentBody} title="Drag to move">
-                    <IconVideo className={styles.clipIcon} />
-                    <span className={styles.clipLabel}>Video</span>
-                  </span>
-                  <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+            ))}
+            {videoOverlays.map((o) => (
+              <div key={o.id} className={styles.clipsStripRow}>
+                <span className={styles.stripLabel}>Video</span>
+                <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
+                  <div
+                    data-clip-segment
+                    className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
+                    style={{
+                      left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
+                      width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
+                    }}
+                    title={`Video ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
+                    onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
+                    onPointerDown={(e) => {
+                      const el = e.target as HTMLElement
+                      const edge = el.getAttribute?.('data-edge')
+                      const forceMode: ClipDragMode | undefined =
+                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
+                      handleClipPointerDown(e, o, forceMode)
+                      const seg = el.closest('[data-clip-segment]') as HTMLElement | null
+                      seg?.setPointerCapture(e.pointerId)
+                    }}
+                    onPointerMove={handleClipPointerMove}
+                    onPointerUp={handleClipPointerUp}
+                    onPointerLeave={handleClipPointerUp}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Video clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
+                  >
+                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                    <span className={styles.clipSegmentBody} title="Drag to move">
+                      <IconVideo className={styles.clipIcon} />
+                      <span className={styles.clipLabel}>Video</span>
+                    </span>
+                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {videoClipTrim && (
-            <div className={styles.clipsStripRow}>
-              <span className={styles.stripLabelVideo}>Video</span>
-              <div ref={videoStripRef} className={styles.clipsStrip}>
-                <div
-                  className={`${styles.clipSegment} ${styles.clipSegmentVideo} ${videoClipDrag ? styles.clipSegmentDragging : ''}`}
-                  style={(() => {
-                    if (safeDuration <= 0) return { left: '0%', width: '100%' }
-                    const leftPct = (videoClipTrim.trimStart / safeDuration) * 100
-                    const widthPct = ((videoClipTrim.trimEnd - videoClipTrim.trimStart) / safeDuration) * 100
-                    const left = Math.max(0, Math.min(100, leftPct))
-                    const width = Math.max(0, Math.min(100 - left, widthPct))
-                    return { left: `${left}%`, width: `${width}%` }
-                  })()}
-                  title="Drag edges to trim, drag body to move"
-                  onPointerDown={(e) => {
-                    const el = e.target as HTMLElement
-                    const edge = el.getAttribute?.('data-edge')
-                    const mode: 'resizeStart' | 'resizeEnd' | 'move' =
-                      edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : 'move'
-                    handleVideoClipPointerDown(e, mode)
-                    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
-                  }}
-                  onPointerMove={handleVideoClipPointerMove}
-                  onPointerUp={handleVideoClipPointerUp}
-                  onPointerLeave={handleVideoClipPointerUp}
-                  data-video-clip
-                >
-                  <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
-                  <span className={styles.clipSegmentBody} title="Drag to move" />
-                  <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+            ))}
+            {videoClipTrim && (
+              <div className={styles.clipsStripRow}>
+                <span className={styles.stripLabelVideo}>Video</span>
+                <div ref={videoStripRef} className={styles.clipsStrip}>
+                  <div
+                    className={`${styles.clipSegment} ${styles.clipSegmentVideo} ${videoClipDrag ? styles.clipSegmentDragging : ''} ${selectedId === 'background' ? styles.clipSegmentSelected : ''}`}
+                    style={(() => {
+                      if (safeDuration <= 0) return { left: '0%', width: '100%' }
+                      const leftPct = (videoClipTrim.trimStart / safeDuration) * 100
+                      const widthPct = ((videoClipTrim.trimEnd - videoClipTrim.trimStart) / safeDuration) * 100
+                      const left = Math.max(0, Math.min(100, leftPct))
+                      const width = Math.max(0, Math.min(100 - left, widthPct))
+                      return { left: `${left}%`, width: `${width}%` }
+                    })()}
+                    title="Drag edges to trim, drag body to move. Click to select."
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectOverlay('background')
+                    }}
+                    onPointerDown={(e) => {
+                      const el = e.target as HTMLElement
+                      const edge = el.getAttribute?.('data-edge')
+                      const mode: 'resizeStart' | 'resizeEnd' | 'move' =
+                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : 'move'
+                      handleVideoClipPointerDown(e, mode)
+                        ; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+                    }}
+                    onPointerMove={handleVideoClipPointerMove}
+                    onPointerUp={handleVideoClipPointerUp}
+                    onPointerLeave={handleVideoClipPointerUp}
+                    data-video-clip
+                  >
+                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                    <span className={styles.clipSegmentBody} title="Drag to move" />
+                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   )

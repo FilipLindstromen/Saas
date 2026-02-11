@@ -155,6 +155,8 @@ interface RecordPreviewProps {
   videoVolume?: number
   selectedOverlayId?: string | null
   onOverlayEdit?: (id: string, patch: Partial<OverlayItem>) => void
+  mode: 'record' | 'edit'
+  playbackUrl?: string | null
 }
 
 export function RecordPreview({
@@ -194,10 +196,11 @@ export function RecordPreview({
   onPlaybackEnd,
   safeZone,
   videoVolume = 100,
+  mode,
+  playbackUrl,
 }: RecordPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
   const startTimeRef = useRef(0)
 
   useEffect(() => {
@@ -223,115 +226,82 @@ export function RecordPreview({
   const [captionDrag, setCaptionDrag] = useState(false)
   const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize'>('default')
 
-  // Playback mode: show recorded video
-  useEffect(() => {
-    if (!recordedBlob) {
-      setPlaybackUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return null
-      })
-      return
-    }
-    const url = URL.createObjectURL(recordedBlob)
-    setPlaybackUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [recordedBlob])
-
-  // Load video only when playback URL changes (do not reload when callbacks/trim change or playback would reset)
+  // Playback mode: show recorded video (only in Edit mode)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!playbackUrl || !video) return
+    if (!video) return
+
+    if (mode === 'record' || !playbackUrl) {
+      video.src = ''
+      video.srcObject = null
+      return
+    }
+
     video.srcObject = null
     video.src = playbackUrl
     video.load()
-    const reportDuration = () => {
-      const d = video.duration
-      if (Number.isFinite(d) && d >= 0) onDurationChange(d)
+
+    const onLoaded = () => {
+      onDurationChange(video.duration)
     }
-    video.addEventListener('loadedmetadata', reportDuration)
-    video.addEventListener('durationchange', reportDuration)
+    video.addEventListener('loadedmetadata', onLoaded)
+    video.addEventListener('ended', onPlaybackEnd || (() => { }))
+
     return () => {
-      video.removeEventListener('loadedmetadata', reportDuration)
-      video.removeEventListener('durationchange', reportDuration)
+      video.removeEventListener('loadedmetadata', onLoaded)
+      video.removeEventListener('ended', onPlaybackEnd || (() => { }))
     }
-  }, [playbackUrl, onDurationChange])
+  }, [playbackUrl, onPlaybackEnd, onDurationChange, mode])
 
-  // Time update and pause-at-trim-end: separate effect so we don't reload video when callbacks/trim change
+  // Live mode: show camera stream (only in Record mode)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!playbackUrl || !video) return
-    const onTimeUpdateEvt = () => {
-      const sourceTime = video.currentTime
-      if (videoTrimStart != null && videoTrimEnd != null) {
-        const trimDuration = videoTrimEnd - videoTrimStart
-        const timelineTime = Math.min(
-          Math.max(0, sourceTime - videoTrimStart),
-          trimDuration
-        )
-        onTimeUpdate?.(timelineTime)
-        if (trimDuration > 0.5 && sourceTime >= videoTrimEnd - 0.05) {
-          video.pause()
-          onPlaybackEnd?.()
-        }
-      } else {
-        onTimeUpdate?.(sourceTime)
+    if (!video || mode !== 'record') return
+
+    if (videoStream) {
+      if (video.srcObject !== videoStream) {
+        video.srcObject = videoStream
+        video.src = ''
+        video.load()
       }
+      video.play().catch(() => { })
     }
-    video.addEventListener('timeupdate', onTimeUpdateEvt)
-    return () => video.removeEventListener('timeupdate', onTimeUpdateEvt)
-  }, [playbackUrl, onTimeUpdate, videoTrimStart, videoTrimEnd, onPlaybackEnd])
-  useEffect(() => {
-    const video = internalVideoRef.current
-    if (!video || seekTime == null || !playbackUrl) return
-    const duration = video.duration
-    const clamped = Number.isFinite(duration) && duration > 0
-      ? Math.max(0, Math.min(duration, seekTime))
-      : seekTime
-    video.currentTime = clamped
-  }, [seekTime, playbackUrl])
 
-  // When parent requests play/pause (edit mode with recorded video), sync video element
+    return () => {
+      // Don't clear srcObject immediately if it might be the same stream, 
+      // but if we switch modes, we definitely want to clear it.
+    }
+  }, [videoStream, mode])
+
+  // Play/Pause control (only for playback in Edit mode)
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!playbackUrl || !video) return
+    if (!video || mode !== 'edit' || !playbackUrl) return
+
     if (isPreviewPlaying) {
       video.play().catch(() => { })
     } else {
       video.pause()
     }
-  }, [isPreviewPlaying, playbackUrl])
+  }, [isPreviewPlaying, playbackUrl, mode])
 
-  // Notify parent when recorded video playback ends (ignore spurious ended events)
+
+  // Volume control
+  useEffect(() => {
+    if (internalVideoRef.current) {
+      internalVideoRef.current.volume = Math.max(0, Math.min(1, videoVolume / 100))
+    }
+  }, [videoVolume])
+
+  // Seek control
   useEffect(() => {
     const video = internalVideoRef.current
-    if (!video || !playbackUrl) return
-    const onEnded = () => {
-      const dur = video.duration
-      const t = video.currentTime
-      if (Number.isFinite(dur) && dur > 0 && t >= dur - 0.25) {
-        onPlaybackEnd?.()
-      }
+    if (!video || seekTime == null || !playbackUrl) return
+    // Only seek if difference is significant to avoid stutter during playback updates
+    if (Math.abs(video.currentTime - seekTime) > 0.1) {
+      video.currentTime = seekTime
     }
-    video.addEventListener('ended', onEnded)
-    return () => video.removeEventListener('ended', onEnded)
-  }, [playbackUrl, onPlaybackEnd])
-
-  // Attach live stream to video element when not in playback mode
-  useEffect(() => {
-    const video = internalVideoRef.current
-    if (!video) return
-    const isPlayback = playbackUrl && recordedBlob
-    if (isPlayback) return
-    if (videoStream) {
-      const vTrack = videoStream.getVideoTracks()[0]
-      if (vTrack) {
-        video.srcObject = new MediaStream([vTrack])
-        video.play().catch(() => { })
-      }
-    } else {
-      video.srcObject = null
-    }
-  }, [videoStream, playbackUrl, recordedBlob])
+  }, [seekTime, playbackUrl])
 
   // Keep video elements for video overlays (create/remove when overlays change)
   useEffect(() => {
@@ -356,157 +326,102 @@ export function RecordPreview({
     }
   }, [overlays])
 
-  // Keep image elements for image overlays (data URL or URL; needed for animated GIFs)
-  // Use actual DOM elements so GIFs animate (HTMLImageElement doesn't animate when drawn to canvas)
+  // Keep image elements for image overlays
   useEffect(() => {
     const map = overlayImageRef.current
     const imageOverlayIds = new Set(
       overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl)).map((o) => o.id)
     )
-    // Remove elements that are no longer in overlays
     for (const id of map.keys()) {
       if (!imageOverlayIds.has(id)) {
-        const el = map.get(id)
-        if (el && el.parentNode) el.parentNode.removeChild(el)
         map.delete(id)
       }
     }
-    // Create new DOM img elements for new overlays
     for (const o of overlays) {
       if (o.type !== 'image' || (!o.imageDataUrl && !o.imageUrl)) continue
       if (map.has(o.id)) continue
-      const el = document.createElement('img')
+      const el = new Image()
       el.crossOrigin = 'anonymous'
-      el.style.position = 'absolute'
-      el.style.left = '-9999px'
-      el.style.pointerEvents = 'none'
       el.src = o.imageDataUrl ?? o.imageUrl!
-      document.body.appendChild(el)
       map.set(o.id, el)
-    }
-    // Cleanup on unmount
-    return () => {
-      for (const el of map.values()) {
-        if (el.parentNode) el.parentNode.removeChild(el)
-      }
-      map.clear()
     }
   }, [overlays])
 
-  // Draw loop: either live video or playback video + overlays onto canvas
+  // Canvas Drawing Loop
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || width <= 0 || height <= 0) return
+    // Use internal video for both playback and preview drawing
+    const video = internalVideoRef.current
+    if (!canvas || !video) return
 
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
 
-    const video = internalVideoRef.current
-    const isPlayback = playbackUrl && !isRecording && recordedBlob
+    let rafId: number
 
-    const drawVideoFit = (v: HTMLVideoElement) => {
-      const vw = v.videoWidth
-      const vh = v.videoHeight
-      if (vw <= 0 || vh <= 0) return
-      const isPortrait = height > width
-      const isSquare = width === height
-      const fillHeight = portraitFillHeight && (isPortrait || isSquare)
-      const scale = fillHeight
-        ? height / vh
-        : Math.min(width / vw, height / vh)
-      const sw = vw * scale
-      const sh = vh * scale
-      const sx = (width - sw) / 2
-      const sy = fillHeight ? 0 : (height - sh) / 2
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, width, height)
-      if (flipVideo) {
-        ctx.save()
-        ctx.translate(width, 0)
-        ctx.scale(-1, 1)
-        ctx.drawImage(v, 0, 0, vw, vh, sx, sy, sw, sh)
-        ctx.restore()
-      } else {
-        ctx.drawImage(v, 0, 0, vw, vh, sx, sy, sw, sh)
-      }
-    }
-
-    const overlaysToDraw =
-      isRecording && !burnOverlaysIntoExport ? [] : overlays
     const draw = () => {
-      if (isPlayback && video && video.readyState >= 2) {
-        const sourceTime = video.currentTime
-        const isInsideVideoClip =
-          videoTrimStart == null || videoTrimEnd == null
-            ? true
-            : sourceTime >= videoTrimStart && sourceTime < videoTrimEnd - 0.02
-        if (isInsideVideoClip) {
-          drawVideoFit(video)
+      if (video.readyState >= 2) {
+        // Draw video frame
+        ctx.save()
+        // Flip video only in record mode (live preview/recording)
+        // In edit mode, we show the recorded video as-is (which might already be flipped if recorded that way)
+        if (flipVideo && mode === 'record') {
+          ctx.translate(width, 0)
+          ctx.scale(-1, 1)
+        }
+
+        // Handle Portrait Fill Height
+        if (portraitFillHeight) {
+          const videoRatio = video.videoWidth / video.videoHeight
+          const canvasRatio = width / height
+
+          let drawW = width
+          let drawH = height
+          let offX = 0
+          let offY = 0
+
+          if (canvasRatio < videoRatio) {
+            // Canvas is narrower -> Fill height
+            drawH = height
+            drawW = height * videoRatio
+            offX = (width - drawW) / 2
+          } else {
+            // Canvas is wider -> Fill width
+            drawW = width
+            drawH = width / videoRatio
+            offY = (height - drawH) / 2
+          }
+
+          ctx.drawImage(video, offX, offY, drawW, drawH)
         } else {
-          ctx.fillStyle = '#000'
-          ctx.fillRect(0, 0, width, height)
+          ctx.drawImage(video, 0, 0, width, height)
         }
-        const timelineTime =
-          videoTrimStart != null && videoTrimEnd != null
-            ? Math.min(Math.max(0, sourceTime - videoTrimStart), videoTrimEnd - videoTrimStart)
-            : sourceTime
-        const videoMap = overlayVideoRef.current
-        overlaysToDraw.filter((o) => o.type === 'video' && o.videoUrl).forEach((o) => {
-          const v = videoMap.get(o.id)
-          if (v && timelineTime >= o.startTime && timelineTime <= o.endTime) {
-            const local = Math.max(0, Math.min(o.endTime - o.startTime, timelineTime - o.startTime))
-            if (Math.abs(v.currentTime - local) > 0.1) v.currentTime = local
-          }
-        })
-        drawOverlays(ctx, width, height, overlaysToDraw, timelineTime, {
-          textAnimation: overlayTextAnimation,
-          defaultFontFamily: defaultFontFamily ?? 'Oswald',
-          defaultSecondaryFont: defaultSecondaryFont ?? 'Playfair Display',
-          defaultBold: defaultBold ?? false,
-          preloadedImages: overlayImageRef.current,
-          preloadedVideos: videoMap,
-        })
-        if (!isRecording && selectedOverlayId) {
-          const sel = overlaysToDraw.find((o) => o.id === selectedOverlayId)
-          if (sel && timelineTime >= sel.startTime && timelineTime <= sel.endTime) {
-            const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
-            if (rect) drawSelectionAndHandle(ctx, rect)
-          }
+
+        ctx.restore()
+
+        // Apply Color Adjustments (Preview Only)
+        if (colorAdjustmentsEnabled && !isRecording) {
+          const filter = `brightness(${colorBrightness}%) contrast(${colorContrast}%) saturate(${colorSaturation}%)`
+          ctx.filter = filter
+          ctx.drawImage(canvas, 0, 0)
+          ctx.filter = 'none'
         }
-        if (captionPreview) {
-          const segments =
-            captionSegments && captionSegments.length > 0 ? captionSegments : [CAPTION_SAMPLE_SEGMENT]
-          drawCaptionStyle(
-            ctx,
-            width,
-            height,
-            segments,
-            timelineTime,
-            captionPreview.style,
-            { fontSizePercent: captionPreview.fontSizePercent, captionY: captionPreview.captionY }
-          )
+
+        // Draw Safe Zones
+        if (safeZone?.visible && safeZone.type) {
+          drawSafeZoneOverlay(ctx, width, height, safeZone.type)
         }
-      } else if (videoStream && video && !isPlayback) {
-        if (video.readyState >= 2) {
-          drawVideoFit(video)
-          const t = isRecording ? performance.now() / 1000 - startTimeRef.current : displayTime
-          const videoMap = overlayVideoRef.current
-          overlaysToDraw.filter((o) => o.type === 'video' && o.videoUrl).forEach((o) => {
-            const v = videoMap.get(o.id)
-            if (v && t >= o.startTime && t <= o.endTime) {
-              const local = Math.max(0, Math.min(o.endTime - o.startTime, t - o.startTime))
-              if (Math.abs(v.currentTime - local) > 0.1) v.currentTime = local
-            }
-          })
-          drawOverlays(ctx, width, height, overlaysToDraw, t, {
+
+        // Draw Overlays (Canvas)
+        // ONLY if recording (burned in) OR if not using DOM overlays.
+        if (isRecording && burnOverlaysIntoExport) {
+          drawOverlays(ctx, width, height, overlays, displayTime, {
             textAnimation: overlayTextAnimation,
-            defaultFontFamily: defaultFontFamily ?? 'Oswald',
-            defaultSecondaryFont: defaultSecondaryFont ?? 'Playfair Display',
-            defaultBold: defaultBold ?? false,
+            defaultFontFamily,
+            defaultSecondaryFont,
+            defaultBold,
             preloadedImages: overlayImageRef.current,
-            preloadedVideos: videoMap,
+            preloadedVideos: overlayVideoRef.current,
           })
         }
       } else {
@@ -689,9 +604,13 @@ export function RecordPreview({
     if (resizeState && onOverlayEdit) {
       const deltaX = x - resizeState.startX
       const deltaY = y - resizeState.startY
-      const sensitivity = 0.012
-      const delta = (deltaX + deltaY) * sensitivity
+      const sensitivity = 0.005 // Adjusted sensitivity
+      // For font size, maybe just deltaY? For scale, diagonal?
+      // Let's use max delta for consistency
+      const delta = (Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY) * sensitivity
+
       let newValue = resizeState.startValue + delta
+
       if (resizeState.kind === 'fontSize') {
         newValue = Math.max(MIN_FONT_SIZE_PCT, Math.min(MAX_FONT_SIZE_PCT, newValue))
         onOverlayEdit(resizeState.overlayId, { fontSizePercent: newValue })
@@ -734,6 +653,105 @@ export function RecordPreview({
     setCursor('default')
   }
 
+  // DOM Overlay Handling
+  const handleOverlayPointerDown = (e: React.PointerEvent, id: string) => {
+    e.stopPropagation()
+    // Select overlay if not already selected
+    if (id !== selectedOverlayId && onOverlayEdit) {
+      // We trigger a "move" start effectively by calling onOverlayMove with current pos?
+      // Actually the parent handles selection via onOverlayMove usually.
+    }
+    // Pass event to parent logic if needed, but for DOM overlays we might want local drag?
+    // The existing app has drag logic in parent (RecordPreview -> Timeline -> ...)
+    // But RecordPreview props include `onOverlayMove`.
+    // If we want to use the parent's drag logic, we need to mimic what the canvas interaction did.
+    // The parent likely expects `onOverlayMove(id, x, y)`.
+    if (onOverlayMove) {
+      // We can initiate drag here.
+      // But we need to track local drag state to send updates.
+      setDragState({
+        overlayId: id,
+        offsetX: 0,
+        offsetY: 0
+      })
+        // We'll calculate offsets in pointerDown to be precise?
+        // Actually let's just let the parent handle it if we can? 
+        // But we are in a DOM element. The canvas pointer down logic isn't firing.
+        // So we MUST handle it here.
+        // So we MUST handle it here.
+        ; (e.target as Element).setPointerCapture(e.pointerId)
+    }
+  }
+
+  const handleResizePointerDown = (e: React.PointerEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const overlay = overlays.find((o) => o.id === id)
+    if (!overlay) return
+
+    setResizeState({
+      overlayId: id,
+      startX: e.clientX,
+      startY: e.clientY,
+      startValue: overlay.type === 'image' || overlay.type === 'video' ? (overlay.imageScale ?? 1) : (overlay.fontSizePercent ?? 5),
+      kind: overlay.type === 'text' ? 'fontSize' : 'scale'
+    })
+
+    const target = e.target as Element
+    target.setPointerCapture(e.pointerId)
+  }
+
+  const handlePointerUpDom = (e: React.PointerEvent) => {
+    if (resizeState) {
+      setResizeState(null)
+      const target = e.target as Element
+      if (target.releasePointerCapture) target.releasePointerCapture(e.pointerId)
+    }
+    if (dragState) {
+      setDragState(null)
+      const target = e.target as Element
+      if (target.releasePointerCapture) target.releasePointerCapture(e.pointerId)
+    }
+  }
+
+  const handlePointerMoveDom = (e: React.PointerEvent) => {
+    if (resizeState && onOverlayEdit) {
+      const deltaX = e.clientX - resizeState.startX
+      // Scale sensitivity
+      const scaleFactor = 1 + (deltaX / 200)
+
+      if (resizeState.kind === 'fontSize') {
+        const newVal = Math.max(0.5, Math.min(20, resizeState.startValue * scaleFactor))
+        onOverlayEdit(resizeState.overlayId, { fontSizePercent: newVal })
+      } else {
+        const newVal = Math.max(0.1, Math.min(5, resizeState.startValue * scaleFactor))
+        onOverlayEdit(resizeState.overlayId, { imageScale: newVal })
+      }
+    }
+
+    if (dragState && onOverlayMove) {
+      // We need to calculate new X/Y based on delta.
+      // But we need the container size.
+      // `e.movementX` might be useful? Or tracking start.
+      // This simple implementation might be jumpy without proper offset tracking.
+      // Let's rely on simple relative movement.
+      const wrap = e.currentTarget.closest(`.${styles.wrap}`)
+      if (wrap) {
+        const rect = wrap.getBoundingClientRect()
+        if (rect.width > 0 && rect.height > 0) {
+          const dx = e.movementX / rect.width
+          const dy = e.movementY / rect.height
+          const overlay = overlays.find(o => o.id === dragState.overlayId)
+          if (overlay) {
+            const nx = Math.max(0, Math.min(1, (overlay.x ?? 0.5) + dx))
+            const ny = Math.max(0, Math.min(1, (overlay.y ?? 0.5) + dy))
+            onOverlayMove(dragState.overlayId, nx, ny)
+          }
+        }
+      }
+    }
+  }
+
   const showColorFilter = (colorAdjustmentsEnabled ?? false) && !isRecording
   const filterStyle =
     showColorFilter && ((colorBrightness ?? 100) !== 100 || (colorContrast ?? 100) !== 100 || (colorSaturation ?? 100) !== 100)
@@ -744,20 +762,7 @@ export function RecordPreview({
 
   return (
     <div className={styles.wrap} style={{ aspectRatio: `${width}/${height}` }}>
-      <div className={styles.canvasWrap} style={filterStyle}>
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          width={width}
-          height={height}
-          style={{ cursor }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
-          onPointerCancel={handlePointerUp}
-        />
-      </div>
+      {/* Hidden container for playback video */}
       <video
         ref={(el) => {
           (internalVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el
@@ -766,12 +771,110 @@ export function RecordPreview({
         className={styles.hiddenVideo}
         muted={isRecording}
         playsInline
+        onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
         style={{ display: 'none' }}
       />
+
+      {/* Canvas Wrap */}
+      <div className={styles.canvasWrap}
+        style={{ touchAction: 'none', ...filterStyle }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={width}
+          height={height}
+          className={styles.canvas}
+          style={{ cursor }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
+          onPointerCancel={handlePointerUp}
+        />
+
+        {/* DOM Overlays Layer (Edit Mode) */}
+        {!isRecording && (
+          <div
+            className={styles.domOverlayLayer}
+            onPointerMove={handlePointerMoveDom}
+            onPointerUp={handlePointerUpDom}
+            onPointerLeave={handlePointerUpDom}
+          >
+            {overlays.map(overlay => {
+              // Visibility check based on playback time
+              const vTime = internalVideoRef.current?.currentTime || 0
+              const show = (vTime >= overlay.startTime) && (vTime < overlay.endTime)
+              if (!show) return null
+
+              const isSelected = overlay.id === selectedOverlayId
+              // Calculate positioning style
+              const left = `${(overlay.x ?? 0.5) * 100}%`
+              const top = `${(overlay.y ?? 0.5) * 100}%`
+
+              return (
+                <div
+                  key={overlay.id}
+                  className={`${styles.domOverlay} ${isSelected ? styles.selected : ''}`}
+                  style={{
+                    left,
+                    top,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: isSelected ? 100 : 10
+                  }}
+                  onPointerDown={(e) => handleOverlayPointerDown(e, overlay.id)}
+                >
+                  {overlay.type === 'text' && (
+                    <div style={{
+                      fontFamily: overlay.fontFamily || defaultFontFamily,
+                      fontSize: `${(width * (overlay.fontSizePercent ?? 5)) / 100}px`,
+                      fontWeight: defaultBold ? 'bold' : 'normal',
+                      color: 'white',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                      whiteSpace: 'pre-wrap',
+                      textAlign: 'center',
+                      lineHeight: 1.2
+                    }}>
+                      {overlay.text}
+                    </div>
+                  )}
+                  {(overlay.type === 'image' || overlay.type === 'video') && (
+                    <img
+                      src={overlay.imageDataUrl || overlay.imageUrl || ''}
+                      alt=""
+                      draggable={false}
+                      style={{
+                        display: 'block',
+                        width: overlay.naturalWidth ? `${overlay.naturalWidth * (overlay.imageScale ?? 1)}px` : '200px',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )}
+
+                  {/* Resize Handle */}
+                  {isSelected && (
+                    <div
+                      className={styles.resizeHandle}
+                      onPointerDown={(e) => handleResizePointerDown(e, overlay.id)}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {isRecording && (
         <div className={styles.recBadge}>
-          <span className={styles.recDot} /> REC
+          <div className={styles.recDot} />
+          <span>REC</span>
         </div>
+      )}
+
+      {captionPreview && !isRecording && (
+        // Caption preview logic could be added here if needed, 
+        // currently drawn on canvas via drawOverlays/drawCaptionStyle
+        null
       )}
     </div>
   )

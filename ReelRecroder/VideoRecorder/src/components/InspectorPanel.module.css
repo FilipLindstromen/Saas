@@ -217,3 +217,59 @@
   min-width: 0;
   accent-color: var(--accent);
 }
+
+.fileUploadRow {
+  display: flex;
+  margin-top: 8px;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.fileBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fileBtn:hover {
+  background: var(--bg-primary);
+  border-color: var(--accent);
+}
+
+.musicControl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.musicTrackInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.musicTrackInfo span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

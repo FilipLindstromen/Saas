@@ -54,7 +54,7 @@
   pointer-events: none;
 }
 
-.headerCenterOverlay > * {
+.headerCenterOverlay>* {
   pointer-events: auto;
 }
 
@@ -159,6 +159,25 @@
   border-color: var(--accent);
 }
 
+.clearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .modeToggle {
   display: flex;
   align-items: center;
@@ -228,8 +247,15 @@
 }
 
 @keyframes recordPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .leftPanel {
@@ -600,7 +626,7 @@
   width: 100%;
 }
 
-.previewWrap.previewConstrained > div {
+.previewWrap.previewConstrained>div {
   height: 100%;
   max-height: 100%;
   width: 100%;
