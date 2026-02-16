@@ -1,3 +1,16 @@
+# GitHub Pages / Jekyll configuration
+# For project sites: https://username.github.io/Saas/
+title: Saas Apps
+description: Collection of SaaS applications and tools
+
+# Required for GitHub Pages project sites (replace 'Saas' with your repo name if different)
+baseurl: "/Saas"
+url: ""
+
+# Markdown processor
+markdown: kramdown
+
+# Exclude from Jekyll processing
 exclude:
   - node_modules
   - vendor
@@ -8,3 +21,4 @@ exclude:
   - yarn.lock
   - pnpm-lock.yaml
   - "**/node_modules/**"
+  - "**/.git/**"
