@@ -22,66 +22,29 @@ A collection of SaaS applications and tools. This project is configured to deplo
 
 ## Deploying to GitHub Pages
 
-### 1. Configure the repository name
+**Automatic deployment** — the project includes a GitHub Actions workflow that builds all apps and deploys them when you push.
 
-If your GitHub repository has a different name than `Saas`, update the `baseurl` in `_config.yml`:
-
-```yaml
-baseurl: "/your-repo-name"  # No trailing slash
-```
-
-### 2. Build each app for GitHub Pages
-
-Each Vite app must be built with the correct base path so assets load correctly. From the project root:
-
-```bash
-# Web Quiz Generator
-cd webquizgenerator
-npm install
-npm run build -- --base=/Saas/webquizgenerator/
-# Output will be in webquizgenerator/dist/
-
-# CopyWriter
-cd CopyWriter
-npm install
-npm run build -- --base=/Saas/CopyWriter/
-
-# Story Writer
-cd StoryWriter
-npm install
-npm run build -- --base=/Saas/StoryWriter/
-
-# Repeat for other apps, using --base=/Saas/AppName/
-```
-
-> **Note:** Replace `Saas` with your actual repository name in the `--base` path.
-
-### 3. Set up the deployment folder (required)
-
-**Use the `/docs` folder** — this avoids Jekyll scanning your entire repo (which causes slow builds and timeouts).
-
-1. The `docs/` folder already contains `index.html` and `.nojekyll`.
-2. Copy the built output from each app's `dist/` folder into `docs/`:
-   - `webquizgenerator/dist/*` → `docs/webquizgenerator/`
-   - `CopyWriter/dist/*` → `docs/CopyWriter/`
-   - etc.
-3. The `.nojekyll` file tells GitHub Pages to skip Jekyll and serve static files directly — this fixes build errors and speeds up deployment.
-
-### 4. Enable GitHub Pages
+### One-time setup
 
 1. Go to your repository on GitHub.
 2. Click **Settings** → **Pages**.
 3. Under **Build and deployment**:
-   - **Source:** Deploy from a branch
-   - **Branch:** `main` (or `master`)
-   - **Folder:** `/docs` ← **Important:** use the docs folder, not root
+   - **Source:** Select **GitHub Actions**
 4. Click **Save**.
 
-Your site will be available at `https://<username>.github.io/Saas/` (or your repo name).
+### How it works
 
-### 5. Optional: GitHub Actions for automatic deployment
+When you push to `main` or `master`, the workflow automatically:
 
-You can add a workflow to build and deploy on push. Create `.github/workflows/deploy.yml` to automate the build and deploy steps above.
+1. Builds each Vite app with the correct base path for your repo
+2. Copies static apps (Conversation Generator, Typography)
+3. Deploys everything to GitHub Pages
+
+Your site will be at `https://<username>.github.io/<repo-name>/` (e.g. `https://username.github.io/Saas/`).
+
+### Manual trigger
+
+You can also run the deployment manually: **Actions** → **Deploy to GitHub Pages** → **Run workflow**.
 
 ## Local development
 

@@ -1,0 +1,105 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Create deploy directory
+        run: |
+          mkdir -p deploy
+          cp docs/index.html deploy/
+          cp docs/.nojekyll deploy/
+          cp -r conversation-generator deploy/
+          cp -r Typography deploy/
+
+      - name: Build Web Quiz Generator
+        run: |
+          cd webquizgenerator
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/webquizgenerator/
+          cp -r dist ../deploy/webquizgenerator
+
+      - name: Build CopyWriter
+        run: |
+          cd CopyWriter
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/CopyWriter/
+          cp -r dist ../deploy/CopyWriter
+
+      - name: Build Story Writer
+        run: |
+          cd StoryWriter
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/StoryWriter/
+          cp -r dist ../deploy/StoryWriter
+
+      - name: Build Color Writer
+        run: |
+          cd ColorWriter
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/ColorWriter/
+          cp -r dist ../deploy/ColorWriter
+
+      - name: Build PostIt
+        run: |
+          cd PostIt
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/PostIt/
+          cp -r dist ../deploy/PostIt
+
+      - name: Build Pitch Deck
+        run: |
+          cd PitchDeck
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/PitchDeck/
+          cp -r dist ../deploy/PitchDeck
+
+      - name: Build Video Recorder
+        run: |
+          cd VIdeoRecorder
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/VIdeoRecorder/
+          cp -r dist ../deploy/VIdeoRecorder
+
+      - name: Build Sound Effects Generator
+        run: |
+          cd SoundEffectsGenerator
+          npm ci
+          npm run build -- --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
+          cp -r dist ../deploy/SoundEffectsGenerator
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy
+
+  deploy:
+    environment: github-pages
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
