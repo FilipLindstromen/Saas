@@ -557,17 +557,26 @@ export default function App() {
             audio: false,
           })
         } else {
+          // Prioritize selected device: deviceId must come first so the browser uses the correct camera
+          const deviceConstraint = videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}
           const videoConstraints: MediaTrackConstraints = {
+            ...deviceConstraint,
             width: { ideal: width },
             height: { ideal: height },
-            ...(videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}),
           }
           try {
             vStream = await navigator.mediaDevices.getUserMedia({
-              video: { ...videoConstraints, width: { exact: width }, height: { exact: height } },
+              video: { ...deviceConstraint, width: { exact: width }, height: { exact: height } },
             })
           } catch (exactErr) {
-            vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+            try {
+              vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+            } catch (idealErr) {
+              // Last resort: device only (no resolution), ensures correct camera is used
+              vStream = await navigator.mediaDevices.getUserMedia({
+                video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : { width: { ideal: width }, height: { ideal: height } },
+              })
+            }
           }
         }
         setVideoStream(vStream)
@@ -795,7 +804,7 @@ export default function App() {
           </span>
         </div>
         <div
-          className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''}`}
+          className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''} ${(aspectRatio === '9:16' || aspectRatio === '1:1') && portraitFillHeight ? styles.previewFillHeight : ''}`}
         >
           {countdown != null && (
             <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>

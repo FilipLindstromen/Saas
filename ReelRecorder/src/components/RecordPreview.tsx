@@ -795,7 +795,10 @@ export function RecordPreview({
       : undefined
 
   return (
-    <div className={styles.wrap} style={{ aspectRatio: `${width}/${height}` }}>
+    <div
+      className={`${styles.wrap} ${portraitFillHeight ? styles.wrapFillHeight : ''}`}
+      style={portraitFillHeight ? undefined : { aspectRatio: `${width}/${height}` }}
+    >
       {/* Hidden container for playback video */}
       <video
         ref={(el) => {
@@ -817,7 +820,7 @@ export function RecordPreview({
           ref={canvasRef}
           width={width}
           height={height}
-          className={styles.canvas}
+          className={`${styles.canvas} ${portraitFillHeight ? styles.canvasCover : ''}`}
           style={{ cursor }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
