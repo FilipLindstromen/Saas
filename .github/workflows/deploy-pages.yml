@@ -37,56 +37,56 @@ jobs:
       - name: Build Web Quiz Generator
         run: |
           cd webquizgenerator
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/webquizgenerator/
           cp -r dist ../deploy/webquizgenerator
 
       - name: Build CopyWriter
         run: |
           cd CopyWriter
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/CopyWriter/
           cp -r dist ../deploy/CopyWriter
 
       - name: Build Story Writer
         run: |
           cd StoryWriter
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/StoryWriter/
           cp -r dist ../deploy/StoryWriter
 
       - name: Build Color Writer
         run: |
           cd ColorWriter
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/ColorWriter/
           cp -r dist ../deploy/ColorWriter
 
       - name: Build PostIt
         run: |
           cd PostIt
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/PostIt/
           cp -r dist ../deploy/PostIt
 
       - name: Build Pitch Deck
         run: |
           cd PitchDeck
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/PitchDeck/
           cp -r dist ../deploy/PitchDeck
 
       - name: Build Video Recorder
         run: |
           cd VIdeoRecorder
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/VIdeoRecorder/
           cp -r dist ../deploy/VIdeoRecorder
 
       - name: Build Sound Effects Generator
         run: |
           cd SoundEffectsGenerator
-          npm ci
+          npm install
           npm run build -- --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
           cp -r dist ../deploy/SoundEffectsGenerator
 
