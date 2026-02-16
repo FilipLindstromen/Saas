@@ -20,6 +20,7 @@ import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
 import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
+import { getStoredTheme, setStoredTheme, applyTheme, type Theme } from './utils/theme'
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
@@ -97,6 +98,7 @@ export default function App() {
   const [safeZoneVisible, setSafeZoneVisible] = useState(() => initialState?.safeZoneVisible ?? false)
   const [exportPanelOpen, setExportPanelOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState<ExportFormat>('webm')
+  const [theme, setTheme] = useState<Theme>(() => getStoredTheme())
   const [musicBlob, setMusicBlob] = useState<Blob | null>(null)
   const [musicVolume, setMusicVolume] = useState(50)
   const [downloadPreparing, setDownloadPreparing] = useState(false)
@@ -861,49 +863,6 @@ export default function App() {
             <h1 className={styles.title}>ReelRecorder</h1>
             <p className={styles.subtitle}>Record with overlays and burn-in captions</p>
           </div>
-          <div className={styles.modeToggle} role="tablist" aria-label="Edit, Thumbnail, Export">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!thumbnailPanelOpen && !exportPanelOpen}
-              aria-label="Edit"
-              className={!thumbnailPanelOpen && !exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => {
-                setThumbnailPanelOpen(false)
-                setExportPanelOpen(false)
-              }}
-              title="Edit recording"
-            >
-              <IconEdit />
-            </button>
-            <button
-              type="button"
-              aria-label="Thumbnail & Captions"
-              className={thumbnailPanelOpen ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => {
-                setThumbnailPanelOpen((p) => !p)
-                if (!thumbnailPanelOpen) setExportPanelOpen(false)
-              }}
-              title="Thumbnail & YouTube description (webcam or record first for video frame)"
-              aria-pressed={thumbnailPanelOpen}
-            >
-              <IconThumbnail />
-            </button>
-            <button
-              type="button"
-              aria-label="Export"
-              className={exportPanelOpen ? styles.modeBtnActive : styles.modeBtn}
-              onClick={() => {
-                setExportPanelOpen((p) => !p)
-                if (!exportPanelOpen) setThumbnailPanelOpen(false)
-              }}
-              disabled={!recordedBlob}
-              title={!recordedBlob ? 'Record first to export' : 'Export, download, publish to YouTube'}
-              aria-pressed={exportPanelOpen}
-            >
-              <IconExport />
-            </button>
-          </div>
         </div>
         <div className={styles.headerCenter}>
           {/* Spacer so headerRight stays right; record + timer are in overlay */}
@@ -942,6 +901,65 @@ export default function App() {
           {recordError && <span className={styles.headerError}>{recordError}</span>}
         </div>
         <div className={styles.headerRight}>
+          <div className={styles.panelToggles} role="group" aria-label="Panel toggles">
+            <button
+              type="button"
+              className={!thumbnailPanelOpen && !exportPanelOpen ? styles.panelToggleActive : styles.panelToggle}
+              onClick={() => {
+                setThumbnailPanelOpen(false)
+                setExportPanelOpen(false)
+              }}
+              title="Edit view"
+              aria-label="Edit view (hide panels)"
+              aria-pressed={!thumbnailPanelOpen && !exportPanelOpen}
+            >
+              <IconEdit />
+            </button>
+            <button
+              type="button"
+              className={thumbnailPanelOpen ? styles.panelToggleActive : styles.panelToggle}
+              onClick={() => setThumbnailPanelOpen((p) => !p)}
+              title="Thumbnail & Captions"
+              aria-label="Toggle Thumbnail & Captions panel"
+              aria-pressed={thumbnailPanelOpen}
+            >
+              <IconThumbnail />
+            </button>
+            <button
+              type="button"
+              className={exportPanelOpen ? styles.panelToggleActive : styles.panelToggle}
+              onClick={() => setExportPanelOpen((p) => !p)}
+              disabled={!recordedBlob}
+              title={!recordedBlob ? 'Record first to export' : 'Toggle Export panel'}
+              aria-label={!recordedBlob ? 'Record first to export' : 'Toggle Export panel'}
+              aria-pressed={exportPanelOpen}
+            >
+              <IconExport />
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.themeToggle}
+            onClick={() => {
+              const next: Theme = theme === 'dark' ? 'light' : 'dark'
+              setTheme(next)
+              setStoredTheme(next)
+              applyTheme(next)
+            }}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
           <button
             type="button"
             className={styles.clearBtn}
