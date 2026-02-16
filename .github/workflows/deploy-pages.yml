@@ -38,56 +38,56 @@ jobs:
         run: |
           cd webquizgenerator
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/webquizgenerator/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/webquizgenerator/
           cp -r dist ../deploy/webquizgenerator
 
       - name: Build CopyWriter
         run: |
           cd CopyWriter
           npm install
-          npx tsc -b && npx vite build --base=/${{ github.event.repository.name }}/CopyWriter/
+          npx tsc -b && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/CopyWriter/
           cp -r dist ../deploy/CopyWriter
 
       - name: Build Story Writer
         run: |
           cd StoryWriter
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/StoryWriter/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/StoryWriter/
           cp -r dist ../deploy/StoryWriter
 
       - name: Build Color Writer
         run: |
           cd ColorWriter
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/ColorWriter/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/ColorWriter/
           cp -r dist ../deploy/ColorWriter
 
       - name: Build PostIt
         run: |
           cd PostIt
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/PostIt/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PostIt/
           cp -r dist ../deploy/PostIt
 
       - name: Build Pitch Deck
         run: |
           cd PitchDeck
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/PitchDeck/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PitchDeck/
           cp -r dist ../deploy/PitchDeck
 
       - name: Build Video Recorder
         run: |
           cd VIdeoRecorder
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/VIdeoRecorder/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/VIdeoRecorder/
           cp -r dist ../deploy/VIdeoRecorder
 
       - name: Build Sound Effects Generator
         run: |
           cd SoundEffectsGenerator
           npm install
-          npx vite build --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
           cp -r dist ../deploy/SoundEffectsGenerator
 
       - name: Upload artifact
