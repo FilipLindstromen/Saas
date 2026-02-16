@@ -96,7 +96,7 @@ jobs:
         run: |
           cd ReelRecorder
           npm install
-          npx tsc -b && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/ReelRecorder/
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/ReelRecorder/
           cp -r dist ../deploy/ReelRecorder
 
       - name: Build Power Writer
