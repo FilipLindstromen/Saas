@@ -11,6 +11,7 @@ url: ""
 markdown: kramdown
 
 # Exclude from Jekyll processing
+# App directories contain node_modules and source - exclude to avoid slow builds/timeouts
 exclude:
   - node_modules
   - vendor
@@ -22,3 +23,20 @@ exclude:
   - pnpm-lock.yaml
   - "**/node_modules/**"
   - "**/.git/**"
+  - webquizgenerator
+  - CopyWriter
+  - StoryWriter
+  - ColorWriter
+  - PostIt
+  - PitchDeck
+  - VIdeoRecorder
+  - SoundEffectsGenerator
+  - Typography
+  - "VSL Writer"
+  - PowerWriter
+  - Quiz
+  - conversation-generator
+  - "conversation-generator - Copy"
+  - "quiz-generator - Copy"
+  - ReelRecroder
+  - VoideDepth

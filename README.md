@@ -56,23 +56,16 @@ npm run build -- --base=/Saas/StoryWriter/
 
 > **Note:** Replace `Saas` with your actual repository name in the `--base` path.
 
-### 3. Set up the deployment folder
+### 3. Set up the deployment folder (required)
 
-GitHub Pages can serve from the **root**, **/docs** folder, or **gh-pages** branch.
+**Use the `/docs` folder** — this avoids Jekyll scanning your entire repo (which causes slow builds and timeouts).
 
-**Option A: Use the `/docs` folder (recommended)**
-
-1. Create a `docs` folder in the project root.
+1. The `docs/` folder already contains `index.html` and `.nojekyll`.
 2. Copy the built output from each app's `dist/` folder into `docs/`:
    - `webquizgenerator/dist/*` → `docs/webquizgenerator/`
    - `CopyWriter/dist/*` → `docs/CopyWriter/`
    - etc.
-3. Add a root `index.html` in `docs/` that links to each app.
-
-**Option B: Use the root**
-
-1. Copy built outputs to the root (e.g. `webquizgenerator/`, `CopyWriter/`, etc.).
-2. Add an `index.html` at the root linking to all apps.
+3. The `.nojekyll` file tells GitHub Pages to skip Jekyll and serve static files directly — this fixes build errors and speeds up deployment.
 
 ### 4. Enable GitHub Pages
 
@@ -80,7 +73,8 @@ GitHub Pages can serve from the **root**, **/docs** folder, or **gh-pages** bran
 2. Click **Settings** → **Pages**.
 3. Under **Build and deployment**:
    - **Source:** Deploy from a branch
-   - **Branch:** `main` (or `master`) / `docs` (if using the docs folder) or `root`
+   - **Branch:** `main` (or `master`)
+   - **Folder:** `/docs` ← **Important:** use the docs folder, not root
 4. Click **Save**.
 
 Your site will be available at `https://<username>.github.io/Saas/` (or your repo name).
