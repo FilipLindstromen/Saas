@@ -796,8 +796,8 @@ export function RecordPreview({
 
   return (
     <div
-      className={`${styles.wrap} ${portraitFillHeight ? styles.wrapFillHeight : ''}`}
-      style={portraitFillHeight ? undefined : { aspectRatio: `${width}/${height}` }}
+      className={`${styles.wrap} ${portraitFillHeight ? styles.wrapFillHeight : styles.wrapFillContainer}`}
+      style={portraitFillHeight ? undefined : undefined}
     >
       {/* Hidden container for playback video */}
       <video

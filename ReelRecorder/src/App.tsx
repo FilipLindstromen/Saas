@@ -806,6 +806,7 @@ export default function App() {
         <div
           className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''} ${(aspectRatio === '9:16' || aspectRatio === '1:1') && portraitFillHeight ? styles.previewFillHeight : ''}`}
         >
+          <div className={styles.previewInner}>
           {countdown != null && (
             <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
               <span className={styles.countdownNumber}>{countdown}</span>
@@ -864,6 +865,7 @@ export default function App() {
             playbackUrl={downloadUrl}
             editPreviewSource={editPreviewSource}
           />
+          </div>
         </div>
       </section>
     </div>
