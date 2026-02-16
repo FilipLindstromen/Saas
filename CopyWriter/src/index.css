@@ -1,0 +1,109 @@
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-muted: #e0e7ff;
+  --border: #e2e8f0;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --shadow-lg: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='dark'] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-muted: #3730a3;
+  --border: #334155;
+  --success: #4ade80;
+  --error: #f87171;
+  --warning: #fbbf24;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-lg: rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background 0.2s, color 0.2s;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+textarea, input {
+  font-family: inherit;
+}
+
+/* Scrollbars - visible when needed */
+.panelContent,
+.panelTextarea,
+.questionDisplay,
+.audienceAnalysis {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg-secondary);
+}
+
+.panelContent::-webkit-scrollbar,
+.panelTextarea::-webkit-scrollbar,
+.questionDisplay::-webkit-scrollbar,
+.audienceAnalysis::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panelContent::-webkit-scrollbar-track,
+.panelTextarea::-webkit-scrollbar-track,
+.questionDisplay::-webkit-scrollbar-track,
+.audienceAnalysis::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.panelContent::-webkit-scrollbar-thumb,
+.panelTextarea::-webkit-scrollbar-thumb,
+.questionDisplay::-webkit-scrollbar-thumb,
+.audienceAnalysis::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.panelContent::-webkit-scrollbar-thumb:hover,
+.panelTextarea::-webkit-scrollbar-thumb:hover,
+.questionDisplay::-webkit-scrollbar-thumb:hover,
+.audienceAnalysis::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
