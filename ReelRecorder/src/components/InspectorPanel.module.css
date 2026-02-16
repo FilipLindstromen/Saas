@@ -131,30 +131,6 @@
   border-color: var(--accent);
 }
 
-.lutRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.lutName {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.fileLabel {
-  display: inline-block;
-  cursor: pointer;
-}
-
-.fileInput {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-}
-
 .fileBtn {
   display: inline-block;
   padding: 6px 12px;

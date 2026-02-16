@@ -8,8 +8,6 @@ import { OptionsBar } from './OptionsBar'
 import type { CaptionSegment } from '../services/captions'
 import { IconTrash, IconVideo, IconAudio, IconLayers, IconCursor, IconType, IconColor, IconSafeZone } from './Icons'
 import { CaptionBurnIn } from './CaptionBurnIn'
-import type { ParsedLUT } from '../utils/colorLut'
-import { parseCubeLUT } from '../utils/colorLut'
 import styles from './InspectorPanel.module.css'
 
 const TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] = [
@@ -71,8 +69,6 @@ interface InspectorPanelProps {
   onStudioQualityChange?: (v: boolean) => void
   portraitFillHeight?: boolean
   onPortraitFillHeightChange?: (v: boolean) => void
-  colorLut?: ParsedLUT | null
-  onColorLutChange?: (lut: ParsedLUT | null) => void
   colorAdjustmentsEnabled?: boolean
   onColorAdjustmentsEnabledChange?: (v: boolean) => void
   colorBrightness?: number
@@ -159,8 +155,6 @@ export function InspectorPanel({
   onColorContrastChange = () => { },
   colorSaturation = 100,
   onColorSaturationChange = () => { },
-  colorLut = null,
-  onColorLutChange = () => { },
   videoBlob = null,
   onBurnedBlob = () => { },
   captionStyle,
@@ -627,49 +621,6 @@ export function InspectorPanel({
                   aria-label="Saturation"
                 />
               </>
-            )}
-            <label className={styles.label} style={{ marginTop: 12 }}>Color LUT (.cube)</label>
-            <p className={styles.hint}>Optional 3D LUT file for a custom look. Applied in preview and export.</p>
-            {colorLut ? (
-              <div className={styles.lutRow}>
-                <span className={styles.lutName} title={`${colorLut.size}×${colorLut.size}×${colorLut.size} LUT`}>
-                  LUT loaded ({colorLut.size}³)
-                </span>
-                <button
-                  type="button"
-                  className={styles.textBtn}
-                  onClick={() => onColorLutChange(null)}
-                >
-                  Remove LUT
-                </button>
-              </div>
-            ) : (
-              <label className={styles.fileLabel}>
-                <input
-                  type="file"
-                  accept=".cube"
-                  className={styles.fileInput}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      try {
-                        const text = reader.result as string
-                        const parsed = parseCubeLUT(text)
-                        onColorLutChange(parsed)
-                      } catch (err) {
-                        console.error('Failed to parse .cube file:', err)
-                        onColorLutChange(null)
-                      }
-                    }
-                    reader.readAsText(file)
-                  }}
-                  aria-label="Choose .cube LUT file"
-                />
-                <span className={styles.fileBtn}>Choose .cube file</span>
-              </label>
             )}
           </section>
         </div>

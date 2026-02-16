@@ -383,29 +383,33 @@ export function RecordPreview({
           ctx.scale(-1, 1)
         }
 
-        // Handle Portrait Fill Height
+        // Handle Portrait Fill Height - center-crop (mask) the video to fill the canvas
         if (portraitFillHeight) {
-          const videoRatio = video.videoWidth / video.videoHeight
-          const canvasRatio = width / height
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          if (vw > 0 && vh > 0) {
+            const videoRatio = vw / vh
+            const canvasRatio = width / height
 
-          let drawW = width
-          let drawH = height
-          let offX = 0
-          let offY = 0
+            let sx = 0
+            let sy = 0
+            let sw = vw
+            let sh = vh
 
-          if (canvasRatio < videoRatio) {
-            // Canvas is narrower -> Fill height
-            drawH = height
-            drawW = height * videoRatio
-            offX = (width - drawW) / 2
+            if (canvasRatio < videoRatio) {
+              // Canvas is narrower -> crop sides of video (center crop)
+              sw = vh * canvasRatio
+              sx = (vw - sw) / 2
+            } else {
+              // Canvas is wider -> crop top/bottom of video (center crop)
+              sh = vw / canvasRatio
+              sy = (vh - sh) / 2
+            }
+
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height)
           } else {
-            // Canvas is wider -> Fill width
-            drawW = width
-            drawH = width / videoRatio
-            offY = (height - drawH) / 2
+            ctx.drawImage(video, 0, 0, width, height)
           }
-
-          ctx.drawImage(video, offX, offY, drawW, drawH)
         } else {
           ctx.drawImage(video, 0, 0, width, height)
         }

@@ -7,7 +7,6 @@ import { loadVideoRecorderState, saveVideoRecorderState } from './utils/persiste
 import { getClipLibrary, saveClipToLibrary, removeClipFromLibrary, generateLibraryId } from './utils/clipLibrary'
 import { saveRecording, loadRecording, clearRecording } from './utils/recordingStorage'
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
-import type { ParsedLUT } from './utils/colorLut'
 import { exportVideoForDownload, getVideoDurationFromBlob, type ExportFormat } from './utils/exportWithColorAdjustments'
 import { RecordPreview } from './components/RecordPreview'
 import { Timeline } from './components/Timeline'
@@ -19,7 +18,7 @@ import { ClipLibraryPanel } from './components/ClipLibraryPanel'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
-import { IconRecord, IconStop, IconEdit, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
+import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
 import { getStoredTheme, setStoredTheme, applyTheme, type Theme } from './utils/theme'
 import styles from './App.module.css'
 
@@ -67,7 +66,6 @@ export default function App() {
   const [colorBrightness, setColorBrightness] = useState(() => initialState?.colorBrightness ?? 100)
   const [colorContrast, setColorContrast] = useState(() => initialState?.colorContrast ?? 100)
   const [colorSaturation, setColorSaturation] = useState(() => initialState?.colorSaturation ?? 100)
-  const [colorLut, setColorLut] = useState<ParsedLUT | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [openaiApiKey, setOpenaiApiKey] = useState(() => getStoredOpenAIKey())
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
@@ -559,11 +557,18 @@ export default function App() {
             audio: false,
           })
         } else {
-          vStream = await navigator.mediaDevices.getUserMedia({
-            video: videoDeviceId
-              ? { deviceId: { exact: videoDeviceId }, width: { ideal: width }, height: { ideal: height } }
-              : { width: { ideal: width }, height: { ideal: height } },
-          })
+          const videoConstraints: MediaTrackConstraints = {
+            width: { ideal: width },
+            height: { ideal: height },
+            ...(videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}),
+          }
+          try {
+            vStream = await navigator.mediaDevices.getUserMedia({
+              video: { ...videoConstraints, width: { exact: width }, height: { exact: height } },
+            })
+          } catch (exactErr) {
+            vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+          }
         }
         setVideoStream(vStream)
       } catch (e) {
@@ -904,19 +909,6 @@ export default function App() {
           <div className={styles.panelToggles} role="group" aria-label="Panel toggles">
             <button
               type="button"
-              className={!thumbnailPanelOpen && !exportPanelOpen ? styles.panelToggleActive : styles.panelToggle}
-              onClick={() => {
-                setThumbnailPanelOpen(false)
-                setExportPanelOpen(false)
-              }}
-              title="Edit view"
-              aria-label="Edit view (hide panels)"
-              aria-pressed={!thumbnailPanelOpen && !exportPanelOpen}
-            >
-              <IconEdit />
-            </button>
-            <button
-              type="button"
               className={thumbnailPanelOpen ? styles.panelToggleActive : styles.panelToggle}
               onClick={() => setThumbnailPanelOpen((p) => !p)}
               title="Thumbnail & Captions"
@@ -1247,8 +1239,6 @@ export default function App() {
             onStudioQualityChange={setStudioQuality}
             portraitFillHeight={portraitFillHeight}
             onPortraitFillHeightChange={setPortraitFillHeight}
-            colorLut={colorLut}
-            onColorLutChange={setColorLut}
             colorAdjustmentsEnabled={colorAdjustmentsEnabled}
             onColorAdjustmentsEnabledChange={setColorAdjustmentsEnabled}
             colorBrightness={colorBrightness}
