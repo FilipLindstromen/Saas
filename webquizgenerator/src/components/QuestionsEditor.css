@@ -1,0 +1,145 @@
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary {
+  background: #4a9eff;
+  border-color: #4a9eff;
+}
+
+.btn-primary:hover {
+  background: #5aa8ff;
+}
+
+.question-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.question-number {
+  font-weight: 600;
+  color: #4a9eff;
+  font-size: 0.95rem;
+}
+
+.btn-delete {
+  padding: 6px 12px;
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  color: #ff5050;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: rgba(255, 80, 80, 0.25);
+}
+
+.answers-section {
+  margin-top: 20px;
+}
+
+.answers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.answers-header label {
+  font-weight: 500;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.answer-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.answer-input-group {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+}
+
+.question-card[draggable="true"],
+.answer-row[draggable="true"] {
+  cursor: move;
+}
+
+.question-card.drag-over,
+.answer-row.drag-over {
+  border-color: rgba(74, 158, 255, 0.4);
+  background: rgba(74, 158, 255, 0.05);
+}
+
+.answer-input-group .form-input {
+  flex: 1;
+}
+
+.tag-input {
+  flex: 0 0 200px;
+  font-size: 0.9rem;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  color: #ff5050;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 80, 80, 0.25);
+}
+

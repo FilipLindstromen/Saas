@@ -1,0 +1,12 @@
+.export-section {
+  background: linear-gradient(135deg, rgba(255, 159, 43, 0.1) 0%, rgba(255, 200, 100, 0.05) 100%);
+  border-color: rgba(255, 159, 43, 0.2);
+}
+
+.btn-export {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  margin-top: 8px;
+}
+

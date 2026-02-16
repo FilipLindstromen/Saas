@@ -1,0 +1,106 @@
+.feedback-editor {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-description,
+.sub-description {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.sub-description {
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.default-feedback {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 32px;
+}
+
+.tag-feedback-list {
+  margin-top: 8px;
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tag-feedback-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tag-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tag-name {
+  font-weight: 600;
+  color: #4a9eff;
+  font-size: 1rem;
+}
+
+.tag-toggle {
+  font-size: 1.5rem;
+  color: #fff;
+  font-weight: 300;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-icon.small {
+  width: 28px;
+  height: 28px;
+  font-size: 0.95rem;
+}
+
+.tag-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0;
+}
+
+.add-tag-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+

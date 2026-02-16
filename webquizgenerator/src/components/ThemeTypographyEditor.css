@@ -1,0 +1,121 @@
+.theme-typo {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.typo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.typo-card,
+.background-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+.typo-card h3,
+.background-card h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #e0e0e0;
+}
+
+.form-group.inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.form-group.inline label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.form-group input[type="range"] {
+  width: 100%;
+}
+
+.form-group select {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.background-card small {
+  display: block;
+  margin-top: 6px;
+  opacity: 0.6;
+}
+
+.gradient-editor {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gradient-row {
+  display: flex;
+  gap: 12px;
+}
+
+.color-input {
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.gradient-preview {
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.image-preview {
+  margin-top: 10px;
+}
+
+.image-thumb {
+  height: 120px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.image-thumb.placeholder {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.9rem;
+}
+
+.image-actions {
+  align-items: center;
+  margin-top: 10px;
+}
+
+.file-input {
+  color: #e6e6e6;
+}
+

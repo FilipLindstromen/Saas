@@ -1,0 +1,47 @@
+.quiz-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.editor-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+.editor-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.editor-section h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  color: #e0e0e0;
+}
+
+.preview-section {
+  background: linear-gradient(135deg, rgba(220, 220, 220, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.preview-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.btn-preview {
+  padding: 12px 24px;
+  font-size: 1rem;
+}
+
