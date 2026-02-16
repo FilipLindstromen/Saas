@@ -31,8 +31,10 @@ jobs:
           mkdir -p deploy
           cp docs/index.html deploy/
           cp docs/.nojekyll deploy/
+          cp docs/robots.txt deploy/
           cp -r conversation-generator deploy/
           cp -r Typography deploy/
+          cp -r VSLWriter deploy/
 
       - name: Build Web Quiz Generator
         run: |
@@ -89,6 +91,20 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
           cp -r dist ../deploy/SoundEffectsGenerator
+
+      - name: Build Reel Recorder
+        run: |
+          cd ReelRecorder
+          npm install
+          npx tsc -b && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/ReelRecorder/
+          cp -r dist ../deploy/ReelRecorder
+
+      - name: Build Power Writer
+        run: |
+          cd PowerWriter/PowerWriter/client
+          npm install
+          npx tsc && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PowerWriter/
+          cp -r dist ../../../deploy/PowerWriter
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

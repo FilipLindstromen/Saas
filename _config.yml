@@ -32,11 +32,11 @@ exclude:
   - VIdeoRecorder
   - SoundEffectsGenerator
   - Typography
-  - "VSL Writer"
+  - VSLWriter
   - PowerWriter
+  - ReelRecorder
   - Quiz
   - conversation-generator
   - "conversation-generator - Copy"
   - "quiz-generator - Copy"
-  - ReelRecroder
   - VoideDepth

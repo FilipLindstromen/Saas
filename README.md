@@ -12,12 +12,12 @@ A collection of SaaS applications and tools. This project is configured to deplo
 | Color Writer | `/ColorWriter` | Color-focused writing tool |
 | PostIt | `/PostIt` | Plan & brainstorm app |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
+| Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
+| Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |
 | Sound Effects Generator | `/SoundEffectsGenerator` | Sound effects creation |
 | Typography | `/Typography` | Typography tools |
-| VSL Writer | `/VSL Writer` | Video sales letter writer |
-| Power Writer | `/PowerWriter` | Writing assistant |
-| Quiz | `/Quiz` | Quiz application |
+| VSL Writer | `/VSLWriter` | Video sales letter writer |
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
 
 ## Deploying to GitHub Pages
@@ -39,7 +39,7 @@ A collection of SaaS applications and tools. This project is configured to deplo
 When you push to `main` or `master`, the workflow automatically:
 
 1. Builds each Vite app with the correct base path for your repo
-2. Copies static apps (Conversation Generator, Typography)
+2. Copies static apps (Conversation Generator, Typography, VSL Writer)
 3. Deploys everything to GitHub Pages
 
 Your site will be at `https://<username>.github.io/<repo-name>/` (e.g. `https://username.github.io/Saas/`).
@@ -61,7 +61,13 @@ If the landing page loads but clicking an app gives "404 File not found":
 For local development, run each app from its folder:
 
 ```bash
+# Most apps (e.g. webquizgenerator, CopyWriter, StoryWriter)
 cd webquizgenerator
+npm install
+npm run dev
+
+# Power Writer (nested path)
+cd PowerWriter/PowerWriter/client
 npm install
 npm run dev
 ```
@@ -72,20 +78,23 @@ Use the default base path (`/`) for local development; only use the `--base` fla
 
 ```
 /
-├── _config.yml          # Jekyll/GitHub Pages config
+├── _config.yml
 ├── README.md
+├── docs/                 # Landing page & static assets for deployment
 ├── webquizgenerator/
 ├── CopyWriter/
 ├── StoryWriter/
 ├── ColorWriter/
 ├── PostIt/
 ├── PitchDeck/
+├── PowerWriter/
+│   └── PowerWriter/
+│       └── client/      # Power Writer app
 ├── VIdeoRecorder/
+├── ReelRecorder/
 ├── SoundEffectsGenerator/
 ├── Typography/
-├── VSL Writer/
-├── PowerWriter/
-├── Quiz/
+├── VSLWriter/
 ├── conversation-generator/
-└── docs/                # (optional) Deployment output for GitHub Pages
+└── .github/workflows/   # GitHub Actions deployment
 ```
