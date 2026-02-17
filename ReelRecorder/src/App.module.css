@@ -482,7 +482,7 @@
   flex-direction: column;
   gap: 24px;
   padding: 24px;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -687,7 +687,8 @@
   gap: 16px;
   min-width: 0;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
+  overflow: hidden;
 }
 
 .contentWithTranscript {
@@ -712,15 +713,17 @@
   align-items: flex-start;
   min-width: 0;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
+  overflow: hidden;
 }
 
 .previewSection {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   padding: 18px;
@@ -753,6 +756,30 @@
   font-size: 0.9rem;
 }
 
+.previewScaleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.previewScaleLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.previewScaleSlider {
+  width: 80px;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.previewScaleValue {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 2.5em;
+}
+
 .exportFormat {
   margin-left: auto;
   font-size: 0.8rem;
@@ -765,9 +792,10 @@
   max-width: 100%;
   max-height: 100%;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Inner wrapper fills available height between header and timeline, centers preview */

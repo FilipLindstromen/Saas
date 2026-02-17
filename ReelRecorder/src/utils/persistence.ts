@@ -58,6 +58,8 @@ export interface PersistedState {
   videoVolume: number
   noiseRemovalEnabled: boolean
   noiseRemovalAmount: number
+  /** Preview scale 50-150%, affects display size only */
+  previewScale: number
 }
 
 const defaults: PersistedState = {
@@ -96,6 +98,7 @@ const defaults: PersistedState = {
   videoVolume: 100,
   noiseRemovalEnabled: false,
   noiseRemovalAmount: 50,
+  previewScale: 100,
 }
 
 function normalizeOverlayItem(raw: unknown): OverlayItem | null {
@@ -257,6 +260,7 @@ function validateState(raw: unknown): PersistedState | null {
     videoVolume: typeof o.videoVolume === 'number' && Number.isFinite(o.videoVolume) ? Math.max(0, Math.min(100, o.videoVolume)) : defaults.videoVolume,
     noiseRemovalEnabled: typeof o.noiseRemovalEnabled === 'boolean' ? o.noiseRemovalEnabled : defaults.noiseRemovalEnabled,
     noiseRemovalAmount: typeof o.noiseRemovalAmount === 'number' && Number.isFinite(o.noiseRemovalAmount) ? Math.max(0, Math.min(100, o.noiseRemovalAmount)) : defaults.noiseRemovalAmount,
+    previewScale: typeof o.previewScale === 'number' && Number.isFinite(o.previewScale) ? Math.max(50, Math.min(150, o.previewScale)) : defaults.previewScale,
   }
 }
 

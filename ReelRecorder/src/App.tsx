@@ -116,6 +116,7 @@ export default function App() {
   const [videoVolume, setVideoVolume] = useState(() => initialState?.videoVolume ?? 100)
   const [noiseRemovalEnabled, setNoiseRemovalEnabled] = useState(() => initialState?.noiseRemovalEnabled ?? false)
   const [noiseRemovalAmount, setNoiseRemovalAmount] = useState(() => initialState?.noiseRemovalAmount ?? 50)
+  const [previewScale, setPreviewScale] = useState(() => initialState?.previewScale ?? 100)
 
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipUserTimelineDurationResetRef = useRef(false)
@@ -409,8 +410,9 @@ export default function App() {
       videoVolume,
       noiseRemovalEnabled,
       noiseRemovalAmount,
+      previewScale,
     })
-  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount])
+  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount, previewScale])
 
   const handleThumbnailChange = useCallback((blob: Blob | null, dataUrl?: string | null) => {
     setThumbnailBlob(blob)
@@ -799,6 +801,21 @@ export default function App() {
         <div className={styles.previewHeader}>
           <h2 className={styles.previewTitle}>Preview</h2>
           <p className={styles.previewSubtitle}>Video + overlays</p>
+          <div className={styles.previewScaleRow}>
+            <label className={styles.previewScaleLabel} htmlFor="preview-scale">Scale</label>
+            <input
+              id="preview-scale"
+              type="range"
+              className={styles.previewScaleSlider}
+              min={50}
+              max={150}
+              step={5}
+              value={previewScale}
+              onChange={(e) => setPreviewScale(Number(e.target.value))}
+              aria-label="Preview scale"
+            />
+            <span className={styles.previewScaleValue}>{previewScale}%</span>
+          </div>
           <span className={styles.exportFormat}>
             Export: {aspectRatio} · {width}×{height}
           </span>
@@ -806,7 +823,13 @@ export default function App() {
         <div
           className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''} ${(aspectRatio === '9:16' || aspectRatio === '1:1') && portraitFillHeight ? styles.previewFillHeight : ''}`}
         >
-          <div className={styles.previewInner}>
+          <div
+            className={styles.previewInner}
+            style={{
+              transform: `scale(${previewScale / 100})`,
+              transformOrigin: 'center center',
+            }}
+          >
           {countdown != null && (
             <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
               <span className={styles.countdownNumber}>{countdown}</span>
