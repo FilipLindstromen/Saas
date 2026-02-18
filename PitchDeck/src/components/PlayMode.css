@@ -43,7 +43,8 @@
   z-index: 1001;
 }
 
-/* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory) */
+/* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory).
+   Use clip-path to ensure content is never visible on screen, even if layout shifts. */
 .play-preload-zone {
   position: absolute;
   left: -9999px;
@@ -53,6 +54,7 @@
   pointer-events: none;
   overflow: hidden;
   z-index: -1;
+  clip-path: inset(100%);
 }
 
 .play-preload-slide {

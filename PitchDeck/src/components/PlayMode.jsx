@@ -439,6 +439,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(-1)
   const [visibleLineIndex, setVisibleLineIndex] = useState(0)
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
+  const [preloadReady, setPreloadReady] = useState(false) // Defer preload until after first paint to avoid overlapping text on play start
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
@@ -478,6 +479,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     return Math.max(1, lines.length)
   }
   const contentLineCount = !isBulletSlide && currentSlide ? getContentLineCount(currentSlide) : 0
+
+  // Defer preload slides until after first paint so only the selected slide shows when play starts
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setPreloadReady(true))
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [])
 
   // Reset line/bullet reveal when changing slides (start with first line visible for line reveal)
   useEffect(() => {
@@ -997,7 +1006,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           isPreload={false}
         />
       </div>
-      {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory) */}
+      {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory). Only render after first paint to avoid overlapping text on play start. */}
+      {preloadReady && (
       <div className="play-preload-zone" aria-hidden="true">
         {Array.from({ length: PRELOAD_AHEAD }, (_, i) => currentIndex + i + 1).map((idx) => {
           const preloadSlide = presentationSlides[idx]
@@ -1015,6 +1025,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           )
         })}
       </div>
+      )}
       {/* Webcam overlay - outside slide transitions */}
       {recordSettings.webcamEnabled && recordSettings.selectedCameraId && (
         <WebcamOverlay
