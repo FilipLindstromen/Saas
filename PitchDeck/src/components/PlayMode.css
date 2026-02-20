@@ -22,6 +22,25 @@
   pointer-events: none;
 }
 
+/* Persistent gradient layer: when consecutive slides have gradient in same position, keep it visible and only fade opacity if it differs */
+.play-gradient-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.play-gradient-layer .slide-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
 .play-slide-container {
   width: 100%;
   height: 100%;

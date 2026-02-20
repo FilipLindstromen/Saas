@@ -216,6 +216,9 @@ function App() {
       h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
       h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
       h3Weight: parseInt(localStorage.getItem('h3Weight'), 10) || 700,
+      h1LineHeight: parseFloat(localStorage.getItem('h1LineHeight')) || 1.2,
+      h2LineHeight: parseFloat(localStorage.getItem('h2LineHeight')) || 1.2,
+      h3LineHeight: parseFloat(localStorage.getItem('h3LineHeight')) || 1.2,
       googleClientId: localStorage.getItem('googleClientId') || '',
       pexelsKey: localStorage.getItem('pexelsKey') || '',
       pixabayKey: localStorage.getItem('pixabayKey') || '',
@@ -609,6 +612,9 @@ function App() {
     if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
     if (settings.h2Weight !== undefined) localStorage.setItem('h2Weight', settings.h2Weight.toString())
     if (settings.h3Weight !== undefined) localStorage.setItem('h3Weight', settings.h3Weight.toString())
+    if (settings.h1LineHeight !== undefined) localStorage.setItem('h1LineHeight', settings.h1LineHeight.toString())
+    if (settings.h2LineHeight !== undefined) localStorage.setItem('h2LineHeight', settings.h2LineHeight.toString())
+    if (settings.h3LineHeight !== undefined) localStorage.setItem('h3LineHeight', settings.h3LineHeight.toString())
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
     localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
@@ -1935,6 +1941,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}
           h3Weight={settings.h3Weight ?? 700}
+          h1LineHeight={settings.h1LineHeight ?? 1.2}
+          h2LineHeight={settings.h2LineHeight ?? 1.2}
+          h3LineHeight={settings.h3LineHeight ?? 1.2}
           onRecordingDone={(blob) => {
             lastRecordingBlobRef.current = blob
             setLastRecordingBlobVersion((v) => v + 1)
@@ -2677,6 +2686,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}
           h3Weight={settings.h3Weight ?? 700}
+          h1LineHeight={settings.h1LineHeight ?? 1.2}
+          h2LineHeight={settings.h2LineHeight ?? 1.2}
+          h3LineHeight={settings.h3LineHeight ?? 1.2}
           recordSettings={recordSettings}
         />
             </div>
@@ -2707,6 +2719,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     onUpdateSlide={updateSlide}
                     selectedSlide={selectedSlide}
                     selectedSlideId={selectedSlideId}
+                    selectedSlides={selectedSlides}
                     backgroundColor={settings.backgroundColor}
                   />
                 </div>

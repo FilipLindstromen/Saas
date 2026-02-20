@@ -134,7 +134,10 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     defaultFontWeight: 700,
     h1Weight: 700,
     h2Weight: 700,
-    h3Weight: 700
+    h3Weight: 700,
+    h1LineHeight: 1.2,
+    h2LineHeight: 1.2,
+    h3LineHeight: 1.2
   }
 
   const handleResetStyling = () => {
@@ -455,6 +458,44 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 step="0.1"
                 value={settings.h3Size !== undefined ? settings.h3Size : 2.5}
                 onChange={(e) => handleChange('h3Size', parseFloat(e.target.value) || 2.5)}
+                className="style-dropdown-input"
+              />
+            </div>
+          </div>
+          <div className="style-dropdown-sub-fields">
+            <div className="style-dropdown-sub-field">
+              <label>H1 line height (em)</label>
+              <input
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={settings.h1LineHeight !== undefined ? settings.h1LineHeight : 1.2}
+                onChange={(e) => handleChange('h1LineHeight', parseFloat(e.target.value) || 1.2)}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>H2 line height (em)</label>
+              <input
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={settings.h2LineHeight !== undefined ? settings.h2LineHeight : 1.2}
+                onChange={(e) => handleChange('h2LineHeight', parseFloat(e.target.value) || 1.2)}
+                className="style-dropdown-input"
+              />
+            </div>
+            <div className="style-dropdown-sub-field">
+              <label>H3 line height (em)</label>
+              <input
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={settings.h3LineHeight !== undefined ? settings.h3LineHeight : 1.2}
+                onChange={(e) => handleChange('h3LineHeight', parseFloat(e.target.value) || 1.2)}
                 className="style-dropdown-input"
               />
             </div>

@@ -1,6 +1,6 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, onUpdateSettings }) {
+function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, onUpdateSettings }) {
   if (!slide) {
     return (
       <div className="slide-settings-empty">
@@ -8,6 +8,7 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEd
       </div>
     )
   }
+  const isMultiSelect = selectedCount > 1
 
   const layout = slide.layout || 'default'
   const showGradient = layout !== 'centered' && layout !== 'right'
@@ -15,6 +16,9 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEd
 
   return (
     <div className="slide-settings-content">
+      {isMultiSelect && (
+        <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
+      )}
       <div className="slide-settings-section">
         <div className="slide-settings-field slide-settings-bg-color">
           <label htmlFor="slide-settings-bg-override">Bg color:</label>
@@ -76,6 +80,18 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEd
 
       {showGradient && (
         <div className="slide-settings-section">
+          <div className="slide-settings-field">
+            <label className="slide-settings-toggle">
+              <input
+                type="checkbox"
+                checked={slide.gradientEnabled !== false}
+                onChange={(e) => onUpdate({ gradientEnabled: e.target.checked })}
+              />
+              <span>Use gradient</span>
+            </label>
+          </div>
+          {slide.gradientEnabled !== false && (
+            <>
           <div className="slide-settings-field slide-settings-row">
             <button
               type="button"
@@ -105,6 +121,8 @@ function SlideSettings({ slide, onUpdate, backgroundColor = '#1a1a1a', contentEd
               <span className="slide-settings-value">{Math.round((slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7) * 100)}%</span>
             </div>
           </div>
+            </>
+          )}
         </div>
       )}
 

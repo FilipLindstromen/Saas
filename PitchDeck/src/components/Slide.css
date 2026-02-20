@@ -50,25 +50,8 @@
   background: transparent;
 }
 
-/* Left with Video: image/video panel on the right, full height and flush to right edge */
-.slide.layout-left-video .slide-background:not(.slide-background-video),
-.slide.layout-left-video .slide-background.slide-background-video {
-  left: auto;
-  right: 0;
-  width: 55%;
-}
-.slide.layout-left-video .slide-background-video-el {
-  object-fit: cover;
-  object-position: center;
-}
-
-/* Right with Video: image/video panel on the left, full height and flush to left edge */
-.slide.layout-right-video .slide-background:not(.slide-background-video),
-.slide.layout-right-video .slide-background.slide-background-video {
-  left: 0;
-  right: auto;
-  width: 55%;
-}
+/* Left with Video / Right with Video: background image/video covers full slide (no black mask) */
+.slide.layout-left-video .slide-background-video-el,
 .slide.layout-right-video .slide-background-video-el {
   object-fit: cover;
   object-position: center;
@@ -549,6 +532,17 @@
   display: none;
 }
 
+/* Present mode: H2 line-height in bullets - use slide variable so it matches edit mode */
+.play-mode .slide .slide-bullets .bullet-text h2 {
+  line-height: var(--slide-h2-line-height, 1.2) !important;
+}
+
+/* Present mode: H2 in slide-content/slide-content-video (non-bullet) - same fix */
+.play-mode .slide .slide-content h2,
+.play-mode .slide .slide-content-video h2 {
+  line-height: var(--slide-h2-line-height, 1.2) !important;
+}
+
 /* Present mode: top-align bullet with text (edit mode keeps bottom alignment above) */
 .play-mode .slide-bullet {
   align-items: flex-start;
@@ -783,6 +777,7 @@
 
 /* ========== Text in/out animations (present mode) ========== */
 .slide[class*="text-animation-"] .slide-content,
+.slide[class*="text-animation-"] .slide-content-video,
 .slide[class*="text-animation-"] .slide-text,
 .slide[class*="text-animation-"] .slide-subtitle,
 .slide[class*="text-animation-"] .slide-section-name,
@@ -818,6 +813,7 @@
 
 /* 1. Fade in */
 .slide.text-animation-fade-in .slide-content,
+.slide.text-animation-fade-in .slide-content-video,
 .slide.text-animation-fade-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in .slide-subtitle,
 .slide.text-animation-fade-in .slide-section-name,
@@ -838,6 +834,7 @@
 
 /* 2. Fade in + slide up */
 .slide.text-animation-fade-in-up .slide-content,
+.slide.text-animation-fade-in-up .slide-content-video,
 .slide.text-animation-fade-in-up .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in-up .slide-subtitle,
 .slide.text-animation-fade-in-up .slide-section-name,
@@ -863,6 +860,7 @@
 
 /* 3. Fade in + slide down */
 .slide.text-animation-fade-in-down .slide-content,
+.slide.text-animation-fade-in-down .slide-content-video,
 .slide.text-animation-fade-in-down .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in-down .slide-subtitle,
 .slide.text-animation-fade-in-down .slide-section-name,
@@ -888,6 +886,7 @@
 
 /* 4. Slide in from right (-x) */
 .slide.text-animation-slide-in-left .slide-content,
+.slide.text-animation-slide-in-left .slide-content-video,
 .slide.text-animation-slide-in-left .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-slide-in-left .slide-subtitle,
 .slide.text-animation-slide-in-left .slide-section-name,
@@ -913,6 +912,7 @@
 
 /* 5. Slide in from left (+x) */
 .slide.text-animation-slide-in-right .slide-content,
+.slide.text-animation-slide-in-right .slide-content-video,
 .slide.text-animation-slide-in-right .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-slide-in-right .slide-subtitle,
 .slide.text-animation-slide-in-right .slide-section-name,
@@ -938,6 +938,7 @@
 
 /* 6. Typewriter */
 .slide.text-animation-typewriter .slide-content,
+.slide.text-animation-typewriter .slide-content-video,
 .slide.text-animation-typewriter .slide-text,
 .slide.text-animation-typewriter .slide-subtitle,
 .slide.text-animation-typewriter .slide-section-name,
@@ -964,6 +965,7 @@
 
 /* 7. Zoom in */
 .slide.text-animation-zoom-in .slide-content,
+.slide.text-animation-zoom-in .slide-content-video,
 .slide.text-animation-zoom-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-zoom-in .slide-subtitle,
 .slide.text-animation-zoom-in .slide-section-name,
@@ -989,6 +991,7 @@
 
 /* 8. Bounce in */
 .slide.text-animation-bounce-in .slide-content,
+.slide.text-animation-bounce-in .slide-content-video,
 .slide.text-animation-bounce-in .slide-text,
 .slide.text-animation-bounce-in .slide-subtitle,
 .slide.text-animation-bounce-in .slide-section-name,
@@ -1015,6 +1018,7 @@
 
 /* 10. Blur in */
 .slide.text-animation-blur-in .slide-content,
+.slide.text-animation-blur-in .slide-content-video,
 .slide.text-animation-blur-in .slide-text:not(:has(.text-animation-word)),
 .slide.text-animation-blur-in .slide-subtitle,
 .slide.text-animation-blur-in .slide-section-name,

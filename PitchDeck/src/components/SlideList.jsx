@@ -49,10 +49,8 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     setEditContent(getPlainText(slide.content))
     setEditSubtitle(getPlainText(slide.subtitle || ''))
     setEditingSubtitle(false)
-    // Also select the slide in the preview
-    if (onSelect) {
-      onSelect(slide.id)
-    }
+    setSelectedSlides(new Set([slide.id]))
+    if (onSelect) onSelect(slide.id)
   }
 
   const handleChange = (e, id) => {
@@ -277,6 +275,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
           newSet.delete(slideId)
         } else {
           newSet.add(slideId)
+          if (onSelect) onSelect(slideId)
         }
         return newSet
       })
@@ -292,6 +291,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
         newSet.add(slides[i].id)
       }
       setSelectedSlides(newSet)
+      if (onSelect) onSelect(slideId)
     } else {
       // Single selection
       setSelectedSlides(new Set([slideId]))
@@ -311,9 +311,9 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
       </div>
       <LayoutSelector 
         onSelectLayout={handleLayoutSelect} 
-        selectedLayout={slides.find(s => s.id === selectedSlideId)?.layout || 'default'}
-        cameraOverrideEnabled={slides.find(s => s.id === selectedSlideId)?.cameraOverrideEnabled ?? false}
-        cameraOverridePosition={slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'}
+        selectedLayout={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.layout || 'default'}
+        cameraOverrideEnabled={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverrideEnabled ?? false}
+        cameraOverridePosition={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverridePosition || 'fullscreen'}
         onCameraOverrideChange={(enabled) => {
           const ids = getIdsToUpdate()
           const currentPos = slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'

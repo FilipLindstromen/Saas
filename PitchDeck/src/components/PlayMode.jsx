@@ -16,6 +16,68 @@ function sameBackground(a, b) {
   return (a.imageUrl || '') === (b.imageUrl || '') && (a.backgroundVideoUrl || '') === (b.backgroundVideoUrl || '')
 }
 
+// Both slides use video layout with background video - keep video layer persistent to avoid fade/flicker
+function bothVideoLayoutWithMedia(a, b) {
+  if (!a || !b) return false
+  const layoutA = (a.layout || 'default') === 'video'
+  const layoutB = (b.layout || 'default') === 'video'
+  if (!layoutA || !layoutB) return false
+  return !!(a.backgroundVideoUrl || a.imageUrl) && !!(b.backgroundVideoUrl || b.imageUrl)
+}
+
+// Two slides have gradient in the same position (gradientFlipped). Gradient shows for default, bulletpoints, video layouts.
+function sameGradientPosition(a, b) {
+  if (!a || !b) return false
+  const layoutA = a.layout || 'default'
+  const layoutB = b.layout || 'default'
+  const hasGradientA = !!(a.imageUrl || a.backgroundVideoUrl) && a.gradientEnabled !== false && layoutA !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutA)
+  const hasGradientB = !!(b.imageUrl || b.backgroundVideoUrl) && b.gradientEnabled !== false && layoutB !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutB)
+  if (!hasGradientA || !hasGradientB) return false
+  return (a.gradientFlipped === true) === (b.gradientFlipped === true)
+}
+
+// Hex to RGB for gradient
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 26, g: 26, b: 26 }
+}
+
+// Persistent gradient overlay - used when consecutive slides have gradient in same position
+function GradientOverlay({ slide, backgroundColor = '#1a1a1a' }) {
+  if (!slide || (slide.layout || 'default') === 'section') return null
+  const hasMedia = !!(slide.imageUrl || slide.backgroundVideoUrl)
+  const layout = slide.layout || 'default'
+  if (!hasMedia || !['default', 'bulletpoints', 'video'].includes(layout)) return null
+  if (slide.gradientEnabled === false) return null
+
+  const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
+  const gradientFlipped = slide.gradientFlipped === true
+  const slideBgColor = (slide.backgroundColorOverride && slide.backgroundColorOverrideValue) ? slide.backgroundColorOverrideValue : backgroundColor
+  const rgb = hexToRgb(slideBgColor === 'transparent' ? backgroundColor : slideBgColor)
+  const maxOpacity = 1
+  const midOpacity = 0.57
+
+  return (
+    <div
+      className="play-gradient-layer"
+      style={{
+        opacity: gradientStrength,
+        transition: 'opacity 0.3s ease-in-out'
+      }}
+    >
+      <div
+        className="slide-gradient-overlay"
+        style={{
+          background: gradientFlipped
+            ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+            : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
+          pointerEvents: 'none'
+        }}
+      />
+    </div>
+  )
+}
+
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterString(recordSettings) {
   const b = typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1
@@ -434,7 +496,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -478,7 +540,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlide = presentationSlides[currentIndex]
   const nextSlideData = presentationSlides[currentIndex + 1]
   const prevSlideData = presentationSlides[currentIndex - 1]
-  const usePersistentBackground = (nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData))
+  // Use persistent background when: consecutive slides share same bg, both are video layout, OR current slide is fullscreen video (keeps video in stable layer to avoid flicker)
+  const isCurrentVideoLayout = (currentSlide?.layout || 'default') === 'video' && !!(currentSlide?.backgroundVideoUrl || currentSlide?.imageUrl)
+  const usePersistentBackground = isCurrentVideoLayout || (nextSlideData && (sameBackground(currentSlide, nextSlideData) || bothVideoLayoutWithMedia(currentSlide, nextSlideData))) || (prevSlideData && (sameBackground(currentSlide, prevSlideData) || bothVideoLayoutWithMedia(currentSlide, prevSlideData)))
+  const usePersistentGradient = usePersistentBackground && ((nextSlideData && sameGradientPosition(currentSlide, nextSlideData)) || (prevSlideData && sameGradientPosition(currentSlide, prevSlideData)))
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
   const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
@@ -533,79 +598,81 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     setCurrentIndex((prevIndex) => {
       if (prevIndex < presentationSlides.length - 1) {
         const nextIndex = prevIndex + 1
+        const currentLayout = (presentationSlides[prevIndex]?.layout || 'default') === 'video'
+        const nextLayout = (presentationSlides[nextIndex]?.layout || 'default') === 'video'
+        const isVideoTransition = currentLayout || nextLayout
+
+        if (isVideoTransition) {
+          // Video layout: switch immediately, no delay or remount to avoid flicker
+          setVisibleBulletIndex(-1)
+          setTransitionPhase('idle')
+          return nextIndex
+        }
+
         setIsTransitioning(true)
         setVisibleBulletIndex(-1) // Reset bullet animation
-        
         const duration = getTransitionDuration(transitionStyle)
-        
-        // Phase 1: Start fade-out animation
         setTransitionPhase('fade-out')
-        
-        // Wait for fade-out animation to complete
+
         setTimeout(() => {
-          // Phase 2: Set fade-in phase FIRST to prevent flicker
           setTransitionPhase('fade-in')
-          // Use double requestAnimationFrame to ensure phase is set before slide change
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              // Phase 3: Change slide (now it will render with fade-in class)
-              // Update state outside of the callback to avoid nested state updates
               setCurrentIndex(nextIndex)
-              setSlideKey(prev => prev + 1) // Force re-render with new slide
-              
-              // Phase 4: Wait for fade-in animation to complete
+              setSlideKey(prev => prev + 1)
               setTimeout(() => {
                 setIsTransitioning(false)
                 setTransitionPhase('idle')
-              }, duration) // Fade in duration
+              }, duration)
             })
           })
-        }, duration) // Fade out duration
-        
-        return prevIndex // Keep current index during fade-out
+        }, duration)
+
+        return prevIndex
       }
       return prevIndex
     })
-  }, [presentationSlides.length, transitionStyle])
+  }, [presentationSlides, transitionStyle])
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => {
       if (prevIndex > 0) {
         const nextIndex = prevIndex - 1
+        const currentLayout = (presentationSlides[prevIndex]?.layout || 'default') === 'video'
+        const prevLayout = (presentationSlides[nextIndex]?.layout || 'default') === 'video'
+        const isVideoTransition = currentLayout || prevLayout
+
+        if (isVideoTransition) {
+          // Video layout: switch immediately, no delay or remount to avoid flicker
+          setVisibleBulletIndex(-1)
+          setTransitionPhase('idle')
+          return nextIndex
+        }
+
         setIsTransitioning(true)
-        setVisibleBulletIndex(-1) // Reset bullet animation
-        
+        setVisibleBulletIndex(-1)
         const duration = getTransitionDuration(transitionStyle)
-        
-        // Phase 1: Start fade-out animation
         setTransitionPhase('fade-out')
-        
-        // Wait for fade-out animation to complete
+
         setTimeout(() => {
-          // Phase 2: Set fade-in phase FIRST to prevent flicker
           setTransitionPhase('fade-in')
-          // Use double requestAnimationFrame to ensure phase is set before slide change
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              // Phase 3: Change slide (now it will render with fade-in class)
-              // Update state outside of the callback to avoid nested state updates
               setCurrentIndex(nextIndex)
-              setSlideKey(prev => prev + 1) // Force re-render with new slide
-              
-              // Phase 4: Wait for fade-in animation to complete
+              setSlideKey(prev => prev + 1)
               setTimeout(() => {
                 setIsTransitioning(false)
                 setTransitionPhase('idle')
-              }, duration) // Fade in duration
+              }, duration)
             })
           })
-        }, duration) // Fade out duration
-        
-        return prevIndex // Keep current index during fade-out
+        }, duration)
+
+        return prevIndex
       }
       return prevIndex
     })
-  }, [transitionStyle])
+  }, [presentationSlides, transitionStyle])
 
   // Reset bullet index when slide changes
   useEffect(() => {
@@ -1008,6 +1075,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     h1Weight,
     h2Weight,
     h3Weight,
+    h1LineHeight,
+    h2LineHeight,
+    h3LineHeight,
     backgroundScaleAnimation,
     backgroundScaleTime,
     backgroundScaleAmount,
@@ -1032,9 +1102,15 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           />
         </div>
       )}
+      {usePersistentGradient && (
+        <GradientOverlay
+          slide={currentSlide}
+          backgroundColor={backgroundColor}
+        />
+      )}
       <div 
-        key={slideKey}
-        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground ? 'play-slide-content-only' : ''}`}
+        key={currentSlideLayout === 'video' ? 'video-persistent' : slideKey}
+        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' && currentSlideLayout !== 'video' ? 'fade-out' : transitionPhase === 'fade-in' && currentSlideLayout !== 'video' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground ? 'play-slide-content-only' : ''}`}
         style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 1001 } : undefined}
       >
         <Slide 
@@ -1046,6 +1122,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           isPreload={false}
           hideBackground={usePersistentBackground}
+          hideGradient={usePersistentGradient}
         />
       </div>
       {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory). Only render after first paint to avoid overlapping text on play start. */}

@@ -28,11 +28,21 @@ function InspectorPanel({
   onUpdateSlide,
   selectedSlide,
   selectedSlideId,
+  selectedSlides = new Set(),
   backgroundColor
 }) {
-  const handleSlideUpdate = (updates) => {
-    if (selectedSlideId != null && onUpdateSlide) onUpdateSlide(selectedSlideId, updates)
+  const getIdsToUpdate = () => {
+    if (selectedSlides.size > 0) return Array.from(selectedSlides)
+    if (selectedSlideId != null) return [selectedSlideId]
+    return []
   }
+  const handleSlideUpdate = (updates) => {
+    const ids = getIdsToUpdate()
+    if (ids.length > 0 && onUpdateSlide) ids.forEach((id) => onUpdateSlide(id, updates))
+  }
+  const displaySlide = selectedSlides.size > 0
+    ? (selectedSlideId && selectedSlides.has(selectedSlideId) ? selectedSlide : slides.find((s) => selectedSlides.has(s.id)))
+    : selectedSlide
 
   return (
     <div className="inspector-panel">
@@ -93,8 +103,9 @@ function InspectorPanel({
       <div className="inspector-panel-content">
         {activeTab === 'slide' && (
           <SlideSettings
-            slide={selectedSlide}
+            slide={displaySlide}
             onUpdate={handleSlideUpdate}
+            selectedCount={getIdsToUpdate().length}
             backgroundColor={backgroundColor}
             contentEdgeOffset={settings.contentEdgeOffset ?? 9}
             contentBottomOffset={settings.contentBottomOffset ?? 12}
