@@ -315,6 +315,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             h3FontFamily={h3FontFamily}
             webcamEnabled={safeRecordSettings.webcamEnabled}
             selectedCameraId={safeRecordSettings.selectedCameraId}
+            webcamFlipHorizontal={safeRecordSettings.webcamFlipHorizontal === true}
             videoBrightness={typeof safeRecordSettings.videoBrightness === 'number' ? safeRecordSettings.videoBrightness : 1}
             videoContrast={typeof safeRecordSettings.videoContrast === 'number' ? safeRecordSettings.videoContrast : 1}
             videoSaturation={typeof safeRecordSettings.videoSaturation === 'number' ? safeRecordSettings.videoSaturation : 1}

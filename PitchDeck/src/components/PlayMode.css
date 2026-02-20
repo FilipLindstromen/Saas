@@ -12,6 +12,16 @@
   z-index: 1000;
 }
 
+/* Persistent background layer: sits behind slide content when consecutive slides share the same background */
+.play-background-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .play-slide-container {
   width: 100%;
   height: 100%;
@@ -24,6 +34,7 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 1;
   /* Initial state - visible */
   opacity: 1;
   transform: translateX(0) scale(1);

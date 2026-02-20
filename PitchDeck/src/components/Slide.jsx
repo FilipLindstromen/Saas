@@ -22,7 +22,7 @@ function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, video
 }
 
 // Webcam component - defined outside to avoid hooks issues. Uses layout or camera override for position/scale.
-function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen' }) {
+function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', flipHorizontal = false }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -85,12 +85,12 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
       playsInline
       muted
       className={`slide-webcam ${getWebcamClass()} ${isPlayMode ? 'play-mode' : ''}`}
-      style={{ filter }}
+      style={{ filter, transform: flipHorizontal ? 'scaleX(-1)' : 'none' }}
     />
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamFlipHorizontal = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -1576,7 +1576,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const aspectRatioValue = slideFormat === '1:1' ? '1/1' : slideFormat === '9:16' ? '9/16' : '16/9'
   const formatClass = slideFormat === '1:1' ? 'slide-format-1-1' : slideFormat === '9:16' ? 'slide-format-9-16' : 'slide-format-16-9'
   const slideStyle = {
-    backgroundColor: slideBgColor,
+    backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
     '--slide-base-font-size': `${defaultTextSize}rem`,
     '--slide-pairing-font': `"${fontPairingSerifFont}", serif`,
@@ -1696,7 +1696,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         }
       `}</style>
       {/* 1. Background image (z-index 0) - behind video */}
-      {slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
+      {!hideBackground && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
           className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
@@ -1716,7 +1716,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         />
       )}
       {/* 2. Background video (z-index 1) - in front of image, behind gradient and content; same scale/position as image */}
-      {slide.backgroundVideoUrl && layout !== 'section' && (() => {
+      {!hideBackground && slide.backgroundVideoUrl && layout !== 'section' && (() => {
         const raw = slide.backgroundVideoUrl
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
@@ -1771,6 +1771,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           cameraId={selectedCameraId}
           layout={layout}
           isPlayMode={isPlayMode}
+          flipHorizontal={webcamFlipHorizontal}
           videoBrightness={videoBrightness}
           videoContrast={videoContrast}
           videoSaturation={videoSaturation}

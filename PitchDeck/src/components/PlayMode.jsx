@@ -1,7 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
+import SlideBackground from './SlideBackground'
 import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
+
+// Two slides share the same background if they use the same image or video
+function sameBackground(a, b) {
+  if (!a || !b) return false
+  const layoutA = (a.layout || 'default') === 'section'
+  const layoutB = (b.layout || 'default') === 'section'
+  if (layoutA || layoutB) return false
+  const hasBgA = !!(a.imageUrl || a.backgroundVideoUrl)
+  const hasBgB = !!(b.imageUrl || b.backgroundVideoUrl)
+  if (!hasBgA || !hasBgB) return false
+  return (a.imageUrl || '') === (b.imageUrl || '') && (a.backgroundVideoUrl || '') === (b.backgroundVideoUrl || '')
+}
 
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterString(recordSettings) {
@@ -187,7 +200,8 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
           height: '100%',
           objectFit: 'cover',
           borderRadius: 'inherit',
-          filter: getVideoFilterString(recordSettings)
+          filter: getVideoFilterString(recordSettings),
+          transform: recordSettings?.webcamFlipHorizontal ? 'scaleX(-1)' : 'none'
         }}
       />
     </div>
@@ -462,6 +476,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }
 
   const currentSlide = presentationSlides[currentIndex]
+  const nextSlideData = presentationSlides[currentIndex + 1]
+  const prevSlideData = presentationSlides[currentIndex - 1]
+  const usePersistentBackground = (nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData))
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
   const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
@@ -993,9 +1010,21 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
+      {/* Persistent background layer: when consecutive slides share the same background, keep it visible during transitions */}
+      {usePersistentBackground && (
+        <div className="play-background-layer" aria-hidden="true">
+          <SlideBackground
+            slide={currentSlide}
+            backgroundScaleAnimation={backgroundScaleAnimation}
+            backgroundScaleTime={backgroundScaleTime}
+            backgroundScaleAmount={backgroundScaleAmount}
+            isPreload={false}
+          />
+        </div>
+      )}
       <div 
         key={slideKey}
-        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''}`}
+        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' ? 'fade-out' : transitionPhase === 'fade-in' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground ? 'play-slide-content-only' : ''}`}
         style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 1001 } : undefined}
       >
         <Slide 
@@ -1004,6 +1033,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           isPreload={false}
+          hideBackground={usePersistentBackground}
         />
       </div>
       {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory). Only render after first paint to avoid overlapping text on play start. */}

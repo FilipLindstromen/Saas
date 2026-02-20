@@ -233,6 +233,7 @@ function App() {
         return {
           ...parsed,
           webcamSize: parsed.webcamSize || 'large',
+          webcamFlipHorizontal: parsed.webcamFlipHorizontal === true,
           recordingFileFormat: parsed.recordingFileFormat || 'webm-vp9',
           recordingResolution: parsed.recordingResolution || '1080p',
           recordingQuality: parsed.recordingQuality || 'high',
@@ -251,6 +252,7 @@ function App() {
       recordInPresentMode: false,
       webcamEnabled: false,
       webcamSize: 'large',
+      webcamFlipHorizontal: false,
       selectedCameraId: '',
       microphoneEnabled: false,
       selectedMicrophoneId: '',
