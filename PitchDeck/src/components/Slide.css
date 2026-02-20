@@ -195,6 +195,8 @@
 }
 .play-mode .slide .slide-content-video,
 .play-mode .slide .slide-content.left-video {
+  width: 100%;
+  box-sizing: border-box;
   justify-content: flex-start;
   align-items: flex-end;
   padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
@@ -301,6 +303,13 @@
 .slide-text.left-video {
   text-align: left;
   max-width: 45%;
+}
+
+/* Present mode: ensure left-video text uses distance from edge/bottom and stays left-aligned */
+.play-mode .slide .slide-text.left-video {
+  text-align: left;
+  align-self: flex-end;
+  margin-right: auto;
 }
 
 /* Right with Video: text on right, narrower text area */

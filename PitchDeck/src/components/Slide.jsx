@@ -1611,13 +1611,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
         .slide .slide-content h2,
-        .slide .slide-content-video h2,
+        .slide .slide-content-video h2 {
+          font-size: ${h2Size}rem !important;
+          font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
+        }
         .slide.play-mode .slide-content h2,
         .slide.play-mode .slide-content-video h2 {
           font-size: ${h2Size}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.9, 1.1).toFixed(2)} !important;
+          margin: 0.05em 0 !important;
         }
         .slide .slide-content h3,
         .slide .slide-content-video h3,
@@ -1635,12 +1641,18 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-weight: ${h1Weight} !important;
           line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
-        .slide .slide-subtitle h2,
-        .slide.play-mode .slide-subtitle h2 {
+        .slide .slide-subtitle h2 {
           font-size: ${h2Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
           line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
+        }
+        .slide.play-mode .slide-subtitle h2 {
+          font-size: ${h2Size * 0.5}rem !important;
+          font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
+          line-height: ${Math.min(lineHeight * 0.9, 1.1).toFixed(2)} !important;
+          margin: 0.05em 0 !important;
         }
         .slide .slide-subtitle h3,
         .slide.play-mode .slide-subtitle h3 {
@@ -1675,12 +1687,18 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-weight: ${h1Weight} !important;
           line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
-        .slide .bullet-text h2,
-        .slide.play-mode .bullet-text h2 {
+        .slide .bullet-text h2 {
           font-size: ${h2Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
           line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
+        }
+        .slide.play-mode .bullet-text h2 {
+          font-size: ${h2Size * 0.6}rem !important;
+          font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
+          font-weight: ${h2Weight} !important;
+          line-height: ${Math.min(lineHeight * 0.9, 1.1).toFixed(2)} !important;
+          margin: 0.05em 0 !important;
         }
         .slide .bullet-text h3,
         .slide.play-mode .bullet-text h3 {
