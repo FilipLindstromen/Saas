@@ -451,8 +451,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const handleContentChange = (e) => {
     if (!onUpdate || isPlayMode) return
     isEditingContentRef.current = false
-    const newContent = e.target.innerHTML || e.target.textContent || ''
-    // Save the content immediately
+    const raw = e.target.innerHTML || e.target.textContent || ''
+    const newContent = normalizeLineBreaksForStorage(raw)
     onUpdate({ content: newContent })
   }
 
@@ -463,12 +463,37 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const handleSubtitleChange = (e) => {
     if (!onUpdate || isPlayMode) return
     isEditingSubtitleRef.current = false
-    const newSubtitle = e.target.innerHTML
+    const raw = e.target.innerHTML
+    const newSubtitle = normalizeLineBreaksForStorage(raw)
     onUpdate({ subtitle: newSubtitle })
   }
 
   const handleSubtitleFocus = (e) => {
     isEditingSubtitleRef.current = true
+  }
+
+  // Both Enter and Shift+Enter insert <br> so edit mode and presentation show identical line breaks
+  const handleLineBreakKey = (e, focusRef) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      document.execCommand('insertLineBreak')
+      const target = e.target
+      setTimeout(() => {
+        const el = focusRef?.current ?? target
+        if (el) el.focus()
+      }, 0)
+    }
+  }
+
+  // Normalize content on save: convert <div>/<p> blocks to <br> so presentation matches edit mode
+  const normalizeLineBreaksForStorage = (html) => {
+    if (!html || typeof html !== 'string') return html
+    return html
+      .replace(/<div[^>]*>\s*/gi, '<br>')
+      .replace(/<\/div>\s*/gi, '')
+      .replace(/<p[^>]*>\s*/gi, '<br>')
+      .replace(/<\/p>\s*/gi, '')
   }
 
   // Font pairing: only active in edit mode when textStyleMode is fontPairing
@@ -683,14 +708,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const syncContentFromTarget = useCallback((target) => {
     if (!target || !onUpdate) return
     if (target.field === 'content') {
-      if (contentRef.current) onUpdate({ content: contentRef.current.innerHTML })
+      if (contentRef.current) onUpdate({ content: normalizeLineBreaksForStorage(contentRef.current.innerHTML) })
     } else if (target.field === 'subtitle') {
-      if (subtitleRef.current) onUpdate({ subtitle: subtitleRef.current.innerHTML })
+      if (subtitleRef.current) onUpdate({ subtitle: normalizeLineBreaksForStorage(subtitleRef.current.innerHTML) })
     } else if (target.field === 'bullet' && typeof target.bulletIndex === 'number' && slideRef.current) {
       const list = slideRef.current.querySelector('.slide-bullets')
       if (!list) return
       const bullets = Array.from(list.querySelectorAll('.slide-bullet')).map(
-        (b) => b.querySelector('.bullet-text')?.innerHTML ?? ''
+        (b) => normalizeLineBreaksForStorage(b.querySelector('.bullet-text')?.innerHTML ?? '')
       )
       onUpdate({ content: bullets.join('\n') })
     }
@@ -1226,19 +1251,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 e.stopPropagation()
               }
             }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            e.stopPropagation()
-            document.execCommand('insertLineBreak')
-            // Keep focus on the element
-            setTimeout(() => {
-              if (contentRef.current) {
-                contentRef.current.focus()
-              }
-            }, 0)
-          }
-        }}
+        onKeyDown={(e) => handleLineBreakKey(e, contentRef)}
         onInput={(e) => {
           // Mark as editing immediately when user types
           isEditingContentRef.current = true
@@ -1294,6 +1307,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               onFocus={handleContentFocus}
               onContextMenu={(e) => textStyleMode === 'fontPairing' && handleFontPairingContextMenu(e, 'content')}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => handleLineBreakKey(e, contentRef)}
               onInput={() => { isEditingContentRef.current = true }}
             />
           ) : (
@@ -1319,19 +1333,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                   e.stopPropagation()
                 }
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  document.execCommand('insertLineBreak')
-                  // Keep focus on the element
-                  setTimeout(() => {
-                    if (subtitleRef.current) {
-                      subtitleRef.current.focus()
-                    }
-                  }, 0)
-                }
-              }}
+              onKeyDown={(e) => handleLineBreakKey(e, subtitleRef)}
               dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.subtitle) }}
             />
           ) : isEditable ? (
@@ -1347,19 +1349,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                   handleSubtitleChange(e)
                 }
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  document.execCommand('insertLineBreak')
-                  // Keep focus on the element
-                  setTimeout(() => {
-                    if (e.target) {
-                      e.target.focus()
-                    }
-                  }, 0)
-                }
-              }}
+              onKeyDown={(e) => handleLineBreakKey(e, null)}
               data-placeholder="Subtitle (optional)"
               onFocus={(e) => {
                 if (e.target.textContent === 'Subtitle (optional)') {
@@ -1426,6 +1416,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           onFocus={handleContentFocus}
           onContextMenu={(e) => textStyleMode === 'fontPairing' && handleFontPairingContextMenu(e, 'content')}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => handleLineBreakKey(e, contentRef)}
           onInput={() => { isEditingContentRef.current = true }}
         />
       )
@@ -1606,7 +1597,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h1Size}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
-          line-height: ${lineHeight} !important;
+          line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
         .slide .slide-content h2,
         .slide .slide-content-video h2,
@@ -1615,7 +1606,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h2Size}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
         }
         .slide .slide-content h3,
         .slide .slide-content-video h3,
@@ -1624,28 +1615,28 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h3Size}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.1).toFixed(2)} !important;
         }
         .slide .slide-subtitle h1,
         .slide.play-mode .slide-subtitle h1 {
           font-size: ${h1Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
-          line-height: ${lineHeight} !important;
+          line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
         .slide .slide-subtitle h2,
         .slide.play-mode .slide-subtitle h2 {
           font-size: ${h2Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
         }
         .slide .slide-subtitle h3,
         .slide.play-mode .slide-subtitle h3 {
           font-size: ${h3Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.1).toFixed(2)} !important;
         }
         /* Block-level H3: when subtitle/content has text-heading-h3 class (edit + present) */
         .slide .slide-subtitle.text-heading-h3,
@@ -1655,7 +1646,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h3Size * 0.5}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.1).toFixed(2)} !important;
         }
         .slide .slide-content .slide-text.text-heading-h3,
         .slide .slide-content-video .slide-text.text-heading-h3,
@@ -1664,28 +1655,28 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           font-size: ${h3Size}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.1).toFixed(2)} !important;
         }
         .slide .bullet-text h1,
         .slide.play-mode .bullet-text h1 {
           font-size: ${h1Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
-          line-height: ${lineHeight} !important;
+          line-height: ${Math.min(lineHeight, 1.15).toFixed(2)} !important;
         }
         .slide .bullet-text h2,
         .slide.play-mode .bullet-text h2 {
           font-size: ${h2Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.92, 1.3).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.92, 1.15).toFixed(2)} !important;
         }
         .slide .bullet-text h3,
         .slide.play-mode .bullet-text h3 {
           font-size: ${h3Size * 0.6}rem !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
-          line-height: ${Math.min(lineHeight * 0.85, 1.25).toFixed(2)} !important;
+          line-height: ${Math.min(lineHeight * 0.85, 1.1).toFixed(2)} !important;
         }
         .slide .slide-content .font-pairing-serif,
         .slide .slide-subtitle .font-pairing-serif,

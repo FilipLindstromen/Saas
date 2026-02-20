@@ -21,6 +21,10 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     if (!content || typeof content !== 'string') return ''
     return content
       .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<div[^>]*>\s*/gi, '\n')
+      .replace(/<\/div>\s*/gi, '')
+      .replace(/<p[^>]*>\s*/gi, '\n')
+      .replace(/<\/p>\s*/gi, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/<[^>]*>/g, '')
       .replace(/&amp;/g, '&')
@@ -30,10 +34,20 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
       .replace(/&#39;/g, "'")
   }
 
+  // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
+  const plainTextToStorage = (text) => {
+    if (!text || typeof text !== 'string') return ''
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>')
+  }
+
   const handleEdit = (slide) => {
     setEditingId(slide.id)
     setEditContent(getPlainText(slide.content))
-    setEditSubtitle(slide.subtitle || '')
+    setEditSubtitle(getPlainText(slide.subtitle || ''))
     setEditingSubtitle(false)
     // Also select the slide in the preview
     if (onSelect) {
@@ -44,15 +58,14 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
   const handleChange = (e, id) => {
     const newContent = e.target.value
     setEditContent(newContent)
-    // Auto-save on every change
-    onUpdate(id, { content: newContent })
+    // Convert \n to <br> for storage so line breaks work in presentation mode
+    onUpdate(id, { content: plainTextToStorage(newContent) })
   }
 
   const handleSubtitleChange = (e, id) => {
     const newSubtitle = e.target.value
     setEditSubtitle(newSubtitle)
-    // Auto-save on every change
-    onUpdate(id, { subtitle: newSubtitle })
+    onUpdate(id, { subtitle: plainTextToStorage(newSubtitle) })
   }
 
   const handleBlur = (e) => {

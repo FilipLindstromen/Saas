@@ -81,6 +81,16 @@ const SECTION_TIPS = {
   }
 }
 
+// Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
+function plainTextToStorage(text) {
+  if (!text || typeof text !== 'string') return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+}
+
 function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange }) {
   const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
   const [editingId, setEditingId] = useState(null)
@@ -430,7 +440,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       const contextKey = editingContextKey()
       const editSlides = getSlidesForContext(contextKey)
       const updatedSlides = editSlides.map(slide =>
-        slide.id === editingId ? { ...slide, content: editContent } : slide
+        slide.id === editingId ? { ...slide, content: plainTextToStorage(editContent) } : slide
       )
       applyUpdate(contextKey, updatedSlides)
     }
@@ -466,7 +476,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       const contextKey = editingContextKey()
       const editSlides = getSlidesForContext(contextKey)
       const updatedSlides = editSlides.map(slide =>
-        slide.id === editingId ? { ...slide, content: editContent } : slide
+        slide.id === editingId ? { ...slide, content: plainTextToStorage(editContent) } : slide
       )
       applyUpdate(contextKey, updatedSlides)
     }
@@ -518,12 +528,12 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     e.target.style.height = 'auto'
     e.target.style.height = e.target.scrollHeight + 'px'
     
-    // Auto-save on every change
+    // Convert \n to <br> for storage so line breaks work in presentation mode
     if (editingId !== null) {
       const contextKey = editingContextKey()
       const contextSlides = getSlidesForContext(contextKey)
       const updatedSlides = contextSlides.map(slide =>
-        slide.id === editingId ? { ...slide, content: newContent } : slide
+        slide.id === editingId ? { ...slide, content: plainTextToStorage(newContent) } : slide
       )
       applyUpdate(contextKey, updatedSlides)
     }
@@ -534,7 +544,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       const contextKey = editingContextKey()
       const contextSlides = getSlidesForContext(contextKey)
       const updatedSlides = contextSlides.map(slide =>
-        slide.id === editingId ? { ...slide, content: editContent } : slide
+        slide.id === editingId ? { ...slide, content: plainTextToStorage(editContent) } : slide
       )
       applyUpdate(contextKey, updatedSlides)
       setEditingId(null)
@@ -562,15 +572,15 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
         e.preventDefault()
         const contextKey = editingContextKey()
         const contextSlides = getSlidesForContext(contextKey)
-        const contentForCurrentSlide = textBeforeCursor.slice(0, -1)
-        const contentForNewSlide = textAfterCursor.trim()
+        const contentForCurrentSlide = plainTextToStorage(textBeforeCursor.slice(0, -1))
+        const contentForNewSlide = plainTextToStorage(textAfterCursor.trim())
         const updatedSlides = contextSlides.map(slide =>
           slide.id === editingId ? { ...slide, content: contentForCurrentSlide } : slide
         )
         const newId = maxSlideId() + 1
         const newSlide = {
           id: newId,
-          content: contentForNewSlide,
+          content: contentForNewSlide, // already converted by plainTextToStorage
           subtitle: '',
           imageUrl: '',
           layout: 'default',
@@ -609,7 +619,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
         const contextKey = editingContextKey()
         const contextSlides = getSlidesForContext(contextKey)
         const updatedSlides = contextSlides.map(slide =>
-          slide.id === editingId ? { ...slide, content: editContent } : slide
+          slide.id === editingId ? { ...slide, content: plainTextToStorage(editContent) } : slide
         )
         applyUpdate(contextKey, updatedSlides)
       }
@@ -665,7 +675,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       const contextKey = editingContextKey()
       const contextSlides = getSlidesForContext(contextKey)
       const savedSlides = contextSlides.map(slide =>
-        slide.id === editingId ? { ...slide, content: editContent } : slide
+        slide.id === editingId ? { ...slide, content: plainTextToStorage(editContent) } : slide
       )
       applyUpdate(contextKey, savedSlides)
       setEditingId(null)
