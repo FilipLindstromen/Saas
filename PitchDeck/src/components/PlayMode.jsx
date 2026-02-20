@@ -981,8 +981,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     shadowOffsetX,
     shadowOffsetY,
     shadowColor,
-    webcamEnabled: false,
-    selectedCameraId: '',
+    webcamEnabled: recordSettings?.webcamEnabled ?? false,
+    selectedCameraId: recordSettings?.selectedCameraId ?? '',
+    webcamFlipHorizontal: recordSettings?.webcamFlipHorizontal === true,
+    videoBrightness: typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1,
+    videoContrast: typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1,
+    videoSaturation: typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1,
+    videoShadows: typeof recordSettings?.videoShadows === 'number' ? recordSettings.videoShadows : 1,
+    videoMidtones: typeof recordSettings?.videoMidtones === 'number' ? recordSettings.videoMidtones : 1,
+    videoHighlights: typeof recordSettings?.videoHighlights === 'number' ? recordSettings.videoHighlights : 1,
+    videoShadowHue: typeof recordSettings?.videoShadowHue === 'number' ? recordSettings.videoShadowHue : 0,
+    videoMidHue: typeof recordSettings?.videoMidHue === 'number' ? recordSettings.videoMidHue : 0,
+    videoHighlightHue: typeof recordSettings?.videoHighlightHue === 'number' ? recordSettings.videoHighlightHue : 0,
     textInlineBackground,
     inlineBgColor,
     inlineBgOpacity,
@@ -1030,6 +1040,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         <Slide 
           slide={presentationSlides[currentIndex]} 
           {...commonSlideProps}
+          cameraOverrideEnabled={currentSlide?.cameraOverrideEnabled === true || recordSettings?.cameraOverrideEnabled === true}
+          cameraOverridePosition={currentSlide?.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           isPreload={false}
@@ -1047,6 +1059,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
               <Slide
                 slide={preloadSlide}
                 {...commonSlideProps}
+                cameraOverrideEnabled={preloadSlide?.cameraOverrideEnabled === true || recordSettings?.cameraOverrideEnabled === true}
+                cameraOverridePosition={preloadSlide?.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}
                 visibleBulletIndex={-1}
                 visibleLineIndex={null}
                 isPreload={true}

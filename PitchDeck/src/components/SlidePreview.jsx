@@ -42,6 +42,9 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
       alert('Please set your OpenAI and Unsplash API keys in settings first.')
       return
     }
+    if ((slide.layout || 'default') === 'video') {
+      return // Skip fullscreen camera layout
+    }
 
     setIsSelectingImages(true)
     try {
@@ -227,8 +230,8 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
               <button
                 className="btn-icon btn-select-images"
                 onClick={handleSelectImages}
-                disabled={isSelectingImages || !slide.content}
-                title="Auto select image"
+                disabled={isSelectingImages || !slide.content || (slide.layout || 'default') === 'video'}
+                title={(slide.layout || 'default') === 'video' ? 'Not available for fullscreen camera layout' : 'Auto select image'}
               >
                 {isSelectingImages ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

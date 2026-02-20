@@ -486,14 +486,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }
 
-  // Normalize content on save: convert <div>/<p> blocks to <br> so presentation matches edit mode
+  // Normalize content on save: convert <div>/<p> blocks to <br> so presentation matches edit mode.
+  // Only add <br> between blocks, not at the start, to avoid extra line breaks when applying H1/H2/H3.
   const normalizeLineBreaksForStorage = (html) => {
     if (!html || typeof html !== 'string') return html
     return html
-      .replace(/<div[^>]*>\s*/gi, '<br>')
-      .replace(/<\/div>\s*/gi, '')
-      .replace(/<p[^>]*>\s*/gi, '<br>')
+      .replace(/<\/p>\s*<p[^>]*>/gi, '<br>')
+      .replace(/<\/div>\s*<div[^>]*>/gi, '<br>')
+      .replace(/<\/p>\s*<div[^>]*>/gi, '<br>')
+      .replace(/<\/div>\s*<p[^>]*>/gi, '<br>')
+      .replace(/<p[^>]*>\s*/gi, '')
       .replace(/<\/p>\s*/gi, '')
+      .replace(/<div[^>]*>\s*/gi, '')
+      .replace(/<\/div>\s*/gi, '')
   }
 
   // Font pairing: only active in edit mode when textStyleMode is fontPairing
@@ -810,10 +815,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const block = getBlockElement(range, container)
       const currentTag = block ? block.tagName.toLowerCase() : null
       const isTogglingOff = block && currentTag === tagName
-      if (isTogglingOff && range.toString().trim() === (block.textContent || '').trim()) {
+      const selectionSpansFullBlock = block && range.toString().trim() === (block.textContent || '').trim()
+      if (isTogglingOff && selectionSpansFullBlock) {
         const p = document.createElement('p')
         while (block.firstChild) p.appendChild(block.firstChild)
         if (block.parentNode) block.parentNode.replaceChild(p, block)
+      } else if (selectionSpansFullBlock) {
+        // Replace block with heading to avoid extra line break from <p><h1>...</h1></p>
+        const newEl = document.createElement(tagName)
+        while (block.firstChild) newEl.appendChild(block.firstChild)
+        if (block.parentNode) block.parentNode.replaceChild(newEl, block)
       } else {
         const newEl = document.createElement(isTogglingOff ? 'p' : tagName)
         try {

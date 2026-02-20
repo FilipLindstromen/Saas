@@ -1441,9 +1441,10 @@ function App() {
       return
     }
 
-    // Find slides without images (exclude sections)
+    // Find slides without images (exclude sections and fullscreen camera layout)
     const slidesWithoutImages = slides.filter(slide => 
       (slide.layout || 'default') !== 'section' && 
+      (slide.layout || 'default') !== 'video' && 
       (!slide.imageUrl || slide.imageUrl.trim() === '')
     )
     
