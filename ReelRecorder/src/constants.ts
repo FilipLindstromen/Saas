@@ -61,6 +61,7 @@ export const CAPTION_STYLES: { value: CaptionStyle; label: string }[] = [
   { value: 'word-by-word', label: 'Word-by-word' },
   { value: 'minimal', label: 'Minimal' },
   { value: 'bold-block', label: 'Bold block' },
+  { value: 'yellow-highlight', label: 'Yellow highlight' },
 ]
 
 export const CAPTION_FONT_SIZES = [

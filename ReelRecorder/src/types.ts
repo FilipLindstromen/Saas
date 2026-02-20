@@ -86,3 +86,4 @@ export type CaptionStyle =
   | 'minimal'
   | 'bold-block'
   | 'word-by-word'
+  | 'yellow-highlight'

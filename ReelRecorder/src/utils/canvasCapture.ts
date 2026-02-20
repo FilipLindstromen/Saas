@@ -373,6 +373,34 @@ export function drawCaptionStyle(
     ctx.fillStyle = 'rgba(255,255,255,0.95)'
     ctx.textBaseline = 'middle'
     ctx.fillText(displayText, width / 2, centerY)
+  } else if (style === 'yellow-highlight') {
+    // Black text on bright yellow blocks, each line in its own block, max 2 lines visible
+    const yellowBg = '#FFEB3B'
+    const lineGap = Math.round(fontSize * 0.25)
+    ctx.font = `bold ${fontSize}px "${CAPTION_FONT}", sans-serif`
+    ctx.textBaseline = 'top'
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const visibleLines = lines.slice(-2)
+    const blockPad = Math.round(fontSize * 0.5)
+    const radius = 6
+    const blockH = lineHeight + blockPad * 2
+    const totalH = visibleLines.length * blockH + Math.max(0, visibleLines.length - 1) * lineGap
+    const lineWidths = visibleLines.map((line) => ctx.measureText(line).width)
+    let y = centerY - totalH / 2
+    for (let i = 0; i < visibleLines.length; i++) {
+      const line = visibleLines[i]
+      const lineW = lineWidths[i]
+      const boxW = lineW + blockPad * 2
+      const boxH = lineHeight + blockPad * 2
+      const x = (width - boxW) / 2
+      ctx.fillStyle = yellowBg
+      ctx.beginPath()
+      roundRect(ctx, x, y, boxW, boxH, radius)
+      ctx.fill()
+      ctx.fillStyle = '#000'
+      ctx.fillText(line, x + blockPad, y + blockPad)
+      y += boxH + lineGap
+    }
   } else {
     // bold-block
     ctx.font = `bold ${fontSize}px "${CAPTION_FONT}", sans-serif`
@@ -414,10 +442,13 @@ export function getCaptionBlockRect(
       : `bold ${fontSize}px "${CAPTION_FONT}", sans-serif`
   const lines = wrapText(ctx, sampleText, maxWidth)
   ctx.restore()
+  const visibleLineCount = style === 'yellow-highlight' ? Math.min(2, lines.length) : lines.length
   const boxH =
     style === 'lower-third' || style === 'bold-block'
       ? lines.length * lineHeight + pad * 2
-      : Math.max(lineHeight * lines.length, pad * 2)
+      : style === 'yellow-highlight'
+        ? visibleLineCount * (lineHeight + pad) + Math.max(0, visibleLineCount - 1) * Math.round(fontSize * 0.25)
+        : Math.max(lineHeight * lines.length, pad * 2)
   const top = centerY - boxH / 2
   return { top, height: boxH }
 }

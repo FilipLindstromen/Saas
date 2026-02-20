@@ -4,7 +4,7 @@ const STORAGE_KEY = 'videoRecorderState'
 
 const TEXT_ANIMATIONS: OverlayTextAnimation[] = ['none', 'fade', 'fade-slide-left', 'fade-slide-right', 'fade-slide-up', 'fade-slide-down']
 
-const CAPTION_STYLES: CaptionStyle[] = ['lower-third', 'centered-subtitle', 'karaoke', 'minimal', 'bold-block']
+const CAPTION_STYLES: CaptionStyle[] = ['lower-third', 'centered-subtitle', 'karaoke', 'minimal', 'bold-block', 'word-by-word', 'yellow-highlight']
 
 const VALID_INSPECTOR_TABS = ['current', 'video', 'color', 'overlays', 'captions', 'safezones'] as const
 const VALID_SAFE_ZONE_TYPES = ['youtube-9:16', 'youtube-16:9', 'youtube-1:1', 'tiktok', 'instagram'] as const
