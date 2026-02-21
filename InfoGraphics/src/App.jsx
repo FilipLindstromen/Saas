@@ -355,6 +355,16 @@ function App() {
           setSelectedIds([])
           return () => setSelectedIds(prev)
         }}
+        canvasData={{
+          format: 'infographics',
+          version: 1,
+          elements,
+          aspectRatio,
+          resolution,
+          backgroundColor,
+          defaultFontFamily,
+          defaultFontSize
+        }}
       />
       <div className="app-main">
         <LeftPanel

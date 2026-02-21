@@ -1,7 +1,7 @@
 import ExportButtons from './ExportButtons'
 import './Toolbar.css'
 
-export default function Toolbar({ onShowImageSearch, onOpenSettings, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData, onExportCanvasCode }) {
+export default function Toolbar({ onShowImageSearch, onOpenSettings, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
   return (
     <div className="toolbar">
       <button className="toolbar-btn toolbar-btn-primary" onClick={onShowImageSearch}>
@@ -17,7 +17,6 @@ export default function Toolbar({ onShowImageSearch, onOpenSettings, canvasRef, 
         includeBackgroundInExport={includeBackgroundInExport}
         onBeforeExport={onBeforeExport}
         canvasData={canvasData}
-        onExportCanvasCode={onExportCanvasCode}
       />
       <button className="toolbar-btn toolbar-btn-icon" onClick={onOpenSettings} title="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
