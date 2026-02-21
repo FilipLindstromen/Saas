@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { exportToPng, exportToMp4, exportToClipboard, exportCanvasCodeToClipboard } from '../utils/exportCanvas'
 import './ExportButtons.css'
 
-export default function ExportButtons({ canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData, onExportCanvasCode }) {
+export default function ExportButtons({ canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
 
@@ -10,9 +10,8 @@ export default function ExportButtons({ canvasRef, includeBackgroundInExport = t
     setError(null)
     setStatus('Exporting canvas...')
     try {
-      const data = canvasData ?? onExportCanvasCode?.()
-      if (!data) throw new Error('No canvas data')
-      await exportCanvasCodeToClipboard(data)
+      if (!canvasData) throw new Error('No canvas data')
+      await exportCanvasCodeToClipboard(canvasData)
       setStatus('Canvas exported')
       setTimeout(() => setStatus(null), 2000)
     } catch (err) {
