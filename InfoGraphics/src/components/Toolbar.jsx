@@ -3,7 +3,7 @@ import ProjectSelector from './ProjectSelector'
 import { ELEMENT_TYPES } from '../constants/elementTypes'
 import './Toolbar.css'
 
-export default function Toolbar({ projects = [], currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, onAddElement, showTimeline = true, onToggleTimeline, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
+export default function Toolbar({ projects = [], currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, onShowShortcuts, onAddElement, showTimeline = true, onToggleTimeline, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
   return (
     <div className="toolbar">
       <span className="toolbar-logo">INFOGRAPHIC GENERATOR</span>
@@ -46,6 +46,12 @@ export default function Toolbar({ projects = [], currentProjectId, currentProjec
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="2" y="6" width="20" height="12" rx="2" />
           <path d="M7 10v4M11 9v6M15 8v8M19 10v4" />
+        </svg>
+      </button>
+      <button className="toolbar-btn toolbar-btn-icon" onClick={onShowShortcuts} title="Keyboard shortcuts (?)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h12" />
         </svg>
       </button>
       <button className="toolbar-btn toolbar-btn-icon" onClick={onOpenSettings} title="Settings">

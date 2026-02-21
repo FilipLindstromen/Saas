@@ -262,6 +262,27 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
           </div>
         </>
       )}
+      {overlay.type === 'infographic' && (
+        <>
+          <label className={styles.label}>Infographic</label>
+          <p className={styles.hint}>
+            {overlay.infographicProjectName || 'Untitled infographic'}. Animations play when this overlay is active in the timeline.
+          </p>
+          <label className={styles.label}>Scale</label>
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              className={styles.slider}
+              min={10}
+              max={200}
+              value={Math.round((overlay.imageScale ?? 1) * 100)}
+              onChange={(e) => onUpdate({ imageScale: Number(e.target.value) / 100 })}
+              aria-label="Infographic scale"
+            />
+            <span className={styles.sliderValue}>{Math.round((overlay.imageScale ?? 1) * 100)}%</span>
+          </div>
+        </>
+      )}
       {overlay.type === 'image' && (
         <>
           <label className={styles.label}>Image</label>

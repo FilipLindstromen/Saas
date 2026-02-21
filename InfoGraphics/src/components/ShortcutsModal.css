@@ -1,0 +1,86 @@
+.shortcuts-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.shortcuts-modal {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  min-width: 360px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #27272a;
+}
+
+.shortcuts-modal-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e4e4e7;
+}
+
+.shortcuts-modal-close {
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.shortcuts-modal-close:hover {
+  background: #27272a;
+  color: #e4e4e7;
+}
+
+.shortcuts-modal-list {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.shortcuts-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.shortcuts-modal-desc {
+  font-size: 0.875rem;
+  color: #a1a1aa;
+}
+
+.shortcuts-modal-keys {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.shortcuts-modal-keys kbd {
+  padding: 0.2rem 0.5rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: #e4e4e7;
+}

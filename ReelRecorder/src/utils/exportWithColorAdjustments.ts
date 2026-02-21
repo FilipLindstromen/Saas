@@ -1,5 +1,7 @@
 import type { OverlayItem, OverlayTextAnimation } from '../types'
 import { drawOverlays } from './canvasCapture'
+import { loadInfographicProjectData } from './infographicLoader'
+import type { InfographicProjectData } from './infographicLoader'
 
 /**
  * Re-encode a video blob with CSS-like color adjustments (brightness, contrast, saturation).
@@ -311,6 +313,32 @@ function preloadOverlayVideos(overlays: OverlayItem[]): Promise<Map<string, HTML
   return Promise.all(promises).then(() => map)
 }
 
+/** Load infographic projects and preload element images for export. */
+function preloadInfographicData(overlays: OverlayItem[]): {
+  projects: Map<string, InfographicProjectData>
+  elementImages: Map<string, HTMLImageElement>
+} {
+  const projects = new Map<string, InfographicProjectData>()
+  const elementImages = new Map<string, HTMLImageElement>()
+  for (const o of overlays) {
+    if (o.type !== 'infographic' || !o.infographicProjectId) continue
+    if (projects.has(o.infographicProjectId)) continue
+    const data = loadInfographicProjectData(o.infographicProjectId)
+    if (data) {
+      projects.set(o.infographicProjectId, data)
+      for (const el of data.elements || []) {
+        if ((el.type === 'image' || el.type === 'image-text') && el.imageUrl && !elementImages.has(el.id)) {
+          const img = document.createElement('img')
+          img.crossOrigin = 'anonymous'
+          img.src = el.imageUrl
+          elementImages.set(el.id, img)
+        }
+      }
+    }
+  }
+  return { projects, elementImages }
+}
+
 function preloadMusic(blob?: Blob | null): Promise<AudioBuffer | null> {
   if (!blob) return Promise.resolve(null)
   return new Promise((resolve, reject) => {
@@ -372,6 +400,9 @@ export function exportVideoForDownload(
     hasColor
       ? `brightness(${colorBrightness}%) contrast(${colorContrast}%) saturate(${colorSaturation}%)`
       : 'none'
+
+  const { projects: infographicProjects, elementImages: infographicElementImages } =
+    preloadInfographicData(overlaysToBurn)
 
   return Promise.all([
     preloadOverlayImages(overlaysToBurn),
@@ -520,6 +551,8 @@ export function exportVideoForDownload(
                 defaultBold,
                 preloadedImages,
                 preloadedVideos,
+                infographicProjects,
+                infographicElementImages,
               })
             }
           }

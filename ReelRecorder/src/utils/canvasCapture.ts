@@ -1,6 +1,8 @@
 import type { OverlayItem, OverlayTextAnimation } from '../types'
 import type { CaptionSegment, CaptionWord } from '../services/captions'
 import type { CaptionStyle } from '../types'
+import type { InfographicProjectData } from './infographicLoader'
+import { drawInfographicOnCanvas } from './infographicCanvas'
 
 const TEXT_ANIM_DURATION = 0.3
 const STAGGER_PER_WORD = 0.08
@@ -89,6 +91,10 @@ export interface DrawOverlaysOptions {
   preloadedImages?: Map<string, HTMLImageElement>
   /** Preloaded video elements for video overlays; caller must set currentTime before each draw */
   preloadedVideos?: Map<string, HTMLVideoElement>
+  /** Infographic project data keyed by project ID; required for infographic overlays */
+  infographicProjects?: Map<string, InfographicProjectData>
+  /** Preloaded images for infographic elements (keyed by element id) */
+  infographicElementImages?: Map<string, HTMLImageElement>
 }
 
 export function drawOverlays(
@@ -215,6 +221,27 @@ export function drawOverlays(
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
         ctx.drawImage(video, x, y, w, h)
+      }
+    }
+    if (o.type === 'infographic' && o.infographicProjectId) {
+      const projectData = options.infographicProjects?.get(o.infographicProjectId)
+      if (projectData) {
+        const timelineDuration = Math.max(0.001, typeof projectData.timelineDuration === 'number' ? projectData.timelineDuration : 10)
+        const elapsed = currentTime - o.startTime
+        const infographicTime = elapsed >= 0 ? (elapsed % timelineDuration) : 0
+        const scale = o.imageScale ?? 1
+        const aspectRatio = projectData.aspectRatio || '16:9'
+        const resolution = projectData.resolution || 800
+        const isPortrait = aspectRatio === '9:16'
+        const baseW = isPortrait ? width * 0.6 : width * 0.8
+        const baseH = isPortrait ? height * 0.8 : height * 0.6
+        const w = baseW * scale
+        const h = baseH * scale
+        const x = ((o.x ?? 0.5) * width) - w / 2
+        const y = ((o.y ?? 0.5) * height) - h / 2
+        drawInfographicOnCanvas(ctx, projectData, infographicTime, x, y, w, h, {
+          preloadedImages: options.infographicElementImages,
+        })
       }
     }
   }

@@ -39,6 +39,8 @@ export function ClipLibraryPanel({ clips, onAddToTimeline, onRemove }: ClipLibra
                   />
                 ) : clip.payload.type === 'video' && clip.payload.videoUrl ? (
                   <div className={styles.thumbPlaceholder} title="Video">▶</div>
+                ) : clip.payload.type === 'infographic' && clip.payload.infographicProjectId ? (
+                  <div className={styles.thumbPlaceholder} title="Infographic">📊</div>
                 ) : (
                   <div className={styles.thumbPlaceholder} title="Text">T</div>
                 )}

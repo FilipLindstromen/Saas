@@ -1,6 +1,8 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import type { CaptionStyle, OverlayItem, OverlayTextAnimation, SafeZoneType } from '../types'
 import { drawOverlays, drawCaptionStyle, getCaptionBlockRect } from '../utils/canvasCapture'
+import { loadInfographicProjectData } from '../utils/infographicLoader'
+import type { InfographicProjectData } from '../utils/infographicLoader'
 import type { CaptionSegment } from '../services/captions'
 import styles from './RecordPreview.module.css'
 
@@ -86,6 +88,16 @@ function getOverlayRect(
     const scale = o.imageScale ?? 1
     const w = (o.naturalWidth ?? 1920) * scale
     const h = (o.naturalHeight ?? 1080) * scale
+    const x = (o.x ?? 0.5) * width - w / 2
+    const y = (o.y ?? 0.5) * height - h / 2
+    return { x, y, w, h }
+  }
+  if (o.type === 'infographic' && o.infographicProjectId) {
+    const scale = o.imageScale ?? 1
+    const baseW = width * 0.8
+    const baseH = height * 0.6
+    const w = baseW * scale
+    const h = baseH * scale
     const x = (o.x ?? 0.5) * width - w / 2
     const y = (o.y ?? 0.5) * height - h / 2
     return { x, y, w, h }
@@ -212,6 +224,7 @@ export function RecordPreview({
   const rafRef = useRef<number>(0)
   const overlayVideoRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const overlayImageRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const infographicElementImagesRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [dragState, setDragState] = useState<{
     overlayId: string
     offsetX: number
@@ -361,6 +374,43 @@ export function RecordPreview({
     }
   }, [overlays])
 
+  // Load infographic project data and preload element images
+  const infographicProjects = useMemo(() => {
+    const map = new Map<string, InfographicProjectData>()
+    for (const o of overlays) {
+      if (o.type === 'infographic' && o.infographicProjectId && !map.has(o.infographicProjectId)) {
+        const data = loadInfographicProjectData(o.infographicProjectId)
+        if (data) map.set(o.infographicProjectId, data)
+      }
+    }
+    return map
+  }, [overlays])
+
+  useEffect(() => {
+    const map = infographicElementImagesRef.current
+    const neededIds = new Set<string>()
+    for (const [, data] of infographicProjects) {
+      for (const el of data.elements || []) {
+        if ((el.type === 'image' || el.type === 'image-text') && el.imageUrl) {
+          neededIds.add(el.id)
+        }
+      }
+    }
+    for (const id of map.keys()) {
+      if (!neededIds.has(id)) map.delete(id)
+    }
+    for (const [, data] of infographicProjects) {
+      for (const el of data.elements || []) {
+        if ((el.type === 'image' || el.type === 'image-text') && el.imageUrl && !map.has(el.id)) {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.src = el.imageUrl
+          map.set(el.id, img)
+        }
+      }
+    }
+  }, [infographicProjects])
+
   // Canvas Drawing Loop
   useEffect(() => {
     const canvas = canvasRef.current
@@ -438,6 +488,8 @@ export function RecordPreview({
           defaultBold,
           preloadedImages: overlayImageRef.current,
           preloadedVideos: overlayVideoRef.current,
+          infographicProjects,
+          infographicElementImages: infographicElementImagesRef.current,
         })
         if (captionPreview && captionSegments && captionSegments.length > 0) {
           const captionTime = showRecordingInEdit && videoTrimStart != null
@@ -476,7 +528,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {
@@ -564,6 +616,18 @@ export function RecordPreview({
         const scale = o.imageScale ?? 1
         const w = (o.naturalWidth ?? 1920) * scale
         const h = (o.naturalHeight ?? 1080) * scale
+        const x = (o.x ?? 0.5) * width - w / 2
+        const y = (o.y ?? 0.5) * height - h / 2
+        if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
+          return { type: 'overlay', id: o.id, offsetX: canvasX - (x + w / 2), offsetY: canvasY - (y + h / 2) }
+        }
+      }
+      if (o.type === 'infographic' && o.infographicProjectId) {
+        const scale = o.imageScale ?? 1
+        const baseW = width * 0.8
+        const baseH = height * 0.6
+        const w = baseW * scale
+        const h = baseH * scale
         const x = (o.x ?? 0.5) * width - w / 2
         const y = (o.y ?? 0.5) * height - h / 2
         if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
@@ -727,7 +791,7 @@ export function RecordPreview({
       overlayId: id,
       startX: e.clientX,
       startY: e.clientY,
-      startValue: overlay.type === 'image' || overlay.type === 'video' ? (overlay.imageScale ?? 1) : (overlay.fontSizePercent ?? 5),
+      startValue: overlay.type === 'image' || overlay.type === 'video' || overlay.type === 'infographic' ? (overlay.imageScale ?? 1) : (overlay.fontSizePercent ?? 5),
       kind: overlay.type === 'text' ? 'fontSize' : 'scale'
     })
 

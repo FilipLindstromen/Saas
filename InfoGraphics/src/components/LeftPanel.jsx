@@ -1,5 +1,6 @@
 import DocumentPanel from './DocumentPanel'
 import LayoutsPanel from './LayoutsPanel'
+import BrandKitPanel from './BrandKitPanel'
 import './LeftPanel.css'
 
 export default function LeftPanel({
@@ -19,7 +20,17 @@ export default function LeftPanel({
   defaultFontFamily,
   onDefaultFontFamilyChange,
   defaultFontSize,
-  onDefaultFontSizeChange
+  onDefaultFontSizeChange,
+  brandPrimaryColor,
+  brandSecondaryColor,
+  brandFontFamily,
+  onBrandPrimaryColorChange,
+  onBrandSecondaryColorChange,
+  onBrandFontFamilyChange,
+  onApplyBrandToSelection,
+  onApplyBrandToAll,
+  hasSelection = false,
+  hasElements = false
 }) {
   return (
     <div className="left-panel" style={{ width }}>
@@ -64,6 +75,13 @@ export default function LeftPanel({
         >
           Layouts
         </button>
+        <button
+          type="button"
+          className={`left-panel-tab ${tab === 'brand' ? 'active' : ''}`}
+          onClick={() => onTabChange?.('brand')}
+        >
+          Brand
+        </button>
       </div>
       <div className="left-panel-content">
         {tab === 'document' && (
@@ -83,6 +101,20 @@ export default function LeftPanel({
           />
         )}
         {tab === 'layouts' && <LayoutsPanel onApplyLayout={onApplyLayout} />}
+        {tab === 'brand' && (
+          <BrandKitPanel
+            primaryColor={brandPrimaryColor}
+            secondaryColor={brandSecondaryColor}
+            fontFamily={brandFontFamily}
+            onPrimaryColorChange={onBrandPrimaryColorChange}
+            onSecondaryColorChange={onBrandSecondaryColorChange}
+            onFontFamilyChange={onBrandFontFamilyChange}
+            onApplyToSelection={onApplyBrandToSelection}
+            onApplyToAll={onApplyBrandToAll}
+            hasSelection={hasSelection}
+            hasElements={hasElements}
+          />
+        )}
       </div>
     </div>
   )

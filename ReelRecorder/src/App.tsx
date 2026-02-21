@@ -619,7 +619,7 @@ export default function App() {
     }
   }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality])
 
-  const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video', initialPatch?: Partial<OverlayItem>) => {
+  const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video' | 'infographic', initialPatch?: Partial<OverlayItem>) => {
     const start = displayTime
     const item: OverlayItem = {
       id: generateId(),
@@ -627,6 +627,7 @@ export default function App() {
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
       ...(type === 'text' ? { text: 'New text', fontSizePercent: 10, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
+      ...(type === 'infographic' ? { infographicProjectId: '', infographicProjectName: '' } : {}),
       ...initialPatch,
     }
     setOverlays((prev) => [...prev, item])

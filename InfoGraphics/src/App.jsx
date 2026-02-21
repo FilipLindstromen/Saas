@@ -9,6 +9,7 @@ import GenerateInput from './components/GenerateInput'
 import Toolbar from './components/Toolbar'
 import ProjectSelector from './components/ProjectSelector'
 import SettingsModal, { loadApiKeys, saveApiKeys } from './components/SettingsModal'
+import ShortcutsModal from './components/ShortcutsModal'
 import { applyLayout } from './layouts'
 import * as projectStorage from './utils/projectStorage'
 import './App.css'
@@ -28,7 +29,7 @@ const ASPECT_RATIOS = {
 
 let nextId = 1
 function createElement(type, overrides = {}, defaults = {}) {
-  const defFont = defaults.fontFamily || 'Inter'
+    const defFont = defaults.fontFamily || defaults.brandFontFamily || 'Inter'
   const defSize = defaults.fontSize ?? 14
   const base = {
     id: nextId++,
@@ -46,7 +47,7 @@ function createElement(type, overrides = {}, defaults = {}) {
     fontSize: type === 'headline' ? Math.round(defSize * 1.7) : type === 'cta' ? Math.round(defSize * 1.15) : defSize,
     fontFamily: defFont,
     color: '#000000',
-    backgroundColor: type === 'cta' ? '#3b82f6' : null,
+    backgroundColor: type === 'cta' ? (defaults.brandPrimaryColor || '#3b82f6') : null,
     arrowDirection: type === 'arrow' ? 'right' : null,
     arrowStyle: type === 'arrow' ? 'simple' : null,
     gradientColor: type === 'gradient' ? '#000000' : null,
@@ -67,6 +68,7 @@ function App() {
   const [selectedIds, setSelectedIds] = useState([])
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [apiKeys, setApiKeys] = useState(() => loadApiKeys())
   const [latestImages, setLatestImages] = useState([])
 
@@ -77,6 +79,9 @@ function App() {
   const [includeBackgroundInExport, setIncludeBackgroundInExport] = useState(true)
   const [defaultFontFamily, setDefaultFontFamily] = useState('Inter')
   const [defaultFontSize, setDefaultFontSize] = useState(14)
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState('#3b82f6')
+  const [brandSecondaryColor, setBrandSecondaryColor] = useState('#1e40af')
+  const [brandFontFamily, setBrandFontFamily] = useState('Inter')
   const [leftPanelTab, setLeftPanelTab] = useState('document')
   const [rightPanelTab, setRightPanelTab] = useState('inspector')
   const [leftPanelWidth, setLeftPanelWidth] = useState(240)
@@ -97,7 +102,7 @@ function App() {
 
   const applyProjectData = useCallback((parsed) => {
     if (!parsed) return
-    const { elements: savedElements, aspectRatio: savedRatio, resolution: savedRes, backgroundColor: bg, zoom: savedZoom, selectedId: savedSelectedId, selectedIds: savedSelectedIds, leftPanelTab: savedLeftTab, rightPanelTab: savedTab, leftPanelWidth: savedLeftWidth, rightPanelWidth: savedRightWidth, includeBackgroundInExport: savedIncludeBg, defaultFontFamily: savedFont, defaultFontSize: savedFontSize, timelineDuration: savedTimelineDuration, timelineHeight: savedTimelineHeight } = parsed
+        const { elements: savedElements, aspectRatio: savedRatio, resolution: savedRes, backgroundColor: bg, zoom: savedZoom, selectedId: savedSelectedId, selectedIds: savedSelectedIds, leftPanelTab: savedLeftTab, rightPanelTab: savedTab, leftPanelWidth: savedLeftWidth, rightPanelWidth: savedRightWidth, includeBackgroundInExport: savedIncludeBg, defaultFontFamily: savedFont, defaultFontSize: savedFontSize, timelineDuration: savedTimelineDuration, timelineHeight: savedTimelineHeight, brandPrimaryColor: savedBrandPrimary, brandSecondaryColor: savedBrandSecondary, brandFontFamily: savedBrandFont } = parsed
     if (Array.isArray(savedElements)) {
       const duration = typeof parsed.timelineDuration === 'number' ? parsed.timelineDuration : 10
       const normalized = savedElements.map(e => ({
@@ -123,7 +128,7 @@ function App() {
     if (typeof savedRes === 'number' && [800, 1080, 1920].includes(savedRes)) setResolution(savedRes)
     if (bg) setBackgroundColor(bg)
     if (typeof savedZoom === 'number' && savedZoom >= 25 && savedZoom <= 200) setZoom(savedZoom)
-    if (savedLeftTab && ['document', 'layouts'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
+    if (savedLeftTab && ['document', 'layouts', 'brand'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
     else if (savedTab && ['document', 'layouts'].includes(savedTab)) setLeftPanelTab(savedTab)
     if (savedTab && ['inspector', 'layers'].includes(savedTab)) setRightPanelTab(savedTab)
     if (typeof savedLeftWidth === 'number' && savedLeftWidth >= 180 && savedLeftWidth <= 400) setLeftPanelWidth(savedLeftWidth)
@@ -134,6 +139,9 @@ function App() {
     if (typeof savedTimelineDuration === 'number' && savedTimelineDuration >= 1 && savedTimelineDuration <= 300) setTimelineDuration(savedTimelineDuration)
     if (typeof parsed.showTimeline === 'boolean') setShowTimeline(parsed.showTimeline)
     if (typeof savedTimelineHeight === 'number' && savedTimelineHeight >= 80 && savedTimelineHeight <= 400) setTimelineHeight(savedTimelineHeight)
+    if (savedBrandPrimary && /^#[0-9a-fA-F]{6}$/.test(savedBrandPrimary)) setBrandPrimaryColor(savedBrandPrimary)
+    if (savedBrandSecondary && /^#[0-9a-fA-F]{6}$/.test(savedBrandSecondary)) setBrandSecondaryColor(savedBrandSecondary)
+    if (savedBrandFont && typeof savedBrandFont === 'string') setBrandFontFamily(savedBrandFont)
   }, [])
 
   useEffect(() => {
@@ -206,10 +214,13 @@ function App() {
       defaultFontSize,
       timelineDuration,
       showTimeline,
-      timelineHeight
+      timelineHeight,
+      brandPrimaryColor,
+      brandSecondaryColor,
+      brandFontFamily
     }
     projectStorage.saveProjectData(currentProjectId, data)
-  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight])
+  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
 
   const createProject = useCallback(() => {
     const id = projectStorage.generateProjectId()
@@ -233,7 +244,10 @@ function App() {
       defaultFontSize: 14,
       timelineDuration: 10,
       showTimeline: true,
-      timelineHeight: 140
+      timelineHeight: 140,
+      brandPrimaryColor: '#3b82f6',
+      brandSecondaryColor: '#1e40af',
+      brandFontFamily: 'Inter'
     })
     setProjects(updated)
     setCurrentProjectId(id)
@@ -250,6 +264,9 @@ function App() {
     setIncludeBackgroundInExport(true)
     setDefaultFontFamily('Inter')
     setDefaultFontSize(14)
+    setBrandPrimaryColor('#3b82f6')
+    setBrandSecondaryColor('#1e40af')
+    setBrandFontFamily('Inter')
     setTimelineDuration(10)
     setShowTimeline(true)
     setTimelineHeight(140)
@@ -276,9 +293,12 @@ function App() {
       defaultFontSize,
       timelineDuration,
       showTimeline,
-      timelineHeight
+      timelineHeight,
+      brandPrimaryColor,
+      brandSecondaryColor,
+      brandFontFamily
     })
-  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight])
+  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
 
   const switchProject = useCallback((id) => {
     if (id === currentProjectId) return
@@ -354,14 +374,20 @@ function App() {
     pushUndoState(elements, selectedIds)
     const baseY = indexHint != null ? 80 + indexHint * 100 : 100
     const baseX = indexHint != null ? 80 : 100
-    const defaults = { fontFamily: defaultFontFamily, fontSize: defaultFontSize }
+    const defaults = {
+      fontFamily: brandFontFamily || defaultFontFamily,
+      fontSize: defaultFontSize,
+      brandFontFamily: brandFontFamily,
+      brandPrimaryColor: brandPrimaryColor,
+      brandSecondaryColor: brandSecondaryColor
+    }
     const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex || 0), 0) : 0
     const clipDefaults = { clipStart: 0, clipEnd: timelineDuration }
     const el = createElement(type, { ...clipDefaults, ...overrides, x: baseX, y: baseY, zIndex: maxZ + 1 }, defaults)
     setElements(prev => [...prev, el])
     setSelectedIds([el.id])
     return el.id
-  }, [defaultFontFamily, defaultFontSize, elements, selectedIds, pushUndoState, timelineDuration])
+  }, [defaultFontFamily, defaultFontSize, brandFontFamily, brandPrimaryColor, brandSecondaryColor, elements, selectedIds, pushUndoState, timelineDuration])
 
   const updateElement = useCallback((id, updates) => {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
@@ -429,6 +455,15 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = document.activeElement
+        const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        if (!isInput) {
+          e.preventDefault()
+          setShowShortcuts(s => !s)
+        }
+        return
+      }
       const target = document.activeElement
       const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       if (!isInput) {
@@ -445,11 +480,43 @@ function App() {
           e.preventDefault()
           duplicateSelected()
         }
+        if (e.key === 'l' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('left')
+        }
+        if (e.key === 'e' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('center')
+        }
+        if (e.key === 'r' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('right')
+        }
+        if (e.key === 't' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('top')
+        }
+        if (e.key === 'm' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('middle')
+        }
+        if (e.key === 'b' && (e.ctrlKey || e.metaKey) && selectedIds.length >= 2) {
+          e.preventDefault()
+          alignElements('bottom')
+        }
+        if (e.key === 'H' && (e.ctrlKey || e.metaKey) && e.shiftKey && selectedIds.length >= 3) {
+          e.preventDefault()
+          distributeElements('horizontal')
+        }
+        if (e.key === 'V' && (e.ctrlKey || e.metaKey) && e.shiftKey && selectedIds.length >= 3) {
+          e.preventDefault()
+          distributeElements('vertical')
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIds, deleteSelected, duplicateSelected, undo, redo])
+  }, [selectedIds, deleteSelected, duplicateSelected, undo, redo, alignElements, distributeElements])
 
   const reorderElement = useCallback((id, direction) => {
     pushUndoState(elements, selectedIds)
@@ -464,6 +531,56 @@ function App() {
       setElements(prev => prev.map(e => e.id === id ? { ...e, zIndex: Math.max(0, nextZ - 1) } : e))
     }
   }, [elements, selectedIds, pushUndoState])
+
+  const alignElements = useCallback((align) => {
+    if (selectedIds.length < 2) return
+    pushUndoState(elements, selectedIds)
+    const selected = elements.filter(e => selectedIds.includes(e.id))
+    const minX = Math.min(...selected.map(e => e.x))
+    const maxX = Math.max(...selected.map(e => e.x + e.width))
+    const minY = Math.min(...selected.map(e => e.y))
+    const maxY = Math.max(...selected.map(e => e.y + e.height))
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    setElements(prev => prev.map(e => {
+      if (!selectedIds.includes(e.id)) return e
+      const updates = {}
+      if (align === 'left') updates.x = minX
+      else if (align === 'right') updates.x = maxX - e.width
+      else if (align === 'center') updates.x = centerX - e.width / 2
+      else if (align === 'top') updates.y = minY
+      else if (align === 'bottom') updates.y = maxY - e.height
+      else if (align === 'middle') updates.y = centerY - e.height / 2
+      return { ...e, ...updates }
+    }))
+  }, [selectedIds, elements, pushUndoState])
+
+  const distributeElements = useCallback((direction) => {
+    if (selectedIds.length < 3) return
+    pushUndoState(elements, selectedIds)
+    const selected = elements.filter(e => selectedIds.includes(e.id))
+    const sorted = direction === 'horizontal'
+      ? [...selected].sort((a, b) => a.x - b.x)
+      : [...selected].sort((a, b) => a.y - b.y)
+    const first = direction === 'horizontal' ? sorted[0].x : sorted[0].y
+    const last = direction === 'horizontal'
+      ? sorted[sorted.length - 1].x + sorted[sorted.length - 1].width
+      : sorted[sorted.length - 1].y + sorted[sorted.length - 1].height
+    const totalSize = sorted.reduce((sum, e) => sum + (direction === 'horizontal' ? e.width : e.height), 0)
+    const gap = (last - first - totalSize) / (sorted.length - 1)
+    let pos = first
+    const updates = {}
+    sorted.forEach(el => {
+      if (direction === 'horizontal') {
+        updates[el.id] = { x: pos }
+        pos += el.width + gap
+      } else {
+        updates[el.id] = { y: pos }
+        pos += el.height + gap
+      }
+    })
+    setElements(prev => prev.map(e => updates[e.id] ? { ...e, ...updates[e.id] } : e))
+  }, [selectedIds, elements, pushUndoState])
 
   const reorderToIndex = useCallback((id, targetIndex) => {
     pushUndoState(elements, selectedIds)
@@ -497,6 +614,32 @@ function App() {
       setSelectedIds([idsOrId])
     }
   }, [])
+
+  const applyBrandToSelection = useCallback(() => {
+    if (selectedIds.length === 0) return
+    pushUndoState(elements, selectedIds)
+    const updates = {
+      fontFamily: brandFontFamily,
+      color: brandPrimaryColor
+    }
+    setElements(prev => prev.map(e =>
+      selectedIds.includes(e.id)
+        ? { ...e, ...updates, ...(e.type === 'cta' ? { backgroundColor: brandPrimaryColor } : {}), ...(e.type === 'gradient' ? { gradientColor: brandSecondaryColor } : {}) }
+        : e
+    ))
+  }, [selectedIds, elements, pushUndoState, brandFontFamily, brandPrimaryColor, brandSecondaryColor])
+
+  const applyBrandToAll = useCallback(() => {
+    if (elements.length === 0) return
+    pushUndoState(elements, selectedIds)
+    setElements(prev => prev.map(e => ({
+      ...e,
+      fontFamily: brandFontFamily,
+      color: brandPrimaryColor,
+      ...(e.type === 'cta' ? { backgroundColor: brandPrimaryColor } : {}),
+      ...(e.type === 'gradient' ? { gradientColor: brandSecondaryColor } : {})
+    })))
+  }, [elements, selectedIds, pushUndoState, brandFontFamily, brandPrimaryColor, brandSecondaryColor])
 
   const handleApplyLayout = useCallback((layoutId) => {
     pushUndoState(elements, selectedIds)
@@ -569,6 +712,7 @@ function App() {
         onRenameProject={renameProject}
         onDeleteProject={deleteProject}
         onOpenSettings={() => setShowSettings(true)}
+        onShowShortcuts={() => setShowShortcuts(true)}
         onAddElement={addElement}
         showTimeline={showTimeline}
         onToggleTimeline={() => setShowTimeline(v => !v)}
@@ -610,6 +754,16 @@ function App() {
           onDefaultFontFamilyChange={setDefaultFontFamily}
           defaultFontSize={defaultFontSize}
           onDefaultFontSizeChange={setDefaultFontSize}
+          brandPrimaryColor={brandPrimaryColor}
+          brandSecondaryColor={brandSecondaryColor}
+          brandFontFamily={brandFontFamily}
+          onBrandPrimaryColorChange={setBrandPrimaryColor}
+          onBrandSecondaryColorChange={setBrandSecondaryColor}
+          onBrandFontFamilyChange={setBrandFontFamily}
+          onApplyBrandToSelection={applyBrandToSelection}
+          onApplyBrandToAll={applyBrandToAll}
+          hasSelection={selectedIds.length > 0}
+          hasElements={elements.length > 0}
         />
         <div className="app-left">
           <GenerateInput
@@ -710,6 +864,10 @@ function App() {
         onClose={() => setShowSettings(false)}
         apiKeys={apiKeys}
         onSave={handleSaveApiKeys}
+      />
+      <ShortcutsModal
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
       />
     </div>
   )

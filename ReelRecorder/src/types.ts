@@ -12,7 +12,7 @@ export type QualityPreset = 'draft' | 'medium' | 'high' | 'max'
 
 export interface OverlayItem {
   id: string
-  type: 'text' | 'image' | 'video'
+  type: 'text' | 'image' | 'video' | 'infographic'
   startTime: number
   endTime: number
   // text
@@ -49,6 +49,9 @@ export interface OverlayItem {
   imageHeight?: number
   // video (stock video from Pexels/Pixabay; layout uses naturalWidth/naturalHeight + imageScale, x, y)
   videoUrl?: string
+  // infographic (from InfoGraphics generator; animations play when overlay is active)
+  infographicProjectId?: string
+  infographicProjectName?: string
   /** When true (default), overlay is drawn during recording and included in the exported file. When false, preview-only. */
   burnIntoExport?: boolean
 }

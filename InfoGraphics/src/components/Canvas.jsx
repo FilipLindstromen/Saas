@@ -23,12 +23,65 @@ function rectsOverlap(a, b) {
   return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y)
 }
 
+const SNAP_THRESHOLD = 8
+
+function getSnapPoints(elements, draggingIds, size) {
+  const points = { x: new Set(), y: new Set() }
+  elements.forEach(el => {
+    if (draggingIds.includes(el.id)) return
+    points.x.add(el.x)
+    points.x.add(el.x + el.width)
+    points.x.add(el.x + el.width / 2)
+    points.y.add(el.y)
+    points.y.add(el.y + el.height)
+    points.y.add(el.y + el.height / 2)
+  })
+  points.x.add(0)
+  points.x.add(size.w)
+  points.x.add(size.w / 2)
+  points.y.add(0)
+  points.y.add(size.h)
+  points.y.add(size.h / 2)
+  return points
+}
+
+function snapValue(val, points, threshold) {
+  for (const p of points) {
+    if (Math.abs(val - p) <= threshold) return p
+  }
+  return val
+}
+
+function findSnappedGuides(draggingRects, snapPoints, threshold) {
+  const guides = []
+  draggingRects.forEach(({ x, y, w, h }) => {
+    const edges = [
+      { val: x, type: 'x', pos: x },
+      { val: x + w, type: 'x', pos: x + w },
+      { val: x + w / 2, type: 'x', pos: x + w / 2 },
+      { val: y, type: 'y', pos: y },
+      { val: y + h, type: 'y', pos: y + h },
+      { val: y + h / 2, type: 'y', pos: y + h / 2 }
+    ]
+    edges.forEach(({ val, type, pos }) => {
+      for (const p of snapPoints[type]) {
+        if (Math.abs(val - p) <= threshold) {
+          guides.push({ type, pos: p })
+          break
+        }
+      }
+    })
+  })
+  return guides
+}
+
 export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
   const containerRef = useRef(null)
   const [dragState, setDragState] = useState(null)
   const [resizeHandle, setResizeHandle] = useState(null)
   const [rotateHandle, setRotateHandle] = useState(null)
   const [marquee, setMarquee] = useState(null)
+  const [snapGuides, setSnapGuides] = useState([])
   const marqueeJustCompleted = useRef(false)
   const dragStateRef = useRef(null)
   const resizeHandleRef = useRef(null)
@@ -92,7 +145,10 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
         const startAngle = Math.atan2(rot.startY - center.y, rot.startX - center.x)
         const currAngle = Math.atan2(e.clientY - center.y, e.clientX - center.x)
         const deltaDeg = ((currAngle - startAngle) * 180) / Math.PI
-        const newRot = Math.round(rot.startRotation + deltaDeg)
+        let newRot = Math.round(rot.startRotation + deltaDeg)
+        if (e.shiftKey) {
+          newRot = Math.round(newRot / 10) * 10
+        }
         onUpdate(rot.id, { rotation: newRot })
         setRotateHandle(prev => prev ? { ...prev, startX: e.clientX, startY: e.clientY, startRotation: newRot } : null)
       }
@@ -103,21 +159,44 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
     }
     if (drag) {
       const currCanvas = screenToCanvas(e.clientX, e.clientY, canvasRef?.current, size)
+      const snapPoints = getSnapPoints(elements, drag.ids, size)
+      const proposed = {}
       drag.ids.forEach(id => {
         const pos = drag.positions[id]
         if (pos && pos.offsetX != null) {
-          const newX = currCanvas.x + pos.offsetX
-          const newY = currCanvas.y + pos.offsetY
+          let newX = currCanvas.x + pos.offsetX
+          let newY = currCanvas.y + pos.offsetY
+          const el = elements.find(x => x.id === id)
+          if (el) {
+            const snappedX = snapValue(newX, snapPoints.x, SNAP_THRESHOLD)
+            const snappedXRight = snapValue(newX + el.width, snapPoints.x, SNAP_THRESHOLD) - el.width
+            const snappedXCenter = snapValue(newX + el.width / 2, snapPoints.x, SNAP_THRESHOLD) - el.width / 2
+            if (snappedX !== newX) newX = snappedX
+            else if (snappedXRight !== newX) newX = snappedXRight
+            else if (snappedXCenter !== newX) newX = snappedXCenter
+            const snappedY = snapValue(newY, snapPoints.y, SNAP_THRESHOLD)
+            const snappedYBottom = snapValue(newY + el.height, snapPoints.y, SNAP_THRESHOLD) - el.height
+            const snappedYCenter = snapValue(newY + el.height / 2, snapPoints.y, SNAP_THRESHOLD) - el.height / 2
+            if (snappedY !== newY) newY = snappedY
+            else if (snappedYBottom !== newY) newY = snappedYBottom
+            else if (snappedYCenter !== newY) newY = snappedYCenter
+          }
+          proposed[id] = { x: newX, y: newY, w: el?.width ?? 100, h: el?.height ?? 100 }
           onUpdate(id, { x: newX, y: newY })
         } else if (pos) {
           onUpdate(id, { x: pos.x, y: pos.y })
         }
       })
+      const rects = Object.entries(proposed).map(([, r]) => r)
+      const guides = findSnappedGuides(rects, snapPoints, SNAP_THRESHOLD)
+      setSnapGuides(guides)
       setDragState(prev => prev ? ({
         ...prev,
         positions: Object.fromEntries(
           prev.ids.map(id => {
             const pos = prev.positions[id]
+            const p = proposed[id]
+            if (p) return [id, { ...pos, x: p.x, y: p.y }]
             if (pos && pos.offsetX != null) {
               return [id, { ...pos, x: currCanvas.x + pos.offsetX, y: currCanvas.y + pos.offsetY }]
             }
@@ -149,6 +228,10 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
 
   const handlePointerDown = useCallback((e, id, handle) => {
     if (handle === 'move') {
+      if (e.shiftKey) {
+        onSelect(id, { shift: true })
+        return
+      }
       e.preventDefault()
       onPushUndo?.()
       const el = elements.find(x => x.id === id)
@@ -167,7 +250,7 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
       document.body.style.cursor = 'grabbing'
       attachGlobalListeners(
         (ev) => handlePointerMove(ev),
-        () => { dragStateRef.current = null; setDragState(null) }
+        () => { dragStateRef.current = null; setDragState(null); setSnapGuides([]) }
       )
     } else if (handle === 'rotate' && selectedIds.length === 1 && selectedIds[0] === id) {
       e.preventDefault()
@@ -295,6 +378,17 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
               }}
             />
           )}
+          {snapGuides.map((g, i) => (
+            <div
+              key={i}
+              className={`canvas-snap-guide canvas-snap-guide-${g.type}`}
+              style={
+                g.type === 'x'
+                  ? { left: g.pos, top: 0, width: 1, height: size.h }
+                  : { left: 0, top: g.pos, width: size.w, height: 1 }
+              }
+            />
+          ))}
         </div>
       </div>
     </div>

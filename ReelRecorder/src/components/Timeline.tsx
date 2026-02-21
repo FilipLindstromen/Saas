@@ -4,6 +4,7 @@ import { IconType, IconImage, IconPlay, IconPause, IconSplit, IconVideo } from '
 import { StickerPicker } from './StickerPicker'
 import { AnimatedStickerPicker } from './AnimatedStickerPicker'
 import { SubscribePicker } from './SubscribePicker'
+import { InfographicPicker } from './InfographicPicker'
 import { getStoredGiphyApiKey } from './SettingsModal'
 import styles from './Timeline.module.css'
 
@@ -24,7 +25,7 @@ interface TimelineProps {
   duration: number
   currentTime: number
   onSeek?: (time: number) => void
-  onAddOverlay: (type: 'text' | 'image' | 'video', initialPatch?: Partial<OverlayItem>) => void
+  onAddOverlay: (type: 'text' | 'image' | 'video' | 'infographic', initialPatch?: Partial<OverlayItem>) => void
   onEditOverlay: (id: string, patch: Partial<OverlayItem>) => void
   onRemoveOverlay: (id: string) => void
   onSelectOverlay: (id: string | null) => void
@@ -100,6 +101,7 @@ export function Timeline({
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
   const [subscribePickerOpen, setSubscribePickerOpen] = useState(false)
   const [animatedStickerPickerOpen, setAnimatedStickerPickerOpen] = useState(false)
+  const [infographicPickerOpen, setInfographicPickerOpen] = useState(false)
   const [animatedStickerInitialQuery, setAnimatedStickerInitialQuery] = useState<string | undefined>(undefined)
   const [inOutMarkerDrag, setInOutMarkerDrag] = useState<'in' | 'out' | null>(null)
   const inOutMarkerDragRef = useRef<{ kind: 'in' | 'out'; rect: DOMRect } | null>(null)
@@ -396,6 +398,7 @@ export function Timeline({
   const textOverlays = overlays.filter((o) => o.type === 'text')
   const imageOverlays = overlays.filter((o) => o.type === 'image')
   const videoOverlays = overlays.filter((o) => o.type === 'video')
+  const infographicOverlays = overlays.filter((o) => o.type === 'infographic')
 
   const selectedOverlayForSplit = selectedId && selectedId !== 'background' ? overlays.find((x) => x.id === selectedId) : null
   const canSplitOverlay = !!(
@@ -516,6 +519,25 @@ export function Timeline({
           <IconVideo />
           <span>Video</span>
         </button>
+        <button type="button" className={styles.toolbarBtn} onClick={() => setInfographicPickerOpen(true)} title="Import infographic from InfoGraphics generator" aria-label="Import infographic">
+          <span className={styles.stickerIcon}>📊</span>
+          <span>Infographic</span>
+        </button>
+        <InfographicPicker
+          isOpen={infographicPickerOpen}
+          onClose={() => setInfographicPickerOpen(false)}
+          onSelect={(projectId, projectName) => {
+            onAddOverlay('infographic', {
+              infographicProjectId: projectId,
+              infographicProjectName: projectName,
+              imageScale: 1,
+              x: 0.5,
+              y: 0.5,
+              burnIntoExport: true,
+            })
+            setInfographicPickerOpen(false)
+          }}
+        />
         <div className={styles.toolbarSpacer} />
         {onPreviewPlayToggle && (
           <button
@@ -814,6 +836,46 @@ export function Timeline({
                     <span className={styles.clipSegmentBody} title="Drag to move">
                       <IconVideo className={styles.clipIcon} />
                       <span className={styles.clipLabel}>Video</span>
+                    </span>
+                    <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {infographicOverlays.map((o) => (
+              <div key={o.id} className={styles.clipsStripRow}>
+                <span className={styles.stripLabel}>Infographic</span>
+                <div ref={(el) => { stripRefsMap.current[o.id] = el }} className={styles.clipsStrip}>
+                  <div
+                    data-clip-segment
+                    className={`${styles.clipSegment} ${styles.clipSegmentImage} ${selectedId === o.id ? styles.clipSegmentSelected : ''} ${clipDrag?.id === o.id ? styles.clipSegmentDragging : ''}`}
+                    style={{
+                      left: `${(o.startTime / Math.max(safeDuration, 0.001)) * 100}%`,
+                      width: `${((o.endTime - o.startTime) / Math.max(safeDuration, 0.001)) * 100}%`,
+                    }}
+                    title={`Infographic ${o.startTime.toFixed(1)}s – ${o.endTime.toFixed(1)}s. Drag to move, drag edges to trim.`}
+                    onClick={(e) => { e.stopPropagation(); onSelectOverlay(o.id) }}
+                    onPointerDown={(e) => {
+                      const el = e.target as HTMLElement
+                      const edge = el.getAttribute?.('data-edge')
+                      const forceMode: ClipDragMode | undefined =
+                        edge === 'left' ? 'resizeStart' : edge === 'right' ? 'resizeEnd' : undefined
+                      handleClipPointerDown(e, o, forceMode)
+                      const seg = el.closest('[data-clip-segment]') as HTMLElement | null
+                      seg?.setPointerCapture(e.pointerId)
+                    }}
+                    onPointerMove={handleClipPointerMove}
+                    onPointerUp={handleClipPointerUp}
+                    onPointerLeave={handleClipPointerUp}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectOverlay(o.id) } }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Infographic clip, ${o.startTime.toFixed(1)} to ${o.endTime.toFixed(1)} seconds`}
+                  >
+                    <span className={styles.clipSegmentEdge} data-edge="left" title="Drag to trim start" />
+                    <span className={styles.clipSegmentBody} title="Drag to move">
+                      <span className={styles.stickerIcon}>📊</span>
+                      <span className={styles.clipLabel}>{o.infographicProjectName || 'Infographic'}</span>
                     </span>
                     <span className={styles.clipSegmentEdge} data-edge="right" title="Drag to trim end" />
                   </div>

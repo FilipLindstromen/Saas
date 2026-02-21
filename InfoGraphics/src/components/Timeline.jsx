@@ -65,12 +65,35 @@ export default function Timeline({
     return () => cancelAnimationFrame(id)
   }, [isPlaying, duration, onCurrentTimeChange, onPlayPause, currentTime])
 
+  const SNAP_THRESHOLD = 0.15
+
+  const getSnapPoints = useCallback(() => {
+    const points = new Set([0, duration])
+    elements.forEach(el => {
+      const start = el.clipStart ?? 0
+      const end = el.clipEnd ?? duration
+      points.add(start)
+      points.add(end)
+    })
+    return [...points].sort((a, b) => a - b)
+  }, [elements, duration])
+
+  const snapToNearest = useCallback((t) => {
+    const points = getSnapPoints()
+    for (const p of points) {
+      if (Math.abs(t - p) <= SNAP_THRESHOLD) return p
+    }
+    return t
+  }, [getSnapPoints])
+
   const handleTrackClick = (e) => {
     if (!trackRef.current) return
     const rect = trackRef.current.getBoundingClientRect()
     const px = e.clientX - rect.left
-    const t = pxToTime(px)
-    onCurrentTimeChange?.(Math.max(0, Math.min(duration, t)))
+    let t = pxToTime(px)
+    t = Math.max(0, Math.min(duration, t))
+    t = snapToNearest(t)
+    onCurrentTimeChange?.(t)
   }
 
   const handleClipPointerDown = (e, el, action) => {

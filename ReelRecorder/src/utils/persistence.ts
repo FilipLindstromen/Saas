@@ -105,7 +105,7 @@ function normalizeOverlayItem(raw: unknown): OverlayItem | null {
   if (!raw || typeof raw !== 'object') return null
   const item = raw as Record<string, unknown>
   const id = typeof item.id === 'string' ? item.id : ''
-  const type = item.type === 'text' || item.type === 'image' || item.type === 'video' ? item.type : null
+  const type = item.type === 'text' || item.type === 'image' || item.type === 'video' || item.type === 'infographic' ? item.type : null
   const startTime = typeof item.startTime === 'number' ? item.startTime : 0
   const endTime = typeof item.endTime === 'number' ? item.endTime : 0
   if (!id || !type || endTime <= startTime) return null
@@ -156,6 +156,8 @@ function normalizeOverlayItem(raw: unknown): OverlayItem | null {
     imageWidth: num(item.imageWidth),
     imageHeight: num(item.imageHeight),
     videoUrl: str(item.videoUrl),
+    infographicProjectId: str(item.infographicProjectId),
+    infographicProjectName: str(item.infographicProjectName),
     burnIntoExport: bool(item.burnIntoExport) ?? true,
   }
   return overlay
