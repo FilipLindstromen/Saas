@@ -1,0 +1,75 @@
+.canvas-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: #18181b;
+  border-bottom: 1px solid #27272a;
+}
+
+.canvas-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.canvas-controls-group label {
+  font-size: 0.75rem;
+  color: #71717a;
+  white-space: nowrap;
+}
+
+.canvas-controls-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.canvas-controls-zoom input[type="range"] {
+  width: 100px;
+  height: 6px;
+  -webkit-appearance: none;
+  background: #27272a;
+  border-radius: 3px;
+}
+
+.canvas-controls-zoom input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.canvas-controls-zoom-value {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  min-width: 36px;
+}
+
+.canvas-controls-bg {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.canvas-controls-bg input[type="color"] {
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.canvas-controls-bg-hex {
+  width: 72px;
+  padding: 0.35rem 0.5rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  color: #e4e4e7;
+  font-size: 0.8rem;
+}

@@ -1,0 +1,130 @@
+import { useState, useCallback } from 'react'
+import { searchImages } from '../api/imageSearch'
+import './InspectorImageSearch.css'
+
+const SERVICES = [
+  { id: 'giphy', label: 'Giphy', types: ['gifs', 'stickers'] },
+  { id: 'iconify', label: 'Iconify', types: ['icons'] }
+]
+
+export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }) {
+  const [service, setService] = useState('giphy')
+  const [type, setType] = useState('stickers')
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState(null)
+
+  const search = useCallback(async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const { results: r, error: err } = await searchImages({ service, type, q: query.trim(), apiKeys, offset: 0 })
+      setResults(r || [])
+      setError(err || null)
+    } catch (e) {
+      setError(e.message)
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [service, type, query, apiKeys])
+
+  const loadMore = useCallback(async () => {
+    if (!query.trim() || loading || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const { results: r, error: err } = await searchImages({ service, type, q: query.trim(), apiKeys, offset: results.length })
+      if (err) setError(err)
+      else if (r?.length) {
+        setResults(prev => {
+          const existingUrls = new Set(prev.map(item => item.url))
+          const newItems = r.filter(item => !existingUrls.has(item.url))
+          return newItems.length ? [...prev, ...newItems] : prev
+        })
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [service, type, query, apiKeys, results.length, loading, loadingMore])
+
+  const serviceConfig = SERVICES.find(s => s.id === service)
+  const types = serviceConfig?.types || ['gifs', 'stickers']
+
+  return (
+    <div className="inspector-image-search">
+      <div className="inspector-image-search-form">
+        <select value={service} onChange={(e) => setService(e.target.value)}>
+          {SERVICES.map(s => (
+            <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
+        {types.length > 1 && (
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {types.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        )}
+        <input
+          type="text"
+          placeholder="Search images..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), search())}
+        />
+        <button type="button" onClick={search} disabled={loading}>
+          {loading ? '…' : 'Search'}
+        </button>
+      </div>
+      {error && <p className="inspector-image-search-error">{error}</p>}
+      {latestImages.length > 0 && (
+        <div className="inspector-image-search-section">
+          <span className="inspector-image-search-label">Recent</span>
+          <div className="inspector-image-search-grid">
+            {latestImages.slice(0, 6).map((img, i) => (
+              <button
+                key={i}
+                type="button"
+                className="inspector-image-search-item"
+                onClick={() => onSelect(img.url, img.source, img.searchQuery)}
+              >
+                <img src={img.url} alt="" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="inspector-image-search-section">
+        <span className="inspector-image-search-label">Results</span>
+        {loading && <span className="inspector-image-search-loading">Searching...</span>}
+        <div className="inspector-image-search-grid">
+          {results.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              className="inspector-image-search-item"
+              onClick={() => onSelect(item.url, service, query.trim() || undefined)}
+            >
+              <img src={item.url} alt="" />
+            </button>
+          ))}
+        </div>
+        {results.length > 0 && (
+          <button
+            type="button"
+            className="inspector-image-search-show-more"
+            onClick={loadMore}
+            disabled={loading || loadingMore}
+          >
+            {loadingMore ? 'Loading…' : 'Show more'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

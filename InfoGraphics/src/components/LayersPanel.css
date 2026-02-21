@@ -1,0 +1,130 @@
+.layers-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #27272a;
+  background: #18181b;
+}
+
+.layers-header {
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid #27272a;
+}
+
+.layers-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.layers-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.layers-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  cursor: grab;
+  margin-bottom: 2px;
+}
+
+.layers-item:active {
+  cursor: grabbing;
+}
+
+.layers-item.layers-item-dragging {
+  opacity: 0.5;
+}
+
+.layers-item.layers-item-drag-over {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: -2px;
+}
+
+.layers-drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: #71717a;
+  cursor: grab;
+}
+
+.layers-item:hover {
+  background: #27272a;
+}
+
+.layers-item.selected {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.layers-item.hidden {
+  opacity: 0.5;
+}
+
+.layers-visibility {
+  flex-shrink: 0;
+  padding: 0.2rem;
+  background: none;
+  border: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.layers-visibility:hover {
+  color: #e4e4e7;
+}
+
+.layers-label {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #e4e4e7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.layers-label-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: #e4e4e7;
+  background: #27272a;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+}
+
+.layers-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.layers-move {
+  padding: 0.2rem;
+  background: none;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.layers-move:hover:not(:disabled) {
+  color: #e4e4e7;
+  background: #27272a;
+}
+
+.layers-move:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

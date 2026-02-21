@@ -1,0 +1,114 @@
+.inspector-image-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.inspector-image-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inspector-image-search-form select,
+.inspector-image-search-form input {
+  padding: 0.4rem 0.5rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  color: #e4e4e7;
+  font-size: 0.8rem;
+}
+
+.inspector-image-search-form input {
+  flex: 1;
+  min-width: 80px;
+}
+
+.inspector-image-search-form button {
+  padding: 0.4rem 0.6rem;
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.inspector-image-search-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inspector-image-search-error {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin: 0;
+}
+
+.inspector-image-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inspector-image-search-label {
+  font-size: 0.7rem;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.inspector-image-search-loading {
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+.inspector-image-search-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+}
+
+.inspector-image-search-item {
+  aspect-ratio: 1;
+  padding: 0;
+  background: #27272a;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.inspector-image-search-item:hover {
+  border-color: #3b82f6;
+}
+
+.inspector-image-search-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inspector-image-search-show-more {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  color: #a1a1aa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.inspector-image-search-show-more:hover:not(:disabled) {
+  background: #3f3f46;
+  color: #e4e4e7;
+}
+
+.inspector-image-search-show-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

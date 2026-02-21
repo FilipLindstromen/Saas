@@ -1,0 +1,54 @@
+.layouts-panel {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.layouts-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #27272a;
+}
+
+.layouts-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  display: block;
+}
+
+.layouts-desc {
+  font-size: 0.75rem;
+  color: #71717a;
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+}
+
+.layouts-grid {
+  padding: 1rem 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.layouts-card {
+  padding: 0.75rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  color: #e4e4e7;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.layouts-card:hover {
+  background: #3f3f46;
+  border-color: #52525b;
+}
+
+.layouts-card-name {
+  display: block;
+  font-weight: 500;
+}
