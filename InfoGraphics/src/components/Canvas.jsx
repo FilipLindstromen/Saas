@@ -75,10 +75,11 @@ function findSnappedGuides(draggingRects, snapPoints, threshold) {
   return guides
 }
 
-export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
+export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onUpdateMultiple, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
   const containerRef = useRef(null)
   const [dragState, setDragState] = useState(null)
   const [resizeHandle, setResizeHandle] = useState(null)
+  const [groupResizeHandle, setGroupResizeHandle] = useState(null)
   const [rotateHandle, setRotateHandle] = useState(null)
   const [marquee, setMarquee] = useState(null)
   const [snapGuides, setSnapGuides] = useState([])
@@ -92,6 +93,11 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
     resizeHandleRef.current = resizeHandle
     rotateHandleRef.current = rotateHandle
   }, [dragState, resizeHandle, rotateHandle])
+
+  const groupResizeHandleRef = useRef(null)
+  useEffect(() => {
+    groupResizeHandleRef.current = groupResizeHandle
+  }, [groupResizeHandle])
 
   const size = getCanvasSize(aspectRatio, resolution)
   const visibleElements = elements
@@ -137,7 +143,49 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
     const marq = marquee
     const drag = dragStateRef.current
     const resize = resizeHandleRef.current
+    const groupResize = groupResizeHandleRef.current
 
+    if (groupResize && onUpdateMultiple) {
+      const dx = e.clientX - groupResize.startX
+      const dy = e.clientY - groupResize.startY
+      const rect = canvasRef?.current?.getBoundingClientRect()
+      const scaleX = rect ? size.w / rect.width : 1
+      const scaleY = rect ? size.h / rect.height : 1
+      const dCanvasX = dx * scaleX
+      const dCanvasY = dy * scaleY
+      let newW = groupResize.startW + dCanvasX
+      let newH = groupResize.startH + dCanvasY
+      if (e.shiftKey) {
+        const aspect = groupResize.startW / groupResize.startH
+        if (Math.abs(dCanvasX) > Math.abs(dCanvasY)) {
+          newH = newW / aspect
+        } else {
+          newW = newH * aspect
+        }
+      }
+      newW = Math.max(40, newW)
+      newH = Math.max(24, newH)
+      const scaleXFactor = newW / groupResize.startW
+      const scaleYFactor = newH / groupResize.startH
+      const updatesById = {}
+      groupResize.ids.forEach(id => {
+        const el = elements.find(x => x.id === id)
+        if (!el) return
+        const relX = (el.x - groupResize.minX) / groupResize.startW
+        const relY = (el.y - groupResize.minY) / groupResize.startH
+        const relW = el.width / groupResize.startW
+        const relH = el.height / groupResize.startH
+        updatesById[id] = {
+          x: groupResize.minX + relX * newW,
+          y: groupResize.minY + relY * newH,
+          width: Math.max(20, el.width * scaleXFactor),
+          height: Math.max(16, el.height * scaleYFactor)
+        }
+      })
+      onUpdateMultiple(updatesById)
+      setGroupResizeHandle(prev => prev ? { ...prev, startX: e.clientX, startY: e.clientY, startW: newW, startH: newH } : null)
+      return
+    }
     if (rot) {
       const el = elements.find(x => x.id === rot.id)
       const center = el && getElementCenter(el)
@@ -224,9 +272,31 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
       onUpdate(resize.id, { width: w, height: h })
       setResizeHandle(prev => prev ? { ...prev, startX: e.clientX, startY: e.clientY, startW: w, startH: h } : null)
     }
-  }, [marquee, size, canvasRef, onUpdate, elements, getElementCenter])
+  }, [marquee, size, canvasRef, onUpdate, onUpdateMultiple, elements, getElementCenter])
 
   const handlePointerDown = useCallback((e, id, handle) => {
+    if (handle === 'group-resize' && selectedIds.length > 1 && onUpdateMultiple) {
+      e.preventDefault()
+      e.stopPropagation()
+      onPushUndo?.()
+      const selected = elements.filter(x => selectedIds.includes(x.id))
+      if (selected.length < 2) return
+      const minX = Math.min(...selected.map(el => el.x))
+      const minY = Math.min(...selected.map(el => el.y))
+      const maxX = Math.max(...selected.map(el => el.x + el.width))
+      const maxY = Math.max(...selected.map(el => el.y + el.height))
+      const w = maxX - minX
+      const h = maxY - minY
+      const state = { ids: selectedIds, minX, minY, startW: w, startH: h, startX: e.clientX, startY: e.clientY }
+      groupResizeHandleRef.current = state
+      setGroupResizeHandle(state)
+      document.body.style.cursor = 'nwse-resize'
+      attachGlobalListeners(
+        (ev) => handlePointerMove(ev),
+        () => { groupResizeHandleRef.current = null; setGroupResizeHandle(null); document.body.style.cursor = '' }
+      )
+      return
+    }
     if (handle === 'move') {
       if (e.shiftKey) {
         onSelect(id, { shift: true })
@@ -287,7 +357,7 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
         onSelect([id])
       }
     }
-  }, [elements, selectedIds, onSelect, onPushUndo, attachGlobalListeners, handlePointerMove, size, canvasRef])
+  }, [elements, selectedIds, onSelect, onPushUndo, onUpdateMultiple, attachGlobalListeners, handlePointerMove, size, canvasRef])
 
   const handleCanvasPointerDown = useCallback((e) => {
     if (e.target !== e.currentTarget) return
@@ -299,6 +369,8 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
 
   const handlePointerUp = useCallback((e) => {
     try { e.target.releasePointerCapture?.(e.pointerId) } catch (_) {}
+    setGroupResizeHandle(null)
+    groupResizeHandleRef.current = null
     if (marquee) {
       const x1 = Math.min(marquee.startX, marquee.endX)
       const y1 = Math.min(marquee.startY, marquee.endY)
@@ -325,6 +397,16 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
     }
     onSelect([])
   }, [onSelect])
+
+  const selectionBounds = selectedIds.length > 1 ? (() => {
+    const selected = visibleElements.filter(el => selectedIds.includes(el.id))
+    if (selected.length < 2) return null
+    const minX = Math.min(...selected.map(el => el.x))
+    const minY = Math.min(...selected.map(el => el.y))
+    const maxX = Math.max(...selected.map(el => el.x + el.width))
+    const maxY = Math.max(...selected.map(el => el.y + el.height))
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+  })() : null
 
   const marqueeRect = marquee ? (() => {
     const x = Math.min(marquee.startX, marquee.endX)
@@ -377,6 +459,23 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
                 height: marqueeRect.h
               }}
             />
+          )}
+          {selectionBounds && (
+            <div
+              className="canvas-selection-group"
+              style={{
+                left: selectionBounds.x,
+                top: selectionBounds.y,
+                width: selectionBounds.w,
+                height: selectionBounds.h
+              }}
+            >
+              <div
+                className="resize-handle se canvas-group-resize-handle"
+                onPointerDown={(e) => handlePointerDown(e, selectedIds[0], 'group-resize')}
+                title="Scale selection"
+              />
+            </div>
           )}
           {snapGuides.map((g, i) => (
             <div

@@ -156,12 +156,7 @@
 .editPreviewSourceBtn:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
-  transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
-}
-
-.editPreviewSourceBtn:active {
-  transform: translateY(0);
 }
 
 .editPreviewSourceBtnActive {
@@ -172,7 +167,6 @@
 
 .editPreviewSourceBtnActive:hover {
   background: var(--bg-hover);
-  transform: translateY(-1px);
 }
 
 .recordStopToggleStop {

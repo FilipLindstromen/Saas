@@ -553,6 +553,13 @@ function App() {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
   }, [])
 
+  const updateMultipleElements = useCallback((updatesById) => {
+    setElements(prev => prev.map(e => {
+      const u = updatesById[e.id]
+      return u ? { ...e, ...u } : e
+    }))
+  }, [])
+
   const deleteElement = useCallback((id) => {
     setElements(prev => prev.filter(e => e.id !== id))
     setSelectedIds(prev => prev.filter(x => x !== id))
@@ -634,11 +641,6 @@ function App() {
     setElements(prev => prev.map(e => updates[e.id] ? { ...e, ...updates[e.id] } : e))
   }, [selectedIds, elements, pushUndoState])
 
-  useEffect(() => {
-    if (selectedIds.length > 0) {
-      setRightPanelTab('inspector')
-    }
-  }, [selectedIds])
 
   useEffect(() => {
     if (elements.length === 0) return
@@ -648,20 +650,45 @@ function App() {
     }
   }, [elements])
 
+  const prevTimelineDurationRef = useRef(timelineDuration)
   useEffect(() => {
+    const prevDuration = prevTimelineDurationRef.current
+    prevTimelineDurationRef.current = timelineDuration
+
     setElements(prev => {
       const needsClamp = prev.some(e => (e.clipEnd ?? timelineDuration) > timelineDuration)
-      if (!needsClamp) return prev
+      const needsExtend = timelineDuration > prevDuration && prev.some(e => {
+        const end = e.clipEnd ?? prevDuration
+        return end >= prevDuration - 0.01
+      })
+
+      if (!needsClamp && !needsExtend) return prev
       return prev.map(e => {
         const start = e.clipStart ?? 0
         const end = e.clipEnd ?? timelineDuration
         if (end > timelineDuration) {
           return { ...e, clipEnd: timelineDuration, clipStart: Math.min(start, Math.max(0, timelineDuration - 0.5)) }
         }
+        if (needsExtend && end >= prevDuration - 0.01) {
+          return { ...e, clipEnd: timelineDuration }
+        }
         return e
       })
     })
   }, [timelineDuration])
+
+  useEffect(() => {
+    const needsClamp = elements.some(e => (e.clipEnd ?? timelineDuration) > timelineDuration)
+    if (!needsClamp) return
+    setElements(prev => prev.map(e => {
+      const start = e.clipStart ?? 0
+      const end = e.clipEnd ?? timelineDuration
+      if (end > timelineDuration) {
+        return { ...e, clipEnd: timelineDuration, clipStart: Math.min(start, Math.max(0, timelineDuration - 0.5)) }
+      }
+      return e
+    }))
+  }, [elements, timelineDuration])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1041,6 +1068,7 @@ function App() {
             selectedIds={selectedIds}
             onSelect={handleSelect}
             onUpdate={updateElement}
+            onUpdateMultiple={updateMultipleElements}
             onDeleteSelected={deleteSelected}
             onPushUndo={() => pushUndoState(elements, selectedIds)}
             backgroundColor={backgroundColor}

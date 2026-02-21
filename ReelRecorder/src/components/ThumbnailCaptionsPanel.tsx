@@ -214,14 +214,32 @@ export function ThumbnailCaptionsPanel({
 
   const startWebcam = useCallback(async () => {
     setWebcamError(null)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setWebcamError('Camera not supported. Use HTTPS and a modern browser.')
+      return
+    }
     try {
-      const videoConstraints: MediaTrackConstraints = videoDeviceId
-        ? { deviceId: { exact: videoDeviceId }, width: { ideal: thumbWidth }, height: { ideal: thumbHeight } }
-        : { width: { ideal: thumbWidth }, height: { ideal: thumbHeight }, facingMode: 'user' }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: false,
-      })
+      const attempts: (MediaTrackConstraints | boolean)[] = [
+        videoDeviceId
+          ? { deviceId: { exact: videoDeviceId }, width: { ideal: thumbWidth }, height: { ideal: thumbHeight } }
+          : { width: { ideal: thumbWidth }, height: { ideal: thumbHeight }, facingMode: 'user' },
+        videoDeviceId
+          ? { deviceId: { ideal: videoDeviceId }, width: { ideal: thumbWidth }, height: { ideal: thumbHeight } }
+          : { width: { ideal: thumbWidth }, height: { ideal: thumbHeight } },
+        videoDeviceId ? { deviceId: { ideal: videoDeviceId } } : { facingMode: 'user' },
+        true,
+      ]
+      let stream: MediaStream | null = null
+      let lastErr: unknown = null
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false })
+          break
+        } catch (e) {
+          lastErr = e
+        }
+      }
+      if (!stream) throw lastErr
       if (webcamStreamRef.current) {
         webcamStreamRef.current.getTracks().forEach((t) => t.stop())
       }

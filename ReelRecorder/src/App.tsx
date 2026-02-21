@@ -567,6 +567,11 @@ export default function App() {
   const connectMedia = useCallback(async () => {
     setVideoStreamError(null)
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVideoStreamError('Camera not supported. Use HTTPS and a modern browser.')
+      return
+    }
+
     try {
       if (videoKind === 'screen') {
         const vStream = await navigator.mediaDevices.getDisplayMedia({
@@ -575,25 +580,46 @@ export default function App() {
         })
         setVideoStream(vStream)
       } else {
-        const deviceConstraint = videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}
-        const videoConstraints: MediaTrackConstraints = {
-          ...deviceConstraint,
-          width: { ideal: width },
-          height: { ideal: height },
+        // Progressive fallback: try stricter constraints first, then relax
+        const attempts: (MediaTrackConstraints | boolean)[] = [
+          // 1. Full: exact device + resolution
+          {
+            ...(videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}),
+            width: { ideal: width },
+            height: { ideal: height },
+          },
+          // 2. Softer device + resolution (ideal instead of exact)
+          {
+            ...(videoDeviceId ? { deviceId: { ideal: videoDeviceId } } : {}),
+            width: { ideal: width },
+            height: { ideal: height },
+          },
+          // 3. Device only, no resolution (let browser pick)
+          videoDeviceId ? { deviceId: { ideal: videoDeviceId } } : { width: { ideal: width }, height: { ideal: height } },
+          // 4. Minimal: just request any video
+          true,
+        ]
+        let vStream: MediaStream | null = null
+        let lastErr: unknown = null
+        for (const constraints of attempts) {
+          try {
+            vStream = await navigator.mediaDevices.getUserMedia({ video: constraints })
+            break
+          } catch (e) {
+            lastErr = e
+          }
         }
-        let vStream: MediaStream
-        try {
-          vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        } catch {
-          vStream = await navigator.mediaDevices.getUserMedia({
-            video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : { width: { ideal: width }, height: { ideal: height } },
-          })
+        if (!vStream) {
+          throw lastErr
         }
         setVideoStream(vStream)
       }
       refreshDevices()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not access video source'
+      let msg = e instanceof Error ? e.message : 'Could not access video source'
+      if (msg.includes('NotReadableError') || msg.includes('Could not start')) {
+        msg = 'Camera in use or unavailable. Close other apps using the camera, then try again.'
+      }
       setVideoStreamError(msg)
       setVideoStream(null)
       console.error(e)
@@ -621,6 +647,15 @@ export default function App() {
       setAudioStream(null)
     }
   }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality, refreshDevices])
+
+  // Auto-connect camera when app loads (no recording yet, camera mode)
+  const hasAutoConnectedRef = useRef(false)
+  useEffect(() => {
+    if (isRestoring || recordedBlob || videoStream || videoKind !== 'camera' || hasAutoConnectedRef.current) return
+    hasAutoConnectedRef.current = true
+    const t = setTimeout(() => connectMedia(), 400)
+    return () => clearTimeout(t)
+  }, [isRestoring, recordedBlob, videoStream, videoKind, connectMedia])
 
   const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video' | 'infographic', initialPatch?: Partial<OverlayItem>) => {
     const start = displayTime
@@ -834,26 +869,6 @@ export default function App() {
               transformOrigin: 'center center',
             }}
           >
-          {!videoStream && !recordedBlob && (
-            <div className={styles.connectOverlay} aria-label="Connect video source">
-              <p className={styles.connectOverlayText}>
-                {videoKind === 'screen' ? 'Share your screen to get started' : 'Connect your camera to get started'}
-              </p>
-              <button
-                type="button"
-                className={styles.connectOverlayBtn}
-                onClick={connectMedia}
-              >
-                {videoKind === 'screen' ? 'Connect screen' : 'Connect camera'}
-              </button>
-              <p className={styles.connectOverlayHint}>Or open Inspector → Video settings to connect</p>
-            </div>
-          )}
-          {countdown != null && (
-            <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
-              <span className={styles.countdownNumber}>{countdown}</span>
-            </div>
-          )}
           <RecordPreview
             videoStream={videoStream}
             width={width}
@@ -907,6 +922,26 @@ export default function App() {
             playbackUrl={downloadUrl}
             editPreviewSource={editPreviewSource}
           />
+          {!videoStream && !recordedBlob && (
+            <div className={styles.connectOverlay} aria-label="Connect video source">
+              <p className={styles.connectOverlayText}>
+                {videoKind === 'screen' ? 'Share your screen to get started' : 'Connect your camera to get started'}
+              </p>
+              <button
+                type="button"
+                className={styles.connectOverlayBtn}
+                onClick={connectMedia}
+              >
+                {videoKind === 'screen' ? 'Connect screen' : 'Connect camera'}
+              </button>
+              <p className={styles.connectOverlayHint}>Or open Inspector → Video settings to connect</p>
+            </div>
+          )}
+          {countdown != null && (
+            <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
+              <span className={styles.countdownNumber}>{countdown}</span>
+            </div>
+          )}
           </div>
         </div>
       </section>

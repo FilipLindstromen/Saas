@@ -29,8 +29,10 @@ export default function Timeline({
   const trackRef = useRef(null)
   const [dragState, setDragState] = useState(null)
   const [trimState, setTrimState] = useState(null)
+  const [autoOffset, setAutoOffset] = useState(0.5)
+  const [autoMode, setAutoMode] = useState('in') // 'in' | 'in-and-out'
 
-  const sorted = [...elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+  const sorted = [...elements].sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
 
   const timeToPx = useCallback((t) => {
     if (!trackRef.current || duration <= 0) return 0
@@ -45,15 +47,17 @@ export default function Timeline({
   const isPlayingRef = useRef(isPlaying)
   isPlayingRef.current = isPlaying
 
+  const startTimeRef = useRef(0)
+  const startWallRef = useRef(0)
   useEffect(() => {
     if (!isPlaying || !onCurrentTimeChange) return
-    const start = performance.now()
-    const startTime = currentTime
+    startTimeRef.current = currentTime
+    startWallRef.current = performance.now()
     let id
-    const raf = (now) => {
+    const raf = () => {
       if (!isPlayingRef.current) return
-      const elapsed = (now - start) / 1000
-      let next = startTime + elapsed
+      const elapsed = (performance.now() - startWallRef.current) / 1000
+      let next = startTimeRef.current + elapsed
       if (next >= duration) {
         next = duration
         onPlayPause?.(false)
@@ -63,7 +67,7 @@ export default function Timeline({
     }
     id = requestAnimationFrame(raf)
     return () => cancelAnimationFrame(id)
-  }, [isPlaying, duration, onCurrentTimeChange, onPlayPause, currentTime])
+  }, [isPlaying, duration, onCurrentTimeChange, onPlayPause])
 
   const SNAP_THRESHOLD = 0.15
 
@@ -85,6 +89,34 @@ export default function Timeline({
     }
     return t
   }, [getSnapPoints])
+
+  const handleApplyAutoAnimation = useCallback(() => {
+    if (sorted.length === 0 || !onUpdateClip || !onClipEditStart) return
+    onClipEditStart()
+    sorted.forEach((el, index) => {
+      const offset = index * autoOffset
+      const currentStart = el.clipStart ?? 0
+      const currentEnd = el.clipEnd ?? duration
+      const clipDuration = currentEnd - currentStart
+      if (autoMode === 'in') {
+        const newStart = Math.min(offset, Math.max(0, currentEnd - 0.5))
+        onUpdateClip(el.id, { clipStart: newStart, clipEnd: currentEnd })
+      } else {
+        const newStart = offset
+        const newEnd = offset + clipDuration
+        onUpdateClip(el.id, { clipStart: newStart, clipEnd: newEnd })
+      }
+    })
+    if (autoMode === 'in-and-out' && sorted.length > 0 && onDurationChange) {
+      const lastIndex = sorted.length - 1
+      const lastEl = sorted[lastIndex]
+      const lastClipDuration = (lastEl.clipEnd ?? duration) - (lastEl.clipStart ?? 0)
+      const lastEnd = lastIndex * autoOffset + lastClipDuration
+      if (lastEnd > duration) {
+        onDurationChange(Math.min(300, Math.ceil(lastEnd * 2) / 2))
+      }
+    }
+  }, [sorted, autoOffset, autoMode, duration, onUpdateClip, onClipEditStart, onDurationChange])
 
   const handleTrackClick = (e) => {
     if (!trackRef.current) return
@@ -187,31 +219,41 @@ export default function Timeline({
           title="Drag to resize timeline"
         />
       )}
-      <div className="timeline-tracks" ref={trackRef}>
-        <div className="timeline-ruler" onClick={handleTrackClick}>
-          {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+      <div className="timeline-tracks">
+        <div className="timeline-ruler-row">
+          <div className="timeline-ruler-spacer" />
+          <div className="timeline-ruler" ref={trackRef} onClick={handleTrackClick}>
+            {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+              <div
+                key={p}
+                className="timeline-ruler-tick"
+                style={{ left: `${p * 100}%` }}
+              >
+                {(duration * p).toFixed(1)}s
+              </div>
+            ))}
             <div
-              key={p}
-              className="timeline-ruler-tick"
-              style={{ left: `${p * 100}%` }}
-            >
-              {(duration * p).toFixed(1)}s
-            </div>
-          ))}
-          <div
-            className="timeline-playhead"
-            style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-          />
+              className="timeline-playhead"
+              style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+            />
+            <div
+              className="timeline-duration-marker"
+              style={{ left: '100%' }}
+              title={`Timeline end (${duration}s)`}
+            />
+          </div>
         </div>
         <div className="timeline-tracks-inner">
           {sorted.length === 0 && (
             <div className="timeline-empty">Add elements to the canvas to see clips</div>
           )}
           {sorted.map((el) => {
-            const start = (el.clipStart ?? 0) / duration
-            const end = (el.clipEnd ?? duration) / duration
+            const rawStart = el.clipStart ?? 0
+            const rawEnd = el.clipEnd ?? duration
+            const start = Math.min(rawStart, duration) / duration
+            const end = Math.min(Math.max(rawStart, rawEnd), duration) / duration
             const left = start * 100
-            const width = (end - start) * 100
+            const width = Math.max(0, (end - start) * 100)
             return (
               <div
                 key={el.id}
@@ -243,24 +285,26 @@ export default function Timeline({
         </div>
       </div>
       <div className="timeline-controls">
-        <button
-          type="button"
-          className="timeline-play-btn"
-          onClick={() => onPlayPause?.(!isPlaying)}
-          title={isPlaying ? 'Pause' : 'Play'}
-        >
-          {isPlaying ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16" />
-              <rect x="14" y="4" width="4" height="16" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-          )}
-        </button>
-        <span className="timeline-time">{currentTime.toFixed(1)}s</span>
+        <div className="timeline-controls-row">
+          <button
+            type="button"
+            className="timeline-play-btn"
+            onClick={() => onPlayPause?.(!isPlaying)}
+            title={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            )}
+          </button>
+          <span className="timeline-time">{currentTime.toFixed(1)}s</span>
+        </div>
         <div className="timeline-duration">
           <label>Duration (s)</label>
           <input
@@ -274,6 +318,63 @@ export default function Timeline({
               if (!isNaN(v) && v >= 1 && v <= 300) onDurationChange?.(v)
             }}
           />
+        </div>
+        <div className="timeline-auto-animation">
+          <label className="timeline-auto-animation-label">Auto animation</label>
+          <div className="timeline-auto-animation-offset">
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.1}
+              value={autoOffset}
+              onChange={(e) => setAutoOffset(parseFloat(e.target.value))}
+              className="timeline-auto-offset-slider"
+            />
+            <input
+              type="number"
+              min={0}
+              max={5}
+              step={0.1}
+              value={autoOffset}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value)
+                if (!isNaN(v) && v >= 0 && v <= 5) setAutoOffset(v)
+              }}
+              className="timeline-auto-offset-input"
+            />
+          </div>
+          <div className="timeline-auto-animation-mode">
+            <label className="timeline-auto-mode-option">
+              <input
+                type="radio"
+                name="autoMode"
+                value="in"
+                checked={autoMode === 'in'}
+                onChange={() => setAutoMode('in')}
+              />
+              In only
+            </label>
+            <label className="timeline-auto-mode-option">
+              <input
+                type="radio"
+                name="autoMode"
+                value="in-and-out"
+                checked={autoMode === 'in-and-out'}
+                onChange={() => setAutoMode('in-and-out')}
+              />
+              In and out
+            </label>
+          </div>
+          <button
+            type="button"
+            className="timeline-auto-apply-btn"
+            onClick={handleApplyAutoAnimation}
+            disabled={sorted.length === 0}
+            title="Offset each clip's start (top to bottom) by the specified seconds"
+          >
+            Apply
+          </button>
         </div>
       </div>
     </div>

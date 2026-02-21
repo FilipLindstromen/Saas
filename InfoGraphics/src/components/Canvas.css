@@ -45,3 +45,23 @@
   width: 100%;
   height: 1px;
 }
+
+.canvas-selection-group {
+  position: absolute;
+  border: 2px solid var(--accent, #f97316);
+  background: rgba(249, 115, 22, 0.08);
+  pointer-events: none;
+  z-index: 9997;
+}
+
+.canvas-selection-group .canvas-group-resize-handle {
+  pointer-events: auto;
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent, #f97316);
+  border-radius: 2px;
+  cursor: nwse-resize;
+}
