@@ -20,6 +20,8 @@ const ARROW_DESIGNS = {
   'hand-swoosh': { d: 'M5 12Q8 8 14 10Q18 12 19 12M17 10l2 2-2 2', strokeWidth: 2, strokeDasharray: 'none', fill: true, paths: [{ d: 'M7 14Q8 12 10 13M9 16Q10 14 12 15M11 18Q12 16 14 17', strokeDasharray: 'none' }] }
 }
 
+const ANIMATION_DURATION = 0.5
+
 function getCanvasSize(aspectRatio, resolution = 800) {
   const r = resolution || 800
   if (aspectRatio === '16:9') return { w: r, h: Math.round(r * 9 / 16) }
@@ -28,8 +30,16 @@ function getCanvasSize(aspectRatio, resolution = 800) {
   return { w: r, h: Math.round(r * 9 / 16) }
 }
 
-function InfographicElement({ element }) {
-  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity } = element
+function InfographicElement({ element, currentTime = 0 }) {
+  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, animationIn, animationOut, gradientColor } = element
+
+  const clipStart = element.clipStart ?? 0
+  const clipEnd = element.clipEnd ?? 10
+  const animIn = animationIn || 'none'
+  const animOut = animationOut || 'none'
+  const isInPhase = animIn !== 'none' && currentTime < clipStart + ANIMATION_DURATION
+  const isOutPhase = animOut !== 'none' && currentTime >= clipEnd - ANIMATION_DURATION
+  const animationClasses = [isInPhase && animIn !== 'none' && `animate-in-${animIn}`, isOutPhase && animOut !== 'none' && `animate-out-${animOut}`].filter(Boolean).join(' ')
 
   const renderContent = () => {
     if (type === 'image') {
@@ -127,10 +137,23 @@ function InfographicElement({ element }) {
         </div>
       )
     }
+    if (type === 'gradient') {
+      const gradColor = gradientColor || '#000000'
+      return (
+        <div
+          className="infographic-element-gradient"
+          style={{
+            background: `linear-gradient(to bottom, ${gradColor} 0%, transparent 100%)`,
+            width: '100%',
+            height: '100%'
+          }}
+        />
+      )
+    }
     return null
   }
 
-  const baseSize = type === 'image-text' ? { w: 180, h: 100 } : type === 'image' ? { w: 80, h: 80 } : type === 'headline' ? { w: 300, h: 60 } : type === 'cta' ? { w: 180, h: 48 } : { w: 200, h: 120 }
+  const baseSize = type === 'image-text' ? { w: 180, h: 100 } : type === 'image' ? { w: 80, h: 80 } : type === 'headline' ? { w: 300, h: 60 } : type === 'cta' ? { w: 180, h: 48 } : type === 'gradient' ? { w: 400, h: 300 } : { w: 200, h: 120 }
   const pad = type === 'headline' ? 0 : 20
   const innerW = Math.max(20, width - pad)
   const innerH = Math.max(20, height - pad)
@@ -150,6 +173,7 @@ function InfographicElement({ element }) {
 
   return (
     <div className={`infographic-element infographic-element-${type}`} style={style}>
+      <div className={`infographic-element-animation-wrapper ${animationClasses}`}>
       <div className="infographic-element-inner">
         {needsScale ? (
           <div
@@ -166,6 +190,7 @@ function InfographicElement({ element }) {
         ) : (
           renderContent()
         )}
+      </div>
       </div>
     </div>
   )
@@ -261,7 +286,7 @@ function InfographicBackground({ projectData, isPlaying = false, opacity = 1, im
         }}
       >
         {visibleElements.map(el => (
-          <InfographicElement key={el.id} element={el} />
+          <InfographicElement key={el.id} element={el} currentTime={currentTime} />
         ))}
       </div>
     </div>

@@ -35,8 +35,8 @@ function createElement(type, overrides = {}, defaults = {}) {
     type,
     x: 100,
     y: 100,
-    width: type === 'headline' ? 300 : type === 'cta' ? 180 : type === 'image' ? 80 : 200,
-    height: type === 'headline' ? 60 : type === 'cta' ? 48 : type === 'image' ? 80 : 120,
+    width: type === 'headline' ? 300 : type === 'cta' ? 180 : type === 'image' ? 80 : type === 'gradient' ? 400 : 200,
+    height: type === 'headline' ? 60 : type === 'cta' ? 48 : type === 'image' ? 80 : type === 'gradient' ? 300 : 120,
     rotation: 0,
     text: type === 'headline' ? 'Headline' : type === 'cta' ? 'Click Here' : '',
     imageUrl: (type === 'image-text' || type === 'image') ? '' : null,
@@ -49,10 +49,13 @@ function createElement(type, overrides = {}, defaults = {}) {
     backgroundColor: type === 'cta' ? '#3b82f6' : null,
     arrowDirection: type === 'arrow' ? 'right' : null,
     arrowStyle: type === 'arrow' ? 'simple' : null,
+    gradientColor: type === 'gradient' ? '#000000' : null,
     zIndex: 0,
     visible: true,
     clipStart: 0,
-    clipEnd: 10
+    clipEnd: 10,
+    animationIn: 'none',
+    animationOut: 'none'
   }
   return { ...base, ...overrides }
 }
@@ -100,7 +103,10 @@ function App() {
       const normalized = savedElements.map(e => ({
         ...e,
         clipStart: typeof e.clipStart === 'number' ? e.clipStart : 0,
-        clipEnd: typeof e.clipEnd === 'number' ? e.clipEnd : duration
+        clipEnd: typeof e.clipEnd === 'number' ? e.clipEnd : duration,
+        animationIn: e.animationIn || 'none',
+        animationOut: e.animationOut || 'none',
+        gradientColor: e.type === 'gradient' ? (e.gradientColor || '#000000') : e.gradientColor
       }))
       setElements(normalized)
       nextId = savedElements.length > 0 ? Math.max(...savedElements.map(e => e.id), 0) + 1 : 1
@@ -110,6 +116,8 @@ function App() {
           ? [savedSelectedId]
           : []
       setSelectedIds(ids)
+      const earliestStart = normalized.length > 0 ? Math.min(...normalized.map(e => e.clipStart ?? 0)) : 0
+      setTimelineCurrentTime(earliestStart)
     }
     if (savedRatio) setAspectRatio(savedRatio)
     if (typeof savedRes === 'number' && [800, 1080, 1920].includes(savedRes)) setResolution(savedRes)
@@ -283,6 +291,7 @@ function App() {
     } else {
       setElements([])
       setSelectedIds([])
+      setTimelineCurrentTime(0)
       nextId = 1
     }
     projectStorage.saveCurrentProjectId(id)
@@ -496,7 +505,9 @@ function App() {
     const newElements = raw.map(e => ({
       ...e,
       clipStart: e.clipStart ?? 0,
-      clipEnd: e.clipEnd ?? timelineDuration
+      clipEnd: e.clipEnd ?? timelineDuration,
+      animationIn: e.animationIn ?? 'none',
+      animationOut: e.animationOut ?? 'none'
     }))
     setElements(newElements)
     setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])

@@ -35,6 +35,7 @@ exclude:
   - VSLWriter
   - PowerWriter
   - ReelRecorder
+  - InfoGraphics
   - Quiz
   - conversation-generator
   - "conversation-generator - Copy"

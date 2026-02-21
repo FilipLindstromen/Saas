@@ -28,5 +28,16 @@ export const ELEMENT_TYPES = [
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="8" width="18" height="8" rx="2" />
     </svg>
+  )},
+  { type: 'gradient', label: 'Gradient', title: 'Gradient overlay', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <defs>
+        <linearGradient id="gradient-icon" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="1" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect x="3" y="3" width="18" height="18" rx="2" fill="url(#gradient-icon)" stroke="currentColor" strokeWidth="2" />
+    </svg>
   )}
 ]

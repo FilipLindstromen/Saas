@@ -1,6 +1,7 @@
 import InspectorImageSearch from './InspectorImageSearch'
 import { ARROW_DESIGNS } from './CanvasElement'
 import { GOOGLE_FONTS } from '../constants/fonts'
+import { ANIMATION_OPTIONS } from '../constants/animations'
 import './InspectorPanel.css'
 
 export default function InspectorPanel({ element, selectedCount = 1, onUpdate, onDelete, apiKeys, latestImages, onImageSelect }) {
@@ -14,7 +15,7 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
     )
   }
 
-  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, rotation, imageTint, imageTintOpacity } = element
+  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, rotation, imageTint, imageTintOpacity, animationIn, animationOut, gradientColor } = element
 
   return (
     <div className="inspector-panel">
@@ -142,6 +143,22 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             </div>
           </>
         )}
+        {type === 'gradient' && (
+          <div className="inspector-field">
+            <label>Color</label>
+            <input
+              type="color"
+              value={gradientColor || '#000000'}
+              onChange={(e) => onUpdate({ gradientColor: e.target.value })}
+            />
+            <input
+              type="text"
+              value={gradientColor || '#000000'}
+              onChange={(e) => onUpdate({ gradientColor: e.target.value })}
+              className="color-hex"
+            />
+          </div>
+        )}
         {type === 'cta' && (
           <div className="inspector-field">
             <label>Background</label>
@@ -241,6 +258,30 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             </div>
           </>
         )}
+        <div className="inspector-section inspector-section-animations">
+          <div className="inspector-field">
+            <label>Animation in</label>
+            <select
+              value={animationIn || 'none'}
+              onChange={(e) => onUpdate({ animationIn: e.target.value })}
+            >
+              {ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="inspector-field">
+            <label>Animation out</label>
+            <select
+              value={animationOut || 'none'}
+              onChange={(e) => onUpdate({ animationOut: e.target.value })}
+            >
+              {ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   )

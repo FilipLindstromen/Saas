@@ -278,6 +278,7 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
             <CanvasElement
               key={el.id}
               element={el}
+              currentTime={currentTime}
               isSelected={selectedIds.includes(el.id)}
               showResizeHandles={selectedIds.length === 1 && selectedIds[0] === el.id}
               onPointerDown={handlePointerDown}

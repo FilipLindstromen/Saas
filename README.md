@@ -11,6 +11,7 @@ A collection of SaaS applications and tools. This project is configured to deplo
 | Story Writer | `/StoryWriter` | Story writing application |
 | Color Writer | `/ColorWriter` | Color-focused writing tool |
 | PostIt | `/PostIt` | Plan & brainstorm app |
+| InfoGraphics | `/InfoGraphics` | Infographic generator |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |

@@ -7,6 +7,7 @@ function getDefaultLabel(el) {
   if (el.type === 'arrow') return 'Arrow'
   if (el.type === 'image') return 'Image'
   if (el.type === 'image-text') return el.text || 'Image+Text'
+  if (el.type === 'gradient') return 'Gradient'
   return el.type
 }
 
@@ -14,7 +15,7 @@ function getElementLabel(el) {
   return (el.layerName && el.layerName.trim()) || getDefaultLabel(el)
 }
 
-function LayerTypeIcon({ type }) {
+function LayerTypeIcon({ type, id }) {
   const size = 16
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
   switch (type) {
@@ -51,6 +52,19 @@ function LayerTypeIcon({ type }) {
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path d="M3 15h6M3 12h9" />
           <circle cx="8" cy="8" r="2" />
+        </svg>
+      )
+    case 'gradient':
+      const gradId = `layer-grad-${id ?? Math.random().toString(36).slice(2)}`
+      return (
+        <svg {...common}>
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="currentColor" stopOpacity="1" />
+              <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <rect x="3" y="3" width="18" height="18" rx="2" fill={`url(#${gradId})`} stroke="currentColor" strokeWidth="2" />
         </svg>
       )
     default:
@@ -180,7 +194,7 @@ export default function LayersPanel({ elements, selectedIds = [], onSelect, onRe
               )}
             </button>
             <span className="layers-type-icon" title={el.type}>
-              <LayerTypeIcon type={el.type} />
+              <LayerTypeIcon type={el.type} id={el.id} />
             </span>
             {editingId === el.id ? (
               <input

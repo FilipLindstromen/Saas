@@ -1,4 +1,5 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
+import { ANIMATION_DURATION } from '../constants/animations'
 import './CanvasElement.css'
 
 export const ARROW_DESIGNS = {
@@ -44,8 +45,22 @@ export const ARROW_DESIGNS = {
   }
 }
 
-export default function CanvasElement({ element, isSelected, showResizeHandles = true, onPointerDown }) {
-  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity } = element
+export default function CanvasElement({ element, currentTime = 0, isSelected, showResizeHandles = true, onPointerDown }) {
+  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, animationIn, animationOut, gradientColor } = element
+
+  const clipStart = element.clipStart ?? 0
+  const clipEnd = element.clipEnd ?? 10
+  const animIn = animationIn || 'none'
+  const animOut = animationOut || 'none'
+  const isInPhase = animIn !== 'none' && currentTime < clipStart + ANIMATION_DURATION
+  const isOutPhase = animOut !== 'none' && currentTime >= clipEnd - ANIMATION_DURATION
+
+  const animationClasses = useMemo(() => {
+    const classes = []
+    if (isInPhase && animIn !== 'none') classes.push(`animate-in-${animIn}`)
+    if (isOutPhase && animOut !== 'none') classes.push(`animate-out-${animOut}`)
+    return classes.join(' ')
+  }, [isInPhase, isOutPhase, animIn, animOut])
 
   const renderContent = () => {
     if (type === 'image') {
@@ -145,6 +160,19 @@ export default function CanvasElement({ element, isSelected, showResizeHandles =
         </div>
       )
     }
+    if (type === 'gradient') {
+      const color = gradientColor || '#000000'
+      return (
+        <div
+          className="element-gradient"
+          style={{
+            background: `linear-gradient(to bottom, ${color} 0%, transparent 100%)`,
+            width: '100%',
+            height: '100%'
+          }}
+        />
+      )
+    }
     return null
   }
 
@@ -153,7 +181,7 @@ export default function CanvasElement({ element, isSelected, showResizeHandles =
     onPointerDown(e, element.id, handle)
   }, [element.id, onPointerDown])
 
-  const baseSize = type === 'image-text' ? { w: 180, h: 100 } : type === 'image' ? { w: 80, h: 80 } : type === 'headline' ? { w: 300, h: 60 } : type === 'cta' ? { w: 180, h: 48 } : { w: 200, h: 120 }
+  const baseSize = type === 'image-text' ? { w: 180, h: 100 } : type === 'image' ? { w: 80, h: 80 } : type === 'headline' ? { w: 300, h: 60 } : type === 'cta' ? { w: 180, h: 48 } : type === 'gradient' ? { w: 400, h: 300 } : { w: 200, h: 120 }
   const pad = type === 'headline' ? 0 : 20
   const innerW = Math.max(20, width - pad)
   const innerH = Math.max(20, height - pad)
@@ -209,6 +237,7 @@ export default function CanvasElement({ element, isSelected, showResizeHandles =
       style={style}
       onPointerDown={(e) => handlePointerDown(e, 'move')}
     >
+      <div className={`element-animation-wrapper ${animationClasses}`}>
       <div className="element-inner">
         {needsScale ? (
           <div
@@ -226,9 +255,10 @@ export default function CanvasElement({ element, isSelected, showResizeHandles =
           renderContent()
         )}
       </div>
+      </div>
       {isSelected && showResizeHandles && (
         <>
-          {(type === 'image' || type === 'arrow') && (
+          {(type === 'image' || type === 'arrow' || type === 'gradient') && (
             <div
               className="rotate-handle"
               onPointerDown={(e) => handlePointerDown(e, 'rotate')}
