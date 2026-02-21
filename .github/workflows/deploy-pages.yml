@@ -99,6 +99,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/ReelRecorder/
           cp -r dist ../deploy/ReelRecorder
 
+      - name: Build InfoGraphics
+        run: |
+          cd InfoGraphics
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/InfoGraphics/
+          cp -r dist ../deploy/InfoGraphics
+
       - name: Build Power Writer
         run: |
           cd PowerWriter/PowerWriter/client
