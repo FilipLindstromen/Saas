@@ -1,16 +1,35 @@
 import ExportButtons from './ExportButtons'
+import ProjectSelector from './ProjectSelector'
+import { ELEMENT_TYPES } from '../constants/elementTypes'
 import './Toolbar.css'
 
-export default function Toolbar({ onShowImageSearch, onOpenSettings, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
+export default function Toolbar({ projects = [], currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, onAddElement, showTimeline = true, onToggleTimeline, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
   return (
     <div className="toolbar">
-      <button className="toolbar-btn toolbar-btn-primary" onClick={onShowImageSearch}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
-        Search Images
-      </button>
+      <span className="toolbar-logo">INFOGRAPHIC GENERATOR</span>
+      <ProjectSelector
+        projects={projects}
+        currentProjectId={currentProjectId}
+        currentProjectName={currentProjectName}
+        onSwitchProject={onSwitchProject}
+        onCreateProject={onCreateProject}
+        onRenameProject={onRenameProject}
+        onDeleteProject={onDeleteProject}
+      />
+      <div className="toolbar-spacer" />
+      <div className="toolbar-elements">
+        {ELEMENT_TYPES.map(({ type, title, icon }) => (
+          <button
+            key={type}
+            type="button"
+            className="toolbar-btn toolbar-btn-element"
+            onClick={() => onAddElement?.(type)}
+            title={title}
+          >
+            {icon}
+          </button>
+        ))}
+      </div>
       <div className="toolbar-spacer" />
       <ExportButtons
         canvasRef={canvasRef}
@@ -18,6 +37,17 @@ export default function Toolbar({ onShowImageSearch, onOpenSettings, canvasRef, 
         onBeforeExport={onBeforeExport}
         canvasData={canvasData}
       />
+      <button
+        type="button"
+        className={`toolbar-btn toolbar-btn-icon ${showTimeline ? 'active' : ''}`}
+        onClick={onToggleTimeline}
+        title={showTimeline ? 'Hide timeline' : 'Show timeline'}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <path d="M7 10v4M11 9v6M15 8v8M19 10v4" />
+        </svg>
+      </button>
       <button className="toolbar-btn toolbar-btn-icon" onClick={onOpenSettings} title="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="3" />

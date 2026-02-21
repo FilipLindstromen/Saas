@@ -233,7 +233,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     if (slideIndex !== -1 && onAdd) {
       // Create new slide after current
       const newId = Math.max(...slides.map(s => s.id), 0) + 1
-      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined }
       const newSlides = [...slides]
       newSlides.splice(slideIndex + 1, 0, newSlide)
       if (onReorder) {
@@ -250,7 +250,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     if (slideIndex !== -1 && onAdd) {
       // Create new slide before current
       const newId = Math.max(...slides.map(s => s.id), 0) + 1
-      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+      const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined }
       const newSlides = [...slides]
       newSlides.splice(slideIndex, 0, newSlide)
       if (onReorder) {

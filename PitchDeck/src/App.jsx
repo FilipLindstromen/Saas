@@ -60,7 +60,7 @@ function App() {
     
     // Default template if no saved data
     return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }],
+      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined }],
       selectedId: 1
     }
   }
@@ -834,7 +834,7 @@ function App() {
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
-    const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
+    const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', infographicProjectId: undefined, layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
     const newSlides = [...slides, newSlide]
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
@@ -1084,7 +1084,7 @@ function App() {
     const newChapter = {
       id: newChapterId,
       name: `Chapter ${newChapterId}`,
-      slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
+      slides: [{ id: 1, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', infographicProjectId: undefined, layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }]
     }
     const newChapters = [...chapters, newChapter]
     setChapters(newChapters)
@@ -1125,6 +1125,7 @@ function App() {
     subtitle: '',
     imageUrl: '',
     backgroundVideoUrl: '',
+    infographicProjectId: undefined,
     layout: 'default',
     gradientStrength: 0.7,
     flipHorizontal: false,
@@ -1149,6 +1150,7 @@ function App() {
       subtitle: slide.subtitle ?? '',
       imageUrl: slide.imageUrl ?? '',
       backgroundVideoUrl: slide.backgroundVideoUrl ?? '',
+      infographicProjectId: slide.infographicProjectId ?? undefined,
       layout: slide.layout ?? 'default',
       gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
       flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
@@ -1194,6 +1196,7 @@ function App() {
         subtitle: '',
         imageUrl: '',
         backgroundVideoUrl: '',
+        infographicProjectId: undefined,
         layout: 'default',
         gradientStrength: 0.7,
         flipHorizontal: false,

@@ -1,6 +1,8 @@
 .document-panel {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
@@ -11,6 +13,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .document-field label {
@@ -27,12 +30,16 @@
   border-radius: 6px;
   color: #e4e4e7;
   font-size: 0.875rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .document-bg {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .document-bg input[type="color"] {
@@ -47,12 +54,14 @@
 
 .document-bg .color-hex {
   flex: 1;
+  min-width: 0;
   padding: 0.5rem 0.6rem;
   background: #27272a;
   border: 1px solid #3f3f46;
   border-radius: 6px;
   color: #e4e4e7;
   font-size: 0.875rem;
+  box-sizing: border-box;
 }
 
 .document-field-checkbox {

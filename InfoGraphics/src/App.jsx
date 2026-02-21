@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Canvas from './components/Canvas'
 import CanvasControls from './components/CanvasControls'
+import Timeline from './components/Timeline'
 import LayersPanel from './components/LayersPanel'
 import LeftPanel from './components/LeftPanel'
 import RightPanel from './components/RightPanel'
 import GenerateInput from './components/GenerateInput'
 import Toolbar from './components/Toolbar'
+import ProjectSelector from './components/ProjectSelector'
 import SettingsModal, { loadApiKeys, saveApiKeys } from './components/SettingsModal'
 import { applyLayout } from './layouts'
+import * as projectStorage from './utils/projectStorage'
 import './App.css'
 
 function getApiHeaders(apiKeys) {
@@ -47,7 +50,9 @@ function createElement(type, overrides = {}, defaults = {}) {
     arrowDirection: type === 'arrow' ? 'right' : null,
     arrowStyle: type === 'arrow' ? 'simple' : null,
     zIndex: 0,
-    visible: true
+    visible: true,
+    clipStart: 0,
+    clipEnd: 10
   }
   return { ...base, ...overrides }
 }
@@ -69,9 +74,17 @@ function App() {
   const [includeBackgroundInExport, setIncludeBackgroundInExport] = useState(true)
   const [defaultFontFamily, setDefaultFontFamily] = useState('Inter')
   const [defaultFontSize, setDefaultFontSize] = useState(14)
-  const [leftPanelTab, setLeftPanelTab] = useState('elements')
+  const [leftPanelTab, setLeftPanelTab] = useState('document')
   const [rightPanelTab, setRightPanelTab] = useState('inspector')
+  const [leftPanelWidth, setLeftPanelWidth] = useState(240)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
+  const [timelineDuration, setTimelineDuration] = useState(10)
+  const [timelineCurrentTime, setTimelineCurrentTime] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showTimeline, setShowTimeline] = useState(true)
+  const [timelineHeight, setTimelineHeight] = useState(140)
+  const [projects, setProjects] = useState([])
+  const [currentProjectId, setCurrentProjectId] = useState(null)
   const canvasRef = useRef(null)
   const hasHydrated = useRef(false)
   const undoStack = useRef([])
@@ -79,38 +92,84 @@ function App() {
   const isRestoring = useRef(false)
   const MAX_HISTORY = 50
 
+  const applyProjectData = useCallback((parsed) => {
+    if (!parsed) return
+    const { elements: savedElements, aspectRatio: savedRatio, resolution: savedRes, backgroundColor: bg, zoom: savedZoom, selectedId: savedSelectedId, selectedIds: savedSelectedIds, leftPanelTab: savedLeftTab, rightPanelTab: savedTab, leftPanelWidth: savedLeftWidth, rightPanelWidth: savedRightWidth, includeBackgroundInExport: savedIncludeBg, defaultFontFamily: savedFont, defaultFontSize: savedFontSize, timelineDuration: savedTimelineDuration, timelineHeight: savedTimelineHeight } = parsed
+    if (Array.isArray(savedElements)) {
+      const duration = typeof parsed.timelineDuration === 'number' ? parsed.timelineDuration : 10
+      const normalized = savedElements.map(e => ({
+        ...e,
+        clipStart: typeof e.clipStart === 'number' ? e.clipStart : 0,
+        clipEnd: typeof e.clipEnd === 'number' ? e.clipEnd : duration
+      }))
+      setElements(normalized)
+      nextId = savedElements.length > 0 ? Math.max(...savedElements.map(e => e.id), 0) + 1 : 1
+      const ids = Array.isArray(savedSelectedIds)
+        ? savedSelectedIds.filter(id => savedElements.some(e => e.id === id))
+        : savedSelectedId != null && savedElements.some(e => e.id === savedSelectedId)
+          ? [savedSelectedId]
+          : []
+      setSelectedIds(ids)
+    }
+    if (savedRatio) setAspectRatio(savedRatio)
+    if (typeof savedRes === 'number' && [800, 1080, 1920].includes(savedRes)) setResolution(savedRes)
+    if (bg) setBackgroundColor(bg)
+    if (typeof savedZoom === 'number' && savedZoom >= 25 && savedZoom <= 200) setZoom(savedZoom)
+    if (savedLeftTab && ['document', 'layouts'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
+    else if (savedTab && ['document', 'layouts'].includes(savedTab)) setLeftPanelTab(savedTab)
+    if (savedTab && ['inspector', 'layers'].includes(savedTab)) setRightPanelTab(savedTab)
+    if (typeof savedLeftWidth === 'number' && savedLeftWidth >= 180 && savedLeftWidth <= 400) setLeftPanelWidth(savedLeftWidth)
+    if (typeof savedRightWidth === 'number' && savedRightWidth >= 200 && savedRightWidth <= 500) setRightPanelWidth(savedRightWidth)
+    if (typeof savedIncludeBg === 'boolean') setIncludeBackgroundInExport(savedIncludeBg)
+    if (savedFont && typeof savedFont === 'string') setDefaultFontFamily(savedFont)
+    if (typeof savedFontSize === 'number' && savedFontSize >= 10 && savedFontSize <= 32) setDefaultFontSize(savedFontSize)
+    if (typeof savedTimelineDuration === 'number' && savedTimelineDuration >= 1 && savedTimelineDuration <= 300) setTimelineDuration(savedTimelineDuration)
+    if (typeof parsed.showTimeline === 'boolean') setShowTimeline(parsed.showTimeline)
+    if (typeof savedTimelineHeight === 'number' && savedTimelineHeight >= 80 && savedTimelineHeight <= 400) setTimelineHeight(savedTimelineHeight)
+  }, [])
+
   useEffect(() => {
-    const saved = localStorage.getItem('infographicsData')
-    if (saved) {
+    let projectList = projectStorage.loadProjects()
+    let projectId = projectStorage.loadCurrentProjectId()
+
+    const legacy = projectStorage.migrateLegacyData()
+    if (legacy && projectList.length === 0) {
+      const id = projectStorage.generateProjectId()
+      projectList = [{ id, name: 'Untitled', updatedAt: Date.now() }]
+      projectStorage.saveProjectData(id, legacy)
+      projectStorage.saveProjects(projectList)
+      projectStorage.saveCurrentProjectId(id)
+      projectStorage.clearLegacyData()
+      projectId = id
+    }
+
+    if (projectList.length === 0) {
+      const id = projectStorage.generateProjectId()
+      projectList = [{ id, name: 'Untitled', updatedAt: Date.now() }]
+      projectStorage.saveProjects(projectList)
+      projectStorage.saveCurrentProjectId(id)
+      projectId = id
+    }
+
+    if (!projectId || !projectList.some(p => p.id === projectId)) {
+      projectId = projectList[0].id
+      projectStorage.saveCurrentProjectId(projectId)
+    }
+
+    setProjects(projectList)
+    setCurrentProjectId(projectId)
+
+    const data = projectStorage.loadProjectData(projectId)
+    if (data) {
       try {
-        const parsed = JSON.parse(saved)
-        const { elements: savedElements, aspectRatio: savedRatio, resolution: savedRes, backgroundColor: bg, zoom: savedZoom, selectedId: savedSelectedId, selectedIds: savedSelectedIds, leftPanelTab: savedLeftTab, rightPanelTab: savedTab, rightPanelWidth: savedRightWidth, includeBackgroundInExport: savedIncludeBg, defaultFontFamily: savedFont, defaultFontSize: savedFontSize } = parsed
-        if (Array.isArray(savedElements)) {
-          setElements(savedElements)
-          nextId = savedElements.length > 0 ? Math.max(...savedElements.map(e => e.id), 0) + 1 : 1
-          const ids = Array.isArray(savedSelectedIds)
-            ? savedSelectedIds.filter(id => savedElements.some(e => e.id === id))
-            : savedSelectedId != null && savedElements.some(e => e.id === savedSelectedId)
-              ? [savedSelectedId]
-              : []
-          setSelectedIds(ids)
-        }
-        if (savedRatio) setAspectRatio(savedRatio)
-        if (typeof savedRes === 'number' && [800, 1080, 1920].includes(savedRes)) setResolution(savedRes)
-        if (bg) setBackgroundColor(bg)
-        if (typeof savedZoom === 'number' && savedZoom >= 25 && savedZoom <= 200) setZoom(savedZoom)
-        if (savedLeftTab && ['elements', 'document', 'layouts'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
-        else if (savedTab && ['document', 'layouts'].includes(savedTab)) setLeftPanelTab(savedTab)
-        if (savedTab && ['inspector', 'layers'].includes(savedTab)) setRightPanelTab(savedTab)
-        if (typeof savedRightWidth === 'number' && savedRightWidth >= 200 && savedRightWidth <= 500) setRightPanelWidth(savedRightWidth)
-        if (typeof savedIncludeBg === 'boolean') setIncludeBackgroundInExport(savedIncludeBg)
-        if (savedFont && typeof savedFont === 'string') setDefaultFontFamily(savedFont)
-        if (typeof savedFontSize === 'number' && savedFontSize >= 10 && savedFontSize <= 32) setDefaultFontSize(savedFontSize)
+        applyProjectData(data)
       } catch (e) {
-        console.error('Error loading saved data:', e)
+        console.error('Error loading project:', e)
       }
     }
+
     queueMicrotask(() => { hasHydrated.current = true })
+
     const savedLatest = localStorage.getItem('infographicsLatestImages')
     if (savedLatest) {
       try {
@@ -119,11 +178,11 @@ function App() {
         console.error('Error loading latest images:', e)
       }
     }
-  }, [])
+  }, [applyProjectData])
 
   useEffect(() => {
-    if (!hasHydrated.current) return
-    localStorage.setItem('infographicsData', JSON.stringify({
+    if (!hasHydrated.current || !currentProjectId) return
+    const data = {
       elements,
       aspectRatio,
       resolution,
@@ -132,12 +191,128 @@ function App() {
       selectedIds,
       leftPanelTab,
       rightPanelTab,
+      leftPanelWidth,
       rightPanelWidth,
       includeBackgroundInExport,
       defaultFontFamily,
-      defaultFontSize
-    }))
-  }, [elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize])
+      defaultFontSize,
+      timelineDuration,
+      showTimeline,
+      timelineHeight
+    }
+    projectStorage.saveProjectData(currentProjectId, data)
+  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight])
+
+  const createProject = useCallback(() => {
+    const id = projectStorage.generateProjectId()
+    const newProject = { id, name: 'Untitled', updatedAt: Date.now() }
+    const updated = [...projects, newProject]
+    projectStorage.saveProjects(updated)
+    projectStorage.saveCurrentProjectId(id)
+    projectStorage.saveProjectData(id, {
+      elements: [],
+      aspectRatio: '16:9',
+      resolution: 800,
+      backgroundColor: '#ffffff',
+      zoom: 100,
+      selectedIds: [],
+      leftPanelTab: 'document',
+      rightPanelTab: 'inspector',
+      leftPanelWidth: 240,
+      rightPanelWidth: 320,
+      includeBackgroundInExport: true,
+      defaultFontFamily: 'Inter',
+      defaultFontSize: 14,
+      timelineDuration: 10,
+      showTimeline: true,
+      timelineHeight: 140
+    })
+    setProjects(updated)
+    setCurrentProjectId(id)
+    setElements([])
+    setSelectedIds([])
+    setAspectRatio('16:9')
+    setResolution(800)
+    setBackgroundColor('#ffffff')
+    setZoom(100)
+    setLeftPanelTab('document')
+    setRightPanelTab('inspector')
+    setLeftPanelWidth(240)
+    setRightPanelWidth(320)
+    setIncludeBackgroundInExport(true)
+    setDefaultFontFamily('Inter')
+    setDefaultFontSize(14)
+    setTimelineDuration(10)
+    setShowTimeline(true)
+    setTimelineHeight(140)
+    undoStack.current = []
+    redoStack.current = []
+    nextId = 1
+  }, [projects])
+
+  const saveCurrentProjectToStorage = useCallback(() => {
+    if (!currentProjectId) return
+    projectStorage.saveProjectData(currentProjectId, {
+      elements,
+      aspectRatio,
+      resolution,
+      backgroundColor,
+      zoom,
+      selectedIds,
+      leftPanelTab,
+      rightPanelTab,
+      leftPanelWidth,
+      rightPanelWidth,
+      includeBackgroundInExport,
+      defaultFontFamily,
+      defaultFontSize,
+      timelineDuration,
+      showTimeline,
+      timelineHeight
+    })
+  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight])
+
+  const switchProject = useCallback((id) => {
+    if (id === currentProjectId) return
+    saveCurrentProjectToStorage()
+    const data = projectStorage.loadProjectData(id)
+    if (data) {
+      isRestoring.current = true
+      applyProjectData(data)
+      isRestoring.current = false
+    } else {
+      setElements([])
+      setSelectedIds([])
+      nextId = 1
+    }
+    projectStorage.saveCurrentProjectId(id)
+    setCurrentProjectId(id)
+    undoStack.current = []
+    redoStack.current = []
+  }, [currentProjectId, applyProjectData, saveCurrentProjectToStorage])
+
+  const renameProject = useCallback((id, name) => {
+    if (!name.trim()) return
+    const updated = projects.map(p => p.id === id ? { ...p, name: name.trim(), updatedAt: Date.now() } : p)
+    projectStorage.saveProjects(updated)
+    setProjects(updated)
+  }, [projects])
+
+  const deleteProject = useCallback((id) => {
+    if (projects.length <= 1) return
+    const idx = projects.findIndex(p => p.id === id)
+    const nextIdToSwitch = idx > 0 ? projects[idx - 1].id : projects[idx + 1]?.id
+    const updated = projects.filter(p => p.id !== id)
+    projectStorage.saveProjects(updated)
+    projectStorage.deleteProjectData(id)
+    if (id === currentProjectId && nextIdToSwitch) {
+      switchProject(nextIdToSwitch)
+    } else if (id === currentProjectId) {
+      setCurrentProjectId(updated[0]?.id || null)
+      projectStorage.saveCurrentProjectId(updated[0]?.id || null)
+    }
+    setProjects(updated)
+  }, [projects, currentProjectId, switchProject])
 
   const pushUndoState = useCallback((els, ids) => {
     if (isRestoring.current) return
@@ -172,11 +347,12 @@ function App() {
     const baseX = indexHint != null ? 80 : 100
     const defaults = { fontFamily: defaultFontFamily, fontSize: defaultFontSize }
     const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex || 0), 0) : 0
-    const el = createElement(type, { ...overrides, x: baseX, y: baseY, zIndex: maxZ + 1 }, defaults)
+    const clipDefaults = { clipStart: 0, clipEnd: timelineDuration }
+    const el = createElement(type, { ...clipDefaults, ...overrides, x: baseX, y: baseY, zIndex: maxZ + 1 }, defaults)
     setElements(prev => [...prev, el])
     setSelectedIds([el.id])
     return el.id
-  }, [defaultFontFamily, defaultFontSize, elements, selectedIds, pushUndoState])
+  }, [defaultFontFamily, defaultFontSize, elements, selectedIds, pushUndoState, timelineDuration])
 
   const updateElement = useCallback((id, updates) => {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
@@ -218,6 +394,29 @@ function App() {
       setRightPanelTab('inspector')
     }
   }, [selectedIds])
+
+  useEffect(() => {
+    if (elements.length === 0) return
+    const earliestStart = Math.min(...elements.map(e => e.clipStart ?? 0))
+    if (timelineCurrentTime === 0 && earliestStart > 0) {
+      setTimelineCurrentTime(earliestStart)
+    }
+  }, [elements])
+
+  useEffect(() => {
+    setElements(prev => {
+      const needsClamp = prev.some(e => (e.clipEnd ?? timelineDuration) > timelineDuration)
+      if (!needsClamp) return prev
+      return prev.map(e => {
+        const start = e.clipStart ?? 0
+        const end = e.clipEnd ?? timelineDuration
+        if (end > timelineDuration) {
+          return { ...e, clipEnd: timelineDuration, clipStart: Math.min(start, Math.max(0, timelineDuration - 0.5)) }
+        }
+        return e
+      })
+    })
+  }, [timelineDuration])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -293,19 +492,24 @@ function App() {
   const handleApplyLayout = useCallback((layoutId) => {
     pushUndoState(elements, selectedIds)
     const maxId = elements.length > 0 ? Math.max(...elements.map(e => e.id), 0) : 0
-    const newElements = applyLayout(layoutId, maxId)
+    const raw = applyLayout(layoutId, maxId)
+    const newElements = raw.map(e => ({
+      ...e,
+      clipStart: e.clipStart ?? 0,
+      clipEnd: e.clipEnd ?? timelineDuration
+    }))
     setElements(newElements)
     setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])
     if (newElements.length > 0) {
       nextId = Math.max(...newElements.map(e => e.id), 0) + 1
     }
-  }, [elements, selectedIds, pushUndoState])
+  }, [elements, selectedIds, pushUndoState, timelineDuration])
 
   const addToLatest = useCallback((imageUrl, source, searchQuery) => {
     const entry = { url: imageUrl, source: source || 'giphy', addedAt: Date.now(), searchQuery: searchQuery || undefined }
     setLatestImages(prev => {
       const filtered = prev.filter(i => i.url !== imageUrl)
-      const next = [entry, ...filtered].slice(0, 24)
+      const next = [entry, ...filtered].slice(0, 48)
       localStorage.setItem('infographicsLatestImages', JSON.stringify(next))
       return next
     })
@@ -346,8 +550,17 @@ function App() {
   return (
     <div className="app">
       <Toolbar
-        onShowImageSearch={() => setShowImageSearch(true)}
+        projects={projects}
+        currentProjectId={currentProjectId}
+        currentProjectName={projects.find(p => p.id === currentProjectId)?.name}
+        onSwitchProject={switchProject}
+        onCreateProject={createProject}
+        onRenameProject={renameProject}
+        onDeleteProject={deleteProject}
         onOpenSettings={() => setShowSettings(true)}
+        onAddElement={addElement}
+        showTimeline={showTimeline}
+        onToggleTimeline={() => setShowTimeline(v => !v)}
         canvasRef={canvasRef}
         includeBackgroundInExport={includeBackgroundInExport}
         onBeforeExport={() => {
@@ -363,15 +576,17 @@ function App() {
           resolution,
           backgroundColor,
           defaultFontFamily,
-          defaultFontSize
+          defaultFontSize,
+          timelineDuration
         }}
       />
       <div className="app-main">
         <LeftPanel
           tab={leftPanelTab}
           onTabChange={setLeftPanelTab}
-          onAddElement={addElement}
           onApplyLayout={handleApplyLayout}
+          width={leftPanelWidth}
+          onResize={setLeftPanelWidth}
           aspectRatio={aspectRatio}
           onAspectRatioChange={setAspectRatio}
           resolution={resolution}
@@ -429,6 +644,7 @@ function App() {
             aspectRatio={aspectRatio}
             resolution={resolution}
             elements={elements}
+            currentTime={timelineCurrentTime}
             canvasRef={canvasRef}
             selectedIds={selectedIds}
             onSelect={handleSelect}
@@ -438,6 +654,23 @@ function App() {
             backgroundColor={backgroundColor}
             zoom={zoom}
           />
+          {showTimeline && (
+          <Timeline
+            height={timelineHeight}
+            onResize={setTimelineHeight}
+            elements={elements}
+            duration={timelineDuration}
+            currentTime={timelineCurrentTime}
+            onCurrentTimeChange={setTimelineCurrentTime}
+            onDurationChange={setTimelineDuration}
+            onUpdateClip={(id, updates) => updateElement(id, updates)}
+            onClipEditStart={() => pushUndoState(elements, selectedIds)}
+            onSelect={handleSelect}
+            selectedIds={selectedIds}
+            isPlaying={isPlaying}
+            onPlayPause={setIsPlaying}
+          />
+          )}
         </div>
         <RightPanel
           element={selectedElement}

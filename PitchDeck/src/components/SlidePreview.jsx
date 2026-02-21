@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import VideoPicker from './VideoPicker'
+import InfographicPicker from './InfographicPicker'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -19,6 +20,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [showVideoPicker, setShowVideoPicker] = useState(false)
+  const [showInfographicPicker, setShowInfographicPicker] = useState(false)
   const [previewZoom, setPreviewZoom] = useState(() => {
     try {
       const saved = localStorage.getItem('pitchDeckPreviewZoom')
@@ -171,6 +173,11 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     onUpdate({ backgroundVideoUrl: '' })
   }
 
+  const handleInfographicSelect = (projectId) => {
+    onUpdate({ infographicProjectId: projectId || undefined })
+    setShowInfographicPicker(false)
+  }
+
   return (
     <div className="slide-preview">
       <div className="preview-header">
@@ -250,6 +257,17 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                 <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Auto select image'}</span>
               </button>
               <button
+                className="btn-icon btn-infographic-background"
+                onClick={() => setShowInfographicPicker(true)}
+                title="Infographic background"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <path d="M3 9h18M9 21V9" />
+                </svg>
+                <span className="btn-tooltip">Infographic background</span>
+              </button>
+              <button
                 className="btn-icon btn-video-background"
                 onClick={() => setShowVideoPicker(true)}
                 disabled={!(settings.pexelsKey && settings.pexelsKey.trim()) && !(settings.pixabayKey && settings.pixabayKey.trim())}
@@ -275,6 +293,21 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
                     <span className="btn-tooltip">Remove Image</span>
                   </button>
                 </>
+              )}
+              {slide.infographicProjectId && (
+                <button
+                  className="btn-icon btn-remove-infographic"
+                  onClick={() => onUpdate({ infographicProjectId: undefined })}
+                  title="Remove infographic background"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <path d="M3 9h18M9 21V9" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                  </svg>
+                  <span className="btn-tooltip">Remove infographic</span>
+                </button>
               )}
               {slide.backgroundVideoUrl && (
                 <button
@@ -404,6 +437,12 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         onClose={() => setShowVideoPicker(false)}
         onSelect={handleVideoBackgroundSelect}
         settings={settings}
+      />
+      <InfographicPicker
+        isOpen={showInfographicPicker}
+        onClose={() => setShowInfographicPicker(false)}
+        onSelect={handleInfographicSelect}
+        currentProjectId={slide.infographicProjectId}
       />
       <ImagePicker
         isOpen={showImagePicker}

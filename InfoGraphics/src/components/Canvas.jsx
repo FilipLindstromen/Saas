@@ -23,7 +23,7 @@ function rectsOverlap(a, b) {
   return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y)
 }
 
-export default function Canvas({ aspectRatio, resolution, elements, selectedIds = [], onSelect, onUpdate, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
+export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
   const containerRef = useRef(null)
   const [dragState, setDragState] = useState(null)
   const [resizeHandle, setResizeHandle] = useState(null)
@@ -41,7 +41,15 @@ export default function Canvas({ aspectRatio, resolution, elements, selectedIds 
   }, [dragState, resizeHandle, rotateHandle])
 
   const size = getCanvasSize(aspectRatio, resolution)
-  const visibleElements = elements.filter(el => el.visible !== false).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+  const visibleElements = elements
+    .filter(el => {
+      if (el.visible === false) return false
+      if (el.clipStart != null && el.clipEnd != null) {
+        return currentTime >= el.clipStart && currentTime < el.clipEnd
+      }
+      return true
+    })
+    .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
 
   const attachGlobalListeners = useCallback((onMove, onUp) => {
     const move = (ev) => {

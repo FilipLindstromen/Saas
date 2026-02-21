@@ -4,12 +4,17 @@ import SlideBackground from './SlideBackground'
 import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
 
-// Two slides share the same background if they use the same image or video
+// Two slides share the same background if they use the same image, video, or infographic
 function sameBackground(a, b) {
   if (!a || !b) return false
   const layoutA = (a.layout || 'default') === 'section'
   const layoutB = (b.layout || 'default') === 'section'
   if (layoutA || layoutB) return false
+  const hasInfographicA = !!a.infographicProjectId
+  const hasInfographicB = !!b.infographicProjectId
+  if (hasInfographicA && hasInfographicB) {
+    return a.infographicProjectId === b.infographicProjectId
+  }
   const hasBgA = !!(a.imageUrl || a.backgroundVideoUrl)
   const hasBgB = !!(b.imageUrl || b.backgroundVideoUrl)
   if (!hasBgA || !hasBgB) return false
@@ -30,8 +35,8 @@ function sameGradientPosition(a, b) {
   if (!a || !b) return false
   const layoutA = a.layout || 'default'
   const layoutB = b.layout || 'default'
-  const hasGradientA = !!(a.imageUrl || a.backgroundVideoUrl) && a.gradientEnabled !== false && layoutA !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutA)
-  const hasGradientB = !!(b.imageUrl || b.backgroundVideoUrl) && b.gradientEnabled !== false && layoutB !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutB)
+  const hasGradientA = !!(a.infographicProjectId || a.imageUrl || a.backgroundVideoUrl) && a.gradientEnabled !== false && layoutA !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutA)
+  const hasGradientB = !!(b.infographicProjectId || b.imageUrl || b.backgroundVideoUrl) && b.gradientEnabled !== false && layoutB !== 'section' && ['default', 'bulletpoints', 'video'].includes(layoutB)
   if (!hasGradientA || !hasGradientB) return false
   return (a.gradientFlipped === true) === (b.gradientFlipped === true)
 }
@@ -45,7 +50,7 @@ function hexToRgb(hex) {
 // Persistent gradient overlay - used when consecutive slides have gradient in same position
 function GradientOverlay({ slide, backgroundColor = '#1a1a1a' }) {
   if (!slide || (slide.layout || 'default') === 'section') return null
-  const hasMedia = !!(slide.imageUrl || slide.backgroundVideoUrl)
+  const hasMedia = !!(slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl)
   const layout = slide.layout || 'default'
   if (!hasMedia || !['default', 'bulletpoints', 'video'].includes(layout)) return null
   if (slide.gradientEnabled === false) return null
@@ -1099,6 +1104,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             backgroundScaleTime={backgroundScaleTime}
             backgroundScaleAmount={backgroundScaleAmount}
             isPreload={false}
+            isPlayMode={true}
           />
         </div>
       )}

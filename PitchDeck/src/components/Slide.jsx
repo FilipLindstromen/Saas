@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
+import InfographicBackground from './InfographicBackground'
+import { loadInfographicProjectData } from '../utils/infographicLoader'
 
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0 }) {
@@ -1710,8 +1712,24 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           display: inline;
         }
       `}</style>
-      {/* 1. Background image (z-index 0) - behind video */}
-      {!hideBackground && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
+      {/* 0. Infographic background (when infographicProjectId is set) */}
+      {!hideBackground && slide.infographicProjectId && layout !== 'section' && (() => {
+        const projectData = loadInfographicProjectData(slide.infographicProjectId)
+        if (!projectData) return null
+        return (
+          <InfographicBackground
+            projectData={projectData}
+            isPlaying={isPlayMode}
+            opacity={backgroundOpacity}
+            imageScale={imageScale}
+            imagePositionX={imagePositionX}
+            imagePositionY={imagePositionY}
+            flipHorizontal={slide.flipHorizontal}
+          />
+        )
+      })()}
+      {/* 1. Background image (z-index 0) - behind video; skip when infographic is used */}
+      {!hideBackground && !slide.infographicProjectId && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
           className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
@@ -1730,8 +1748,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           }}
         />
       )}
-      {/* 2. Background video (z-index 1) - in front of image, behind gradient and content; same scale/position as image */}
-      {!hideBackground && slide.backgroundVideoUrl && layout !== 'section' && (() => {
+      {/* 2. Background video (z-index 1) - in front of image, behind gradient and content; skip when infographic is used */}
+      {!hideBackground && !slide.infographicProjectId && slide.backgroundVideoUrl && layout !== 'section' && (() => {
         const raw = slide.backgroundVideoUrl
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
@@ -1770,14 +1788,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           </div>
         )
       })()}
-      {!hideGradient && slide.gradientEnabled !== false && layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && layout !== 'right-video' && (slide.imageUrl || slide.backgroundVideoUrl) && (
+      {!hideGradient && slide.gradientEnabled !== false && layout !== 'centered' && layout !== 'right' && layout !== 'section' && layout !== 'video' && layout !== 'left-video' && layout !== 'right-video' && (slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl) && (
         <div 
           className="slide-gradient-overlay"
           style={{
             background: gradientFlipped
               ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
               : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
-            pointerEvents: (!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl)) ? 'none' : 'auto'
+            pointerEvents: (!isPlayMode && onUpdate && (slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl)) ? 'none' : 'auto'
           }}
         />
       )}

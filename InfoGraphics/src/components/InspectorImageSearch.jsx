@@ -86,7 +86,7 @@ export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }
         <div className="inspector-image-search-section">
           <span className="inspector-image-search-label">Recent</span>
           <div className="inspector-image-search-grid">
-            {latestImages.slice(0, 6).map((img, i) => (
+            {latestImages.slice(0, 48).map((img, i) => (
               <button
                 key={i}
                 type="button"

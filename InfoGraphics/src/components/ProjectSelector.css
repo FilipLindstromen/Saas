@@ -1,0 +1,148 @@
+.project-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.project-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  color: #e4e4e7;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.project-selector-trigger:hover {
+  background: #3f3f46;
+  border-color: #52525b;
+}
+
+.project-selector-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-selector-trigger svg:last-child {
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.project-selector-trigger svg:last-child.open {
+  transform: rotate(180deg);
+}
+
+.project-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.project-selector-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.project-selector-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.project-selector-item:hover {
+  background: #27272a;
+}
+
+.project-selector-item.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.project-selector-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.project-selector-item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0.7;
+}
+
+.project-selector-item:hover .project-selector-item-actions {
+  opacity: 1;
+}
+
+.project-selector-action {
+  padding: 0.2rem;
+  background: none;
+  border: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.project-selector-action:hover {
+  background: #3f3f46;
+  color: #e4e4e7;
+}
+
+.project-selector-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.project-selector-delete:hover:not(:disabled) {
+  color: #ef4444;
+}
+
+.project-selector-edit {
+  flex: 1;
+  padding: 0.25rem 0.4rem;
+  background: #27272a;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  color: #e4e4e7;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.project-selector-new {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #27272a;
+  border: none;
+  border-top: 1px solid #27272a;
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.project-selector-new:hover {
+  background: #3f3f46;
+  color: #e4e4e7;
+}

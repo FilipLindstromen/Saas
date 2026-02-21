@@ -144,7 +144,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
               <span className="slide-settings-value">{Math.round((slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6) * 100)}%</span>
             </div>
           </div>
-          {(slide.imageUrl || slide.backgroundVideoUrl) && (
+          {(slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl) && (
             <>
               <div className="slide-settings-field slide-settings-row">
                 <button

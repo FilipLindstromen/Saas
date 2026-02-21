@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
+import InfographicBackground from './InfographicBackground'
+import { loadInfographicProjectData } from '../utils/infographicLoader'
 import './Slide.css'
 
 /**
- * Renders only the background (image or video) of a slide.
+ * Renders only the background (infographic, image or video) of a slide.
  * Used in PlayMode when consecutive slides share the same background - we keep this layer visible
  * and only fade the content to avoid redundant background fade in/out.
  */
-function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, isPreload = false }) {
+function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, isPreload = false, isPlayMode = false }) {
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
@@ -86,10 +88,28 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
   }, [slide?.backgroundVideoUrl, layout, backgroundVideoSrc, isPreload])
 
   if (!slide || layout === 'section') return null
-  if (!slide.imageUrl && !slide.backgroundVideoUrl) return null
+  if (!slide.infographicProjectId && !slide.imageUrl && !slide.backgroundVideoUrl) return null
 
   const currentPosition = { x: imagePositionX, y: imagePositionY }
   const layoutClass = layout === 'left-video' ? 'layout-left-video' : layout === 'right-video' ? 'layout-right-video' : ''
+
+  if (slide.infographicProjectId) {
+    const projectData = loadInfographicProjectData(slide.infographicProjectId)
+    if (!projectData) return null
+    return (
+      <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>
+        <InfographicBackground
+          projectData={projectData}
+          isPlaying={isPlayMode}
+          opacity={backgroundOpacity}
+          imageScale={imageScale}
+          imagePositionX={imagePositionX}
+          imagePositionY={imagePositionY}
+          flipHorizontal={slide.flipHorizontal}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>

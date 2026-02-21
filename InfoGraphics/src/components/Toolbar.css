@@ -5,6 +5,16 @@
   padding: 0.5rem 1rem;
   background: #18181b;
   border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+
+.toolbar-logo {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  letter-spacing: 0.03em;
+  margin-right: 0.25rem;
 }
 
 .toolbar-section {
@@ -74,8 +84,29 @@
   flex: 1;
 }
 
+.toolbar-elements {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.toolbar-btn-element {
+  padding: 0.4rem;
+}
+
+.toolbar-btn-element svg {
+  display: block;
+}
+
 .toolbar-btn-icon {
   padding: 0.4rem;
+}
+
+.toolbar-btn-icon.active {
+  background: #3f3f46;
+  border-color: #52525b;
+  color: #3b82f6;
 }
 
 .toolbar-btn-icon svg {

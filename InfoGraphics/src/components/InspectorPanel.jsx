@@ -1,5 +1,6 @@
 import InspectorImageSearch from './InspectorImageSearch'
 import { ARROW_DESIGNS } from './CanvasElement'
+import { GOOGLE_FONTS } from '../constants/fonts'
 import './InspectorPanel.css'
 
 export default function InspectorPanel({ element, selectedCount = 1, onUpdate, onDelete, apiKeys, latestImages, onImageSelect }) {
@@ -118,8 +119,9 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
                 value={fontFamily || 'Inter'}
                 onChange={(e) => onUpdate({ fontFamily: e.target.value })}
               >
-                <option value="Inter">Inter</option>
-                <option value="Caveat">Caveat (handwritten)</option>
+                {GOOGLE_FONTS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
                 <option value="Georgia">Georgia</option>
                 <option value="system-ui">System</option>
               </select>
