@@ -2,14 +2,14 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #27272a;
-  background: #18181b;
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-secondary);
   position: relative;
 }
 
 .left-panel-tabs {
   display: flex;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .left-panel-tab {
@@ -17,7 +17,7 @@
   padding: 0.75rem 1rem;
   background: none;
   border: none;
-  color: #71717a;
+  color: var(--text-tertiary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -25,12 +25,12 @@
 }
 
 .left-panel-tab:hover {
-  color: #e4e4e7;
+  color: var(--text-primary);
 }
 
 .left-panel-tab.active {
-  color: #3b82f6;
-  border-bottom: 2px solid #3b82f6;
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
   margin-bottom: -1px;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .left-panel-resize-handle:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(255, 107, 53, 0.2);
 }
 
 .elements-panel {
@@ -64,7 +64,7 @@
 
 .elements-panel-hint {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   margin: 0;
 }
 
@@ -79,17 +79,17 @@
   align-items: center;
   justify-content: center;
   padding: 0.6rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .elements-panel-btn:hover {
-  background: #3f3f46;
-  border-color: #52525b;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .elements-panel-btn svg {

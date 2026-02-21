@@ -8,7 +8,7 @@
 .inspector-empty {
   padding: 2rem 1.5rem;
   text-align: center;
-  color: #71717a;
+  color: var(--text-tertiary);
   font-size: 0.9rem;
 }
 
@@ -17,27 +17,28 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .inspector-title {
   font-size: 0.9rem;
   font-weight: 600;
   text-transform: capitalize;
+  color: var(--text-primary);
 }
 
 .inspector-delete {
   padding: 0.35rem;
   background: transparent;
   border: none;
-  color: #71717a;
+  color: var(--text-tertiary);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .inspector-delete:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-secondary);
+  background: rgba(255, 71, 87, 0.1);
 }
 
 .inspector-body {
@@ -56,7 +57,7 @@
 .inspector-section-animations {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 1px solid #27272a;
+  border-top: 1px solid var(--border-default);
 }
 
 .inspector-field {
@@ -67,7 +68,7 @@
 
 .inspector-field label {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -77,10 +78,10 @@
 .inspector-field textarea,
 .inspector-field select {
   padding: 0.5rem 0.6rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.875rem;
 }
 
@@ -88,9 +89,9 @@
   width: 48px;
   height: 32px;
   padding: 2px;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
   cursor: pointer;
 }
 
@@ -104,7 +105,7 @@
   height: 80px;
   border-radius: 8px;
   overflow: hidden;
-  background: #27272a;
+  background: var(--bg-tertiary);
 }
 
 .inspector-image-preview img {
@@ -133,15 +134,15 @@
 .inspector-recolor-clear {
   padding: 0.35rem 0.5rem;
   font-size: 0.75rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .inspector-recolor-clear:hover {
-  background: #3f3f46;
+  background: var(--bg-hover);
 }
 
 .inspector-opacity {
@@ -150,7 +151,7 @@
 
 .inspector-opacity-label {
   font-size: 0.7rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: block;
@@ -183,23 +184,23 @@
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 
 .inspector-arrow-btn:hover {
-  border-color: #52525b;
-  background: #3f3f46;
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
 }
 
 .inspector-arrow-btn.active {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  border-color: var(--accent);
+  background: rgba(255, 107, 53, 0.15);
+  color: var(--accent);
 }
 
 .inspector-arrow-btn svg {

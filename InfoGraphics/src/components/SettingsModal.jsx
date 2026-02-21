@@ -10,13 +10,15 @@ export function loadApiKeys() {
       const parsed = JSON.parse(saved)
       return {
         giphy: parsed.giphy || '',
+        pixabay: parsed.pixabay || '',
+        pexels: parsed.pexels || '',
         openai: parsed.openai || ''
       }
     }
   } catch (e) {
     console.error('Error loading API keys:', e)
   }
-  return { giphy: '', openai: '' }
+  return { giphy: '', pixabay: '', pexels: '', openai: '' }
 }
 
 export function saveApiKeys(keys) {
@@ -25,17 +27,21 @@ export function saveApiKeys(keys) {
 
 export default function SettingsModal({ isOpen, onClose, apiKeys = {}, onSave }) {
   const [giphy, setGiphy] = useState(apiKeys?.giphy || '')
+  const [pixabay, setPixabay] = useState(apiKeys?.pixabay || '')
+  const [pexels, setPexels] = useState(apiKeys?.pexels || '')
   const [openai, setOpenai] = useState(apiKeys?.openai || '')
 
   useEffect(() => {
     if (isOpen) {
       setGiphy(apiKeys?.giphy || '')
+      setPixabay(apiKeys?.pixabay || '')
+      setPexels(apiKeys?.pexels || '')
       setOpenai(apiKeys?.openai || '')
     }
   }, [isOpen, apiKeys])
 
   const handleSave = () => {
-    onSave({ giphy: giphy.trim(), openai: openai.trim() })
+    onSave({ giphy: giphy.trim(), pixabay: pixabay.trim(), pexels: pexels.trim(), openai: openai.trim() })
     onClose()
   }
 
@@ -60,6 +66,28 @@ export default function SettingsModal({ isOpen, onClose, apiKeys = {}, onSave })
               value={giphy}
               onChange={(e) => setGiphy(e.target.value)}
               placeholder="Get one at developers.giphy.com"
+              autoComplete="off"
+            />
+          </div>
+          <div className="settings-field">
+            <label htmlFor="pixabay-key">Pixabay API Key</label>
+            <input
+              id="pixabay-key"
+              type="password"
+              value={pixabay}
+              onChange={(e) => setPixabay(e.target.value)}
+              placeholder="Get one at pixabay.com/api/docs/"
+              autoComplete="off"
+            />
+          </div>
+          <div className="settings-field">
+            <label htmlFor="pexels-key">Pexels API Key</label>
+            <input
+              id="pexels-key"
+              type="password"
+              value={pexels}
+              onChange={(e) => setPexels(e.target.value)}
+              placeholder="Get one at pexels.com/api"
               autoComplete="off"
             />
           </div>

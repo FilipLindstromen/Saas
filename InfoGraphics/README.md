@@ -1,13 +1,13 @@
 # InfoGraphics Generator
 
-Create infographics with a drag-and-drop canvas. Add image+text elements, headlines, arrows, and CTA buttons. Search for images from Giphy and Iconify. Use AI to generate step-based infographics from a prompt.
+Create infographics with a drag-and-drop canvas. Add image+text elements, headlines, arrows, and CTA buttons. Search for images from Giphy, Pixabay, Pexels, and Iconify. Use AI to generate step-based infographics from a prompt.
 
 ## Features
 
 - **Canvas** – Drag and resize elements
 - **Element types** – Image+Text, Headline, Arrow, CTA Button
 - **Aspect ratios** – 16:9, 9:16, or 1:1
-- **Image search** – Giphy (GIFs, stickers) and Iconify (icons)
+- **Image search** – Giphy (GIFs, stickers), Pixabay (photos), Pexels (photos), and Iconify (icons)
 - **AI generation** – Describe a process (e.g. "5-step stress response in hand drawn style") and get elements with images
 - **Latest selected** – Recently used images for quick access
 - **Server storage** – Selected images are saved on the server
@@ -27,10 +27,12 @@ npm install
 
 Copy `server/.env.example` to `server/.env` and add your keys:
 
-- **GIPHY_API_KEY** – [Get one](https://developers.giphy.com/dashboard) for image search
+- **GIPHY_API_KEY** – [Get one](https://developers.giphy.com/dashboard) for Giphy image search
+- **PIXABAY_API_KEY** – [Get one](https://pixabay.com/api/docs/) for Pixabay photo search
+- **PEXELS_API_KEY** – [Get one](https://www.pexels.com/api/) for Pexels photo search
 - **OPENAI_API_KEY** – For AI-powered generation (uses GPT-4o-mini)
 
-Without these keys, Iconify search still works (no key required), but Giphy search and AI generation will be limited.
+Without these keys, Iconify search still works (no key required), but Giphy, Pixabay, Pexels, and AI generation will be limited.
 
 ### 3. Run
 

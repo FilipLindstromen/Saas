@@ -1,7 +1,7 @@
 .panel {
   background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -18,7 +18,7 @@
   margin: -4px 0 0;
   padding: 0;
   list-style: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tab {
@@ -105,30 +105,30 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  border-radius: var(--button-radius);
 }
 
 .iconBtn:hover {
-  color: var(--danger);
-  border-color: var(--danger);
+  color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
 }
 
 .textBtn {
   padding: 6px 10px;
   font-size: 0.85rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  border-radius: var(--button-radius);
   cursor: pointer;
 }
 
 .textBtn:hover {
-  color: var(--text-primary);
-  border-color: var(--accent);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .fileBtn {

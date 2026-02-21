@@ -15,7 +15,7 @@ export function getClipLibrary(): LibraryClip[] {
         typeof (item as LibraryClip).libraryId === 'string' &&
         typeof (item as LibraryClip).name === 'string' &&
         typeof (item as LibraryClip).payload === 'object' &&
-        ['text', 'image', 'video'].includes((item as LibraryClip).payload?.type)
+        ['text', 'image', 'video', 'infographic'].includes((item as LibraryClip).payload?.type)
     )
   } catch {
     return []

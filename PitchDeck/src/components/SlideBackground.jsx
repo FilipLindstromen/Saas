@@ -94,7 +94,7 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
   const layoutClass = layout === 'left-video' ? 'layout-left-video' : layout === 'right-video' ? 'layout-right-video' : ''
 
   if (slide.infographicProjectId) {
-    const projectData = loadInfographicProjectData(slide.infographicProjectId)
+    const projectData = loadInfographicProjectData(slide.infographicProjectId, slide.infographicTabId)
     if (!projectData) return null
     return (
       <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>

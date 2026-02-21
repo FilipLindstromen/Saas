@@ -157,6 +157,7 @@ function normalizeOverlayItem(raw: unknown): OverlayItem | null {
     imageHeight: num(item.imageHeight),
     videoUrl: str(item.videoUrl),
     infographicProjectId: str(item.infographicProjectId),
+    infographicTabId: str(item.infographicTabId),
     infographicProjectName: str(item.infographicProjectName),
     burnIntoExport: bool(item.burnIntoExport) ?? true,
   }

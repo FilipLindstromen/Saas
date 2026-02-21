@@ -4,6 +4,8 @@ import './InspectorImageSearch.css'
 
 const SERVICES = [
   { id: 'giphy', label: 'Giphy', types: ['gifs', 'stickers'] },
+  { id: 'pixabay', label: 'Pixabay', types: ['photos'] },
+  { id: 'pexels', label: 'Pexels', types: ['photos'] },
   { id: 'iconify', label: 'Iconify', types: ['icons'] }
 ]
 
@@ -58,28 +60,32 @@ export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }
   return (
     <div className="inspector-image-search">
       <div className="inspector-image-search-form">
-        <select value={service} onChange={(e) => setService(e.target.value)}>
-          {SERVICES.map(s => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
-        {types.length > 1 && (
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            {types.map(t => (
-              <option key={t} value={t}>{t}</option>
+        <div className="inspector-image-search-form-row">
+          <select value={service} onChange={(e) => setService(e.target.value)}>
+            {SERVICES.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
-        )}
-        <input
-          type="text"
-          placeholder="Search images..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), search())}
-        />
-        <button type="button" onClick={search} disabled={loading}>
-          {loading ? '…' : 'Search'}
-        </button>
+          {types.length > 1 && (
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              {types.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="inspector-image-search-form-row">
+          <input
+            type="text"
+            placeholder="Search images..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), search())}
+          />
+          <button type="button" onClick={search} disabled={loading}>
+            {loading ? '…' : 'Search'}
+          </button>
+        </div>
       </div>
       {error && <p className="inspector-image-search-error">{error}</p>}
       {latestImages.length > 0 && (

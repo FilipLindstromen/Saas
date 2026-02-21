@@ -88,6 +88,39 @@
   gap: 1rem;
 }
 
+.infographic-picker-project {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.infographic-picker-project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.infographic-picker-project-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.infographic-picker-tab-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.infographic-picker-tab-select:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .infographic-picker-item {
   display: flex;
   flex-direction: column;

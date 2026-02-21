@@ -7,6 +7,12 @@ export default function LeftPanel({
   tab = 'document',
   onTabChange,
   onApplyLayout,
+  selectedLayoutId,
+  onSelectLayout,
+  customTemplates,
+  onCustomTemplatesChange,
+  onEnterTemplateMode,
+  templateEditMode = false,
   width = 240,
   onResize,
   aspectRatio,
@@ -100,7 +106,17 @@ export default function LeftPanel({
             onDefaultFontSizeChange={onDefaultFontSizeChange}
           />
         )}
-        {tab === 'layouts' && <LayoutsPanel onApplyLayout={onApplyLayout} />}
+        {tab === 'layouts' && (
+          <LayoutsPanel
+            selectedLayoutId={selectedLayoutId}
+            onSelectLayout={onSelectLayout}
+            onApplyLayout={onApplyLayout}
+            customTemplates={customTemplates}
+            onCustomTemplatesChange={onCustomTemplatesChange}
+            onEnterTemplateMode={onEnterTemplateMode}
+            templateEditMode={templateEditMode}
+          />
+        )}
         {tab === 'brand' && (
           <BrandKitPanel
             primaryColor={brandPrimaryColor}

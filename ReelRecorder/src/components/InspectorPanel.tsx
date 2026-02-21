@@ -56,6 +56,8 @@ interface InspectorPanelProps {
   audioDeviceId?: string
   onAudioDeviceIdChange?: (id: string) => void
   videoError?: string | null
+  onConnectMedia?: () => void | Promise<void>
+  hasVideoStream?: boolean
   aspectRatio?: AspectRatio
   onAspectRatioChange?: (a: AspectRatio) => void
   videoWidth?: number
@@ -136,6 +138,8 @@ export function InspectorPanel({
   audioDeviceId = '',
   onAudioDeviceIdChange,
   videoError = null,
+  onConnectMedia,
+  hasVideoStream = false,
   aspectRatio = '16:9',
   onAspectRatioChange,
   resolutions = [],
@@ -318,6 +322,8 @@ export function InspectorPanel({
               audioDeviceId={audioDeviceId}
               onAudioDeviceIdChange={onAudioDeviceIdChange}
               error={videoError}
+              onConnect={onConnectMedia}
+              hasStream={hasVideoStream}
             />
           </section>
           <section className={styles.section}>

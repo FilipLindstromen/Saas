@@ -224,7 +224,8 @@ export function drawOverlays(
       }
     }
     if (o.type === 'infographic' && o.infographicProjectId) {
-      const projectData = options.infographicProjects?.get(o.infographicProjectId)
+      const key = `${o.infographicProjectId}:${o.infographicTabId || 'default'}`
+      const projectData = options.infographicProjects?.get(key)
       if (projectData) {
         const timelineDuration = Math.max(0.001, typeof projectData.timelineDuration === 'number' ? projectData.timelineDuration : 10)
         const elapsed = currentTime - o.startTime

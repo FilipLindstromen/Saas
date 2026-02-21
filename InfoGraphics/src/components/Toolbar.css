@@ -3,16 +3,17 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: #18181b;
-  border-bottom: 1px solid #27272a;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  box-shadow: var(--header-inset);
 }
 
 .toolbar-logo {
   flex-shrink: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #e4e4e7;
+  color: var(--text-primary);
   letter-spacing: 0.03em;
   margin-right: 0.25rem;
 }
@@ -25,23 +26,23 @@
 
 .toolbar-label {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .toolbar-select {
   padding: 0.35rem 0.6rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.875rem;
   cursor: pointer;
 }
 
 .toolbar-select:hover {
-  border-color: #52525b;
+  border-color: var(--border-strong);
 }
 
 .toolbar-btn {
@@ -49,35 +50,35 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.4rem 0.75rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .toolbar-btn:hover {
-  background: #3f3f46;
-  border-color: #52525b;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .toolbar-btn-primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--accent-gradient);
+  border-color: var(--accent);
   color: white;
 }
 
 .toolbar-btn-primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--accent);
+  border-color: var(--accent-hover);
 }
 
 .toolbar-divider {
   width: 1px;
   height: 24px;
-  background: #3f3f46;
+  background: var(--border-default);
 }
 
 .toolbar-spacer {
@@ -104,9 +105,13 @@
 }
 
 .toolbar-btn-icon.active {
-  background: #3f3f46;
-  border-color: #52525b;
-  color: #3b82f6;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+
+.toolbar-btn-theme {
+  color: var(--text-primary);
 }
 
 .toolbar-btn-icon svg {

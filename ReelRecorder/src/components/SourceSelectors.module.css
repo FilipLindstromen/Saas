@@ -4,6 +4,28 @@
   gap: 10px;
 }
 
+.connectBtn {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.connectBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.connectBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .error {
   color: var(--danger);
   font-size: 0.9rem;

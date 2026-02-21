@@ -8,15 +8,20 @@ import RightPanel from './components/RightPanel'
 import GenerateInput from './components/GenerateInput'
 import Toolbar from './components/Toolbar'
 import ProjectSelector from './components/ProjectSelector'
+import TabBar from './components/TabBar'
 import SettingsModal, { loadApiKeys, saveApiKeys } from './components/SettingsModal'
 import ShortcutsModal from './components/ShortcutsModal'
-import { applyLayout } from './layouts'
+import TemplateEditBanner from './components/TemplateEditBanner'
+import { LAYOUTS, applyLayout, applyLayoutWithContent, getLayoutSlotCount } from './layouts'
 import * as projectStorage from './utils/projectStorage'
+import { loadCustomTemplates, saveCustomTemplate, getCustomTemplate } from './utils/customTemplates'
 import './App.css'
 
 function getApiHeaders(apiKeys) {
   const h = { 'Content-Type': 'application/json' }
   if (apiKeys?.giphy) h['X-Giphy-Api-Key'] = apiKeys.giphy
+  if (apiKeys?.pixabay) h['X-Pixabay-Api-Key'] = apiKeys.pixabay
+  if (apiKeys?.pexels) h['X-Pexels-Api-Key'] = apiKeys.pexels
   if (apiKeys?.openai) h['X-OpenAI-Api-Key'] = apiKeys.openai
   return h
 }
@@ -69,6 +74,7 @@ function App() {
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('appTheme') || 'dark')
   const [apiKeys, setApiKeys] = useState(() => loadApiKeys())
   const [latestImages, setLatestImages] = useState([])
 
@@ -82,6 +88,10 @@ function App() {
   const [brandPrimaryColor, setBrandPrimaryColor] = useState('#3b82f6')
   const [brandSecondaryColor, setBrandSecondaryColor] = useState('#1e40af')
   const [brandFontFamily, setBrandFontFamily] = useState('Inter')
+  const [selectedLayoutId, setSelectedLayoutId] = useState(null)
+  const [templateEditMode, setTemplateEditMode] = useState(false)
+  const [customTemplates, setCustomTemplates] = useState(() => loadCustomTemplates())
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   const [leftPanelTab, setLeftPanelTab] = useState('document')
   const [rightPanelTab, setRightPanelTab] = useState('inspector')
   const [leftPanelWidth, setLeftPanelWidth] = useState(240)
@@ -93,6 +103,8 @@ function App() {
   const [timelineHeight, setTimelineHeight] = useState(140)
   const [projects, setProjects] = useState([])
   const [currentProjectId, setCurrentProjectId] = useState(null)
+  const [currentTabId, setCurrentTabId] = useState(null)
+  const [currentTabName, setCurrentTabName] = useState('Document 1')
   const canvasRef = useRef(null)
   const hasHydrated = useRef(false)
   const undoStack = useRef([])
@@ -144,6 +156,12 @@ function App() {
     if (savedBrandFont && typeof savedBrandFont === 'string') setBrandFontFamily(savedBrandFont)
   }, [])
 
+  // Apply theme to document and persist
+  useEffect(() => {
+    localStorage.setItem('appTheme', theme)
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
   useEffect(() => {
     let projectList = projectStorage.loadProjects()
     let projectId = projectStorage.loadCurrentProjectId()
@@ -175,7 +193,44 @@ function App() {
     setProjects(projectList)
     setCurrentProjectId(projectId)
 
-    const data = projectStorage.loadProjectData(projectId)
+    let tabId = projectStorage.loadCurrentTabId(projectId)
+    const tabs = projectStorage.getProjectTabs(projectId)
+    if (tabs.length === 0) {
+      projectStorage.saveProjectData(projectId, {
+        elements: [],
+        aspectRatio: '16:9',
+        resolution: 800,
+        backgroundColor: '#ffffff',
+        zoom: 100,
+        selectedIds: [],
+        leftPanelTab: 'document',
+        rightPanelTab: 'inspector',
+        leftPanelWidth: 240,
+        rightPanelWidth: 320,
+        includeBackgroundInExport: true,
+        defaultFontFamily: 'Inter',
+        defaultFontSize: 14,
+        timelineDuration: 10,
+        showTimeline: true,
+        timelineHeight: 140,
+        brandPrimaryColor: '#3b82f6',
+        brandSecondaryColor: '#1e40af',
+        brandFontFamily: 'Inter'
+      })
+      const newTabs = projectStorage.getProjectTabs(projectId)
+      tabId = newTabs[0]?.id || null
+    }
+    if (!tabId || !tabs.some(t => t.id === tabId)) {
+      tabId = tabs[0]?.id || null
+    }
+    if (tabId) {
+      projectStorage.saveCurrentTabId(projectId, tabId)
+      setCurrentTabId(tabId)
+      const tab = tabs.find(t => t.id === tabId)
+      setCurrentTabName(tab?.name || 'Document 1')
+    }
+
+    const data = projectStorage.getDocumentDataForProject(projectId, tabId)
     if (data) {
       try {
         applyProjectData(data)
@@ -197,7 +252,7 @@ function App() {
   }, [applyProjectData])
 
   useEffect(() => {
-    if (!hasHydrated.current || !currentProjectId) return
+    if (!hasHydrated.current || !currentProjectId || !currentTabId) return
     const data = {
       elements,
       aspectRatio,
@@ -219,8 +274,8 @@ function App() {
       brandSecondaryColor,
       brandFontFamily
     }
-    projectStorage.saveProjectData(currentProjectId, data)
-  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
+    projectStorage.saveTabData(currentProjectId, currentTabId, currentTabName, data)
+  }, [currentProjectId, currentTabId, currentTabName, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
 
   const createProject = useCallback(() => {
     const id = projectStorage.generateProjectId()
@@ -251,6 +306,11 @@ function App() {
     })
     setProjects(updated)
     setCurrentProjectId(id)
+    const newTabs = projectStorage.getProjectTabs(id)
+    const firstTabId = newTabs[0]?.id || null
+    setCurrentTabId(firstTabId)
+    setCurrentTabName(newTabs[0]?.name || 'Document 1')
+    projectStorage.saveCurrentTabId(id, firstTabId)
     setElements([])
     setSelectedIds([])
     setAspectRatio('16:9')
@@ -276,8 +336,8 @@ function App() {
   }, [projects])
 
   const saveCurrentProjectToStorage = useCallback(() => {
-    if (!currentProjectId) return
-    projectStorage.saveProjectData(currentProjectId, {
+    if (!currentProjectId || !currentTabId) return
+    projectStorage.saveTabData(currentProjectId, currentTabId, currentTabName, {
       elements,
       aspectRatio,
       resolution,
@@ -298,12 +358,21 @@ function App() {
       brandSecondaryColor,
       brandFontFamily
     })
-  }, [currentProjectId, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
+  }, [currentProjectId, currentTabId, currentTabName, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
 
   const switchProject = useCallback((id) => {
     if (id === currentProjectId) return
     saveCurrentProjectToStorage()
-    const data = projectStorage.loadProjectData(id)
+    const tabs = projectStorage.getProjectTabs(id)
+    let tabId = projectStorage.loadCurrentTabId(id)
+    if (!tabId || !tabs.some(t => t.id === tabId)) tabId = tabs[0]?.id || null
+    if (tabId) {
+      projectStorage.saveCurrentTabId(id, tabId)
+      setCurrentTabId(tabId)
+      const tab = tabs.find(t => t.id === tabId)
+      setCurrentTabName(tab?.name || 'Document 1')
+    }
+    const data = projectStorage.getDocumentDataForProject(id, tabId)
     if (data) {
       isRestoring.current = true
       applyProjectData(data)
@@ -319,6 +388,97 @@ function App() {
     undoStack.current = []
     redoStack.current = []
   }, [currentProjectId, applyProjectData, saveCurrentProjectToStorage])
+
+  const switchTab = useCallback((tabId) => {
+    if (tabId === currentTabId || !currentProjectId) return
+    saveCurrentProjectToStorage()
+    const tabs = projectStorage.getProjectTabs(currentProjectId)
+    const tab = tabs.find(t => t.id === tabId)
+    if (!tab) return
+    projectStorage.saveCurrentTabId(currentProjectId, tabId)
+    setCurrentTabId(tabId)
+    setCurrentTabName(tab.name || 'Document')
+    const data = projectStorage.getDocumentDataForProject(currentProjectId, tabId)
+    if (data) {
+      isRestoring.current = true
+      applyProjectData(data)
+      isRestoring.current = false
+    } else {
+      setElements([])
+      setSelectedIds([])
+      setTimelineCurrentTime(0)
+      nextId = 1
+    }
+    undoStack.current = []
+    redoStack.current = []
+  }, [currentProjectId, currentTabId, applyProjectData, saveCurrentProjectToStorage])
+
+  const addTab = useCallback(() => {
+    if (!currentProjectId) return
+    const tabId = projectStorage.addProjectTab(currentProjectId, 'New document')
+    projectStorage.saveCurrentTabId(currentProjectId, tabId)
+    setCurrentTabId(tabId)
+    setCurrentTabName('New document')
+    const defaultData = {
+      elements: [],
+      aspectRatio: '16:9',
+      resolution: 800,
+      backgroundColor: '#ffffff',
+      zoom: 100,
+      selectedIds: [],
+      leftPanelTab: 'document',
+      rightPanelTab: 'inspector',
+      leftPanelWidth: 240,
+      rightPanelWidth: 320,
+      includeBackgroundInExport: true,
+      defaultFontFamily: 'Inter',
+      defaultFontSize: 14,
+      timelineDuration: 10,
+      showTimeline: true,
+      timelineHeight: 140,
+      brandPrimaryColor: '#3b82f6',
+      brandSecondaryColor: '#1e40af',
+      brandFontFamily: 'Inter'
+    }
+    isRestoring.current = true
+    applyProjectData(defaultData)
+    isRestoring.current = false
+    undoStack.current = []
+    redoStack.current = []
+    nextId = 1
+  }, [currentProjectId, applyProjectData])
+
+  const deleteTab = useCallback((tabId) => {
+    if (!currentProjectId) return
+    saveCurrentProjectToStorage()
+    const nextTabId = projectStorage.removeProjectTab(currentProjectId, tabId)
+    if (nextTabId === null) return
+    if (tabId === currentTabId) {
+      const tabs = projectStorage.getProjectTabs(currentProjectId)
+      const nextTab = tabs.find(t => t.id === nextTabId)
+      if (nextTab) {
+        setCurrentTabId(nextTabId)
+        setCurrentTabName(nextTab.name)
+        projectStorage.saveCurrentTabId(currentProjectId, nextTabId)
+        const data = projectStorage.getDocumentDataForProject(currentProjectId, nextTabId)
+        if (data) {
+          isRestoring.current = true
+          applyProjectData(data)
+          isRestoring.current = false
+        }
+      }
+    }
+    undoStack.current = []
+    redoStack.current = []
+  }, [currentProjectId, currentTabId, saveCurrentProjectToStorage, applyProjectData])
+
+  const renameTab = useCallback((tabId, name) => {
+    if (!currentProjectId) return
+    projectStorage.renameProjectTab(currentProjectId, tabId, name)
+    if (tabId === currentTabId) {
+      setCurrentTabName((name || 'Document').trim())
+    }
+  }, [currentProjectId, currentTabId])
 
   const renameProject = useCallback((id, name) => {
     if (!name.trim()) return
@@ -644,7 +804,13 @@ function App() {
   const handleApplyLayout = useCallback((layoutId) => {
     pushUndoState(elements, selectedIds)
     const maxId = elements.length > 0 ? Math.max(...elements.map(e => e.id), 0) : 0
-    const raw = applyLayout(layoutId, maxId)
+    let raw
+    const custom = getCustomTemplate(layoutId)
+    if (custom?.elements) {
+      raw = custom.elements.map((e, i) => ({ ...e, id: maxId + 1 + i, zIndex: e.zIndex ?? i }))
+    } else {
+      raw = applyLayout(layoutId, maxId)
+    }
     const newElements = raw.map(e => ({
       ...e,
       clipStart: e.clipStart ?? 0,
@@ -658,6 +824,27 @@ function App() {
       nextId = Math.max(...newElements.map(e => e.id), 0) + 1
     }
   }, [elements, selectedIds, pushUndoState, timelineDuration])
+
+  const handleSaveTemplate = useCallback(async (name) => {
+    setIsSavingTemplate(true)
+    try {
+      saveCustomTemplate({ name, elements })
+      setCustomTemplates(loadCustomTemplates())
+      setSelectedLayoutId(null)
+    } finally {
+      setIsSavingTemplate(false)
+    }
+  }, [elements])
+
+  const handleEnterTemplateMode = useCallback(() => {
+    setTemplateEditMode(prev => !prev)
+  }, [])
+
+  useEffect(() => {
+    if (templateEditMode && leftPanelTab !== 'layouts') {
+      setLeftPanelTab('layouts')
+    }
+  }, [templateEditMode])
 
   const addToLatest = useCallback((imageUrl, source, searchQuery) => {
     const entry = { url: imageUrl, source: source || 'giphy', addedAt: Date.now(), searchQuery: searchQuery || undefined }
@@ -713,6 +900,8 @@ function App() {
         onDeleteProject={deleteProject}
         onOpenSettings={() => setShowSettings(true)}
         onShowShortcuts={() => setShowShortcuts(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         onAddElement={addElement}
         showTimeline={showTimeline}
         onToggleTimeline={() => setShowTimeline(v => !v)}
@@ -735,11 +924,26 @@ function App() {
           timelineDuration
         }}
       />
+      <TabBar
+        tabs={currentProjectId ? projectStorage.getProjectTabs(currentProjectId) : []}
+        currentTabId={currentTabId}
+        currentTabName={currentTabName}
+        onSwitchTab={switchTab}
+        onAddTab={addTab}
+        onDeleteTab={deleteTab}
+        onRenameTab={renameTab}
+      />
       <div className="app-main">
         <LeftPanel
           tab={leftPanelTab}
           onTabChange={setLeftPanelTab}
           onApplyLayout={handleApplyLayout}
+          selectedLayoutId={selectedLayoutId}
+          onSelectLayout={setSelectedLayoutId}
+          customTemplates={customTemplates}
+          onCustomTemplatesChange={() => setCustomTemplates(loadCustomTemplates())}
+          onEnterTemplateMode={handleEnterTemplateMode}
+          templateEditMode={templateEditMode}
           width={leftPanelWidth}
           onResize={setLeftPanelWidth}
           aspectRatio={aspectRatio}
@@ -766,14 +970,30 @@ function App() {
           hasElements={elements.length > 0}
         />
         <div className="app-left">
+          {templateEditMode && (
+            <TemplateEditBanner
+              onSave={handleSaveTemplate}
+              onExit={() => setTemplateEditMode(false)}
+              isSaving={isSavingTemplate}
+            />
+          )}
           <GenerateInput
+            selectedLayoutId={selectedLayoutId}
+            selectedLayoutName={
+              LAYOUTS.find(l => l.id === selectedLayoutId)?.name ||
+              getCustomTemplate(selectedLayoutId)?.name
+            }
             onGenerate={async (prompt) => {
+              const layoutId = selectedLayoutId || '5-step-v'
+              const custom = getCustomTemplate(layoutId)
+              const customElements = custom?.elements
+              const stepCount = getLayoutSlotCount(layoutId, customElements)
               let res
               try {
                 res = await fetch('/api/generate', {
                   method: 'POST',
                   headers: getApiHeaders(apiKeys),
-                  body: JSON.stringify({ prompt })
+                  body: JSON.stringify({ prompt, stepCount })
                 })
               } catch (e) {
                 throw new Error('Cannot reach server – start the backend with: npm run server (from InfoGraphics folder)')
@@ -790,13 +1010,20 @@ function App() {
                 throw new Error(msg)
               }
               const { steps } = await res.json()
-              steps.forEach((step, i) => {
-                addElement('image-text', {
-                  text: step.text,
-                  imageUrl: step.imageUrl || '',
-                  imageSource: step.imageSource
-                }, i)
-              })
+              pushUndoState(elements, selectedIds)
+              const maxId = elements.length > 0 ? Math.max(...elements.map(e => e.id), 0) : 0
+              const newElements = applyLayoutWithContent(layoutId, steps, maxId, customElements).map(e => ({
+                ...e,
+                clipStart: e.clipStart ?? 0,
+                clipEnd: e.clipEnd ?? timelineDuration,
+                animationIn: e.animationIn ?? 'none',
+                animationOut: e.animationOut ?? 'none'
+              }))
+              setElements(newElements)
+              setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])
+              if (newElements.length > 0) {
+                nextId = Math.max(...newElements.map(e => e.id), 0) + 1
+              }
             }}
           />
           <CanvasControls

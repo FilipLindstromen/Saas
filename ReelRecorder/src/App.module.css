@@ -5,18 +5,6 @@
   color: var(--text-primary);
 }
 
-/* Subtle ambient gradient */
-.app::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(99, 102, 241, 0.04), transparent);
-  pointer-events: none;
-  z-index: 0;
-}
-
 .header {
   position: relative;
   z-index: 20;
@@ -25,13 +13,12 @@
   justify-content: space-between;
   gap: 24px;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   flex-wrap: wrap;
-  box-shadow: var(--shadow-sm), 0 1px 0 rgba(255, 255, 255, 0.03);
-  transition: box-shadow var(--transition-smooth);
+  box-shadow: var(--header-inset);
 }
 
 .headerLeft {
@@ -130,8 +117,8 @@
 }
 
 .recordStopToggleRecord {
-  background: linear-gradient(135deg, var(--success) 0%, color-mix(in srgb, var(--success) 85%, black) 100%);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+  background: var(--accent-gradient);
+  box-shadow: var(--shadow-sm);
 }
 
 .recordStopToggleRecord:hover:not(:disabled) {
@@ -156,37 +143,41 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--text-secondary);
-  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
   cursor: pointer;
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
 }
 
 .editPreviewSourceBtn:hover {
-  color: var(--text);
-  background: var(--surface-hover);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .editPreviewSourceBtn:active {
-  background: color-mix(in srgb, var(--surface-hover) 90%, var(--surface));
+  transform: translateY(0);
 }
 
 .editPreviewSourceBtnActive {
-  color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
-  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .editPreviewSourceBtnActive:hover {
-  background: color-mix(in srgb, var(--primary) 28%, transparent);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
 }
 
 .recordStopToggleStop {
-  background: linear-gradient(135deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 85%, black) 100%);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+  background: var(--accent-secondary);
+  box-shadow: 0 1px 3px rgba(255, 71, 87, 0.35);
   transition: transform var(--transition-fast), box-shadow var(--transition-smooth), filter var(--transition-fast);
 }
 
@@ -202,12 +193,9 @@
 .title {
   margin: 0;
   font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .subtitle {
@@ -248,18 +236,20 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   cursor: pointer;
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .themeToggle:hover {
-  color: var(--text-primary);
-  border-color: var(--accent);
-  background: var(--surface-hover);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .settingsBtn {
@@ -269,18 +259,21 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   flex-shrink: 0;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
 }
 
 .settingsBtn:hover {
-  color: var(--text-primary);
+  background: var(--bg-hover);
   border-color: var(--accent);
-  background: var(--surface-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  color: var(--accent);
 }
 
 .clearBtn {
@@ -290,18 +283,19 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   flex-shrink: 0;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
 }
 
 .clearBtn:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: rgba(239, 68, 68, 0.08);
+  color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
+  background: rgba(255, 71, 87, 0.15);
   transform: scale(1.05);
 }
 
@@ -311,7 +305,7 @@
   gap: 4px;
   margin-right: 4px;
   padding-right: 8px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .panelToggle,
@@ -322,25 +316,26 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--button-radius);
   cursor: pointer;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
 }
 
 .panelToggle:hover:not(:disabled) {
-  color: var(--text-primary);
+  background: var(--bg-hover);
   border-color: var(--accent);
-  background: var(--surface-hover);
-  transform: scale(1.05);
-  box-shadow: var(--shadow-glow-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  color: var(--accent);
 }
 
 .panelToggle:active:not(:disabled),
 .panelToggleActive:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: translateY(0);
 }
 
 .panelToggle:disabled {
@@ -349,15 +344,15 @@
 }
 
 .panelToggleActive {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--bg-hover);
   border-color: var(--accent);
   color: var(--accent);
 }
 
 .panelToggleActive:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-  transform: scale(1.05);
-  box-shadow: var(--shadow-glow-accent);
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .recordTimer {
@@ -367,15 +362,15 @@
   padding: 8px 16px;
   min-width: 72px;
   justify-content: center;
-  background: color-mix(in srgb, var(--bg-tertiary) 95%, var(--accent));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
   font-variant-numeric: tabular-nums;
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  transition: box-shadow var(--transition-smooth);
+  box-shadow: var(--header-inset);
+  transition: box-shadow 0.2s ease;
 }
 
 .recordTimerDot {
@@ -406,22 +401,19 @@
   width: 320px;
   z-index: 10;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
   padding: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-md), 1px 0 0 rgba(255, 255, 255, 0.02);
-  transition: box-shadow var(--transition-smooth);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
 }
 
 .leftPanelTabs {
   display: flex;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 8px;
   gap: 0;
 }
@@ -431,7 +423,7 @@
   padding: 10px 12px;
   font-size: 0.9rem;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -446,8 +438,8 @@
   flex: 1;
   padding: 10px 12px;
   font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--text-primary);
   background: none;
   border: none;
   border-bottom: 2px solid var(--accent);
@@ -455,7 +447,7 @@
 }
 
 .leftPanelTabActive:hover {
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
 .leftPanelContent {
@@ -496,30 +488,27 @@
   z-index: 10;
   display: flex;
   flex-direction: row;
-  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-subtle);
   box-sizing: border-box;
-  box-shadow: var(--shadow-md), -1px 0 0 rgba(255, 255, 255, 0.02);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
 }
 
 .inspectorResizeHandle {
-  width: 6px;
+  width: 4px;
   flex-shrink: 0;
-  cursor: ew-resize;
-  background: transparent;
+  cursor: col-resize;
+  background: var(--bg-tertiary);
   touch-action: none;
+  transition: background 0.2s;
 }
 
 .inspectorResizeHandle:hover {
   background: var(--accent);
-  opacity: 0.25;
 }
 
 .inspectorResizeHandle:active {
-  background: var(--accent);
-  opacity: 0.4;
+  background: var(--accent-active);
 }
 
 .inspectorFixed {
@@ -533,7 +522,7 @@
 .globalTimeline {
   flex-shrink: 0;
   padding: 0 24px 24px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -542,12 +531,13 @@
 
 .timelineResizeHandle {
   flex-shrink: 0;
-  height: 8px;
-  cursor: ns-resize;
-  background: var(--border);
+  height: 4px;
+  cursor: row-resize;
+  background: var(--bg-tertiary);
   margin: 8px 0 0;
   border-radius: 4px 4px 0 0;
   touch-action: none;
+  transition: background 0.2s;
 }
 
 .timelineResizeHandle:hover {
@@ -572,16 +562,16 @@
 
 .section {
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   padding: 18px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  transition: box-shadow var(--transition-smooth), border-color var(--transition-fast);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .section:hover {
-  border-color: color-mix(in srgb, var(--border) 90%, var(--accent));
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .sectionTitle {
@@ -725,15 +715,15 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   padding: 18px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  transition: box-shadow var(--transition-smooth);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease;
 }
 
 .previewSection:hover {
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-md);
 }
 
 .previewHeader {
@@ -800,6 +790,7 @@
 
 /* Inner wrapper fills available height between header and timeline, centers preview */
 .previewInner {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -807,6 +798,50 @@
   align-items: center;
   width: 100%;
   overflow: hidden;
+}
+
+.connectOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.connectOverlayText {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.connectOverlayBtn {
+  padding: 0.625rem 1.5rem;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--button-radius);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.connectOverlayBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
+}
+
+.connectOverlayHint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
 }
 
 .countdownOverlay {
@@ -824,7 +859,7 @@
   font-size: clamp(72px, 20vw, 180px);
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 80px rgba(99, 102, 241, 0.3);
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 80px rgba(255, 107, 53, 0.3);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   animation: countdownPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -901,34 +936,35 @@
 }
 
 .playBtn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   color: var(--text-primary);
 }
 
 .playBtn:hover {
+  background: var(--bg-hover);
   border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
   color: var(--accent);
-  transform: scale(1.02);
-  box-shadow: var(--shadow-glow-accent);
 }
 
 .playBtn:active,
 .downloadBtn:active {
-  transform: scale(0.98);
+  transform: translateY(0);
 }
 
 .downloadBtn {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  background: var(--accent-gradient);
   color: #fff;
   border: none;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .downloadBtn:hover {
-  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
-  transform: scale(1.02);
-  box-shadow: var(--shadow-glow-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.1);
 }
 
 .editorWrap {

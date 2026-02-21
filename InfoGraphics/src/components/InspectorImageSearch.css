@@ -6,33 +6,47 @@
 
 .inspector-image-search-form {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inspector-image-search-form-row {
+  display: flex;
   gap: 0.35rem;
+  align-items: center;
+}
+
+.inspector-image-search-form-row input {
+  flex: 1;
+  min-width: 0;
 }
 
 .inspector-image-search-form select,
 .inspector-image-search-form input {
   padding: 0.4rem 0.5rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.8rem;
 }
 
 .inspector-image-search-form input {
-  flex: 1;
   min-width: 80px;
 }
 
 .inspector-image-search-form button {
   padding: 0.4rem 0.6rem;
-  background: #3b82f6;
+  background: var(--accent-gradient);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--button-radius);
   color: white;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+.inspector-image-search-form button:hover:not(:disabled) {
+  background: var(--accent);
 }
 
 .inspector-image-search-form button:disabled {
@@ -42,7 +56,7 @@
 
 .inspector-image-search-error {
   font-size: 0.75rem;
-  color: #ef4444;
+  color: var(--accent-secondary);
   margin: 0;
 }
 
@@ -54,14 +68,14 @@
 
 .inspector-image-search-label {
   font-size: 0.7rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .inspector-image-search-loading {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-tertiary);
 }
 
 .inspector-image-search-grid {
@@ -73,16 +87,16 @@
 .inspector-image-search-item {
   aspect-ratio: 1;
   padding: 0;
-  background: #27272a;
+  background: var(--bg-tertiary);
   border: 2px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--button-radius);
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.15s;
 }
 
 .inspector-image-search-item:hover {
-  border-color: #3b82f6;
+  border-color: var(--accent);
 }
 
 .inspector-image-search-item img {
@@ -94,18 +108,18 @@
 .inspector-image-search-show-more {
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #a1a1aa;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-tertiary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .inspector-image-search-show-more:hover:not(:disabled) {
-  background: #3f3f46;
-  color: #e4e4e7;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .inspector-image-search-show-more:disabled {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { MediaDeviceInfo } from '../hooks/useMediaDevices'
 import type { VideoSourceKind } from '../types'
 import styles from './SourceSelectors.module.css'
@@ -12,6 +13,8 @@ interface SourceSelectorsProps {
   audioDeviceId: string
   onAudioDeviceIdChange: (id: string) => void
   error: string | null
+  onConnect?: () => void | Promise<void>
+  hasStream?: boolean
 }
 
 export function SourceSelectors({
@@ -24,9 +27,33 @@ export function SourceSelectors({
   audioDeviceId,
   onAudioDeviceIdChange,
   error,
+  onConnect,
+  hasStream = false,
 }: SourceSelectorsProps) {
+  const [connecting, setConnecting] = useState(false)
+
+  const handleConnect = async () => {
+    if (!onConnect || connecting) return
+    setConnecting(true)
+    try {
+      await onConnect()
+    } finally {
+      setConnecting(false)
+    }
+  }
+
   return (
     <div className={styles.wrap}>
+      {!hasStream && onConnect && (
+        <button
+          type="button"
+          className={styles.connectBtn}
+          onClick={handleConnect}
+          disabled={connecting}
+        >
+          {connecting ? 'Connecting…' : videoKind === 'screen' ? 'Connect screen' : 'Connect camera'}
+        </button>
+      )}
       {error && <p className={styles.error}>{error}</p>}
       <div className={`${styles.row} ${styles.rowInline}`}>
         <label className={styles.label}>Video source</label>

@@ -20,6 +20,14 @@ function getGiphyKey(req) {
   return req.headers['x-giphy-api-key'] || process.env.GIPHY_API_KEY || ''
 }
 
+function getPixabayKey(req) {
+  return req.headers['x-pixabay-api-key'] || process.env.PIXABAY_API_KEY || ''
+}
+
+function getPexelsKey(req) {
+  return req.headers['x-pexels-api-key'] || process.env.PEXELS_API_KEY || ''
+}
+
 function getOpenAIKey(req) {
   return req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY || ''
 }
@@ -53,6 +61,53 @@ async function searchGiphy(q, type = 'stickers', limit = 20, offset = 0, apiKey)
     }).filter(Boolean)
   } catch (e) {
     console.error('Giphy search error:', e.message)
+    return []
+  }
+}
+
+// Search Pixabay
+async function searchPixabay(q, limit = 24, page = 1, apiKey) {
+  try {
+    const key = (apiKey || process.env.PIXABAY_API_KEY || '').trim()
+    if (!key) {
+      console.error('Pixabay search: no API key provided')
+      return []
+    }
+    const res = await fetch(
+      `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}&per_page=${limit}&page=${page}&safesearch=true`
+    )
+    const data = await res.json().catch(() => ({}))
+    if (!data?.hits || !Array.isArray(data.hits)) return []
+    return data.hits.map((item) => {
+      const url = item.webformatURL || item.largeImageURL || item.previewURL
+      return url ? { url } : null
+    }).filter(Boolean)
+  } catch (e) {
+    console.error('Pixabay search error:', e.message)
+    return []
+  }
+}
+
+// Search Pexels
+async function searchPexels(q, limit = 24, page = 1, apiKey) {
+  try {
+    const key = (apiKey || process.env.PEXELS_API_KEY || '').trim()
+    if (!key) {
+      console.error('Pexels search: no API key provided')
+      return []
+    }
+    const res = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=${limit}&page=${page}`,
+      { headers: { Authorization: key } }
+    )
+    const data = await res.json().catch(() => ({}))
+    if (!data?.photos || !Array.isArray(data.photos)) return []
+    return data.photos.map((photo) => {
+      const url = photo.src?.medium || photo.src?.large || photo.src?.original
+      return url ? { url } : null
+    }).filter(Boolean)
+  } catch (e) {
+    console.error('Pexels search error:', e.message)
     return []
   }
 }
@@ -96,7 +151,7 @@ async function saveImage(url, baseUrl) {
   }
 }
 
-// GET /api/search?service=giphy|iconify&type=stickers|gifs|icons&q=...&offset=...
+// GET /api/search?service=giphy|iconify|pixabay|pexels&type=...&q=...&offset=...
 app.get('/api/search', async (req, res) => {
   try {
     const { service, type, q, offset } = req.query
@@ -111,6 +166,20 @@ app.get('/api/search', async (req, res) => {
       results = await searchGiphy(q, type || 'stickers', 24, off, apiKey)
     } else if (service === 'iconify') {
       results = await searchIconify(q, 32, off)
+    } else if (service === 'pixabay') {
+      const apiKey = getPixabayKey(req)
+      if (!apiKey?.trim()) {
+        return res.status(400).json({ error: 'Pixabay API key required. Add it in Settings (gear icon).' })
+      }
+      const page = Math.floor(off / 24) + 1
+      results = await searchPixabay(q, 24, page, apiKey)
+    } else if (service === 'pexels') {
+      const apiKey = getPexelsKey(req)
+      if (!apiKey?.trim()) {
+        return res.status(400).json({ error: 'Pexels API key required. Add it in Settings (gear icon).' })
+      }
+      const page = Math.floor(off / 24) + 1
+      results = await searchPexels(q, 24, page, apiKey)
     }
     res.json({ results })
   } catch (e) {
@@ -136,7 +205,7 @@ app.post('/api/save-image', async (req, res) => {
 // POST /api/generate - AI generate steps and fetch images
 app.post('/api/generate', async (req, res) => {
   try {
-    const { prompt } = req.body
+    const { prompt, stepCount } = req.body
     if (!prompt) return res.status(400).json({ error: 'prompt required' })
 
     const openaiKey = getOpenAIKey(req)
@@ -151,7 +220,7 @@ app.post('/api/generate', async (req, res) => {
           messages: [
             {
               role: 'system',
-              content: `You are an infographic designer. Given a user prompt like "5-step process of how the stress response works in hand drawn style", output a JSON array of steps. Each step has: "text" (short label for the step, 3-8 words) and "searchTerm" (search query for finding an icon/sticker, e.g. "stress brain", "cortisol", "fight or flight"). Use simple, visual search terms. Output ONLY valid JSON, no markdown.`
+              content: `You are an infographic designer. Given a user prompt, output a JSON array of steps. Each step has: "text" (short label 3-8 words, optionally followed by a brief description on a new line) and "searchTerm" (search query for finding an icon/sticker, e.g. "stress brain", "cortisol"). Use simple, visual search terms. Output ONLY valid JSON, no markdown.${stepCount ? ` Generate exactly ${stepCount} steps.` : ''}`
             },
             {
               role: 'user',
@@ -176,7 +245,7 @@ app.post('/api/generate', async (req, res) => {
     if (steps.length === 0) {
       // Fallback: simple heuristic - extract number and topic
       const match = prompt.match(/(\d+)[- ]?step\s+(?:process\s+of\s+)?(.+?)(?:\s+in\s+(.+))?$/i)
-      const n = match ? parseInt(match[1], 10) : 5
+      const n = stepCount || (match ? parseInt(match[1], 10) : 5)
       const topic = match ? match[2].trim() : prompt
       const style = match ? match[3] || '' : ''
       for (let i = 0; i < Math.min(n, 10); i++) {
@@ -196,7 +265,7 @@ app.post('/api/generate', async (req, res) => {
       let imageUrl = ''
       let imageSource = null
       if (giphyKey) {
-        const giphyResults = await searchGiphy(term, searchType, 1, giphyKey)
+        const giphyResults = await searchGiphy(term, searchType, 1, 0, giphyKey)
         if (giphyResults[0]) {
           imageUrl = giphyResults[0].url
           imageSource = 'giphy'

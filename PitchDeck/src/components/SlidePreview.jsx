@@ -173,8 +173,8 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     onUpdate({ backgroundVideoUrl: '' })
   }
 
-  const handleInfographicSelect = (projectId) => {
-    onUpdate({ infographicProjectId: projectId || undefined })
+  const handleInfographicSelect = (projectId, tabId) => {
+    onUpdate({ infographicProjectId: projectId || undefined, infographicTabId: tabId || undefined })
     setShowInfographicPicker(false)
   }
 
@@ -297,7 +297,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
               {slide.infographicProjectId && (
                 <button
                   className="btn-icon btn-remove-infographic"
-                  onClick={() => onUpdate({ infographicProjectId: undefined })}
+                  onClick={() => onUpdate({ infographicProjectId: undefined, infographicTabId: undefined })}
                   title="Remove infographic background"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -443,6 +443,7 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         onClose={() => setShowInfographicPicker(false)}
         onSelect={handleInfographicSelect}
         currentProjectId={slide.infographicProjectId}
+        currentTabId={slide.infographicTabId}
       />
       <ImagePicker
         isOpen={showImagePicker}

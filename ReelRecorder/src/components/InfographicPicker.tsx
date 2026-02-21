@@ -1,58 +1,90 @@
 import { useState, useEffect } from 'react'
-import { loadInfographicProjects, loadInfographicProjectData } from '../utils/infographicLoader'
+import {
+  loadInfographicProjects,
+  loadInfographicProjectData,
+  getInfographicProjectTabs,
+} from '../utils/infographicLoader'
 import type { InfographicProjectData } from '../utils/infographicLoader'
 import styles from './InfographicPicker.module.css'
 
 interface InfographicPickerProps {
   isOpen: boolean
   onClose: () => void
-  onSelect: (projectId: string, projectName: string) => void
+  onSelect: (projectId: string, tabId: string, projectName: string, tabName: string) => void
 }
 
-interface InfographicPickerItemProps {
+interface InfographicPickerProjectProps {
   project: { id: string; name: string }
-  isSelected: boolean
-  onSelect: () => void
+  selectedProjectId: string | null
+  selectedTabId: string | null
+  onSelect: (projectId: string, tabId: string) => void
 }
 
-function InfographicPickerItem({ project, isSelected, onSelect }: InfographicPickerItemProps) {
+function InfographicPickerProject({
+  project,
+  selectedProjectId,
+  selectedTabId,
+  onSelect,
+}: InfographicPickerProjectProps) {
+  const tabs = getInfographicProjectTabs(project.id)
+  const effectiveTabId =
+    selectedTabId && tabs.some((t) => t.id === selectedTabId) ? selectedTabId : tabs[0]?.id
   const [data, setData] = useState<InfographicProjectData | null>(null)
 
   useEffect(() => {
-    setData(loadInfographicProjectData(project.id))
-  }, [project.id])
+    setData(loadInfographicProjectData(project.id, effectiveTabId))
+  }, [project.id, effectiveTabId])
 
   const elementCount = data?.elements?.length ?? 0
   const hasTimeline =
     elementCount > 0 && data?.elements?.some((e) => e.clipStart != null || e.clipEnd != null)
+  const isSelected = selectedProjectId === project.id && selectedTabId === effectiveTabId
 
   return (
-    <button
-      type="button"
-      className={`${styles.item} ${isSelected ? styles.itemSelected : ''}`}
-      onClick={onSelect}
-    >
-      <div className={styles.itemPreview}>
-        {data?.elements?.length ? (
-          <SimpleThumb data={data} />
-        ) : (
-          <div className={styles.placeholder}>
-            <span>Empty</span>
-          </div>
+    <div className={styles.project}>
+      <div className={styles.projectHeader}>
+        <span className={styles.projectName}>{project.name || 'Untitled'}</span>
+        {tabs.length > 1 && (
+          <select
+            className={styles.tabSelect}
+            value={effectiveTabId || ''}
+            onChange={(e) => onSelect(project.id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {tabs.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
-      <div className={styles.itemInfo}>
-        <span className={styles.itemName}>{project.name || 'Untitled'}</span>
-        <span className={styles.itemMeta}>
-          {elementCount} element{elementCount !== 1 ? 's' : ''}
-          {hasTimeline && ' • Animated'}
-        </span>
-      </div>
-    </button>
+      <button
+        type="button"
+        className={`${styles.item} ${isSelected ? styles.itemSelected : ''}`}
+        onClick={() => onSelect(project.id, effectiveTabId || '')}
+      >
+        <div className={styles.itemPreview}>
+          {data?.elements?.length ? (
+            <SimpleThumb data={data} />
+          ) : (
+            <div className={styles.placeholder}>
+              <span>Empty</span>
+            </div>
+          )}
+        </div>
+        <div className={styles.itemInfo}>
+          <span className={styles.itemMeta}>
+            {tabs.length > 1 ? `${tabs.find((t) => t.id === effectiveTabId)?.name || 'Document'} • ` : ''}
+            {elementCount} element{elementCount !== 1 ? 's' : ''}
+            {hasTimeline && ' • Animated'}
+          </span>
+        </div>
+      </button>
+    </div>
   )
 }
 
-/** Simple thumb: show a colored block with element count */
 function SimpleThumb({ data }: { data: InfographicProjectData }) {
   const count = data?.elements?.length ?? 0
   return (
@@ -64,19 +96,30 @@ function SimpleThumb({ data }: { data: InfographicProjectData }) {
 
 export function InfographicPicker({ isOpen, onClose, onSelect }: InfographicPickerProps) {
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedTabId, setSelectedTabId] = useState<string | null>(null)
 
   useEffect(() => {
     if (isOpen) {
       setProjects(loadInfographicProjects())
-      setSelectedId(null)
+      setSelectedProjectId(null)
+      setSelectedTabId(null)
     }
   }, [isOpen])
 
+  const handleSelect = (projectId: string, tabId: string) => {
+    setSelectedProjectId(projectId)
+    setSelectedTabId(tabId)
+  }
+
   const handleConfirm = () => {
-    if (selectedId) {
-      const project = projects.find((p) => p.id === selectedId)
-      onSelect(selectedId, project?.name || 'Untitled')
+    if (selectedProjectId && selectedTabId) {
+      const project = projects.find((p) => p.id === selectedProjectId)
+      const tabs = getInfographicProjectTabs(selectedProjectId)
+      const tab = tabs.find((t) => t.id === selectedTabId)
+      const projectName = project?.name || 'Untitled'
+      const tabName = tabs.length > 1 ? (tab?.name || 'Document') : projectName
+      onSelect(selectedProjectId, selectedTabId, projectName, tabName)
       onClose()
     }
   }
@@ -89,8 +132,8 @@ export function InfographicPicker({ isOpen, onClose, onSelect }: InfographicPick
         <div className={styles.header}>
           <h3>Import Infographic</h3>
           <p className={styles.hint}>
-            Select an infographic from the InfoGraphics generator. It will appear as a timeline overlay
-            and play its animations when active.
+            Select an infographic from the InfoGraphics generator. It will appear as a timeline
+            overlay and play its animations when active.
           </p>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
             ×
@@ -115,11 +158,12 @@ export function InfographicPicker({ isOpen, onClose, onSelect }: InfographicPick
           ) : (
             <div className={styles.list}>
               {projects.map((p) => (
-                <InfographicPickerItem
+                <InfographicPickerProject
                   key={p.id}
                   project={p}
-                  isSelected={selectedId === p.id}
-                  onSelect={() => setSelectedId(p.id)}
+                  selectedProjectId={selectedProjectId}
+                  selectedTabId={selectedTabId}
+                  onSelect={handleSelect}
                 />
               ))}
             </div>
@@ -133,7 +177,7 @@ export function InfographicPicker({ isOpen, onClose, onSelect }: InfographicPick
             type="button"
             className={styles.confirmBtn}
             onClick={handleConfirm}
-            disabled={!selectedId}
+            disabled={!selectedProjectId || !selectedTabId}
           >
             Add to timeline
           </button>

@@ -322,10 +322,11 @@ function preloadInfographicData(overlays: OverlayItem[]): {
   const elementImages = new Map<string, HTMLImageElement>()
   for (const o of overlays) {
     if (o.type !== 'infographic' || !o.infographicProjectId) continue
-    if (projects.has(o.infographicProjectId)) continue
-    const data = loadInfographicProjectData(o.infographicProjectId)
+    const key = `${o.infographicProjectId}:${o.infographicTabId || 'default'}`
+    if (projects.has(key)) continue
+    const data = loadInfographicProjectData(o.infographicProjectId, o.infographicTabId)
     if (data) {
-      projects.set(o.infographicProjectId, data)
+      projects.set(key, data)
       for (const el of data.elements || []) {
         if ((el.type === 'image' || el.type === 'image-text') && el.imageUrl && !elementImages.has(el.id)) {
           const img = document.createElement('img')

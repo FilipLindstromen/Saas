@@ -1,8 +1,71 @@
+/* Theme Variables - Dark Mode (Default) - PitchDeck Style */
+:root[data-theme="dark"],
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #1f1f1f;
+  --bg-hover: #252525;
+  --bg-active: #2a2a2a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: rgba(255, 255, 255, 0.65);
+  --text-quaternary: rgba(255, 255, 255, 0.45);
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.7);
+  --header-inset: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --card-radius: 16px;
+  --button-radius: 12px;
+}
+
+/* Theme Variables - Light Mode - PitchDeck Style */
+:root[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f3f5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e9ecef;
+  --bg-active: #dee2e6;
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --text-primary: #1a1a1a;
+  --text-secondary: rgba(0, 0, 0, 0.85);
+  --text-tertiary: rgba(0, 0, 0, 0.6);
+  --text-quaternary: rgba(0, 0, 0, 0.4);
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.2);
+  --header-inset: 0 1px 0 rgba(0, 0, 0, 0.06) inset;
+  --card-radius: 16px;
+  --button-radius: 12px;
+}
+
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0f0f12;
+  background: var(--bg-primary);
 }
 
 .app-main {
@@ -24,7 +87,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #27272a;
-  background: #18181b;
+  border-left: 1px solid var(--border-default);
+  background: var(--bg-secondary);
   position: relative;
 }

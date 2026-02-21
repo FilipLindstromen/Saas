@@ -10,6 +10,14 @@
   justify-content: center;
   cursor: pointer;
   z-index: 1000;
+  overflow: hidden;
+}
+
+/* Canvas wrapper: fixed pixel dimensions (1920×1080, 1080×1080, 1080×1920) scaled to fit viewport */
+.play-canvas-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 /* Persistent background layer: sits behind slide content when consecutive slides share the same background */
@@ -79,8 +87,8 @@
   position: absolute;
   left: -9999px;
   top: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   overflow: hidden;
   z-index: -1;

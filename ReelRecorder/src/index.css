@@ -1,89 +1,113 @@
-/* Professional design system – dark (default) and light themes */
-
+/* Theme Variables - Match PitchDeck style (dark default) */
 :root,
 [data-theme="dark"] {
-  --bg-primary: #0d0d0f;
-  --bg-secondary: #16161a;
-  --bg-tertiary: #1f1f24;
-  --bg-elevated: #27272e;
-  --border: #2d2d35;
-  --border-subtle: #25252c;
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text: #f4f4f5;
-  --surface: #1f1f24;
-  --surface-hover: #27272e;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --primary: #6366f1;
-  --danger: #ef4444;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #1f1f1f;
+  --bg-hover: #252525;
+  --bg-active: #2a2a2a;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: rgba(255, 255, 255, 0.65);
+  --text-quaternary: rgba(255, 255, 255, 0.45);
+  --text-muted: rgba(255, 255, 255, 0.65);
+  --text: #ffffff;
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --primary: #ff6b35;
+  --danger: #ff4757;
   --success: #22c55e;
   --success-glow: rgba(34, 197, 94, 0.4);
   --warning: #f59e0b;
+  --surface: #1a1a1a;
+  --surface-hover: #252525;
   --radius: 8px;
   --radius-sm: 6px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-  --shadow-glow-accent: 0 0 20px rgba(99, 102, 241, 0.25);
+  --card-radius: 16px;
+  --button-radius: 12px;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.7);
+  --shadow-glow-accent: 0 0 20px rgba(255, 107, 53, 0.25);
   --shadow-glow-success: 0 0 24px rgba(34, 197, 94, 0.35);
-  --shadow-glow-danger: 0 0 24px rgba(239, 68, 68, 0.35);
+  --shadow-glow-danger: 0 0 24px rgba(255, 71, 87, 0.35);
+  --header-inset: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --text-on-accent: #fff;
-  --text-error: #ef4444;
+  --text-error: #ff4757;
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --inspector-bg: var(--bg-elevated);
 }
 
 [data-theme="light"] {
-  --bg-primary: #fafafa;
+  --bg-primary: #f8f9fa;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #f4f4f5;
-  --bg-elevated: #e4e4e7;
-  --border: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-muted: #71717a;
-  --text: #18181b;
-  --surface: #f4f4f5;
-  --surface-hover: #e4e4e7;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --primary: #4f46e5;
-  --danger: #dc2626;
-  --success: #16a34a;
-  --success-glow: rgba(22, 163, 74, 0.3);
-  --warning: #d97706;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-  --shadow-glow-accent: 0 0 20px rgba(79, 70, 229, 0.2);
+  --bg-tertiary: #f1f3f5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e9ecef;
+  --bg-active: #dee2e6;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --text-primary: #1a1a1a;
+  --text-secondary: rgba(0, 0, 0, 0.85);
+  --text-tertiary: rgba(0, 0, 0, 0.6);
+  --text-quaternary: rgba(0, 0, 0, 0.4);
+  --text-muted: rgba(0, 0, 0, 0.6);
+  --text: #1a1a1a;
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --primary: #ff6b35;
+  --danger: #ff4757;
+  --success: #22c55e;
+  --success-glow: rgba(34, 197, 94, 0.3);
+  --warning: #f59e0b;
+  --surface: #f1f3f5;
+  --surface-hover: #e9ecef;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.2);
+  --shadow-glow-accent: 0 0 20px rgba(255, 107, 53, 0.2);
   --shadow-glow-success: 0 0 24px rgba(22, 163, 74, 0.25);
-  --shadow-glow-danger: 0 0 24px rgba(220, 38, 38, 0.25);
-  --text-on-accent: #fff;
-  --text-error: #dc2626;
+  --shadow-glow-danger: 0 0 24px rgba(255, 71, 87, 0.25);
+  --header-inset: 0 1px 0 rgba(0, 0, 0, 0.06) inset;
+  --text-error: #ff4757;
+  --inspector-bg: var(--bg-elevated);
 }
 
 * {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.5;
 }
-
 
 #root {
   min-height: 100vh;
@@ -106,4 +130,30 @@ input[type="range"] {
 
 a {
   color: var(--accent);
+}
+
+/* Custom Scrollbar - Match PitchDeck */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 2px solid var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tertiary) var(--bg-secondary);
 }

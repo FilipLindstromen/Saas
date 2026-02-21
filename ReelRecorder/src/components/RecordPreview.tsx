@@ -374,14 +374,15 @@ export function RecordPreview({
     }
   }, [overlays])
 
-  // Load infographic project data and preload element images
+  // Load infographic project data and preload element images (key = projectId:tabId)
   const infographicProjects = useMemo(() => {
     const map = new Map<string, InfographicProjectData>()
     for (const o of overlays) {
-      if (o.type === 'infographic' && o.infographicProjectId && !map.has(o.infographicProjectId)) {
-        const data = loadInfographicProjectData(o.infographicProjectId)
-        if (data) map.set(o.infographicProjectId, data)
-      }
+      if (o.type !== 'infographic' || !o.infographicProjectId) continue
+      const key = `${o.infographicProjectId}:${o.infographicTabId || 'default'}`
+      if (map.has(key)) continue
+      const data = loadInfographicProjectData(o.infographicProjectId, o.infographicTabId)
+      if (data) map.set(key, data)
     }
     return map
   }, [overlays])

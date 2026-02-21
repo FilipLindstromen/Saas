@@ -8,18 +8,18 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.6rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .project-selector-trigger:hover {
-  background: #3f3f46;
-  border-color: #52525b;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .project-selector-name {
@@ -43,10 +43,10 @@
   top: calc(100% + 4px);
   left: 0;
   min-width: 200px;
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 8px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   overflow: hidden;
 }
@@ -64,15 +64,16 @@
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   transition: background 0.15s;
+  color: var(--text-primary);
 }
 
 .project-selector-item:hover {
-  background: #27272a;
+  background: var(--bg-tertiary);
 }
 
 .project-selector-item.active {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: rgba(255, 107, 53, 0.15);
+  color: var(--accent);
 }
 
 .project-selector-item-name {
@@ -97,14 +98,14 @@
   padding: 0.2rem;
   background: none;
   border: none;
-  color: #a1a1aa;
+  color: var(--text-tertiary);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .project-selector-action:hover {
-  background: #3f3f46;
-  color: #e4e4e7;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .project-selector-action:disabled {
@@ -113,16 +114,16 @@
 }
 
 .project-selector-delete:hover:not(:disabled) {
-  color: #ef4444;
+  color: var(--accent-secondary);
 }
 
 .project-selector-edit {
   flex: 1;
   padding: 0.25rem 0.4rem;
-  background: #27272a;
-  border: 1px solid #3b82f6;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent);
   border-radius: 4px;
-  color: #e4e4e7;
+  color: var(--text-primary);
   font-size: 0.85rem;
   outline: none;
 }
@@ -133,16 +134,16 @@
   gap: 0.5rem;
   width: 100%;
   padding: 0.5rem 0.75rem;
-  background: #27272a;
+  background: var(--bg-tertiary);
   border: none;
-  border-top: 1px solid #27272a;
-  color: #a1a1aa;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-tertiary);
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .project-selector-new:hover {
-  background: #3f3f46;
-  color: #e4e4e7;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }

@@ -1,32 +1,39 @@
 import { useState, useEffect } from 'react'
-import { loadInfographicProjects, loadInfographicProjectData } from '../utils/infographicLoader'
+import { loadInfographicProjects, loadInfographicProjectData, getInfographicProjectTabs } from '../utils/infographicLoader'
 import InfographicBackground from './InfographicBackground'
 import './InfographicPicker.css'
 
-function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId }) {
+function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, currentTabId }) {
   const [projects, setProjects] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedProjectId, setSelectedProjectId] = useState(null)
+  const [selectedTabId, setSelectedTabId] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
       setProjects(loadInfographicProjects())
-      setSelectedId(currentProjectId || null)
+      setSelectedProjectId(currentProjectId || null)
+      setSelectedTabId(currentTabId || null)
+      if (currentProjectId && !currentTabId) {
+        const tabs = getInfographicProjectTabs(currentProjectId)
+        if (tabs.length > 0) setSelectedTabId(tabs[0].id)
+      }
     }
-  }, [isOpen, currentProjectId])
+  }, [isOpen, currentProjectId, currentTabId])
 
-  const handleSelect = (projectId) => {
-    setSelectedId(projectId)
+  const handleSelect = (projectId, tabId) => {
+    setSelectedProjectId(projectId)
+    setSelectedTabId(tabId)
   }
 
   const handleConfirm = () => {
-    if (selectedId) {
-      onSelect(selectedId)
+    if (selectedProjectId) {
+      onSelect(selectedProjectId, selectedTabId)
       onClose()
     }
   }
 
   const handleRemove = () => {
-    onSelect(null)
+    onSelect(null, null)
     onClose()
   }
 
@@ -55,11 +62,12 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId }) {
           ) : (
             <div className="infographic-picker-list">
               {projects.map(p => (
-                <InfographicPickerItem
+                <InfographicPickerProject
                   key={p.id}
                   project={p}
-                  isSelected={selectedId === p.id}
-                  onSelect={() => handleSelect(p.id)}
+                  selectedProjectId={selectedProjectId}
+                  selectedTabId={selectedTabId}
+                  onSelect={handleSelect}
                 />
               ))}
             </div>
@@ -81,7 +89,7 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId }) {
               type="button"
               className="infographic-picker-btn infographic-picker-btn-confirm"
               onClick={handleConfirm}
-              disabled={!selectedId}
+              disabled={!selectedProjectId}
             >
               Use as background
             </button>
@@ -92,44 +100,64 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId }) {
   )
 }
 
-function InfographicPickerItem({ project, isSelected, onSelect }) {
+function InfographicPickerProject({ project, selectedProjectId, selectedTabId, onSelect }) {
+  const tabs = getInfographicProjectTabs(project.id)
+  const effectiveTabId = selectedTabId && tabs.some(t => t.id === selectedTabId) ? selectedTabId : tabs[0]?.id
   const [data, setData] = useState(null)
 
   useEffect(() => {
-    setData(loadInfographicProjectData(project.id))
-  }, [project.id])
+    setData(loadInfographicProjectData(project.id, effectiveTabId))
+  }, [project.id, effectiveTabId])
 
   const elementCount = data?.elements?.length ?? 0
   const hasTimeline = elementCount > 0 && data?.elements?.some(e => (e.clipStart != null || e.clipEnd != null))
+  const isSelected = selectedProjectId === project.id && selectedTabId === effectiveTabId
 
   return (
-    <button
-      type="button"
-      className={`infographic-picker-item ${isSelected ? 'selected' : ''}`}
-      onClick={onSelect}
-    >
-      <div className="infographic-picker-item-preview">
-        {data && data.elements?.length > 0 ? (
-          <InfographicBackground
-            projectData={data}
-            isPlaying={false}
-            opacity={1}
-            className="infographic-picker-preview-bg"
-          />
-        ) : (
-          <div className="infographic-picker-item-placeholder">
-            <span>Empty</span>
-          </div>
+    <div className="infographic-picker-project">
+      <div className="infographic-picker-project-header">
+        <span className="infographic-picker-project-name">{project.name || 'Untitled'}</span>
+        {tabs.length > 1 && (
+          <select
+            className="infographic-picker-tab-select"
+            value={effectiveTabId || ''}
+            onChange={(e) => onSelect(project.id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {tabs.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
         )}
       </div>
-      <div className="infographic-picker-item-info">
-        <span className="infographic-picker-item-name">{project.name || 'Untitled'}</span>
-        <span className="infographic-picker-item-meta">
-          {elementCount} element{elementCount !== 1 ? 's' : ''}
-          {hasTimeline && ' • Animated'}
-        </span>
-      </div>
-    </button>
+      <button
+        type="button"
+        className={`infographic-picker-item ${isSelected ? 'selected' : ''}`}
+        onClick={() => onSelect(project.id, effectiveTabId)}
+      >
+        <div className="infographic-picker-item-preview">
+          {data && data.elements?.length > 0 ? (
+            <InfographicBackground
+              projectData={data}
+              isPlaying={false}
+              opacity={1}
+              className="infographic-picker-preview-bg"
+            />
+          ) : (
+            <div className="infographic-picker-item-placeholder">
+              <span>Empty</span>
+            </div>
+          )}
+        </div>
+        <div className="infographic-picker-item-info">
+          <span className="infographic-picker-item-meta">
+            {tabs.length > 1 ? `${tabs.find(t => t.id === effectiveTabId)?.name || 'Document'} • ` : ''}
+            {elementCount} element{elementCount !== 1 ? 's' : ''}
+            {hasTimeline && ' • Animated'}
+          </span>
+        </div>
+      </button>
+    </div>
   )
 }
 

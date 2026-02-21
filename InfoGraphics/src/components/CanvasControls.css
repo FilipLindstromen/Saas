@@ -3,8 +3,8 @@
   align-items: center;
   gap: 1.5rem;
   padding: 0.5rem 1rem;
-  background: #18181b;
-  border-bottom: 1px solid #27272a;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .canvas-controls-group {
@@ -15,7 +15,7 @@
 
 .canvas-controls-group label {
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
@@ -29,7 +29,7 @@
   width: 100px;
   height: 6px;
   -webkit-appearance: none;
-  background: #27272a;
+  background: var(--bg-tertiary);
   border-radius: 3px;
 }
 
@@ -37,14 +37,14 @@
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
-  background: #3b82f6;
+  background: var(--accent);
   border-radius: 50%;
   cursor: pointer;
 }
 
 .canvas-controls-zoom-value {
   font-size: 0.8rem;
-  color: #a1a1aa;
+  color: var(--text-tertiary);
   min-width: 36px;
 }
 
@@ -58,18 +58,18 @@
   width: 32px;
   height: 28px;
   padding: 2px;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
   cursor: pointer;
 }
 
 .canvas-controls-bg-hex {
   width: 72px;
   padding: 0.35rem 0.5rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.8rem;
 }

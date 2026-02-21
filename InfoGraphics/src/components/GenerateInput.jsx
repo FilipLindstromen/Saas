@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './GenerateInput.css'
 
-export default function GenerateInput({ onGenerate }) {
+export default function GenerateInput({ onGenerate, selectedLayoutId, selectedLayoutName }) {
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -23,9 +23,14 @@ export default function GenerateInput({ onGenerate }) {
 
   return (
     <form className="generate-input" onSubmit={handleSubmit}>
+      {selectedLayoutName && (
+        <span className="generate-selected-template" title="Selected in Layouts tab">
+          Template: {selectedLayoutName}
+        </span>
+      )}
       <input
         type="text"
-        placeholder='e.g. "5-step process of how the stress response works in hand drawn style"'
+        placeholder={selectedLayoutId ? 'Describe your content...' : 'Select a template in Layouts, then describe your content...'}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         disabled={loading}

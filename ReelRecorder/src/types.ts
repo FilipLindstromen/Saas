@@ -51,6 +51,7 @@ export interface OverlayItem {
   videoUrl?: string
   // infographic (from InfoGraphics generator; animations play when overlay is active)
   infographicProjectId?: string
+  infographicTabId?: string
   infographicProjectName?: string
   /** When true (default), overlay is drawn during recording and included in the exported file. When false, preview-only. */
   burnIntoExport?: boolean

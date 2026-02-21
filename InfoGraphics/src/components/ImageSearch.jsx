@@ -4,6 +4,8 @@ import './ImageSearch.css'
 
 const SERVICES = [
   { id: 'giphy', label: 'Giphy', types: ['gifs', 'stickers'] },
+  { id: 'pixabay', label: 'Pixabay', types: ['photos'] },
+  { id: 'pexels', label: 'Pexels', types: ['photos'] },
   { id: 'iconify', label: 'Iconify', types: ['icons'] }
 ]
 
@@ -45,26 +47,30 @@ export default function ImageSearch({ latestImages, onSelect, onClose, apiKeys }
         <button className="image-search-close" onClick={onClose}>×</button>
       </div>
       <div className="image-search-form">
-        <select value={service} onChange={(e) => setService(e.target.value)}>
-          {SERVICES.map(s => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
-        {types.length > 1 && (
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            {types.map(t => (
-              <option key={t} value={t}>{t}</option>
+        <div className="image-search-form-row">
+          <select value={service} onChange={(e) => setService(e.target.value)}>
+            {SERVICES.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
-        )}
-        <input
-          type="text"
-          placeholder="Search..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && search()}
-        />
-        <button onClick={search} disabled={loading}>Search</button>
+          {types.length > 1 && (
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              {types.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="image-search-form-row">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+          />
+          <button onClick={search} disabled={loading}>Search</button>
+        </div>
       </div>
       {latestImages.length > 0 && (
         <div className="image-search-section">

@@ -15,12 +15,12 @@
 
 .export-status {
   font-size: 0.75rem;
-  color: #a1a1aa;
+  color: var(--text-tertiary);
   margin-left: 0.25rem;
 }
 
 .export-error {
   font-size: 0.75rem;
-  color: #f87171;
+  color: var(--accent-secondary);
   margin-left: 0.25rem;
 }

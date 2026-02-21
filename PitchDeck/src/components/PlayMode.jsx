@@ -13,7 +13,7 @@ function sameBackground(a, b) {
   const hasInfographicA = !!a.infographicProjectId
   const hasInfographicB = !!b.infographicProjectId
   if (hasInfographicA && hasInfographicB) {
-    return a.infographicProjectId === b.infographicProjectId
+    return a.infographicProjectId === b.infographicProjectId && (a.infographicTabId || '') === (b.infographicTabId || '')
   }
   const hasBgA = !!(a.imageUrl || a.backgroundVideoUrl)
   const hasBgB = !!(b.imageUrl || b.backgroundVideoUrl)
@@ -541,6 +541,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       .filter(line => line.length > 0)
       .map(line => line.replace(/^[-•*]\s*/, ''))
   }
+
+  // Canvas size by aspect ratio: 16:9 → 1920×1080, 1:1 → 1080×1080, 9:16 → 1080×1920
+  const canvasSize = slideFormat === '16:9' ? { w: 1920, h: 1080 } : slideFormat === '1:1' ? { w: 1080, h: 1080 } : { w: 1080, h: 1920 }
 
   const currentSlide = presentationSlides[currentIndex]
   const nextSlideData = presentationSlides[currentIndex + 1]
@@ -1093,8 +1096,26 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     slideFormat
   }
 
+  // Scale canvas to fit viewport while preserving exact pixel dimensions
+  const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  useEffect(() => {
+    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const scale = Math.min(viewportSize.w / canvasSize.w, viewportSize.h / canvasSize.h)
+
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
+      <div
+        className="play-canvas-wrapper"
+        style={{
+          width: canvasSize.w,
+          height: canvasSize.h,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center'
+        }}
+      >
       {/* Persistent background layer: when consecutive slides share the same background, keep it visible during transitions */}
       {usePersistentBackground && (
         <div className="play-background-layer" aria-hidden="true">
@@ -1154,6 +1175,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       </div>
       )}
       {/* Webcam overlay - outside slide transitions */}
+      </div>
       {recordSettings.webcamEnabled && recordSettings.selectedCameraId && (
         <WebcamOverlay
           cameraId={recordSettings.selectedCameraId}

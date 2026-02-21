@@ -526,10 +526,12 @@ export function Timeline({
         <InfographicPicker
           isOpen={infographicPickerOpen}
           onClose={() => setInfographicPickerOpen(false)}
-          onSelect={(projectId, projectName) => {
+          onSelect={(projectId, tabId, projectName, tabName) => {
+            const displayName = tabName !== projectName ? `${projectName} / ${tabName}` : projectName
             onAddOverlay('infographic', {
               infographicProjectId: projectId,
-              infographicProjectName: projectName,
+              infographicTabId: tabId,
+              infographicProjectName: displayName,
               imageScale: 1,
               x: 0.5,
               y: 0.5,

@@ -1714,7 +1714,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       `}</style>
       {/* 0. Infographic background (when infographicProjectId is set) */}
       {!hideBackground && slide.infographicProjectId && layout !== 'section' && (() => {
-        const projectData = loadInfographicProjectData(slide.infographicProjectId)
+        const projectData = loadInfographicProjectData(slide.infographicProjectId, slide.infographicTabId)
         if (!projectData) return null
         return (
           <InfographicBackground

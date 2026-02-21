@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export interface MediaDeviceInfo {
   deviceId: string
@@ -11,14 +11,9 @@ export function useMediaDevices() {
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        stream.getTracks().forEach((t) => t.stop())
-      } catch {
-        setError('Could not access media devices')
-      }
+  const load = useCallback(async () => {
+    setError(null)
+    try {
       const devices = await navigator.mediaDevices.enumerateDevices()
       setVideoDevices(
         devices
@@ -30,11 +25,16 @@ export function useMediaDevices() {
           .filter((d) => d.kind === 'audioinput')
           .map((d) => ({ deviceId: d.deviceId, label: d.label || `Microphone ${d.deviceId.slice(0, 8)}`, kind: d.kind }))
       )
+    } catch (e) {
+      setError('Could not enumerate devices')
     }
+  }, [])
+
+  useEffect(() => {
     load()
     navigator.mediaDevices.addEventListener('devicechange', load)
     return () => navigator.mediaDevices.removeEventListener('devicechange', load)
-  }, [])
+  }, [load])
 
-  return { videoDevices, audioDevices, error }
+  return { videoDevices, audioDevices, error, refresh: load }
 }

@@ -1,8 +1,8 @@
 .wrap {
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--card-radius);
   padding: 14px 18px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-default);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -48,18 +48,20 @@
   gap: 6px;
   height: 36px;
   padding: 0 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   color: var(--text-primary);
-  border-radius: var(--radius);
+  border-radius: var(--button-radius);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .toolbarBtn:hover:not(:disabled) {
-  background: var(--bg-elevated);
-  border-color: var(--accent);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .toolbarBtn:disabled {
@@ -69,7 +71,7 @@
 
 .toolbarBtnActive {
   border-color: var(--accent);
-  background: var(--bg-elevated);
+  background: var(--bg-hover);
 }
 
 .toolbarBtn svg,

@@ -29,7 +29,8 @@ function generateId() {
 }
 
 export default function App() {
-  const { videoDevices, audioDevices, error: devicesError } = useMediaDevices()
+  const { videoDevices, audioDevices, error: devicesError, refresh: refreshDevices } = useMediaDevices()
+  const [videoStreamError, setVideoStreamError] = useState<string | null>(null)
 
   const initialState = useMemo(() => loadVideoRecorderState(), [])
 
@@ -120,6 +121,7 @@ export default function App() {
 
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipUserTimelineDurationResetRef = useRef(false)
+  const studioDisconnectRef = useRef<(() => void) | null>(null)
 
   const allResolutions = useMemo(() => getResolutionsForAspect(aspectRatio), [aspectRatio])
   const resolutions = useMemo(() => {
@@ -546,78 +548,79 @@ export default function App() {
     }
   }, [timelineResize, handleTimelineResizeMove, handleTimelineResizeEnd])
 
+  // When source settings change, stop current stream (user must reconnect)
   useEffect(() => {
-    let vStream: MediaStream | null = null
-    let aStream: MediaStream | null = null
-    let studioDisconnect: (() => void) | null = null
+    return () => {
+      studioDisconnectRef.current?.()
+      studioDisconnectRef.current = null
+      setVideoStream((s) => {
+        s?.getTracks().forEach((t) => t.stop())
+        return null
+      })
+      setAudioStream((s) => {
+        s?.getTracks().forEach((t) => t.stop())
+        return null
+      })
+    }
+  }, [videoKind, videoDeviceId])
 
-    async function start() {
-      try {
-        if (videoKind === 'screen') {
-          vStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { width: { ideal: width }, height: { ideal: height } },
-            audio: false,
+  const connectMedia = useCallback(async () => {
+    setVideoStreamError(null)
+
+    try {
+      if (videoKind === 'screen') {
+        const vStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { ideal: width }, height: { ideal: height } },
+          audio: false,
+        })
+        setVideoStream(vStream)
+      } else {
+        const deviceConstraint = videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}
+        const videoConstraints: MediaTrackConstraints = {
+          ...deviceConstraint,
+          width: { ideal: width },
+          height: { ideal: height },
+        }
+        let vStream: MediaStream
+        try {
+          vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        } catch {
+          vStream = await navigator.mediaDevices.getUserMedia({
+            video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : { width: { ideal: width }, height: { ideal: height } },
           })
-        } else {
-          // Prioritize selected device: deviceId must come first so the browser uses the correct camera
-          const deviceConstraint = videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {}
-          const videoConstraints: MediaTrackConstraints = {
-            ...deviceConstraint,
-            width: { ideal: width },
-            height: { ideal: height },
-          }
-          try {
-            vStream = await navigator.mediaDevices.getUserMedia({
-              video: { ...deviceConstraint, width: { exact: width }, height: { exact: height } },
-            })
-          } catch (exactErr) {
-            try {
-              vStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-            } catch (idealErr) {
-              // Last resort: device only (no resolution), ensures correct camera is used
-              vStream = await navigator.mediaDevices.getUserMedia({
-                video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : { width: { ideal: width }, height: { ideal: height } },
-              })
-            }
-          }
         }
         setVideoStream(vStream)
-      } catch (e) {
-        console.error(e)
-        setVideoStream(null)
       }
+      refreshDevices()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not access video source'
+      setVideoStreamError(msg)
+      setVideoStream(null)
+      console.error(e)
+      return
+    }
 
-      try {
-        if (audioDeviceId) {
-          aStream = await navigator.mediaDevices.getUserMedia({
-            audio: { deviceId: { exact: audioDeviceId } },
-          })
-          if (studioQuality) {
-            const { createStudioAudioStream } = await import('./utils/studioAudio')
-            const { stream, disconnect } = await createStudioAudioStream(aStream)
-            studioDisconnect = disconnect
-            setAudioStream(stream)
-          } else {
-            setAudioStream(aStream)
-          }
+    try {
+      if (audioDeviceId) {
+        const aStream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: audioDeviceId } },
+        })
+        if (studioQuality) {
+          const { createStudioAudioStream } = await import('./utils/studioAudio')
+          const { stream, disconnect } = await createStudioAudioStream(aStream)
+          studioDisconnectRef.current = disconnect
+          setAudioStream(stream)
         } else {
-          setAudioStream(null)
+          setAudioStream(aStream)
         }
-      } catch (e) {
-        console.error(e)
+      } else {
         setAudioStream(null)
       }
-    }
-
-    start()
-    return () => {
-      studioDisconnect?.()
-      vStream?.getTracks().forEach((t) => t.stop())
-      aStream?.getTracks().forEach((t) => t.stop())
-      setVideoStream(null)
+    } catch (e) {
+      console.error(e)
       setAudioStream(null)
     }
-  }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality])
+  }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality, refreshDevices])
 
   const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video' | 'infographic', initialPatch?: Partial<OverlayItem>) => {
     const start = displayTime
@@ -627,7 +630,7 @@ export default function App() {
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
       ...(type === 'text' ? { text: 'New text', fontSizePercent: 10, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
-      ...(type === 'infographic' ? { infographicProjectId: '', infographicProjectName: '' } : {}),
+      ...(type === 'infographic' ? { infographicProjectId: '', infographicTabId: '', infographicProjectName: '' } : {}),
       ...initialPatch,
     }
     setOverlays((prev) => [...prev, item])
@@ -831,6 +834,21 @@ export default function App() {
               transformOrigin: 'center center',
             }}
           >
+          {!videoStream && !recordedBlob && (
+            <div className={styles.connectOverlay} aria-label="Connect video source">
+              <p className={styles.connectOverlayText}>
+                {videoKind === 'screen' ? 'Share your screen to get started' : 'Connect your camera to get started'}
+              </p>
+              <button
+                type="button"
+                className={styles.connectOverlayBtn}
+                onClick={connectMedia}
+              >
+                {videoKind === 'screen' ? 'Connect screen' : 'Connect camera'}
+              </button>
+              <p className={styles.connectOverlayHint}>Or open Inspector → Video settings to connect</p>
+            </div>
+          )}
           {countdown != null && (
             <div className={styles.countdownOverlay} aria-live="polite" aria-label={`Countdown ${countdown}`}>
               <span className={styles.countdownNumber}>{countdown}</span>
@@ -1262,7 +1280,9 @@ export default function App() {
             onVideoDeviceIdChange={setVideoDeviceId}
             audioDeviceId={audioDeviceId}
             onAudioDeviceIdChange={setAudioDeviceId}
-            videoError={devicesError}
+            videoError={videoStreamError || devicesError}
+            onConnectMedia={connectMedia}
+            hasVideoStream={!!videoStream}
             aspectRatio={aspectRatio}
             onAspectRatioChange={(a) => { setAspectRatio(a); setResolutionIndex(0) }}
             resolutions={resolutions}

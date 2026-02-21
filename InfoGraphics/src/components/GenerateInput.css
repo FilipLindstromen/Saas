@@ -1,31 +1,39 @@
 .generate-input {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #18181b;
-  border-bottom: 1px solid #27272a;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.generate-selected-template {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  flex: 1 1 100%;
+  margin-bottom: -0.25rem;
 }
 
 .generate-input input {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  color: #e4e4e7;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
   font-size: 0.875rem;
 }
 
 .generate-input input::placeholder {
-  color: #71717a;
+  color: var(--text-tertiary);
 }
 
 .generate-input button {
   padding: 0.5rem 1rem;
-  background: #3b82f6;
+  background: var(--accent-gradient);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--button-radius);
   color: white;
   font-size: 0.875rem;
   font-weight: 500;
@@ -34,7 +42,7 @@
 }
 
 .generate-input button:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .generate-input button:disabled {
@@ -44,5 +52,5 @@
 
 .generate-error {
   font-size: 0.75rem;
-  color: #ef4444;
+  color: var(--accent-secondary);
 }

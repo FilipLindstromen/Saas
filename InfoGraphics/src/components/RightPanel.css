@@ -2,8 +2,8 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #27272a;
-  background: #18181b;
+  border-left: 1px solid var(--border-default);
+  background: var(--bg-secondary);
   position: relative;
 }
 
@@ -18,12 +18,12 @@
 }
 
 .right-panel-resize-handle:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(255, 107, 53, 0.2);
 }
 
 .right-panel-tabs {
   display: flex;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .right-panel-tab {
@@ -31,7 +31,7 @@
   padding: 0.75rem 1rem;
   background: none;
   border: none;
-  color: #71717a;
+  color: var(--text-tertiary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -39,12 +39,12 @@
 }
 
 .right-panel-tab:hover {
-  color: #e4e4e7;
+  color: var(--text-primary);
 }
 
 .right-panel-tab.active {
-  color: #3b82f6;
-  border-bottom: 2px solid #3b82f6;
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
   margin-bottom: -1px;
 }
 
