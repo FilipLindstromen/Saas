@@ -49,7 +49,7 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId }) {
             <div className="infographic-picker-empty">
               <p>No infographic projects found.</p>
               <p className="infographic-picker-empty-hint">
-                Create infographics in the <a href="https://filiplindstromen.github.io/InfoGraphics/" target="_blank" rel="noopener noreferrer">InfoGraphics generator</a> first.
+                Create infographics in the <a href="https://filiplindstromen.github.io/Saas/InfoGraphics/" target="_blank" rel="noopener noreferrer">InfoGraphics generator</a> first.
               </p>
             </div>
           ) : (

@@ -424,6 +424,56 @@ function App() {
     setSelectedIds(duplicates.map(d => d.id))
   }, [elements, selectedIds, pushUndoState])
 
+  const alignElements = useCallback((align) => {
+    if (selectedIds.length < 2) return
+    pushUndoState(elements, selectedIds)
+    const selected = elements.filter(e => selectedIds.includes(e.id))
+    const minX = Math.min(...selected.map(e => e.x))
+    const maxX = Math.max(...selected.map(e => e.x + e.width))
+    const minY = Math.min(...selected.map(e => e.y))
+    const maxY = Math.max(...selected.map(e => e.y + e.height))
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    setElements(prev => prev.map(e => {
+      if (!selectedIds.includes(e.id)) return e
+      const updates = {}
+      if (align === 'left') updates.x = minX
+      else if (align === 'right') updates.x = maxX - e.width
+      else if (align === 'center') updates.x = centerX - e.width / 2
+      else if (align === 'top') updates.y = minY
+      else if (align === 'bottom') updates.y = maxY - e.height
+      else if (align === 'middle') updates.y = centerY - e.height / 2
+      return { ...e, ...updates }
+    }))
+  }, [selectedIds, elements, pushUndoState])
+
+  const distributeElements = useCallback((direction) => {
+    if (selectedIds.length < 3) return
+    pushUndoState(elements, selectedIds)
+    const selected = elements.filter(e => selectedIds.includes(e.id))
+    const sorted = direction === 'horizontal'
+      ? [...selected].sort((a, b) => a.x - b.x)
+      : [...selected].sort((a, b) => a.y - b.y)
+    const first = direction === 'horizontal' ? sorted[0].x : sorted[0].y
+    const last = direction === 'horizontal'
+      ? sorted[sorted.length - 1].x + sorted[sorted.length - 1].width
+      : sorted[sorted.length - 1].y + sorted[sorted.length - 1].height
+    const totalSize = sorted.reduce((sum, e) => sum + (direction === 'horizontal' ? e.width : e.height), 0)
+    const gap = (last - first - totalSize) / (sorted.length - 1)
+    let pos = first
+    const updates = {}
+    sorted.forEach(el => {
+      if (direction === 'horizontal') {
+        updates[el.id] = { x: pos }
+        pos += el.width + gap
+      } else {
+        updates[el.id] = { y: pos }
+        pos += el.height + gap
+      }
+    })
+    setElements(prev => prev.map(e => updates[e.id] ? { ...e, ...updates[e.id] } : e))
+  }, [selectedIds, elements, pushUndoState])
+
   useEffect(() => {
     if (selectedIds.length > 0) {
       setRightPanelTab('inspector')
@@ -531,56 +581,6 @@ function App() {
       setElements(prev => prev.map(e => e.id === id ? { ...e, zIndex: Math.max(0, nextZ - 1) } : e))
     }
   }, [elements, selectedIds, pushUndoState])
-
-  const alignElements = useCallback((align) => {
-    if (selectedIds.length < 2) return
-    pushUndoState(elements, selectedIds)
-    const selected = elements.filter(e => selectedIds.includes(e.id))
-    const minX = Math.min(...selected.map(e => e.x))
-    const maxX = Math.max(...selected.map(e => e.x + e.width))
-    const minY = Math.min(...selected.map(e => e.y))
-    const maxY = Math.max(...selected.map(e => e.y + e.height))
-    const centerX = (minX + maxX) / 2
-    const centerY = (minY + maxY) / 2
-    setElements(prev => prev.map(e => {
-      if (!selectedIds.includes(e.id)) return e
-      const updates = {}
-      if (align === 'left') updates.x = minX
-      else if (align === 'right') updates.x = maxX - e.width
-      else if (align === 'center') updates.x = centerX - e.width / 2
-      else if (align === 'top') updates.y = minY
-      else if (align === 'bottom') updates.y = maxY - e.height
-      else if (align === 'middle') updates.y = centerY - e.height / 2
-      return { ...e, ...updates }
-    }))
-  }, [selectedIds, elements, pushUndoState])
-
-  const distributeElements = useCallback((direction) => {
-    if (selectedIds.length < 3) return
-    pushUndoState(elements, selectedIds)
-    const selected = elements.filter(e => selectedIds.includes(e.id))
-    const sorted = direction === 'horizontal'
-      ? [...selected].sort((a, b) => a.x - b.x)
-      : [...selected].sort((a, b) => a.y - b.y)
-    const first = direction === 'horizontal' ? sorted[0].x : sorted[0].y
-    const last = direction === 'horizontal'
-      ? sorted[sorted.length - 1].x + sorted[sorted.length - 1].width
-      : sorted[sorted.length - 1].y + sorted[sorted.length - 1].height
-    const totalSize = sorted.reduce((sum, e) => sum + (direction === 'horizontal' ? e.width : e.height), 0)
-    const gap = (last - first - totalSize) / (sorted.length - 1)
-    let pos = first
-    const updates = {}
-    sorted.forEach(el => {
-      if (direction === 'horizontal') {
-        updates[el.id] = { x: pos }
-        pos += el.width + gap
-      } else {
-        updates[el.id] = { y: pos }
-        pos += el.height + gap
-      }
-    })
-    setElements(prev => prev.map(e => updates[e.id] ? { ...e, ...updates[e.id] } : e))
-  }, [selectedIds, elements, pushUndoState])
 
   const reorderToIndex = useCallback((id, targetIndex) => {
     pushUndoState(elements, selectedIds)

@@ -175,27 +175,42 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             />
           </div>
         )}
+        <div className="inspector-section inspector-section-animations">
+          <div className="inspector-field">
+            <label>Animation in</label>
+            <select
+              value={animationIn || 'none'}
+              onChange={(e) => onUpdate({ animationIn: e.target.value })}
+            >
+              {ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="inspector-field">
+            <label>Animation out</label>
+            <select
+              value={animationOut || 'none'}
+              onChange={(e) => onUpdate({ animationOut: e.target.value })}
+            >
+              {ANIMATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         {(type === 'image-text' || type === 'image') && (
           <>
             <div className="inspector-field">
               <label>Rotation</label>
-              <div className="inspector-rotation">
-                <input
-                  type="range"
-                  min={-180}
-                  max={180}
-                  value={rotation || 0}
-                  onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
-                />
-                <input
-                  type="number"
-                  value={rotation || 0}
-                  onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
-                  min={-180}
-                  max={180}
-                  className="inspector-rotation-value"
-                />
-              </div>
+              <input
+                type="number"
+                value={rotation || 0}
+                onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
+                min={-180}
+                max={180}
+                className="inspector-rotation-value"
+              />
             </div>
             <div className="inspector-field">
               <label>Recolor</label>
@@ -258,30 +273,6 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             </div>
           </>
         )}
-        <div className="inspector-section inspector-section-animations">
-          <div className="inspector-field">
-            <label>Animation in</label>
-            <select
-              value={animationIn || 'none'}
-              onChange={(e) => onUpdate({ animationIn: e.target.value })}
-            >
-              {ANIMATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="inspector-field">
-            <label>Animation out</label>
-            <select
-              value={animationOut || 'none'}
-              onChange={(e) => onUpdate({ animationOut: e.target.value })}
-            >
-              {ANIMATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
     </div>
   )

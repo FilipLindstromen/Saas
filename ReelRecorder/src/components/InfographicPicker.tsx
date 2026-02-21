@@ -103,7 +103,7 @@ export function InfographicPicker({ isOpen, onClose, onSelect }: InfographicPick
               <p className={styles.emptyHint}>
                 Create infographics in the{' '}
                 <a
-                  href="https://filiplindstromen.github.io/InfoGraphics/"
+                  href="https://filiplindstromen.github.io/Saas/InfoGraphics/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
