@@ -1,9 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { applyTheme } from '@shared/theme'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { log } from './utils/logger'
 import './index.css'
+
+applyTheme()
 
 // Log app initialization
 log.info('Application starting', {

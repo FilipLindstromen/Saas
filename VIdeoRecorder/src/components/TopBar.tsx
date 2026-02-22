@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import ThemeToggle from '@shared/ThemeToggle'
+import { getTheme, setTheme, initThemeSync } from '@shared/theme'
 import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import TabBar from '@shared/TabBar/TabBar'
 
@@ -32,6 +34,7 @@ export default function TopBar({
   onExportClick,
 }: TopBarProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [theme, setThemeState] = useState(() => getTheme())
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(title)
   const [isSaving, setIsSaving] = useState(false)
@@ -75,6 +78,20 @@ export default function TopBar({
   const [projects] = useState([{ id: 'default', name: 'Untitled' }])
   const [tabs, setTabs] = useState([{ id: '1', name: 'Recording 1' }])
   const [activeTabId, setActiveTabId] = useState('1')
+
+  useEffect(() => {
+    const unsub = initThemeSync()
+    const handler = () => setThemeState(getTheme())
+    window.addEventListener('saas-theme-change', handler)
+    return () => {
+      unsub?.()
+      window.removeEventListener('saas-theme-change', handler)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   return (
     <div className="bg-gray-800 h-12 flex items-center justify-between px-4 border-b border-gray-700">
@@ -329,6 +346,7 @@ export default function TopBar({
         )}
       </div>
       <div className="flex items-center gap-2">
+        <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="p-1 hover:bg-gray-700 rounded" />
         <button
           onClick={() => {/* TODO: Implement undo */ }}
           className="p-1 hover:bg-gray-700 rounded"

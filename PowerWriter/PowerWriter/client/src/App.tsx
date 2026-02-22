@@ -26,6 +26,8 @@ import {
 import { AudioEditor } from "./AudioEditor";
 import type { Transcription } from "./types";
 import { loadApiKeys, saveApiKeys } from "./apiKeys";
+import ThemeToggle from "@shared/ThemeToggle";
+import { getTheme, setTheme, initThemeSync } from "@shared/theme";
 
 type Selection =
   | {
@@ -724,6 +726,7 @@ export default function App() {
   });
   const [recordingType, setRecordingType] = useState<"audio" | "audio+video">("audio");
   const [videoAspectRatio, setVideoAspectRatio] = useState<"16:9" | "9:16">("16:9");
+  const [theme, setThemeState] = useState(() => getTheme());
   const [isRecordingSettingsOpen, setIsRecordingSettingsOpen] = useState(false);
   const [selectedRecordingId, setSelectedRecordingId] = useState<string | null>(null);
   const [showVideoPreview, setShowVideoPreview] = useState(false);
@@ -743,6 +746,21 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem("powerwriter.sidebarVisible", String(sidebarVisible));
   }, [sidebarVisible]);
+
+  // Theme sync (shared across all Saas apps)
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setThemeState(getTheme());
+    window.addEventListener("saas-theme-change", handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener("saas-theme-change", handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   // Apply mic mute to active stream
   useEffect(() => {
@@ -3115,6 +3133,7 @@ export default function App() {
               >
                 <IconLayers className="icon" />
               </button>
+              <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="panel-toggle-btn" />
               <button
                 type="button"
                 className={clsx("panel-toggle-btn", isSettingsOpen && "toggle-active")}

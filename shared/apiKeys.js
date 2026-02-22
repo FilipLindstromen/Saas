@@ -67,13 +67,13 @@ function migrateFromLegacy() {
     const cwApiKey = localStorage.getItem('copywriter_api_key')
     if (cwApiKey) merged.openai = merged.openai || cwApiKey
 
+    // VSLWriter
+    const vslOpenai = localStorage.getItem('vsl_openai_key') || localStorage.getItem('openai_api_key')
+    if (vslOpenai) merged.openai = merged.openai || vslOpenai
+
     // VIdeoRecorder
     const vrOpenai = localStorage.getItem('openai_api_key')
     if (vrOpenai) merged.openai = merged.openai || vrOpenai
-
-    // VSLWriter
-    const vslOpenai = localStorage.getItem('vsl_openai_key')
-    if (vslOpenai) merged.openai = merged.openai || vslOpenai
 
     // SoundEffectsGenerator
     const seRaw = localStorage.getItem('soundeffects_settings')

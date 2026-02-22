@@ -12,6 +12,7 @@ import { exportPreviewCanvas, isPreviewExportSupported } from '../utils/previewC
 import { exportCanvasImproved, isImprovedExportSupported } from '../utils/improvedCanvasExport'
 import { capturePreviewDirectly, isDirectCaptureSupported } from '../utils/directCanvasCapture'
 import { exportFrameAccurate, isFrameAccurateSupported, type VideoSource } from '../utils/frameAccurateExport'
+import { loadApiKeys } from '@shared/apiKeys'
 import SettingsPanel from './SettingsPanel'
 import { TimelineAudioClip } from './TimelineAudioClip'
 
@@ -2946,7 +2947,7 @@ export default function EditStep({ scenes, onScenesChange, onEditedChange }: Edi
       return
     }
 
-    const apiKey = localStorage.getItem('openai_api_key')
+    const apiKey = loadApiKeys().openai ?? ''
     if (!apiKey) {
       alert('OpenAI API key not found. Please set it in Settings.')
       setShowSettings(true)

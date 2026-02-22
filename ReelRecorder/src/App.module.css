@@ -710,7 +710,7 @@
 .previewSection {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 0;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -729,9 +729,25 @@
 .previewHeader {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.previewHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.previewHeaderCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
 }
 
 .previewTitle {
@@ -771,7 +787,7 @@
 }
 
 .exportFormat {
-  margin-left: auto;
+  flex-shrink: 0;
   font-size: 0.8rem;
   color: var(--text-muted);
 }
@@ -781,7 +797,7 @@
   width: 100%;
   max-width: 100%;
   max-height: 100%;
-  min-height: 0;
+  min-height: 240px;
   flex: 1 1 0;
   display: flex;
   flex-direction: column;

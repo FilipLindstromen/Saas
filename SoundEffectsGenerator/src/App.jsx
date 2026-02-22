@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import ThemeToggle from '@shared/ThemeToggle';
+import { getTheme, setTheme, initThemeSync } from '@shared/theme';
 import { transcribe, analyzeImportant, generateEffect } from './services/api';
 import SettingsModal from './components/SettingsModal';
 import AppTopBar from '@shared/AppTopBar/AppTopBar';
@@ -46,6 +48,7 @@ function App() {
     } catch { return 420; }
   });
   const [activeResizer, setActiveResizer] = useState(null);
+  const [theme, setThemeState] = useState(() => getTheme());
   const [isPlayingAll, setIsPlayingAll] = useState(false);
   const [isPlayingWithVoiceover, setIsPlayingWithVoiceover] = useState(false);
   const [soundEffectsVolume, setSoundEffectsVolume] = useState(() => {
@@ -129,6 +132,20 @@ function App() {
       localStorage.setItem('soundeffects_sfx_volume', String(soundEffectsVolume));
     } catch (_) {}
   }, [soundEffectsVolume]);
+
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setThemeState(getTheme());
+    window.addEventListener('saas-theme-change', handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener('saas-theme-change', handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   // Restore state from browser on mount
   useEffect(() => {
@@ -701,6 +718,7 @@ function App() {
         }}
         actions={
           <div className="header-actions">
+            <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="settings-btn" />
             {ambientSegments.length > 0 && (
               <button
                 type="button"

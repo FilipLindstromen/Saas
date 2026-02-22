@@ -9,6 +9,7 @@ import { saveRecording, loadRecording, clearRecording } from './utils/recordingS
 import { getVideoTrackCapabilities, filterResolutionsByCapabilities } from './utils/cameraCapabilities'
 import { exportVideoForDownload, getVideoDurationFromBlob, type ExportFormat } from './utils/exportWithColorAdjustments'
 import { RecordPreview } from './components/RecordPreview'
+import { AddOverlayToolbar } from './components/AddOverlayToolbar'
 import { Timeline } from './components/Timeline'
 import { TranscriptionPanel } from './components/TranscriptionPanel'
 import { ThumbnailCaptionsPanel } from './components/ThumbnailCaptionsPanel'
@@ -22,7 +23,7 @@ import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import TabBar from '@shared/TabBar/TabBar'
 import ThemeToggle from '@shared/ThemeToggle'
 import AppTopBar from '@shared/AppTopBar/AppTopBar'
-import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
+import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconFilmReel, IconCamera } from './components/Icons'
 import { getStoredTheme, setStoredTheme, applyTheme, initThemeSync, type Theme } from './utils/theme'
 import styles from './App.module.css'
 
@@ -855,22 +856,37 @@ export default function App() {
     <div className={styles.previewRow}>
       <section className={styles.previewSection} aria-label="Preview">
         <div className={styles.previewHeader}>
-          <h2 className={styles.previewTitle}>Preview</h2>
-          <p className={styles.previewSubtitle}>Video + overlays</p>
-          <div className={styles.previewScaleRow}>
-            <label className={styles.previewScaleLabel} htmlFor="preview-scale">Scale</label>
-            <input
-              id="preview-scale"
-              type="range"
-              className={styles.previewScaleSlider}
-              min={50}
-              max={150}
-              step={5}
-              value={previewScale}
-              onChange={(e) => setPreviewScale(Number(e.target.value))}
-              aria-label="Preview scale"
+          <div className={styles.previewHeaderLeft}>
+            <h2 className={styles.previewTitle}>Preview</h2>
+            <p className={styles.previewSubtitle}>Video + overlays</p>
+            <div className={styles.previewScaleRow}>
+              <label className={styles.previewScaleLabel} htmlFor="preview-scale">Scale</label>
+              <input
+                id="preview-scale"
+                type="range"
+                className={styles.previewScaleSlider}
+                min={50}
+                max={150}
+                step={5}
+                value={previewScale}
+                onChange={(e) => setPreviewScale(Number(e.target.value))}
+                aria-label="Preview scale"
+              />
+              <span className={styles.previewScaleValue}>{previewScale}%</span>
+            </div>
+          </div>
+          <div className={styles.previewHeaderCenter}>
+            <AddOverlayToolbar
+              onAddOverlay={handleAddOverlay}
+              onSplitClip={handleSplitClipAtPlayhead}
+              onVideoClipSplit={recordedBlob ? handleVideoClipSplit : undefined}
+              overlays={overlays}
+              selectedId={selectedOverlayId}
+              currentTime={safeDisplayTime}
+              duration={timelineDuration}
+              videoClipSegments={recordedBlob && videoClipSegments ? videoClipSegments : undefined}
+              videoSourceDuration={recordedBlob ? Math.max(sourceDuration ?? 0, 0.01) : undefined}
             />
-            <span className={styles.previewScaleValue}>{previewScale}%</span>
           </div>
           <span className={styles.exportFormat}>
             Export: {aspectRatio} · {width}×{height}
@@ -1015,7 +1031,7 @@ export default function App() {
               aria-label={editPreviewSource === 'recording' ? 'Use recording in preview' : 'Use webcam in preview'}
               aria-pressed={editPreviewSource === 'webcam'}
             >
-              {editPreviewSource === 'recording' ? <IconVideo /> : <IconCamera />}
+              {editPreviewSource === 'recording' ? <IconFilmReel /> : <IconCamera />}
             </button>
           <button
             type="button"

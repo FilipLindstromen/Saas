@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
 
 interface SettingsPanelProps {
   isOpen: boolean
@@ -9,13 +10,13 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [openaiApiKey, setOpenaiApiKey] = useState('')
 
   useEffect(() => {
-    // Load API key from localStorage
-    const savedKey = localStorage.getItem('openai_api_key') || ''
-    setOpenaiApiKey(savedKey)
-  }, [])
+    if (isOpen) {
+      setOpenaiApiKey(loadApiKeys().openai ?? '')
+    }
+  }, [isOpen])
 
   const handleSave = () => {
-    localStorage.setItem('openai_api_key', openaiApiKey)
+    saveApiKeys({ openai: openaiApiKey })
     onClose()
   }
 

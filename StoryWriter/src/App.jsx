@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import ThemeToggle from '@shared/ThemeToggle';
+import { getTheme, setTheme, initThemeSync } from '@shared/theme';
 import { getSettings, saveSettings, PRESENTATION_FONTS } from './utils/settings';
 import { normalizeStoryData } from './utils/persistence';
 import * as projectStorage from './utils/projectStorage';
@@ -54,6 +56,7 @@ function App() {
   const [currentTabId, setCurrentTabId] = useState(null);
   const [currentTabName, setCurrentTabName] = useState('Story 1');
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [theme, setThemeState] = useState(() => getTheme());
   const [settingsPresentationFont, setSettingsPresentationFont] = useState('Poppins');
   const [settingsPresentationSize, setSettingsPresentationSize] = useState('medium');
   const resizeStartRef = useRef({ x: 0, width: 0 });
@@ -159,6 +162,20 @@ function App() {
       setSettingsPresentationSize(s.presentationFontSize || 'medium');
     }
   }, [settingsOpen]);
+
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setThemeState(getTheme());
+    window.addEventListener('saas-theme-change', handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener('saas-theme-change', handler);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -474,6 +491,7 @@ function App() {
           <FontSettingsPopover onApply={() => setSettingsVersion((v) => v + 1)} />
           <BackgroundAnimationPopover onApply={() => setSettingsVersion((v) => v + 1)} />
           <RecordingOptionsPopover onApply={() => setSettingsVersion((v) => v + 1)} />
+          <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="app-settings-btn" />
           <button
             type="button"
             className="app-settings-btn"

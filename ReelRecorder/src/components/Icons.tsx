@@ -245,3 +245,16 @@ export function IconCamera(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/** Film reel – represents recorded footage / playback */
+export function IconFilmReel(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)} aria-hidden viewBox="0 0 24 24">
+      <rect x="2" y="5" width="16" height="14" rx="2" ry="2" />
+      <polygon points="8 9 8 15 14 12" fill="currentColor" stroke="none" />
+      <rect x="18" y="6" width="2" height="3" rx="0.5" />
+      <rect x="18" y="11" width="2" height="3" rx="0.5" />
+      <rect x="18" y="16" width="2" height="3" rx="0.5" />
+    </svg>
+  )
+}
