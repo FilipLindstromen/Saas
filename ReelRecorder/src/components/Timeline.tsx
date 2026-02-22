@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import type { OverlayItem, OverlayTextAnimation } from '../types'
-import { IconPlay, IconPause } from './Icons'
+import { IconPlay, IconPause, IconType, IconImage, IconVideo } from './Icons'
 import styles from './Timeline.module.css'
 
 const MIN_CLIP_DURATION = 0.5
