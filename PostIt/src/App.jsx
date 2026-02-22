@@ -412,8 +412,7 @@ export default function App() {
               ))}
             </div>
           )}
-          <button
-            <ThemeToggle
+          <ThemeToggle
             theme={state.theme}
             onToggle={(next) => { setTheme(next); setStateAndSave((prev) => ({ ...prev, theme: next })); }}
             className="app-btn app-btn-theme"
