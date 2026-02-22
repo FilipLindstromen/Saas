@@ -535,6 +535,10 @@ function App() {
     isRestoring.current = false
   }, [elements, selectedIds])
 
+  const updateElement = useCallback((id, updates) => {
+    setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
+  }, [])
+
   const addElement = useCallback((type, overrides = {}, indexHint) => {
     pushUndoState(elements, selectedIds)
     const baseY = indexHint != null ? 80 + indexHint * 100 : 100
@@ -567,10 +571,6 @@ function App() {
     }
     return el.id
   }, [defaultFontFamily, defaultFontSize, brandFontFamily, brandPrimaryColor, brandSecondaryColor, elements, selectedIds, pushUndoState, timelineDuration, latestImages, apiKeys, updateElement])
-
-  const updateElement = useCallback((id, updates) => {
-    setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
-  }, [])
 
   const updateMultipleElements = useCallback((updatesById) => {
     setElements(prev => prev.map(e => {

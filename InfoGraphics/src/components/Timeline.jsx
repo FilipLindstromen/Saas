@@ -70,6 +70,8 @@ export default function Timeline({
   }, [isPlaying, duration, onCurrentTimeChange, onPlayPause])
 
   const SNAP_THRESHOLD = 0.15
+  const CLIP_END_BUFFER = 0.1
+  const maxClipEnd = Math.max(0, duration - CLIP_END_BUFFER)
 
   const getSnapPoints = useCallback(() => {
     const points = new Set([0, duration])
@@ -185,7 +187,7 @@ export default function Timeline({
         const totalDur = maxEnd - minStart
         let clampedDt = dt
         if (minStart + dt < 0) clampedDt = -minStart
-        if (maxEnd + dt > duration) clampedDt = duration - maxEnd
+        if (maxEnd + dt > maxClipEnd) clampedDt = maxClipEnd - maxEnd
 
         dragState.ids.forEach((id) => {
           const { start, end } = dragState.clips[id]
@@ -194,8 +196,8 @@ export default function Timeline({
           if (shift) {
             newStart = snapToSecondOrHalf(newStart)
             newEnd = snapToSecondOrHalf(newEnd)
-            newStart = Math.max(0, Math.min(duration - 0.5, newStart))
-            newEnd = Math.max(newStart + 0.5, Math.min(duration, newEnd))
+            newStart = Math.max(0, Math.min(maxClipEnd - 0.5, newStart))
+            newEnd = Math.max(newStart + 0.5, Math.min(maxClipEnd, newEnd))
           }
           onUpdateClip?.(id, { clipStart: newStart, clipEnd: newEnd })
         })
