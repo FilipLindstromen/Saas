@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Zap, Loader2, User } from 'lucide-react';
-import { generateCopy } from '../services/openai';
+import { Zap, Loader2, User, Sparkles } from 'lucide-react';
+import { generateCopy, improveInputs } from '../services/openai';
+import ImproveInputsModal from './ImproveInputsModal';
 
 const Sidebar = ({
     docType, setDocType,
@@ -33,6 +34,8 @@ const Sidebar = ({
 }) => {
     const [loading, setLoading] = useState(false);
     const [pimpLoading, setPimpLoading] = useState(false);
+    const [improveInputsLoading, setImproveInputsLoading] = useState(false);
+    const [improveInputsSuggestions, setImproveInputsSuggestions] = useState(null);
 
     const docTypes = [
         '📄 Sales Page',
@@ -76,7 +79,7 @@ const Sidebar = ({
     };
 
     const handleImproveInstructions = async () => {
-        if (!apiKey || !instructions.trim() || !onImproveInstructions) return;
+        if (!apiKey || !instructions.trim()) return;
         setPimpLoading(true);
         try {
             const { improveInstructions } = await import('../services/openai');
@@ -90,7 +93,69 @@ const Sidebar = ({
         }
     };
 
+    const handleImproveInputs = async () => {
+        if (!apiKey) return;
+        setImproveInputsLoading(true);
+        setImproveInputsSuggestions(null);
+        try {
+            const result = await improveInputs(apiKey, {
+                docType,
+                offerType,
+                targetAudience,
+                situationsList,
+                painPoints,
+                hiddenFrustrations,
+                desiredOutcomes,
+                objections,
+                oldBelief,
+                newBelief,
+                desiredEmotion,
+                primaryCta
+            }, customMasterPrompt);
+
+            // Apply improved values directly
+            if (result.improved) {
+                if (result.improved.targetAudience) setTargetAudience(result.improved.targetAudience);
+                if (result.improved.situationsList) setSituationsList(result.improved.situationsList);
+                if (result.improved.painPoints) setPainPoints(result.improved.painPoints);
+                if (result.improved.hiddenFrustrations) setHiddenFrustrations(result.improved.hiddenFrustrations);
+                if (result.improved.desiredOutcomes) setDesiredOutcomes(result.improved.desiredOutcomes);
+                if (result.improved.objections) setObjections(result.improved.objections);
+                if (result.improved.oldBelief) setOldBelief(result.improved.oldBelief);
+                if (result.improved.newBelief) setNewBelief(result.improved.newBelief);
+                if (result.improved.desiredEmotion) setDesiredEmotion(result.improved.desiredEmotion);
+                if (result.improved.primaryCta) setPrimaryCta(result.improved.primaryCta);
+            }
+
+            // If there are suggestions for empty fields, show modal
+            const hasSuggestions = result.suggestions && Object.values(result.suggestions).some(v => Array.isArray(v) && v.length > 0);
+            if (hasSuggestions) {
+                setImproveInputsSuggestions(result.suggestions);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error improving inputs. Check console/API Key.");
+        } finally {
+            setImproveInputsLoading(false);
+        }
+    };
+
+    const handleApplySuggestions = (selections) => {
+        if (selections.targetAudience) setTargetAudience(selections.targetAudience);
+        if (selections.situationsList) setSituationsList(selections.situationsList);
+        if (selections.painPoints) setPainPoints(selections.painPoints);
+        if (selections.hiddenFrustrations) setHiddenFrustrations(selections.hiddenFrustrations);
+        if (selections.desiredOutcomes) setDesiredOutcomes(selections.desiredOutcomes);
+        if (selections.objections) setObjections(selections.objections);
+        if (selections.oldBelief) setOldBelief(selections.oldBelief);
+        if (selections.newBelief) setNewBelief(selections.newBelief);
+        if (selections.desiredEmotion) setDesiredEmotion(selections.desiredEmotion);
+        if (selections.primaryCta) setPrimaryCta(selections.primaryCta);
+        setImproveInputsSuggestions(null);
+    };
+
     return (
+        <>
         <aside style={{
             width: '320px',
             borderRight: '1px solid var(--border-default)',
@@ -102,12 +167,6 @@ const Sidebar = ({
             flexShrink: 0,
             overflowY: 'auto'
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: '800' }}>ColorWriter</span>
-                </h1>
-            </div>
-
             <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                     Document Type
@@ -243,6 +302,31 @@ const Sidebar = ({
                 />
             </div>
 
+            <button
+                type="button"
+                onClick={handleImproveInputs}
+                disabled={!apiKey || improveInputsLoading}
+                style={{
+                    width: '100%',
+                    padding: '0.6rem 1rem',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    background: !apiKey || improveInputsLoading ? 'var(--bg-tertiary)' : 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                    color: !apiKey || improveInputsLoading ? 'var(--text-tertiary)' : '#0369a1',
+                    border: '1px solid #7dd3fc',
+                    borderRadius: '6px',
+                    cursor: !apiKey || improveInputsLoading ? 'not-allowed' : 'pointer'
+                }}
+                title="Improve and sharpen inputs according to master prompt. Empty fields get 3 suggestions."
+            >
+                {improveInputsLoading ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                Improve the inputs
+            </button>
+
             <div className="control-group" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -306,7 +390,14 @@ const Sidebar = ({
                 )}
             </div>
 
-        </aside >
+        </aside>
+        <ImproveInputsModal
+                isOpen={!!improveInputsSuggestions}
+                onClose={() => setImproveInputsSuggestions(null)}
+                suggestions={improveInputsSuggestions}
+                onApply={handleApplySuggestions}
+            />
+        </>
     );
 };
 

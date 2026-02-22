@@ -9,6 +9,7 @@ export {
     analyzeCopy,
     analyzeAudienceFeedback,
     improveCopy,
+    improveInputs,
     improveInstructions,
     analyzeColorBalance,
     improveBalance,

@@ -65,8 +65,8 @@ export class Muxer {
       const MP4Box = (await import('mp4box')).default
       return this.muxMP4WithMP4Box(MP4Box)
     } catch (error) {
-      console.warn('mp4box.js not available, trying webm-muxer fallback for MP4...', error)
-      // Fallback: If mp4box fails, try using webm-muxer but this won't work for MP4
+      console.warn('mp4box.js not available for MP4 muxing', error)
+      // Fallback: MP4 requires mp4box.js
       // In this case, we'll throw an error to make it clear
       throw new Error(
         'MP4 muxing requires mp4box.js. Please ensure it is installed: npm install mp4box. ' +
@@ -222,51 +222,60 @@ export class Muxer {
 }
 
 /**
- * Alternative: Simple WebM muxer using WebM muxer library
- * Install: npm install webm-muxer
+ * Simple WebM muxer using Mediabunny (replaces deprecated webm-muxer)
+ * Install: npm install mediabunny
  */
 export async function createWebMMuxer(
   config: MuxerConfig
 ): Promise<{ addChunk: (chunk: EncodedVideoChunk) => void; finalize: () => Promise<Blob> }> {
-  // Try to use webm-muxer if available
   try {
-    const { WebMMuxer } = await import('webm-muxer')
-    
-    const muxer = new WebMMuxer({
-      target: 'buffer',
-      video: {
-        codec: 'V_VP9',
-        width: config.width,
-        height: config.height,
-        frameRate: config.fps,
-      },
-      audio: config.audioCodec ? {
-        codec: 'A_OPUS',
-        sampleRate: 48000,
-        numberOfChannels: 2,
-      } : undefined,
+    const {
+      Output,
+      WebMOutputFormat,
+      BufferTarget,
+      EncodedVideoPacketSource,
+      EncodedPacket,
+    } = await import('mediabunny')
+
+    // Map config videoCodec to Mediabunny codec (vp8, vp9, av1, etc.)
+    const codec = config.videoCodec?.toLowerCase().includes('vp9')
+      ? 'vp9'
+      : config.videoCodec?.toLowerCase().includes('vp8')
+        ? 'vp8'
+        : 'vp9'
+
+    const videoSource = new EncodedVideoPacketSource(codec as 'vp8' | 'vp9')
+    const output = new Output({
+      format: new WebMOutputFormat(),
+      target: new BufferTarget(),
     })
+    output.addVideoTrack(videoSource, { frameRate: config.fps })
+    await output.start()
+
+    const chunks: EncodedVideoChunk[] = []
 
     return {
       addChunk: (chunk: EncodedVideoChunk) => {
-        const buffer = new Uint8Array(chunk.byteLength)
-        chunk.copyTo(buffer)
-        muxer.addVideoChunk(buffer, chunk.timestamp)
+        chunks.push(chunk)
       },
       finalize: async () => {
-        const buffer = muxer.finalize()
-        return new Blob([buffer], { type: 'video/webm' })
+        for (const chunk of chunks) {
+          const packet = EncodedPacket.fromEncodedChunk(chunk)
+          await videoSource.add(packet)
+        }
+        await output.finalize()
+        const buffer = output.target.buffer
+        return new Blob([buffer!], { type: 'video/webm' })
       },
     }
   } catch (error) {
-    // Fallback to basic implementation
-    console.warn('webm-muxer not available, using basic muxer')
+    console.warn('mediabunny not available, using basic muxer', error)
     return createBasicWebMMuxer(config)
   }
 }
 
 function createBasicWebMMuxer(
-  config: MuxerConfig
+  _config: MuxerConfig
 ): { addChunk: (chunk: EncodedVideoChunk) => void; finalize: () => Promise<Blob> } {
   const chunks: Uint8Array[] = []
 

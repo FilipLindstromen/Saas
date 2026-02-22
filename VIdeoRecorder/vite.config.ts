@@ -100,7 +100,7 @@ export default defineConfig(({ mode }) => {
                 return 'ffmpeg-vendor'
               }
               // Other large libraries
-              if (id.includes('html2canvas') || id.includes('mp4box') || id.includes('webm-muxer')) {
+              if (id.includes('html2canvas') || id.includes('mp4box') || id.includes('mediabunny')) {
                 return 'media-vendor'
               }
               // All other node_modules

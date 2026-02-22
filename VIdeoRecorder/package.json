@@ -2,6 +2,7 @@
   "name": "video-recorder",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "description": "Video planning, recording, and editing software",
   "main": "electron/main.js",
   "scripts": {
@@ -25,7 +26,7 @@
     "mp4box": "^2.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "webm-muxer": "^5.1.4"
+    "mediabunny": "^1.34.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

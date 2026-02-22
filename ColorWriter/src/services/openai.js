@@ -15,12 +15,14 @@ Persuasion must come through clarity, relevance, authority, and inevitability �
 
 CORE PERSUASION FRAMEWORK (MANDATORY)
 
-Every section MUST follow:
+Every paragraph/block MUST follow this exact sequence, repeating throughout the document.
 
 1. Statement — clear idea or claim
 2. Impact — why it matters
 3. Evidence — proof, logic, or credibility
 4. Relevance — why THIS audience should care NOW
+
+Then repeat: Statement → Impact → Evidence → Relevance. The cycle never breaks. No random ordering.
 
 Relevance is mandatory.
 
@@ -356,13 +358,13 @@ Ensure:
 
 OUTPUT REQUIREMENTS
 
-Produce ONLY requested output:
+Produce ONLY the actual copy — the real words the reader/viewer will see or hear.
 
-* VSL OR Sales Page OR Ad Copy.
+* VSL = the full VSL script (HTML), not advice about the VSL
+* Sales Page = the full sales page (HTML), not a description of it
+* Ad Copy = the actual headlines and body, not recommendations
 
-No commentary.
-No explanation.
-No meta-language.
+FORBIDDEN: Meta-commentary, style recommendations, "The copy should...", "This approach aligns...", or any text that describes the copy instead of being the copy.
 
 Write with elite senior-copywriter precision.
 
@@ -378,6 +380,12 @@ You MUST output HTML using the ColorWriter row layout. Use ONLY these four block
 2. **block-impact** — why it matters (Impact)
 3. **block-evidence** — proof, logic, credibility (Evidence)
 4. **block-relevance** — why THIS audience should care NOW (Relevance)
+
+**BLOCK SEQUENCE (CRITICAL):**
+Blocks MUST follow this exact order, repeating throughout the entire document:
+Statement → Impact → Evidence → Relevance → Statement → Impact → Evidence → Relevance → ...
+
+Do NOT skip or reorder. Each content-row must be the next block in the cycle. If you just wrote block-relevance, the next block MUST be block-statement. If you just wrote block-statement, the next MUST be block-impact, then block-evidence, then block-relevance. This cycle repeats for every paragraph, section, and the entire document.
 
 Structure:
 <div class="content-row">
@@ -406,9 +414,9 @@ export function buildSystemPrompt(template, params) {
         oldBelief, newBelief, desiredEmotion, primaryCta, docType
     } = params;
     const docTypeExtension = [
-        docType?.includes('Sales Page') ? '\nSALES PAGE: Generate complete 3000-6000+ word sales page. Start with Hero (outcome + relevance), then Problem, Mechanism, Offer, Proof, Objections, CTAs. Use Persuasive Cycle in every section.' : '',
-        docType?.includes('VSL') ? '\nVSL: Follow the 10-step VSL structure. Use Persuasive Cycle per section. Retention spike around minute 8–12.' : '',
-        (docType?.includes('AD') || docType?.includes('Facebook')) ? '\nAD COPY: Provide headlines, hooks, primary ad body (Statement → Impact → Evidence → Relevance → CTA), and creative suggestions.' : ''
+        docType?.includes('Sales Page') ? '\nSALES PAGE: Generate complete 3000-6000+ word sales page. Start with Hero (outcome + relevance), then Problem, Mechanism, Offer, Proof, Objections, CTAs. Use Persuasive Cycle in every section. Blocks MUST follow Statement → Impact → Evidence → Relevance in strict repeating order.' : '',
+        docType?.includes('VSL') ? '\nVSL: Follow the 10-step VSL structure. Retention spike around minute 8–12. Every block MUST follow the cycle: Statement → Impact → Evidence → Relevance, repeating throughout. No random ordering.' : '',
+        (docType?.includes('AD') || docType?.includes('Facebook')) ? '\nAD COPY: Provide headlines, hooks, primary ad body. Follow Statement → Impact → Evidence → Relevance → CTA in strict order.' : ''
     ].filter(Boolean).join('\n');
     const replacements = {
         '{{offerType}}': offerType || 'Mid-ticket',
@@ -499,9 +507,19 @@ For each objection: (1) Restate it calmly, (2) Validate the concern, (3) Provide
 Reframe objections as buying signals. Include an FAQ or objection section addressing these.
 ` : '';
 
-    const userPrompt = `${docType.includes('Sales Page') ? `CRITICAL: Generate the COMPLETE, FULL-LENGTH sales page (3000-6000+ words) in this single response. Do NOT provide a condensed version, draft, or abbreviated content. Generate the entire sales page with all sections, all content, and all required elements now.
+    const docTypeTask = docType.includes('Sales Page')
+        ? `CRITICAL: Generate the COMPLETE, FULL-LENGTH sales page (3000-6000+ words) in this single response. Do NOT provide a condensed version, draft, or abbreviated content. Generate the entire sales page with all sections, all content, and all required elements now.`
+        : docType.includes('VSL')
+            ? `CRITICAL: Generate the ACTUAL VSL script/copy. Output the full video sales letter script as HTML — the real words the viewer will hear and read. Do NOT output meta-commentary, style recommendations, or descriptions of what the copy should be. Output ONLY the persuasive copy itself in the required HTML format.`
+            : docType.includes('AD') || docType.includes('Facebook')
+                ? `Generate the ACTUAL ad copy — headlines, hooks, and body text. Output the real ad content, not commentary about it.`
+                : `Generate the ACTUAL ${docType} copy. Output the real persuasive content in HTML format, not commentary or recommendations about it.`;
 
-` : ''}Instructions: ${instructions}${objectionGuidance}`;
+    const userPrompt = `${docTypeTask ? docTypeTask + '\n\n' : ''}**Product/offer context and instructions:** ${instructions || 'No additional instructions provided.'}${objectionGuidance}
+
+**OUTPUT REQUIREMENT:** Return ONLY the copy in HTML format. No preamble, no explanation, no meta-language like "The copy should..." or "This approach...". Start directly with <div class="content-row">.
+
+**BLOCK ORDER:** Every content-row must follow the cycle: Statement → Impact → Evidence → Relevance → Statement → Impact → Evidence → Relevance... Do not skip or reorder blocks.`;
 
     try {
         const completion = await openai.chat.completions.create({
@@ -777,6 +795,103 @@ CRITICAL: Return ONLY the full valid HTML with rows, gutters, and blocks.
         return completion.choices[0].message.content;
     } catch (error) {
         console.error("OpenAI Improve Error:", error);
+        throw error;
+    }
+};
+
+export const improveInputs = async (apiKey, inputs, customMasterPrompt) => {
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+    const masterPromptContext = customMasterPrompt && customMasterPrompt.trim()
+        ? `The user has a custom master prompt that defines the copywriting framework. Use it to guide improvements:\n\n${customMasterPrompt.slice(0, 2000)}`
+        : 'Use the standard direct-response copywriting framework: persuasion through clarity, relevance, authority, and inevitability.';
+
+    const systemPrompt = `You are an elite senior direct-response copywriter and persuasion strategist.
+
+${masterPromptContext}
+
+**YOUR TASK**:
+Improve and sharpen the user's input fields for a ${inputs.docType || 'sales page'} targeting ${inputs.targetAudience || 'an audience'}.
+
+**RULES**:
+1. For fields that HAVE real content: Improve and sharpen the text. Make it more specific, persuasive, and aligned with the master prompt. Return the improved version.
+2. For fields that are EMPTY or contain ONLY placeholder text (e.g. "• Pain 1", "• Pain 2", "e.g. Relief, Hope", "• Objection 1"): Generate exactly 3 strong, specific suggestions the user can choose from. Each suggestion should be tailored to the target audience and document type.
+
+**FIELD DEFINITIONS** (use these exact keys in your JSON):
+- targetAudience
+- situationsList (list format, one per line with •)
+- painPoints (list format)
+- hiddenFrustrations (list format)
+- desiredOutcomes (list format)
+- objections (list format)
+- oldBelief
+- newBelief
+- desiredEmotion
+- primaryCta
+
+**OUTPUT FORMAT** - Return ONLY valid JSON:
+{
+  "improved": {
+    "targetAudience": "improved value or null if was empty",
+    "situationsList": "improved value or null",
+    "painPoints": "improved value or null",
+    "hiddenFrustrations": "improved value or null",
+    "desiredOutcomes": "improved value or null",
+    "objections": "improved value or null",
+    "oldBelief": "improved value or null",
+    "newBelief": "improved value or null",
+    "desiredEmotion": "improved value or null",
+    "primaryCta": "improved value or null"
+  },
+  "suggestions": {
+    "targetAudience": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "situationsList": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "painPoints": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "hiddenFrustrations": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "desiredOutcomes": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "objections": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "oldBelief": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "newBelief": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "desiredEmotion": ["suggestion 1", "suggestion 2", "suggestion 3"] or null,
+    "primaryCta": ["suggestion 1", "suggestion 2", "suggestion 3"] or null
+  }
+}
+
+For "improved": include the field only if it had real content to improve. Use null for empty fields.
+For "suggestions": include exactly 3 suggestions only for fields that were empty or placeholder-only. Use null for fields that had content.
+`;
+
+    const userPrompt = `Improve these inputs:
+
+Document Type: ${inputs.docType || 'Sales Page'}
+Offer Type: ${inputs.offerType || 'Mid-ticket'}
+Target Audience: ${inputs.targetAudience || ''}
+Specific Situations: ${inputs.situationsList || ''}
+Pain Patterns: ${inputs.painPoints || ''}
+Hidden Frustrations: ${inputs.hiddenFrustrations || ''}
+Desired Outcomes: ${inputs.desiredOutcomes || ''}
+Common Objections: ${inputs.objections || ''}
+Old Belief: ${inputs.oldBelief || ''}
+New Belief: ${inputs.newBelief || ''}
+Desired Emotion After Reading: ${inputs.desiredEmotion || ''}
+Primary CTA: ${inputs.primaryCta || ''}
+
+Return ONLY the JSON object.`;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            temperature: 0.7
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("OpenAI Improve Inputs Error:", error);
         throw error;
     }
 };
