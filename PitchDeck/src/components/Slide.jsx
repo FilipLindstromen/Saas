@@ -1718,8 +1718,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         if (!projectData) return null
         return (
           <InfographicBackground
+            key={`infographic-${slide.infographicProjectId}-${slide.infographicTabId || ''}`}
             projectData={projectData}
             isPlaying={isPlayMode}
+            showAllElements={!isPlayMode}
             opacity={backgroundOpacity}
             imageScale={imageScale}
             imagePositionX={imagePositionX}

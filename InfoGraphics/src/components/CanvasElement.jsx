@@ -1,6 +1,8 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef, useEffect } from 'react'
 import { ANIMATION_DURATION } from '../constants/animations'
 import './CanvasElement.css'
+
+const TEXT_TYPES = ['headline', 'cta', 'image-text']
 
 export const ARROW_DESIGNS = {
   simple: { d: 'M5 12h14M12 5l7 7-7 7', strokeWidth: 2, strokeDasharray: 'none' },
@@ -11,42 +13,43 @@ export const ARROW_DESIGNS = {
   double: { d: 'M4 12h8M16 12h4M12 5l7 7-7 7', strokeWidth: 2, strokeDasharray: 'none' },
   circle: { d: 'M12 8v8M8 12h8', strokeWidth: 2, strokeDasharray: 'none', circle: true },
   filled: { d: 'M5 12h14l-7-7v14z', strokeWidth: 1, strokeDasharray: 'none', fill: true },
-  // Hand-drawn styles (thick outline, 3D shadow, sketch aesthetic)
-  'hand-outline-3d': {
-    d: 'M6 8h10l-5 8 5 8H6l4-8z',
+  'hand-curved': {
+    d: 'M6 6Q12 18 18 16',
     strokeWidth: 2.5,
     strokeDasharray: 'none',
-    outlineOnly: true,
-    paths: [{ d: 'M7 10h10l-5 8 5 8H7l4-8z', fill: true }]
+    paths: [{ d: 'M17 13L21 16L17 19Z', fill: true, stroke: false }]
   },
-  'hand-curved-thick': { d: 'M6 12Q12 6 18 12M15 9l3 3-3 3', strokeWidth: 2.5, strokeDasharray: 'none' },
-  'hand-chevrons-stack': { d: 'M12 6l4 6-4 6M12 10l4 6-4 6M12 14l4 6-4 6', strokeWidth: 1.5, strokeDasharray: 'none' },
-  'hand-wavy': { d: 'M5 12Q7 10 9 12Q11 14 13 12Q15 10 17 12Q19 14 19 12', strokeWidth: 1.5, strokeDasharray: 'none' },
-  'hand-pointing': {
-    d: 'M11 4l1 2v12l-2 2-2-2V6l1-2z',
+  'hand-simple': {
+    d: 'M5 12L12 12',
+    strokeWidth: 2.5,
+    strokeDasharray: 'none',
+    paths: [{ d: 'M12 8L19 12L12 16Z', fill: true, stroke: 'currentColor', strokeWidth: 1 }]
+  },
+  outlined: {
+    d: '',
     strokeWidth: 1.5,
     strokeDasharray: 'none',
-    fill: true,
-    paths: [{ d: 'M10 3l2 1M12 3l-1 2M10 5l1 0.5M12 5l-1 0.5', strokeDasharray: '1 1' }]
-  },
-  'hand-block-3d': {
-    d: 'M6 9h10l-5 6 5 6H6l4-6z',
-    strokeWidth: 2,
-    strokeDasharray: 'none',
-    fill: true,
-    paths: [{ d: 'M16 15l2 2M16 9l2-2', strokeDasharray: 'none' }]
-  },
-  'hand-swoosh': {
-    d: 'M5 12Q8 8 14 10Q18 12 19 12M17 10l2 2-2 2',
-    strokeWidth: 2,
-    strokeDasharray: 'none',
-    fill: true,
-    paths: [{ d: 'M7 14Q8 12 10 13M9 16Q10 14 12 15M11 18Q12 16 14 17', strokeDasharray: 'none' }]
+    paths: [{
+      d: 'M15 9L21 12L15 15L5 15A3 3 0 0 1 5 9L15 9Z',
+      fill: '#ffffff',
+      stroke: 'currentColor',
+      strokeWidth: 1.5,
+      strokeLinejoin: 'miter'
+    }]
   }
 }
 
-export default function CanvasElement({ element, currentTime = 0, isSelected, showResizeHandles = true, onPointerDown }) {
-  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, animationIn, animationOut, gradientColor } = element
+export default function CanvasElement({ element, currentTime = 0, isSelected, showResizeHandles = true, onPointerDown, isEditingText = false, onStartEditText, onFinishEditText, onUpdate }) {
+  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, imageFlipHorizontal, animationIn, animationOut, gradientColor } = element
+  const textEditRef = useRef(null)
+  const isTextType = TEXT_TYPES.includes(type)
+
+  useEffect(() => {
+    if (isEditingText && textEditRef.current) {
+      textEditRef.current.focus()
+      textEditRef.current.select()
+    }
+  }, [isEditingText])
 
   const clipStart = element.clipStart ?? 0
   const clipEnd = element.clipEnd ?? 10
@@ -64,10 +67,11 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
 
   const renderContent = () => {
     if (type === 'image') {
+      const imgStyle = imageFlipHorizontal ? { transform: 'scaleX(-1)' } : undefined
       return imageUrl ? (
         <div className="element-image-wrap element-image-full">
           <div className="element-image-inner">
-            <img src={imageUrl} alt="" className="element-image" />
+            <img src={imageUrl} alt="" className="element-image" style={imgStyle} />
             {imageTint && (
               <div
                 className="element-image-tint-mask"
@@ -76,6 +80,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
                   opacity: (imageTintOpacity ?? 100) / 100,
                   WebkitMaskImage: `url(${imageUrl})`,
                   maskImage: `url(${imageUrl})`,
+                  ...(imageFlipHorizontal && { transform: 'scaleX(-1)' })
                 }}
               />
             )}
@@ -86,12 +91,13 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
       )
     }
     if (type === 'image-text') {
+      const imgStyle = imageFlipHorizontal ? { transform: 'scaleX(-1)' } : undefined
       return (
         <>
           {imageUrl && (
             <div className="element-image-wrap">
               <div className="element-image-inner">
-                <img src={imageUrl} alt="" className="element-image" />
+                <img src={imageUrl} alt="" className="element-image" style={imgStyle} />
                 {imageTint && (
                   <div
                     className="element-image-tint-mask"
@@ -100,26 +106,99 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
                       opacity: (imageTintOpacity ?? 100) / 100,
                       WebkitMaskImage: `url(${imageUrl})`,
                       maskImage: `url(${imageUrl})`,
+                      ...(imageFlipHorizontal && { transform: 'scaleX(-1)' })
                     }}
                   />
                 )}
               </div>
             </div>
           )}
-          <div className="element-text" style={{ fontSize, fontFamily, color }}>
-            {text || 'Add text'}
+          <div
+            className="element-text element-text-multiline"
+            style={{ fontSize, fontFamily, color }}
+            onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
+          >
+            {isEditingText ? (
+              <textarea
+                ref={textEditRef}
+                className="element-text-edit"
+                value={text || ''}
+                onChange={(e) => onUpdate?.(element.id, { text: e.target.value })}
+                onBlur={(e) => onFinishEditText?.(element.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    onUpdate?.(element.id, { text: element.text })
+                    e.target.blur()
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{ fontSize, fontFamily, color }}
+              />
+            ) : (
+              (text || 'Add text').split('\n').map((line, i) => (
+                <span key={i}>{line || '\u00A0'}{i < (text || '').split('\n').length - 1 ? <br /> : null}</span>
+              ))
+            )}
           </div>
         </>
       )
     }
     if (type === 'headline') {
       return (
-        <div className="element-text element-headline" style={{ fontSize, fontFamily, color }}>
-          {text || 'Headline'}
+        <div
+          className="element-text element-headline element-text-multiline"
+          style={{ fontSize, fontFamily, color }}
+          onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
+        >
+          {isEditingText ? (
+            <textarea
+              ref={textEditRef}
+              className="element-text-edit"
+              value={text || ''}
+              onChange={(e) => onUpdate?.(element.id, { text: e.target.value })}
+              onBlur={(e) => onFinishEditText?.(element.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  onUpdate?.(element.id, { text: element.text })
+                  e.target.blur()
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ fontSize, fontFamily, color }}
+            />
+          ) : (
+            (text || 'Headline').split('\n').map((line, i) => (
+              <span key={i}>{line || '\u00A0'}{i < (text || 'Headline').split('\n').length - 1 ? <br /> : null}</span>
+            ))
+          )}
         </div>
       )
     }
     if (type === 'arrow') {
+      if (imageUrl) {
+        const imgStyle = imageFlipHorizontal ? { transform: 'scaleX(-1)' } : undefined
+        return (
+          <div className="element-image-wrap element-image-full">
+            <div className="element-image-inner">
+              <img src={imageUrl} alt="" className="element-image" style={imgStyle} />
+              {imageTint && (
+                <div
+                  className="element-image-tint-mask"
+                  style={{
+                    backgroundColor: imageTint,
+                    opacity: (imageTintOpacity ?? 100) / 100,
+                    WebkitMaskImage: `url(${imageUrl})`,
+                    maskImage: `url(${imageUrl})`,
+                    ...(imageFlipHorizontal && { transform: 'scaleX(-1)' })
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        )
+      }
       const dir = arrowDirection || 'right'
       const rot = { right: 0, down: 90, left: 180, up: 270 }[dir]
       const design = ARROW_DESIGNS[arrowStyle || 'simple'] || ARROW_DESIGNS.simple
@@ -137,12 +216,12 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
             <path
               key={i}
               d={p.d}
-              fill={p.fill ? 'currentColor' : 'none'}
+              fill={typeof p.fill === 'string' ? p.fill : p.fill ? 'currentColor' : 'none'}
               stroke={p.stroke !== false ? 'currentColor' : 'none'}
               strokeWidth={p.strokeWidth ?? design.strokeWidth}
               strokeDasharray={p.strokeDasharray}
               strokeLinecap="round"
-              strokeLinejoin="round"
+              strokeLinejoin={p.strokeLinejoin || 'round'}
             />
           ))}
           <path
@@ -155,8 +234,33 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
     }
     if (type === 'cta') {
       return (
-        <div className="element-cta" style={{ fontSize, fontFamily, color, backgroundColor: backgroundColor || '#3b82f6' }}>
-          {text || 'Click Here'}
+        <div
+          className="element-cta element-text-multiline"
+          style={{ fontSize, fontFamily, color, backgroundColor: backgroundColor || '#3b82f6' }}
+          onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
+        >
+          {isEditingText ? (
+            <textarea
+              ref={textEditRef}
+              className="element-text-edit element-cta-edit"
+              value={text || ''}
+              onChange={(e) => onUpdate?.(element.id, { text: e.target.value })}
+              onBlur={(e) => onFinishEditText?.(element.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  onUpdate?.(element.id, { text: element.text })
+                  e.target.blur()
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ fontSize, fontFamily, color, backgroundColor: backgroundColor || '#3b82f6' }}
+            />
+          ) : (
+            (text || 'Click Here').split('\n').map((line, i) => (
+              <span key={i}>{line || '\u00A0'}{i < (text || 'Click Here').split('\n').length - 1 ? <br /> : null}</span>
+            ))
+          )}
         </div>
       )
     }

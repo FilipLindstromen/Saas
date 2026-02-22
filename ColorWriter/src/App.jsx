@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
@@ -16,7 +17,7 @@ import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversion
 import { Settings, Moon, Sun } from 'lucide-react';
 
 function App() {
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => loadApiKeys().openai || '');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Persistent State Helpers
@@ -203,7 +204,7 @@ function App() {
   // Handler for saving API key
   const handleSaveApiKey = (key) => {
     setApiKey(key);
-    localStorage.setItem('openai_api_key', key);
+    saveApiKeys({ openai: key });
     setIsSettingsOpen(false);
   };
 

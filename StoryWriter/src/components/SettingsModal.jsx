@@ -49,7 +49,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
         <form onSubmit={handleSave} className="settings-form">
           <p className="settings-hint">
-            Your API key is stored only in this browser and is never sent to any server other than OpenAI.
+            API keys are stored once and shared across all Saas apps. They are never sent to our servers.
           </p>
           <label className="settings-label">
             OpenAI API Key

@@ -32,6 +32,9 @@ function Settings({ settings, onUpdate, onClose }) {
         <div className="settings-content">
           {activeTab === 'api' && (
             <>
+              <p className="settings-hint" style={{ marginBottom: '1rem', gridColumn: '1 / -1' }}>
+                API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, StoryWriter, etc.).
+              </p>
               <div className="settings-field">
                 <label htmlFor="openai-key">OpenAI API Key</label>
                 <input

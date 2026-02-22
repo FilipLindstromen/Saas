@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
 import SlideList from './components/SlideList'
 import SlidePreview from './components/SlidePreview'
 import PlayMode from './components/PlayMode'
@@ -176,9 +177,10 @@ function App() {
   const updateSlideTimeoutRef = useRef(null)
   const latestStateRef = useRef(null)
   const [settings, setSettings] = useState(() => {
+    const apiKeys = loadApiKeys()
     const savedSettings = {
-      openaiKey: localStorage.getItem('openaiKey') || '',
-      unsplashKey: localStorage.getItem('unsplashKey') || '',
+      openaiKey: apiKeys.openai || '',
+      unsplashKey: apiKeys.unsplash || '',
       backgroundColor: localStorage.getItem('backgroundColor') || '#1a1a1a',
       textColor: localStorage.getItem('textColor') || '#ffffff',
       fontFamily: localStorage.getItem('fontFamily') || 'Poppins',
@@ -219,9 +221,9 @@ function App() {
       h1LineHeight: parseFloat(localStorage.getItem('h1LineHeight')) || 1.2,
       h2LineHeight: parseFloat(localStorage.getItem('h2LineHeight')) || 1.2,
       h3LineHeight: parseFloat(localStorage.getItem('h3LineHeight')) || 1.2,
-      googleClientId: localStorage.getItem('googleClientId') || '',
-      pexelsKey: localStorage.getItem('pexelsKey') || '',
-      pixabayKey: localStorage.getItem('pixabayKey') || '',
+      googleClientId: apiKeys.googleClientId || '',
+      pexelsKey: apiKeys.pexels || '',
+      pixabayKey: apiKeys.pixabay || '',
       showBullets: localStorage.getItem('showBullets') !== 'false',
       autoAdvance: localStorage.getItem('autoAdvance') === 'true',
       autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5
@@ -556,14 +558,15 @@ function App() {
     document.documentElement.setAttribute('data-theme', savedTheme)
   }, [])
 
-  // Save settings to localStorage
+  // Save settings to localStorage (API keys go to shared storage)
   useEffect(() => {
-    if (settings.openaiKey) {
-      localStorage.setItem('openaiKey', settings.openaiKey)
-    }
-    if (settings.unsplashKey) {
-      localStorage.setItem('unsplashKey', settings.unsplashKey)
-    }
+    saveApiKeys({
+      openai: settings.openaiKey || '',
+      unsplash: settings.unsplashKey || '',
+      pexels: settings.pexelsKey || '',
+      pixabay: settings.pixabayKey || '',
+      googleClientId: settings.googleClientId || ''
+    })
     localStorage.setItem('backgroundColor', settings.backgroundColor)
     localStorage.setItem('textColor', settings.textColor)
     localStorage.setItem('fontFamily', settings.fontFamily)
@@ -618,9 +621,6 @@ function App() {
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
     localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
-    if (settings.googleClientId !== undefined) localStorage.setItem('googleClientId', settings.googleClientId || '')
-    if (settings.pexelsKey !== undefined) localStorage.setItem('pexelsKey', settings.pexelsKey || '')
-    if (settings.pixabayKey !== undefined) localStorage.setItem('pixabayKey', settings.pixabayKey || '')
   }, [settings])
 
   // Save workspace data when it changes
@@ -831,6 +831,52 @@ function App() {
       return [fileInfo, ...filtered].slice(0, 10)
     })
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
+
+  // Export slides as plain text (Slide 1: ... Slide 2: ...)
+  const exportSlidesAsText = useCallback(() => {
+    const getPlainText = (content) => {
+      if (!content || typeof content !== 'string') return ''
+      return content
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<div[^>]*>\s*/gi, '\n')
+        .replace(/<\/div>\s*/gi, '')
+        .replace(/<p[^>]*>\s*/gi, '\n')
+        .replace(/<\/p>\s*/gi, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .trim()
+    }
+
+    const allSlides = chapters.flatMap(ch => ch.slides)
+    const lines = allSlides.map((slide, i) => {
+      const num = i + 1
+      let text = getPlainText(slide.content || '')
+      if (slide.layout === 'centered' && slide.subtitle) {
+        const sub = getPlainText(slide.subtitle)
+        if (sub) text = text ? `${text}\n${sub}` : sub
+      }
+      return `Slide ${num}:\n${text || '(empty)'}`
+    })
+    const output = lines.join('\n\n')
+
+    const filename = projectName.trim()
+      ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}-slides.txt`
+      : `slides-${new Date().toISOString().split('T')[0]}.txt`
+    const blob = new Blob([output], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, [chapters, projectName])
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
@@ -2268,6 +2314,21 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={exportSlidesAsText}
+                  title="Export slides as text"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span className="btn-tooltip">Export text</span>
+                </button>
                 <button 
                   className="btn-icon-header btn-theme-toggle" 
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
@@ -2584,6 +2645,21 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
               <div className="header-icon-group">
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={exportSlidesAsText}
+                  title="Export slides as text"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span className="btn-tooltip">Export text</span>
+                </button>
                 <button 
                   className="btn-icon-header btn-theme-toggle" 
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 

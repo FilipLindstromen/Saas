@@ -199,8 +199,9 @@ function InfographicElement({ element, currentTime = 0 }) {
 /**
  * Renders an infographic project as a background layer.
  * Supports timeline animations (clipStart/clipEnd) - when isPlaying, advances time and shows elements accordingly.
+ * When showAllElements is true (e.g. for picker previews), all elements are shown regardless of timeline clips.
  */
-function InfographicBackground({ projectData, isPlaying = false, opacity = 1, imageScale = 1, imagePositionX = 50, imagePositionY = 50, flipHorizontal = false, className = '' }) {
+function InfographicBackground({ projectData, isPlaying = false, showAllElements = false, opacity = 1, imageScale = 1, imagePositionX = 50, imagePositionY = 50, flipHorizontal = false, className = '' }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [scale, setScale] = useState(1)
   const containerRef = useRef(null)
@@ -240,6 +241,7 @@ function InfographicBackground({ projectData, isPlaying = false, opacity = 1, im
   const visibleElements = elements
     .filter(el => {
       if (el.visible === false) return false
+      if (showAllElements) return true
       if (el.clipStart != null && el.clipEnd != null) {
         return currentTime >= el.clipStart && currentTime < el.clipEnd
       }
@@ -247,6 +249,7 @@ function InfographicBackground({ projectData, isPlaying = false, opacity = 1, im
     })
     .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
 
+  // Advance timeline when playing - uses same timing as InfoGraphics (clipStart/clipEnd in seconds)
   useEffect(() => {
     if (!isPlaying) return
     startTimeRef.current = performance.now() - currentTime * 1000

@@ -47,10 +47,13 @@ export default function TabBar({
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename(tab.id, editName)
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleRename(tab.id, e.target.value)
+                  }
                   if (e.key === 'Escape') setEditingId(null)
                 }}
-                onBlur={() => handleRename(tab.id, editName)}
+                onBlur={(e) => handleRename(tab.id, e.target.value)}
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (

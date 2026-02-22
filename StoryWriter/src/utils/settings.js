@@ -1,3 +1,5 @@
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+
 const STORAGE_KEY = 'storywriter_settings';
 
 function clampNum(val, min, max, fallback) {
@@ -66,19 +68,22 @@ const defaults = {
 };
 
 export function getSettings() {
+  const apiKeys = loadApiKeys();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...defaults };
+    if (!raw) return { ...defaults, openaiApiKey: apiKeys.openai, unsplashAccessKey: apiKeys.unsplash };
     const parsed = JSON.parse(raw);
     const opacity = parsed.presentationBackgroundOpacity;
     return {
       ...defaults,
       ...parsed,
+      openaiApiKey: apiKeys.openai || '',
+      unsplashAccessKey: apiKeys.unsplash || '',
       presentationBackgroundOpacity:
         typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
     };
   } catch {
-    return { ...defaults };
+    return { ...defaults, openaiApiKey: apiKeys.openai, unsplashAccessKey: apiKeys.unsplash };
   }
 }
 
@@ -86,14 +91,17 @@ export function saveSettings(settings) {
   const font = String(settings.presentationFont ?? defaults.presentationFont).trim();
   const size = String(settings.presentationFontSize ?? defaults.presentationFontSize).trim();
   const opacity = settings.presentationBackgroundOpacity;
+  const openaiApiKey = String(settings.openaiApiKey ?? '').trim();
+  const unsplashAccessKey = String(settings.unsplashAccessKey ?? '').trim();
+  saveApiKeys({ openai: openaiApiKey, unsplash: unsplashAccessKey });
   const next = {
-    openaiApiKey: String(settings.openaiApiKey ?? '').trim(),
+    openaiApiKey,
     presentationFont: PRESENTATION_FONTS.includes(font) ? font : defaults.presentationFont,
     presentationFontSize: ['small', 'medium', 'large'].includes(size) ? size : defaults.presentationFontSize,
     presentationLineHeight: LINE_HEIGHT_OPTIONS.some((o) => o.value === settings.presentationLineHeight)
       ? settings.presentationLineHeight
       : defaults.presentationLineHeight,
-    unsplashAccessKey: String(settings.unsplashAccessKey ?? '').trim(),
+    unsplashAccessKey,
     presentationBackgroundOpacity:
       typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
     presentationWebcamEnabled: Boolean(settings.presentationWebcamEnabled),

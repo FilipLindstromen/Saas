@@ -1,28 +1,14 @@
 import { useState, useEffect } from 'react'
+import { loadApiKeys as loadShared, saveApiKeys as saveShared } from '@shared/apiKeys'
 import './SettingsModal.css'
 
-const STORAGE_KEY = 'infographicsApiKeys'
-
 export function loadApiKeys() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      return {
-        giphy: parsed.giphy || '',
-        pixabay: parsed.pixabay || '',
-        pexels: parsed.pexels || '',
-        openai: parsed.openai || ''
-      }
-    }
-  } catch (e) {
-    console.error('Error loading API keys:', e)
-  }
-  return { giphy: '', pixabay: '', pexels: '', openai: '' }
+  const keys = loadShared()
+  return { giphy: keys.giphy, pixabay: keys.pixabay, pexels: keys.pexels, openai: keys.openai }
 }
 
 export function saveApiKeys(keys) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(keys))
+  saveShared({ giphy: keys.giphy, pixabay: keys.pixabay, pexels: keys.pexels, openai: keys.openai })
 }
 
 export default function SettingsModal({ isOpen, onClose, apiKeys = {}, onSave }) {
@@ -56,7 +42,7 @@ export default function SettingsModal({ isOpen, onClose, apiKeys = {}, onSave })
         </div>
         <div className="settings-modal-body">
           <p className="settings-modal-desc">
-            API keys are stored locally in your browser. They are sent to the server when making requests.
+            API keys are stored once and shared across all Saas apps. They are sent to the server when making requests.
           </p>
           <div className="settings-field">
             <label htmlFor="giphy-key">Giphy API Key</label>

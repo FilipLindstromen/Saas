@@ -99,8 +99,10 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
     return (
       <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>
         <InfographicBackground
+          key={`infographic-${slide.infographicProjectId}-${slide.infographicTabId || ''}`}
           projectData={projectData}
           isPlaying={isPlayMode}
+          showAllElements={!isPlayMode}
           opacity={backgroundOpacity}
           imageScale={imageScale}
           imagePositionX={imagePositionX}

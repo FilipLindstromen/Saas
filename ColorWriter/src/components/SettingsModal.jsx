@@ -41,7 +41,7 @@ const SettingsModal = ({ apiKey, onSave, onClose }) => {
                         style={{ width: '100%' }}
                     />
                     <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-tertiary)' }}>
-                        Your key is stored locally in your browser.
+                        Stored once and shared across all Saas apps.
                     </p>
                 </div>
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { searchImages } from '../api/imageSearch'
 import './InspectorImageSearch.css'
 
@@ -9,10 +9,10 @@ const SERVICES = [
   { id: 'iconify', label: 'Iconify', types: ['icons'] }
 ]
 
-export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }) {
-  const [service, setService] = useState('giphy')
-  const [type, setType] = useState('stickers')
-  const [query, setQuery] = useState('')
+export default function InspectorImageSearch({ apiKeys, latestImages, onSelect, presetQuery, presetService, presetType, recentFilter }) {
+  const [service, setService] = useState(presetService || 'giphy')
+  const [type, setType] = useState(presetType || 'stickers')
+  const [query, setQuery] = useState(presetQuery || '')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -57,6 +57,33 @@ export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }
   const serviceConfig = SERVICES.find(s => s.id === service)
   const types = serviceConfig?.types || ['gifs', 'stickers']
 
+  const filteredLatest = recentFilter
+    ? (latestImages || []).filter(img => img.elementType === recentFilter)
+    : (latestImages || [])
+
+  useEffect(() => {
+    if (presetQuery && presetQuery.trim() && apiKeys) {
+      setLoading(true)
+      searchImages({
+        service: presetService || 'giphy',
+        type: presetType || 'stickers',
+        q: presetQuery.trim(),
+        apiKeys,
+        offset: 0
+      })
+        .then(({ results: r, error: err }) => {
+          setResults(r || [])
+          setError(err || null)
+        })
+        .catch(e => {
+          setError(e?.message)
+          setResults([])
+        })
+        .finally(() => setLoading(false))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount when presetQuery is set
+  }, [])
+
   return (
     <div className="inspector-image-search">
       <div className="inspector-image-search-form">
@@ -88,11 +115,11 @@ export default function InspectorImageSearch({ apiKeys, latestImages, onSelect }
         </div>
       </div>
       {error && <p className="inspector-image-search-error">{error}</p>}
-      {latestImages.length > 0 && (
+      {filteredLatest.length > 0 && (
         <div className="inspector-image-search-section">
           <span className="inspector-image-search-label">Recent</span>
           <div className="inspector-image-search-grid">
-            {latestImages.slice(0, 48).map((img, i) => (
+            {filteredLatest.slice(0, 48).map((img, i) => (
               <button
                 key={i}
                 type="button"

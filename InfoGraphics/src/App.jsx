@@ -14,6 +14,7 @@ import ShortcutsModal from './components/ShortcutsModal'
 import TemplateEditBanner from './components/TemplateEditBanner'
 import { LAYOUTS, applyLayout, applyLayoutWithContent, getLayoutSlotCount } from './layouts'
 import * as projectStorage from './utils/projectStorage'
+import { searchImages } from './api/imageSearch'
 import { loadCustomTemplates, saveCustomTemplate, getCustomTemplate } from './utils/customTemplates'
 import './App.css'
 
@@ -105,6 +106,7 @@ function App() {
   const [currentProjectId, setCurrentProjectId] = useState(null)
   const [currentTabId, setCurrentTabId] = useState(null)
   const [currentTabName, setCurrentTabName] = useState('Document 1')
+  const [editingTextId, setEditingTextId] = useState(null)
   const canvasRef = useRef(null)
   const hasHydrated = useRef(false)
   const undoStack = useRef([])
@@ -543,11 +545,25 @@ function App() {
     }
     const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex || 0), 0) : 0
     const clipDefaults = { clipStart: 0, clipEnd: timelineDuration }
-    const el = createElement(type, { ...clipDefaults, ...overrides, x: baseX, y: baseY, zIndex: maxZ + 1 }, defaults)
+    let arrowOverrides = overrides
+    if (type === 'arrow' && !overrides.imageUrl) {
+      const recentArrow = (latestImages || []).find(i => i.elementType === 'arrow')
+      if (recentArrow?.url) {
+        arrowOverrides = { ...overrides, imageUrl: recentArrow.url }
+      }
+    }
+    const el = createElement(type, { ...clipDefaults, ...arrowOverrides, x: baseX, y: baseY, zIndex: maxZ + 1 }, defaults)
     setElements(prev => [...prev, el])
     setSelectedIds([el.id])
+    if (type === 'arrow' && !el.imageUrl && apiKeys?.giphy) {
+      searchImages({ service: 'giphy', type: 'stickers', q: 'arrows', apiKeys, offset: 0 })
+        .then(({ results }) => {
+          const url = results?.[0]?.url
+          if (url) updateElement(el.id, { imageUrl: url })
+        })
+    }
     return el.id
-  }, [defaultFontFamily, defaultFontSize, brandFontFamily, brandPrimaryColor, brandSecondaryColor, elements, selectedIds, pushUndoState, timelineDuration])
+  }, [defaultFontFamily, defaultFontSize, brandFontFamily, brandPrimaryColor, brandSecondaryColor, elements, selectedIds, pushUndoState, timelineDuration, latestImages, apiKeys, updateElement])
 
   const updateElement = useCallback((id, updates) => {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
@@ -787,18 +803,25 @@ function App() {
   }, [])
 
   const handleSelect = useCallback((idsOrId, opts = {}) => {
+    const clearEditingIfNotSelected = (newIds) => {
+      setEditingTextId(prev => (prev != null && !newIds.includes(prev) ? null : prev))
+    }
     if (opts.shift && typeof idsOrId === 'number') {
       setSelectedIds(prev => {
         const id = idsOrId
-        if (prev.includes(id)) return prev.filter(x => x !== id)
-        return [...prev, id]
+        const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        clearEditingIfNotSelected(next)
+        return next
       })
     } else if (Array.isArray(idsOrId)) {
       setSelectedIds(idsOrId)
+      clearEditingIfNotSelected(idsOrId)
     } else if (idsOrId == null) {
       setSelectedIds([])
+      setEditingTextId(null)
     } else {
       setSelectedIds([idsOrId])
+      clearEditingIfNotSelected([idsOrId])
     }
   }, [])
 
@@ -838,19 +861,39 @@ function App() {
     } else {
       raw = applyLayout(layoutId, maxId)
     }
-    const newElements = raw.map(e => ({
-      ...e,
-      clipStart: e.clipStart ?? 0,
-      clipEnd: e.clipEnd ?? timelineDuration,
-      animationIn: e.animationIn ?? 'none',
-      animationOut: e.animationOut ?? 'none'
-    }))
+    const recentArrow = (latestImages || []).find(i => i.elementType === 'arrow')
+    const defaultArrowUrl = recentArrow?.url
+    const newElements = raw.map(e => {
+      const base = {
+        ...e,
+        clipStart: e.clipStart ?? 0,
+        clipEnd: e.clipEnd ?? timelineDuration,
+        animationIn: e.animationIn ?? 'none',
+        animationOut: e.animationOut ?? 'none'
+      }
+      if (e.type === 'arrow' && !e.imageUrl && defaultArrowUrl) {
+        return { ...base, imageUrl: defaultArrowUrl }
+      }
+      return base
+    })
     setElements(newElements)
     setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])
     if (newElements.length > 0) {
       nextId = Math.max(...newElements.map(e => e.id), 0) + 1
     }
-  }, [elements, selectedIds, pushUndoState, timelineDuration])
+    const arrowsNeedingImage = newElements.filter(e => e.type === 'arrow' && !e.imageUrl)
+    if (arrowsNeedingImage.length > 0 && apiKeys?.giphy) {
+      searchImages({ service: 'giphy', type: 'stickers', q: 'arrows', apiKeys, offset: 0 })
+        .then(({ results }) => {
+          const url = results?.[0]?.url
+          if (url) {
+            setElements(prev => prev.map(el =>
+              el.type === 'arrow' && !el.imageUrl ? { ...el, imageUrl: url } : el
+            ))
+          }
+        })
+    }
+  }, [elements, selectedIds, pushUndoState, timelineDuration, latestImages, apiKeys])
 
   const handleSaveTemplate = useCallback(async (name) => {
     setIsSavingTemplate(true)
@@ -873,8 +916,8 @@ function App() {
     }
   }, [templateEditMode])
 
-  const addToLatest = useCallback((imageUrl, source, searchQuery) => {
-    const entry = { url: imageUrl, source: source || 'giphy', addedAt: Date.now(), searchQuery: searchQuery || undefined }
+  const addToLatest = useCallback((imageUrl, source, searchQuery, elementType) => {
+    const entry = { url: imageUrl, source: source || 'giphy', addedAt: Date.now(), searchQuery: searchQuery || undefined, elementType: elementType || undefined }
     setLatestImages(prev => {
       const filtered = prev.filter(i => i.url !== imageUrl)
       const next = [entry, ...filtered].slice(0, 48)
@@ -888,7 +931,7 @@ function App() {
     setApiKeys(keys)
   }, [])
 
-  const handleAddImageToElement = useCallback(async (imageUrl, source, searchQuery) => {
+  const handleAddImageToElement = useCallback(async (imageUrl, source, searchQuery, elementType) => {
     let finalUrl = imageUrl
     try {
       const res = await fetch('/api/save-image', {
@@ -911,7 +954,7 @@ function App() {
     } else {
       addElement('image-text', { ...updates })
     }
-    addToLatest(finalUrl, source, searchQuery)
+    addToLatest(finalUrl, source, searchQuery, elementType)
     setShowImageSearch(false)
   }, [selectedIds, updateElement, addElement, addToLatest, apiKeys])
 
@@ -1039,15 +1082,35 @@ function App() {
               const { steps } = await res.json()
               pushUndoState(elements, selectedIds)
               const maxId = elements.length > 0 ? Math.max(...elements.map(e => e.id), 0) : 0
-              const newElements = applyLayoutWithContent(layoutId, steps, maxId, customElements).map(e => ({
-                ...e,
-                clipStart: e.clipStart ?? 0,
-                clipEnd: e.clipEnd ?? timelineDuration,
-                animationIn: e.animationIn ?? 'none',
-                animationOut: e.animationOut ?? 'none'
-              }))
+              const recentArrow = (latestImages || []).find(i => i.elementType === 'arrow')
+              const defaultArrowUrl = recentArrow?.url
+              const newElements = applyLayoutWithContent(layoutId, steps, maxId, customElements).map(e => {
+                const base = {
+                  ...e,
+                  clipStart: e.clipStart ?? 0,
+                  clipEnd: e.clipEnd ?? timelineDuration,
+                  animationIn: e.animationIn ?? 'none',
+                  animationOut: e.animationOut ?? 'none'
+                }
+                if (e.type === 'arrow' && !e.imageUrl && defaultArrowUrl) {
+                  return { ...base, imageUrl: defaultArrowUrl }
+                }
+                return base
+              })
               setElements(newElements)
               setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])
+              const arrowsNeedingImage = newElements.filter(e => e.type === 'arrow' && !e.imageUrl)
+              if (arrowsNeedingImage.length > 0 && apiKeys?.giphy) {
+                searchImages({ service: 'giphy', type: 'stickers', q: 'arrows', apiKeys, offset: 0 })
+                  .then(({ results }) => {
+                    const url = results?.[0]?.url
+                    if (url) {
+                      setElements(prev => prev.map(el =>
+                        el.type === 'arrow' && !el.imageUrl ? { ...el, imageUrl: url } : el
+                      ))
+                    }
+                  })
+              }
               if (newElements.length > 0) {
                 nextId = Math.max(...newElements.map(e => e.id), 0) + 1
               }
@@ -1073,6 +1136,12 @@ function App() {
             onPushUndo={() => pushUndoState(elements, selectedIds)}
             backgroundColor={backgroundColor}
             zoom={zoom}
+            editingTextId={editingTextId}
+            onStartEditText={setEditingTextId}
+            onFinishEditText={(id, text) => {
+              updateElement(id, { text })
+              setEditingTextId(null)
+            }}
           />
           {showTimeline && (
           <Timeline

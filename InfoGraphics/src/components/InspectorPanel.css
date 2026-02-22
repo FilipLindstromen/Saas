@@ -48,6 +48,17 @@
   gap: 1rem;
 }
 
+.inspector-hint {
+  margin-bottom: -0.5rem;
+}
+
+.inspector-text-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
 .inspector-section {
   display: flex;
   flex-direction: column;
@@ -71,6 +82,21 @@
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.inspector-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  text-transform: none !important;
+}
+
+.inspector-checkbox-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .inspector-field input[type="text"],

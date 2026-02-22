@@ -75,7 +75,7 @@ function findSnappedGuides(draggingRects, snapPoints, threshold) {
   return guides
 }
 
-export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onUpdateMultiple, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef }) {
+export default function Canvas({ aspectRatio, resolution, elements, currentTime = 0, selectedIds = [], onSelect, onUpdate, onUpdateMultiple, onDeleteSelected, onPushUndo, backgroundColor = '#ffffff', zoom = 100, canvasRef, editingTextId = null, onStartEditText, onFinishEditText }) {
   const containerRef = useRef(null)
   const [dragState, setDragState] = useState(null)
   const [resizeHandle, setResizeHandle] = useState(null)
@@ -447,6 +447,10 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
               isSelected={selectedIds.includes(el.id)}
               showResizeHandles={selectedIds.length === 1 && selectedIds[0] === el.id}
               onPointerDown={handlePointerDown}
+              isEditingText={editingTextId === el.id}
+              onStartEditText={onStartEditText}
+              onFinishEditText={onFinishEditText}
+              onUpdate={onUpdate}
             />
           ))}
           {marqueeRect && (

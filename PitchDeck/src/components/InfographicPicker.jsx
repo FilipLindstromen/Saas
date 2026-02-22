@@ -140,6 +140,7 @@ function InfographicPickerProject({ project, selectedProjectId, selectedTabId, o
             <InfographicBackground
               projectData={data}
               isPlaying={false}
+              showAllElements={true}
               opacity={1}
               className="infographic-picker-preview-bg"
             />

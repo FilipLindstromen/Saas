@@ -1,5 +1,4 @@
 import InspectorImageSearch from './InspectorImageSearch'
-import { ARROW_DESIGNS } from './CanvasElement'
 import { GOOGLE_FONTS } from '../constants/fonts'
 import { ANIMATION_OPTIONS } from '../constants/animations'
 import './InspectorPanel.css'
@@ -15,7 +14,7 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
     )
   }
 
-  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, rotation, imageTint, imageTintOpacity, animationIn, animationOut, gradientColor } = element
+  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, rotation, imageTint, imageTintOpacity, imageFlipHorizontal, animationIn, animationOut, gradientColor } = element
 
   return (
     <div className="inspector-panel">
@@ -33,73 +32,100 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
       </div>
       <div className="inspector-body">
         {(type === 'image-text' || type === 'headline' || type === 'cta') && (
-          <div className="inspector-field">
-            <label>Text</label>
-            <textarea
-              value={text || ''}
-              onChange={(e) => onUpdate({ text: e.target.value })}
-              rows={3}
-              placeholder="Enter text"
-            />
+          <div className="inspector-field inspector-hint">
+            <p className="inspector-text-hint">Double-click text on the canvas to edit. Press Enter for line breaks.</p>
           </div>
         )}
         {type === 'arrow' && (
           <>
             <div className="inspector-field">
-              <label>Direction</label>
-              <select
-                value={arrowDirection || 'right'}
-                onChange={(e) => onUpdate({ arrowDirection: e.target.value })}
-              >
-                <option value="right">Right</option>
-                <option value="down">Down</option>
-                <option value="left">Left</option>
-                <option value="up">Up</option>
-              </select>
+              <label>Image</label>
+              {element.imageUrl ? (
+                <div className="inspector-image-preview">
+                  <img src={element.imageUrl} alt="" />
+                </div>
+              ) : null}
+              {onImageSelect && (
+                <InspectorImageSearch
+                  apiKeys={apiKeys}
+                  latestImages={latestImages || []}
+                  onSelect={(url, source, searchQuery) => onImageSelect(url, source, searchQuery, 'arrow')}
+                  presetQuery="arrows"
+                  presetService="giphy"
+                  presetType="stickers"
+                  recentFilter="arrow"
+                />
+              )}
             </div>
-            <div className="inspector-field">
-              <label>Color</label>
-              <input
-                type="color"
-                value={color || '#000000'}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-              />
-              <input
-                type="text"
-                value={color || '#000000'}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-                className="color-hex"
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Style</label>
-              <div className="inspector-arrow-styles">
-                {Object.keys(ARROW_DESIGNS).map((style) => {
-                  const design = ARROW_DESIGNS[style]
-                  return (
-                    <button
-                      key={style}
-                      type="button"
-                      className={`inspector-arrow-btn ${(arrowStyle || 'simple') === style ? 'active' : ''}`}
-                      onClick={() => onUpdate({ arrowStyle: style })}
-                      title={style.replace(/-/g, ' ')}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={design.strokeWidth || 2}>
-                        {design.circle && <circle cx="12" cy="12" r="8" />}
-                        {design.paths?.map((p, i) => (
-                          <path key={i} d={p.d} fill={p.fill ? 'currentColor' : 'none'} strokeDasharray={p.strokeDasharray} />
-                        ))}
-                        <path
-                          d={design.d}
-                          fill={design.outlineOnly ? 'none' : design.fill ? 'currentColor' : 'none'}
-                          strokeDasharray={design.strokeDasharray !== 'none' ? design.strokeDasharray : undefined}
+            {element.imageUrl && (
+              <>
+                <div className="inspector-field">
+                  <label className="inspector-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={!!element.imageFlipHorizontal}
+                      onChange={(e) => onUpdate({ imageFlipHorizontal: e.target.checked })}
+                    />
+                    Flip horizontally
+                  </label>
+                </div>
+                <div className="inspector-field">
+                  <label>Rotation</label>
+                  <input
+                    type="number"
+                    value={element.rotation || 0}
+                    onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
+                    min={-180}
+                    max={180}
+                    className="inspector-rotation-value"
+                  />
+                </div>
+                <div className="inspector-field">
+                  <label>Recolor</label>
+                  <div className="inspector-recolor">
+                    <input
+                      type="color"
+                      value={element.imageTint || '#ffffff'}
+                      onChange={(e) => onUpdate({ imageTint: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      value={element.imageTint || ''}
+                      onChange={(e) => onUpdate({ imageTint: e.target.value || null })}
+                      placeholder="None"
+                      className="color-hex"
+                    />
+                    {element.imageTint && (
+                      <button type="button" className="inspector-recolor-clear" onClick={() => onUpdate({ imageTint: null })}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {element.imageTint && (
+                    <div className="inspector-opacity">
+                      <label className="inspector-opacity-label">Opacity</label>
+                      <div className="inspector-opacity-controls">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={element.imageTintOpacity ?? 100}
+                          onChange={(e) => onUpdate({ imageTintOpacity: parseInt(e.target.value, 10) })}
                         />
-                      </svg>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={element.imageTintOpacity ?? 100}
+                          onChange={(e) => onUpdate({ imageTintOpacity: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)) })}
+                          className="inspector-opacity-value"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
         {(type === 'image-text' || type === 'headline' || type === 'cta') && (
@@ -201,6 +227,16 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
         </div>
         {(type === 'image-text' || type === 'image') && (
           <>
+            <div className="inspector-field">
+              <label className="inspector-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={!!imageFlipHorizontal}
+                  onChange={(e) => onUpdate({ imageFlipHorizontal: e.target.checked })}
+                />
+                Flip horizontally
+              </label>
+            </div>
             <div className="inspector-field">
               <label>Rotation</label>
               <input
