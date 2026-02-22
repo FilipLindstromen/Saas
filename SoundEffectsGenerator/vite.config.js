@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: { '@shared': path.resolve(__dirname, '../shared') },
   },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react/jsx-runtime']
+  },
   plugins: [react()],
   server: {
     proxy: {
