@@ -1,39 +1,35 @@
 
 import React, { useState } from 'react';
-import { Settings, Zap, BookOpen, Smile, Brain, MousePointer2, Box, Loader2, MessageCircle, User, Scale, Lightbulb } from 'lucide-react';
-import { generateCopy, analyzeAudienceFeedback } from '../services/openai';
+import { Zap, Loader2, User } from 'lucide-react';
+import { generateCopy } from '../services/openai';
 
 const Sidebar = ({
     docType, setDocType,
-    style, setStyle,
     instructions, setInstructions,
     targetAudience, setTargetAudience,
     onGenerated,
-    onOpenSettings,
     apiKey,
-    copywriter,
-    setCopywriter,
-    bigIdea,
-    setBigIdea,
-    onGenerateBigIdeas,
-    bigIdeaLoading,
-    specificSituation,
-    setSpecificSituation,
+    offerType,
+    setOfferType,
     situationsList,
     setSituationsList,
     painPoints,
     setPainPoints,
+    hiddenFrustrations,
+    setHiddenFrustrations,
     desiredOutcomes,
     setDesiredOutcomes,
     objections,
     setObjections,
-    beliefShift,
-    setBeliefShift,
+    oldBelief,
+    setOldBelief,
+    newBelief,
+    setNewBelief,
     desiredEmotion,
     setDesiredEmotion,
     primaryCta,
     setPrimaryCta,
-    onGenerateWeirdStoryIdeas
+    customMasterPrompt,
 }) => {
     const [loading, setLoading] = useState(false);
     const [pimpLoading, setPimpLoading] = useState(false);
@@ -44,40 +40,30 @@ const Sidebar = ({
         '📢 AD',
         '📘 Facebook Ad',
         '📧 Email',
-        '⚡ 10s Reel Script',
-        '📖 E-book',
-        '📝 Misc'
-    ];
-    const styles = [
-        'Aggressive', 'Story-driven', 'Direct', 'Educational', 'Empathetic',
-        'Funny', 'Curiosity', 'Relatable', 'Personal', '🔮 Weird stories'
+        '⚡ 10s Reel Script'
     ];
 
-    // 10+ Legends
-    const legends = [
-        'None',
-        'David Ogilvy',
-        'Joe Sugarman',
-        'Frank Kern',
-        'Eugene Schwartz',
-        'Gary Halbert',
-        'Claude Hopkins',
-        'Robert Collier',
-        'John Caples',
-        'Dan Kennedy',
-        'Gary Bencivenga',
-        'Clayton Makepeace',
-        'Victor Schwab'
-    ];
+    const offerTypes = ['High-ticket', 'Mid-ticket', 'Low-ticket'];
 
     const handleGenerate = async () => {
         if (!apiKey) return;
         setLoading(true);
         try {
             const content = await generateCopy(apiKey, {
-                docType, style, instructions, targetAudience, copywriter, bigIdea,
-                specificSituation, situationsList, painPoints, desiredOutcomes,
-                objections, beliefShift, desiredEmotion, primaryCta
+                docType,
+                instructions,
+                targetAudience,
+                offerType,
+                situationsList,
+                painPoints,
+                hiddenFrustrations,
+                desiredOutcomes,
+                objections,
+                oldBelief,
+                newBelief,
+                desiredEmotion,
+                primaryCta,
+                customMasterPrompt: customMasterPrompt || undefined
             });
             onGenerated(content);
         } catch (e) {
@@ -90,12 +76,11 @@ const Sidebar = ({
     };
 
     const handleImproveInstructions = async () => {
-        if (!apiKey || !instructions.trim()) return;
+        if (!apiKey || !instructions.trim() || !onImproveInstructions) return;
         setPimpLoading(true);
         try {
-            // Dynamic import to avoid circular dependency issues if any, or just consistent usage
             const { improveInstructions } = await import('../services/openai');
-            const betterInstructions = await improveInstructions(apiKey, instructions, docType, style, targetAudience);
+            const betterInstructions = await improveInstructions(apiKey, instructions, docType, 'Direct', targetAudience);
             setInstructions(betterInstructions);
         } catch (e) {
             console.error(e);
@@ -121,13 +106,6 @@ const Sidebar = ({
                 <h1 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontWeight: '800' }}>ColorWriter</span>
                 </h1>
-                <button
-                    onClick={onOpenSettings}
-                    style={{ padding: '0.5rem', border: 'none', background: 'transparent' }}
-                    title="Settings"
-                >
-                    <Settings size={20} color="var(--text-secondary)" />
-                </button>
             </div>
 
             <div className="control-group">
@@ -145,27 +123,14 @@ const Sidebar = ({
 
             <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                    Writing Style
+                    Offer Type
                 </label>
                 <select
-                    value={style}
-                    onChange={(e) => setStyle(e.target.value)}
+                    value={offerType}
+                    onChange={(e) => setOfferType(e.target.value)}
                     style={{ width: '100%' }}
                 >
-                    {styles.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-            </div>
-
-            <div className="control-group">
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                    Write as (Legend)
-                </label>
-                <select
-                    value={copywriter}
-                    onChange={(e) => setCopywriter(e.target.value)}
-                    style={{ width: '100%' }}
-                >
-                    {legends.map(l => <option key={l} value={l}>{l}</option>)}
+                    {offerTypes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
             </div>
 
@@ -186,36 +151,34 @@ const Sidebar = ({
 
             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.5rem', marginBottom: '-0.5rem' }}>Audience & Offer</div>
             <div className="control-group">
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="What specific situation is this offer about?">
-                    Offer Situation
-                </label>
-                <input
-                    value={specificSituation}
-                    onChange={(e) => setSpecificSituation(e.target.value)}
-                    placeholder="e.g. Launching a course, selling a coaching program..."
-                    style={{ width: '100%' }}
-                />
-            </div>
-
-            <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="Specific situations to target (one per line)">
-                    Situations to Target
+                    Specific Situations
                 </label>
                 <textarea
                     value={situationsList}
                     onChange={(e) => setSituationsList(e.target.value)}
-                    placeholder={'• Situation 1\n• Situation 2\n• Situation 3'}
+                    placeholder={'• Situation 1\n• Situation 2\n• Situation 3\n• Situation 4\n• Situation 5'}
                     style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
                 />
             </div>
 
             <div className="control-group">
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Pain Points</label>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Pain Patterns</label>
                 <textarea
                     value={painPoints}
                     onChange={(e) => setPainPoints(e.target.value)}
                     placeholder={'• Pain 1\n• Pain 2\n• Pain 3'}
                     style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Hidden Frustrations</label>
+                <textarea
+                    value={hiddenFrustrations}
+                    onChange={(e) => setHiddenFrustrations(e.target.value)}
+                    placeholder={'• Hidden issue 1\n• Hidden issue 2'}
+                    style={{ width: '100%', minHeight: '50px', resize: 'vertical', fontFamily: 'inherit' }}
                 />
             </div>
 
@@ -234,17 +197,28 @@ const Sidebar = ({
                 <textarea
                     value={objections}
                     onChange={(e) => setObjections(e.target.value)}
-                    placeholder={'• Objection 1\n• Objection 2\n• Objection 3'}
+                    placeholder={'• Objection 1\n• Objection 2\n• Objection 3\n• Objection 4'}
                     style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
                 />
             </div>
 
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.5rem', marginBottom: '-0.5rem' }}>Intention</div>
             <div className="control-group">
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="Old belief → New belief">Belief Shift</label>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Old Belief</label>
                 <input
-                    value={beliefShift}
-                    onChange={(e) => setBeliefShift(e.target.value)}
-                    placeholder="e.g. 'I'm broken' → 'It's a biological state I can change'"
+                    value={oldBelief}
+                    onChange={(e) => setOldBelief(e.target.value)}
+                    placeholder="e.g. I'm broken or failing"
+                    style={{ width: '100%' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>New Belief</label>
+                <input
+                    value={newBelief}
+                    onChange={(e) => setNewBelief(e.target.value)}
+                    placeholder="e.g. It's a biological state I can change"
                     style={{ width: '100%' }}
                 />
             </div>
@@ -275,24 +249,24 @@ const Sidebar = ({
                         Instructions
                     </label>
                     <button
-                        onClick={handleImproveInstructions}
-                        disabled={!apiKey || !instructions.trim() || pimpLoading}
-                        style={{
-                            fontSize: '0.7rem',
-                            padding: '0.25rem 0.5rem',
-                            height: 'auto',
-                            background: '#e0f2fe',
-                            color: '#0369a1',
-                            border: '1px solid #bae6fd',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                        }}
-                        title="Rewrite instructions for better AI results"
-                    >
-                        {pimpLoading ? <Loader2 className="animate-spin" size={10} /> : <Zap size={10} />}
-                        Improve
-                    </button>
+                            onClick={handleImproveInstructions}
+                            disabled={!apiKey || !instructions.trim() || pimpLoading}
+                            style={{
+                                fontSize: '0.7rem',
+                                padding: '0.25rem 0.5rem',
+                                height: 'auto',
+                                background: '#e0f2fe',
+                                color: '#0369a1',
+                                border: '1px solid #bae6fd',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                            }}
+                            title="Rewrite instructions for better AI results"
+                        >
+                            {pimpLoading ? <Loader2 className="animate-spin" size={10} /> : <Zap size={10} />}
+                            Improve
+                        </button>
                 </div>
                 <textarea
                     value={instructions}
@@ -302,83 +276,6 @@ const Sidebar = ({
                 />
             </div>
 
-            {/* Big Idea Section */}
-            <div className="control-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        Big Idea (Optional)
-                    </label>
-                    <button
-                        onClick={onGenerateBigIdeas}
-                        disabled={!apiKey || !instructions || bigIdeaLoading}
-                        style={{
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            padding: '0.4rem 0.75rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            borderRadius: '4px',
-                            cursor: !apiKey || !instructions || bigIdeaLoading ? 'not-allowed' : 'pointer',
-                            opacity: !apiKey || !instructions || bigIdeaLoading ? 0.6 : 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                        }}
-                        title="Generate 5 big idea suggestions"
-                    >
-                        {bigIdeaLoading ? <Loader2 className="animate-spin" size={12} /> : <Lightbulb size={12} />}
-                        {bigIdeaLoading ? 'Generating...' : 'Generate Ideas'}
-                    </button>
-                </div>
-                <input
-                    type="text"
-                    value={bigIdea}
-                    onChange={(e) => setBigIdea(e.target.value)}
-                    placeholder="e.g., 'The 90-second brain reset that stops anxiety'"
-                    style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        fontSize: '0.875rem',
-                        fontFamily: 'inherit',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--bg-secondary)',
-                        color: 'var(--text-primary)'
-                    }}
-                />
-            </div>
-
-            {/* Generate Ideas Button - Only show for Weird stories */}
-            {style.includes('Weird stories') && (
-                <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
-                    <button
-                        onClick={onGenerateWeirdStoryIdeas}
-                        disabled={!apiKey || loading}
-                        style={{
-                            width: '100%',
-                            background: !apiKey || loading ? 'var(--bg-tertiary)' : 'var(--accent)',
-                            color: !apiKey || loading ? 'var(--text-tertiary)' : '#ffffff',
-                            fontSize: '1rem',
-                            fontWeight: 600,
-                            padding: '1rem',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: !apiKey || loading ? 'not-allowed' : 'pointer',
-                            marginBottom: '0.75rem'
-                        }}
-                    >
-                        {loading ? <Loader2 className="animate-spin" size={18} /> : <Lightbulb size={18} />}
-                        {loading ? 'Finding Stories...' : 'Generate Ideas'}
-                    </button>
-                </div>
-            )}
-
-            {/* Generate Copy Button - Moved to bottom */}
             <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
                 <button
                     onClick={handleGenerate}
@@ -403,8 +300,8 @@ const Sidebar = ({
                     {loading ? 'Writing...' : 'Generate Copy'}
                 </button>
                 {!apiKey && (
-                    <p style={{ fontSize: '0.75rem', color: 'red', textAlign: 'center', marginTop: '0.5rem' }}>
-                        Please add API Key in Settings to generate.
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center', marginTop: '0.5rem' }}>
+                        API key is shared across Saas apps. Configure it in another app (e.g. CopyWriter, PitchDeck) or refresh after setting.
                     </p>
                 )}
             </div>

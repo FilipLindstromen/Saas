@@ -330,15 +330,7 @@ input[type="range"]::-ms-fill-upper {
   align-items: center;
 }
 
-/* Content Blocks - Layout Container */
-.block-story,
-.block-emotion,
-.block-logic,
-.block-cta,
-.block-ad,
-.block-misc,
-.block-proof,
-.block-hook,
+/* Content Blocks - Persuasive Cycle only */
 .block-statement,
 .block-impact,
 .block-evidence,
@@ -356,41 +348,6 @@ input[type="range"]::-ms-fill-upper {
 }
 
 /* Define Color Variables for Children */
-.block-story {
-  --block-bg: var(--color-story);
-  --block-text: var(--text-primary);
-}
-
-.block-emotion {
-  --block-bg: var(--color-emotion);
-  --block-text: var(--text-primary);
-}
-
-.block-logic {
-  --block-bg: var(--color-logic);
-  --block-text: var(--text-primary);
-}
-
-.block-cta {
-  --block-bg: var(--color-cta);
-  --block-text: var(--text-primary);
-}
-
-.block-ad {
-  --block-bg: var(--color-ad);
-  --block-text: var(--text-primary);
-}
-
-.block-misc {
-  --block-bg: var(--color-misc);
-  --block-text: var(--text-primary);
-}
-
-.block-proof {
-  --block-bg: var(--color-proof);
-  --block-text: var(--color-proof-text);
-}
-
 .block-statement {
   --block-bg: var(--color-statement);
   --block-text: var(--color-statement-text);
@@ -411,40 +368,7 @@ input[type="range"]::-ms-fill-upper {
   --block-text: var(--color-relevance-text);
 }
 
-/* Persuasive Cycle mode: map belief blocks to persuasive colors */
-.editor-content.color-mode-persuasive .block-hook,
-.editor-content.color-mode-persuasive .block-ad {
-  --block-bg: var(--color-statement);
-  --block-text: var(--color-statement-text);
-}
-
-.editor-content.color-mode-persuasive .block-emotion,
-.editor-content.color-mode-persuasive .block-story {
-  --block-bg: var(--color-impact);
-  --block-text: var(--color-impact-text);
-}
-
-.editor-content.color-mode-persuasive .block-proof,
-.editor-content.color-mode-persuasive .block-logic {
-  --block-bg: var(--color-evidence);
-  --block-text: var(--color-evidence-text);
-}
-
-.editor-content.color-mode-persuasive .block-cta,
-.editor-content.color-mode-persuasive .block-misc {
-  --block-bg: var(--color-relevance);
-  --block-text: var(--color-relevance-text);
-}
-
 /* Apply Highlight to SPANS inside Headings/Paragraphs */
-.block-story span,
-.block-emotion span,
-.block-logic span,
-.block-cta span,
-.block-ad span,
-.block-misc span,
-.block-proof span,
-.block-hook span,
 .block-statement span,
 .block-impact span,
 .block-evidence span,
@@ -465,38 +389,6 @@ input[type="range"]::-ms-fill-upper {
 }
 
 /* Ensure Parent Elements (H1, P) flow correctly as blocks */
-.block-story h1,
-.block-story h2,
-.block-story h3,
-.block-story p,
-.block-emotion h1,
-.block-emotion h2,
-.block-emotion h3,
-.block-emotion p,
-.block-logic h1,
-.block-logic h2,
-.block-logic h3,
-.block-logic p,
-.block-cta h1,
-.block-cta h2,
-.block-cta h3,
-.block-cta p,
-.block-ad h1,
-.block-ad h2,
-.block-ad h3,
-.block-ad p,
-.block-misc h1,
-.block-misc h2,
-.block-misc h3,
-.block-misc p,
-.block-proof h1,
-.block-proof h2,
-.block-proof h3,
-.block-proof p,
-.block-hook h1,
-.block-hook h2,
-.block-hook h3,
-.block-hook p,
 .content-body h1,
 .content-body h2,
 .content-body h3,
@@ -533,58 +425,26 @@ input[type="range"]::-ms-fill-upper {
    but since they are inline, they merged. 
    We rely on the user or AI to put <br> if they want a break. */
 
-/* Background Colors */
-.block-story {
-  background: var(--color-story);
-  color: var(--color-story-text);
+/* Background Colors - Persuasive Cycle only */
+.block-statement {
+  background: var(--color-statement);
+  color: var(--color-statement-text);
 }
 
-.block-emotion {
-  background: var(--color-emotion);
-  color: var(--color-emotion-text);
+.block-impact {
+  background: var(--color-impact);
+  color: var(--color-impact-text);
 }
 
-.block-logic {
-  background: var(--color-logic);
-  color: var(--color-logic-text);
+.block-evidence {
+  background: var(--color-evidence);
+  color: var(--color-evidence-text);
 }
 
-.block-cta {
-  background: var(--color-cta);
-  color: var(--color-cta-text);
+.block-relevance {
+  background: var(--color-relevance);
+  color: var(--color-relevance-text);
   font-weight: 600;
-}
-
-.block-ad {
-  background: var(--color-ad);
-  color: var(--color-ad-text);
-}
-
-.block-misc {
-  background: var(--color-misc);
-  color: var(--color-misc-text);
-}
-
-.block-hook {
-  background: var(--color-hook);
-  color: var(--color-hook-text);
-  font-weight: 700;
-  /* Extra weight for Hook */
-}
-
-.block-proof {
-  background: var(--color-proof);
-  color: var(--color-proof-text);
-}
-
-/* Remove legacy afters */
-.block-story::after,
-.block-emotion::after,
-.block-logic::after,
-.block-cta::after,
-.block-ad::after,
-.block-misc::after {
-  content: none;
 }
 
 /* Icons */
@@ -604,84 +464,24 @@ i {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Block Type Icons */
-i[type="hook"]::before {
+/* Block Type Icons - Persuasive Cycle only */
+i[type="statement"]::before {
+  content: '📌';
+}
+
+i[type="impact"]::before {
+  content: '⚡';
+}
+
+i[type="evidence"]::before {
+  content: '📋';
+}
+
+i[type="relevance"]::before {
   content: '🎯';
 }
 
-i[type="story"]::before {
-  content: '📖';
-}
-
-i[type="emotion"]::before {
-  content: '❤️';
-}
-
-i[type="logic"]::before {
-  content: '🧠';
-}
-
-i[type="proof"]::before {
-  content: '✅';
-}
-
-i[type="cta"]::before {
-  content: '🚀';
-}
-
-i[type="ad"]::before {
-  content: '💡';
-}
-
-i[type="misc"]::before {
-  content: '📝';
-}
-
-/* Mechanics Icons */
-i[type="interrupt"]::before {
-  content: '🛑';
-}
-
-i[type="loop-open"]::before {
-  content: '➰';
-}
-
-i[type="loop-close"]::before {
-  content: '✅';
-}
-
-/* Highlights (Inline spans for specific words) */
-.highlight-interrupt,
-.highlight-loop-open,
-.highlight-loop-close {
-  border-bottom: 2px dashed;
-  padding-bottom: 0px;
-}
-
-.highlight-interrupt {
-  border-color: #ef4444;
-  color: #7f1d1d;
-}
-
-.highlight-loop-open {
-  border-color: #8b5cf6;
-  color: #4c1d95;
-}
-
-.highlight-loop-close {
-  border-color: #10b981;
-  color: #064e3b;
-}
-
 /* Hide Background Colors Toggle */
-.hide-colors .block-story span,
-.hide-colors .block-emotion span,
-.hide-colors .block-logic span,
-.hide-colors .block-cta span,
-.hide-colors .block-ad span,
-.hide-colors .block-misc span,
-.hide-colors .block-hook span,
-.hide-colors .block-proof span,
 .hide-colors .block-statement span,
 .hide-colors .block-impact span,
 .hide-colors .block-evidence span,
@@ -690,14 +490,6 @@ i[type="loop-close"]::before {
   color: var(--text-primary) !important;
 }
 
-.hide-colors .block-story,
-.hide-colors .block-emotion,
-.hide-colors .block-logic,
-.hide-colors .block-cta,
-.hide-colors .block-ad,
-.hide-colors .block-misc,
-.hide-colors .block-hook,
-.hide-colors .block-proof,
 .hide-colors .block-statement,
 .hide-colors .block-impact,
 .hide-colors .block-evidence,

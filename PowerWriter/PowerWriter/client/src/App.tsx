@@ -3133,7 +3133,7 @@ export default function App() {
               >
                 <IconLayers className="icon" />
               </button>
-              <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="panel-toggle-btn" />
+              <ThemeToggle theme={theme} onToggle={(t: 'light' | 'dark') => { setTheme(t); setThemeState(t); }} className="panel-toggle-btn" />
               <button
                 type="button"
                 className={clsx("panel-toggle-btn", isSettingsOpen && "toggle-active")}

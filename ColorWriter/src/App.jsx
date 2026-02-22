@@ -5,29 +5,27 @@ import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import AppTopBar from '@shared/AppTopBar/AppTopBar';
-import SettingsModal from '@shared/SettingsModal/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
 import ThreeKeyIngredientsModal from './components/ThreeKeyIngredientsModal';
 import ThreeRulesModal from './components/ThreeRulesModal';
 import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
-import BigIdeaModal from './components/BigIdeaModal';
-import WeirdStoriesModal from './components/WeirdStoriesModal';
 import RightPanel from './components/RightPanel';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules } from './services';
-import { Settings } from 'lucide-react';
+import MasterPromptModal from './components/MasterPromptModal';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules } from './services';
+import { FileText } from 'lucide-react';
 import ThemeToggle from '@shared/ThemeToggle';
 
 function App() {
+  // Use shared API key from @shared/apiKeys (configured in SaaS Apps or other apps)
   const [apiKey, setApiKey] = useState(() => loadApiKeys().openai || '');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Sync apiKey from shared storage when settings opens (in case it was set in another app)
+  // Sync apiKey from shared storage when window gains focus (e.g. user set it in another app)
   useEffect(() => {
-    if (isSettingsOpen) {
-      setApiKey(loadApiKeys().openai || '');
-    }
-  }, [isSettingsOpen]);
+    const handler = () => setApiKey(loadApiKeys().openai || '');
+    window.addEventListener('focus', handler);
+    return () => window.removeEventListener('focus', handler);
+  }, []);
 
   // Persistent State Helpers
   const usePersistentState = (key, initialValue) => {
@@ -41,8 +39,7 @@ function App() {
     return [state, setState];
   };
 
-  const [docType, setDocType] = usePersistentState('cw_docType', 'Sales Page');
-  const [style, setStyle] = usePersistentState('cw_style', 'Aggressive');
+  const [docType, setDocType] = usePersistentState('cw_docType', '📄 Sales Page');
   const [instructions, setInstructions] = usePersistentState('cw_instructions', '');
   const [targetAudience, setTargetAudience] = usePersistentState('cw_targetAudience', '');
   
@@ -181,11 +178,6 @@ function App() {
   const [threeRulesLoading, setThreeRulesLoading] = useState(false);
   const [isImprovingThreeRules, setIsImprovingThreeRules] = useState(false);
   const [headerSuggestions, setHeaderSuggestions] = useState(null);
-  const [bigIdea, setBigIdea] = usePersistentState('cw_bigIdea', '');
-  const [bigIdeaSuggestions, setBigIdeaSuggestions] = useState(null);
-  const [bigIdeaLoading, setBigIdeaLoading] = useState(false);
-  const [weirdStories, setWeirdStories] = useState(null);
-  const [weirdStoryLoading, setWeirdStoryLoading] = useState(false);
 
   // Legend Highlighting
   const [activeLegendItem, setActiveLegendItem] = useState(null);
@@ -212,23 +204,24 @@ function App() {
     }
   }, [conversionMetrics]);
 
-  // Legendary Copywriter Selection
-  const [copywriter, setCopywriter] = usePersistentState('cw_copywriter', 'None');
-
-  // Erickson framework inputs
-  const [specificSituation, setSpecificSituation] = usePersistentState('cw_specificSituation', '');
+  // Persuasion framework inputs
+  const [offerType, setOfferType] = usePersistentState('cw_offerType', 'Mid-ticket');
   const [situationsList, setSituationsList] = usePersistentState('cw_situationsList', '');
   const [painPoints, setPainPoints] = usePersistentState('cw_painPoints', '');
+  const [hiddenFrustrations, setHiddenFrustrations] = usePersistentState('cw_hiddenFrustrations', '');
   const [desiredOutcomes, setDesiredOutcomes] = usePersistentState('cw_desiredOutcomes', '');
   const [objections, setObjections] = usePersistentState('cw_objections', '');
-  const [beliefShift, setBeliefShift] = usePersistentState('cw_beliefShift', '');
+  const [oldBelief, setOldBelief] = usePersistentState('cw_oldBelief', '');
+  const [newBelief, setNewBelief] = usePersistentState('cw_newBelief', '');
   const [desiredEmotion, setDesiredEmotion] = usePersistentState('cw_desiredEmotion', '');
   const [primaryCta, setPrimaryCta] = usePersistentState('cw_primaryCta', '');
 
   // Show/Hide Background Colors Toggle
   const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
-  // Color scheme: 'belief' (hook, story, emotion, etc.) or 'persuasive' (Statement, Impact, Evidence, Relevance)
-  const [colorScheme, setColorScheme] = usePersistentState('cw_colorScheme', 'belief');
+
+  // Master prompt (custom override; empty = use default)
+  const [customMasterPrompt, setCustomMasterPrompt] = usePersistentState('cw_customMasterPrompt', '');
+  const [isMasterPromptOpen, setIsMasterPromptOpen] = useState(false);
 
 
   const handleAudienceFeedback = async (targetAudience, currentDocType) => {
@@ -292,7 +285,7 @@ function App() {
     if (!apiKey || !threeRulesData) return;
     setIsImprovingThreeRules(true);
     try {
-      const newContent = await improveCopyThreeRules(apiKey, content, threeRulesData, docType, style, targetAudience, copywriter);
+      const newContent = await improveCopyThreeRules(apiKey, content, threeRulesData, docType, 'Direct', targetAudience, 'None');
       setContent(newContent);
       setThreeRulesData(null); // Close modal after improvement
     } catch (e) {
@@ -322,7 +315,7 @@ function App() {
     setMetricsLoading(true);
     setIsImproving(true);
     try {
-      const newContent = await improveConversionMetrics(apiKey, content, conversionMetrics, docType, style, targetAudience, copywriter);
+      const newContent = await improveConversionMetrics(apiKey, content, conversionMetrics, docType, 'Direct', targetAudience, 'None');
       setContent(newContent);
       // Auto-refresh metrics after improvement
       setTimeout(async () => {
@@ -346,7 +339,7 @@ function App() {
     if (!apiKey) return;
     setMetricsLoading(true);
     try {
-      const suggestions = await generateHeaderSuggestions(apiKey, content, targetAudience, docType, style);
+      const suggestions = await generateHeaderSuggestions(apiKey, content, targetAudience, docType, 'Direct');
       setHeaderSuggestions(suggestions);
     } catch (e) {
       console.error(e);
@@ -355,71 +348,6 @@ function App() {
       setMetricsLoading(false);
     }
   };
-
-
-  const handleGenerateBigIdeas = async () => {
-    if (!apiKey || !instructions) return;
-    setBigIdeaLoading(true);
-    try {
-      const suggestions = await generateBigIdeas(apiKey, instructions, targetAudience, docType, style);
-      setBigIdeaSuggestions(suggestions);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to generate big ideas.');
-    } finally {
-      setBigIdeaLoading(false);
-    }
-  };
-
-  const handleSelectBigIdea = (idea) => {
-    setBigIdea(idea);
-  };
-
-  const handleGenerateWeirdStoryIdeas = async () => {
-    if (!apiKey || !instructions) return;
-    setWeirdStoryLoading(true);
-    try {
-      const { generateWeirdStoryIdeas } = await import('./services');
-      if (!generateWeirdStoryIdeas || typeof generateWeirdStoryIdeas !== 'function') {
-        throw new Error('generateWeirdStoryIdeas function not found. Please ensure src/services/index.js exports the function.');
-      }
-      const stories = await generateWeirdStoryIdeas(apiKey, instructions);
-      setWeirdStories(stories.stories || []);
-    } catch (e) {
-      console.error('Error generating weird story ideas:', e);
-      alert(`Failed to generate weird story ideas: ${e.message || 'Unknown error'}`);
-    } finally {
-      setWeirdStoryLoading(false);
-    }
-  };
-
-  const handleGenerateCopyFromStory = async (story) => {
-    if (!apiKey) return;
-    setWeirdStoryLoading(true);
-    try {
-      const { generateCopyFromStory } = await import('./services');
-      if (!generateCopyFromStory || typeof generateCopyFromStory !== 'function') {
-        throw new Error('generateCopyFromStory function not found. Please ensure src/services/index.js exports the function.');
-      }
-      const newContent = await generateCopyFromStory(apiKey, {
-        story,
-        docType,
-        style,
-        instructions,
-        targetAudience,
-        copywriter,
-        bigIdea
-      });
-      setContent(newContent);
-      setWeirdStories(null); // Close modal on success
-    } catch (e) {
-      console.error(e);
-      alert(`Failed to generate copy from story: ${e.message || 'Unknown error'}`);
-    } finally {
-      setWeirdStoryLoading(false);
-    }
-  };
-
 
 
   const handleAnalyzeAndColor = async () => {
@@ -440,7 +368,7 @@ function App() {
     if (!apiKey || !feedbackData) return;
     setIsImproving(true);
     try {
-      const newContent = await improveCopy(apiKey, content, feedbackData, docType, style, targetAudience);
+      const newContent = await improveCopy(apiKey, content, feedbackData, docType, 'Direct', targetAudience);
       setContent(newContent);
       setFeedbackData(null); // Close modal on success
     } catch (e) {
@@ -455,7 +383,7 @@ function App() {
     setIsImproving(true);
     try {
       const { improveBalance } = await import('./services');
-      const newContent = await improveBalance(apiKey, content, balanceData, docType, style, targetAudience);
+      const newContent = await improveBalance(apiKey, content, balanceData, docType, 'Direct', targetAudience);
       setContent(newContent);
       setBalanceData(null);
     } catch (e) {
@@ -481,7 +409,7 @@ function App() {
           `4. The Big Idea (${threeKeyIngredientsData.big_idea.score}/100): ${threeKeyIngredientsData.big_idea.feedback}`
         ]
       };
-      const improved = await improveCopy(apiKey, content, feedbackData, docType, style, targetAudience);
+      const improved = await improveCopy(apiKey, content, feedbackData, docType, 'Direct', targetAudience);
       setContent(improved);
       setThreeKeyIngredientsData(null);
     } catch (e) {
@@ -500,10 +428,10 @@ function App() {
         originalText: content,
         blockType,
         docType,
-        style,
+        style: 'Direct',
         instructions,
         targetAudience,
-        copywriter
+        copywriter: 'None'
       });
       setContent(newContent);
     } catch (e) {
@@ -538,16 +466,16 @@ function App() {
           }}
           actions={
             <>
-              <ThemeToggle theme={theme} onToggle={setThemeState} className="app-toolbar-btn" />
               <button
                 type="button"
                 className="app-toolbar-btn"
-                onClick={() => setIsSettingsOpen(true)}
-                title="Settings"
-                aria-label="Open settings"
+                onClick={() => setIsMasterPromptOpen(true)}
+                title="View & Edit Master Prompt"
+                aria-label="Master prompt"
               >
-                <Settings size={18} />
+                <FileText size={18} />
               </button>
+              <ThemeToggle theme={theme} onToggle={setThemeState} className="app-toolbar-btn" />
             </>
           }
         />
@@ -556,38 +484,33 @@ function App() {
           <Sidebar
             docType={docType}
             setDocType={setDocType}
-            style={style}
-            setStyle={setStyle}
             instructions={instructions}
             setInstructions={setInstructions}
             targetAudience={targetAudience}
             setTargetAudience={setTargetAudience}
             onGenerated={setContent}
-            onOpenSettings={() => setIsSettingsOpen(true)}
             apiKey={apiKey}
-            copywriter={copywriter}
-            setCopywriter={setCopywriter}
-            bigIdea={bigIdea}
-            setBigIdea={setBigIdea}
-            onGenerateBigIdeas={handleGenerateBigIdeas}
-            bigIdeaLoading={bigIdeaLoading}
-            specificSituation={specificSituation}
-            setSpecificSituation={setSpecificSituation}
+            offerType={offerType}
+            setOfferType={setOfferType}
             situationsList={situationsList}
             setSituationsList={setSituationsList}
             painPoints={painPoints}
             setPainPoints={setPainPoints}
+            hiddenFrustrations={hiddenFrustrations}
+            setHiddenFrustrations={setHiddenFrustrations}
             desiredOutcomes={desiredOutcomes}
             setDesiredOutcomes={setDesiredOutcomes}
             objections={objections}
             setObjections={setObjections}
-            beliefShift={beliefShift}
-            setBeliefShift={setBeliefShift}
+            oldBelief={oldBelief}
+            setOldBelief={setOldBelief}
+            newBelief={newBelief}
+            setNewBelief={setNewBelief}
             desiredEmotion={desiredEmotion}
             setDesiredEmotion={setDesiredEmotion}
             primaryCta={primaryCta}
             setPrimaryCta={setPrimaryCta}
-            onGenerateWeirdStoryIdeas={handleGenerateWeirdStoryIdeas}
+            customMasterPrompt={customMasterPrompt}
           />
 
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, height: '100%', overflow: 'hidden' }}>
@@ -597,7 +520,6 @@ function App() {
                 setContent={setContent}
                 onSelectionChange={setActiveLegendItem}
                 showColors={showColors === 'true'}
-                colorScheme={colorScheme}
                 selectedBlockType={selectedBlockType}
               />
             </div>
@@ -629,18 +551,10 @@ function App() {
             onBlockTypeSelect={setSelectedBlockType}
             showColors={showColors === 'true'}
             setShowColors={(value) => setShowColors(value ? 'true' : 'false')}
-            colorScheme={colorScheme}
-            setColorScheme={setColorScheme}
           />
 
         </Layout>
       </div>
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSave={() => setApiKey(loadApiKeys().openai || '')}
-      />
 
       {feedbackData && (
         <FeedbackModal
@@ -685,22 +599,13 @@ function App() {
         />
       )}
 
-      {bigIdeaSuggestions && (
-        <BigIdeaModal
-          suggestions={bigIdeaSuggestions}
-          onClose={() => setBigIdeaSuggestions(null)}
-          onSelect={handleSelectBigIdea}
-        />
-      )}
+      <MasterPromptModal
+        isOpen={isMasterPromptOpen}
+        onClose={() => setIsMasterPromptOpen(false)}
+        promptValue={customMasterPrompt}
+        onSave={setCustomMasterPrompt}
+      />
 
-      {weirdStories && (
-        <WeirdStoriesModal
-          stories={weirdStories}
-          onClose={() => setWeirdStories(null)}
-          onGenerateCopy={handleGenerateCopyFromStory}
-          loading={weirdStoryLoading}
-        />
-      )}
     </>
   );
 }
