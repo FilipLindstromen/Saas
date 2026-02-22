@@ -65,6 +65,19 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
     return classes.join(' ')
   }, [isInPhase, isOutPhase, animIn, animOut])
 
+  const animationDelay = useMemo(() => {
+    if (isInPhase && animIn !== 'none') {
+      const elapsed = Math.max(0, Math.min(ANIMATION_DURATION, currentTime - clipStart))
+      return -elapsed
+    }
+    if (isOutPhase && animOut !== 'none') {
+      const outStart = clipEnd - ANIMATION_DURATION
+      const elapsed = Math.max(0, Math.min(ANIMATION_DURATION, currentTime - outStart))
+      return -elapsed
+    }
+    return 0
+  }, [isInPhase, isOutPhase, currentTime, clipStart, clipEnd, animIn, animOut])
+
   const renderContent = () => {
     if (type === 'image') {
       const imgStyle = imageFlipHorizontal ? { transform: 'scaleX(-1)' } : undefined
@@ -341,7 +354,10 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
       style={style}
       onPointerDown={(e) => handlePointerDown(e, 'move')}
     >
-      <div className={`element-animation-wrapper ${animationClasses}`}>
+      <div
+        className={`element-animation-wrapper ${animationClasses}`}
+        style={animationDelay !== 0 ? { animationDelay: `${animationDelay}s` } : undefined}
+      >
       <div className="element-inner">
         {needsScale ? (
           <div

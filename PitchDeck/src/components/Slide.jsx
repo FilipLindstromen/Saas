@@ -1733,7 +1733,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {/* 1. Background image (z-index 0) - behind video; skip when infographic is used */}
       {!hideBackground && !slide.infographicProjectId && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
-          className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: `${imageScale * 100}%`,
@@ -1742,7 +1742,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             cursor: (!isPlayMode && onUpdate) ? 'move' : 'default',
             pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : 'none',
-            ...(isPlayMode && backgroundScaleAnimation ? {
+            ...(isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
               '--initial-scale': `${imageScale * 100}%`,
               '--final-scale': `${(imageScale * 100) + (backgroundScaleAmount || 20)}%`

@@ -1121,6 +1121,12 @@ function App() {
             onZoomChange={setZoom}
             backgroundColor={backgroundColor}
             onBackgroundColorChange={setBackgroundColor}
+            selectedElement={selectedElement}
+            defaultFontFamily={defaultFontFamily}
+            defaultFontSize={defaultFontSize}
+            onUpdate={(updates) => selectedIds.forEach(id => updateElement(id, updates))}
+            onDefaultFontFamilyChange={setDefaultFontFamily}
+            onDefaultFontSizeChange={setDefaultFontSize}
           />
           <Canvas
             aspectRatio={aspectRatio}

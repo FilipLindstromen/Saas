@@ -117,14 +117,14 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
     <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>
       {slide.imageUrl && !slide.backgroundVideoUrl && (
         <div
-          className={`slide-background ${backgroundScaleAnimation ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: `${imageScale * 100}%`,
             backgroundPosition: `${currentPosition.x}% ${currentPosition.y}%`,
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
-            ...(backgroundScaleAnimation ? {
+            ...(backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
               '--initial-scale': `${imageScale * 100}%`,
               '--final-scale': `${(imageScale * 100) + (backgroundScaleAmount || 20)}%`

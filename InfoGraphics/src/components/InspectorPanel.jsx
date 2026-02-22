@@ -1,5 +1,4 @@
 import InspectorImageSearch from './InspectorImageSearch'
-import { GOOGLE_FONTS } from '../constants/fonts'
 import { ANIMATION_OPTIONS } from '../constants/animations'
 import './InspectorPanel.css'
 
@@ -126,47 +125,6 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
                 </div>
               </>
             )}
-          </>
-        )}
-        {(type === 'image-text' || type === 'headline' || type === 'cta') && (
-          <>
-            <div className="inspector-field">
-              <label>Font size</label>
-              <input
-                type="number"
-                value={fontSize || 14}
-                onChange={(e) => onUpdate({ fontSize: parseInt(e.target.value, 10) || 14 })}
-                min={8}
-                max={72}
-              />
-            </div>
-            <div className="inspector-field">
-              <label>Font</label>
-              <select
-                value={fontFamily || 'Inter'}
-                onChange={(e) => onUpdate({ fontFamily: e.target.value })}
-              >
-                {GOOGLE_FONTS.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-                <option value="Georgia">Georgia</option>
-                <option value="system-ui">System</option>
-              </select>
-            </div>
-            <div className="inspector-field">
-              <label>Color</label>
-              <input
-                type="color"
-                value={color || '#000000'}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-              />
-              <input
-                type="text"
-                value={color || '#000000'}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-                className="color-hex"
-              />
-            </div>
           </>
         )}
         {type === 'gradient' && (

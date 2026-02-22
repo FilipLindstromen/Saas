@@ -73,3 +73,23 @@
   color: var(--text-primary);
   font-size: 0.8rem;
 }
+
+.canvas-controls-font-size {
+  width: 4rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.canvas-controls-font-select {
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  min-width: 100px;
+}

@@ -186,6 +186,17 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
                   <span className="slide-settings-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
                 </div>
               </div>
+              <div className="slide-settings-field">
+                <label className="slide-settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!!slide.overrideBackgroundScaleAnimation}
+                    onChange={(e) => onUpdate({ overrideBackgroundScaleAnimation: e.target.checked })}
+                  />
+                  <span>Override background scale animation</span>
+                </label>
+                <p className="slide-settings-hint">When enabled, this slide uses static scale instead of the global scale animation.</p>
+              </div>
             </>
           )}
         </div>
