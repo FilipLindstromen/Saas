@@ -94,8 +94,8 @@ function getOverlayRect(
   }
   if (o.type === 'infographic' && o.infographicProjectId) {
     const scale = o.imageScale ?? 1
-    const baseW = width * 0.8
-    const baseH = height * 0.6
+    const baseW = width
+    const baseH = height
     const w = baseW * scale
     const h = baseH * scale
     const x = (o.x ?? 0.5) * width - w / 2
@@ -648,8 +648,8 @@ export function RecordPreview({
       }
       if (o.type === 'infographic' && o.infographicProjectId) {
         const scale = o.imageScale ?? 1
-        const baseW = width * 0.8
-        const baseH = height * 0.6
+        const baseW = width
+        const baseH = height
         const w = baseW * scale
         const h = baseH * scale
         const x = (o.x ?? 0.5) * width - w / 2

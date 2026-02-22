@@ -231,11 +231,8 @@ export function drawOverlays(
         const elapsed = currentTime - o.startTime
         const infographicTime = elapsed >= 0 ? (elapsed % timelineDuration) : 0
         const scale = o.imageScale ?? 1
-        const aspectRatio = projectData.aspectRatio || '16:9'
-        const resolution = projectData.resolution || 800
-        const isPortrait = aspectRatio === '9:16'
-        const baseW = isPortrait ? width * 0.6 : width * 0.8
-        const baseH = isPortrait ? height * 0.8 : height * 0.6
+        const baseW = width
+        const baseH = height
         const w = baseW * scale
         const h = baseH * scale
         const x = ((o.x ?? 0.5) * width) - w / 2

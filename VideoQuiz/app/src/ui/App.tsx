@@ -1065,7 +1065,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-gray-300">
                             Overlay #{index + 1}
-                </div>
+                          </div>
                           <button
                             className="text-red-400 text-xs"
                             onClick={() => removeOverlayItem(item.id)}

@@ -223,6 +223,10 @@ function App() {
   // Show/Hide Background Colors Toggle
   const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
 
+  // Resizable panel widths (persisted)
+  const [leftPanelWidth, setLeftPanelWidth] = usePersistentState('cw_leftPanelWidth', '320');
+  const [rightPanelWidth, setRightPanelWidth] = usePersistentState('cw_rightPanelWidth', '300');
+
   // Master prompt (custom override; empty = use default)
   const [customMasterPrompt, setCustomMasterPrompt] = usePersistentState('cw_customMasterPrompt', '');
   const [isMasterPromptOpen, setIsMasterPromptOpen] = useState(false);
@@ -486,6 +490,8 @@ function App() {
 
         <Layout>
           <Sidebar
+            width={Number(leftPanelWidth) || 320}
+            onResize={setLeftPanelWidth}
             docType={docType}
             setDocType={setDocType}
             instructions={instructions}
@@ -530,6 +536,8 @@ function App() {
           </div>
 
           <RightPanel
+            width={Number(rightPanelWidth) || 300}
+            onResize={setRightPanelWidth}
             apiKey={apiKey}
             docType={docType}
             targetAudience={targetAudience}

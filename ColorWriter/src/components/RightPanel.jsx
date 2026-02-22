@@ -3,6 +3,8 @@ import { Wand2, Loader2, MessageCircle, Scale, BarChart3, RefreshCw, Palette, Pl
 import ColorLegend from './ColorLegend';
 
 const RightPanel = ({
+    width = 300,
+    onResize,
     apiKey,
     docType,
     targetAudience,
@@ -70,14 +72,53 @@ const RightPanel = ({
 
     return (
         <aside style={{
-            width: '300px',
+            width: `${width}px`,
+            minWidth: 220,
+            maxWidth: 500,
             background: 'var(--bg-secondary)',
             borderLeft: '1px solid var(--border-default)',
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
-            transition: 'background 0.3s'
+            transition: 'background 0.3s',
+            flexShrink: 0,
+            position: 'relative'
         }}>
+            {onResize && (
+                <div
+                    className="panel-resize-handle panel-resize-handle-left"
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 6,
+                        cursor: 'col-resize',
+                        zIndex: 1
+                    }}
+                    onPointerDown={(e) => {
+                        e.preventDefault();
+                        const startX = e.clientX;
+                        const startW = width;
+                        const move = (ev) => {
+                            const dx = startX - ev.clientX;
+                            const newW = Math.max(220, Math.min(500, startW + dx));
+                            onResize(String(Math.round(newW)));
+                        };
+                        const up = () => {
+                            document.removeEventListener('pointermove', move);
+                            document.removeEventListener('pointerup', up);
+                            document.body.style.cursor = '';
+                            document.body.style.userSelect = '';
+                        };
+                        document.body.style.cursor = 'col-resize';
+                        document.body.style.userSelect = 'none';
+                        document.addEventListener('pointermove', move);
+                        document.addEventListener('pointerup', up);
+                    }}
+                    title="Drag to resize"
+                />
+            )}
             {/* Header */}
             <div style={{
                 padding: '1.25rem',

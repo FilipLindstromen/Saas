@@ -583,3 +583,17 @@ i[type="relevance"]::before {
   background: var(--bg-hover);
   border-color: var(--border-strong);
 }
+
+/* Resizable panel handles */
+.panel-resize-handle {
+  transition: background 0.15s;
+}
+.panel-resize-handle:hover {
+  background: rgba(255, 107, 53, 0.2);
+}
+.panel-resize-handle-right:hover {
+  box-shadow: -2px 0 0 0 var(--accent);
+}
+.panel-resize-handle-left:hover {
+  box-shadow: 2px 0 0 0 var(--accent);
+}

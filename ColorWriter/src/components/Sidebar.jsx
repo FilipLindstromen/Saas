@@ -5,6 +5,8 @@ import { generateCopy, improveInputs } from '../services/openai';
 import ImproveInputsModal from './ImproveInputsModal';
 
 const Sidebar = ({
+    width = 320,
+    onResize,
     docType, setDocType,
     instructions, setInstructions,
     targetAudience, setTargetAudience,
@@ -157,7 +159,9 @@ const Sidebar = ({
     return (
         <>
         <aside style={{
-            width: '320px',
+            width: `${width}px`,
+            minWidth: 220,
+            maxWidth: 500,
             borderRight: '1px solid var(--border-default)',
             padding: '1.5rem',
             display: 'flex',
@@ -165,8 +169,44 @@ const Sidebar = ({
             gap: '1.5rem',
             backgroundColor: 'var(--bg-secondary)',
             flexShrink: 0,
-            overflowY: 'auto'
+            overflowY: 'auto',
+            position: 'relative'
         }}>
+            {onResize && (
+                <div
+                    className="panel-resize-handle panel-resize-handle-right"
+                    style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 6,
+                        cursor: 'col-resize',
+                        zIndex: 1
+                    }}
+                    onPointerDown={(e) => {
+                        e.preventDefault();
+                        const startX = e.clientX;
+                        const startW = width;
+                        const move = (ev) => {
+                            const dx = ev.clientX - startX;
+                            const newW = Math.max(220, Math.min(500, startW + dx));
+                            onResize(String(Math.round(newW)));
+                        };
+                        const up = () => {
+                            document.removeEventListener('pointermove', move);
+                            document.removeEventListener('pointerup', up);
+                            document.body.style.cursor = '';
+                            document.body.style.userSelect = '';
+                        };
+                        document.body.style.cursor = 'col-resize';
+                        document.body.style.userSelect = 'none';
+                        document.addEventListener('pointermove', move);
+                        document.addEventListener('pointerup', up);
+                    }}
+                    title="Drag to resize"
+                />
+            )}
             <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                     Document Type
