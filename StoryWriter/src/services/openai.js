@@ -9,7 +9,11 @@ CRITICAL — PRESERVE THE USER'S CONTENT (follow strictly):
 CRITICAL — PRESERVE THE USER'S STYLE:
 - Match their voice: same sentence length and rhythm, same tone, same level of detail. Stay in the same person (first person if they wrote in first person).
 - Be emotional and direct. Use open and close loops. No generic self-help tone. Sound like a real person telling a real story.
-- Each section should feel complete but leave a thread to the next.`;
+- Each section should feel complete but leave a thread to the next.
+
+CRITICAL — NO REPETITION:
+- Do NOT repeat sentences, paragraphs, or scenes from earlier sections. Each section must advance the story.
+- If previous sections are provided, build on them — do not re-state what was already written. Move the narrative forward.`;
 
 const LENGTH_INSTRUCTIONS = {
   micro: 'Keep this section very short: 1–2 sentences only. Be punchy and concise.',
@@ -18,14 +22,17 @@ const LENGTH_INSTRUCTIONS = {
   long: 'Write 2–7 sentences for this section.',
 };
 
-function buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength) {
+function buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength, previousSectionsContent) {
   const lengthInstruction = LENGTH_INSTRUCTIONS[storyLength] || LENGTH_INSTRUCTIONS.medium;
   const part = existingContent ? `Current text (user may have edited; preserve their intent and style):\n${existingContent}\n\nRefine the above for this section only.` : `Write this section.`;
+  const previousBlock = previousSectionsContent
+    ? `\n\n---\nSECTIONS ALREADY WRITTEN (do NOT repeat this content; your section must CONTINUE from here):\n${previousSectionsContent}\n---\n`
+    : '';
   return `The user's story (this is the source of truth — use their locations, problems, attempts, and insights; do not invent new ones):
 ---
 ${storyAbout}
 ---
-
+${previousBlock}
 Section: "${sectionDef.title}"
 ${sectionDef.description}
 Length: ${lengthInstruction}
@@ -33,12 +40,12 @@ ${sectionInput ? `Additional context for this section: ${sectionInput}` : ''}
 
 ${part}
 
-Stay faithful to the user's content. Refine and polish only. Output only the story text for this section. No section title, no numbering, no meta-commentary.`;
+Stay faithful to the user's content. Refine and polish only. Do NOT repeat what was already written in previous sections — advance the story. Output only the story text for this section. No section title, no numbering, no meta-commentary.`;
 }
 
 const LENGTH_MAX_TOKENS = { micro: 80, short: 150, medium: 350, long: 500 };
 
-export async function generateSection(apiKey, { sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength }) {
+export async function generateSection(apiKey, { sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength, previousSectionsContent }) {
   const maxTokens = LENGTH_MAX_TOKENS[storyLength] ?? LENGTH_MAX_TOKENS.medium;
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -52,7 +59,7 @@ export async function generateSection(apiKey, { sectionId, sectionDef, storyAbou
         { role: 'system', content: STORY_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength),
+          content: buildSectionPrompt(sectionId, sectionDef, storyAbout, sectionInput, existingContent, storyLength, previousSectionsContent),
         },
       ],
       temperature: 0.6,
@@ -72,9 +79,11 @@ export async function generateSection(apiKey, { sectionId, sectionDef, storyAbou
 
 export async function generateFullStory(apiKey, { storyAbout, storyLength, sectionsData, sectionOrder, sectionDefs }) {
   const results = {};
+  const previousParts = [];
   for (const sectionId of sectionOrder) {
     const def = sectionDefs[sectionId];
     const data = sectionsData[sectionId] || {};
+    const previousSectionsContent = previousParts.length > 0 ? previousParts.join('\n\n') : null;
     const content = await generateSection(apiKey, {
       sectionId,
       sectionDef: def,
@@ -82,8 +91,10 @@ export async function generateFullStory(apiKey, { storyAbout, storyLength, secti
       sectionInput: data.input || '',
       existingContent: null,
       storyLength: storyLength || 'medium',
+      previousSectionsContent,
     });
     results[sectionId] = content;
+    previousParts.push(`[${def.title}]\n${content}`);
   }
   return results;
 }

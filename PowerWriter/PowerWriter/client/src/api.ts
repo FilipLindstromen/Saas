@@ -4,10 +4,33 @@ import type {
   TreeNode,
   Transcription
 } from "./types";
+import {
+  isApiAvailable,
+  storageCreateDocument,
+  storageCreateFolder,
+  storageDeleteDocument,
+  storageDeleteFolder,
+  storageFetchTree,
+  storageGetDocumentDetails,
+  storageGetFolderDetails,
+  storageRenameDocument,
+  storageRenameFolder,
+  storageSaveDocument,
+  storageSaveDocumentTranscription,
+  storageSaveFolderInstructions
+} from "./storage";
 
 const baseHeaders = {
   "Content-Type": "application/json"
 };
+
+let useStorage: boolean | null = null;
+
+async function shouldUseStorage(): Promise<boolean> {
+  if (useStorage !== null) return useStorage;
+  useStorage = !(await isApiAvailable());
+  return useStorage;
+}
 
 function buildHeaders(additional?: Record<string, string>) {
   return additional
@@ -27,6 +50,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function fetchTree(): Promise<TreeNode[]> {
+  if (await shouldUseStorage()) {
+    return storageFetchTree();
+  }
   const response = await fetch("/api/tree");
   return handleResponse<TreeNode[]>(response);
 }
@@ -34,6 +60,9 @@ export async function fetchTree(): Promise<TreeNode[]> {
 export async function getFolderDetails(
   path: string
 ): Promise<FolderDetails> {
+  if (await shouldUseStorage()) {
+    return storageGetFolderDetails(path);
+  }
   const response = await fetch(
     `/api/folder?path=${encodeURIComponent(path)}`
   );
@@ -45,6 +74,10 @@ export async function saveFolderInstructions(
   instructions: string,
   color?: string
 ) {
+  if (await shouldUseStorage()) {
+    storageSaveFolderInstructions(path, instructions, color);
+    return { success: true as const };
+  }
   const response = await fetch("/api/folder", {
     method: "POST",
     headers: buildHeaders(),
@@ -57,6 +90,9 @@ export async function createFolder(
   parentPath: string | null,
   name: string
 ) {
+  if (await shouldUseStorage()) {
+    return storageCreateFolder(parentPath, name);
+  }
   const response = await fetch("/api/folder/create", {
     method: "POST",
     headers: buildHeaders(),
@@ -68,6 +104,9 @@ export async function createFolder(
 export async function getDocumentDetails(
   path: string
 ): Promise<DocumentDetails> {
+  if (await shouldUseStorage()) {
+    return storageGetDocumentDetails(path);
+  }
   const response = await fetch(
     `/api/document?path=${encodeURIComponent(path)}`
   );
@@ -80,6 +119,10 @@ export async function saveDocument(
   instructions: string,
   options?: { completed?: boolean }
 ) {
+  if (await shouldUseStorage()) {
+    storageSaveDocument(path, content, instructions, options);
+    return { success: true as const };
+  }
   const response = await fetch("/api/document", {
     method: "POST",
     headers: buildHeaders(),
@@ -97,6 +140,9 @@ export async function createDocument(
   folderPath: string | null,
   name: string
 ) {
+  if (await shouldUseStorage()) {
+    return storageCreateDocument(folderPath, name);
+  }
   const response = await fetch("/api/document/create", {
     method: "POST",
     headers: buildHeaders(),
@@ -106,6 +152,9 @@ export async function createDocument(
 }
 
 export async function renameFolder(path: string, newName: string) {
+  if (await shouldUseStorage()) {
+    return storageRenameFolder(path, newName);
+  }
   const response = await fetch("/api/folder/rename", {
     method: "POST",
     headers: buildHeaders(),
@@ -115,6 +164,9 @@ export async function renameFolder(path: string, newName: string) {
 }
 
 export async function renameDocument(path: string, newName: string) {
+  if (await shouldUseStorage()) {
+    return storageRenameDocument(path, newName);
+  }
   const response = await fetch("/api/document/rename", {
     method: "POST",
     headers: buildHeaders(),
@@ -124,6 +176,10 @@ export async function renameDocument(path: string, newName: string) {
 }
 
 export async function deleteFolder(path: string) {
+  if (await shouldUseStorage()) {
+    storageDeleteFolder(path);
+    return { success: true as const };
+  }
   const response = await fetch("/api/folder/delete", {
     method: "POST",
     headers: buildHeaders(),
@@ -133,6 +189,10 @@ export async function deleteFolder(path: string) {
 }
 
 export async function deleteDocument(path: string) {
+  if (await shouldUseStorage()) {
+    storageDeleteDocument(path);
+    return { success: true as const };
+  }
   const response = await fetch("/api/document/delete", {
     method: "POST",
     headers: buildHeaders(),
@@ -264,6 +324,10 @@ export async function saveDocumentTranscription(
   path: string,
   transcription: Transcription
 ): Promise<{ success: true }> {
+  if (await shouldUseStorage()) {
+    storageSaveDocumentTranscription(path, transcription);
+    return { success: true as const };
+  }
   const response = await fetch("/api/document/transcription", {
     method: "POST",
     headers: buildHeaders(),
