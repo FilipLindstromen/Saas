@@ -13,10 +13,10 @@
 .settings-modal {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   max-width: 420px;
   width: 100%;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-xl);
 }
 
 .settings-header {
@@ -98,7 +98,7 @@
 .settings-input:focus {
   background: var(--focus-bg);
   border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px var(--accent-dim);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
 }
 
 .settings-input::placeholder {
@@ -136,11 +136,12 @@
 }
 
 .settings-actions .btn.primary {
-  background: var(--btn-primary-bg);
-  border: none;
+  background: var(--accent-gradient);
+  border: 1px solid var(--accent);
   color: var(--btn-primary-text);
 }
 
 .settings-actions .btn.primary:hover {
-  filter: brightness(0.96);
+  background: var(--accent-hover);
+  filter: none;
 }

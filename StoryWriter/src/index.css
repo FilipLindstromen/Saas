@@ -1,29 +1,58 @@
-/* Story Writer — dark theme (Pitch Deck–style) */
+/* Story Writer — PitchDeck-style theme */
 
+/* PitchDeck theme variables */
+:root[data-theme="dark"],
 :root {
-  --bg: #1a1a1a;
-  --surface: #222222;
-  --surface-elevated: #2a2a2a;
-  --border: #333333;
-  --border-hover: #444444;
-  --text: #ffffff;
-  --text-muted: #b0b0b0;
-  --accent: #5c88bf;
-  --accent-dim: rgba(92, 136, 191, 0.25);
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #1f1f1f;
+  --bg-hover: #252525;
+  --bg-active: #2a2a2a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: rgba(255, 255, 255, 0.65);
+  --text-quaternary: rgba(255, 255, 255, 0.45);
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.7);
+  --card-radius: 16px;
+  --button-radius: 12px;
+}
+
+/* Compatibility mappings for StoryWriter components */
+:root {
+  --bg: var(--bg-primary);
+  --surface: var(--bg-secondary);
+  --surface-elevated: var(--bg-elevated);
+  --border: var(--border-default);
+  --border-hover: var(--border-strong);
+  --text: var(--text-primary);
+  --text-muted: var(--text-tertiary);
+  --accent-dim: rgba(255, 107, 53, 0.25);
   --text-on-accent: #ffffff;
-  --focus-bg: #335378;
-  --focus-border: #5c88bf;
+  --focus-bg: rgba(255, 107, 53, 0.12);
+  --focus-border: var(--accent);
   --hover: rgba(255, 255, 255, 0.08);
   --error-bg: rgba(239, 68, 68, 0.12);
   --error-border: rgba(239, 68, 68, 0.35);
   --error-text: #fca5a5;
-  --btn-radius: 8px;
+  --btn-radius: var(--button-radius);
   --btn-padding-y: 0.5rem;
   --btn-padding-x: 1rem;
   --btn-font-size: 0.875rem;
   --btn-font-weight: 500;
-  --btn-primary-bg: #ffffff;
-  --btn-primary-text: #1a1a1a;
+  --btn-primary-bg: var(--accent);
+  --btn-primary-text: #ffffff;
 }
 
 *,
@@ -41,7 +70,7 @@ html {
 body {
   margin: 0;
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #1a1a1a;
+  background: var(--bg-primary);
   color: var(--text);
   line-height: 1.5;
 }
@@ -65,6 +94,6 @@ textarea:focus,
 select:focus {
   background: var(--focus-bg);
   border-color: var(--focus-border);
-  box-shadow: 0 0 0 2px var(--accent-dim);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
   outline: none;
 }

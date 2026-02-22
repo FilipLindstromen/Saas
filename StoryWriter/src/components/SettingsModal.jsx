@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getSettings, saveSettings } from '../utils/settings';
+import { getSettings, saveSettings, PRESENTATION_FONTS } from '../utils/settings';
 import './SettingsModal.css';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [unsplashAccessKey, setUnsplashAccessKey] = useState('');
+  const [presentationFont, setPresentationFont] = useState('Poppins');
+  const [presentationFontSize, setPresentationFontSize] = useState('medium');
 
   useEffect(() => {
     if (isOpen) {
@@ -22,6 +24,8 @@ export default function SettingsModal({ isOpen, onClose }) {
       ...getSettings(),
       openaiApiKey,
       unsplashAccessKey,
+      presentationFont,
+      presentationFontSize,
     });
     onClose();
   };
@@ -49,7 +53,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
         <form onSubmit={handleSave} className="settings-form">
           <p className="settings-hint">
-            API keys are stored once and shared across all Saas apps. They are never sent to our servers.
+            API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, PowerWriter, etc.).
           </p>
           <label className="settings-label">
             OpenAI API Key
