@@ -76,7 +76,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('appTheme') || 'dark')
-  const [apiKeys, setApiKeys] = useState(() => loadApiKeys())
+  const [apiKeys, setApiKeys] = useState({})
+  useEffect(() => {
+    setApiKeys(loadApiKeys())
+  }, [])
   const [latestImages, setLatestImages] = useState([])
 
   const selectedElement = elements.find(e => e.id === selectedIds[0])
