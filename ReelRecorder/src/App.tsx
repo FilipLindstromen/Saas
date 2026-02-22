@@ -18,8 +18,12 @@ import { ClipLibraryPanel } from './components/ClipLibraryPanel'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
 import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
+import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
+import TabBar from '@shared/TabBar/TabBar'
+import ThemeToggle from '@shared/ThemeToggle'
+import AppTopBar from '@shared/AppTopBar/AppTopBar'
 import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconVideo, IconCamera } from './components/Icons'
-import { getStoredTheme, setStoredTheme, applyTheme, type Theme } from './utils/theme'
+import { getStoredTheme, setStoredTheme, applyTheme, initThemeSync, type Theme } from './utils/theme'
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
@@ -98,6 +102,16 @@ export default function App() {
   const [exportPanelOpen, setExportPanelOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState<ExportFormat>('webm')
   const [theme, setTheme] = useState<Theme>(() => getStoredTheme())
+
+  useEffect(() => {
+    const unsub = initThemeSync()
+    const handler = () => setTheme(getStoredTheme() as Theme)
+    window.addEventListener('saas-theme-change', handler)
+    return () => {
+      unsub?.()
+      window.removeEventListener('saas-theme-change', handler)
+    }
+  }, [])
   const [musicBlob, setMusicBlob] = useState<Blob | null>(null)
   const [musicVolume, setMusicVolume] = useState(50)
   const [downloadPreparing, setDownloadPreparing] = useState(false)
@@ -110,6 +124,9 @@ export default function App() {
   const [inspectorResize, setInspectorResize] = useState<{ startX: number; startWidth: number } | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isRestoring, setIsRestoring] = useState(true)
+  const [projects] = useState([{ id: 'default', name: 'Untitled' }])
+  const [tabs, setTabs] = useState([{ id: '1', name: 'Recording 1' }])
+  const [activeTabId, setActiveTabId] = useState('1')
   /** In edit mode: show recording (playback) or live webcam in preview */
   const [editPreviewSource, setEditPreviewSource] = useState<'recording' | 'webcam'>('recording')
 
@@ -956,6 +973,35 @@ export default function App() {
             <h1 className={styles.title}>ReelRecorder</h1>
             <p className={styles.subtitle}>Record with overlays and burn-in captions</p>
           </div>
+          <ProjectSelector
+            projects={projects}
+            currentProjectId="default"
+            currentProjectName="Untitled"
+          />
+          <div className={styles.headerTabBar}>
+            <TabBar
+              tabs={tabs}
+              currentTabId={activeTabId}
+              onSwitchTab={setActiveTabId}
+              onAddTab={() => {
+                const id = 't_' + Date.now()
+                setTabs((prev) => [...prev, { id, name: 'Recording ' + (prev.length + 1) }])
+                setActiveTabId(id)
+              }}
+              onRenameTab={(tabId, name) => {
+                setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, name } : t)))
+              }}
+              onDeleteTab={(tabId) => {
+                if (tabs.length <= 1) return
+                const nextTabs = tabs.filter((t) => t.id !== tabId)
+                const nextActive = activeTabId === tabId ? (nextTabs[0]?.id ?? '1') : activeTabId
+                setTabs(nextTabs)
+                setActiveTabId(nextActive)
+              }}
+              defaultTabName="Recording"
+              addTitle="Add recording"
+            />
+          </div>
         </div>
         <div className={styles.headerCenter}>
           {/* Spacer so headerRight stays right; record + timer are in overlay */}
@@ -1017,29 +1063,7 @@ export default function App() {
               <IconExport />
             </button>
           </div>
-          <button
-            type="button"
-            className={styles.themeToggle}
-            onClick={() => {
-              const next: Theme = theme === 'dark' ? 'light' : 'dark'
-              setTheme(next)
-              setStoredTheme(next)
-              applyTheme(next)
-            }}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="5" />
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
+          <ThemeToggle theme={theme} onToggle={(next) => setTheme(next as Theme)} className={styles.themeToggle} />
           <button
             type="button"
             className={styles.clearBtn}

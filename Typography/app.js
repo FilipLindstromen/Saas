@@ -16,8 +16,15 @@ class TypographyAnimationApp {
         this.words = [];
         this.isPlaying = false;
 
+        // Project & tab state
+        this.projects = this.loadProjects();
+        this.currentProjectId = this.loadCurrentProjectId();
+        this.tabs = this.loadTabs();
+        this.activeTabId = this.loadActiveTabId();
+
         // Initialize UI
         this.initializeUI();
+        this.initProjectTabBar();
         this.attachEventListeners();
 
         // Start renderer
@@ -28,7 +35,194 @@ class TypographyAnimationApp {
         this.generatePreview();
     }
 
-    // Save current settings to localStorage
+    loadProjects() {
+        try {
+            const raw = localStorage.getItem('typographyProjects');
+            if (raw) {
+                const list = JSON.parse(raw);
+                return Array.isArray(list) && list.length > 0 ? list : [{ id: 'default', name: 'Untitled' }];
+            }
+        } catch (e) { }
+        return [{ id: 'default', name: 'Untitled' }];
+    }
+
+    saveProjects() {
+        localStorage.setItem('typographyProjects', JSON.stringify(this.projects));
+    }
+
+    loadCurrentProjectId() {
+        return localStorage.getItem('typographyCurrentProject') || 'default';
+    }
+
+    saveCurrentProjectId(id) {
+        localStorage.setItem('typographyCurrentProject', id);
+    }
+
+    loadTabs() {
+        try {
+            const raw = localStorage.getItem('typographyTabs_' + this.currentProjectId);
+            if (raw) {
+                const list = JSON.parse(raw);
+                return Array.isArray(list) && list.length > 0 ? list : [{ id: '1', name: 'Animation 1' }];
+            }
+        } catch (e) { }
+        return [{ id: '1', name: 'Animation 1' }];
+    }
+
+    saveTabs() {
+        localStorage.setItem('typographyTabs_' + this.currentProjectId, JSON.stringify(this.tabs));
+    }
+
+    loadActiveTabId() {
+        return localStorage.getItem('typographyActiveTab_' + this.currentProjectId) || (this.tabs[0]?.id || '1');
+    }
+
+    saveActiveTabId(id) {
+        localStorage.setItem('typographyActiveTab_' + this.currentProjectId, id);
+    }
+
+    initProjectTabBar() {
+        this.renderProjectSelector();
+        this.renderTabBar();
+
+        const projectTrigger = document.getElementById('project-trigger');
+        const projectDropdown = document.getElementById('project-dropdown');
+        if (projectTrigger && projectDropdown) {
+            projectTrigger.addEventListener('click', () => {
+                projectDropdown.style.display = projectDropdown.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#project-selector')) {
+                const d = document.getElementById('project-dropdown');
+                if (d) d.style.display = 'none';
+            }
+        });
+
+        const projectNew = document.getElementById('project-new');
+        if (projectNew) {
+            projectNew.addEventListener('click', () => {
+                const id = 'p_' + Date.now();
+                this.projects = [...this.projects, { id, name: 'Untitled' }];
+                this.saveProjects();
+                this.currentProjectId = id;
+                this.saveCurrentProjectId(id);
+                this.tabs = [{ id: '1', name: 'Animation 1' }];
+                this.saveTabs();
+                this.activeTabId = '1';
+                this.saveActiveTabId('1');
+                document.getElementById('project-dropdown').style.display = 'none';
+                this.renderProjectSelector();
+                this.renderTabBar();
+                this.loadSettings();
+            });
+        }
+
+        const projectList = document.getElementById('project-list');
+        if (projectList) {
+            projectList.addEventListener('click', (e) => {
+                if (e.target.closest('.project-selector-action')) return;
+                const item = e.target.closest('.project-selector-item');
+                if (!item || item.dataset.id === this.currentProjectId) {
+                    if (item) document.getElementById('project-dropdown').style.display = 'none';
+                    return;
+                }
+                this.saveSettings();
+                this.currentProjectId = item.dataset.id;
+                this.saveCurrentProjectId(this.currentProjectId);
+                this.tabs = this.loadTabs();
+                this.activeTabId = this.loadActiveTabId();
+                document.getElementById('project-dropdown').style.display = 'none';
+                this.renderProjectSelector();
+                this.renderTabBar();
+                this.loadSettings();
+                this.generatePreview();
+            });
+        }
+
+        const tabAdd = document.getElementById('tab-add');
+        if (tabAdd) {
+            tabAdd.addEventListener('click', () => {
+                const id = 't_' + Date.now();
+                this.tabs = [...this.tabs, { id, name: 'Animation ' + (this.tabs.length + 1) }];
+                this.saveTabs();
+                this.activeTabId = id;
+                this.saveActiveTabId(id);
+                this.renderTabBar();
+                this.loadSettings();
+            });
+        }
+    }
+
+    renderProjectSelector() {
+        const nameEl = document.getElementById('project-name');
+        const listEl = document.getElementById('project-list');
+        if (!nameEl || !listEl) return;
+        const proj = this.projects.find(p => p.id === this.currentProjectId);
+        nameEl.textContent = proj ? proj.name : 'Untitled';
+        listEl.innerHTML = this.projects.map(p =>
+            '<div class="project-selector-item' + (p.id === this.currentProjectId ? ' active' : '') + '" data-id="' + p.id + '">' +
+            '<span class="project-selector-item-name">' + (p.name || 'Untitled') + '</span></div>'
+        ).join('');
+    }
+
+    renderTabBar() {
+        const container = document.getElementById('tab-bar-tabs');
+        if (!container) return;
+        container.innerHTML = this.tabs.map(t => {
+            const isActive = t.id === this.activeTabId;
+            return '<div class="tab-bar-tab' + (isActive ? ' active' : '') + '">' +
+                '<button type="button" class="tab-bar-tab-btn" data-id="' + t.id + '">' + (t.name || 'Animation') + '</button>' +
+                (this.tabs.length > 1 ? '<button type="button" class="tab-bar-tab-close" data-id="' + t.id + '" title="Close">×</button>' : '') +
+                '</div>';
+        }).join('');
+
+        container.querySelectorAll('.tab-bar-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                if (id === this.activeTabId) return;
+                this.saveSettings();
+                this.activeTabId = id;
+                this.saveActiveTabId(id);
+                this.renderTabBar();
+                this.loadSettings();
+                this.generatePreview();
+            });
+            btn.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const tab = this.tabs.find(t => t.id === id);
+                const name = prompt('Rename animation:', tab ? tab.name : 'Animation');
+                if (name != null && name.trim()) {
+                    this.tabs = this.tabs.map(t => t.id === id ? { ...t, name: name.trim() } : t);
+                    this.saveTabs();
+                    this.renderTabBar();
+                }
+            });
+        });
+
+        container.querySelectorAll('.tab-bar-tab-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                if (this.tabs.length <= 1) return;
+                const idx = this.tabs.findIndex(t => t.id === id);
+                const nextTab = idx > 0 ? this.tabs[idx - 1] : this.tabs[idx + 1];
+                this.tabs = this.tabs.filter(t => t.id !== id);
+                this.saveTabs();
+                if (id === this.activeTabId) {
+                    this.activeTabId = nextTab.id;
+                    this.saveActiveTabId(nextTab.id);
+                    this.loadSettings();
+                    this.generatePreview();
+                }
+                this.renderTabBar();
+            });
+        });
+    }
+
+    // Save current settings to localStorage (per tab)
     saveSettings() {
         const selectedFonts = Array.from(document.querySelectorAll('input[name="font"]:checked'))
             .map(cb => cb.value);
@@ -45,12 +239,21 @@ class TypographyAnimationApp {
             fonts: selectedFonts
         };
 
-        localStorage.setItem('typographySettings', JSON.stringify(settings));
+        const key = 'typographySettings_' + this.activeTabId;
+        localStorage.setItem(key, JSON.stringify(settings));
     }
 
-    // Load settings from localStorage
+    // Load settings from localStorage (per tab, with legacy migration)
     loadSettings() {
-        const saved = localStorage.getItem('typographySettings');
+        let key = 'typographySettings_' + this.activeTabId;
+        let saved = localStorage.getItem(key);
+        if (!saved && this.activeTabId === '1') {
+            const legacy = localStorage.getItem('typographySettings');
+            if (legacy) {
+                localStorage.setItem(key, legacy);
+                saved = legacy;
+            }
+        }
         if (!saved) return;
 
         try {
@@ -523,7 +726,8 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsModal.querySelector('.settings-modal-backdrop')?.addEventListener('click', closeSettings);
     }
 
-    // Theme toggle (like InfoGraphics)
+    // Theme toggle - global saas-apps-theme (syncs across all apps)
+    const STORAGE_KEY = 'saas-apps-theme';
     const themeToggle = document.getElementById('themeToggle');
     const iconSun = themeToggle?.querySelector('.theme-icon-sun');
     const iconMoon = themeToggle?.querySelector('.theme-icon-moon');
@@ -531,16 +735,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (iconSun) iconSun.style.display = theme === 'dark' ? 'block' : 'none';
         if (iconMoon) iconMoon.style.display = theme === 'light' ? 'block' : 'none';
     };
+    function migrateTheme() {
+        if (localStorage.getItem(STORAGE_KEY)) return;
+        ['typographyTheme', 'appTheme', 'theme', 'cw_theme', 'reelRecorderTheme'].forEach(k => {
+            const v = localStorage.getItem(k);
+            if (v === 'light' || v === 'dark') { localStorage.setItem(STORAGE_KEY, v); return; }
+        });
+    }
+    function getTheme() {
+        migrateTheme();
+        const t = localStorage.getItem(STORAGE_KEY);
+        if (t === 'light' || t === 'dark') return t;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem(STORAGE_KEY, theme);
+        updateThemeIcon(theme);
+    }
     if (themeToggle) {
-        const saved = localStorage.getItem('typographyTheme') || 'dark';
-        document.documentElement.setAttribute('data-theme', saved);
-        updateThemeIcon(saved);
-        themeToggle.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme') || 'dark';
-            const next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('typographyTheme', next);
-            updateThemeIcon(next);
+        setTheme(getTheme());
+        themeToggle.addEventListener('click', () => setTheme(getTheme() === 'dark' ? 'light' : 'dark'));
+        window.addEventListener('storage', (e) => {
+            if (e.key === STORAGE_KEY && (e.newValue === 'light' || e.newValue === 'dark')) {
+                document.documentElement.setAttribute('data-theme', e.newValue);
+                updateThemeIcon(e.newValue);
+            }
         });
     }
 });

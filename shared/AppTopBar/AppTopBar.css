@@ -1,0 +1,50 @@
+.shared-app-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  box-shadow: var(--header-inset, 0 1px 0 rgba(0, 0, 0, 0.05) inset);
+}
+
+.shared-app-top-bar-logo {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.shared-app-top-bar-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.shared-app-top-bar-tabs .shared-tab-bar {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  min-height: 32px;
+}
+
+.shared-app-top-bar-tabs .shared-tab-bar-tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+.shared-app-top-bar-spacer {
+  flex: 1;
+}
+
+.shared-app-top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { transcribeAudio } from '../services/openai';
+import { transcribeAudio } from '@shared/openai';
 import { getSettings } from '../utils/settings';
 import './RambleRecorder.css';
 
@@ -163,7 +163,7 @@ export default function RambleRecorder({ onTranscription, onError, disabled }) {
         }
         setIsTranscribing(true);
         try {
-          const text = await transcribeAudio(apiKey, blob);
+          const text = await transcribeAudio(blob, apiKey);
           if (text) onTranscription?.(text);
         } catch (err) {
           onError?.(err.message || 'Transcription failed.');

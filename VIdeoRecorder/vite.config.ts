@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { copyFileSync, mkdirSync, existsSync } from 'fs'
-import { join } from 'path'
+import path, { join } from 'path'
 
 // Helper function to copy FFmpeg files
 function copyFFmpegFilesToPublic() {
@@ -65,6 +65,9 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
   
   return {
+    resolve: {
+      alias: { '@shared': path.resolve(__dirname, '../shared') },
+    },
     plugins: [react(), copyFFmpegFiles()],
     base: './', // Important for Electron - use relative paths
     build: {

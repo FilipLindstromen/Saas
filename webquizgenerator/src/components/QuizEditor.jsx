@@ -120,7 +120,6 @@ function QuizEditor() {
   }
 
   const updateTheme = (themeData) => {
-    // when gradient controls change, compute backgroundValue here
     if (themeData.gradientStart || themeData.gradientEnd || typeof themeData.gradientAngle !== 'undefined') {
       const start = themeData.gradientStart ?? quizData.theme.gradientStart
       const end = themeData.gradientEnd ?? quizData.theme.gradientEnd
@@ -146,32 +145,89 @@ function QuizEditor() {
   }
 
   const [showPreview, setShowPreview] = useState(false)
-  const [showAI, setShowAI] = useState(false)
+  const [showAI, setShowAI] = useState(true)
 
   return (
-    <div className="quiz-editor">
-      <div className="editor-section">
-        <ThemeTypographyEditor
+    <>
+      {/* Left Panel: Style, AI, Basic Info */}
+      <div className="app-left">
+        <div className="panel-scroll">
+          <div className="panel-section">
+            <ThemeTypographyEditor
+              typography={quizData.typography}
+              theme={quizData.theme}
+              onTypographyChange={updateTypography}
+              onThemeChange={updateTheme}
+            />
+          </div>
+          <div className="panel-section">
+            <div className="panel-section-header">
+              <h3>AI Content Generator</h3>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => setShowAI(!showAI)}
+              >
+                {showAI ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {showAI && (
+              <OpenAIGenerator onGenerate={handleOpenAIGenerate} currentData={quizData} />
+            )}
+          </div>
+          <div className="panel-section">
+            <QuizBasicInfo
+              title={quizData.quizTitle}
+              subtitle={quizData.quizSubtitle}
+              summary={quizData.summary}
+              onUpdate={updateBasicInfo}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Center: Live Preview Canvas */}
+      <div className="app-center">
+        <QuizPreview
+          quizData={quizData}
           typography={quizData.typography}
           theme={quizData.theme}
-          onTypographyChange={updateTypography}
-          onThemeChange={updateTheme}
+          embedded={true}
         />
       </div>
 
-      <div className="editor-section preview-section">
-        <div className="preview-header-section">
-          <h2>Preview</h2>
-          <button
-            onClick={() => setShowPreview(true)}
-            className="btn-primary btn-preview"
-          >
-            👁️ Preview Quiz
-          </button>
+      {/* Right Panel: Questions, Feedback, Export */}
+      <div className="app-right">
+        <div className="panel-scroll">
+          <div className="panel-section">
+            <QuestionsEditor
+              questions={quizData.questions}
+              onUpdate={updateQuestions}
+            />
+          </div>
+          <div className="panel-section">
+            <FeedbackEditor
+              questions={quizData.questions}
+              tagLabels={quizData.tagLabels}
+              headlines={quizData.headlines}
+              tagInsights={quizData.tagInsights}
+              cta={quizData.cta}
+              onUpdate={updateFeedback}
+            />
+          </div>
+          <div className="panel-section">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              className="btn-secondary btn-preview"
+            >
+              Full Screen Preview
+            </button>
+          </div>
+          <div className="panel-section">
+            <ExportButton quizData={quizData} />
+          </div>
         </div>
-        <p className="section-description">
-          See how your quiz will look and behave before exporting.
-        </p>
       </div>
 
       <QuizPreview
@@ -181,55 +237,8 @@ function QuizEditor() {
         typography={quizData.typography}
         theme={quizData.theme}
       />
-
-      <div className="editor-section ai-section">
-        <div className="ai-header">
-          <h2>AI Content Generator</h2>
-          <button
-            className="btn-secondary ai-toggle"
-            onClick={() => setShowAI(!showAI)}
-          >
-            {showAI ? 'Hide' : 'Show'} AI Panel
-          </button>
-        </div>
-        {showAI && (
-          <OpenAIGenerator onGenerate={handleOpenAIGenerate} currentData={quizData} />
-        )}
-      </div>
-
-      <div className="editor-section">
-        <QuizBasicInfo
-          title={quizData.quizTitle}
-          subtitle={quizData.quizSubtitle}
-          summary={quizData.summary}
-          onUpdate={updateBasicInfo}
-        />
-      </div>
-
-      <div className="editor-section">
-        <QuestionsEditor
-          questions={quizData.questions}
-          onUpdate={updateQuestions}
-        />
-      </div>
-
-      <div className="editor-section">
-        <FeedbackEditor
-          questions={quizData.questions}
-          tagLabels={quizData.tagLabels}
-          headlines={quizData.headlines}
-          tagInsights={quizData.tagInsights}
-          cta={quizData.cta}
-          onUpdate={updateFeedback}
-        />
-      </div>
-
-      <div className="editor-section">
-        <ExportButton quizData={quizData} />
-      </div>
-    </div>
+    </>
   )
 }
 
 export default QuizEditor
-

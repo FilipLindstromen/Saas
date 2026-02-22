@@ -1,0 +1,142 @@
+.shared-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.shared-settings-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius, 16px);
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl, 0 16px 64px rgba(0, 0, 0, 0.6));
+}
+
+.shared-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.shared-settings-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shared-settings-close {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.shared-settings-close:hover {
+  color: var(--text-primary);
+}
+
+.shared-settings-form {
+  padding: 1.5rem;
+}
+
+.shared-settings-hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.shared-settings-field {
+  margin-bottom: 1rem;
+}
+
+.shared-settings-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.shared-settings-field input,
+.shared-settings-field select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius, 12px);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.shared-settings-field input::placeholder {
+  color: var(--text-quaternary);
+}
+
+.shared-settings-field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-quaternary);
+  margin-top: 0.25rem;
+}
+
+.shared-settings-extra {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.shared-settings-extra .shared-settings-field {
+  margin-bottom: 1rem;
+}
+
+.shared-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.shared-settings-btn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--button-radius, 12px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shared-settings-btn.primary {
+  background: var(--accent-gradient, linear-gradient(135deg, #ff6b35 0%, #ff4757 100%));
+  border: none;
+  color: white;
+}
+
+.shared-settings-btn.primary:hover {
+  background: var(--accent, #ff6b35);
+}
+
+.shared-settings-btn.secondary {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+}
+
+.shared-settings-btn.secondary:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}

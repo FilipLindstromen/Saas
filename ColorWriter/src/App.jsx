@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+import { getTheme, setTheme as applyTheme, initThemeSync } from '@shared/theme';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
-import TabBar from './components/TabBar';
-import SettingsModal from './components/SettingsModal';
+import AppTopBar from '@shared/AppTopBar/AppTopBar';
+import SettingsModal from '@shared/SettingsModal/SettingsModal';
 import FeedbackModal from './components/FeedbackModal';
 import BalanceModal from './components/BalanceModal';
 import ThreeKeyIngredientsModal from './components/ThreeKeyIngredientsModal';
@@ -14,7 +15,8 @@ import BigIdeaModal from './components/BigIdeaModal';
 import WeirdStoriesModal from './components/WeirdStoriesModal';
 import RightPanel from './components/RightPanel';
 import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, generateBigIdeas, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules } from './services';
-import { Settings, Moon, Sun } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import ThemeToggle from '@shared/ThemeToggle';
 
 function App() {
   const [apiKey, setApiKey] = useState(() => loadApiKeys().openai || '');
@@ -76,6 +78,11 @@ function App() {
     const saved = localStorage.getItem('cw_activeTabId');
     return saved || '1';
   });
+
+  // Project state - single "Default" project for now (tabs live under it)
+  const [projects] = useState([{ id: 'default', name: 'Default' }]);
+  const currentProjectId = 'default';
+  const currentProjectName = 'Default';
 
   // Save tabs to localStorage whenever they change
   useEffect(() => {
@@ -141,16 +148,22 @@ function App() {
     );
   };
 
-  // Theme State - default dark to match InfoGraphics
-  const [theme, setTheme] = usePersistentState('cw_theme', 'dark');
+  // Theme - use shared theme for consistency across apps
+  const [theme, setThemeState] = useState(() => getTheme());
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    applyTheme(theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setThemeState(getTheme());
+    window.addEventListener('saas-theme-change', handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener('saas-theme-change', handler);
+    };
+  }, []);
 
   const [feedbackData, setFeedbackData] = useState(null);
   const [balanceData, setBalanceData] = useState(null);
@@ -208,12 +221,6 @@ function App() {
   // Show/Hide Background Colors Toggle
   const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
 
-  // Handler for saving API key
-  const handleSaveApiKey = (key) => {
-    setApiKey(key);
-    saveApiKeys({ openai: key });
-    setIsSettingsOpen(false);
-  };
 
   const handleAudienceFeedback = async (targetAudience, currentDocType) => {
     if (!apiKey) return;
@@ -501,29 +508,40 @@ function App() {
   return (
     <>
       <div className="app-container">
-        {/* Toolbar - InfoGraphics style */}
-        <header className="app-toolbar">
-          <span className="app-toolbar-logo">COLOR WRITER</span>
-          <div className="app-toolbar-spacer" />
-          <button
-            type="button"
-            className="app-toolbar-btn"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <button
-            type="button"
-            className="app-toolbar-btn"
-            onClick={() => setIsSettingsOpen(true)}
-            title="Settings"
-            aria-label="Open settings"
-          >
-            <Settings size={18} />
-          </button>
-        </header>
+        <AppTopBar
+          logo={<span className="app-toolbar-logo">COLOR WRITER</span>}
+          showProject={true}
+          projectProps={{
+            projects,
+            currentProjectId,
+            currentProjectName,
+          }}
+          showTabs={true}
+          tabProps={{
+            tabs,
+            currentTabId: activeTabId,
+            onSwitchTab: handleTabSelect,
+            onAddTab: handleTabAdd,
+            onRenameTab: handleTabRename,
+            onDeleteTab: handleTabDelete,
+            defaultTabName: 'Sales Page',
+            addTitle: 'Add tab',
+          }}
+          actions={
+            <>
+              <ThemeToggle theme={theme} onToggle={setThemeState} className="app-toolbar-btn" />
+              <button
+                type="button"
+                className="app-toolbar-btn"
+                onClick={() => setIsSettingsOpen(true)}
+                title="Settings"
+                aria-label="Open settings"
+              >
+                <Settings size={18} />
+              </button>
+            </>
+          }
+        />
 
         <Layout>
           <Sidebar
@@ -550,14 +568,6 @@ function App() {
           />
 
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, height: '100%', overflow: 'hidden' }}>
-            <TabBar
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onTabSelect={handleTabSelect}
-              onTabAdd={handleTabAdd}
-              onTabDelete={handleTabDelete}
-              onTabRename={handleTabRename}
-            />
             <div style={{ flexGrow: 1, overflow: 'hidden' }}>
               <Editor
                 content={content}
@@ -600,13 +610,12 @@ function App() {
         </Layout>
       </div>
 
-      {isSettingsOpen && (
-        <SettingsModal
-          apiKey={apiKey}
-          onSave={handleSaveApiKey}
-          onClose={() => setIsSettingsOpen(false)}
-        />
-      )}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        fields={['openai']}
+        onSave={() => setApiKey(loadApiKeys().openai || '')}
+      />
 
       {feedbackData && (
         <FeedbackModal

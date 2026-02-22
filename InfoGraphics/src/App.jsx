@@ -8,8 +8,10 @@ import RightPanel from './components/RightPanel'
 import GenerateInput from './components/GenerateInput'
 import Toolbar from './components/Toolbar'
 import ProjectSelector from './components/ProjectSelector'
-import TabBar from './components/TabBar'
-import SettingsModal, { loadApiKeys, saveApiKeys } from './components/SettingsModal'
+import TabBar from '@shared/TabBar/TabBar'
+import SettingsModal from '@shared/SettingsModal/SettingsModal'
+import { loadApiKeys } from '@shared/apiKeys'
+import { getTheme, initThemeSync } from '@shared/theme'
 import ShortcutsModal from './components/ShortcutsModal'
 import TemplateEditBanner from './components/TemplateEditBanner'
 import { LAYOUTS, applyLayout, applyLayoutWithContent, getLayoutSlotCount } from './layouts'
@@ -75,7 +77,7 @@ function App() {
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
-  const [theme, setTheme] = useState(() => localStorage.getItem('appTheme') || 'dark')
+  const [theme, setTheme] = useState(() => getTheme())
   const [apiKeys, setApiKeys] = useState({})
   useEffect(() => {
     setApiKeys(loadApiKeys())
@@ -163,11 +165,20 @@ function App() {
     if (savedBrandFont && typeof savedBrandFont === 'string') setBrandFontFamily(savedBrandFont)
   }, [])
 
-  // Apply theme to document and persist
+  // Apply theme to document (uses shared saas-apps-theme for global sync)
   useEffect(() => {
-    localStorage.setItem('appTheme', theme)
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const unsub = initThemeSync()
+    const handler = () => setTheme(getTheme())
+    window.addEventListener('saas-theme-change', handler)
+    return () => {
+      unsub?.()
+      window.removeEventListener('saas-theme-change', handler)
+    }
+  }, [])
 
   useEffect(() => {
     let projectList = projectStorage.loadProjects()
@@ -980,10 +991,6 @@ function App() {
     })
   }, [])
 
-  const handleSaveApiKeys = useCallback((keys) => {
-    saveApiKeys(keys)
-    setApiKeys(keys)
-  }, [])
 
   const handleAddImageToElement = useCallback(async (imageUrl, source, searchQuery, elementType) => {
     let finalUrl = imageUrl
@@ -1025,7 +1032,7 @@ function App() {
         onOpenSettings={() => setShowSettings(true)}
         onShowShortcuts={() => setShowShortcuts(true)}
         theme={theme}
-        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+        onToggleTheme={(next) => setTheme(next)}
         onAddElement={addElement}
         showTimeline={showTimeline}
         onToggleTimeline={() => setShowTimeline(v => !v)}
@@ -1051,11 +1058,12 @@ function App() {
       <TabBar
         tabs={currentProjectId ? projectStorage.getProjectTabs(currentProjectId) : []}
         currentTabId={currentTabId}
-        currentTabName={currentTabName}
         onSwitchTab={switchTab}
         onAddTab={addTab}
         onDeleteTab={deleteTab}
         onRenameTab={renameTab}
+        defaultTabName="Document"
+        addTitle="Add document"
       />
       <div className="app-main">
         <LeftPanel
@@ -1256,8 +1264,8 @@ function App() {
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        apiKeys={apiKeys}
-        onSave={handleSaveApiKeys}
+        fields={['openai', 'giphy', 'pixabay', 'pexels']}
+        onSave={() => setApiKeys(loadApiKeys())}
       />
       <ShortcutsModal
         isOpen={showShortcuts}

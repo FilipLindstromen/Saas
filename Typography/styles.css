@@ -137,6 +137,215 @@ body {
   display: none;
 }
 
+.header-project-area {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  max-width: 420px;
+}
+
+.header-project-area .project-selector {
+  min-width: 120px;
+}
+
+.header-project-area .project-selector-trigger {
+  width: auto;
+  min-width: 0;
+  border-radius: var(--button-radius) 0 0 0;
+  border-right: none;
+}
+
+.header-project-area .tab-bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0 0 var(--button-radius) var(--button-radius);
+  border-left: 1px solid var(--border-default);
+}
+
+.project-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.project-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.project-selector-trigger:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.project-selector-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-chevron {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.project-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 200px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.project-selector-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.project-selector-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.project-selector-item:hover {
+  background: var(--bg-hover);
+}
+
+.project-selector-item.active {
+  background: rgba(255, 107, 53, 0.15);
+  color: var(--accent);
+}
+
+.project-selector-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-selector-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: none;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.project-selector-new:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-top: none;
+  border-radius: 0 0 var(--button-radius) var(--button-radius);
+  min-height: 32px;
+}
+
+.tab-bar-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tab-bar-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-right: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+}
+
+.tab-bar-tab.active {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: -1px;
+}
+
+.tab-bar-tab-btn {
+  padding: 0.25rem 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-bar-tab-btn:hover {
+  background: var(--bg-hover);
+}
+
+.tab-bar-tab-close {
+  padding: 0.15rem 0.25rem;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.tab-bar-tab-close:hover {
+  color: var(--text-primary);
+}
+
+.tab-bar-add {
+  padding: 0.35rem 0.6rem;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tab-bar-add:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
 .header-spacer {
   flex: 1;
 }

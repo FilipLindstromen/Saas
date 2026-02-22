@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
+import TabBar from '@shared/TabBar/TabBar'
 
 type Step = 'script' | 'record' | 'edit'
 
@@ -70,9 +72,42 @@ export default function TopBar({
     }, 3000)
   }
 
+  const [projects] = useState([{ id: 'default', name: 'Untitled' }])
+  const [tabs, setTabs] = useState([{ id: '1', name: 'Recording 1' }])
+  const [activeTabId, setActiveTabId] = useState('1')
+
   return (
     <div className="bg-gray-800 h-12 flex items-center justify-between px-4 border-b border-gray-700">
       <div className="flex items-center gap-4">
+        <ProjectSelector
+          projects={projects}
+          currentProjectId="default"
+          currentProjectName={title || 'Untitled'}
+        />
+        <div className="flex items-center gap-1 min-w-[120px] max-w-[200px]">
+          <TabBar
+            tabs={tabs}
+            currentTabId={activeTabId}
+            onSwitchTab={setActiveTabId}
+            onAddTab={() => {
+              const id = 't_' + Date.now()
+              setTabs((prev) => [...prev, { id, name: 'Recording ' + (prev.length + 1) }])
+              setActiveTabId(id)
+            }}
+            onRenameTab={(tabId, name) => {
+              setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, name } : t)))
+            }}
+            onDeleteTab={(tabId) => {
+              if (tabs.length <= 1) return
+              const nextTabs = tabs.filter((t) => t.id !== tabId)
+              const nextActive = activeTabId === tabId ? (nextTabs[0]?.id ?? '1') : activeTabId
+              setTabs(nextTabs)
+              setActiveTabId(nextActive)
+            }}
+            defaultTabName="Recording"
+            addTitle="Add recording"
+          />
+        </div>
         {/* Project Menu */}
         <div className="relative">
           <button

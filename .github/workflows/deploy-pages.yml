@@ -32,6 +32,7 @@ jobs:
           cp docs/index.html deploy/
           cp docs/.nojekyll deploy/
           cp docs/robots.txt deploy/
+          cp -r docs/assets deploy/
           cp -r conversation-generator deploy/
           cp -r Typography deploy/
           cp -r VSLWriter deploy/
@@ -77,6 +78,14 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PitchDeck/
           cp -r dist ../deploy/PitchDeck
+
+      - name: Build Video Quiz
+        run: |
+          cd VideoQuiz/app
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/VideoQuiz/
+          mkdir -p ../../deploy/VideoQuiz
+          cp -r dist/* ../../deploy/VideoQuiz/
 
       - name: Build Video Recorder
         run: |

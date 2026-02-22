@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import ThemeToggle from '@shared/ThemeToggle';
 import {
   FileText,
   Settings,
   FileEdit,
-  Sun,
-  Moon,
   Plus,
   Sparkles,
   ClipboardList,
@@ -21,6 +20,7 @@ import {
   FileCheck,
 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
+import ProjectSelector from '@shared/ProjectSelector/ProjectSelector';
 import { DEFAULT_INSTRUCTIONS } from './constants';
 import {
   getApiKey,
@@ -33,12 +33,10 @@ import {
   setActiveProjectId,
   getActiveDocId,
   setActiveDocId,
-  getTheme,
-  setTheme,
   type ProjectData,
   type DocumentData,
-  type Theme,
 } from './storage';
+import { getTheme, setTheme, initThemeSync } from '@shared/theme';
 import { generateWithOpenAI } from './api';
 import './App.css';
 
@@ -76,7 +74,7 @@ export default function App() {
   const [projects, setProjectsState] = useState<ProjectData[]>([]);
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [activeDocId, setActiveDocIdState] = useState<string | null>(null);
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => getTheme());
   const [showSettings, setShowSettings] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -114,6 +112,16 @@ export default function App() {
     setThemeState(getTheme());
     setApiKeyInput(getApiKey());
     setInstructionsInput(getInstructions() || DEFAULT_INSTRUCTIONS);
+  }, []);
+
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setThemeState(getTheme());
+    window.addEventListener('saas-theme-change', handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener('saas-theme-change', handler);
+    };
   }, []);
 
   // Apply theme
@@ -201,8 +209,8 @@ export default function App() {
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
-    setThemeState(next);
     setTheme(next);
+    setThemeState(next);
   };
 
   return (
@@ -213,6 +221,48 @@ export default function App() {
             <FileText size={24} strokeWidth={2} />
             CopyWriter
           </div>
+          <ProjectSelector
+            projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+            currentProjectId={activeProjectId ?? ''}
+            currentProjectName={activeProject?.name ?? 'Untitled'}
+            onSwitchProject={(id) => {
+              setActiveProjectIdState(id);
+              setActiveProjectId(id);
+              const proj = projects.find((p) => p.id === id);
+              if (proj?.documents[0]) {
+                setActiveDocIdState(proj.documents[0].id);
+                setActiveDocId(proj.documents[0].id);
+              }
+            }}
+            onCreateProject={() => {
+              const proj = createProject('New Project');
+              setProjectsState((prev) => [...prev, proj]);
+              setActiveProjectIdState(proj.id);
+              setActiveDocIdState(proj.documents[0].id);
+              setActiveProjectId(proj.id);
+              setActiveDocId(proj.documents[0].id);
+            }}
+            onRenameProject={(id, name) => {
+              setProjectsState((prev) =>
+                prev.map((p) => (p.id === id ? { ...p, name } : p))
+              );
+            }}
+            onDeleteProject={(id) => {
+              if (projects.length <= 1) return;
+              const idx = projects.findIndex((p) => p.id === id);
+              const nextId = idx > 0 ? projects[idx - 1].id : projects[idx + 1]?.id;
+              setProjectsState((prev) => prev.filter((p) => p.id !== id));
+              if (id === activeProjectId && nextId) {
+                setActiveProjectIdState(nextId);
+                setActiveProjectId(nextId);
+                const proj = projects.find((p) => p.id === nextId);
+                if (proj?.documents[0]) {
+                  setActiveDocIdState(proj.documents[0].id);
+                  setActiveDocId(proj.documents[0].id);
+                }
+              }
+            }}
+          />
         </div>
         <div className="headerRight">
           <button
@@ -229,13 +279,7 @@ export default function App() {
           >
             <Settings size={20} />
           </button>
-          <button
-            className="iconBtn themeBtn"
-            onClick={toggleTheme}
-            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
-          >
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
+          <ThemeToggle theme={theme} onToggle={(t) => { setTheme(t); setThemeState(t); }} className="iconBtn themeBtn" />
         </div>
       </header>
 

@@ -42,6 +42,12 @@
   margin: 0;
 }
 
+.headerTabBar {
+  flex: 1;
+  min-width: 120px;
+  max-width: 280px;
+}
+
 .headerCenter {
   flex: 1;
   min-width: 0;

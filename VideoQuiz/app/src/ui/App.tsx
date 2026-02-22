@@ -1,4 +1,9 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AppTopBar from '@shared/AppTopBar/AppTopBar'
+import ThemeToggle from '@shared/ThemeToggle'
+import SettingsModal from '@shared/SettingsModal/SettingsModal'
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
+import { getTheme, initThemeSync } from '@shared/theme'
 import { useQuizState, createBooleanQuestion, createMultipleChoiceQuestion } from '../state'
 import { useMemeState } from '../memeState'
 import { QuizQuestion, QuizData, QuizAnswer, AspectRatio, MemeData, QuizBackground, QuizSettings, OverlayTextItem, OverlaySettings, OverlayAnimation, OverlayHorizontalAlign, OverlayVerticalPosition } from '../types'
@@ -65,8 +70,33 @@ export function App() {
   const [customInstructions, setCustomInstructions] = useState(() => localStorage.getItem('customInstructions') || '')
   const [idea, setIdea] = useState(() => localStorage.getItem('idea') || '')
   const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false)
-  const [openaiApiKey, setOpenaiApiKey] = useState(() => localStorage.getItem('openaiApiKey') || '')
+  const [openaiApiKey, setOpenaiApiKey] = useState(() => loadApiKeys().openai || '')
+  const [theme, setTheme] = useState(() => getTheme())
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [projects] = useState([{ id: 'default', name: 'Untitled' }])
+  const [tabs, setTabs] = useState([{ id: '1', name: 'Quiz 1' }])
+  const [activeTabId, setActiveTabId] = useState('1')
   const [showAIModal, setShowAIModal] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    const unsub = initThemeSync()
+    const handler = () => setTheme(getTheme())
+    window.addEventListener('saas-theme-change', handler)
+    return () => {
+      unsub?.()
+      window.removeEventListener('saas-theme-change', handler)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setOpenaiApiKey(loadApiKeys().openai || '')
+    }
+  }, [isSettingsOpen])
   const [isGeneratingVoiceOvers, setIsGeneratingVoiceOvers] = useState(false)
   const [voiceOverStatus, setVoiceOverStatus] = useState<string | null>(null)
   const [selectedVoice, setSelectedVoice] = useState<string>(() => localStorage.getItem('selectedVoice') || 'alloy')
@@ -321,7 +351,7 @@ export function App() {
 
   const persistOpenaiApiKey = (value: string) => {
     setOpenaiApiKey(value)
-    try { localStorage.setItem('openaiApiKey', value) } catch {}
+    saveApiKeys({ openai: value })
   }
 
   const savePreviousBackground = (type: 'image' | 'video', url: string) => {
@@ -877,7 +907,56 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
   }
 
   return (
-    <div className="min-h-screen bg-iosbg text-iostext">
+    <div className="videoquiz-app min-h-screen text-iostext">
+      <AppTopBar
+        logo={<span className="font-semibold text-iostext">Video Quiz</span>}
+        showProject
+        projectProps={{
+          projects,
+          currentProjectId: 'default',
+          currentProjectName: 'Untitled',
+        }}
+        showTabs
+        tabProps={{
+          tabs,
+          currentTabId: activeTabId,
+          onSwitchTab: setActiveTabId,
+          onAddTab: () => {
+            const id = 't_' + Date.now()
+            setTabs((prev) => [...prev, { id, name: 'Quiz ' + (prev.length + 1) }])
+            setActiveTabId(id)
+          },
+          onRenameTab: (tabId, name) => {
+            setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, name } : t)))
+          },
+          onDeleteTab: (tabId) => {
+            if (tabs.length <= 1) return
+            const nextTabs = tabs.filter((t) => t.id !== tabId)
+            const nextActive = activeTabId === tabId ? (nextTabs[0]?.id ?? '1') : activeTabId
+            setTabs(nextTabs)
+            setActiveTabId(nextActive)
+          },
+          defaultTabName: 'Quiz',
+          addTitle: 'Add quiz',
+        }}
+        actions={
+          <>
+            <ThemeToggle theme={theme} onToggle={setTheme} className="videoquiz-toolbar-btn" />
+            <button
+              type="button"
+              className="videoquiz-toolbar-btn"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Settings"
+              aria-label="Open settings"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          </>
+        }
+      />
       <div className="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left Editor */}
         <div className="ios-card p-4 h-[85vh] overflow-y-auto scroll-thin">
@@ -2556,6 +2635,12 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
         onApiKeyChange={persistOpenaiApiKey}
       />
 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        fields={['openai', 'pexels', 'pixabay', 'unsplash']}
+        onSave={() => setOpenaiApiKey(loadApiKeys().openai || '')}
+      />
     </div>
   )
 }

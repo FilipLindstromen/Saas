@@ -9,6 +9,23 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --bg-primary: #0d0d0d;
+  --bg-secondary: #171717;
+  --bg-tertiary: #262626;
+  --bg-elevated: #262626;
+  --bg-hover: #333;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #e5e5e5;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: #737373;
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --header-inset: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --card-radius: 16px;
+  --button-radius: 12px;
 }
 
 a {

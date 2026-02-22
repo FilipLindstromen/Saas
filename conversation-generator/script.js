@@ -2,23 +2,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const PS = window.ConversationProjectStorage;
     const API_KEYS = window.ConversationApiKeys;
 
-    // Theme Toggle
+    // Theme Toggle - global saas-apps-theme (syncs across all apps)
+    const STORAGE_KEY = 'saas-apps-theme';
     const themeToggle = document.getElementById('theme-toggle');
+    const themeIconEl = themeToggle && themeToggle.querySelector('.theme-icon-svg');
     const html = document.documentElement;
-    const themeIcon = themeToggle.querySelector('.theme-icon');
-    
-    // Load saved theme or default to dark
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    html.setAttribute('data-theme', savedTheme);
-    themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-    
-    themeToggle.addEventListener('click', () => {
-        const currentTheme = html.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', newTheme);
-        themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
-        localStorage.setItem('theme', newTheme);
+
+    function migrateTheme() {
+        if (localStorage.getItem(STORAGE_KEY)) return;
+        var keys = ['theme', 'appTheme', 'typographyTheme', 'cw_theme', 'reelRecorderTheme'];
+        for (var i = 0; i < keys.length; i++) {
+            var v = localStorage.getItem(keys[i]);
+            if (v === 'light' || v === 'dark') {
+                localStorage.setItem(STORAGE_KEY, v);
+                return;
+            }
+        }
+    }
+    function getTheme() {
+        migrateTheme();
+        var t = localStorage.getItem(STORAGE_KEY);
+        if (t === 'light' || t === 'dark') return t;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function setTheme(theme) {
+        html.setAttribute('data-theme', theme);
+        localStorage.setItem(STORAGE_KEY, theme);
+        if (themeIconEl) {
+            themeIconEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+        }
+    }
+    var SUN_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+    var MOON_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+    setTheme(getTheme());
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function() {
+            setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+        });
+    }
+    window.addEventListener('storage', function(e) {
+        if (e.key === STORAGE_KEY && (e.newValue === 'light' || e.newValue === 'dark')) {
+            html.setAttribute('data-theme', e.newValue);
+            if (themeIconEl) themeIconEl.innerHTML = e.newValue === 'dark' ? SUN_SVG : MOON_SVG;
+        }
     });
+
+    // Settings button (direct open)
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => openSettingsOverlay());
+    }
     
     const messagesScriptContainer = document.getElementById('messages-script');
     const addMessageBtn = document.getElementById('add-message-btn');

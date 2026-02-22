@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
+import { getTheme, setTheme as setSharedTheme, initThemeSync } from '@shared/theme'
+import ThemeToggle from '@shared/ThemeToggle'
 import SlideList from './components/SlideList'
 import SlidePreview from './components/SlidePreview'
 import PlayMode from './components/PlayMode'
@@ -117,10 +119,7 @@ function App() {
     const saved = localStorage.getItem('analysisFolded')
     return saved === 'true'
   })
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('appTheme')
-    return saved || 'dark'
-  })
+  const [theme, setTheme] = useState(() => getTheme())
   const [showProjectOverview, setShowProjectOverview] = useState(false)
   const [analyzeThisRecording, setAnalyzeThisRecording] = useState(false)
   const analyzeAfterRecordingRef = useRef(false)
@@ -546,16 +545,20 @@ function App() {
     localStorage.setItem('analysisFolded', analysisFolded.toString())
   }, [analysisFolded])
 
-  // Save theme to localStorage and apply to document
+  // Apply theme to document when it changes
   useEffect(() => {
-    localStorage.setItem('appTheme', theme)
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  // Apply theme on initial load
+  // Sync theme with shared saas-apps-theme (global across apps)
   useEffect(() => {
-    const savedTheme = localStorage.getItem('appTheme') || 'dark'
-    document.documentElement.setAttribute('data-theme', savedTheme)
+    const unsub = initThemeSync()
+    const handler = () => setTheme(getTheme())
+    window.addEventListener('saas-theme-change', handler)
+    return () => {
+      unsub?.()
+      window.removeEventListener('saas-theme-change', handler)
+    }
   }, [])
 
   // Save settings to localStorage (API keys go to shared storage)
@@ -1780,9 +1783,29 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
 
   const selectedSlide = slides.find(s => s.id === selectedSlideId)
 
-  // Present: open present view and go fullscreen (one button, one action)
+  // Present: open present view and fullscreen (one button, one action)
   const handlePresentClick = () => {
     setMode('present')
+  }
+
+  const handleCommandPaletteAction = (action, arg) => {
+    switch (action) {
+      case 'undo': undo(); break
+      case 'redo': redo(); break
+      case 'newSlide': addSlide(); break
+      case 'duplicateSlide': duplicateSlide(selectedSlideId); break
+      case 'deleteSlide': deleteSlide(selectedSlideId); break
+      case 'analyze': runAnalyze(); break
+      case 'export': handleExportFile(); break
+      case 'import': handleImportFile(); break
+      case 'settings': setShowSettings(true); break
+      case 'transitions': setInspectorTab('transitions'); break
+      case 'toggleTheme': setSharedTheme(theme === 'dark' ? 'light' : 'dark'); break
+      case 'present': setMode('present'); break
+      case 'goToSlide': if (arg) setSelectedSlideId(arg); break
+      case 'switchChapter': if (arg) setCurrentChapterId(arg); break
+      default: break
+    }
   }
 
   // Record: start screen recording in-place (no present mode, no fullscreen)
@@ -2329,29 +2352,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   </svg>
                   <span className="btn-tooltip">Export text</span>
                 </button>
-                <button 
-                  className="btn-icon-header btn-theme-toggle" 
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-                  title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                >
-                  {theme === 'dark' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="5" />
-                      <line x1="12" y1="1" x2="12" y2="3" />
-                      <line x1="12" y1="21" x2="12" y2="23" />
-                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                      <line x1="1" y1="12" x2="3" y2="12" />
-                      <line x1="21" y1="12" x2="23" y2="12" />
-                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
-                  )}
-                </button>
+                <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
@@ -2660,29 +2661,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   </svg>
                   <span className="btn-tooltip">Export text</span>
                 </button>
-                <button 
-                  className="btn-icon-header btn-theme-toggle" 
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-                  title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                >
-                  {theme === 'dark' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="5" />
-                      <line x1="12" y1="1" x2="12" y2="3" />
-                      <line x1="12" y1="21" x2="12" y2="23" />
-                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                      <line x1="1" y1="12" x2="3" y2="12" />
-                      <line x1="21" y1="12" x2="23" y2="12" />
-                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
-                  )}
-                </button>
+                <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />

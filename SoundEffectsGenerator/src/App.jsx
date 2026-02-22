@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { transcribe, analyzeImportant, generateEffect } from './services/api';
 import SettingsModal from './components/SettingsModal';
+import AppTopBar from '@shared/AppTopBar/AppTopBar';
 import { loadAppState, saveAppState } from './utils/persistence';
 import JSZip from 'jszip';
 import './App.css';
@@ -655,15 +656,50 @@ function App() {
     URL.revokeObjectURL(a.href);
   };
 
+  const [projects] = useState([{ id: 'default', name: 'Untitled' }]);
+  const [tabs, setTabs] = useState([{ id: '1', name: 'Project 1' }]);
+  const [activeTabId, setActiveTabId] = useState('1');
+
   return (
     <div className="app">
-      <header className="header">
-        <div className="header-content">
-          <div>
+      <AppTopBar
+        logo={
+          <div className="header-content">
             <h1>Sound effects from voice-over</h1>
             <p>Upload audio → Transcribe (OpenAI) → Mark important parts → Generate effects (ElevenLabs) → Export</p>
             <p className="services-note">Transcription: OpenAI only · Sound effects: ElevenLabs only</p>
           </div>
+        }
+        showProject={true}
+        projectProps={{
+          projects,
+          currentProjectId: 'default',
+          currentProjectName: 'Untitled',
+        }}
+        showTabs={true}
+        tabProps={{
+          tabs,
+          currentTabId: activeTabId,
+          onSwitchTab: setActiveTabId,
+          onAddTab: () => {
+            const id = 't_' + Date.now();
+            setTabs((prev) => [...prev, { id, name: 'Project ' + (prev.length + 1) }]);
+            setActiveTabId(id);
+          },
+          onRenameTab: (tabId, name) => {
+            setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, name } : t)));
+          },
+          onDeleteTab: (tabId) => {
+            if (tabs.length <= 1) return;
+            const nextTabs = tabs.filter((t) => t.id !== tabId);
+            const nextActive = activeTabId === tabId ? (nextTabs[0]?.id ?? '1') : activeTabId;
+            setTabs(nextTabs);
+            setActiveTabId(nextActive);
+          },
+          defaultTabName: 'Project',
+          addTitle: 'Add project',
+        }}
+        actions={
           <div className="header-actions">
             {ambientSegments.length > 0 && (
               <button
@@ -745,8 +781,8 @@ function App() {
             Settings
           </button>
           </div>
-        </div>
-      </header>
+        }
+      />
       {!backendTipDismissed && (
         <div className="backend-tip" role="status">
           <span>Start the backend so Transcribe works: run <code>npm run dev:all</code> in the project folder (runs frontend + backend), or in a second terminal run <code>npm run server</code>.</span>

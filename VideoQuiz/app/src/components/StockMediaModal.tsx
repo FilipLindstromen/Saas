@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { API_KEYS } from '../config/apiKeys'
+import { getApiKeys } from '../config/apiKeys'
 
 interface StockImage {
   id: string
@@ -46,25 +46,25 @@ export function StockMediaModal({
   const [selectedSource, setSelectedSource] = useState<'pexels' | 'unsplash' | 'pixabay'>('pexels')
   const [page, setPage] = useState(1)
 
-  // Use API keys from config
-  const PEXELS_API_KEY = API_KEYS.PEXELS_API_KEY
-  const UNSPLASH_API_KEY = API_KEYS.UNSPLASH_API_KEY
-  const PIXABAY_API_KEY = API_KEYS.PIXABAY_API_KEY
+  // Use shared API keys (configure in Settings on main app screen)
+  const apiKeys = getApiKeys()
+  const PEXELS_API_KEY = apiKeys.pexels || ''
+  const UNSPLASH_API_KEY = apiKeys.unsplash || ''
+  const PIXABAY_API_KEY = apiKeys.pixabay || ''
 
   const searchMedia = async (query: string, pageNum: number = 1) => {
     if (!query.trim()) return
     
-    // Check if API keys are configured
-    if (selectedSource === 'pexels' && PEXELS_API_KEY === 'YOUR_PEXELS_API_KEY_HERE') {
-      alert('Please configure your Pexels API key in src/config/apiKeys.ts to use Pexels media.')
+    if (selectedSource === 'pexels' && !PEXELS_API_KEY.trim()) {
+      alert('Please add your Pexels API key in Settings (gear icon on the main app screen).')
       return
     }
-    if (selectedSource === 'unsplash' && UNSPLASH_API_KEY === 'YOUR_UNSPLASH_API_KEY_HERE') {
-      alert('Please configure your Unsplash API key in src/config/apiKeys.ts to use Unsplash media.')
+    if (selectedSource === 'unsplash' && !UNSPLASH_API_KEY.trim()) {
+      alert('Please add your Unsplash API key in Settings (gear icon on the main app screen).')
       return
     }
-    if (selectedSource === 'pixabay' && PIXABAY_API_KEY === 'YOUR_PIXABAY_API_KEY_HERE') {
-      alert('Please configure your Pixabay API key in src/config/apiKeys.ts to use Pixabay media.')
+    if (selectedSource === 'pixabay' && !PIXABAY_API_KEY.trim()) {
+      alert('Please add your Pixabay API key in Settings (gear icon on the main app screen).')
       return
     }
     

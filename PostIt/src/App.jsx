@@ -5,6 +5,9 @@ import { createHistory } from './utils/undoRedo';
 import { GOOGLE_FONTS, POSTIT_COLORS, POSTIT_WIDTH, POSTIT_MIN_HEIGHT, OPENAI_API_KEY_STORAGE } from './constants';
 import { TEMPLATES } from './templates';
 import { suggestIconForNote } from './services/openai';
+import ProjectSelector from '@shared/ProjectSelector/ProjectSelector';
+import ThemeToggle from '@shared/ThemeToggle';
+import { getTheme, setTheme, initThemeSync } from '@shared/theme';
 import './App.css';
 
 const defaultPage = () => ({
@@ -26,11 +29,13 @@ const defaultState = {
 
 function getInitialState() {
   const saved = loadState();
+  const theme = getTheme();
   if (saved?.pages?.length) {
     saved.currentPageId = saved.currentPageId ?? saved.pages[0].id;
+    saved.theme = theme;
     return saved;
   }
-  const state = { ...defaultState, pages: [defaultPage()] };
+  const state = { ...defaultState, theme, pages: [defaultPage()] };
   state.currentPageId = state.pages[0].id;
   return state;
 }
@@ -73,6 +78,20 @@ export default function App() {
       return nextState;
     });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', state.theme);
+  }, [state.theme]);
+
+  useEffect(() => {
+    const unsub = initThemeSync();
+    const handler = () => setStateAndSave((prev) => ({ ...prev, theme: getTheme() }));
+    window.addEventListener('saas-theme-change', handler);
+    return () => {
+      unsub?.();
+      window.removeEventListener('saas-theme-change', handler);
+    };
+  }, [setStateAndSave]);
 
   const updatePage = useCallback(
     (updater, opts) => {
@@ -258,6 +277,11 @@ export default function App() {
       <header className="app-header">
         <div className="app-header-left">
           <span className="app-logo">PostIt</span>
+          <ProjectSelector
+            projects={[{ id: 'default', name: 'Untitled' }]}
+            currentProjectId="default"
+            currentProjectName="Untitled"
+          />
           <button
             type="button"
             className="app-btn app-btn-pages"
@@ -389,13 +413,11 @@ export default function App() {
             </div>
           )}
           <button
-            type="button"
+            <ThemeToggle
+            theme={state.theme}
+            onToggle={(next) => { setTheme(next); setStateAndSave((prev) => ({ ...prev, theme: next })); }}
             className="app-btn app-btn-theme"
-            onClick={() => setStateAndSave((prev) => ({ ...prev, theme: prev.theme === 'light' ? 'dark' : 'light' }))}
-            title={state.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-          >
-            {state.theme === 'light' ? 'Dark' : 'Light'}
-          </button>
+          />
         </div>
       </header>
       <Board

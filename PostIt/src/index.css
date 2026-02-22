@@ -1,3 +1,23 @@
+:root {
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f0f0f2;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e8e8ec;
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --text-primary: #1a1a1a;
+  --text-secondary: rgba(0, 0, 0, 0.85);
+  --text-tertiary: #6b7280;
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-secondary: #ff4757;
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --card-radius: 16px;
+  --button-radius: 12px;
+}
+
 *,
 *::before,
 *::after {
@@ -29,6 +49,17 @@ button {
 
 .app--dark {
   background: #17181c;
+  --bg-primary: #17181c;
+  --bg-secondary: #1e2025;
+  --bg-tertiary: #25282f;
+  --bg-elevated: #2a2d36;
+  --bg-hover: #32363f;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #fafafa;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: rgba(255, 255, 255, 0.65);
 }
 
 .app-header {

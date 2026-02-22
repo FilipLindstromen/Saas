@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getSettings } from './utils/settings';
+import { getSettings, saveSettings, PRESENTATION_FONTS } from './utils/settings';
 import { normalizeStoryData } from './utils/persistence';
-import { saveSettings } from './utils/settings';
 import * as projectStorage from './utils/projectStorage';
 import {
   getDefaultSectionOrder,
@@ -11,8 +10,8 @@ import {
 } from './constants/frameworks';
 import { getSentenceStarts } from './utils/sentences';
 import { generateFullStory } from './services/openai';
-import { searchUnsplashFirst } from './services/unsplash';
-import SettingsModal from './components/SettingsModal';
+import { searchUnsplashFirst } from '@shared/stockMedia/unsplash';
+import SettingsModal from '@shared/SettingsModal/SettingsModal';
 import FontSettingsPopover from './components/FontSettingsPopover';
 import RecordingOptionsPopover from './components/RecordingOptionsPopover';
 import BackgroundAnimationPopover from './components/BackgroundAnimationPopover';
@@ -21,7 +20,7 @@ import EditView from './components/EditView';
 import PresentView from './components/PresentView';
 import RambleRecorder from './components/RambleRecorder';
 import ProjectSelector from './components/ProjectSelector';
-import TabBar from './components/TabBar';
+import TabBar from '@shared/TabBar/TabBar';
 import './App.css';
 
 const INPUT_PANEL_MIN = 280;
@@ -55,6 +54,8 @@ function App() {
   const [currentTabId, setCurrentTabId] = useState(null);
   const [currentTabName, setCurrentTabName] = useState('Story 1');
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [settingsPresentationFont, setSettingsPresentationFont] = useState('Poppins');
+  const [settingsPresentationSize, setSettingsPresentationSize] = useState('medium');
   const resizeStartRef = useRef({ x: 0, width: 0 });
   const persistedRef = useRef(persisted);
   persistedRef.current = persisted;
@@ -150,6 +151,14 @@ function App() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [saveCurrentProjectToStorage]);
+
+  useEffect(() => {
+    if (settingsOpen) {
+      const s = getSettings();
+      setSettingsPresentationFont(s.presentationFont || 'Poppins');
+      setSettingsPresentationSize(s.presentationFontSize || 'medium');
+    }
+  }, [settingsOpen]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -483,12 +492,13 @@ function App() {
       <TabBar
         tabs={currentProjectId ? projectStorage.getProjectTabs(currentProjectId) : []}
         currentTabId={currentTabId}
-        currentTabName={currentTabName}
         onSwitchTab={switchTab}
         onAddTab={addTab}
         onDeleteTab={deleteTab}
         onRenameTab={renameTab}
         disabled={!hasHydrated}
+        defaultTabName="Story"
+        addTitle="Add story"
       />
 
       {view === 'write' && (
@@ -656,7 +666,43 @@ function App() {
         />
       )}
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        fields={['openai', 'unsplash']}
+        onSave={() => {
+          saveSettings({
+            ...getSettings(),
+            presentationFont: settingsPresentationFont,
+            presentationFontSize: settingsPresentationSize,
+          });
+        }}
+      >
+        <div className="shared-settings-field">
+          <label htmlFor="sw-presentation-font">Presentation font</label>
+          <select
+            id="sw-presentation-font"
+            value={settingsPresentationFont}
+            onChange={(e) => setSettingsPresentationFont(e.target.value)}
+          >
+            {PRESENTATION_FONTS.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </div>
+        <div className="shared-settings-field">
+          <label htmlFor="sw-presentation-size">Presentation size</label>
+          <select
+            id="sw-presentation-size"
+            value={settingsPresentationSize}
+            onChange={(e) => setSettingsPresentationSize(e.target.value)}
+          >
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </div>
+      </SettingsModal>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './QuizPreview.css'
 
-function QuizPreview({ quizData, isOpen, onClose, typography, theme }) {
+function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = false }) {
   const [step, setStep] = useState('title')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedTags, setSelectedTags] = useState([])
@@ -199,7 +199,32 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme }) {
     )
   }
 
-  if (!isOpen) return null
+  if (!embedded && !isOpen) return null
+
+  const previewContent = (
+    <div className={`preview-content-wrapper ${embedded ? 'preview-embedded' : ''}`}>
+      {step === 'title' && renderTitle()}
+      {step === 'quiz' && renderQuestion()}
+      {step === 'result' && renderResult()}
+    </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="quiz-canvas">
+        <div className="quiz-canvas-inner">
+          {previewContent}
+          {step !== 'title' && (
+            <div className="quiz-canvas-controls">
+              <button onClick={resetPreview} className="btn-secondary btn-sm">
+                Reset
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="preview-overlay" onClick={onClose}>
@@ -209,9 +234,7 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme }) {
           <button className="preview-close-btn" onClick={onClose}>×</button>
         </div>
         <div className="preview-content">
-          {step === 'title' && renderTitle()}
-          {step === 'quiz' && renderQuestion()}
-          {step === 'result' && renderResult()}
+          {previewContent}
         </div>
         {step !== 'title' && (
           <div className="preview-controls">

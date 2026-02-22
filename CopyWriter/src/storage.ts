@@ -1,10 +1,10 @@
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+
 const STORAGE_KEYS = {
-  API_KEY: 'copywriter_api_key',
   INSTRUCTIONS: 'copywriter_instructions',
   PROJECTS: 'copywriter_projects',
   ACTIVE_PROJECT: 'copywriter_active_project',
   ACTIVE_DOC: 'copywriter_active_doc',
-  THEME: 'copywriter_theme',
 } as const;
 
 export type Theme = 'light' | 'dark';
@@ -31,11 +31,11 @@ export interface ProjectData {
 }
 
 export function getApiKey(): string {
-  return localStorage.getItem(STORAGE_KEYS.API_KEY) ?? '';
+  return loadApiKeys().openai ?? '';
 }
 
 export function setApiKey(key: string): void {
-  localStorage.setItem(STORAGE_KEYS.API_KEY, key);
+  saveApiKeys({ openai: key });
 }
 
 export function getInstructions(): string {
@@ -77,12 +77,3 @@ export function setActiveDocId(id: string | null): void {
   else localStorage.removeItem(STORAGE_KEYS.ACTIVE_DOC);
 }
 
-export function getTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEYS.THEME);
-  if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-export function setTheme(theme: Theme): void {
-  localStorage.setItem(STORAGE_KEYS.THEME, theme);
-}

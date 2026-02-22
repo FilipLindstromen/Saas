@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { API_KEYS } from '../config/apiKeys'
+import { getApiKeys } from '../config/apiKeys'
 // Real music URLs - no audio generation needed
 
 interface PixabayMusicModalProps {
@@ -38,8 +38,9 @@ export function PixabayMusicModal({ isOpen, onClose, onSelectMusic }: PixabayMus
   const [error, setError] = useState('')
 
   const searchMusic = async (query: string = searchQuery) => {
-    if (!API_KEYS.PIXABAY_API_KEY || API_KEYS.PIXABAY_API_KEY === 'YOUR_PIXABAY_API_KEY_HERE') {
-      setError('Please configure your Pixabay API key in src/config/apiKeys.ts')
+    const pixabayKey = getApiKeys().pixabay || ''
+    if (!pixabayKey.trim()) {
+      setError('Please add your Pixabay API key in Settings (gear icon on the main app screen).')
       return
     }
 
@@ -48,7 +49,7 @@ export function PixabayMusicModal({ isOpen, onClose, onSelectMusic }: PixabayMus
 
     try {
       const response = await fetch(
-        `https://pixabay.com/api/videos/?key=${API_KEYS.PIXABAY_API_KEY}&q=${encodeURIComponent(query)}&safesearch=true&per_page=20`
+        `https://pixabay.com/api/videos/?key=${pixabayKey}&q=${encodeURIComponent(query)}&safesearch=true&per_page=20`
       )
       
       if (!response.ok) {

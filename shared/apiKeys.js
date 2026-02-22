@@ -59,6 +59,31 @@ function migrateFromLegacy() {
     const pwOpenai = localStorage.getItem('powerwriter.openaiKey')
     if (pwOpenai) merged.openai = merged.openai || pwOpenai
 
+    // VideoQuiz
+    const vqOpenai = localStorage.getItem('openaiApiKey')
+    if (vqOpenai) merged.openai = merged.openai || vqOpenai
+
+    // CopyWriter
+    const cwApiKey = localStorage.getItem('copywriter_api_key')
+    if (cwApiKey) merged.openai = merged.openai || cwApiKey
+
+    // VIdeoRecorder
+    const vrOpenai = localStorage.getItem('openai_api_key')
+    if (vrOpenai) merged.openai = merged.openai || vrOpenai
+
+    // VSLWriter
+    const vslOpenai = localStorage.getItem('vsl_openai_key')
+    if (vslOpenai) merged.openai = merged.openai || vslOpenai
+
+    // SoundEffectsGenerator
+    const seRaw = localStorage.getItem('soundeffects_settings')
+    if (seRaw) {
+      try {
+        const parsed = JSON.parse(seRaw)
+        if (parsed.openaiApiKey) merged.openai = merged.openai || parsed.openaiApiKey
+      } catch {}
+    }
+
     return merged
   } catch (e) {
     return merged
