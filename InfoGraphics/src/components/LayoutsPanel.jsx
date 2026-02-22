@@ -8,6 +8,7 @@ export default function LayoutsPanel({
   selectedLayoutId,
   onSelectLayout,
   onApplyLayout,
+  onApplyLayoutEmpty,
   customTemplates = [],
   onCustomTemplatesChange,
   onEnterTemplateMode,
@@ -98,10 +99,23 @@ export default function LayoutsPanel({
         </div>
       )}
 
-      {onApplyLayout && selectedLayoutId && (
-        <p className="layouts-apply-hint">
-          Or <button type="button" className="layouts-apply-link" onClick={() => onApplyLayout(selectedLayoutId)}>apply template now</button> without generating.
-        </p>
+      {selectedLayoutId && (
+        <div className="layouts-apply-actions">
+          {onApplyLayoutEmpty && (
+            <button
+              type="button"
+              className="layouts-add-empty-btn"
+              onClick={() => onApplyLayoutEmpty(selectedLayoutId)}
+            >
+              Add empty template
+            </button>
+          )}
+          {onApplyLayout && (
+            <p className="layouts-apply-hint">
+              Or <button type="button" className="layouts-apply-link" onClick={() => onApplyLayout(selectedLayoutId)}>apply template now</button> with placeholder text.
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

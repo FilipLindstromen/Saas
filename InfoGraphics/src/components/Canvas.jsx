@@ -336,6 +336,14 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
           () => { rotateHandleRef.current = null; setRotateHandle(null); document.body.style.cursor = '' }
         )
       }
+    } else if (handle === 'flip' && selectedIds.length === 1 && selectedIds[0] === id) {
+      e.preventDefault()
+      e.stopPropagation()
+      onPushUndo?.()
+      const el = elements.find(x => x.id === id)
+      if (el) {
+        onUpdate(id, { imageFlipHorizontal: !el.imageFlipHorizontal })
+      }
     } else if (handle && selectedIds.length === 1 && selectedIds[0] === id) {
       e.preventDefault()
       onPushUndo?.()
@@ -357,7 +365,7 @@ export default function Canvas({ aspectRatio, resolution, elements, currentTime 
         onSelect([id])
       }
     }
-  }, [elements, selectedIds, onSelect, onPushUndo, onUpdateMultiple, attachGlobalListeners, handlePointerMove, size, canvasRef])
+  }, [elements, selectedIds, onSelect, onPushUndo, onUpdate, onUpdateMultiple, attachGlobalListeners, handlePointerMove, size, canvasRef])
 
   const handleCanvasPointerDown = useCallback((e) => {
     if (e.target !== e.currentTarget) return

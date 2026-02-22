@@ -160,12 +160,35 @@
   line-height: 1.2;
 }
 
-.layouts-apply-hint {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
+.layouts-apply-actions {
   margin: 0.75rem 1.25rem 0;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.layouts-add-empty-btn {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary, #3b82f6);
+  border: none;
+  border-radius: var(--card-radius);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.layouts-add-empty-btn:hover {
+  background: var(--accent-hover, #2563eb);
+}
+
+.layouts-apply-hint {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0;
 }
 
 .layouts-apply-link {

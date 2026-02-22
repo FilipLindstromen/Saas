@@ -1,5 +1,4 @@
 import InspectorImageSearch from './InspectorImageSearch'
-import { ANIMATION_OPTIONS } from '../constants/animations'
 import './InspectorPanel.css'
 
 export default function InspectorPanel({ element, selectedCount = 1, onUpdate, onDelete, apiKeys, latestImages, onImageSelect }) {
@@ -13,7 +12,7 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
     )
   }
 
-  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, rotation, imageTint, imageTintOpacity, imageFlipHorizontal, animationIn, animationOut, gradientColor } = element
+  const { type, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, gradientColor } = element
 
   return (
     <div className="inspector-panel">
@@ -58,27 +57,6 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             </div>
             {element.imageUrl && (
               <>
-                <div className="inspector-field">
-                  <label className="inspector-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={!!element.imageFlipHorizontal}
-                      onChange={(e) => onUpdate({ imageFlipHorizontal: e.target.checked })}
-                    />
-                    Flip horizontally
-                  </label>
-                </div>
-                <div className="inspector-field">
-                  <label>Rotation</label>
-                  <input
-                    type="number"
-                    value={element.rotation || 0}
-                    onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
-                    min={-180}
-                    max={180}
-                    className="inspector-rotation-value"
-                  />
-                </div>
                 <div className="inspector-field">
                   <label>Recolor</label>
                   <div className="inspector-recolor">
@@ -159,53 +137,8 @@ export default function InspectorPanel({ element, selectedCount = 1, onUpdate, o
             />
           </div>
         )}
-        <div className="inspector-section inspector-section-animations">
-          <div className="inspector-field">
-            <label>Animation in</label>
-            <select
-              value={animationIn || 'none'}
-              onChange={(e) => onUpdate({ animationIn: e.target.value })}
-            >
-              {ANIMATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="inspector-field">
-            <label>Animation out</label>
-            <select
-              value={animationOut || 'none'}
-              onChange={(e) => onUpdate({ animationOut: e.target.value })}
-            >
-              {ANIMATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
         {(type === 'image-text' || type === 'image') && (
           <>
-            <div className="inspector-field">
-              <label className="inspector-checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={!!imageFlipHorizontal}
-                  onChange={(e) => onUpdate({ imageFlipHorizontal: e.target.checked })}
-                />
-                Flip horizontally
-              </label>
-            </div>
-            <div className="inspector-field">
-              <label>Rotation</label>
-              <input
-                type="number"
-                value={rotation || 0}
-                onChange={(e) => onUpdate({ rotation: parseInt(e.target.value, 10) || 0 })}
-                min={-180}
-                max={180}
-                className="inspector-rotation-value"
-              />
-            </div>
             <div className="inspector-field">
               <label>Recolor</label>
               <div className="inspector-recolor">

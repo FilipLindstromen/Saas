@@ -102,13 +102,16 @@ export default function Timeline({
       const currentStart = el.clipStart ?? 0
       const currentEnd = el.clipEnd ?? duration
       const clipDuration = currentEnd - currentStart
+      const animUpdates = { animationIn: 'fade' }
+      if (autoMode === 'in-and-out') animUpdates.animationOut = 'fade'
+      else animUpdates.animationOut = 'none'
       if (autoMode === 'in') {
         const newStart = Math.min(offset, Math.max(0, currentEnd - 0.5))
-        onUpdateClip(el.id, { clipStart: newStart, clipEnd: currentEnd })
+        onUpdateClip(el.id, { clipStart: newStart, clipEnd: currentEnd, ...animUpdates })
       } else {
         const newStart = offset
         const newEnd = offset + clipDuration
-        onUpdateClip(el.id, { clipStart: newStart, clipEnd: newEnd })
+        onUpdateClip(el.id, { clipStart: newStart, clipEnd: newEnd, ...animUpdates })
       }
     })
     if (autoMode === 'in-and-out' && sorted.length > 0 && onDurationChange) {
@@ -163,12 +166,18 @@ export default function Timeline({
         startX: e.clientX
       })
     } else if (action === 'trim-left' || action === 'trim-right') {
+      const idsToTrim = selectedIds.includes(el.id) ? selectedIds : [el.id]
+      const clips = {}
+      idsToTrim.forEach((id) => {
+        const elem = elements.find(x => x.id === id)
+        if (elem) clips[id] = { start: elem.clipStart ?? 0, end: elem.clipEnd ?? duration }
+      })
       setTrimState({
         id: el.id,
+        ids: idsToTrim,
+        clips,
         side: action,
-        startX: e.clientX,
-        startClipStart: el.clipStart ?? 0,
-        startClipEnd: el.clipEnd ?? duration
+        startX: e.clientX
       })
     }
   }
@@ -202,23 +211,26 @@ export default function Timeline({
           onUpdateClip?.(id, { clipStart: newStart, clipEnd: newEnd })
         })
       } else if (trimState) {
-        let newStart = trimState.startClipStart
-        let newEnd = trimState.startClipEnd
-        if (trimState.side === 'trim-left') {
-          newStart = Math.max(0, Math.min(trimState.startClipEnd - 0.5, trimState.startClipStart + dt))
-        } else {
-          newEnd = Math.max(trimState.startClipStart + 0.5, Math.min(duration, trimState.startClipEnd + dt))
-        }
-        if (shift) {
+        trimState.ids.forEach((id) => {
+          const { start, end } = trimState.clips[id]
+          let newStart = start
+          let newEnd = end
           if (trimState.side === 'trim-left') {
-            newStart = snapToSecondOrHalf(newStart)
-            newStart = Math.max(0, Math.min(trimState.startClipEnd - 0.5, newStart))
+            newStart = Math.max(0, Math.min(end - 0.5, start + dt))
           } else {
-            newEnd = snapToSecondOrHalf(newEnd)
-            newEnd = Math.max(trimState.startClipStart + 0.5, Math.min(duration, newEnd))
+            newEnd = Math.max(start + 0.5, Math.min(maxClipEnd, end + dt))
           }
-        }
-        onUpdateClip?.(trimState.id, { clipStart: newStart, clipEnd: newEnd })
+          if (shift) {
+            if (trimState.side === 'trim-left') {
+              newStart = snapToSecondOrHalf(newStart)
+              newStart = Math.max(0, Math.min(end - 0.5, newStart))
+            } else {
+              newEnd = snapToSecondOrHalf(newEnd)
+              newEnd = Math.max(start + 0.5, Math.min(maxClipEnd, newEnd))
+            }
+          }
+          onUpdateClip?.(id, { clipStart: newStart, clipEnd: newEnd })
+        })
       }
     }
     const onUp = () => {

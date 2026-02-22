@@ -28,14 +28,19 @@
 
 .right-panel-tab {
   flex: 1;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem;
   background: none;
   border: none;
   color: var(--text-tertiary);
-  font-size: 0.875rem;
-  font-weight: 500;
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.right-panel-tab svg {
+  flex-shrink: 0;
 }
 
 .right-panel-tab:hover {

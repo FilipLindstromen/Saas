@@ -93,3 +93,38 @@
   font-size: 0.8rem;
   min-width: 100px;
 }
+
+.canvas-controls-style-buttons {
+  gap: 0;
+}
+
+.canvas-controls-style-btn {
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.canvas-controls-style-btn:first-child {
+  border-radius: var(--button-radius) 0 0 var(--button-radius);
+  border-right: none;
+}
+
+.canvas-controls-style-btn:last-child {
+  border-radius: 0 var(--button-radius) var(--button-radius) 0;
+}
+
+.canvas-controls-style-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.canvas-controls-style-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}

@@ -40,7 +40,7 @@ export const ARROW_DESIGNS = {
 }
 
 export default function CanvasElement({ element, currentTime = 0, isSelected, showResizeHandles = true, onPointerDown, isEditingText = false, onStartEditText, onFinishEditText, onUpdate }) {
-  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, imageFlipHorizontal, animationIn, animationOut, gradientColor } = element
+  const { type, x, y, width, height, rotation, text, imageUrl, fontSize, fontFamily, color, backgroundColor, arrowDirection, arrowStyle, imageTint, imageTintOpacity, imageFlipHorizontal, animationIn, animationOut, gradientColor, textAlign, fontWeight, fontStyle } = element
   const textEditRef = useRef(null)
   const isTextType = TEXT_TYPES.includes(type)
 
@@ -77,6 +77,15 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
     }
     return 0
   }, [isInPhase, isOutPhase, currentTime, clipStart, clipEnd, animIn, animOut])
+
+  const textStyle = (type === 'image-text' || type === 'headline' || type === 'cta') ? {
+    fontSize,
+    fontFamily,
+    color,
+    textAlign: textAlign || 'center',
+    fontWeight: fontWeight ?? (type === 'headline' ? 700 : 400),
+    fontStyle: fontStyle || 'normal'
+  } : {}
 
   const renderContent = () => {
     if (type === 'image') {
@@ -128,7 +137,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
           )}
           <div
             className="element-text element-text-multiline"
-            style={{ fontSize, fontFamily, color }}
+            style={textStyle}
             onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
           >
             {isEditingText ? (
@@ -146,7 +155,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                style={{ fontSize, fontFamily, color }}
+                style={textStyle}
               />
             ) : (
               (text || 'Add text').split('\n').map((line, i) => (
@@ -161,7 +170,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
       return (
         <div
           className="element-text element-headline element-text-multiline"
-          style={{ fontSize, fontFamily, color }}
+          style={textStyle}
           onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
         >
           {isEditingText ? (
@@ -179,7 +188,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
               }}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              style={{ fontSize, fontFamily, color }}
+              style={textStyle}
             />
           ) : (
             (text || 'Headline').split('\n').map((line, i) => (
@@ -223,7 +232,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
         strokeDasharray: design.strokeDasharray !== 'none' ? design.strokeDasharray : undefined
       }
       return (
-        <svg className="element-arrow" viewBox="0 0 24 24" style={{ transform: `rotate(${rot}deg)`, color: color || '#000000' }}>
+        <svg className="element-arrow" viewBox="0 0 24 24" style={{ transform: `rotate(${rot}deg)${imageFlipHorizontal ? ' scaleX(-1)' : ''}`, color: color || '#000000' }}>
           {design.circle && <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth={design.strokeWidth} fill="none" />}
           {design.paths?.map((p, i) => (
             <path
@@ -249,7 +258,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
       return (
         <div
           className="element-cta element-text-multiline"
-          style={{ fontSize, fontFamily, color, backgroundColor: backgroundColor || '#3b82f6' }}
+          style={{ ...textStyle, backgroundColor: backgroundColor || '#3b82f6' }}
           onDoubleClick={(e) => { e.stopPropagation(); isTextType && onStartEditText?.(element.id) }}
         >
           {isEditingText ? (
@@ -267,7 +276,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
               }}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              style={{ fontSize, fontFamily, color, backgroundColor: backgroundColor || '#3b82f6' }}
+              style={{ ...textStyle, backgroundColor: backgroundColor || '#3b82f6' }}
             />
           ) : (
             (text || 'Click Here').split('\n').map((line, i) => (
@@ -302,7 +311,7 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
   const pad = type === 'headline' ? 0 : 20
   const innerW = Math.max(20, width - pad)
   const innerH = Math.max(20, height - pad)
-  const contentScale = (type === 'image-text' || type === 'image' || type === 'headline' || type === 'cta')
+  const contentScale = type === 'image'
     ? Math.min(innerW / baseSize.w, innerH / baseSize.h)
     : 1
 
@@ -316,7 +325,8 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
     ...(isSelected && showResizeHandles && { zIndex: 10000 })
   }
 
-  const needsScale = (type === 'image-text' || type === 'image' || type === 'headline' || type === 'cta') && contentScale !== 1
+  // Only scale images; text elements use fixed font size - box defines text area
+  const needsScale = type === 'image' && contentScale !== 1
 
   // For rotated elements, keep resize handle at visual bottom-right corner
   const rot = (rotation || 0) * (Math.PI / 180)
@@ -387,6 +397,19 @@ export default function CanvasElement({ element, currentTime = 0, isSelected, sh
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 11-9-9" />
                 <path d="M21 3v6h-6" />
+              </svg>
+            </div>
+          )}
+          {(type === 'image' || type === 'arrow' || type === 'image-text') && (
+            <div
+              className="flip-handle"
+              onPointerDown={(e) => handlePointerDown(e, 'flip')}
+              title="Flip horizontally"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12h18" />
+                <path d="M7 12l-4 4 4 4" />
+                <path d="M17 12l4 4-4 4" />
               </svg>
             </div>
           )}

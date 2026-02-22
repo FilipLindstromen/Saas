@@ -145,9 +145,11 @@ function App() {
     if (typeof savedRes === 'number' && [800, 1080, 1920].includes(savedRes)) setResolution(savedRes)
     if (bg) setBackgroundColor(bg)
     if (typeof savedZoom === 'number' && savedZoom >= 25 && savedZoom <= 200) setZoom(savedZoom)
-    if (savedLeftTab && ['document', 'layouts', 'brand'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
+    if (savedLeftTab && ['document', 'layouts', 'brand', 'layers'].includes(savedLeftTab)) setLeftPanelTab(savedLeftTab)
     else if (savedTab && ['document', 'layouts'].includes(savedTab)) setLeftPanelTab(savedTab)
-    if (savedTab && ['inspector', 'layers'].includes(savedTab)) setRightPanelTab(savedTab)
+    if (savedTab === 'layers') setLeftPanelTab('layers')
+    if (savedTab && ['inspector', 'animation'].includes(savedTab)) setRightPanelTab(savedTab)
+    else if (savedTab === 'layers') setRightPanelTab('inspector')
     if (typeof savedLeftWidth === 'number' && savedLeftWidth >= 180 && savedLeftWidth <= 400) setLeftPanelWidth(savedLeftWidth)
     if (typeof savedRightWidth === 'number' && savedRightWidth >= 200 && savedRightWidth <= 500) setRightPanelWidth(savedRightWidth)
     if (typeof savedIncludeBg === 'boolean') setIncludeBackgroundInExport(savedIncludeBg)
@@ -551,7 +553,7 @@ function App() {
       brandSecondaryColor: brandSecondaryColor
     }
     const maxZ = elements.length > 0 ? Math.max(...elements.map(e => e.zIndex || 0), 0) : 0
-    const clipDefaults = { clipStart: 0, clipEnd: timelineDuration }
+    const clipDefaults = { clipStart: 0, clipEnd: Math.max(0.5, timelineDuration - 0.1) }
     let arrowOverrides = overrides
     if (type === 'arrow' && !overrides.imageUrl) {
       const recentArrow = (latestImages || []).find(i => i.elementType === 'arrow')
@@ -674,8 +676,9 @@ function App() {
     const prevDuration = prevTimelineDurationRef.current
     prevTimelineDurationRef.current = timelineDuration
 
+    const maxClipEnd = Math.max(0.5, timelineDuration - 0.1)
     setElements(prev => {
-      const needsClamp = prev.some(e => (e.clipEnd ?? timelineDuration) > timelineDuration)
+      const needsClamp = prev.some(e => (e.clipEnd ?? timelineDuration) > maxClipEnd)
       const needsExtend = timelineDuration > prevDuration && prev.some(e => {
         const end = e.clipEnd ?? prevDuration
         return end >= prevDuration - 0.01
@@ -685,11 +688,11 @@ function App() {
       return prev.map(e => {
         const start = e.clipStart ?? 0
         const end = e.clipEnd ?? timelineDuration
-        if (end > timelineDuration) {
-          return { ...e, clipEnd: timelineDuration, clipStart: Math.min(start, Math.max(0, timelineDuration - 0.5)) }
+        if (end > maxClipEnd) {
+          return { ...e, clipEnd: maxClipEnd, clipStart: Math.min(start, Math.max(0, maxClipEnd - 0.5)) }
         }
         if (needsExtend && end >= prevDuration - 0.01) {
-          return { ...e, clipEnd: timelineDuration }
+          return { ...e, clipEnd: maxClipEnd }
         }
         return e
       })
@@ -697,13 +700,14 @@ function App() {
   }, [timelineDuration])
 
   useEffect(() => {
-    const needsClamp = elements.some(e => (e.clipEnd ?? timelineDuration) > timelineDuration)
+    const maxClipEnd = Math.max(0.5, timelineDuration - 0.1)
+    const needsClamp = elements.some(e => (e.clipEnd ?? timelineDuration) > maxClipEnd)
     if (!needsClamp) return
     setElements(prev => prev.map(e => {
       const start = e.clipStart ?? 0
       const end = e.clipEnd ?? timelineDuration
-      if (end > timelineDuration) {
-        return { ...e, clipEnd: timelineDuration, clipStart: Math.min(start, Math.max(0, timelineDuration - 0.5)) }
+      if (end > maxClipEnd) {
+        return { ...e, clipEnd: maxClipEnd, clipStart: Math.min(start, Math.max(0, maxClipEnd - 0.5)) }
       }
       return e
     }))
@@ -870,12 +874,59 @@ function App() {
       const base = {
         ...e,
         clipStart: e.clipStart ?? 0,
-        clipEnd: e.clipEnd ?? timelineDuration,
+        clipEnd: e.clipEnd ?? Math.max(0.5, timelineDuration - 0.1),
         animationIn: e.animationIn ?? 'none',
         animationOut: e.animationOut ?? 'none'
       }
       if (e.type === 'arrow' && !e.imageUrl && defaultArrowUrl) {
         return { ...base, imageUrl: defaultArrowUrl }
+      }
+      return base
+    })
+    setElements(newElements)
+    setSelectedIds(newElements.length > 0 ? [newElements[0].id] : [])
+    if (newElements.length > 0) {
+      nextId = Math.max(...newElements.map(e => e.id), 0) + 1
+    }
+    const arrowsNeedingImage = newElements.filter(e => e.type === 'arrow' && !e.imageUrl)
+    if (arrowsNeedingImage.length > 0 && apiKeys?.giphy) {
+      searchImages({ service: 'giphy', type: 'stickers', q: 'arrows', apiKeys, offset: 0 })
+        .then(({ results }) => {
+          const url = results?.[0]?.url
+          if (url) {
+            setElements(prev => prev.map(el =>
+              el.type === 'arrow' && !el.imageUrl ? { ...el, imageUrl: url } : el
+            ))
+          }
+        })
+    }
+  }, [elements, selectedIds, pushUndoState, timelineDuration, latestImages, apiKeys])
+
+  const handleApplyLayoutEmpty = useCallback((layoutId) => {
+    pushUndoState(elements, selectedIds)
+    const maxId = elements.length > 0 ? Math.max(...elements.map(e => e.id), 0) : 0
+    let raw
+    const custom = getCustomTemplate(layoutId)
+    if (custom?.elements) {
+      raw = custom.elements.map((e, i) => ({ ...e, id: maxId + 1 + i, zIndex: e.zIndex ?? i }))
+    } else {
+      raw = applyLayout(layoutId, maxId)
+    }
+    const recentArrow = (latestImages || []).find(i => i.elementType === 'arrow')
+    const defaultArrowUrl = recentArrow?.url
+    const newElements = raw.map(e => {
+      const base = {
+        ...e,
+        clipStart: e.clipStart ?? 0,
+        clipEnd: e.clipEnd ?? Math.max(0.5, timelineDuration - 0.1),
+        animationIn: e.animationIn ?? 'none',
+        animationOut: e.animationOut ?? 'none'
+      }
+      if (e.type === 'arrow' && !e.imageUrl && defaultArrowUrl) {
+        return { ...base, imageUrl: defaultArrowUrl }
+      }
+      if (base.text !== undefined && base.text !== null) {
+        return { ...base, text: '' }
       }
       return base
     })
@@ -1011,6 +1062,7 @@ function App() {
           tab={leftPanelTab}
           onTabChange={setLeftPanelTab}
           onApplyLayout={handleApplyLayout}
+          onApplyLayoutEmpty={handleApplyLayoutEmpty}
           selectedLayoutId={selectedLayoutId}
           onSelectLayout={setSelectedLayoutId}
           customTemplates={customTemplates}
@@ -1041,6 +1093,13 @@ function App() {
           onApplyBrandToAll={applyBrandToAll}
           hasSelection={selectedIds.length > 0}
           hasElements={elements.length > 0}
+          elements={elements}
+          selectedIds={selectedIds}
+          onSelect={handleSelect}
+          onReorder={reorderElement}
+          onReorderToIndex={reorderToIndex}
+          onToggleVisibility={toggleVisibility}
+          onRename={(id, name) => updateElement(id, { layerName: name || undefined })}
         />
         <div className="app-left">
           {templateEditMode && (
@@ -1101,7 +1160,7 @@ function App() {
                 const base = {
                   ...e,
                   clipStart: e.clipStart ?? 0,
-                  clipEnd: e.clipEnd ?? timelineDuration,
+                  clipEnd: e.clipEnd ?? Math.max(0.5, timelineDuration - 0.1),
                   animationIn: e.animationIn ?? 'none',
                   animationOut: e.animationOut ?? 'none'
                 }
@@ -1180,17 +1239,11 @@ function App() {
         </div>
         <RightPanel
           element={selectedElement}
-          elements={elements}
           selectedIds={selectedIds}
           tab={rightPanelTab}
           onTabChange={setRightPanelTab}
           onUpdate={(updates) => selectedIds.forEach(id => updateElement(id, updates))}
           onDelete={deleteSelected}
-          onSelect={handleSelect}
-          onReorder={reorderElement}
-          onReorderToIndex={reorderToIndex}
-          onToggleVisibility={toggleVisibility}
-          onRename={(id, name) => updateElement(id, { layerName: name || undefined })}
           apiKeys={apiKeys}
           latestImages={latestImages}
           onImageSelect={handleAddImageToElement}
