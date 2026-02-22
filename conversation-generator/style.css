@@ -70,6 +70,10 @@
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
+html, body {
+    height: 100%;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: var(--bg-primary);
@@ -218,22 +222,21 @@ body {
     letter-spacing: -0.005em;
 }
 
-/* ========== App Container ========== */
+/* ========== App Container (full width like InfoGraphics) ========== */
 .app-container {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    max-width: 1680px;
-    margin: 0 auto;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .main-content {
     flex: 1;
-    display: grid;
-    grid-template-columns: 220px 1fr 240px 30%;
-    gap: 24px;
-    align-items: start;
-    padding: 24px 40px 40px;
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .project-selector {
@@ -461,13 +464,11 @@ body {
     line-height: 1.4;
 }
 
-/* ========== Main Content Layout ========== */
+/* ========== Main Content Layout (Left | Middle | Right) ========== */
 .left-settings-panel {
-    background: var(--card-bg);
-    border: 1px solid var(--border-default);
-    border-radius: var(--card-radius);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    flex-shrink: 0;
 }
 
 .left-settings-tabs {
@@ -529,18 +530,29 @@ body {
 
 /* ========== Right Inspector Panel ========== */
 .right-inspector-panel {
-    background: var(--card-bg);
-    border: 1px solid var(--border-default);
-    border-radius: var(--card-radius);
-    overflow: hidden;
+    width: 300px;
     flex-shrink: 0;
-    position: sticky;
-    top: 100px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border-default);
+    background: var(--bg-secondary);
+    overflow-y: auto;
 }
 
-.inspector-panel-header {
-    padding: 1rem 1.25rem;
+.right-inspector-panel .inspector-panel-header {
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-default);
+    flex-shrink: 0;
+}
+
+.right-inspector-panel .inspector-panel-content {
+    flex: none;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.right-inspector-panel .inspector-panel-content:last-of-type {
+    border-bottom: none;
 }
 
 .inspector-panel-title {
@@ -553,7 +565,7 @@ body {
 }
 
 .inspector-panel-title::before {
-    content: '⏱️';
+    content: var(--inspector-icon, '⏱️');
     font-size: 1rem;
 }
 
@@ -586,14 +598,42 @@ body {
     border-color: var(--border-strong);
 }
 
+/* ========== Left Panel (Content) ========== */
+.left-panel {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-default);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.left-panel .left-settings-panel {
+    border-right: none;
+    border-radius: 0;
+    flex-shrink: 0;
+}
+
+.left-panel .left-settings-content {
+    overflow: visible;
+}
+
+.left-panel .control-panel {
+    flex: 1;
+    padding: 1rem;
+    gap: 1rem;
+    min-height: 0;
+}
+
 /* ========== Control Panel ========== */
 .control-panel {
     display: flex;
     flex-direction: column;
     gap: 24px;
-    max-height: calc(100vh - 200px);
     overflow-y: auto;
-    padding-right: 12px;
+    padding-right: 8px;
+    min-height: 0;
 }
 
 .control-panel::-webkit-scrollbar {
@@ -733,6 +773,10 @@ body {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+#bg-color-group, #bg-image-group, #bg-video-group {
+    flex-direction: column;
 }
 
 .checkbox-group label {
@@ -962,10 +1006,16 @@ input[type="range"]::-moz-range-thumb {
     background: rgba(255, 59, 48, 0.1);
 }
 
-/* ========== Preview Panel ========== */
+/* ========== Preview Panel (Middle) ========== */
 .preview-panel {
-    position: sticky;
-    top: 100px;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: auto;
 }
 
 .preview-container {
@@ -1234,30 +1284,28 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ========== Responsive Design ========== */
-@media (max-width: 1400px) {
-    .main-content {
-        grid-template-columns: 200px 1fr 220px 32%;
-    }
-}
-
 @media (max-width: 1200px) {
     .main-content {
-        grid-template-columns: 1fr;
+        flex-wrap: wrap;
     }
     
-    .left-settings-panel {
-        order: -1;
-    }
-    
-    .right-inspector-panel {
-        order: 0;
-        position: relative;
-        top: 0;
+    .left-panel {
+        width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border-default);
     }
     
     .preview-panel {
-        position: relative;
-        top: 0;
+        flex: 1;
+        min-width: 300px;
+    }
+    
+    .right-inspector-panel {
+        width: 100%;
+        max-height: 40vh;
+        border-left: none;
+        border-top: 1px solid var(--border-default);
     }
 }
 

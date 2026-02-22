@@ -12,7 +12,7 @@ import ThreeRulesModal from './components/ThreeRulesModal';
 import HeaderSuggestionsModal from './components/HeaderSuggestionsModal';
 import RightPanel from './components/RightPanel';
 import MasterPromptModal from './components/MasterPromptModal';
-import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules } from './services';
+import { analyzeAudienceFeedback, improveCopy, improveBalance, analyzeConversionMetrics, improveConversionMetrics, generateHeaderSuggestions, analyzeThreeKeyIngredients, analyzeThreeRules, improveCopyThreeRules, normalizeToSingleColumn } from './services';
 import { FileText } from 'lucide-react';
 import ThemeToggle from '@shared/ThemeToggle';
 
@@ -48,7 +48,11 @@ function App() {
     const saved = localStorage.getItem('cw_tabs');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return parsed.map(tab => ({
+          ...tab,
+          content: normalizeToSingleColumn(tab.content || '')
+        }));
       } catch (e) {
         console.error('Failed to parse saved tabs:', e);
       }
@@ -60,7 +64,7 @@ function App() {
       const migratedTab = {
         id: '1',
         name: 'Sales Page',
-        content: oldContent
+        content: normalizeToSingleColumn(oldContent)
       };
       // Clear old content key after migration
       localStorage.removeItem('cw_content');

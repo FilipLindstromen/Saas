@@ -54,142 +54,117 @@
         </header>
         
         <div class="main-content">
-            <!-- Left Settings Panel -->
-            <div class="left-settings-panel" id="left-settings-panel">
-                <div class="left-settings-tabs">
-                    <button type="button" class="left-settings-tab active" data-tab="profile">Profile</button>
-                </div>
-                <div class="left-settings-content">
-                    <div class="left-settings-section" id="section-profile">
-                        <div class="form-group">
-                            <label>Profile Name</label>
-                            <input type="text" id="panel-profile-name" placeholder="My Brain">
+            <!-- Left Panel - Content -->
+            <div class="left-panel">
+                <div class="left-settings-panel" id="left-settings-panel">
+                    <div class="left-settings-tabs">
+                        <button type="button" class="left-settings-tab active" data-tab="profile">Profile</button>
+                    </div>
+                    <div class="left-settings-content">
+                        <div class="left-settings-section" id="section-profile">
+                            <div class="form-group">
+                                <label>Profile Name</label>
+                                <input type="text" id="panel-profile-name" placeholder="My Brain">
+                            </div>
+                            <div class="form-group">
+                                <label>Profile Picture</label>
+                                <button type="button" class="btn-secondary" id="panel-profile-picture-btn">Choose File</button>
+                            </div>
+                            <div class="form-group">
+                                <label>Message Count</label>
+                                <input type="number" id="panel-message-count" min="0" placeholder="147">
+                            </div>
+                            <div class="form-group">
+                                <label>Time Display</label>
+                                <input type="time" id="panel-time-display" value="14:47">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Profile Picture</label>
-                            <button type="button" class="btn-secondary" id="panel-profile-picture-btn">Choose File</button>
+                    </div>
+                </div>
+                <div class="control-panel">
+                    <div class="quick-actions">
+                        <button class="action-btn secondary" id="save-load-menu-btn">
+                            <span class="btn-icon">💾</span>
+                            <span class="btn-text">Export/Import</span>
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-icon">✨</span>
+                            <h3>Generate with AI</h3>
                         </div>
-                        <div class="form-group">
-                            <label>Message Count</label>
-                            <input type="number" id="panel-message-count" min="0" placeholder="147">
+                        <p class="card-hint">Describe the conversation you want. Requires OpenAI API key in Settings.</p>
+                        <textarea id="generate-input" placeholder="e.g. A customer asking about a refund, and a support agent helping them resolve it. 6-8 messages." rows="3"></textarea>
+                        <button class="btn-primary" id="generate-btn">
+                            <span>✨</span> Generate Conversation
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-icon">📝</span>
+                            <h3>Import Conversation</h3>
                         </div>
-                        <div class="form-group">
-                            <label>Time Display</label>
-                            <input type="time" id="panel-time-display" value="14:47">
+                        <textarea id="import-text" placeholder="Paste your conversation here...&#10;Format: Me: message / Name: message"></textarea>
+                        <button class="btn-primary" id="import-btn">
+                            <span>📥</span> Import
+                        </button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-icon">💬</span>
+                            <h3>Messages</h3>
                         </div>
+                        <div id="messages-script"></div>
+                        <button class="btn-primary" id="add-message-btn">
+                            <span>➕</span> Add Message
+                        </button>
                     </div>
-                </div>
-            </div>
-            <!-- Control Panel -->
-            <div class="control-panel">
-                <div class="quick-actions">
-                    <button class="action-btn secondary" id="save-load-menu-btn">
-                        <span class="btn-icon">💾</span>
-                        <span class="btn-text">Export/Import</span>
-                    </button>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">✨</span>
-                        <h3>Generate with AI</h3>
-                    </div>
-                    <p class="card-hint">Describe the conversation you want. Requires OpenAI API key in Settings.</p>
-                    <textarea id="generate-input" placeholder="e.g. A customer asking about a refund, and a support agent helping them resolve it. 6-8 messages." rows="3"></textarea>
-                    <button class="btn-primary" id="generate-btn">
-                        <span>✨</span> Generate Conversation
-                    </button>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">📝</span>
-                        <h3>Import Conversation</h3>
-                    </div>
-                    <textarea id="import-text" placeholder="Paste your conversation here...&#10;Format: Me: message / Name: message"></textarea>
-                    <button class="btn-primary" id="import-btn">
-                        <span>📥</span> Import
-                    </button>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">🎨</span>
-                        <h3>Background</h3>
-                    </div>
-                    <div class="form-group">
-                        <label>Type</label>
-                        <select id="bg-type">
-                            <option value="color">Color</option>
-                            <option value="image">Image</option>
-                            <option value="video">Video</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="bg-color-group">
-                        <label>Color</label>
-                        <input type="color" id="bg-color" value="#000000">
-                    </div>
-                    <div class="form-group" id="bg-image-group" style="display: none;">
-                        <label>Image</label>
-                        <input type="file" id="bg-image" accept="image/*">
-                    </div>
-                    <div class="form-group" id="bg-video-group" style="display: none;">
-                        <label>Video</label>
-                        <input type="file" id="bg-video" accept="video/*">
-                    </div>
-                    <div class="form-group">
-                        <label>Background Music</label>
-                        <input type="file" id="bg-music" accept="audio/*">
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">🔊</span>
-                        <h3>Sound Effects</h3>
-                    </div>
-                    <div class="form-group checkbox-group">
-                        <label>
-                            <input type="checkbox" id="sound-effects" checked>
-                            <span>Enable Sound Effects</span>
-                        </label>
-                    </div>
-                    <div class="slider-group">
-                        <label>
-                            <span>Typing</span>
-                            <span class="slider-value" id="typing-volume-value">50%</span>
-                        </label>
-                        <input type="range" id="typing-volume" min="0" max="100" step="5" value="50">
-                    </div>
-                    <div class="slider-group">
-                        <label>
-                            <span>Send</span>
-                            <span class="slider-value" id="send-volume-value">50%</span>
-                        </label>
-                        <input type="range" id="send-volume" min="0" max="100" step="5" value="50">
-                    </div>
-                    <div class="slider-group">
-                        <label>
-                            <span>Receive</span>
-                            <span class="slider-value" id="receive-volume-value">50%</span>
-                        </label>
-                        <input type="range" id="receive-volume" min="0" max="100" step="5" value="50">
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">💬</span>
-                        <h3>Messages</h3>
-                    </div>
-                    <div id="messages-script"></div>
-                    <button class="btn-primary" id="add-message-btn">
-                        <span>➕</span> Add Message
-                    </button>
                 </div>
             </div>
 
-            <!-- Right Inspector Panel: Timing -->
+            <!-- Middle Panel - Preview -->
+            <div class="preview-panel">
+                <div class="preview-container">
+                    <div class="phone-wrapper">
+                        <div class="phone-screen" id="phone-screen">
+                            <div class="status-bar">
+                                <span class="time">14:47</span>
+                                <div class="status-icons">
+                                    <span class="signal">●●●●</span>
+                                    <span class="wifi">📶</span>
+                                    <span class="battery">🔋</span>
+                                </div>
+                            </div>
+                            <div class="chat-header">
+                                <div class="back-button">‹ <span class="back-count">147</span></div>
+                                <div class="profile-info">
+                                    <img id="header-profile-pic" src="" alt="" class="profile-pic">
+                                    <div class="profile-name" id="header-profile-name">My Brain</div>
+                                </div>
+                            </div>
+                            <div class="chat-background" id="chat-background">
+                                <video id="bg-video-element" loop muted style="display: none;"></video>
+                            </div>
+                            <div class="chat-messages" id="chat-messages"></div>
+                            <div class="imessage-input-bar">
+                                <span class="input-icon">+</span>
+                                <div class="imessage-input" id="imessage-input"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-actions">
+                        <button class="btn-large btn-preview" id="preview-btn">
+                            <span>▶️</span> Preview Animation
+                        </button>
+                        <button class="btn-large btn-export" id="export-btn">
+                            <span>📹</span> Export Video
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Settings -->
             <aside class="right-inspector-panel">
                 <div class="inspector-panel-header">
                     <h3 class="inspector-panel-title">Timing</h3>
@@ -231,49 +206,68 @@
                         <input type="range" id="typing-speed" min="10" max="200" step="10" value="50">
                     </div>
                 </div>
-            </aside>
-            
-            <!-- Right Panel: Preview -->
-            <div class="preview-panel">
-                <div class="preview-container">
-                    <div class="phone-wrapper">
-                        <div class="phone-screen" id="phone-screen">
-                            <div class="status-bar">
-                                <span class="time">14:47</span>
-                                <div class="status-icons">
-                                    <span class="signal">●●●●</span>
-                                    <span class="wifi">📶</span>
-                                    <span class="battery">🔋</span>
-                                </div>
-                            </div>
-                            <div class="chat-header">
-                                <div class="back-button">‹ <span class="back-count">147</span></div>
-                                <div class="profile-info">
-                                    <img id="header-profile-pic" src="" alt="" class="profile-pic">
-                                    <div class="profile-name" id="header-profile-name">My Brain</div>
-                                </div>
-                            </div>
-                            <div class="chat-background" id="chat-background">
-                                <video id="bg-video-element" loop muted style="display: none;"></video>
-                            </div>
-                            <div class="chat-messages" id="chat-messages"></div>
-                            <div class="imessage-input-bar">
-                                <span class="input-icon">+</span>
-                                <div class="imessage-input" id="imessage-input"></div>
-                            </div>
-                        </div>
+                <div class="inspector-panel-header">
+                    <h3 class="inspector-panel-title" style="--inspector-icon: '🎨';">Background</h3>
+                </div>
+                <div class="inspector-panel-content">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="bg-type">
+                            <option value="color">Color</option>
+                            <option value="image">Image</option>
+                            <option value="video">Video</option>
+                        </select>
                     </div>
-                    
-                    <div class="preview-actions">
-                        <button class="btn-large btn-preview" id="preview-btn">
-                            <span>▶️</span> Preview Animation
-                        </button>
-                        <button class="btn-large btn-export" id="export-btn">
-                            <span>📹</span> Export Video
-                        </button>
+                    <div class="form-group" id="bg-color-group">
+                        <label>Color</label>
+                        <input type="color" id="bg-color" value="#000000">
+                    </div>
+                    <div class="form-group" id="bg-image-group" style="display: none;">
+                        <label>Image</label>
+                        <input type="file" id="bg-image" accept="image/*">
+                    </div>
+                    <div class="form-group" id="bg-video-group" style="display: none;">
+                        <label>Video</label>
+                        <input type="file" id="bg-video" accept="video/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Background Music</label>
+                        <input type="file" id="bg-music" accept="audio/*">
                     </div>
                 </div>
-            </div>
+                <div class="inspector-panel-header">
+                    <h3 class="inspector-panel-title" style="--inspector-icon: '🔊';">Sound Effects</h3>
+                </div>
+                <div class="inspector-panel-content">
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="sound-effects" checked>
+                            <span>Enable Sound Effects</span>
+                        </label>
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Typing</span>
+                            <span class="slider-value" id="typing-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="typing-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Send</span>
+                            <span class="slider-value" id="send-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="send-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            <span>Receive</span>
+                            <span class="slider-value" id="receive-volume-value">50%</span>
+                        </label>
+                        <input type="range" id="receive-volume" min="0" max="100" step="5" value="50">
+                    </div>
+                </div>
+            </aside>
         </div>
     </div>
     

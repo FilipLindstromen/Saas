@@ -324,6 +324,14 @@ input[type="range"]::-ms-fill-upper {
   width: 100% !important;
 }
 
+/* Force all content-body children to stack vertically - no side-by-side text */
+.editor-content .content-body > * {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  float: none !important;
+}
+
 /* Content Body Wrapper (Right Side) */
 .content-body {
   flex-grow: 1;

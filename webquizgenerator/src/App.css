@@ -73,6 +73,29 @@
   background: var(--bg-secondary);
 }
 
+.app-resizer {
+  position: relative;
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.app-resizer:hover,
+.app-resizer.active {
+  background: var(--accent);
+}
+
+.app-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
 .app-center {
   flex: 1;
   display: flex;

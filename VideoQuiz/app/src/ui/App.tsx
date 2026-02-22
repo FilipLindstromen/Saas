@@ -64,7 +64,7 @@ export function App() {
   const [recordingProgress, setRecordingProgress] = useState(0)
   const [videoQuality, setVideoQuality] = useState<'low' | 'medium' | 'high' | 'ultra'>('high')
   const [exportFormat, setExportFormat] = useState<'webm' | 'mp4'>('webm')
-  const [activeTab, setActiveTab] = useState<'settings' | 'questions' | 'meme' | 'overlay'>('settings')
+  const [activeTab, setActiveTab] = useState<'questions' | 'meme' | 'overlay'>('questions')
 
   // AI state
   const [customInstructions, setCustomInstructions] = useState(() => localStorage.getItem('customInstructions') || '')
@@ -957,10 +957,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
           </>
         }
       />
-      <div className="max-w-7xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Left Editor */}
-        <div className="ios-card p-4 h-[85vh] overflow-y-auto scroll-thin">
-          <h2 className="text-lg font-semibold mb-4">Editor</h2>
+      <div className="max-w-[1920px] mx-auto p-4 flex gap-4 flex-1 min-h-0">
+        {/* Left Panel - Content Generation */}
+        <div className="w-72 shrink-0 ios-card p-4 h-[85vh] overflow-y-auto scroll-thin">
+          <h2 className="text-lg font-semibold mb-4">Content</h2>
           
           {/* Save/Load */}
           <div className="mb-4 flex items-center gap-2">
@@ -973,16 +973,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
 
           {/* Tab Navigation */}
           <div className="flex mb-4 bg-gray-100/20 rounded-lg p-1">
-            <button
-              className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
-                activeTab === 'settings' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-              onClick={() => setActiveTab('settings')}
-            >
-              ⚙️ Settings
-            </button>
             <button
               className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
                 activeTab === 'questions' 
@@ -1015,726 +1005,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
             </button>
           </div>
 
-          {/* Settings Tab */}
-          {activeTab === 'settings' && (
-            <div className="space-y-4">
-              {/* Background */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">🎨 Background</div>
-                
-                {/* Background Type Selection */}
-                <div className="flex items-center gap-2 mb-3">
-              <select
-                className="ios-input"
-                value={quiz.background.type}
-                onChange={e => {
-                  const type = e.target.value as QuizData['background']['type']
-                  if (type === 'color') updateBackground({ type, color: quiz.background.color ?? '#0b0b0c' })
-                  if (type === 'image') updateBackground({ type, imageUrl: '' })
-                  if (type === 'video') updateBackground({ type, videoUrl: '', videoStartOffsetSeconds: quiz.background.videoStartOffsetSeconds ?? 0 })
-                  if (type === 'meme') updateBackground({ type, memeUrl: '', memeTitle: '' })
-                  if (type === 'splitScreen') updateBackground({ type, splitScreen: true, upperVideoUrl: '', lowerVideoUrl: '' })
-                }}
-              >
-                <option value="color">Color</option>
-                <option value="image">Image (upload)</option>
-                <option value="video">Video (upload)</option>
-                <option value="meme">Meme (API)</option>
-                <option value="splitScreen">Split Screen (2 videos)</option>
-              </select>
-              {quiz.background.type === 'color' && (
-                <input type="color" value={quiz.background.color ?? '#0b0b0c'} onChange={e => updateBackground({ type: 'color', color: e.target.value })} />
-              )}
-            </div>
-
-                {/* Animation Type & Aspect Ratio */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <div className="text-sm text-iossub mb-1">Animation Type</div>
-                    <select
-                      className="ios-input w-full"
-                      value={quiz.settings?.animationType || 'quiz'}
-                      onChange={e => updateSettings(s => {
-                        const animationType = e.target.value as 'quiz' | 'meme' | 'overlay'
-                        const next: QuizSettings = { ...s, animationType }
-                        if (animationType === 'overlay') {
-                          const currentOverlay: OverlaySettings = s.overlay ?? { enabled: false, items: [] }
-                          next.overlay = { ...currentOverlay, enabled: true }
-                        }
-                        return next
-                      })}
-                    >
-                      <option value="quiz">Quiz</option>
-                      <option value="meme">Meme</option>
-                      <option value="overlay">Text Overlay</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Background Overlay */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="block text-sm text-iossub mb-1">Overlay Color</label>
-                    <input
-                      type="color"
-                      className="ios-input w-full h-10"
-                      value={quiz.settings?.bgOverlayColor ?? '#000000'}
-                      onChange={e => updateSettings(s => ({ ...s, bgOverlayColor: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <LabeledSlider 
-                      label="Overlay Opacity" 
-                      value={quiz.settings?.bgOverlayOpacity ?? 0} 
-                      min={0} 
-                      max={1} 
-                      step={0.01} 
-                      onChange={v => updateSettings(s => ({ ...s, bgOverlayOpacity: v }))} 
-                    />
-                  </div>
-            </div>
-            {quiz.background.type === 'image' && (
-              <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                  {quiz.background.imageUrl ? 'Change image' : 'Upload image'}
-                  <input type="file" accept="image/*" className="hidden" onChange={e => {
-                    const f = e.target.files?.[0]
-                    if (!f) return
-                    const url = URL.createObjectURL(f)
-                    updateBackground({ type: 'image', imageUrl: url })
-                      savePreviousBackground('image', url)
-                  }} />
-                </label>
-                  <button 
-                    className="ios-card px-3 py-2 text-sm" 
-                    onClick={() => openStockMedia('image')}
-                  >
-                    📸 Stock Images
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  {previousBackground.image && (
-                    <button 
-                      className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => updateBackground({ type: 'image', imageUrl: previousBackground.image! })}
-                    >
-                      Use Previous
-                    </button>
-                  )}
-                {quiz.background.imageUrl && (
-                  <button className="ios-card px-3 py-2" onClick={() => updateBackground({ type: 'image', imageUrl: '' })}>Clear</button>
-                )}
-                </div>
-                <div className="mt-3 space-y-3 border border-iosborder/60 rounded-lg p-3 bg-black/10">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={quiz.settings?.bgZoomEnabled ?? false}
-                      onChange={e => updateSettings(s => ({ ...s, bgZoomEnabled: e.target.checked }))}
-                    />
-                    Enable zoom animation
-                  </label>
-                  {quiz.settings?.bgZoomEnabled && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <LabeledSlider
-                        label="Zoom Amount (x)"
-                        value={quiz.settings?.bgZoomScale ?? 1.1}
-                        min={1}
-                        max={2}
-                        step={0.01}
-                        onChange={v => updateSettings(s => ({ ...s, bgZoomScale: v }))}
-                      />
-                      <LabeledSlider
-                        label="Zoom Duration (ms)"
-                        value={quiz.settings?.bgZoomDurationMs ?? 6000}
-                        min={500}
-                        max={20000}
-                        step={100}
-                        onChange={v => updateSettings(s => ({ ...s, bgZoomDurationMs: v }))}
-                      />
-                    </div>
-                )}
-                </div>
-              </div>
-            )}
-            {quiz.background.type === 'video' && (
-              <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                  {quiz.background.videoUrl ? 'Change video' : 'Upload video'}
-                  <input type="file" accept="video/*" className="hidden" onChange={e => {
-                    const f = e.target.files?.[0]
-                    if (!f) return
-                    const url = URL.createObjectURL(f)
-                    updateBackground({ 
-                      ...quiz.background,
-                      type: 'video', 
-                      videoUrl: url 
-                    })
-                      savePreviousBackground('video', url)
-                  }} />
-                </label>
-                  <button 
-                    className="ios-card px-3 py-2 text-sm" 
-                    onClick={() => openStockMedia('video')}
-                  >
-                    🎬 Stock Videos
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  {previousBackground.video && (
-                    <button 
-                      className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => updateBackground({ 
-                        ...quiz.background,
-                        type: 'video', 
-                        videoUrl: previousBackground.video! 
-                      })}
-                    >
-                      Use Previous
-                    </button>
-                  )}
-                {quiz.background.videoUrl && (
-                  <button className="ios-card px-3 py-2" onClick={() => updateBackground({ 
-                    ...quiz.background,
-                    type: 'video', 
-                    videoUrl: '' 
-                  })}>Clear</button>
-                )}
-                </div>
-                <LabeledSlider 
-                  label="Start Offset (s)" 
-                  value={quiz.background.videoStartOffsetSeconds ?? 0} 
-                  min={0} 
-                  max={120} 
-                  step={0.1} 
-                  onChange={v => updateBackground({ 
-                    ...quiz.background, 
-                    type: 'video', 
-                    videoStartOffsetSeconds: Number.isFinite(v) ? v : 0 
-                  })} 
-                />
-              </div>
-            )}
-            {quiz.background.type === 'meme' && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <button 
-                    className="ios-card px-3 py-2 text-sm" 
-                    onClick={() => setShowMemeBackground(true)}
-                  >
-                    🎭 Browse Memes
-                  </button>
-                  {quiz.background.memeUrl && (
-                    <button 
-                      className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => setShowMemeBackground(true)}
-                    >
-                      Change Meme
-                    </button>
-                  )}
-                </div>
-                {quiz.background.memeUrl && (
-                  <div className="space-y-2">
-                    <div className="text-sm text-iossub">
-                      <strong>Current Meme:</strong> {quiz.background.memeTitle || 'Untitled'}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button className="ios-card px-3 py-2" onClick={() => updateBackground({ type: 'meme', memeUrl: '', memeTitle: '' })}>
-                        Clear Meme
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {quiz.background.type === 'splitScreen' && (
-              <div className="space-y-3">
-                <div className="text-sm text-iossub mb-2">Upload two videos for split screen</div>
-                
-                {/* Upper Video */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-300">Upper Half Video</div>
-                  <div className="flex items-center gap-2">
-                    <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                      {quiz.background.upperVideoUrl ? 'Change upper video' : 'Upload upper video'}
-                      <input type="file" accept="video/*" className="hidden" onChange={e => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        const url = URL.createObjectURL(f)
-                        updateBackground({ 
-                          type: 'splitScreen', 
-                          splitScreen: true,
-                          upperVideoUrl: url,
-                          lowerVideoUrl: quiz.background.lowerVideoUrl || ''
-                        })
-                      }} />
-                    </label>
-                    <button 
-                      className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => openSplitScreenStockMedia('video', 'upper')}
-                    >
-                      🎬 Stock Videos
-                    </button>
-                    {quiz.background.upperVideoUrl && (
-                      <button className="ios-card px-3 py-2" onClick={() => updateBackground({ 
-                        type: 'splitScreen', 
-                        splitScreen: true,
-                        upperVideoUrl: '',
-                        lowerVideoUrl: quiz.background.lowerVideoUrl || ''
-                      })}>
-                        Clear Upper
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Lower Video */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-300">Lower Half Video</div>
-                  <div className="flex items-center gap-2">
-                    <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                      {quiz.background.lowerVideoUrl ? 'Change lower video' : 'Upload lower video'}
-                      <input type="file" accept="video/*" className="hidden" onChange={e => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        const url = URL.createObjectURL(f)
-                        updateBackground({ 
-                          type: 'splitScreen', 
-                          splitScreen: true,
-                          upperVideoUrl: quiz.background.upperVideoUrl || '',
-                          lowerVideoUrl: url
-                        })
-                      }} />
-                    </label>
-                    <button 
-                      className="ios-card px-3 py-2 text-sm" 
-                      onClick={() => openSplitScreenStockMedia('video', 'lower')}
-                    >
-                      🎬 Stock Videos
-                    </button>
-                    {quiz.background.lowerVideoUrl && (
-                      <button className="ios-card px-3 py-2" onClick={() => updateBackground({ 
-                        type: 'splitScreen', 
-                        splitScreen: true,
-                        upperVideoUrl: quiz.background.upperVideoUrl || '',
-                        lowerVideoUrl: ''
-                      })}>
-                        Clear Lower
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Clear All */}
-                {(quiz.background.upperVideoUrl || quiz.background.lowerVideoUrl) && (
-                  <div className="flex items-center gap-2">
-                    <button className="ios-card px-3 py-2" onClick={() => updateBackground({ 
-                      type: 'splitScreen', 
-                      splitScreen: true,
-                      upperVideoUrl: '',
-                      lowerVideoUrl: ''
-                    })}>
-                      Clear All Videos
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-              </div>
-
-              {/* CTA Settings */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">📢 Call-to-Action Screen</div>
-                
-                <div className="flex items-center gap-2 mb-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={currentCTA.enabled}
-                      onChange={e => applyCTAUpdate(cta => ({ ...cta, enabled: e.target.checked }))}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-300">Show CTA screen after completion</span>
-                  </label>
-                </div>
-
-                {currentCTA.enabled && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-3">
-                      <LabeledSlider 
-                        label="CTA Duration (ms)" 
-                        value={currentCTA.durationMs}
-                        min={1000} 
-                        max={10000} 
-                        onChange={v => applyCTAUpdate(cta => ({ ...cta, durationMs: v }))}
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-300">Background Source</div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="radio" 
-                            name="ctaBackground"
-                            checked={currentCTA.useSameBackground}
-                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: true, backgroundVideoUrl: undefined, imageUrl: undefined, backgroundType: 'video' }))}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-300">Use same background as quiz/meme</span>
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="radio" 
-                            name="ctaBackground"
-                            checked={!currentCTA.useSameBackground && currentCTA.backgroundType === 'video'}
-                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false, backgroundType: 'video', imageUrl: undefined }))}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-300">Use custom CTA video</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="ctaBackground"
-                            checked={!currentCTA.useSameBackground && currentCTA.backgroundType === 'image'}
-                            onChange={() => applyCTAUpdate(cta => ({ ...cta, useSameBackground: false, backgroundType: 'image', backgroundVideoUrl: undefined }))}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-300">Use custom CTA image</span>
-                        </label>
-                      </div>
-
-                        {!currentCTA.useSameBackground && currentCTA.backgroundType === 'video' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                              {currentCTA.backgroundVideoUrl ? 'Change CTA video' : 'Upload CTA video'}
-                              <input
-                                type="file"
-                                accept="video/*"
-                                className="hidden"
-                                onChange={e => {
-                                  const file = e.target.files?.[0]
-                                  if (!file) return
-                                  const url = URL.createObjectURL(file)
-                                  applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: url, imageUrl: undefined, useSameBackground: false, backgroundType: 'video' }))
-                                }}
-                              />
-                            </label>
-                            {currentCTA.backgroundVideoUrl && (
-                              <button 
-                                className="ios-card px-3 py-2" 
-                                onClick={() => applyCTAUpdate(cta => ({ ...cta, backgroundVideoUrl: undefined }))}
-                              >
-                                Clear CTA Video
-                              </button>
-                            )}
-                          </div>
-                          {currentCTA.backgroundVideoUrl && (
-                            <div className="text-xs text-iossub">
-                              CTA video loaded successfully
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                        {!currentCTA.useSameBackground && currentCTA.backgroundType === 'image' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
-                              {currentCTA.imageUrl ? 'Change CTA image' : 'Upload CTA image'}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={e => {
-                                  const file = e.target.files?.[0]
-                                  if (!file) return
-                                  const url = URL.createObjectURL(file)
-                                  applyCTAUpdate(cta => ({ ...cta, imageUrl: url, backgroundVideoUrl: undefined, useSameBackground: false, backgroundType: 'image' }))
-                                }}
-                              />
-                            </label>
-                            {currentCTA.imageUrl && (
-                              <button
-                                className="ios-card px-3 py-2"
-                                onClick={() => applyCTAUpdate(cta => ({ ...cta, imageUrl: undefined }))}
-                              >
-                                Clear CTA Image
-                              </button>
-                            )}
-                          </div>
-                          {currentCTA.imageUrl && (
-                            <div className="text-xs text-iossub">
-                              CTA image loaded successfully
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-300">CTA Text</div>
-                        <TransparentTextarea
-                          placeholder="Enter CTA text... (use Shift+Enter for line breaks)"
-                          value={currentCTA.text ?? ''}
-                          onChange={value => applyCTAUpdate(cta => ({ ...cta, text: value }))}
-                          className="ios-input w-full"
-                          rows={3}
-                        />
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <div className="text-sm text-iossub">Font Family</div>
-                          <select
-                            className="ios-input w-full"
-                            value={currentCTA.fontFamily}
-                            onChange={e => applyCTAUpdate(cta => ({ ...cta, fontFamily: e.target.value }))}
-                          >
-                            {fontOptions.map(font => (
-                              <option key={font} value={font}>
-                                {font}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                        <LabeledSlider 
-                          label="Text Size %" 
-                            value={currentCTA.textSizePercent ?? 8}
-                          min={2} 
-                          max={20} 
-                            onChange={v => applyCTAUpdate(cta => ({ ...cta, textSizePercent: v }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <div className="text-sm text-iossub">Text Color</div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={currentCTA.textColor}
-                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textColor: e.target.value }))}
-                              className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={currentCTA.textColor}
-                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textColor: e.target.value }))}
-                              className="ios-input flex-1"
-                              placeholder="#FFFFFF"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-2 text-iossub">
-                            <input
-                              type="checkbox"
-                              checked={currentCTA.textShadowEnabled}
-                              onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowEnabled: e.target.checked }))}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            Enable text shadow
-                          </label>
-                          {currentCTA.textShadowEnabled && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={currentCTA.textShadowColor}
-                                onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowColor: e.target.value }))}
-                                className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
-                              />
-                              <input
-                                type="text"
-                                value={currentCTA.textShadowColor}
-                                onChange={e => applyCTAUpdate(cta => ({ ...cta, textShadowColor: e.target.value }))}
-                                className="ios-input flex-1"
-                                placeholder="#000000"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <LabeledSlider 
-                          label="Fade In (ms)" 
-                          value={currentCTA.fadeInMs ?? 600}
-                          min={200} 
-                          max={2000} 
-                          onChange={v => applyCTAUpdate(cta => ({ ...cta, fadeInMs: v }))}
-                        />
-                        <LabeledSlider 
-                          label="Hold (ms)" 
-                          value={currentCTA.holdMs ?? 1800}
-                          min={500} 
-                          max={5000} 
-                          onChange={v => applyCTAUpdate(cta => ({ ...cta, holdMs: v }))}
-                        />
-                      </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="text-sm text-gray-300">Video Overlay</div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                          checked={currentCTA.overlayEnabled}
-                          onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayEnabled: e.target.checked }))}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-300">Enable video overlay</span>
-                          </label>
-
-                      {currentCTA.overlayEnabled && (
-                          <div className="space-y-3">
-                          <div className="space-y-1">
-                            <div className="text-sm text-iossub">Overlay Color</div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="color"
-                                value={currentCTA.overlayColor ?? '#000000'}
-                                onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayColor: e.target.value }))}
-                                  className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
-                                />
-                                <input
-                                  type="text"
-                                value={currentCTA.overlayColor ?? '#000000'}
-                                onChange={e => applyCTAUpdate(cta => ({ ...cta, overlayColor: e.target.value }))}
-                                  className="ios-input flex-1"
-                                  placeholder="#000000"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3">
-                              <LabeledSlider 
-                                label="Overlay Opacity" 
-                              value={Math.round((currentCTA.overlayOpacity ?? 0.4) * 100)}
-                                min={0} 
-                                max={100} 
-                              onChange={v => applyCTAUpdate(cta => ({ ...cta, overlayOpacity: v / 100 }))}
-                              />
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Music Settings */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">🎵 Music</div>
-                <div className="space-y-3">
-            <div>
-                    <div className="text-sm text-iossub mb-2">Music Source</div>
-                    <div className="space-y-2">
-              <label className="ios-card px-3 py-2 block text-sm cursor-pointer text-iossub">
-                        {quiz.settings?.music?.name ?? 'Upload Music File'}
-                <input type="file" accept="audio/*" className="hidden" onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (!f) return
-                  const url = URL.createObjectURL(f)
-                  updateSettings(s => ({ ...s, music: { name: f.name, url, volume: s.music?.volume ?? 0.6 } }))
-                }} />
-              </label>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowPixabayMusic(true)}
-                      >
-                        🎼 Browse Pixabay Music
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowTikTokMusic(true)}
-                      >
-                        🎵 Browse TikTok Music
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowFreesoundMusic(true)}
-                      >
-                        🔊 Browse Freesound Music
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowYouTubeAudio(true)}
-                      >
-                        🎵 Free Music Library
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowRealMusic(true)}
-                      >
-                        🎼 Real Music Library
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => setShowLocalMusic(true)}
-                      >
-                        📁 Upload Local File
-                      </button>
-                      <button 
-                        className="ios-card px-3 py-2 block text-sm text-iossub w-full"
-                        onClick={() => {
-                          const testUrl = createTestAudio(10)
-                          updateSettings(s => ({ 
-                            ...s, 
-                            music: { 
-                              name: 'Test Audio', 
-                              url: testUrl, 
-                              volume: s.music?.volume ?? 0.6 
-                            } 
-                          }))
-                        }}
-                      >
-                        🧪 Test Audio (10s)
-                      </button>
-                    </div>
-                  </div>
-                  {quiz.settings?.music?.url && (
-                  <div className="space-y-3">
-                      <LabeledSlider 
-                        label="Music Volume" 
-                        value={quiz.settings.music.volume} 
-                        min={0} 
-                        max={1} 
-                        step={0.01} 
-                        onChange={v => updateSettings(s => ({ ...s, music: { ...s.music!, volume: v } }))} 
-                      />
-                    <LabeledSlider 
-                      label="Start Offset (s)" 
-                      value={quiz.settings.music.startOffsetSeconds ?? 0} 
-                      min={0} 
-                      max={120} 
-                      step={0.1} 
-                      onChange={v => updateSettings(s => ({ ...s, music: { ...s.music!, startOffsetSeconds: Number.isFinite(v) ? v : 0 } }))} 
-                      />
-                    </div>
-                  )}
-            </div>
-          </div>
-
-              {/* Volume Settings */}
-              <div className="bg-gray-100/20 rounded-lg p-3">
-                <div className="text-sm font-medium text-gray-300 mb-3">🔊 Volume</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <LabeledSlider label="SFX appear" value={quiz.settings!.sfx.appearVolume} min={0} max={1} step={0.01} onChange={v => updateSettings(s => ({ ...s, sfx: { ...s.sfx, appearVolume: v } }))} />
-                  <LabeledSlider label="SFX correct" value={quiz.settings!.sfx.correctVolume} min={0} max={1} step={0.01} onChange={v => updateSettings(s => ({ ...s, sfx: { ...s.sfx, correctVolume: v } }))} />
-            </div>
-          </div>
-
-            </div>
-          )}
-
+          {/* Content Tabs */}
           {activeTab === 'overlay' && (
             <div className="space-y-4">
               <div className="bg-gray-100/20 rounded-lg p-3">
@@ -2416,8 +1687,8 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
           )}
         </div>
 
-        {/* Right Preview */}
-        <div className="ios-card p-4 relative flex flex-col gap-4">
+        {/* Middle - Preview */}
+        <div className="flex-1 min-w-0 ios-card p-4 relative flex flex-col gap-4">
           <div className="relative mx-auto w-full" style={aspectStyle(quiz.settings?.aspectRatio ?? '9:16')}>
             <div data-frame className="absolute inset-0">
               {activeTab === 'meme' || quiz.settings?.animationType === 'meme' ? (
@@ -2480,7 +1751,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
               )}
             </div>
             
-            {/* Recording */}
             <div className="ios-card p-3">
               <button 
                 className={`ios-card px-3 py-2 w-full ${isRecording ? 'bg-red-500' : ''}`} 
@@ -2489,10 +1759,211 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
               >
                 {isRecording ? `Recording... ${recordingProgress.toFixed(0)}%` : '🎬 Record Video'}
               </button>
-               </div>
-               
-            {/* Recording Settings */}
-               <div className="ios-card p-3">
+            </div>
+            {recordingStatus && (
+              <div className="ios-card p-3">
+                <div className="text-sm text-iossub">{recordingStatus}</div>
+                {isRecording && (
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${recordingProgress}%` }}
+                    ></div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Animation & Recording Settings */}
+        <div className="w-72 shrink-0 ios-card p-4 h-[85vh] overflow-y-auto scroll-thin space-y-4">
+          <h2 className="text-lg font-semibold mb-2">Settings</h2>
+
+          {/* Background */}
+          <div className="bg-gray-100/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-gray-300 mb-3">🎨 Background</div>
+            <div className="flex items-center gap-2 mb-3">
+              <select
+                className="ios-input"
+                value={quiz.background.type}
+                onChange={e => {
+                  const type = e.target.value as QuizData['background']['type']
+                  if (type === 'color') updateBackground({ type, color: quiz.background.color ?? '#0b0b0c' })
+                  if (type === 'image') updateBackground({ type, imageUrl: '' })
+                  if (type === 'video') updateBackground({ type, videoUrl: '', videoStartOffsetSeconds: quiz.background.videoStartOffsetSeconds ?? 0 })
+                  if (type === 'meme') updateBackground({ type, memeUrl: '', memeTitle: '' })
+                  if (type === 'splitScreen') updateBackground({ type, splitScreen: true, upperVideoUrl: '', lowerVideoUrl: '' })
+                }}
+              >
+                <option value="color">Color</option>
+                <option value="image">Image (upload)</option>
+                <option value="video">Video (upload)</option>
+                <option value="meme">Meme (API)</option>
+                <option value="splitScreen">Split Screen (2 videos)</option>
+              </select>
+              {quiz.background.type === 'color' && (
+                <input type="color" value={quiz.background.color ?? '#0b0b0c'} onChange={e => updateBackground({ type: 'color', color: e.target.value })} />
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <div className="text-sm text-iossub mb-1">Animation Type</div>
+                <select
+                  className="ios-input w-full"
+                  value={quiz.settings?.animationType || 'quiz'}
+                  onChange={e => updateSettings(s => {
+                    const animationType = e.target.value as 'quiz' | 'meme' | 'overlay'
+                    const next: QuizSettings = { ...s, animationType }
+                    if (animationType === 'overlay') {
+                      const currentOverlay: OverlaySettings = s.overlay ?? { enabled: false, items: [] }
+                      next.overlay = { ...currentOverlay, enabled: true }
+                    }
+                    return next
+                  })}
+                >
+                  <option value="quiz">Quiz</option>
+                  <option value="meme">Meme</option>
+                  <option value="overlay">Text Overlay</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm text-iossub mb-1">Overlay Color</label>
+                <input
+                  type="color"
+                  className="ios-input w-full h-10"
+                  value={quiz.settings?.bgOverlayColor ?? '#000000'}
+                  onChange={e => updateSettings(s => ({ ...s, bgOverlayColor: e.target.value }))}
+                />
+              </div>
+              <div>
+                <LabeledSlider 
+                  label="Overlay Opacity" 
+                  value={quiz.settings?.bgOverlayOpacity ?? 0} 
+                  min={0} max={1} step={0.01} 
+                  onChange={v => updateSettings(s => ({ ...s, bgOverlayOpacity: v }))} 
+                />
+              </div>
+            </div>
+            {quiz.background.type === 'image' && (
+              <div className="space-y-2 mt-3">
+                <div className="flex items-center gap-2">
+                  <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
+                    {quiz.background.imageUrl ? 'Change' : 'Upload image'}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      updateBackground({ type: 'image', imageUrl: URL.createObjectURL(f) })
+                    }} />
+                  </label>
+                  <button className="ios-card px-3 py-2 text-sm" onClick={() => openStockMedia('image')}>📸 Stock</button>
+                  {quiz.background.imageUrl && <button className="ios-card px-3 py-2 text-sm" onClick={() => updateBackground({ type: 'image', imageUrl: '' })}>Clear</button>}
+                </div>
+              </div>
+            )}
+            {quiz.background.type === 'video' && (
+              <div className="space-y-2 mt-3">
+                <div className="flex items-center gap-2">
+                  <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub">
+                    {quiz.background.videoUrl ? 'Change' : 'Upload video'}
+                    <input type="file" accept="video/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      updateBackground({ ...quiz.background, type: 'video', videoUrl: URL.createObjectURL(f) })
+                    }} />
+                  </label>
+                  <button className="ios-card px-3 py-2 text-sm" onClick={() => openStockMedia('video')}>🎬 Stock</button>
+                  {quiz.background.videoUrl && <button className="ios-card px-3 py-2 text-sm" onClick={() => updateBackground({ ...quiz.background, type: 'video', videoUrl: '' })}>Clear</button>}
+                </div>
+                <LabeledSlider label="Start Offset (s)" value={quiz.background.videoStartOffsetSeconds ?? 0} min={0} max={120} step={0.1} onChange={v => updateBackground({ ...quiz.background, type: 'video', videoStartOffsetSeconds: Number.isFinite(v) ? v : 0 })} />
+              </div>
+            )}
+            {quiz.background.type === 'meme' && (
+              <div className="space-y-2 mt-3">
+                <button className="ios-card px-3 py-2 text-sm w-full" onClick={() => setShowMemeBackground(true)}>🎭 Browse Memes</button>
+                {quiz.background.memeUrl && <button className="ios-card px-3 py-2 text-sm w-full" onClick={() => updateBackground({ type: 'meme', memeUrl: '', memeTitle: '' })}>Clear Meme</button>}
+              </div>
+            )}
+            {quiz.background.type === 'splitScreen' && (
+              <div className="space-y-3 mt-3">
+                <div className="flex items-center gap-2">
+                  <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub flex-1">
+                    {quiz.background.upperVideoUrl ? 'Change upper' : 'Upper video'}
+                    <input type="file" accept="video/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      updateBackground({ type: 'splitScreen', splitScreen: true, upperVideoUrl: URL.createObjectURL(f), lowerVideoUrl: quiz.background.lowerVideoUrl || '' })
+                    }} />
+                  </label>
+                  <button className="ios-card px-3 py-2 text-sm" onClick={() => openSplitScreenStockMedia('video', 'upper')}>Stock</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="ios-card px-3 py-2 cursor-pointer text-sm text-iossub flex-1">
+                    {quiz.background.lowerVideoUrl ? 'Change lower' : 'Lower video'}
+                    <input type="file" accept="video/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      updateBackground({ type: 'splitScreen', splitScreen: true, upperVideoUrl: quiz.background.upperVideoUrl || '', lowerVideoUrl: URL.createObjectURL(f) })
+                    }} />
+                  </label>
+                  <button className="ios-card px-3 py-2 text-sm" onClick={() => openSplitScreenStockMedia('video', 'lower')}>Stock</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <div className="bg-gray-100/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-gray-300 mb-3">📢 Call-to-Action</div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={currentCTA.enabled}
+                onChange={e => applyCTAUpdate(cta => ({ ...cta, enabled: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">Show CTA screen after completion</span>
+            </label>
+          </div>
+
+          {/* Music */}
+          <div className="bg-gray-100/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-gray-300 mb-3">🎵 Music</div>
+            <div className="space-y-2">
+              <label className="ios-card px-3 py-2 block text-sm cursor-pointer text-iossub">
+                {quiz.settings?.music?.name ?? 'Upload Music File'}
+                <input type="file" accept="audio/*" className="hidden" onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  const url = URL.createObjectURL(f)
+                  updateSettings(s => ({ ...s, music: { name: f.name, url, volume: s.music?.volume ?? 0.6 } }))
+                }} />
+              </label>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowPixabayMusic(true)}>🎼 Pixabay</button>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowTikTokMusic(true)}>🎵 TikTok</button>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowFreesoundMusic(true)}>🔊 Freesound</button>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowYouTubeAudio(true)}>🎵 Free Library</button>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowRealMusic(true)}>🎼 Real Library</button>
+              <button className="ios-card px-3 py-2 block text-sm text-iossub w-full" onClick={() => setShowLocalMusic(true)}>📁 Upload</button>
+              {quiz.settings?.music?.url && (
+                <LabeledSlider label="Music Volume" value={quiz.settings.music.volume} min={0} max={1} step={0.01} onChange={v => updateSettings(s => ({ ...s, music: { ...s.music!, volume: v } }))} />
+              )}
+            </div>
+          </div>
+
+          {/* Volume */}
+          <div className="bg-gray-100/20 rounded-lg p-3">
+            <div className="text-sm font-medium text-gray-300 mb-3">🔊 Volume</div>
+            <div className="grid grid-cols-2 gap-3">
+              <LabeledSlider label="SFX appear" value={quiz.settings!.sfx.appearVolume} min={0} max={1} step={0.01} onChange={v => updateSettings(s => ({ ...s, sfx: { ...s.sfx, appearVolume: v } }))} />
+              <LabeledSlider label="SFX correct" value={quiz.settings!.sfx.correctVolume} min={0} max={1} step={0.01} onChange={v => updateSettings(s => ({ ...s, sfx: { ...s.sfx, correctVolume: v } }))} />
+            </div>
+          </div>
+
+          {/* Recording Settings */}
+          <div className="ios-card p-3">
               <div className="text-sm text-iossub mb-3">Recording Settings</div>
                  <div className="grid grid-cols-2 gap-3 mb-3">
                    <div>
@@ -2542,25 +2013,8 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                      </div>
                    </div>
                  </div>
-                 </div>
-                 
-            {/* Recording Status */}
-            {recordingStatus && (
-              <div className="ios-card p-3">
-                <div className="text-sm text-iossub">{recordingStatus}</div>
-                {isRecording && (
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${recordingProgress}%` }}
-                    ></div>
-                   </div>
-                )}
-                     </div>
-                   )}
-                 </div>
-               </div>
-            </div>
+          </div>
+        </div>
 
       {/* Modals */}
       <AIModal

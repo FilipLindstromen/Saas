@@ -387,7 +387,14 @@ Statement → Impact → Evidence → Relevance → Statement → Impact → Evi
 
 Do NOT skip or reorder. Each content-row must be the next block in the cycle. If you just wrote block-relevance, the next block MUST be block-statement. If you just wrote block-statement, the next MUST be block-impact, then block-evidence, then block-relevance. This cycle repeats for every paragraph, section, and the entire document.
 
-Structure: ONE content-row per block. Each block on its own line. No columns or side-by-side layout.
+Structure: ONE content-row per block. Each block on its own line. Vertical flow only — NO columns.
+
+CRITICAL LAYOUT RULES:
+- ALL text must flow vertically in a single column. Use line breaks (<br>) or new paragraphs (<p>) between sections.
+- NEVER use display:flex, display:grid, column-count, or any CSS that creates side-by-side text.
+- NEVER put two blocks of text next to each other. Every block stacks vertically.
+- One content-row per block. Vertical stack only.
+
 <div class="content-row">
   <div class="gutter"><i type="statement"></i></div>
   <div class="content-body">
@@ -408,7 +415,7 @@ FORMATTING:
 - Wrap inner text of every <h1>, <h2>, <h3>, <p> in <span> tag
 - No extra whitespace inside block divs
 - Use h1, h2, h3 for headlines; p for paragraphs
-- NEVER use columns, multi-column layout, or side-by-side blocks. Each block must be on its own line. One content-row per block. Regular vertical flow with line breaks between blocks.
+- Use <br> or new <p> for line breaks between sections — NEVER columns or side-by-side layout
 
 {{docTypeExtension}}
 
@@ -445,15 +452,7 @@ export function buildSystemPrompt(template, params) {
     return result;
 }
 
-const cleanContent = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/^```html\s*/i, '') // Remove start fence
-        .replace(/^```\s*/i, '')      // Remove generic start fence
-        .replace(/```\s*$/i, '')      // Remove end fence
-        .replace(/>\s+</g, '><')      // REMOVE WHITESPACE BETWEEN TAGS (Aggressive tightness)
-        .trim();
-};
+import { cleanContent } from './utils';
 
 export async function generateCopy(apiKey, {
     docType, instructions, targetAudience,
@@ -527,7 +526,9 @@ Reframe objections as buying signals. Include an FAQ or objection section addres
 
 **OUTPUT REQUIREMENT:** Return ONLY the copy in HTML format. No preamble, no explanation, no meta-language like "The copy should..." or "This approach...". Start directly with <div class="content-row">.
 
-**BLOCK ORDER:** Every content-row must follow the cycle: Statement → Impact → Evidence → Relevance → Statement → Impact → Evidence → Relevance... Do not skip or reorder blocks.`;
+**BLOCK ORDER:** Every content-row must follow the cycle: Statement → Impact → Evidence → Relevance → Statement → Impact → Evidence → Relevance... Do not skip or reorder blocks.
+
+**LAYOUT:** All text must flow vertically in a single column with line breaks. NEVER use columns, flex row, grid, or side-by-side layout.`;
 
     try {
         const completion = await openai.chat.completions.create({
@@ -602,6 +603,7 @@ Gutter icon types: statement, impact, evidence, relevance (match the block type)
 
 **Formatting Constraints**:
 - **ONE ROW PER BLOCK**: Each content-row must contain exactly ONE block. No columns, no side-by-side layout. Vertical stack only.
+- **SINGLE COLUMN**: All text must flow vertically. NEVER use display:flex, display:grid, column-count, or any layout that creates columns. Use line breaks and paragraphs.
 - **SPAN WRAPPERS**: Wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag.
 - **NO EXTRA SPACE**: Do not add newlines or spaces inside the block-[type] div.
 - **TIGHT HTML**: Write compact HTML on single lines where possible.
@@ -788,6 +790,7 @@ Re-write the content to solve the audience's complaints while keeping the good p
 - **SPAN WRAPPERS**: You MUST wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag. Example: &lt;h1&gt;&lt;span&gt;Title&lt;/span&gt;&lt;/h1&gt;
 - **NO EXTRA SPACE**: Do not add newlines or spaces inside the block-[type] div.
 - **TIGHT HTML**: Write &lt;div class='block-story'&gt;&lt;p&gt;&lt;span&gt;Text...&lt;/span&gt;&lt;/p&gt;&lt;/div&gt; on a SINGLE line if possible.
+- **SINGLE COLUMN**: All text must flow vertically. NEVER use columns, flex row, grid, or side-by-side layout.
 
 CRITICAL: Return ONLY the full valid HTML with rows, gutters, and blocks.
 `;
@@ -801,7 +804,7 @@ CRITICAL: Return ONLY the full valid HTML with rows, gutters, and blocks.
             model: "gpt-4o",
         });
 
-        return completion.choices[0].message.content;
+        return cleanContent(completion.choices[0].message.content);
     } catch (error) {
         console.error("OpenAI Improve Error:", error);
         throw error;
@@ -1543,15 +1546,6 @@ CRITICAL: Return ONLY the valid HTML.
             ],
             model: "gpt-4o",
         });
-
-        const cleanContent = (text) => {
-            if (!text) return '';
-            return text
-                .replace(/^```html\s*/i, '')
-                .replace(/^```\s*/i, '')
-                .replace(/```\s*$/i, '')
-                .trim();
-        };
 
         return cleanContent(completion.choices[0].message.content);
     } catch (error) {

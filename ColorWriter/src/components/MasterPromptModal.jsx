@@ -77,7 +77,7 @@ const MasterPromptModal = ({ isOpen, onClose, promptValue, onSave }) => {
                                 padding: '0.5rem 1rem',
                                 fontSize: '0.875rem',
                                 fontWeight: 600,
-                                background: 'var(--bg-hover)',
+                                background: 'var(--accent-gradient)',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: '6px',

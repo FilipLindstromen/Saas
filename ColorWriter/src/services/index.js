@@ -26,4 +26,4 @@ export {
 } from './openai';
 
 // Re-export utilities
-export { cleanContent, stripTags } from './utils';
+export { cleanContent, stripTags, normalizeToSingleColumn } from './utils';

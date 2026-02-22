@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import QuizBasicInfo from './QuizBasicInfo'
 import QuestionsEditor from './QuestionsEditor'
 import FeedbackEditor from './FeedbackEditor'
@@ -7,6 +7,13 @@ import OpenAIGenerator from './OpenAIGenerator'
 import QuizPreview from './QuizPreview'
 import ThemeTypographyEditor from './ThemeTypographyEditor'
 import './QuizEditor.css'
+
+const STORAGE_KEY_LEFT = 'webquiz_panel_left_width'
+const STORAGE_KEY_RIGHT = 'webquiz_panel_right_width'
+const MIN_PANEL = 200
+const MAX_PANEL = 500
+const DEFAULT_LEFT = 280
+const DEFAULT_RIGHT = 320
 
 function QuizEditor() {
   const ensureTagKeys = (tags, prev) => {
@@ -147,10 +154,60 @@ function QuizEditor() {
   const [showPreview, setShowPreview] = useState(false)
   const [showAI, setShowAI] = useState(true)
 
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const v = localStorage.getItem(STORAGE_KEY_LEFT)
+    const n = v ? parseInt(v, 10) : NaN
+    return !isNaN(n) && n >= MIN_PANEL && n <= MAX_PANEL ? n : DEFAULT_LEFT
+  })
+  const [rightWidth, setRightWidth] = useState(() => {
+    const v = localStorage.getItem(STORAGE_KEY_RIGHT)
+    const n = v ? parseInt(v, 10) : NaN
+    return !isNaN(n) && n >= MIN_PANEL && n <= MAX_PANEL ? n : DEFAULT_RIGHT
+  })
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_LEFT, String(leftWidth))
+  }, [leftWidth])
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_RIGHT, String(rightWidth))
+  }, [rightWidth])
+
+  const [resizing, setResizing] = useState(null)
+  const containerRef = useRef(null)
+
+  const handleResizeMove = useCallback((e) => {
+    const el = containerRef.current?.parentElement
+    if (!el) return
+    const { left, right } = el.getBoundingClientRect()
+    if (resizing === 'left') {
+      const w = Math.min(MAX_PANEL, Math.max(MIN_PANEL, e.clientX - left))
+      setLeftWidth(w)
+    } else if (resizing === 'right') {
+      const w = Math.min(MAX_PANEL, Math.max(MIN_PANEL, right - e.clientX))
+      setRightWidth(w)
+    }
+  }, [resizing])
+
+  const handleResizeEnd = useCallback(() => setResizing(null), [])
+
+  useEffect(() => {
+    if (!resizing) return
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', handleResizeMove)
+    window.addEventListener('mouseup', handleResizeEnd)
+    return () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', handleResizeMove)
+      window.removeEventListener('mouseup', handleResizeEnd)
+    }
+  }, [resizing, handleResizeMove, handleResizeEnd])
+
   return (
     <>
       {/* Left Panel: Style, AI, Basic Info */}
-      <div className="app-left">
+      <div ref={containerRef} className="app-left" style={{ width: leftWidth }}>
         <div className="panel-scroll">
           <div className="panel-section">
             <ThemeTypographyEditor
@@ -186,6 +243,14 @@ function QuizEditor() {
         </div>
       </div>
 
+      <div
+        className={`app-resizer app-resizer-left ${resizing === 'left' ? 'active' : ''}`}
+        onMouseDown={(e) => { e.preventDefault(); setResizing('left') }}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize left panel"
+      />
+
       {/* Center: Live Preview Canvas */}
       <div className="app-center">
         <QuizPreview
@@ -196,8 +261,16 @@ function QuizEditor() {
         />
       </div>
 
+      <div
+        className={`app-resizer app-resizer-right ${resizing === 'right' ? 'active' : ''}`}
+        onMouseDown={(e) => { e.preventDefault(); setResizing('right') }}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize right panel"
+      />
+
       {/* Right Panel: Questions, Feedback, Export */}
-      <div className="app-right">
+      <div className="app-right" style={{ width: rightWidth }}>
         <div className="panel-scroll">
           <div className="panel-section">
             <QuestionsEditor
