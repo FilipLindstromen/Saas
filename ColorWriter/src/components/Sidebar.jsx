@@ -184,6 +184,7 @@ const Sidebar = ({
                 </div>
             </div>
 
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.5rem', marginBottom: '-0.5rem' }}>Audience & Offer</div>
             <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="What specific situation is this offer about?">
                     Offer Situation

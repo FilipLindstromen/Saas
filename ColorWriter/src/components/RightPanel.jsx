@@ -27,7 +27,9 @@ const RightPanel = ({
     selectedBlockType,
     onBlockTypeSelect,
     showColors,
-    setShowColors
+    setShowColors,
+    colorScheme = 'belief',
+    setColorScheme
 }) => {
     const [infuseBlockType, setInfuseBlockType] = useState('story');
 
@@ -99,7 +101,7 @@ const RightPanel = ({
 
                 {/* Color Legend */}
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <h3 style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
                             Content Guide
                         </h3>
@@ -125,7 +127,50 @@ const RightPanel = ({
                             {showColors ? 'Hide Colors' : 'Show Colors'}
                         </button>
                     </div>
-                    <ColorLegend activeItem={activeLegendItem} selectedBlockType={selectedBlockType} onBlockTypeSelect={onBlockTypeSelect} />
+                    {showColors && setColorScheme && (
+                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1rem' }}>
+                            <button
+                                onClick={() => setColorScheme('belief')}
+                                title="Hook, Story, Emotion, Logic, Proof, CTA, Ad, Misc"
+                                style={{
+                                    flex: 1,
+                                    padding: '0.35rem 0.5rem',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 500,
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--border-default)',
+                                    background: colorScheme === 'belief' ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                                    color: colorScheme === 'belief' ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Belief
+                            </button>
+                            <button
+                                onClick={() => setColorScheme('persuasive')}
+                                title="Statement, Impact, Evidence, Relevance"
+                                style={{
+                                    flex: 1,
+                                    padding: '0.35rem 0.5rem',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 500,
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--border-default)',
+                                    background: colorScheme === 'persuasive' ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                                    color: colorScheme === 'persuasive' ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Persuasive
+                            </button>
+                        </div>
+                    )}
+                    <ColorLegend
+                        activeItem={activeLegendItem}
+                        selectedBlockType={selectedBlockType}
+                        onBlockTypeSelect={onBlockTypeSelect}
+                        colorScheme={colorScheme}
+                    />
                 </div>
 
                 {/* Main Actions Group */}

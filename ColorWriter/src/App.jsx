@@ -227,6 +227,8 @@ function App() {
 
   // Show/Hide Background Colors Toggle
   const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
+  // Color scheme: 'belief' (hook, story, emotion, etc.) or 'persuasive' (Statement, Impact, Evidence, Relevance)
+  const [colorScheme, setColorScheme] = usePersistentState('cw_colorScheme', 'belief');
 
 
   const handleAudienceFeedback = async (targetAudience, currentDocType) => {
@@ -595,6 +597,7 @@ function App() {
                 setContent={setContent}
                 onSelectionChange={setActiveLegendItem}
                 showColors={showColors === 'true'}
+                colorScheme={colorScheme}
                 selectedBlockType={selectedBlockType}
               />
             </div>
@@ -626,6 +629,8 @@ function App() {
             onBlockTypeSelect={setSelectedBlockType}
             showColors={showColors === 'true'}
             setShowColors={(value) => setShowColors(value ? 'true' : 'false')}
+            colorScheme={colorScheme}
+            setColorScheme={setColorScheme}
           />
 
         </Layout>

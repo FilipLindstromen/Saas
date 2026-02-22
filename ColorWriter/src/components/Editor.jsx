@@ -2,7 +2,14 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Wand2, Loader2, Scale, MessageCircle, Bold, Heading1, Heading2, Heading3, Type } from 'lucide-react';
 import { analyzeCopy } from '../services/openai';
 
-const Editor = ({ content, setContent, onSelectionChange, showColors = true, selectedBlockType = null }) => {
+const PERSUASIVE_MAP = {
+    statement: ['hook', 'ad', 'statement'],
+    impact: ['emotion', 'story', 'impact'],
+    evidence: ['proof', 'logic', 'evidence'],
+    relevance: ['cta', 'misc', 'relevance']
+};
+
+const Editor = ({ content, setContent, onSelectionChange, showColors = true, colorScheme = 'belief', selectedBlockType = null }) => {
     const editorRef = useRef(null);
 
     // Toolbar State
@@ -22,13 +29,15 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
         const editor = editorRef.current;
 
         if (selectedBlockType) {
-            // Mark all blocks with data-selected attribute
             const allBlocks = editor.querySelectorAll('[class*="block-"]');
+            const typesToSelect = colorScheme === 'persuasive' && PERSUASIVE_MAP[selectedBlockType]
+                ? PERSUASIVE_MAP[selectedBlockType]
+                : [selectedBlockType];
             allBlocks.forEach(block => {
                 const blockClass = Array.from(block.classList).find(cls => cls.startsWith('block-'));
                 if (blockClass) {
                     const blockType = blockClass.replace('block-', '');
-                    if (blockType === selectedBlockType) {
+                    if (typesToSelect.includes(blockType)) {
                         block.setAttribute('data-selected', 'true');
                     } else {
                         block.removeAttribute('data-selected');
@@ -40,7 +49,7 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
             const allBlocks = editor.querySelectorAll('[data-selected]');
             allBlocks.forEach(block => block.removeAttribute('data-selected'));
         }
-    }, [selectedBlockType, content]);
+    }, [selectedBlockType, colorScheme, content]);
 
     const handleInput = (e) => {
         // We handle content updates primarily through generation, but manual edits exist.
@@ -148,6 +157,10 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
                         else if (className.includes('block-cta')) blockType = 'cta';
                         else if (className.includes('block-ad')) blockType = 'ad';
                         else if (className.includes('block-misc')) blockType = 'misc';
+                        else if (className.includes('block-statement')) blockType = 'statement';
+                        else if (className.includes('block-impact')) blockType = 'impact';
+                        else if (className.includes('block-evidence')) blockType = 'evidence';
+                        else if (className.includes('block-relevance')) blockType = 'relevance';
                     }
 
                     // Check for Mechanics (Highlights) - these can override
@@ -334,7 +347,7 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
             }}>
                 <div
                     ref={editorRef}
-                    className={`editor-content ${showColors ? '' : 'hide-colors'}`}
+                    className={`editor-content ${showColors ? '' : 'hide-colors'} ${showColors && colorScheme === 'persuasive' ? 'color-mode-persuasive' : ''}`}
                     contentEditable
                     suppressContentEditableWarning
                     onInput={handleInput}

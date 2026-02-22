@@ -41,6 +41,10 @@ const LegendItem = ({ label, color, subtitle, type, iconStart, iconEnd, isActive
             {type === 'cta' && '🚀'}
             {type === 'ad' && '💡'}
             {type === 'misc' && '📝'}
+            {type === 'statement' && '📌'}
+            {type === 'impact' && '⚡'}
+            {type === 'evidence' && '📋'}
+            {type === 'relevance' && '🎯'}
             {type === 'interrupt' && '🛑'}
             {type === 'loop-open' && '➰'}
             {type === 'loop-close' && '✅'}
@@ -52,14 +56,37 @@ const LegendItem = ({ label, color, subtitle, type, iconStart, iconEnd, isActive
     </div>
 );
 
-const ColorLegend = ({ activeItem, selectedBlockType, onBlockTypeSelect }) => {
+// Persuasive Cycle: maps belief block types to persuasive types
+const PERSUASIVE_MAP = {
+    statement: ['hook', 'ad', 'statement'],
+    impact: ['emotion', 'story', 'impact'],
+    evidence: ['proof', 'logic', 'evidence'],
+    relevance: ['cta', 'misc', 'relevance']
+};
+
+const ColorLegend = ({ activeItem, selectedBlockType, onBlockTypeSelect, colorScheme = 'belief' }) => {
     // If activeItem exists, everything else is dimmed (for text selection highlighting)
     const isAnyActive = !!activeItem;
-    
+    const isPersuasive = colorScheme === 'persuasive';
+
+    // Resolve active/selected for persuasive mode (map belief types to persuasive)
+    const resolveActive = (key) => {
+        if (isPersuasive && PERSUASIVE_MAP[key]) {
+            return activeItem && PERSUASIVE_MAP[key].includes(activeItem);
+        }
+        return activeItem === key;
+    };
+    const resolveDimmed = (key) => {
+        if (isPersuasive && PERSUASIVE_MAP[key]) {
+            return isAnyActive && !PERSUASIVE_MAP[key].includes(activeItem);
+        }
+        return isAnyActive && activeItem !== key;
+    };
+    const resolveSelected = (key) => selectedBlockType === key;
+
     // Block type selection (for filtering/fading)
     const handleBlockTypeClick = (type) => {
         if (onBlockTypeSelect) {
-            // Toggle: if clicking the same type, deselect it
             if (selectedBlockType === type) {
                 onBlockTypeSelect(null);
             } else {
@@ -67,10 +94,6 @@ const ColorLegend = ({ activeItem, selectedBlockType, onBlockTypeSelect }) => {
             }
         }
     };
-
-    const checkActive = (key) => activeItem === key;
-    const checkDimmed = (key) => isAnyActive && activeItem !== key;
-    const checkSelected = (key) => selectedBlockType === key;
 
     return (
         <div style={{ padding: '0 0.5rem' }}>
@@ -82,19 +105,28 @@ const ColorLegend = ({ activeItem, selectedBlockType, onBlockTypeSelect }) => {
                 marginBottom: '1rem',
                 letterSpacing: '0.05em'
             }}>
-                Block Types
+                {isPersuasive ? 'Persuasive Cycle' : 'Block Types'}
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <LegendItem label="Hook" color="var(--color-hook)" type="hook" isActive={checkActive('hook')} isDimmed={checkDimmed('hook')} isSelected={checkSelected('hook')} onClick={() => handleBlockTypeClick('hook')} />
-                <LegendItem label="Story" color="var(--color-story)" type="story" isActive={checkActive('story')} isDimmed={checkDimmed('story')} isSelected={checkSelected('story')} onClick={() => handleBlockTypeClick('story')} />
-                <LegendItem label="Emotions" color="var(--color-emotion)" type="emotion" isActive={checkActive('emotion')} isDimmed={checkDimmed('emotion')} isSelected={checkSelected('emotion')} onClick={() => handleBlockTypeClick('emotion')} />
-                <LegendItem label="Logic" color="var(--color-logic)" type="logic" isActive={checkActive('logic')} isDimmed={checkDimmed('logic')} isSelected={checkSelected('logic')} onClick={() => handleBlockTypeClick('logic')} />
-                <LegendItem label="Proof" color="var(--color-proof)" type="proof" isActive={checkActive('proof')} isDimmed={checkDimmed('proof')} isSelected={checkSelected('proof')} onClick={() => handleBlockTypeClick('proof')} />
-                <LegendItem label="CTA" color="var(--color-cta)" type="cta" isActive={checkActive('cta')} isDimmed={checkDimmed('cta')} isSelected={checkSelected('cta')} onClick={() => handleBlockTypeClick('cta')} />
-                <LegendItem label="Ad / Creative" color="var(--color-ad)" type="ad" isActive={checkActive('ad')} isDimmed={checkDimmed('ad')} isSelected={checkSelected('ad')} onClick={() => handleBlockTypeClick('ad')} />
-                <LegendItem label="Misc" color="var(--color-misc)" type="misc" isActive={checkActive('misc')} isDimmed={checkDimmed('misc')} isSelected={checkSelected('misc')} onClick={() => handleBlockTypeClick('misc')} />
-            </div>
+            {isPersuasive ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <LegendItem label="Statement" color="var(--color-statement)" type="statement" isActive={resolveActive('statement')} isDimmed={resolveDimmed('statement')} isSelected={resolveSelected('statement')} onClick={() => handleBlockTypeClick('statement')} />
+                    <LegendItem label="Impact" color="var(--color-impact)" type="impact" isActive={resolveActive('impact')} isDimmed={resolveDimmed('impact')} isSelected={resolveSelected('impact')} onClick={() => handleBlockTypeClick('impact')} />
+                    <LegendItem label="Evidence" color="var(--color-evidence)" type="evidence" isActive={resolveActive('evidence')} isDimmed={resolveDimmed('evidence')} isSelected={resolveSelected('evidence')} onClick={() => handleBlockTypeClick('evidence')} />
+                    <LegendItem label="Relevance" color="var(--color-relevance)" type="relevance" isActive={resolveActive('relevance')} isDimmed={resolveDimmed('relevance')} isSelected={resolveSelected('relevance')} onClick={() => handleBlockTypeClick('relevance')} />
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <LegendItem label="Hook" color="var(--color-hook)" type="hook" isActive={resolveActive('hook')} isDimmed={resolveDimmed('hook')} isSelected={resolveSelected('hook')} onClick={() => handleBlockTypeClick('hook')} />
+                    <LegendItem label="Story" color="var(--color-story)" type="story" isActive={resolveActive('story')} isDimmed={resolveDimmed('story')} isSelected={resolveSelected('story')} onClick={() => handleBlockTypeClick('story')} />
+                    <LegendItem label="Emotions" color="var(--color-emotion)" type="emotion" isActive={resolveActive('emotion')} isDimmed={resolveDimmed('emotion')} isSelected={resolveSelected('emotion')} onClick={() => handleBlockTypeClick('emotion')} />
+                    <LegendItem label="Logic" color="var(--color-logic)" type="logic" isActive={resolveActive('logic')} isDimmed={resolveDimmed('logic')} isSelected={resolveSelected('logic')} onClick={() => handleBlockTypeClick('logic')} />
+                    <LegendItem label="Proof" color="var(--color-proof)" type="proof" isActive={resolveActive('proof')} isDimmed={resolveDimmed('proof')} isSelected={resolveSelected('proof')} onClick={() => handleBlockTypeClick('proof')} />
+                    <LegendItem label="CTA" color="var(--color-cta)" type="cta" isActive={resolveActive('cta')} isDimmed={resolveDimmed('cta')} isSelected={resolveSelected('cta')} onClick={() => handleBlockTypeClick('cta')} />
+                    <LegendItem label="Ad / Creative" color="var(--color-ad)" type="ad" isActive={resolveActive('ad')} isDimmed={resolveDimmed('ad')} isSelected={resolveSelected('ad')} onClick={() => handleBlockTypeClick('ad')} />
+                    <LegendItem label="Misc" color="var(--color-misc)" type="misc" isActive={resolveActive('misc')} isDimmed={resolveDimmed('misc')} isSelected={resolveSelected('misc')} onClick={() => handleBlockTypeClick('misc')} />
+                </div>
+            )}
 
             {/* MECHANICS */}
             <h4 style={{

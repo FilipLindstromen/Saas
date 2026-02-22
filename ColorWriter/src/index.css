@@ -67,6 +67,20 @@
   --color-proof-text: #065f46;
   /* emerald-800 - Dark text for good contrast */
 
+  /* Persuasive Cycle colors */
+  --color-statement: #ffedd5;
+  /* orange - clear claim */
+  --color-statement-text: #c2410c;
+  --color-impact: #ffe4e6;
+  /* rose - why it matters */
+  --color-impact-text: #be123c;
+  --color-evidence: #dbeafe;
+  /* blue - proof */
+  --color-evidence-text: #1e40af;
+  --color-relevance: #dcfce7;
+  /* green - why this audience */
+  --color-relevance-text: #166534;
+
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -149,6 +163,16 @@
   /* gray-700 */
   --color-misc-text: #f3f4f6;
   /* gray-100 */
+
+  /* Persuasive Cycle - dark */
+  --color-statement: #7c2d12;
+  --color-statement-text: #ffedd5;
+  --color-impact: #881337;
+  --color-impact-text: #ffe4e6;
+  --color-evidence: #1e3a8a;
+  --color-evidence-text: #dbeafe;
+  --color-relevance: #14532d;
+  --color-relevance-text: #dcfce7;
 }
 
 * {
@@ -314,7 +338,11 @@ input[type="range"]::-ms-fill-upper {
 .block-ad,
 .block-misc,
 .block-proof,
-.block-hook {
+.block-hook,
+.block-statement,
+.block-impact,
+.block-evidence,
+.block-relevance {
   /* Layout: Standard Block (Vertical Stacking) */
   display: block;
   margin: 0;
@@ -363,6 +391,51 @@ input[type="range"]::-ms-fill-upper {
   --block-text: var(--color-proof-text);
 }
 
+.block-statement {
+  --block-bg: var(--color-statement);
+  --block-text: var(--color-statement-text);
+}
+
+.block-impact {
+  --block-bg: var(--color-impact);
+  --block-text: var(--color-impact-text);
+}
+
+.block-evidence {
+  --block-bg: var(--color-evidence);
+  --block-text: var(--color-evidence-text);
+}
+
+.block-relevance {
+  --block-bg: var(--color-relevance);
+  --block-text: var(--color-relevance-text);
+}
+
+/* Persuasive Cycle mode: map belief blocks to persuasive colors */
+.editor-content.color-mode-persuasive .block-hook,
+.editor-content.color-mode-persuasive .block-ad {
+  --block-bg: var(--color-statement);
+  --block-text: var(--color-statement-text);
+}
+
+.editor-content.color-mode-persuasive .block-emotion,
+.editor-content.color-mode-persuasive .block-story {
+  --block-bg: var(--color-impact);
+  --block-text: var(--color-impact-text);
+}
+
+.editor-content.color-mode-persuasive .block-proof,
+.editor-content.color-mode-persuasive .block-logic {
+  --block-bg: var(--color-evidence);
+  --block-text: var(--color-evidence-text);
+}
+
+.editor-content.color-mode-persuasive .block-cta,
+.editor-content.color-mode-persuasive .block-misc {
+  --block-bg: var(--color-relevance);
+  --block-text: var(--color-relevance-text);
+}
+
 /* Apply Highlight to SPANS inside Headings/Paragraphs */
 .block-story span,
 .block-emotion span,
@@ -371,7 +444,11 @@ input[type="range"]::-ms-fill-upper {
 .block-ad span,
 .block-misc span,
 .block-proof span,
-.block-hook span {
+.block-hook span,
+.block-statement span,
+.block-impact span,
+.block-evidence span,
+.block-relevance span {
   background-color: var(--block-bg);
   color: var(--block-text);
 
@@ -604,7 +681,11 @@ i[type="loop-close"]::before {
 .hide-colors .block-ad span,
 .hide-colors .block-misc span,
 .hide-colors .block-hook span,
-.hide-colors .block-proof span {
+.hide-colors .block-proof span,
+.hide-colors .block-statement span,
+.hide-colors .block-impact span,
+.hide-colors .block-evidence span,
+.hide-colors .block-relevance span {
   background-color: transparent !important;
   color: var(--text-primary) !important;
 }
@@ -616,7 +697,11 @@ i[type="loop-close"]::before {
 .hide-colors .block-ad,
 .hide-colors .block-misc,
 .hide-colors .block-hook,
-.hide-colors .block-proof {
+.hide-colors .block-proof,
+.hide-colors .block-statement,
+.hide-colors .block-impact,
+.hide-colors .block-evidence,
+.hide-colors .block-relevance {
   background: transparent !important;
   color: var(--text-primary) !important;
 }
