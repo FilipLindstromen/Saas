@@ -53,6 +53,10 @@ export interface OverlayItem {
   infographicProjectId?: string
   infographicTabId?: string
   infographicProjectName?: string
+  /** Rotation in degrees (0–360). Applied to image, video, infographic overlays. */
+  rotation?: number
+  /** Flip horizontally. Applied to image, video, infographic overlays. */
+  flipHorizontal?: boolean
   /** When true (default), overlay is drawn during recording and included in the exported file. When false, preview-only. */
   burnIntoExport?: boolean
 }

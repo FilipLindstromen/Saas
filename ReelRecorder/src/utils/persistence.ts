@@ -159,6 +159,8 @@ function normalizeOverlayItem(raw: unknown): OverlayItem | null {
     infographicProjectId: str(item.infographicProjectId),
     infographicTabId: str(item.infographicTabId),
     infographicProjectName: str(item.infographicProjectName),
+    rotation: num(item.rotation),
+    flipHorizontal: bool(item.flipHorizontal),
     burnIntoExport: bool(item.burnIntoExport) ?? true,
   }
   return overlay

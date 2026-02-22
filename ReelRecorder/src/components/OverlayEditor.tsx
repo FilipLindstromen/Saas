@@ -260,6 +260,27 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
             />
             <span className={styles.sliderValue}>{Math.round((overlay.imageScale ?? 1) * 100)}%</span>
           </div>
+          <label className={styles.label}>Rotation</label>
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              className={styles.slider}
+              min={0}
+              max={360}
+              value={Math.round(overlay.rotation ?? 0)}
+              onChange={(e) => onUpdate({ rotation: Number(e.target.value) })}
+              aria-label="Rotation"
+            />
+            <span className={styles.sliderValue}>{Math.round(overlay.rotation ?? 0)}°</span>
+          </div>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={!!overlay.flipHorizontal}
+              onChange={(e) => onUpdate({ flipHorizontal: e.target.checked })}
+            />
+            <span>Flip horizontal</span>
+          </label>
         </>
       )}
       {overlay.type === 'infographic' && (
@@ -281,6 +302,27 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
             />
             <span className={styles.sliderValue}>{Math.round((overlay.imageScale ?? 1) * 100)}%</span>
           </div>
+          <label className={styles.label}>Rotation</label>
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              className={styles.slider}
+              min={0}
+              max={360}
+              value={Math.round(overlay.rotation ?? 0)}
+              onChange={(e) => onUpdate({ rotation: Number(e.target.value) })}
+              aria-label="Rotation"
+            />
+            <span className={styles.sliderValue}>{Math.round(overlay.rotation ?? 0)}°</span>
+          </div>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={!!overlay.flipHorizontal}
+              onChange={(e) => onUpdate({ flipHorizontal: e.target.checked })}
+            />
+            <span>Flip horizontal</span>
+          </label>
         </>
       )}
       {overlay.type === 'image' && (
@@ -368,6 +410,27 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
                 />
                 <span className={styles.sliderValue}>{Math.round((overlay.imageScale ?? 1) * 100)}%</span>
               </div>
+              <label className={styles.label}>Rotation</label>
+              <div className={styles.sliderRow}>
+                <input
+                  type="range"
+                  className={styles.slider}
+                  min={0}
+                  max={360}
+                  value={Math.round(overlay.rotation ?? 0)}
+                  onChange={(e) => onUpdate({ rotation: Number(e.target.value) })}
+                  aria-label="Rotation"
+                />
+                <span className={styles.sliderValue}>{Math.round(overlay.rotation ?? 0)}°</span>
+              </div>
+              <label className={styles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={!!overlay.flipHorizontal}
+                  onChange={(e) => onUpdate({ flipHorizontal: e.target.checked })}
+                />
+                <span>Flip horizontal</span>
+              </label>
             </>
           )}
         </>

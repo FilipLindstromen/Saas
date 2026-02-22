@@ -449,7 +449,11 @@ export function buildSystemPrompt(template, params) {
     for (const [key, val] of Object.entries(replacements)) {
         result = result.split(key).join(val);
     }
-    return result;
+    const hierarchyPreamble = `**INPUT HIERARCHY**: The structured inputs below (Target Audience, Situations, Pain Points, Hidden Frustrations, Desired Outcomes, Objections, Framework) are the PRIMARY drivers of the copy. Build the copy around them. Any additional "instructions" from the user provide topic context only — extract meaning, not wording. Write fresh copy driven by the structured inputs and framework.
+
+---
+`;
+    return hierarchyPreamble + result;
 }
 
 import { cleanContent } from './utils';
@@ -522,7 +526,18 @@ Reframe objections as buying signals. Include an FAQ or objection section addres
                 ? `Generate the ACTUAL ad copy — headlines, hooks, and body text. Output the real ad content, not commentary about it.`
                 : `Generate the ACTUAL ${docType} copy. Output the real persuasive content in HTML format, not commentary or recommendations about it.`;
 
-    const userPrompt = `${docTypeTask ? docTypeTask + '\n\n' : ''}**Product/offer context and instructions:** ${instructions || 'No additional instructions provided.'}${objectionGuidance}
+    const instructionsGuidance = instructions?.trim()
+        ? `**Topic reference (instructions field):**
+${instructions}
+
+Use this ONLY to understand the subject matter, offer type, and key ideas. Extract the content and meaning — do NOT copy the phrasing, structure, or wording. Write fresh copy. The instructions provide context; the structured inputs below drive the actual copy.`
+        : '';
+
+    const userPrompt = `${docTypeTask ? docTypeTask + '\n\n' : ''}**PRIMARY DRIVERS (these shape the copy — use them heavily):**
+The system prompt already contains: Target Audience, Specific Situations, Pain Points, Hidden Frustrations, Desired Outcomes, Objections, and the Persuasion Framework. These are the main inputs. Your copy must be built around them — situations, pains, outcomes, and framework drive structure and messaging.
+
+${instructionsGuidance}
+${objectionGuidance}
 
 **OUTPUT REQUIREMENT:** Return ONLY the copy in HTML format. No preamble, no explanation, no meta-language like "The copy should..." or "This approach...". Start directly with <div class="content-row">.
 

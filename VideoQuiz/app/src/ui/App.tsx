@@ -1319,7 +1319,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
               {/* Answer Format Settings */}
               <div className="bg-gray-100/20 rounded-lg p-3">
                 <div className="text-sm font-medium text-gray-300 mb-3">📝 Answer Format</div>
-            <div className="flex gap-2">
+                <div className="flex gap-2">
                   <button
                     className={`px-3 py-2 rounded text-sm ${
                       (quiz.settings!.answerFormat ?? 'letters') === 'letters' 
@@ -1350,8 +1350,8 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     >
                       Step 1:, 2:, 3:
                     </button>
-            </div>
-          </div>
+                </div>
+              </div>
 
               {/* Correct Answer Styling */}
               <div className="bg-gray-100/20 rounded-lg p-3">
@@ -1433,8 +1433,8 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                   <LabeledSlider label="Title size %" value={quiz.settings!.titleSizePercent ?? 6.0} min={2} max={12} step={0.1} onChange={v => updateSettings(s => ({ ...s, titleSizePercent: v }))} />
                   <LabeledSlider label="Question size %" value={quiz.settings!.questionSizePercent ?? 4.5} min={2} max={10} step={0.1} onChange={v => updateSettings(s => ({ ...s, questionSizePercent: v }))} />
                   <LabeledSlider label="Answer size %" value={quiz.settings!.answerSizePercent ?? 2.2} min={1} max={6} step={0.1} onChange={v => updateSettings(s => ({ ...s, answerSizePercent: v }))} />
-            </div>
-          </div>
+                </div>
+              </div>
 
               {/* Questions List */}
               <div className="bg-gray-100/20 rounded-lg p-3">
@@ -1568,10 +1568,10 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                     </div>
                   )}
                 </div>
-          </div>
+              </div>
 
               {/* Question Editor */}
-          {selectedQuestion && (
+              {selectedQuestion && (
                 <div className="ios-card p-4">
                   <div className="text-sm font-medium text-gray-300 mb-3">Edit Question</div>
                   <TransparentTextarea 

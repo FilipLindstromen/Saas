@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -320,23 +320,6 @@
       box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.25);
     }
 
-    .section {
-      margin-bottom: 2.5rem;
-    }
-
-    .section:last-child {
-      margin-bottom: 0;
-    }
-
-    .section-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin: 0 0 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -391,7 +374,7 @@
   <div class="container">
     <div class="header">
       <div class="header-text">
-        <h1>Saas Apps</h1>
+  <h1>Saas Apps</h1>
         <p class="subtitle">Select an app to get started</p>
       </div>
       <div class="header-actions">
@@ -406,150 +389,128 @@
         </button>
       </div>
     </div>
-
-    <section class="section">
-      <h2 class="section-title">Presentation / Video</h2>
-      <div class="grid">
-        <a href="InfoGraphics/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/info-graphics.svg" alt="Info Graphic Generator" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Info Graphic Generator</h2>
-          </div>
-        </a>
-        <a href="PitchDeck/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/pitch-deck.svg" alt="Pitch Deck" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Pitch Deck</h2>
-          </div>
-        </a>
-        <a href="ReelRecorder/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/reel-recorder.svg" alt="Reel Recorder" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Reel Recorder</h2>
-          </div>
-        </a>
-        <a href="SoundEffectsGenerator/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/sound-effects.svg" alt="Sound Effects Generator" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Sound Effects Generator</h2>
-          </div>
-        </a>
-        <a href="VIdeoRecorder/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/video-recorder.svg" alt="Video Recorder" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Video Recorder</h2>
-          </div>
-        </a>
-        <a href="VSLWriter/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/vsl-writer.svg" alt="VSL Writer" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">VSL Writer</h2>
-          </div>
-        </a>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2 class="section-title">Copywriting</h2>
-      <div class="grid">
-        <a href="ColorWriter/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/color-writer.svg" alt="Color Writer" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Color Writer</h2>
-          </div>
-        </a>
-        <a href="conversation-generator/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/conversation.svg" alt="Conversation Generator" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Conversation Generator</h2>
-          </div>
-        </a>
-        <a href="CopyWriter/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/copywriter.svg" alt="CopyWriter" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">CopyWriter</h2>
-          </div>
-        </a>
-        <a href="PowerWriter/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/power-writer.svg" alt="Power Writer" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Power Writer</h2>
-          </div>
-        </a>
-        <a href="StoryWriter/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/story-writer.svg" alt="Story Writer" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Story Writer</h2>
-          </div>
-        </a>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2 class="section-title">Quiz Apps</h2>
-      <div class="grid">
-        <a href="VideoQuiz/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/video-quiz.svg" alt="Video Quiz" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Video Quiz</h2>
-          </div>
-        </a>
-        <a href="webquizgenerator/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/web-quiz.svg" alt="Web Quiz Generator" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Web Quiz Generator</h2>
-          </div>
-        </a>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2 class="section-title">Other</h2>
-      <div class="grid">
-        <a href="PostIt/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/postit.svg" alt="PostIt" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">PostIt</h2>
-          </div>
-        </a>
-        <a href="Typography/" class="card">
-          <div class="card-thumb">
-            <img src="assets/icons/typography.svg" alt="Typography" loading="lazy">
-          </div>
-          <div class="card-body">
-            <h2 class="card-title">Typography</h2>
-          </div>
-        </a>
-      </div>
-    </section>
+    <div class="grid">
+      <a href="ColorWriter/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/color-writer.svg" alt="Color Writer" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Color Writer</h2>
+        </div>
+      </a>
+      <a href="InfoGraphics/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/info-graphics.svg" alt="Info Graphic Generator" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Info Graphic Generator</h2>
+        </div>
+      </a>
+      <a href="conversation-generator/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/conversation.svg" alt="Conversation Generator" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Conversation Generator</h2>
+        </div>
+      </a>
+      <a href="CopyWriter/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/copywriter.svg" alt="CopyWriter" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">CopyWriter</h2>
+        </div>
+      </a>
+      <a href="PitchDeck/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/pitch-deck.svg" alt="Pitch Deck" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Pitch Deck</h2>
+        </div>
+      </a>
+      <a href="PostIt/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/postit.svg" alt="PostIt" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">PostIt</h2>
+        </div>
+      </a>
+      <a href="PowerWriter/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/power-writer.svg" alt="Power Writer" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Power Writer</h2>
+        </div>
+      </a>
+      <a href="ReelRecorder/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/reel-recorder.svg" alt="Reel Recorder" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Reel Recorder</h2>
+        </div>
+      </a>
+      <a href="SoundEffectsGenerator/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/sound-effects.svg" alt="Sound Effects Generator" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Sound Effects Generator</h2>
+        </div>
+      </a>
+      <a href="StoryWriter/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/story-writer.svg" alt="Story Writer" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Story Writer</h2>
+        </div>
+      </a>
+      <a href="Typography/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/typography.svg" alt="Typography" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Typography</h2>
+        </div>
+      </a>
+      <a href="VideoQuiz/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/video-quiz.svg" alt="Video Quiz" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Video Quiz</h2>
+        </div>
+      </a>
+      <a href="VIdeoRecorder/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/video-recorder.svg" alt="Video Recorder" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Video Recorder</h2>
+        </div>
+      </a>
+      <a href="VSLWriter/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/vsl-writer.svg" alt="VSL Writer" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">VSL Writer</h2>
+        </div>
+      </a>
+      <a href="webquizgenerator/" class="card">
+        <div class="card-thumb">
+          <img src="assets/icons/web-quiz.svg" alt="Web Quiz Generator" loading="lazy">
+        </div>
+        <div class="card-body">
+          <h2 class="card-title">Web Quiz Generator</h2>
+        </div>
+      </a>
+    </div>
   </div>
 
   <!-- Settings Modal -->
@@ -680,3 +641,4 @@
   </script>
 </body>
 </html>
+

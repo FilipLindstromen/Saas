@@ -209,7 +209,21 @@ export function drawOverlays(
           : imgToUse.naturalHeight * scale
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
-        ctx.drawImage(imgToUse, x, y, w, h)
+        const cx = x + w / 2
+        const cy = y + h / 2
+        const rot = (o.rotation ?? 0) * (Math.PI / 180)
+        const flip = !!o.flipHorizontal
+        if (rot !== 0 || flip) {
+          ctx.save()
+          ctx.translate(cx, cy)
+          if (rot !== 0) ctx.rotate(rot)
+          if (flip) ctx.scale(-1, 1)
+          ctx.translate(-cx, -cy)
+          ctx.drawImage(imgToUse, x, y, w, h)
+          ctx.restore()
+        } else {
+          ctx.drawImage(imgToUse, x, y, w, h)
+        }
       }
     }
     if (o.type === 'video' && o.videoUrl) {
@@ -220,7 +234,21 @@ export function drawOverlays(
         const h = (o.naturalHeight ?? video.videoHeight) * scale
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
-        ctx.drawImage(video, x, y, w, h)
+        const cx = x + w / 2
+        const cy = y + h / 2
+        const rot = (o.rotation ?? 0) * (Math.PI / 180)
+        const flip = !!o.flipHorizontal
+        if (rot !== 0 || flip) {
+          ctx.save()
+          ctx.translate(cx, cy)
+          if (rot !== 0) ctx.rotate(rot)
+          if (flip) ctx.scale(-1, 1)
+          ctx.translate(-cx, -cy)
+          ctx.drawImage(video, x, y, w, h)
+          ctx.restore()
+        } else {
+          ctx.drawImage(video, x, y, w, h)
+        }
       }
     }
     if (o.type === 'infographic' && o.infographicProjectId) {
@@ -237,9 +265,25 @@ export function drawOverlays(
         const h = baseH * scale
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
-        drawInfographicOnCanvas(ctx, projectData, infographicTime, x, y, w, h, {
-          preloadedImages: options.infographicElementImages,
-        })
+        const cx = x + w / 2
+        const cy = y + h / 2
+        const rot = (o.rotation ?? 0) * (Math.PI / 180)
+        const flip = !!o.flipHorizontal
+        if (rot !== 0 || flip) {
+          ctx.save()
+          ctx.translate(cx, cy)
+          if (rot !== 0) ctx.rotate(rot)
+          if (flip) ctx.scale(-1, 1)
+          ctx.translate(-cx, -cy)
+          drawInfographicOnCanvas(ctx, projectData, infographicTime, x, y, w, h, {
+            preloadedImages: options.infographicElementImages,
+          })
+          ctx.restore()
+        } else {
+          drawInfographicOnCanvas(ctx, projectData, infographicTime, x, y, w, h, {
+            preloadedImages: options.infographicElementImages,
+          })
+        }
       }
     }
   }

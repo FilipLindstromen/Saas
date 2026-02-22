@@ -39,8 +39,12 @@ function drawSafeZoneOverlay(
   drawRect(title, 'rgba(255, 200, 0, 0.8)', [2, 2])
 }
 
-const RESIZE_HANDLE_SIZE = 16
+const RESIZE_HANDLE_SIZE = 24
+const ROTATE_HANDLE_SIZE = 28
+const FLIP_ICON_SIZE = 22
 const SELECTION_STROKE = 2
+const SNAP_THRESHOLD = 8
+const GUIDE_COLOR = '#f97316' // Orange, matches InfoGraphics accent
 const MIN_FONT_SIZE_PCT = 0.5
 const MAX_FONT_SIZE_PCT = 20
 const MIN_IMAGE_SCALE = 0.1
@@ -105,9 +109,66 @@ function getOverlayRect(
   return null
 }
 
-function drawSelectionAndHandle(
+/** Build snap points from overlay rects (exclude dragging overlay). */
+function getSnapPoints(
+  rects: { x: number; y: number; w: number; h: number }[],
+  width: number,
+  height: number
+): { x: Set<number>; y: Set<number> } {
+  const points = { x: new Set<number>(), y: new Set<number>() }
+  for (const r of rects) {
+    points.x.add(r.x)
+    points.x.add(r.x + r.w)
+    points.x.add(r.x + r.w / 2)
+    points.y.add(r.y)
+    points.y.add(r.y + r.h)
+    points.y.add(r.y + r.h / 2)
+  }
+  points.x.add(0)
+  points.x.add(width)
+  points.x.add(width / 2)
+  points.y.add(0)
+  points.y.add(height)
+  points.y.add(height / 2)
+  return points
+}
+
+function snapValue(val: number, points: Set<number>, threshold: number): number {
+  for (const p of points) {
+    if (Math.abs(val - p) <= threshold) return p
+  }
+  return val
+}
+
+function findSnappedGuides(
+  rect: { x: number; y: number; w: number; h: number },
+  snapPoints: { x: Set<number>; y: Set<number> },
+  threshold: number
+): { type: 'x' | 'y'; pos: number }[] {
+  const guides: { type: 'x' | 'y'; pos: number }[] = []
+  const edges = [
+    { val: rect.x, type: 'x' as const, pos: rect.x },
+    { val: rect.x + rect.w, type: 'x' as const, pos: rect.x + rect.w },
+    { val: rect.x + rect.w / 2, type: 'x' as const, pos: rect.x + rect.w / 2 },
+    { val: rect.y, type: 'y' as const, pos: rect.y },
+    { val: rect.y + rect.h, type: 'y' as const, pos: rect.y + rect.h },
+    { val: rect.y + rect.h / 2, type: 'y' as const, pos: rect.y + rect.h / 2 },
+  ]
+  for (const { val, type, pos } of edges) {
+    for (const p of snapPoints[type]) {
+      if (Math.abs(val - p) <= threshold) {
+        guides.push({ type, pos: p })
+        break
+      }
+    }
+  }
+  return guides
+}
+
+function drawSelectionAndHandles(
   ctx: CanvasRenderingContext2D,
-  rect: { x: number; y: number; w: number; h: number }
+  rect: { x: number; y: number; w: number; h: number },
+  showRotateAndFlip: boolean
 ) {
   ctx.strokeStyle = '#5b8def'
   ctx.lineWidth = SELECTION_STROKE
@@ -116,6 +177,55 @@ function drawSelectionAndHandle(
   const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
   ctx.fillStyle = '#5b8def'
   ctx.fillRect(handleX, handleY, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
+  if (showRotateAndFlip) {
+    const cx = rect.x + rect.w / 2
+    const rotateY = rect.y - ROTATE_HANDLE_SIZE / 2 - 4
+    ctx.fillStyle = '#5b8def'
+    ctx.beginPath()
+    ctx.arc(cx, rotateY, ROTATE_HANDLE_SIZE / 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    ctx.fillStyle = '#fff'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('↻', cx, rotateY)
+    const flipX = rect.x + FLIP_ICON_SIZE / 2 + 4
+    const flipY = rect.y + FLIP_ICON_SIZE / 2 + 4
+    ctx.fillStyle = 'rgba(91, 141, 239, 0.9)'
+    ctx.fillRect(flipX - FLIP_ICON_SIZE / 2, flipY - FLIP_ICON_SIZE / 2, FLIP_ICON_SIZE, FLIP_ICON_SIZE)
+    ctx.strokeStyle = '#fff'
+    ctx.strokeRect(flipX - FLIP_ICON_SIZE / 2, flipY - FLIP_ICON_SIZE / 2, FLIP_ICON_SIZE, FLIP_ICON_SIZE)
+    ctx.fillStyle = '#fff'
+    ctx.font = '14px sans-serif'
+    ctx.fillText('⇄', flipX, flipY)
+  }
+}
+
+function drawSnapGuides(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  guides: { type: 'x' | 'y'; pos: number }[]
+) {
+  if (guides.length === 0) return
+  ctx.save()
+  ctx.strokeStyle = GUIDE_COLOR
+  ctx.lineWidth = 1
+  for (const g of guides) {
+    ctx.beginPath()
+    if (g.type === 'x') {
+      ctx.moveTo(g.pos, 0)
+      ctx.lineTo(g.pos, height)
+    } else {
+      ctx.moveTo(0, g.pos)
+      ctx.lineTo(width, g.pos)
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 interface RecordPreviewProps {
@@ -166,6 +276,7 @@ interface RecordPreviewProps {
   safeZone?: { type: SafeZoneType; visible: boolean }
   videoVolume?: number
   selectedOverlayId?: string | null
+  onOverlaySelect?: (id: string | null) => void
   onOverlayEdit?: (id: string, patch: Partial<OverlayItem>) => void
   playbackUrl?: string | null
   /** In edit mode: show recording (playback) or live webcam. When 'webcam', preview uses videoStream. */
@@ -190,6 +301,7 @@ export function RecordPreview({
   videoRef: externalVideoRef,
   onOverlayMove,
   selectedOverlayId = null,
+  onOverlaySelect,
   onOverlayEdit,
   portraitFillHeight = false,
   overlayTextAnimation = 'none',
@@ -237,8 +349,16 @@ export function RecordPreview({
     startValue: number
     kind: 'fontSize' | 'scale'
   } | null>(null)
+  const [rotateState, setRotateState] = useState<{
+    overlayId: string
+    startAngle: number
+    startRotation: number
+    centerX: number
+    centerY: number
+  } | null>(null)
   const [captionDrag, setCaptionDrag] = useState(false)
-  const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize'>('default')
+  const [snapGuides, setSnapGuides] = useState<{ type: 'x' | 'y'; pos: number }[]>([])
+  const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize' | 'pointer'>('default')
 
   // Effective "show recording": only when editPreviewSource is 'recording' (or no webcam when 'webcam')
   // When isRecording, always show webcam (we're recording it); don't show playback.
@@ -531,8 +651,15 @@ export function RecordPreview({
           const sel = active.find((o) => o.id === selectedOverlayId)
           if (sel) {
             const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
-            if (rect) drawSelectionAndHandle(ctx, rect)
+            if (rect) {
+              const showRotateFlip = sel.type === 'image' || sel.type === 'video' || sel.type === 'infographic'
+              drawSelectionAndHandles(ctx, rect, showRotateFlip)
+            }
           }
+        }
+        // Draw alignment guides when dragging
+        if (!isRecording && snapGuides.length > 0) {
+          drawSnapGuides(ctx, width, height, snapGuides)
         }
       } else {
         ctx.fillStyle = '#1a1a1e'
@@ -552,7 +679,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {
@@ -581,6 +708,8 @@ export function RecordPreview({
   type HitResult =
     | { type: 'overlay'; id: string; offsetX: number; offsetY: number }
     | { type: 'resize'; id: string }
+    | { type: 'rotate'; id: string }
+    | { type: 'flip'; id: string }
     | { type: 'caption' }
     | null
 
@@ -589,15 +718,29 @@ export function RecordPreview({
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return null
     const active = overlays.filter((o) => displayTime >= o.startTime && displayTime <= o.endTime)
-    if (selectedOverlayId && onOverlayEdit) {
-      const sel = active.find((o) => o.id === selectedOverlayId)
-      if (sel) {
-        const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+    // Check resize, rotate, flip handles for ALL overlays first (handles take priority over body)
+    if (onOverlayEdit) {
+      for (let i = active.length - 1; i >= 0; i--) {
+        const o = active[i]
+        const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
         if (rect) {
           const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
           const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
           if (canvasX >= handleX && canvasX <= rect.x + rect.w && canvasY >= handleY && canvasY <= rect.y + rect.h) {
-            return { type: 'resize', id: sel.id }
+            return { type: 'resize', id: o.id }
+          }
+          const showRotateFlip = o.type === 'image' || o.type === 'video' || o.type === 'infographic'
+          if (showRotateFlip) {
+            const cx = rect.x + rect.w / 2
+            const rotateY = rect.y - ROTATE_HANDLE_SIZE / 2 - 4
+            const dist = Math.hypot(canvasX - cx, canvasY - rotateY)
+            if (dist <= ROTATE_HANDLE_SIZE / 2) return { type: 'rotate', id: o.id }
+            const flipX = rect.x + FLIP_ICON_SIZE / 2 + 4
+            const flipY = rect.y + FLIP_ICON_SIZE / 2 + 4
+            const flipHalf = FLIP_ICON_SIZE / 2
+            if (canvasX >= flipX - flipHalf && canvasX <= flipX + flipHalf && canvasY >= flipY - flipHalf && canvasY <= flipY + flipHalf) {
+              return { type: 'flip', id: o.id }
+            }
           }
         }
       }
@@ -689,8 +832,42 @@ export function RecordPreview({
         ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
+    if (hit?.type === 'flip' && onOverlayEdit && !isRecording) {
+      e.preventDefault()
+      onOverlaySelect?.(hit.id)
+      const o = overlays.find((ov) => ov.id === hit.id)
+      if (o) {
+        onOverlayEdit(hit.id, { flipHorizontal: !o.flipHorizontal })
+      }
+      return
+    }
+    if (hit?.type === 'rotate' && onOverlayEdit && !isRecording) {
+      e.preventDefault()
+      onOverlaySelect?.(hit.id)
+      const o = overlays.find((ov) => ov.id === hit.id)
+      if (!o) return
+      const canvas = canvasRef.current
+      const ctx2 = canvas?.getContext('2d')
+      if (!ctx2) return
+      const rect = getOverlayRect(ctx2, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+      if (!rect) return
+      const centerX = rect.x + rect.w / 2
+      const centerY = rect.y + rect.h / 2
+      const startAngle = Math.atan2(y - centerY, x - centerX)
+      setRotateState({
+        overlayId: hit.id,
+        startAngle,
+        startRotation: o.rotation ?? 0,
+        centerX,
+        centerY,
+      })
+      setCursor('grabbing')
+      ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+      return
+    }
     if (hit?.type === 'resize' && onOverlayEdit && !isRecording) {
       e.preventDefault()
+      onOverlaySelect?.(hit.id)
       const o = overlays.find((ov) => ov.id === hit.id)
       if (!o) return
       const startValue =
@@ -708,11 +885,12 @@ export function RecordPreview({
         ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
-    if (hit?.type === 'overlay' && onOverlayMove && !isRecording) {
+    if (hit?.type === 'overlay' && !isRecording) {
       e.preventDefault()
+      onOverlaySelect?.(hit.id)
       setDragState({ overlayId: hit.id, offsetX: hit.offsetX, offsetY: hit.offsetY })
       setCursor('grabbing')
-        ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+      ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
     }
   }
 
@@ -721,6 +899,15 @@ export function RecordPreview({
     if (captionDrag && onCaptionYChange) {
       const newY = Math.max(0, Math.min(1, y / height))
       onCaptionYChange(newY)
+      return
+    }
+    if (rotateState && onOverlayEdit) {
+      const currAngle = Math.atan2(y - rotateState.centerY, x - rotateState.centerX)
+      const deltaDeg = ((currAngle - rotateState.startAngle) * 180) / Math.PI
+      let newRotation = rotateState.startRotation + deltaDeg
+      newRotation = ((newRotation % 360) + 360) % 360
+      if (newRotation > 180) newRotation -= 360
+      onOverlayEdit(rotateState.overlayId, { rotation: newRotation })
       return
     }
     if (resizeState && onOverlayEdit) {
@@ -743,34 +930,84 @@ export function RecordPreview({
       return
     }
     if (dragState && onOverlayMove) {
-      const nx = (x - dragState.offsetX) / width
-      const ny = (y - dragState.offsetY) / height
+      const o = overlays.find((ov) => ov.id === dragState.overlayId)
+      const ctx = canvasRef.current?.getContext('2d')
+      if (!o || !ctx) return
+      const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+      if (!rect) return
+      // Proposed position in pixels (text: top-left; image/video/infographic: offset is from center)
+      const isCenterAnchored = o.type === 'image' || o.type === 'video' || o.type === 'infographic'
+      let proposedX: number
+      let proposedY: number
+      if (isCenterAnchored) {
+        proposedX = x - dragState.offsetX - rect.w / 2 // top-left from center
+        proposedY = y - dragState.offsetY - rect.h / 2
+      } else {
+        proposedX = x - dragState.offsetX
+        proposedY = y - dragState.offsetY
+      }
+      const active = overlays.filter((ov) => displayTime >= ov.startTime && displayTime <= ov.endTime && ov.id !== dragState.overlayId)
+      const rects: { x: number; y: number; w: number; h: number }[] = []
+      for (const ov of active) {
+        const r = getOverlayRect(ctx, width, height, ov, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+        if (r) rects.push(r)
+      }
+      const snapPoints = getSnapPoints(rects, width, height)
+      const proposedRect = { x: proposedX, y: proposedY, w: rect.w, h: rect.h }
+      let snappedX = snapValue(proposedX, snapPoints.x, SNAP_THRESHOLD)
+      const snappedXRight = snapValue(proposedX + rect.w, snapPoints.x, SNAP_THRESHOLD) - rect.w
+      const snappedXCenter = snapValue(proposedX + rect.w / 2, snapPoints.x, SNAP_THRESHOLD) - rect.w / 2
+      if (snappedX !== proposedX) proposedRect.x = snappedX
+      else if (snappedXRight !== proposedX) proposedRect.x = snappedXRight
+      else if (snappedXCenter !== proposedX) proposedRect.x = snappedXCenter
+      let snappedY = snapValue(proposedY, snapPoints.y, SNAP_THRESHOLD)
+      const snappedYBottom = snapValue(proposedY + rect.h, snapPoints.y, SNAP_THRESHOLD) - rect.h
+      const snappedYCenter = snapValue(proposedY + rect.h / 2, snapPoints.y, SNAP_THRESHOLD) - rect.h / 2
+      if (snappedY !== proposedY) proposedRect.y = snappedY
+      else if (snappedYBottom !== proposedY) proposedRect.y = snappedYBottom
+      else if (snappedYCenter !== proposedY) proposedRect.y = snappedYCenter
+      const guides = findSnappedGuides(proposedRect, snapPoints, SNAP_THRESHOLD)
+      setSnapGuides(guides)
       const clamp = (v: number) => Math.max(0, Math.min(1, v))
-      onOverlayMove(dragState.overlayId, clamp(nx), clamp(ny))
+      if (isCenterAnchored) {
+        const nx = clamp((proposedRect.x + rect.w / 2) / width)
+        const ny = clamp((proposedRect.y + rect.h / 2) / height)
+        onOverlayMove(dragState.overlayId, nx, ny)
+      } else {
+        const nx = clamp(proposedRect.x / width)
+        const ny = clamp(proposedRect.y / height)
+        onOverlayMove(dragState.overlayId, nx, ny)
+      }
       return
     }
     const hit = hitTest(x, y)
     if (hit?.type === 'caption' && onCaptionYChange) setCursor('grab')
     else if (hit?.type === 'resize' && !isRecording && onOverlayEdit) setCursor('nwse-resize')
+    else if (hit?.type === 'rotate' && !isRecording && onOverlayEdit) setCursor('grab')
+    else if (hit?.type === 'flip' && !isRecording && onOverlayEdit) setCursor('pointer')
     else if (hit?.type === 'overlay' && !isRecording && onOverlayMove) setCursor('grab')
     else setCursor('default')
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (captionDrag || dragState || resizeState) {
+    if (captionDrag || dragState || resizeState || rotateState) {
       ; (e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
       setCaptionDrag(false)
       setDragState(null)
       setResizeState(null)
+      setRotateState(null)
+      setSnapGuides([])
       setCursor('default')
     }
   }
 
   const handlePointerLeave = () => {
-    if (captionDrag || dragState || resizeState) {
+    if (captionDrag || dragState || resizeState || rotateState) {
       setCaptionDrag(false)
       setDragState(null)
       setResizeState(null)
+      setRotateState(null)
+      setSnapGuides([])
     }
     setCursor('default')
   }

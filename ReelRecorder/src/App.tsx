@@ -684,7 +684,7 @@ export default function App() {
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
       ...(type === 'text' ? { text: 'New text', fontSizePercent: 10, fontFamily: defaultFontFamily, secondaryFont: defaultSecondaryFont, color: '#ffffff', x: 0.1, y: 0.1, burnIntoExport: true } : { x: 0.5, y: 0.5, imageScale: 1, burnIntoExport: true }),
-      ...(type === 'infographic' ? { infographicProjectId: '', infographicTabId: '', infographicProjectName: '' } : {}),
+      ...(type === 'infographic' ? { infographicProjectId: '', infographicTabId: '', infographicProjectName: '', imageScale: 1, x: 0.5, y: 0.5 } : {}),
       ...initialPatch,
     }
     setOverlays((prev) => [...prev, item])
@@ -929,6 +929,7 @@ export default function App() {
             videoRef={previewVideoRef}
             onOverlayMove={(id, x, y) => handleEditOverlay(id, { x, y })}
             selectedOverlayId={selectedOverlayId}
+            onOverlaySelect={setSelectedOverlayId}
             onOverlayEdit={handleEditOverlay}
             portraitFillHeight={portraitFillHeight}
             overlayTextAnimation={overlayTextAnimation}
