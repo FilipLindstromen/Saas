@@ -24,10 +24,11 @@
   padding: 0.25rem 0.5rem;
   border-right: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  background: var(--bg-tertiary);
 }
 
 .tab-bar-tab.active {
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   border-bottom: 2px solid var(--accent);
   margin-bottom: -1px;
 }

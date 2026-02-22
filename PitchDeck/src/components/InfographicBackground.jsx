@@ -215,12 +215,13 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
   const elements = projectData.elements
   const aspectRatio = projectData.aspectRatio || '16:9'
   const resolution = projectData.resolution || 800
-  const backgroundColor = projectData.backgroundColor || '#ffffff'
+  const includeBackground = projectData.includeBackgroundInExport !== false
+  const backgroundColor = includeBackground ? (projectData.backgroundColor || '#ffffff') : 'transparent'
   const timelineDuration = typeof projectData.timelineDuration === 'number' ? projectData.timelineDuration : 10
 
   const size = getCanvasSize(aspectRatio, resolution)
 
-  // Scale to cover container (fill screen) - same behavior as infographic generator at 100% zoom
+  // Scale to contain - show full infographic without cropping (matches infographic generator)
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -229,8 +230,8 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
       const cw = el.clientWidth
       const ch = el.clientHeight
       if (cw && ch && size.w && size.h) {
-        const coverScale = Math.max(cw / size.w, ch / size.h)
-        const s = coverScale * imageScale
+        const containScale = Math.min(cw / size.w, ch / size.h)
+        const s = containScale * imageScale
         setScale(s)
       }
     }

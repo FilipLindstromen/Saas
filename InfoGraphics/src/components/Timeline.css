@@ -62,6 +62,19 @@
   pointer-events: none;
 }
 
+.timeline-ruler-tick-major {
+  font-size: 10px;
+}
+
+.timeline-ruler-tick-minor {
+  font-size: 0;
+  width: 1px;
+  height: 8px;
+  top: 10px;
+  background: var(--text-tertiary);
+  opacity: 0.5;
+}
+
 .timeline-playhead {
   position: absolute;
   top: 0;

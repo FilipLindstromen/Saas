@@ -90,6 +90,8 @@ export default function Timeline({
     return t
   }, [getSnapPoints])
 
+  const snapToSecondOrHalf = useCallback((t) => Math.round(t * 2) / 2, [])
+
   const handleApplyAutoAnimation = useCallback(() => {
     if (sorted.length === 0 || !onUpdateClip || !onClipEditStart) return
     onClipEditStart()
@@ -128,17 +130,35 @@ export default function Timeline({
     onCurrentTimeChange?.(t)
   }
 
+  const handleClipClick = (e, el) => {
+    e.stopPropagation()
+    if (e.shiftKey) {
+      onSelect?.(el.id, { shift: true })
+    } else {
+      onSelect?.([el.id])
+    }
+  }
+
   const handleClipPointerDown = (e, el, action) => {
     e.stopPropagation()
+    if (action === 'move' && e.shiftKey) {
+      return
+    }
     if (action === 'move' || action.startsWith('trim-')) {
       onClipEditStart?.()
     }
     if (action === 'move') {
+      const idsToMove = selectedIds.includes(el.id) ? selectedIds : [el.id]
+      const clips = {}
+      idsToMove.forEach((id) => {
+        const elem = elements.find(x => x.id === id)
+        if (elem) clips[id] = { start: elem.clipStart ?? 0, end: elem.clipEnd ?? duration }
+      })
       setDragState({
         id: el.id,
-        startX: e.clientX,
-        startClipStart: el.clipStart ?? 0,
-        startClipEnd: el.clipEnd ?? duration
+        ids: idsToMove,
+        clips,
+        startX: e.clientX
       })
     } else if (action === 'trim-left' || action === 'trim-right') {
       setTrimState({
@@ -155,19 +175,30 @@ export default function Timeline({
     if (!dragState && !trimState) return
     const onMove = (e) => {
       if (!trackRef.current) return
-      const rect = trackRef.current.getBoundingClientRect()
       const dx = e.clientX - (dragState ? dragState.startX : trimState.startX)
       const dt = pxToTime(dx)
+      const shift = e.shiftKey
 
       if (dragState) {
-        const dur = dragState.startClipEnd - dragState.startClipStart
-        let newStart = dragState.startClipStart + dt
-        let newEnd = dragState.startClipEnd + dt
-        newStart = Math.max(0, Math.min(duration - dur, newStart))
-        newEnd = newStart + dur
-        newEnd = Math.min(duration, newEnd)
-        newStart = newEnd - dur
-        onUpdateClip?.(dragState.id, { clipStart: newStart, clipEnd: newEnd })
+        const minStart = Math.min(...Object.values(dragState.clips).map(c => c.start))
+        const maxEnd = Math.max(...Object.values(dragState.clips).map(c => c.end))
+        const totalDur = maxEnd - minStart
+        let clampedDt = dt
+        if (minStart + dt < 0) clampedDt = -minStart
+        if (maxEnd + dt > duration) clampedDt = duration - maxEnd
+
+        dragState.ids.forEach((id) => {
+          const { start, end } = dragState.clips[id]
+          let newStart = start + clampedDt
+          let newEnd = end + clampedDt
+          if (shift) {
+            newStart = snapToSecondOrHalf(newStart)
+            newEnd = snapToSecondOrHalf(newEnd)
+            newStart = Math.max(0, Math.min(duration - 0.5, newStart))
+            newEnd = Math.max(newStart + 0.5, Math.min(duration, newEnd))
+          }
+          onUpdateClip?.(id, { clipStart: newStart, clipEnd: newEnd })
+        })
       } else if (trimState) {
         let newStart = trimState.startClipStart
         let newEnd = trimState.startClipEnd
@@ -175,6 +206,15 @@ export default function Timeline({
           newStart = Math.max(0, Math.min(trimState.startClipEnd - 0.5, trimState.startClipStart + dt))
         } else {
           newEnd = Math.max(trimState.startClipStart + 0.5, Math.min(duration, trimState.startClipEnd + dt))
+        }
+        if (shift) {
+          if (trimState.side === 'trim-left') {
+            newStart = snapToSecondOrHalf(newStart)
+            newStart = Math.max(0, Math.min(trimState.startClipEnd - 0.5, newStart))
+          } else {
+            newEnd = snapToSecondOrHalf(newEnd)
+            newEnd = Math.max(trimState.startClipStart + 0.5, Math.min(duration, newEnd))
+          }
         }
         onUpdateClip?.(trimState.id, { clipStart: newStart, clipEnd: newEnd })
       }
@@ -189,7 +229,7 @@ export default function Timeline({
       document.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerup', onUp)
     }
-  }, [dragState, trimState, duration, pxToTime, onUpdateClip])
+  }, [dragState, trimState, duration, pxToTime, onUpdateClip, snapToSecondOrHalf])
 
   return (
     <div className="timeline" style={{ height: `${height}px`, minHeight: `${height}px` }}>
@@ -223,15 +263,19 @@ export default function Timeline({
         <div className="timeline-ruler-row">
           <div className="timeline-ruler-spacer" />
           <div className="timeline-ruler" ref={trackRef} onClick={handleTrackClick}>
-            {[0, 0.25, 0.5, 0.75, 1].map((p) => (
-              <div
-                key={p}
-                className="timeline-ruler-tick"
-                style={{ left: `${p * 100}%` }}
-              >
-                {(duration * p).toFixed(1)}s
-              </div>
-            ))}
+            {Array.from({ length: Math.floor(duration * 2) + 1 }, (_, i) => i * 0.5).map((t) => {
+              const p = duration > 0 ? t / duration : 0
+              const isFullSecond = t % 1 === 0
+              return (
+                <div
+                  key={t}
+                  className={`timeline-ruler-tick ${isFullSecond ? 'timeline-ruler-tick-major' : 'timeline-ruler-tick-minor'}`}
+                  style={{ left: `${Math.min(100, p * 100)}%` }}
+                >
+                  {isFullSecond ? `${t}s` : null}
+                </div>
+              )
+            })}
             <div
               className="timeline-playhead"
               style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
@@ -258,7 +302,7 @@ export default function Timeline({
               <div
                 key={el.id}
                 className="timeline-track"
-                onClick={() => onSelect?.([el.id])}
+                onClick={(e) => handleClipClick(e, el)}
               >
                 <span className="timeline-track-label">{getElementLabel(el)}</span>
                 <div className="timeline-track-clips">

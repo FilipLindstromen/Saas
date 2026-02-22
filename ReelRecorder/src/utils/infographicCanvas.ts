@@ -75,7 +75,8 @@ export function drawInfographicOnCanvas(
   const elements = projectData.elements
   const aspectRatio = projectData.aspectRatio || '16:9'
   const resolution = projectData.resolution || 800
-  const backgroundColor = projectData.backgroundColor || '#ffffff'
+  const includeBackground = projectData.includeBackgroundInExport !== false
+  const backgroundColor = includeBackground ? (projectData.backgroundColor || '#ffffff') : 'transparent'
 
   const size = getCanvasSize(aspectRatio, resolution)
   const scaleX = destW / size.w
@@ -99,9 +100,11 @@ export function drawInfographicOnCanvas(
   ctx.translate(offsetX, offsetY)
   ctx.scale(scale, scale)
 
-  // Background
-  ctx.fillStyle = backgroundColor
-  ctx.fillRect(0, 0, size.w, size.h)
+  // Background (only when includeBackgroundInExport is true)
+  if (includeBackground) {
+    ctx.fillStyle = backgroundColor
+    ctx.fillRect(0, 0, size.w, size.h)
+  }
 
   const preloadedImages = options.preloadedImages ?? new Map()
 

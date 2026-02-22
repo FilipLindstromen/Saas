@@ -45,6 +45,7 @@ export interface InfographicProjectData {
   aspectRatio?: string
   resolution?: number
   backgroundColor?: string
+  includeBackgroundInExport?: boolean
   timelineDuration?: number
 }
 
