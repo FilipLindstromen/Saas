@@ -2045,6 +2045,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
                  </div>
           </div>
         </div>
+      </div>
 
       {/* Modals */}
       <AIModal
