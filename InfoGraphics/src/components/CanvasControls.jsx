@@ -6,8 +6,6 @@ const TEXT_TYPES = ['headline', 'cta', 'image-text']
 export default function CanvasControls({
   zoom,
   onZoomChange,
-  backgroundColor,
-  onBackgroundColorChange,
   selectedElement,
   defaultFontFamily = 'Inter',
   defaultFontSize = 14,
@@ -47,23 +45,6 @@ export default function CanvasControls({
             onChange={(e) => onZoomChange(Number(e.target.value))}
           />
           <span className="canvas-controls-zoom-value">{zoom}%</span>
-        </div>
-      </div>
-      <div className="canvas-controls-group">
-        <label>Background</label>
-        <div className="canvas-controls-bg">
-          <input
-            type="color"
-            value={backgroundColor}
-            onChange={(e) => onBackgroundColorChange(e.target.value)}
-            title="Document background color"
-          />
-          <input
-            type="text"
-            value={backgroundColor}
-            onChange={(e) => onBackgroundColorChange(e.target.value)}
-            className="canvas-controls-bg-hex"
-          />
         </div>
       </div>
       <div className="canvas-controls-group">

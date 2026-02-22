@@ -13,21 +13,14 @@
   pointer-events: none;
 }
 
+/* Canvas keeps intrinsic size (e.g. 800x450); scaling is done via transform only */
 .infographic-background-canvas {
-  position: relative;
-  flex-shrink: 0;
-  min-width: 100%;
-  min-height: 100%;
-  object-fit: cover;
-}
-
-/* Scale canvas to cover - use transform to fill container */
-.infographic-background .infographic-background-canvas {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  flex-shrink: 0;
   transform-origin: center center;
+  /* transform (with scale) is set inline in InfographicBackground.jsx */
 }
 
 /* Element styles - match InfoGraphics CanvasElement */

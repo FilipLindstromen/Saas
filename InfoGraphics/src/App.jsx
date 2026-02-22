@@ -15,7 +15,7 @@ import TemplateEditBanner from './components/TemplateEditBanner'
 import { LAYOUTS, applyLayout, applyLayoutWithContent, getLayoutSlotCount } from './layouts'
 import * as projectStorage from './utils/projectStorage'
 import { searchImages } from './api/imageSearch'
-import { loadCustomTemplates, saveCustomTemplate, getCustomTemplate } from './utils/customTemplates'
+import { loadCustomTemplates, saveCustomTemplate, getCustomTemplate, updateCustomTemplateName } from './utils/customTemplates'
 import './App.css'
 
 function getApiHeaders(apiKeys) {
@@ -1053,6 +1053,16 @@ function App() {
               LAYOUTS.find(l => l.id === selectedLayoutId)?.name ||
               getCustomTemplate(selectedLayoutId)?.name
             }
+            templateEditMode={templateEditMode}
+            isCustomTemplate={!!getCustomTemplate(selectedLayoutId)}
+            onRenameTemplate={
+              templateEditMode && selectedLayoutId
+                ? (name) => {
+                    updateCustomTemplateName(selectedLayoutId, name)
+                    setCustomTemplates(loadCustomTemplates())
+                  }
+                : undefined
+            }
             onGenerate={async (prompt) => {
               const layoutId = selectedLayoutId || '5-step-v'
               const custom = getCustomTemplate(layoutId)
@@ -1119,8 +1129,6 @@ function App() {
           <CanvasControls
             zoom={zoom}
             onZoomChange={setZoom}
-            backgroundColor={backgroundColor}
-            onBackgroundColorChange={setBackgroundColor}
             selectedElement={selectedElement}
             defaultFontFamily={defaultFontFamily}
             defaultFontSize={defaultFontSize}

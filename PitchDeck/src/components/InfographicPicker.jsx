@@ -20,8 +20,17 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, curren
     }
   }, [isOpen, currentProjectId, currentTabId])
 
-  const handleSelect = (projectId, tabId) => {
+  const handleSelectProject = (projectId) => {
     setSelectedProjectId(projectId)
+    if (projectId) {
+      const tabs = getInfographicProjectTabs(projectId)
+      setSelectedTabId(tabs.length > 0 ? tabs[0].id : null)
+    } else {
+      setSelectedTabId(null)
+    }
+  }
+
+  const handleSelectTab = (tabId) => {
     setSelectedTabId(tabId)
   }
 
@@ -36,6 +45,8 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, curren
     onSelect(null, null)
     onClose()
   }
+
+  const tabs = selectedProjectId ? getInfographicProjectTabs(selectedProjectId) : []
 
   if (!isOpen) return null
 
@@ -60,17 +71,38 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, curren
               </p>
             </div>
           ) : (
-            <div className="infographic-picker-list">
-              {projects.map(p => (
-                <InfographicPickerProject
-                  key={p.id}
-                  project={p}
-                  selectedProjectId={selectedProjectId}
-                  selectedTabId={selectedTabId}
-                  onSelect={handleSelect}
-                />
-              ))}
-            </div>
+            <>
+              <div className="infographic-picker-project-select">
+                <label htmlFor="infographic-picker-project">Project:</label>
+                <select
+                  id="infographic-picker-project"
+                  className="infographic-picker-project-dropdown"
+                  value={selectedProjectId || ''}
+                  onChange={(e) => handleSelectProject(e.target.value || null)}
+                >
+                  <option value="">Select a project...</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name || 'Untitled'}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedProjectId && (
+                <div className="infographic-picker-tabs-section">
+                  <p className="infographic-picker-tabs-label">Select tab:</p>
+                  <div className="infographic-picker-list">
+                    {tabs.map(tab => (
+                      <InfographicPickerTab
+                        key={tab.id}
+                        projectId={selectedProjectId}
+                        tab={tab}
+                        isSelected={selectedTabId === tab.id}
+                        onSelect={() => handleSelectTab(tab.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
         <div className="infographic-picker-footer">
@@ -100,65 +132,45 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, curren
   )
 }
 
-function InfographicPickerProject({ project, selectedProjectId, selectedTabId, onSelect }) {
-  const tabs = getInfographicProjectTabs(project.id)
-  const effectiveTabId = selectedTabId && tabs.some(t => t.id === selectedTabId) ? selectedTabId : tabs[0]?.id
+function InfographicPickerTab({ projectId, tab, isSelected, onSelect }) {
   const [data, setData] = useState(null)
 
   useEffect(() => {
-    setData(loadInfographicProjectData(project.id, effectiveTabId))
-  }, [project.id, effectiveTabId])
+    setData(loadInfographicProjectData(projectId, tab.id))
+  }, [projectId, tab.id])
 
   const elementCount = data?.elements?.length ?? 0
   const hasTimeline = elementCount > 0 && data?.elements?.some(e => (e.clipStart != null || e.clipEnd != null))
-  const isSelected = selectedProjectId === project.id && selectedTabId === effectiveTabId
 
   return (
-    <div className="infographic-picker-project">
-      <div className="infographic-picker-project-header">
-        <span className="infographic-picker-project-name">{project.name || 'Untitled'}</span>
-        {tabs.length > 1 && (
-          <select
-            className="infographic-picker-tab-select"
-            value={effectiveTabId || ''}
-            onChange={(e) => onSelect(project.id, e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {tabs.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+    <button
+      type="button"
+      className={`infographic-picker-item ${isSelected ? 'selected' : ''}`}
+      onClick={onSelect}
+    >
+      <div className="infographic-picker-item-preview">
+        {data && data.elements?.length > 0 ? (
+          <InfographicBackground
+            projectData={data}
+            isPlaying={false}
+            showAllElements={true}
+            opacity={1}
+            className="infographic-picker-preview-bg"
+          />
+        ) : (
+          <div className="infographic-picker-item-placeholder">
+            <span>Empty</span>
+          </div>
         )}
       </div>
-      <button
-        type="button"
-        className={`infographic-picker-item ${isSelected ? 'selected' : ''}`}
-        onClick={() => onSelect(project.id, effectiveTabId)}
-      >
-        <div className="infographic-picker-item-preview">
-          {data && data.elements?.length > 0 ? (
-            <InfographicBackground
-              projectData={data}
-              isPlaying={false}
-              showAllElements={true}
-              opacity={1}
-              className="infographic-picker-preview-bg"
-            />
-          ) : (
-            <div className="infographic-picker-item-placeholder">
-              <span>Empty</span>
-            </div>
-          )}
-        </div>
-        <div className="infographic-picker-item-info">
-          <span className="infographic-picker-item-meta">
-            {tabs.length > 1 ? `${tabs.find(t => t.id === effectiveTabId)?.name || 'Document'} • ` : ''}
-            {elementCount} element{elementCount !== 1 ? 's' : ''}
-            {hasTimeline && ' • Animated'}
-          </span>
-        </div>
-      </button>
-    </div>
+      <div className="infographic-picker-item-info">
+        <span className="infographic-picker-item-name">{tab.name || 'Document'}</span>
+        <span className="infographic-picker-item-meta">
+          {elementCount} element{elementCount !== 1 ? 's' : ''}
+          {hasTimeline && ' • Animated'}
+        </span>
+      </div>
+    </button>
   )
 }
 

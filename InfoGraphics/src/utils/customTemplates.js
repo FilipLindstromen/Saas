@@ -44,3 +44,9 @@ export function deleteCustomTemplate(id) {
 export function getCustomTemplate(id) {
   return loadCustomTemplates().find(t => t.id === id)
 }
+
+export function updateCustomTemplateName(id, name) {
+  const template = getCustomTemplate(id)
+  if (!template) return
+  saveCustomTemplate({ id, name: name.trim(), elements: template.elements })
+}

@@ -220,6 +220,7 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
 
   const size = getCanvasSize(aspectRatio, resolution)
 
+  // Scale to cover container (fill screen) - same behavior as infographic generator at 100% zoom
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -228,7 +229,8 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
       const cw = el.clientWidth
       const ch = el.clientHeight
       if (cw && ch && size.w && size.h) {
-        const s = Math.max(cw / size.w, ch / size.h) * imageScale
+        const coverScale = Math.max(cw / size.w, ch / size.h)
+        const s = coverScale * imageScale
         setScale(s)
       }
     }
@@ -284,8 +286,8 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
           width: size.w,
           height: size.h,
           backgroundColor,
-          transform: `translate(-50%, -50%) scale(${scale})`,
-          transformOrigin: 'center center',
+          transform: `translate(-${imagePositionX}%, -${imagePositionY}%) scale(${scale})`,
+          transformOrigin: `${imagePositionX}% ${imagePositionY}%`,
         }}
       >
         {visibleElements.map(el => (

@@ -1513,7 +1513,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }, [isPlayMode, defaultTextSize, bulletTextSize]) // Re-run when play mode or text sizes change
 
   const handleImageMouseDown = (e) => {
-    if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl)) return
+    if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl && !slide.infographicProjectId)) return
     // Only start dragging if clicking directly on the background, not on text content
     // Check if the click is on a text element (these have pointerEvents: auto)
     const target = e.target
@@ -1544,7 +1544,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }
 
   const handleImageMouseMove = useCallback((e) => {
-    if (!isDragging || !onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl)) return
+    if (!isDragging || !onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl && !slide.infographicProjectId)) return
     e.preventDefault()
     const rect = slideRef.current?.getBoundingClientRect()
     if (rect) {
@@ -1558,10 +1558,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       
       setCurrentPosition({ x: newX, y: newY })
     }
-  }, [isDragging, dragStart, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl])
+  }, [isDragging, dragStart, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl, slide.infographicProjectId])
 
   const handleImageMouseUp = useCallback(() => {
-    if (isDragging && onUpdate && !isPlayMode && (slide.imageUrl || slide.backgroundVideoUrl)) {
+    if (isDragging && onUpdate && !isPlayMode && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)) {
       // Save the final position when releasing
       onUpdate({ 
         imagePositionX: currentPosition.x, 
@@ -1569,7 +1569,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       })
     }
     setIsDragging(false)
-  }, [isDragging, currentPosition, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl])
+  }, [isDragging, currentPosition, onUpdate, isPlayMode, slide.imageUrl, slide.backgroundVideoUrl, slide.infographicProjectId])
 
   useEffect(() => {
     if (isDragging) {
@@ -1586,9 +1586,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const aspectRatioValue = slideFormat === '1:1' ? '1/1' : slideFormat === '9:16' ? '9/16' : '16/9'
   const formatClass = slideFormat === '1:1' ? 'slide-format-1-1' : slideFormat === '9:16' ? 'slide-format-9-16' : 'slide-format-16-9'
+  const hasDraggableBackground = !isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
   const slideStyle = {
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
+    cursor: hasDraggableBackground ? 'move' : undefined,
     '--slide-base-font-size': `${defaultTextSize}rem`,
     '--slide-pairing-font': `"${fontPairingSerifFont}", serif`,
     '--slide-content-bottom': `${contentBottomOffset}%`,
@@ -1602,7 +1604,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       className={`slide ${formatClass} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''}`}
       ref={slideRef} 
       style={slideStyle}
-      onMouseDown={(!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl)) ? handleImageMouseDown : undefined}
+      onMouseDown={(!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)) ? handleImageMouseDown : undefined}
     >
       <style>{`
         /* Default font weight for body text in slide content */
@@ -1724,8 +1726,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             showAllElements={!isPlayMode}
             opacity={backgroundOpacity}
             imageScale={imageScale}
-            imagePositionX={imagePositionX}
-            imagePositionY={imagePositionY}
+            imagePositionX={isDragging ? currentPosition.x : imagePositionX}
+            imagePositionY={isDragging ? currentPosition.y : imagePositionY}
             flipHorizontal={slide.flipHorizontal}
           />
         )
