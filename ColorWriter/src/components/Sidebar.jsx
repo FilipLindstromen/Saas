@@ -102,7 +102,7 @@ const Sidebar = ({
     return (
         <aside style={{
             width: '320px',
-            borderRight: '1px solid var(--border-color)',
+            borderRight: '1px solid var(--border-default)',
             padding: '1.5rem',
             display: 'flex',
             flexDirection: 'column',
@@ -279,7 +279,7 @@ const Sidebar = ({
                         disabled={!apiKey || loading}
                         style={{
                             width: '100%',
-                            background: !apiKey || loading ? 'var(--bg-tertiary)' : '#7c3aed',
+                            background: !apiKey || loading ? 'var(--bg-tertiary)' : 'var(--accent)',
                             color: !apiKey || loading ? 'var(--text-tertiary)' : '#ffffff',
                             fontSize: '1rem',
                             fontWeight: 600,
@@ -307,7 +307,7 @@ const Sidebar = ({
                     disabled={!apiKey || loading}
                     style={{
                         width: '100%',
-                        background: !apiKey || loading ? 'var(--bg-tertiary)' : '#111827',
+                        background: !apiKey || loading ? 'var(--bg-tertiary)' : 'var(--bg-hover)',
                         color: !apiKey || loading ? 'var(--text-tertiary)' : '#ffffff',
                         fontSize: '1rem',
                         fontWeight: 600,

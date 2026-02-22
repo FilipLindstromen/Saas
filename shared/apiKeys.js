@@ -43,7 +43,7 @@ function migrateFromLegacy() {
       if (parsed.pexels) merged.pexels = merged.pexels || parsed.pexels
     }
 
-    // ColorWriter
+    // ColorWriter (legacy openai_api_key)
     const cwOpenai = localStorage.getItem('openai_api_key')
     if (cwOpenai) merged.openai = merged.openai || cwOpenai
 

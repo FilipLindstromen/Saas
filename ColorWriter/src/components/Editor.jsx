@@ -282,9 +282,10 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
                     position: 'fixed',
                     top: `${toolbar.y}px`,
                     left: `${toolbar.x}px`,
-                    background: '#1f2937',
-                    color: '#fff',
-                    borderRadius: '8px',
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-primary)',
+                    borderRadius: 'var(--button-radius)',
+                    border: '1px solid var(--border-default)',
                     padding: '0.4rem',
                     display: 'flex',
                     gap: '0.4rem',
@@ -296,24 +297,24 @@ const Editor = ({ content, setContent, onSelectionChange, showColors = true, sel
                     <button onClick={() => applyFormat('h2')} className="toolbar-btn" title="Heading 2"><Heading2 size={18} /></button>
                     <button onClick={() => applyFormat('h3')} className="toolbar-btn" title="Heading 3"><Heading3 size={18} /></button>
                     <button onClick={() => applyFormat('p')} className="toolbar-btn" title="Body Text"><Type size={18} /></button>
-                    <div style={{ width: 1, background: '#4b5563', margin: '0 2px' }}></div>
+                    <div style={{ width: 1, background: 'var(--border-default)', margin: '0 2px' }}></div>
                     <button onClick={() => applyFormat('bold')} className="toolbar-btn" title="Bold"><Bold size={18} /></button>
 
                     <style>{`
                         .toolbar-btn {
                             background: transparent;
-                        border: none;
-                        color: #d1d5db;
-                        border-radius: 4px;
-                        padding: 4px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
+                            border: none;
+                            color: var(--text-tertiary);
+                            border-radius: 4px;
+                            padding: 4px;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
                         }
                         .toolbar-btn:hover {
-                            background: rgba(255,255,255,0.1);
-                        color: #fff;
+                            background: var(--bg-hover);
+                            color: var(--text-primary);
                         }
                         @keyframes fadeIn {from {opacity: 0; transform: translateY(5px); } to {opacity: 1; transform: translateY(0); } }
                     `}</style>

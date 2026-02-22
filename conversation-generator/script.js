@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const PS = window.ConversationProjectStorage;
+    const API_KEYS = window.ConversationApiKeys;
+
     // Theme Toggle
     const themeToggle = document.getElementById('theme-toggle');
     const html = document.documentElement;
@@ -68,6 +71,316 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let recordedChunks = [];
     let audioContext = null;
+
+    let currentProjectId = null;
+    let currentTabId = null;
+    let currentTabName = 'Conversation 1';
+    let projects = [];
+    let saveTimeout = null;
+
+    function collectState() {
+        var panelName = document.getElementById('panel-profile-name');
+        var panelCount = document.getElementById('panel-message-count');
+        var panelTime = document.getElementById('panel-time-display');
+        return {
+            messages: getMessages(),
+            settings: {
+                profileName: panelName ? panelName.value : profileNameInput.value,
+                messageCount: panelCount ? panelCount.value : messageCountInput.value,
+                timeDisplay: panelTime ? panelTime.value : (document.querySelector('.time') ? document.querySelector('.time').textContent : '14:47'),
+                profilePic: profilePicUrl,
+                bgType: bgTypeSelect.value,
+                bgColor: bgColorInput.value,
+                bgImage: backgroundImageUrl,
+                bgVideo: backgroundVideoUrl,
+                bgMusic: backgroundMusicUrl,
+                senderDelay: senderDelayInput.value,
+                receiverDelay: receiverDelayInput.value,
+                typingDelay: typingDelayInput.value,
+                typingPerChar: typingPerCharInput.value,
+                typingSpeed: typingSpeedInput.value,
+                soundEffects: soundEffectsCheckbox.checked,
+                typingVolume: typingVolumeInput.value,
+                sendVolume: sendVolumeInput.value,
+                receiveVolume: receiveVolumeInput.value
+            }
+        };
+    }
+
+    function applyState(data) {
+        if (!data || !data.settings) return;
+        const s = data.settings;
+        var profileName = s.profileName || 'My Brain';
+        var msgCount = s.messageCount || '147';
+        var timeDisplay = s.timeDisplay || '14:47';
+        profileNameInput.value = profileName;
+        headerProfileName.textContent = profileName;
+        messageCountInput.value = msgCount;
+        backCount.textContent = msgCount;
+        var panelName = document.getElementById('panel-profile-name');
+        var panelCount = document.getElementById('panel-message-count');
+        var panelTime = document.getElementById('panel-time-display');
+        var timeEl = document.querySelector('.time');
+        if (panelName) panelName.value = profileName;
+        if (panelCount) panelCount.value = msgCount;
+        if (panelTime) panelTime.value = timeDisplay;
+        if (timeEl) timeEl.textContent = timeDisplay;
+        profilePicUrl = s.profilePic || null;
+        if (profilePicUrl) {
+            headerProfilePic.src = profilePicUrl;
+            headerProfilePic.style.display = 'block';
+        } else headerProfilePic.style.display = '';
+        bgTypeSelect.value = s.bgType || 'color';
+        bgColorInput.value = s.bgColor || '#000000';
+        backgroundImageUrl = s.bgImage || null;
+        backgroundVideoUrl = s.bgVideo || null;
+        backgroundMusicUrl = s.bgMusic || null;
+        if (backgroundMusicUrl) bgMusicElement.src = backgroundMusicUrl;
+        senderDelayInput.value = s.senderDelay || '1000';
+        receiverDelayInput.value = s.receiverDelay || '1500';
+        typingDelayInput.value = s.typingDelay || '500';
+        typingPerCharInput.value = s.typingPerChar || '30';
+        typingSpeedInput.value = s.typingSpeed || '50';
+        soundEffectsCheckbox.checked = s.soundEffects !== false;
+        typingVolumeInput.value = s.typingVolume || '50';
+        sendVolumeInput.value = s.sendVolume || '50';
+        receiveVolumeInput.value = s.receiveVolume || '50';
+        document.getElementById('sender-delay-value').textContent = s.senderDelay || '1000';
+        document.getElementById('receiver-delay-value').textContent = s.receiverDelay || '1500';
+        document.getElementById('typing-delay-value').textContent = s.typingDelay || '500';
+        document.getElementById('typing-per-char-value').textContent = s.typingPerChar || '30';
+        document.getElementById('typing-speed-value').textContent = s.typingSpeed || '50';
+        document.getElementById('typing-volume-value').textContent = s.typingVolume || '50';
+        document.getElementById('send-volume-value').textContent = s.sendVolume || '50';
+        document.getElementById('receive-volume-value').textContent = s.receiveVolume || '50';
+        updateBackground();
+        messagesScriptContainer.innerHTML = '';
+        messageCount = 0;
+        (data.messages || []).forEach(function (m) {
+            addMessageInput(m.text, m.sender, m.delay || 0);
+        });
+    }
+
+    function saveCurrentTab() {
+        if (!currentProjectId || !currentTabId) return;
+        PS.saveTabData(currentProjectId, currentTabId, currentTabName, collectState());
+    }
+
+    function debouncedSave() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveCurrentTab, 500);
+    }
+
+    function initProjectsAndTabs() {
+        let projectList = PS.loadProjects();
+        let projectId = PS.loadCurrentProjectId();
+        const legacy = PS.migrateLegacyData();
+        if (legacy && legacy.tabs && legacy.tabs.length > 0 && projectList.length === 0) {
+            const id = PS.generateProjectId();
+            projectList = [{ id: id, name: 'Migrated', updatedAt: Date.now() }];
+            PS.saveProjects(projectList);
+            PS.saveCurrentProjectId(id);
+            legacy.tabs.forEach(function (t) {
+                PS.saveTabData(id, t.id, t.name, { messages: t.data?.messages || [], settings: t.data?.settings || {} });
+            });
+            PS.saveCurrentTabId(id, legacy.tabs[0].id);
+            PS.clearLegacyData();
+            projectId = id;
+        }
+        if (projectList.length === 0) {
+            const id = PS.generateProjectId();
+            projectList = [{ id: id, name: 'Untitled', updatedAt: Date.now() }];
+            PS.saveProjects(projectList);
+            PS.saveCurrentProjectId(id);
+            const tabId = PS.addProjectTab(id, 'Conversation 1');
+            PS.saveCurrentTabId(id, tabId);
+            projectId = id;
+        }
+        if (!projectId || !projectList.some(function (p) { return p.id === projectId; })) {
+            projectId = projectList[0].id;
+            PS.saveCurrentProjectId(projectId);
+        }
+        projects = projectList;
+        currentProjectId = projectId;
+        let tabId = PS.loadCurrentTabId(projectId);
+        let tabs = PS.getProjectTabs(projectId);
+        if (tabs.length === 0) {
+            tabId = PS.addProjectTab(projectId, 'Conversation 1');
+            tabs = PS.getProjectTabs(projectId);
+        }
+        if (!tabId || !tabs.some(function (t) { return t.id === tabId; })) {
+            tabId = tabs[0].id;
+        }
+        PS.saveCurrentTabId(projectId, tabId);
+        currentTabId = tabId;
+        currentTabName = tabs.find(function (t) { return t.id === tabId; })?.name || 'Conversation 1';
+        const data = PS.getDocumentDataForProject(projectId, tabId);
+        applyState(data || { messages: [], settings: {} });
+        renderProjectSelector();
+        renderTabBar();
+    }
+
+    function renderProjectSelector() {
+        const nameEl = document.getElementById('project-name');
+        const listEl = document.getElementById('project-list');
+        const proj = projects.find(function (p) { return p.id === currentProjectId; });
+        nameEl.textContent = proj ? proj.name : 'Untitled';
+        listEl.innerHTML = projects.map(function (p) {
+            return '<div class="project-selector-item' + (p.id === currentProjectId ? ' active' : '') + '" data-id="' + p.id + '">' +
+                '<span class="project-selector-item-name">' + (p.name || 'Untitled') + '</span>' +
+                '<div class="project-selector-item-actions">' +
+                '<button type="button" class="project-selector-action project-rename" data-id="' + p.id + '" title="Rename">✎</button>' +
+                '<button type="button" class="project-selector-action project-delete" data-id="' + p.id + '" title="Delete" ' + (projects.length <= 1 ? 'disabled' : '') + '>🗑</button>' +
+                '</div></div>';
+        }).join('');
+        listEl.querySelectorAll('.project-rename').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const p = projects.find(function (x) { return x.id === id; });
+                const name = prompt('Rename project:', p ? p.name : 'Untitled');
+                if (name != null && name.trim()) {
+                    projects = projects.map(function (x) {
+                        return x.id === id ? { ...x, name: name.trim(), updatedAt: Date.now() } : x;
+                    });
+                    PS.saveProjects(projects);
+                    renderProjectSelector();
+                }
+            });
+        });
+        listEl.querySelectorAll('.project-delete').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (projects.length <= 1) return;
+                const id = btn.dataset.id;
+                if (!confirm('Delete this project?')) return;
+                const idx = projects.findIndex(function (p) { return p.id === id; });
+                const nextId = idx > 0 ? projects[idx - 1].id : projects[idx + 1]?.id;
+                projects = projects.filter(function (p) { return p.id !== id; });
+                PS.saveProjects(projects);
+                PS.deleteProjectData(id);
+                if (id === currentProjectId) {
+                    currentProjectId = nextId;
+                    PS.saveCurrentProjectId(nextId);
+                    const tabs = PS.getProjectTabs(nextId);
+                    currentTabId = tabs[0]?.id || null;
+                    currentTabName = tabs[0]?.name || 'Conversation 1';
+                    if (currentTabId) PS.saveCurrentTabId(nextId, currentTabId);
+                    applyState(PS.getDocumentDataForProject(nextId, currentTabId) || { messages: [], settings: {} });
+                }
+                document.getElementById('project-dropdown').style.display = 'none';
+                renderProjectSelector();
+                renderTabBar();
+            });
+        });
+    }
+
+    function renderTabBar() {
+        const tabs = currentProjectId ? PS.getProjectTabs(currentProjectId) : [];
+        const container = document.getElementById('tab-bar-tabs');
+        container.innerHTML = tabs.map(function (t) {
+            return '<div class="tab-bar-tab' + (t.id === currentTabId ? ' active' : '') + '">' +
+                '<button type="button" class="tab-bar-tab-btn" data-id="' + t.id + '">' + (t.name || 'Conversation') + '</button>' +
+                (tabs.length > 1 ? '<button type="button" class="tab-bar-tab-close" data-id="' + t.id + '" title="Close">×</button>' : '') +
+                '</div>';
+        }).join('');
+        container.querySelectorAll('.tab-bar-tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const id = btn.dataset.id;
+                if (id === currentTabId) return;
+                saveCurrentTab();
+                currentTabId = id;
+                currentTabName = tabs.find(function (t) { return t.id === id; })?.name || 'Conversation';
+                PS.saveCurrentTabId(currentProjectId, id);
+                applyState(PS.getDocumentDataForProject(currentProjectId, id) || { messages: [], settings: {} });
+                renderTabBar();
+            });
+            btn.addEventListener('dblclick', function (e) {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const tab = tabs.find(function (t) { return t.id === id; });
+                const name = prompt('Rename conversation:', tab ? tab.name : 'Conversation');
+                if (name != null && name.trim()) {
+                    PS.renameProjectTab(currentProjectId, id, name.trim());
+                    if (id === currentTabId) currentTabName = name.trim();
+                    renderTabBar();
+                }
+            });
+        });
+        container.querySelectorAll('.tab-bar-tab-close').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const nextId = PS.removeProjectTab(currentProjectId, id);
+                if (!nextId) return;
+                if (id === currentTabId) {
+                    currentTabId = nextId;
+                    currentTabName = PS.getProjectTabs(currentProjectId).find(function (t) { return t.id === nextId; })?.name || 'Conversation';
+                    PS.saveCurrentTabId(currentProjectId, nextId);
+                    applyState(PS.getDocumentDataForProject(currentProjectId, nextId) || { messages: [], settings: {} });
+                }
+                renderTabBar();
+            });
+        });
+    }
+
+    document.getElementById('project-trigger').addEventListener('click', function () {
+        const dropdown = document.getElementById('project-dropdown');
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.getElementById('project-list').addEventListener('click', function (e) {
+        if (e.target.closest('.project-selector-action')) return;
+        const item = e.target.closest('.project-selector-item');
+        if (!item) return;
+        const id = item.dataset.id;
+        if (id === currentProjectId) {
+            document.getElementById('project-dropdown').style.display = 'none';
+            return;
+        }
+        saveCurrentTab();
+        currentProjectId = id;
+        PS.saveCurrentProjectId(id);
+        const tabs = PS.getProjectTabs(id);
+        currentTabId = tabs[0]?.id || null;
+        currentTabName = tabs[0]?.name || 'Conversation 1';
+        if (currentTabId) PS.saveCurrentTabId(id, currentTabId);
+        applyState(PS.getDocumentDataForProject(id, currentTabId) || { messages: [], settings: {} });
+        document.getElementById('project-dropdown').style.display = 'none';
+        renderProjectSelector();
+        renderTabBar();
+    });
+
+    document.getElementById('project-new').addEventListener('click', function () {
+        const id = PS.generateProjectId();
+        projects = [...projects, { id: id, name: 'Untitled', updatedAt: Date.now() }];
+        PS.saveProjects(projects);
+        PS.saveCurrentProjectId(id);
+        const tabId = PS.addProjectTab(id, 'Conversation 1');
+        PS.saveCurrentTabId(id, tabId);
+        currentProjectId = id;
+        currentTabId = tabId;
+        currentTabName = 'Conversation 1';
+        applyState({ messages: [], settings: {} });
+        document.getElementById('project-dropdown').style.display = 'none';
+        renderProjectSelector();
+        renderTabBar();
+    });
+
+    document.getElementById('tab-add').addEventListener('click', function () {
+        const tabId = PS.addProjectTab(currentProjectId, 'New conversation');
+        PS.saveCurrentTabId(currentProjectId, tabId);
+        currentTabId = tabId;
+        currentTabName = 'New conversation';
+        applyState({ messages: [], settings: {} });
+        renderTabBar();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('#project-selector')) {
+            document.getElementById('project-dropdown').style.display = 'none';
+        }
+    });
 
     // Slider value updates
     senderDelayInput.addEventListener('input', (e) => {
@@ -254,12 +567,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 messagesScriptContainer.insertBefore(sibling, messageGroup);
             }
+            debouncedSave();
         }
     }
     
     function deleteMessage(messageGroup) {
         if (confirm('Delete this message?')) {
             messageGroup.remove();
+            debouncedSave();
         }
     }
     
@@ -310,31 +625,22 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please paste a conversation to import');
             return;
         }
-        
-        // Clear existing messages
         messagesScriptContainer.innerHTML = '';
         messageCount = 0;
-        
         const lines = text.split('\n');
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) continue; // Skip empty lines
-            
-            // Parse "Name: message" format
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line) continue;
             const colonIndex = line.indexOf(':');
-            if (colonIndex === -1) continue; // Skip lines without colon
-            
+            if (colonIndex === -1) continue;
             const name = line.substring(0, colonIndex).trim();
             const message = line.substring(colonIndex + 1).trim();
-            
-            if (!message) continue; // Skip if no message
-            
-            // "Me" = sent, anything else = received
+            if (!message) continue;
             const sender = name.toLowerCase() === 'me' ? 'sent' : 'received';
             addMessageInput(message, sender);
         }
-        
         document.getElementById('import-text').value = '';
+        debouncedSave();
         alert('Conversation imported!');
     }
 
@@ -776,155 +1082,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Save/Load functionality
-    function saveConversation() {
-        const name = saveNameInput.value.trim();
-        if (!name) {
-            alert('Please enter a name for this conversation');
-            return;
-        }
-
-        const data = {
-            name,
-            messages: getMessages(),
-            settings: {
-                profileName: profileNameInput.value,
-                messageCount: messageCountInput.value,
-                profilePic: profilePicUrl,
-                bgType: bgTypeSelect.value,
-                bgColor: bgColorInput.value,
-                bgImage: backgroundImageUrl,
-                bgVideo: backgroundVideoUrl,
-                bgMusic: backgroundMusicUrl,
-                senderDelay: senderDelayInput.value,
-                receiverDelay: receiverDelayInput.value,
-                typingDelay: typingDelayInput.value,
-                typingPerChar: typingPerCharInput.value,
-                typingSpeed: typingSpeedInput.value,
-                soundEffects: soundEffectsCheckbox.checked,
-                typingVolume: typingVolumeInput.value,
-                sendVolume: sendVolumeInput.value,
-                receiveVolume: receiveVolumeInput.value
-            }
-        };
-
-        const saved = JSON.parse(localStorage.getItem('savedConversations') || '{}');
-        saved[name] = data;
-        localStorage.setItem('savedConversations', JSON.stringify(saved));
-        
-        loadSavedConversationsList();
-        saveNameInput.value = '';
-        alert('Conversation saved!');
-    }
-
-    function loadSavedConversationsList() {
-        const saved = JSON.parse(localStorage.getItem('savedConversations') || '{}');
-        savedConversationsSelect.innerHTML = '';
-        
-        const names = Object.keys(saved);
-        if (names.length === 0) {
-            savedConversationsSelect.innerHTML = '<option value="">-- No saved conversations --</option>';
-        } else {
-            names.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                savedConversationsSelect.appendChild(option);
-            });
-        }
-    }
-
-    function loadConversation() {
-        const name = savedConversationsSelect.value;
-        if (!name) {
-            alert('Please select a conversation to load');
-            return;
-        }
-
-        const saved = JSON.parse(localStorage.getItem('savedConversations') || '{}');
-        const data = saved[name];
-        
-        if (!data) {
-            alert('Conversation not found');
-            return;
-        }
-
-        // Load settings
-        const s = data.settings;
-        profileNameInput.value = s.profileName;
-        headerProfileName.textContent = s.profileName;
-        
-        if (s.messageCount !== undefined) {
-            messageCountInput.value = s.messageCount;
-            backCount.textContent = s.messageCount;
-        }
-        
-        if (s.profilePic) {
-            profilePicUrl = s.profilePic;
-            headerProfilePic.src = profilePicUrl;
-            headerProfilePic.style.display = 'block';
-        }
-        
-        bgTypeSelect.value = s.bgType;
-        bgColorInput.value = s.bgColor;
-        backgroundImageUrl = s.bgImage;
-        backgroundVideoUrl = s.bgVideo;
-        backgroundMusicUrl = s.bgMusic;
-        
-        if (backgroundMusicUrl) {
-            bgMusicElement.src = backgroundMusicUrl;
-        }
-        
-        senderDelayInput.value = s.senderDelay;
-        receiverDelayInput.value = s.receiverDelay;
-        typingDelayInput.value = s.typingDelay;
-        typingPerCharInput.value = s.typingPerChar || 30;
-        typingSpeedInput.value = s.typingSpeed;
-        soundEffectsCheckbox.checked = s.soundEffects !== undefined ? s.soundEffects : true;
-        typingVolumeInput.value = s.typingVolume || 50;
-        sendVolumeInput.value = s.sendVolume || 50;
-        receiveVolumeInput.value = s.receiveVolume || 50;
-        
-        document.getElementById('sender-delay-value').textContent = s.senderDelay;
-        document.getElementById('receiver-delay-value').textContent = s.receiverDelay;
-        document.getElementById('typing-delay-value').textContent = s.typingDelay;
-        document.getElementById('typing-per-char-value').textContent = s.typingPerChar || 30;
-        document.getElementById('typing-speed-value').textContent = s.typingSpeed;
-        document.getElementById('typing-volume-value').textContent = s.typingVolume || 50;
-        document.getElementById('send-volume-value').textContent = s.sendVolume || 50;
-        document.getElementById('receive-volume-value').textContent = s.receiveVolume || 50;
-        
-        updateBackground();
-        
-        // Load messages
-        messagesScriptContainer.innerHTML = '';
-        messageCount = 0;
-        data.messages.forEach(msg => {
-            addMessageInput(msg.text, msg.sender, msg.delay || 0);
-        });
-        
-        alert('Conversation loaded!');
-    }
-
-    function deleteConversation() {
-        const name = savedConversationsSelect.value;
-        if (!name) {
-            alert('Please select a conversation to delete');
-            return;
-        }
-
-        if (!confirm(`Delete conversation "${name}"?`)) {
-            return;
-        }
-
-        const saved = JSON.parse(localStorage.getItem('savedConversations') || '{}');
-        delete saved[name];
-        localStorage.setItem('savedConversations', JSON.stringify(saved));
-        
-        loadSavedConversationsList();
-        alert('Conversation deleted!');
-    }
-
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -936,7 +1093,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const overlayTitle = document.getElementById('overlay-title');
     const overlayBody = document.getElementById('overlay-body');
     
-    const profileMenuBtn = document.getElementById('profile-menu-btn');
     const saveLoadMenuBtn = document.getElementById('save-load-menu-btn');
     
     function openOverlay(title, content) {
@@ -952,144 +1108,84 @@ document.addEventListener('DOMContentLoaded', () => {
     hamburgerBtn.addEventListener('click', () => {
         const content = `
             <div style="text-align: center;">
-                <button onclick="document.getElementById('profile-menu-btn').click(); document.getElementById('close-overlay').click();" style="width: 100%; padding: 15px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background-color: #007aff; color: white;">👤 Profile Settings</button>
-                <button onclick="document.getElementById('save-load-menu-btn').click(); document.getElementById('close-overlay').click();" style="width: 100%; padding: 15px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background-color: #007aff; color: white;">💾 Save/Load</button>
+                <button id="menu-settings-btn" style="width: 100%; padding: 15px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background: var(--accent-gradient); color: white;">⚙️ Settings</button>
+                <button id="menu-save-load-btn" style="width: 100%; padding: 15px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background: var(--accent); color: white;">💾 Export/Import</button>
             </div>
         `;
         openOverlay('Menu', content);
+        setTimeout(() => {
+            document.getElementById('menu-settings-btn').addEventListener('click', () => {
+                closeOverlay();
+                openSettingsOverlay();
+            });
+            document.getElementById('menu-save-load-btn').addEventListener('click', () => {
+                closeOverlay();
+                saveLoadMenuBtn.click();
+            });
+        }, 50);
     });
+
+    function openSettingsOverlay() {
+        const keys = API_KEYS.loadApiKeys();
+        const content = `
+            <p class="settings-hint" style="margin-bottom: 1rem;">API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, PowerWriter, StoryWriter, etc.).</p>
+            <div class="form-group">
+                <label>OpenAI API Key</label>
+                <input type="password" id="overlay-openai-key" value="${(keys.openai || '').replace(/"/g, '&quot;')}" placeholder="sk-..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--input-bg); color: var(--text-primary);">
+            </div>
+            <button id="overlay-save-settings-btn" style="width: 100%; padding: 12px; margin-top: 16px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background: var(--accent-gradient); color: white;">Save</button>
+        `;
+        openOverlay('Settings', content);
+        setTimeout(() => {
+            document.getElementById('overlay-save-settings-btn').addEventListener('click', () => {
+                const key = document.getElementById('overlay-openai-key').value.trim();
+                API_KEYS.saveApiKeys({ openai: key });
+                closeOverlay();
+                alert('Settings saved.');
+            });
+        }, 50);
+    }
     
     closeOverlayBtn.addEventListener('click', closeOverlay);
     menuOverlay.addEventListener('click', (e) => {
         if (e.target === menuOverlay) closeOverlay();
     });
     
-    profileMenuBtn.addEventListener('click', () => {
-        const currentTime = document.querySelector('.time').textContent;
-        const content = `
-            <div class="setting-group">
-                <label>Profile Name:</label>
-                <input type="text" id="overlay-profile-name" value="${profileNameInput.value}" style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 200px;">
-            </div>
-            <div class="setting-group" style="margin-top: 15px;">
-                <label>Profile Picture:</label>
-                <button onclick="document.getElementById('profile-picture').click()" style="padding: 8px 15px; cursor: pointer; border: none; border-radius: 5px; background-color: #007aff; color: white;">Choose File</button>
-            </div>
-            <div class="setting-group" style="margin-top: 15px;">
-                <label>Message Count:</label>
-                <input type="number" id="overlay-message-count" value="${messageCountInput.value}" min="0" style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100px;">
-            </div>
-            <div class="setting-group" style="margin-top: 15px;">
-                <label>Time Display:</label>
-                <input type="time" id="overlay-time" value="${currentTime}" style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 150px;">
-            </div>
-            <button id="save-profile-btn" style="width: 100%; padding: 12px; margin-top: 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background-color: #28a745; color: white;">Save Profile</button>
-        `;
-        openOverlay('Profile Settings', content);
-        
-        setTimeout(() => {
-            document.getElementById('save-profile-btn').addEventListener('click', () => {
-                profileNameInput.value = document.getElementById('overlay-profile-name').value;
-                messageCountInput.value = document.getElementById('overlay-message-count').value;
-                const timeValue = document.getElementById('overlay-time').value;
-                headerProfileName.textContent = profileNameInput.value || 'My Brain';
-                backCount.textContent = messageCountInput.value || '147';
-                if (timeValue) {
-                    document.querySelector('.time').textContent = timeValue;
-                }
-                closeOverlay();
-                alert('Profile updated!');
-            });
-        }, 100);
-    });
-    
     saveLoadMenuBtn.addEventListener('click', () => {
-        loadSavedConversationsList();
-        const savedList = savedConversationsSelect.innerHTML;
-        
         const content = `
-            <h3>Save Current Conversation</h3>
+            <p class="settings-hint" style="margin-bottom: 1rem;">Conversations are auto-saved to the current project/tab. Export to backup or share.</p>
+            <h3>Export to File</h3>
             <div style="margin-bottom: 20px;">
-                <input type="text" id="overlay-save-name" placeholder="Conversation name..." style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px;">
-                <button id="overlay-save-btn" style="width: 48%; padding: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #28a745; color: white; margin-right: 2%;">💾 Save to Browser</button>
-                <button id="overlay-export-btn" style="width: 48%; padding: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #007aff; color: white; margin-left: 2%;">📥 Export to File</button>
+                <input type="text" id="overlay-export-name" placeholder="File name..." value="${(currentTabName || 'conversation').replace(/"/g, '&quot;')}" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-default); margin-bottom: 10px; background: var(--input-bg); color: var(--text-primary);">
+                <button id="overlay-export-btn" style="width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 8px; background: var(--accent); color: white;">📥 Export to File</button>
             </div>
-            
-            <h3>Load Conversation</h3>
-            <select id="overlay-saved-conversations" size="5" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px;">${savedList}</select>
-            <button id="overlay-load-btn" style="width: 48%; padding: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #007aff; color: white; margin-right: 2%;">📂 Load</button>
-            <button id="overlay-delete-btn" style="width: 48%; padding: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #dc3545; color: white; margin-left: 2%;">🗑️ Delete</button>
-            
             <h3 style="margin-top: 20px;">Import from File</h3>
             <input type="file" id="overlay-import-file" accept=".json" style="width: 100%; padding: 10px; margin-bottom: 10px;">
-            <button id="overlay-import-btn" style="width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #17a2b8; color: white;">📤 Import File</button>
+            <button id="overlay-import-btn" style="width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 8px; background: var(--accent); color: white;">📤 Import File</button>
         `;
-        openOverlay('Save/Load Conversations', content);
-        
+        openOverlay('Export / Import', content);
         setTimeout(() => {
-            document.getElementById('overlay-save-btn').addEventListener('click', () => {
-                const name = document.getElementById('overlay-save-name').value.trim();
-                if (!name) {
-                    alert('Please enter a name');
-                    return;
-                }
-                saveNameInput.value = name;
-                saveConversation();
-                saveLoadMenuBtn.click();
-            });
-            
             document.getElementById('overlay-export-btn').addEventListener('click', () => {
-                const name = document.getElementById('overlay-save-name').value.trim() || 'conversation';
+                const name = document.getElementById('overlay-export-name').value.trim() || 'conversation';
                 exportConversationToFile(name);
             });
-            
-            document.getElementById('overlay-load-btn').addEventListener('click', () => {
-                const select = document.getElementById('overlay-saved-conversations');
-                savedConversationsSelect.value = select.value;
-                loadConversation();
-                closeOverlay();
-            });
-            
-            document.getElementById('overlay-delete-btn').addEventListener('click', () => {
-                const select = document.getElementById('overlay-saved-conversations');
-                savedConversationsSelect.value = select.value;
-                deleteConversation();
-                saveLoadMenuBtn.click();
-            });
-            
             document.getElementById('overlay-import-btn').addEventListener('click', () => {
                 const fileInput = document.getElementById('overlay-import-file');
                 const file = fileInput.files[0];
                 if (file) {
                     importConversationFromFile(file);
+                    debouncedSave();
                 }
             });
         }, 100);
     });
     
     function exportConversationToFile(name) {
+        var state = collectState();
         const data = {
             name,
-            messages: getMessages(),
-            settings: {
-                profileName: profileNameInput.value,
-                messageCount: messageCountInput.value,
-                profilePic: profilePicUrl,
-                bgType: bgTypeSelect.value,
-                bgColor: bgColorInput.value,
-                bgImage: backgroundImageUrl,
-                bgVideo: backgroundVideoUrl,
-                bgMusic: backgroundMusicUrl,
-                senderDelay: senderDelayInput.value,
-                receiverDelay: receiverDelayInput.value,
-                typingDelay: typingDelayInput.value,
-                typingPerChar: typingPerCharInput.value,
-                typingSpeed: typingSpeedInput.value,
-                soundEffects: soundEffectsCheckbox.checked,
-                typingVolume: typingVolumeInput.value,
-                sendVolume: sendVolumeInput.value,
-                receiveVolume: receiveVolumeInput.value
-            }
+            messages: state.messages,
+            settings: state.settings
         };
         
         const json = JSON.stringify(data, null, 2);
@@ -1105,64 +1201,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function importConversationFromFile(file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = function (e) {
             try {
-                const data = JSON.parse(e.target.result);
-                
-                // Load settings
-                const s = data.settings;
-                profileNameInput.value = s.profileName;
-                headerProfileName.textContent = s.profileName;
-                
-                if (s.messageCount !== undefined) {
-                    messageCountInput.value = s.messageCount;
-                    backCount.textContent = s.messageCount;
-                }
-                
-                if (s.profilePic) {
-                    profilePicUrl = s.profilePic;
-                    headerProfilePic.src = profilePicUrl;
-                    headerProfilePic.style.display = 'block';
-                }
-                
-                bgTypeSelect.value = s.bgType;
-                bgColorInput.value = s.bgColor;
-                backgroundImageUrl = s.bgImage;
-                backgroundVideoUrl = s.bgVideo;
-                backgroundMusicUrl = s.bgMusic;
-                
-                if (backgroundMusicUrl) {
-                    bgMusicElement.src = backgroundMusicUrl;
-                }
-                
-                senderDelayInput.value = s.senderDelay;
-                receiverDelayInput.value = s.receiverDelay;
-                typingDelayInput.value = s.typingDelay;
-                typingPerCharInput.value = s.typingPerChar || 30;
-                typingSpeedInput.value = s.typingSpeed;
-                soundEffectsCheckbox.checked = s.soundEffects !== undefined ? s.soundEffects : true;
-                typingVolumeInput.value = s.typingVolume || 50;
-                sendVolumeInput.value = s.sendVolume || 50;
-                receiveVolumeInput.value = s.receiveVolume || 50;
-                
-                document.getElementById('sender-delay-value').textContent = s.senderDelay;
-                document.getElementById('receiver-delay-value').textContent = s.receiverDelay;
-                document.getElementById('typing-delay-value').textContent = s.typingDelay;
-                document.getElementById('typing-per-char-value').textContent = s.typingPerChar || 30;
-                document.getElementById('typing-speed-value').textContent = s.typingSpeed;
-                document.getElementById('typing-volume-value').textContent = s.typingVolume || 50;
-                document.getElementById('send-volume-value').textContent = s.sendVolume || 50;
-                document.getElementById('receive-volume-value').textContent = s.receiveVolume || 50;
-                
-                updateBackground();
-                
-                // Load messages
-                messagesScriptContainer.innerHTML = '';
-                messageCount = 0;
-                data.messages.forEach(msg => {
-                    addMessageInput(msg.text, msg.sender, msg.delay || 0);
-                });
-                
+                var data = JSON.parse(e.target.result);
+                if (!data.settings) data.settings = {};
+                if (!data.messages) data.messages = [];
+                applyState(data);
                 closeOverlay();
                 alert('Conversation imported from file!');
             } catch (error) {
@@ -1172,19 +1216,124 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     }
 
-    addMessageBtn.addEventListener('click', () => addMessageInput());
+    addMessageBtn.addEventListener('click', () => {
+        addMessageInput();
+        debouncedSave();
+    });
     previewBtn.addEventListener('click', animateConversation);
     exportBtn.addEventListener('click', exportVideo);
     document.getElementById('import-btn').addEventListener('click', importConversation);
 
-    // Add sample messages on load
-    addMessageInput("Hello there!", "sent");
-    addMessageInput("Hi! How are you?", "received");
-    addMessageInput("I'm good, thanks!", "sent");
-    
-    // Initialize with default background
-    updateBackground();
-    
-    // Load saved conversations list
-    loadSavedConversationsList();
+    // Generate with AI
+    document.getElementById('generate-btn').addEventListener('click', async function () {
+        const input = document.getElementById('generate-input').value.trim();
+        if (!input) {
+            alert('Please describe the conversation you want to generate.');
+            return;
+        }
+        const keys = API_KEYS.loadApiKeys();
+        const apiKey = (keys.openai || '').trim();
+        if (!apiKey) {
+            alert('Please add your OpenAI API key in Settings (menu). Keys are shared across all Saas apps.');
+            return;
+        }
+        const btn = document.getElementById('generate-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> Generating...';
+        try {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + apiKey
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Generate a realistic text message conversation. Output ONLY the conversation in this exact format, one message per line:\n\nMe: message text\nOtherPerson: message text\n\nUse "Me" for the first/sender side. Use a short name (e.g. Support, Alex, Sarah) for the other side. No numbering, no titles, no extra text. 6-12 messages.'
+                        },
+                        {
+                            role: 'user',
+                            content: input
+                        }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 800
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(function () { return {}; });
+                throw new Error(err.error?.message || 'API error: ' + res.status);
+            }
+            const data = await res.json();
+            const text = (data.choices?.[0]?.message?.content || '').trim();
+            if (!text) throw new Error('No response from AI');
+            messagesScriptContainer.innerHTML = '';
+            messageCount = 0;
+            const lines = text.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const colonIndex = line.indexOf(':');
+                if (colonIndex === -1) continue;
+                const name = line.substring(0, colonIndex).trim();
+                const msg = line.substring(colonIndex + 1).trim();
+                if (!msg) continue;
+                const sender = name.toLowerCase() === 'me' ? 'sent' : 'received';
+                addMessageInput(msg, sender);
+            }
+            document.getElementById('generate-input').value = '';
+            debouncedSave();
+        } catch (err) {
+            alert('Error: ' + (err.message || 'Failed to generate'));
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<span>✨</span> Generate Conversation';
+    });
+
+    // Left panel: Profile settings
+    var panelProfileName = document.getElementById('panel-profile-name');
+    var panelMessageCount = document.getElementById('panel-message-count');
+    var panelTimeDisplay = document.getElementById('panel-time-display');
+    var panelProfilePicBtn = document.getElementById('panel-profile-picture-btn');
+    if (panelProfileName) {
+        panelProfileName.addEventListener('input', function () {
+            profileNameInput.value = panelProfileName.value;
+            headerProfileName.textContent = panelProfileName.value || 'My Brain';
+            debouncedSave();
+        });
+    }
+    if (panelMessageCount) {
+        panelMessageCount.addEventListener('input', function () {
+            messageCountInput.value = panelMessageCount.value;
+            backCount.textContent = panelMessageCount.value || '147';
+            debouncedSave();
+        });
+    }
+    if (panelTimeDisplay) {
+        panelTimeDisplay.addEventListener('change', function () {
+            var timeEl = document.querySelector('.time');
+            if (timeEl) timeEl.textContent = panelTimeDisplay.value;
+            debouncedSave();
+        });
+    }
+    if (panelProfilePicBtn && profilePictureInput) {
+        panelProfilePicBtn.addEventListener('click', function () {
+            profilePictureInput.click();
+        });
+    }
+    profilePictureInput.addEventListener('change', debouncedSave);
+
+    // Debounced save on changes
+    [profileNameInput, messageCountInput, senderDelayInput, receiverDelayInput, typingDelayInput, typingPerCharInput, typingSpeedInput, typingVolumeInput, sendVolumeInput, receiveVolumeInput, bgTypeSelect, bgColorInput].forEach(function (el) {
+        if (el) el.addEventListener('change', debouncedSave);
+    });
+    soundEffectsCheckbox.addEventListener('change', debouncedSave);
+    messagesScriptContainer.addEventListener('input', debouncedSave);
+    messagesScriptContainer.addEventListener('change', debouncedSave);
+
+    // Initialize projects and tabs (loads data, applies to UI)
+    initProjectsAndTabs();
 });

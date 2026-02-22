@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getSettings } from './utils/settings';
-import { loadContent, saveContent } from './utils/persistence';
+import { normalizeStoryData } from './utils/persistence';
 import { saveSettings } from './utils/settings';
+import * as projectStorage from './utils/projectStorage';
 import {
   getDefaultSectionOrder,
   createEmptySections,
@@ -19,17 +20,25 @@ import SortableSectionList from './components/SortableSectionList';
 import EditView from './components/EditView';
 import PresentView from './components/PresentView';
 import RambleRecorder from './components/RambleRecorder';
+import ProjectSelector from './components/ProjectSelector';
+import TabBar from './components/TabBar';
 import './App.css';
 
 const INPUT_PANEL_MIN = 280;
 const INPUT_PANEL_MAX = 560;
 const INPUT_PANEL_DEFAULT = 320;
 
+const DEFAULT_STORY = {
+  storyAbout: '',
+  frameworkId: 'heros_arc',
+  sectionOrder: [],
+  sectionsData: {},
+  storyLength: 'medium',
+};
+
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [persisted, setPersisted] = useState(() =>
-    loadContent(getDefaultSectionOrder, createEmptySections)
-  );
+  const [persisted, setPersisted] = useState(DEFAULT_STORY);
   const { storyAbout, frameworkId, sectionOrder, sectionsData, storyLength } = persisted;
   const sectionDefs = getSectionDefs(frameworkId);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -41,27 +50,106 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const [magicImageLoading, setMagicImageLoading] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [currentProjectId, setCurrentProjectId] = useState(null);
+  const [currentTabId, setCurrentTabId] = useState(null);
+  const [currentTabName, setCurrentTabName] = useState('Story 1');
+  const [hasHydrated, setHasHydrated] = useState(false);
   const resizeStartRef = useRef({ x: 0, width: 0 });
   const persistedRef = useRef(persisted);
   persistedRef.current = persisted;
 
-  useEffect(() => {
-    saveContent(persisted);
-  }, [persisted]);
+  const getDefaultStoryData = useCallback(() => {
+    const fid = 'heros_arc';
+    return {
+      storyAbout: '',
+      frameworkId: fid,
+      sectionOrder: getDefaultSectionOrder(fid),
+      sectionsData: createEmptySections(fid),
+      storyLength: 'medium',
+    };
+  }, []);
 
   useEffect(() => {
-    const flush = () => saveContent(persistedRef.current);
-    const onBeforeUnload = flush;
+    let projectList = projectStorage.loadProjects();
+    let projectId = projectStorage.loadCurrentProjectId();
+
+    const legacy = projectStorage.migrateLegacyData();
+    if (legacy && projectList.length === 0) {
+      const id = projectStorage.generateProjectId();
+      projectList = [{ id, name: 'Untitled', updatedAt: Date.now() }];
+      projectStorage.saveProjectData(id, legacy);
+      projectStorage.saveProjects(projectList);
+      projectStorage.saveCurrentProjectId(id);
+      projectStorage.clearLegacyData();
+      projectId = id;
+    }
+
+    if (projectList.length === 0) {
+      const id = projectStorage.generateProjectId();
+      projectList = [{ id, name: 'Untitled', updatedAt: Date.now() }];
+      projectStorage.saveProjects(projectList);
+      projectStorage.saveCurrentProjectId(id);
+      projectId = id;
+    }
+
+    if (!projectId || !projectList.some((p) => p.id === projectId)) {
+      projectId = projectList[0].id;
+      projectStorage.saveCurrentProjectId(projectId);
+    }
+
+    setProjects(projectList);
+    setCurrentProjectId(projectId);
+
+    let tabId = projectStorage.loadCurrentTabId(projectId);
+    let tabs = projectStorage.getProjectTabs(projectId);
+    if (tabs.length === 0) {
+      projectStorage.saveProjectData(projectId, getDefaultStoryData());
+      tabs = projectStorage.getProjectTabs(projectId);
+      tabId = tabs[0]?.id || null;
+    }
+    if (!tabId || !tabs.some((t) => t.id === tabId)) {
+      tabId = tabs[0]?.id || null;
+    }
+    if (tabId) {
+      projectStorage.saveCurrentTabId(projectId, tabId);
+      setCurrentTabId(tabId);
+      const tab = tabs.find((t) => t.id === tabId);
+      setCurrentTabName(tab?.name || 'Story 1');
+    }
+
+    const data = projectStorage.getDocumentDataForProject(projectId, tabId);
+    if (data) {
+      setPersisted(normalizeStoryData(data, getDefaultSectionOrder, createEmptySections));
+    } else {
+      setPersisted(getDefaultStoryData());
+    }
+
+    setHasHydrated(true);
+  }, [getDefaultStoryData]);
+
+  const saveCurrentProjectToStorage = useCallback(() => {
+    if (!hasHydrated || !currentProjectId || !currentTabId) return;
+    projectStorage.saveTabData(currentProjectId, currentTabId, currentTabName, persistedRef.current);
+  }, [hasHydrated, currentProjectId, currentTabId, currentTabName]);
+
+  useEffect(() => {
+    if (!hasHydrated || !currentProjectId || !currentTabId) return;
+    projectStorage.saveTabData(currentProjectId, currentTabId, currentTabName, persisted);
+  }, [hasHydrated, currentProjectId, currentTabId, currentTabName, persisted]);
+
+  useEffect(() => {
+    const flush = () => saveCurrentProjectToStorage();
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') flush();
     };
-    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('beforeunload', flush);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('beforeunload', flush);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, []);
+  }, [saveCurrentProjectToStorage]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -139,6 +227,128 @@ function App() {
     }
   }, [sectionOrder, sectionsData, handleSentenceImageChange]);
 
+  const createProject = useCallback(() => {
+    const id = projectStorage.generateProjectId();
+    const newProject = { id, name: 'Untitled', updatedAt: Date.now() };
+    const updated = [...projects, newProject];
+    projectStorage.saveProjects(updated);
+    projectStorage.saveCurrentProjectId(id);
+    const defaultData = getDefaultStoryData();
+    projectStorage.saveProjectData(id, defaultData);
+    setProjects(updated);
+    setCurrentProjectId(id);
+    const newTabs = projectStorage.getProjectTabs(id);
+    const firstTabId = newTabs[0]?.id || null;
+    setCurrentTabId(firstTabId);
+    setCurrentTabName(newTabs[0]?.name || 'Story 1');
+    projectStorage.saveCurrentTabId(id, firstTabId);
+    setPersisted(defaultData);
+  }, [projects, getDefaultStoryData]);
+
+  const switchProject = useCallback((id) => {
+    if (id === currentProjectId) return;
+    saveCurrentProjectToStorage();
+    const tabs = projectStorage.getProjectTabs(id);
+    let tabId = projectStorage.loadCurrentTabId(id);
+    if (!tabId || !tabs.some((t) => t.id === tabId)) tabId = tabs[0]?.id || null;
+    if (tabId) {
+      projectStorage.saveCurrentTabId(id, tabId);
+      setCurrentTabId(tabId);
+      const tab = tabs.find((t) => t.id === tabId);
+      setCurrentTabName(tab?.name || 'Story 1');
+    }
+    const data = projectStorage.getDocumentDataForProject(id, tabId);
+    setPersisted(
+      data
+        ? normalizeStoryData(data, getDefaultSectionOrder, createEmptySections)
+        : getDefaultStoryData()
+    );
+    projectStorage.saveCurrentProjectId(id);
+    setCurrentProjectId(id);
+  }, [currentProjectId, saveCurrentProjectToStorage, getDefaultStoryData]);
+
+  const switchTab = useCallback((tabId) => {
+    if (tabId === currentTabId || !currentProjectId) return;
+    saveCurrentProjectToStorage();
+    const tabs = projectStorage.getProjectTabs(currentProjectId);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    projectStorage.saveCurrentTabId(currentProjectId, tabId);
+    setCurrentTabId(tabId);
+    setCurrentTabName(tab.name || 'Story');
+    const data = projectStorage.getDocumentDataForProject(currentProjectId, tabId);
+    setPersisted(
+      data
+        ? normalizeStoryData(data, getDefaultSectionOrder, createEmptySections)
+        : getDefaultStoryData()
+    );
+  }, [currentProjectId, currentTabId, saveCurrentProjectToStorage, getDefaultStoryData]);
+
+  const addTab = useCallback(() => {
+    if (!currentProjectId) return;
+    const defaultData = getDefaultStoryData();
+    const tabId = projectStorage.addProjectTab(currentProjectId, 'New story', defaultData);
+    projectStorage.saveCurrentTabId(currentProjectId, tabId);
+    setCurrentTabId(tabId);
+    setCurrentTabName('New story');
+    setPersisted(defaultData);
+  }, [currentProjectId, getDefaultStoryData]);
+
+  const deleteTab = useCallback((tabId) => {
+    if (!currentProjectId) return;
+    saveCurrentProjectToStorage();
+    const nextTabId = projectStorage.removeProjectTab(currentProjectId, tabId);
+    if (nextTabId === null) return;
+    if (tabId === currentTabId) {
+      const tabs = projectStorage.getProjectTabs(currentProjectId);
+      const nextTab = tabs.find((t) => t.id === nextTabId);
+      if (nextTab) {
+        setCurrentTabId(nextTabId);
+        setCurrentTabName(nextTab.name);
+        projectStorage.saveCurrentTabId(currentProjectId, nextTabId);
+        const data = projectStorage.getDocumentDataForProject(currentProjectId, nextTabId);
+        setPersisted(
+          data
+            ? normalizeStoryData(data, getDefaultSectionOrder, createEmptySections)
+            : getDefaultStoryData()
+        );
+      }
+    }
+  }, [currentProjectId, currentTabId, saveCurrentProjectToStorage, getDefaultStoryData]);
+
+  const renameTab = useCallback((tabId, name) => {
+    if (!currentProjectId) return;
+    projectStorage.renameProjectTab(currentProjectId, tabId, name);
+    if (tabId === currentTabId) {
+      setCurrentTabName((name || 'Story').trim());
+    }
+  }, [currentProjectId, currentTabId]);
+
+  const renameProject = useCallback((id, name) => {
+    if (!name.trim()) return;
+    const updated = projects.map((p) =>
+      p.id === id ? { ...p, name: name.trim(), updatedAt: Date.now() } : p
+    );
+    projectStorage.saveProjects(updated);
+    setProjects(updated);
+  }, [projects]);
+
+  const deleteProject = useCallback((id) => {
+    if (projects.length <= 1) return;
+    const idx = projects.findIndex((p) => p.id === id);
+    const nextIdToSwitch = idx > 0 ? projects[idx - 1].id : projects[idx + 1]?.id;
+    const updated = projects.filter((p) => p.id !== id);
+    projectStorage.saveProjects(updated);
+    projectStorage.deleteProjectData(id);
+    if (id === currentProjectId && nextIdToSwitch) {
+      switchProject(nextIdToSwitch);
+    } else if (id === currentProjectId) {
+      setCurrentProjectId(updated[0]?.id || null);
+      projectStorage.saveCurrentProjectId(updated[0]?.id || null);
+    }
+    setProjects(updated);
+  }, [projects, currentProjectId, switchProject]);
+
   const handleGenerate = async () => {
     setError('');
     const apiKey = getSettings().openaiApiKey?.trim();
@@ -178,6 +388,16 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Story Writer</h1>
+
+        <ProjectSelector
+          projects={projects}
+          currentProjectId={currentProjectId}
+          currentProjectName={projects.find((p) => p.id === currentProjectId)?.name}
+          onSwitchProject={switchProject}
+          onCreateProject={createProject}
+          onRenameProject={renameProject}
+          onDeleteProject={deleteProject}
+        />
 
         <div className="view-switcher">
           <button
@@ -259,6 +479,17 @@ function App() {
           </button>
         </div>
       </header>
+
+      <TabBar
+        tabs={currentProjectId ? projectStorage.getProjectTabs(currentProjectId) : []}
+        currentTabId={currentTabId}
+        currentTabName={currentTabName}
+        onSwitchTab={switchTab}
+        onAddTab={addTab}
+        onDeleteTab={deleteTab}
+        onRenameTab={renameTab}
+        disabled={!hasHydrated}
+      />
 
       {view === 'write' && (
       <main className="app-main">

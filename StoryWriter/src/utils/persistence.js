@@ -16,9 +16,8 @@ function loadRaw() {
 
 const DEFAULT_FRAMEWORK_ID = 'heros_arc';
 
-/** Load saved content; validates and merges with defaults. Returns default object if none saved. */
-export function loadContent(getDefaultSectionOrder, createEmptySections) {
-  const raw = loadRaw();
+/** Normalize raw story data; validates and merges with defaults. */
+export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySections) {
   const frameworkId =
     raw && typeof raw.frameworkId === 'string' ? raw.frameworkId : DEFAULT_FRAMEWORK_ID;
   const validOrder = getDefaultSectionOrder(frameworkId);
@@ -71,6 +70,11 @@ export function loadContent(getDefaultSectionOrder, createEmptySections) {
         ? raw.storyLength
         : 'medium',
   };
+}
+
+/** Load saved content; validates and merges with defaults. Returns default object if none saved. */
+export function loadContent(getDefaultSectionOrder, createEmptySections) {
+  return normalizeStoryData(loadRaw(), getDefaultSectionOrder, createEmptySections);
 }
 
 export function saveContent(payload) {

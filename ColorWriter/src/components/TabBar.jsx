@@ -31,12 +31,12 @@ const TabBar = ({ tabs, activeTabId, onTabSelect, onTabAdd, onTabDelete, onTabRe
         <div style={{
             display: 'flex',
             alignItems: 'center',
-            borderBottom: '1px solid var(--border-color)',
+            borderBottom: '1px solid var(--border-default)',
             backgroundColor: 'var(--bg-secondary)',
             padding: '0 0.5rem',
             gap: '0.25rem',
             overflowX: 'auto',
-            minHeight: '42px'
+            minHeight: '36px'
         }}>
             {tabs.map((tab) => (
                 <div
@@ -46,9 +46,9 @@ const TabBar = ({ tabs, activeTabId, onTabSelect, onTabAdd, onTabDelete, onTabRe
                         alignItems: 'center',
                         padding: '0.5rem 0.75rem',
                         cursor: 'pointer',
-                        borderBottom: activeTabId === tab.id ? '2px solid var(--text-primary)' : '2px solid transparent',
-                        backgroundColor: activeTabId === tab.id ? 'var(--bg-primary)' : 'transparent',
-                        color: activeTabId === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        borderBottom: activeTabId === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+                        backgroundColor: activeTabId === tab.id ? 'var(--bg-secondary)' : 'transparent',
+                        color: activeTabId === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
                         fontWeight: activeTabId === tab.id ? 600 : 400,
                         fontSize: '0.875rem',
                         whiteSpace: 'nowrap',
@@ -69,14 +69,14 @@ const TabBar = ({ tabs, activeTabId, onTabSelect, onTabAdd, onTabDelete, onTabRe
                             onKeyDown={(e) => handleKeyDown(e, tab.id)}
                             onClick={(e) => e.stopPropagation()}
                             style={{
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-primary)',
+                                border: '1px solid var(--accent)',
+                                background: 'var(--bg-tertiary)',
                                 color: 'var(--text-primary)',
                                 padding: '0.25rem 0.5rem',
                                 fontSize: '0.875rem',
                                 width: '100%',
                                 outline: 'none',
-                                borderRadius: '4px'
+                                borderRadius: 'var(--button-radius, 12px)'
                             }}
                             autoFocus
                         />
@@ -108,7 +108,7 @@ const TabBar = ({ tabs, activeTabId, onTabSelect, onTabAdd, onTabDelete, onTabRe
                                     }}
                                     title="Delete tab"
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
                                         e.currentTarget.style.color = 'var(--text-primary)';
                                     }}
                                     onMouseLeave={(e) => {
@@ -141,12 +141,12 @@ const TabBar = ({ tabs, activeTabId, onTabSelect, onTabAdd, onTabDelete, onTabRe
                 }}
                 title="Add new tab"
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                    e.currentTarget.style.color = 'var(--text-primary)';
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                    e.currentTarget.style.color = 'var(--accent)';
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.color = 'var(--text-tertiary)';
                 }}
             >
                 <Plus size={16} />

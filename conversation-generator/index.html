@@ -29,21 +29,74 @@
     
     <div class="app-container">
         <div class="app-header">
-            <h1>📱 Conversation Animator Pro</h1>
+            <div class="header-top">
+                <h1>📱 Conversation Animator Pro</h1>
+                <div class="header-actions">
+                    <div class="project-selector" id="project-selector">
+                        <button type="button" class="project-selector-trigger" id="project-trigger">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+                            <span class="project-selector-name" id="project-name">Untitled</span>
+                            <span class="project-chevron">▼</span>
+                        </button>
+                        <div class="project-selector-dropdown" id="project-dropdown" style="display:none;">
+                            <div class="project-selector-list" id="project-list"></div>
+                            <button type="button" class="project-selector-new" id="project-new">+ New project</button>
+                        </div>
+                    </div>
+                    <div class="tab-bar" id="tab-bar">
+                        <div class="tab-bar-tabs" id="tab-bar-tabs"></div>
+                        <button type="button" class="tab-bar-add" id="tab-add" title="Add conversation">+</button>
+                    </div>
+                </div>
+            </div>
             <p class="subtitle">Create stunning iOS-style message animations</p>
         </div>
         
         <div class="main-content">
-            <!-- Left Panel: Controls -->
+            <!-- Left Settings Panel -->
+            <div class="left-settings-panel" id="left-settings-panel">
+                <div class="left-settings-tabs">
+                    <button type="button" class="left-settings-tab active" data-tab="profile">Profile</button>
+                </div>
+                <div class="left-settings-content">
+                    <div class="left-settings-section" id="section-profile">
+                        <div class="form-group">
+                            <label>Profile Name</label>
+                            <input type="text" id="panel-profile-name" placeholder="My Brain">
+                        </div>
+                        <div class="form-group">
+                            <label>Profile Picture</label>
+                            <button type="button" class="btn-secondary" id="panel-profile-picture-btn">Choose File</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Message Count</label>
+                            <input type="number" id="panel-message-count" min="0" placeholder="147">
+                        </div>
+                        <div class="form-group">
+                            <label>Time Display</label>
+                            <input type="time" id="panel-time-display" value="14:47">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Control Panel -->
             <div class="control-panel">
                 <div class="quick-actions">
-                    <button class="action-btn primary" id="profile-menu-btn">
-                        <span class="btn-icon">👤</span>
-                        <span class="btn-text">Profile</span>
-                    </button>
                     <button class="action-btn secondary" id="save-load-menu-btn">
                         <span class="btn-icon">💾</span>
-                        <span class="btn-text">Save/Load</span>
+                        <span class="btn-text">Export/Import</span>
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">✨</span>
+                        <h3>Generate with AI</h3>
+                    </div>
+                    <p class="card-hint">Describe the conversation you want. Requires OpenAI API key in Settings.</p>
+                    <textarea id="generate-input" placeholder="e.g. A customer asking about a refund, and a support agent helping them resolve it. 6-8 messages." rows="3"></textarea>
+                    <button class="btn-primary" id="generate-btn">
+                        <span>✨</span> Generate Conversation
                     </button>
                 </div>
                 
@@ -230,6 +283,8 @@
     
     <audio id="bg-music-element" loop style="display: none;"></audio>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.0.0-rc.5/dist/html2canvas.min.js"></script>
+    <script src="apiKeys.js"></script>
+    <script src="projectStorage.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

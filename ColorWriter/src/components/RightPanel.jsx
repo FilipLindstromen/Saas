@@ -75,8 +75,8 @@ const RightPanel = ({
     return (
         <aside style={{
             width: '300px',
-            background: 'var(--bg-primary)',
-            borderLeft: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            borderLeft: '1px solid var(--border-default)',
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
@@ -85,7 +85,7 @@ const RightPanel = ({
             {/* Header */}
             <div style={{
                 padding: '1.25rem',
-                borderBottom: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--border-default)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',

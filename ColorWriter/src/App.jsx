@@ -20,6 +20,13 @@ function App() {
   const [apiKey, setApiKey] = useState(() => loadApiKeys().openai || '');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Sync apiKey from shared storage when settings opens (in case it was set in another app)
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setApiKey(loadApiKeys().openai || '');
+    }
+  }, [isSettingsOpen]);
+
   // Persistent State Helpers
   const usePersistentState = (key, initialValue) => {
     const [state, setState] = useState(() => {
@@ -134,8 +141,8 @@ function App() {
     );
   };
 
-  // Theme State
-  const [theme, setTheme] = usePersistentState('cw_theme', 'light');
+  // Theme State - default dark to match InfoGraphics
+  const [theme, setTheme] = usePersistentState('cw_theme', 'dark');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -494,25 +501,29 @@ function App() {
   return (
     <>
       <div className="app-container">
-        {/* Theme Toggle - Fixed Top Right - Adjusted position for 3-col layout */}
-        <button
-          onClick={toggleTheme}
-          style={{
-            position: 'fixed',
-            bottom: '1rem', // Moved to bottom right to not conflict with header
-            right: '1rem',
-            zIndex: 100,
-            padding: '0.5rem',
-            borderRadius: '50%',
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-            color: 'var(--text-primary)'
-          }}
-          title="Toggle Theme"
-        >
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-        </button>
+        {/* Toolbar - InfoGraphics style */}
+        <header className="app-toolbar">
+          <span className="app-toolbar-logo">COLOR WRITER</span>
+          <div className="app-toolbar-spacer" />
+          <button
+            type="button"
+            className="app-toolbar-btn"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <button
+            type="button"
+            className="app-toolbar-btn"
+            onClick={() => setIsSettingsOpen(true)}
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <Settings size={18} />
+          </button>
+        </header>
 
         <Layout>
           <Sidebar

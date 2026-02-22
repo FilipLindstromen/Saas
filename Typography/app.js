@@ -489,4 +489,58 @@ class TypographyAnimationApp {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new TypographyAnimationApp();
+
+    // Settings modal - shared API keys
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModalClose = document.getElementById('settingsModalClose');
+    const settingsCancel = document.getElementById('settingsCancel');
+    const settingsSave = document.getElementById('settingsSave');
+    const settingsOpenaiKey = document.getElementById('settingsOpenaiKey');
+
+    function openSettings() {
+        const keys = window.loadApiKeys ? window.loadApiKeys() : { openai: '' };
+        if (settingsOpenaiKey) settingsOpenaiKey.value = keys.openai || '';
+        if (settingsModal) settingsModal.style.display = 'flex';
+    }
+
+    function closeSettings() {
+        if (settingsModal) settingsModal.style.display = 'none';
+    }
+
+    function saveSettingsKeys() {
+        if (!window.saveApiKeys) return;
+        const openai = settingsOpenaiKey ? settingsOpenaiKey.value.trim() : '';
+        window.saveApiKeys({ openai });
+        closeSettings();
+    }
+
+    if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+    if (settingsModalClose) settingsModalClose.addEventListener('click', closeSettings);
+    if (settingsCancel) settingsCancel.addEventListener('click', closeSettings);
+    if (settingsSave) settingsSave.addEventListener('click', saveSettingsKeys);
+    if (settingsModal) {
+        settingsModal.querySelector('.settings-modal-backdrop')?.addEventListener('click', closeSettings);
+    }
+
+    // Theme toggle (like InfoGraphics)
+    const themeToggle = document.getElementById('themeToggle');
+    const iconSun = themeToggle?.querySelector('.theme-icon-sun');
+    const iconMoon = themeToggle?.querySelector('.theme-icon-moon');
+    const updateThemeIcon = (theme) => {
+        if (iconSun) iconSun.style.display = theme === 'dark' ? 'block' : 'none';
+        if (iconMoon) iconMoon.style.display = theme === 'light' ? 'block' : 'none';
+    };
+    if (themeToggle) {
+        const saved = localStorage.getItem('typographyTheme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        updateThemeIcon(saved);
+        themeToggle.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('typographyTheme', next);
+            updateThemeIcon(next);
+        });
+    }
 });
