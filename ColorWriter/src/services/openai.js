@@ -15,25 +15,98 @@ const cleanContent = (text) => {
         .trim();
 };
 
-export async function generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter, bigIdea }) {
+export async function generateCopy(apiKey, {
+    docType, style, instructions, targetAudience, copywriter, bigIdea,
+    specificSituation = '', situationsList = '', painPoints = '', desiredOutcomes = '',
+    objections = '', beliefShift = '', desiredEmotion = '', primaryCta = ''
+}) {
     const openai = new OpenAI({
         apiKey: apiKey,
         dangerouslyAllowBrowser: true
     });
 
+    const buildList = (text) => text ? text.trim().split(/\n+/).filter(Boolean).map(s => s.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean) : [];
+
+    const situations = buildList(situationsList);
+    const pains = buildList(painPoints);
+    const outcomes = buildList(desiredOutcomes);
+    const objectionList = buildList(objections);
+
+    const contextBlock = `
+**TARGET AUDIENCE & SITUATION (FROM USER - USE THROUGHOUT)**
+
+Primary audience: ${targetAudience || '[Describe who this is for]'}
+${specificSituation ? `Offer situation: ${specificSituation}` : ''}
+
+${situations.length ? `Specific situations to target:\n${situations.map(s => `* ${s}`).join('\n')}` : ''}
+${pains.length ? `Pain points:\n${pains.map(p => `* ${p}`).join('\n')}` : ''}
+${outcomes.length ? `Desired outcomes:\n${outcomes.map(o => `* ${o}`).join('\n')}` : ''}
+${objectionList.length ? `Common objections:\n${objectionList.map(o => `* ${o}`).join('\n')}` : ''}
+
+**INTENTION (MANDATORY - LOCK ONTO THIS)**
+${beliefShift ? `Desired belief shift: ${beliefShift}` : 'Define: Old belief → New belief'}
+${desiredEmotion ? `Desired emotional state after reading: ${desiredEmotion}` : 'Define the emotion you want the reader to feel'}
+${primaryCta ? `Primary action/CTA: ${primaryCta}` : 'Define the primary CTA'}
+
+Every section must support this intention. Speak to specific situations, not generic audiences.
+Use patterns like: "If you're someone who…", "This matters especially when…", "You might be experiencing…"
+Avoid broad statements like "For anyone who wants success."
+`;
+
     let systemPrompt = `**ROLE**
-You are an elite conversion copywriter and persuasion strategist.
+You are an expert direct-response copywriter and persuasion strategist.
 You do not produce generic, explanatory, or safe copy.
 You do not write blog posts, educational articles, or "helpful content."
 
-Your task is to generate high-impact sales copy that installs a single dominant belief and makes the offer feel inevitable.
+Your task is to generate HIGH-CONVERSION ${docType} copy.
 
 **IMPORTANT**: Generate copy that is persuasive and effective while remaining compliant with content policies. Focus on legitimate solutions, honest claims, and ethical persuasion techniques.
 
 ${copywriter && copywriter !== 'None' ? `Write in the specific style of ${copywriter}. Emulate their tone, vocabulary, sentence structure, and persuasion techniques perfectly.` : 'Write as an expert A-list copywriter.'}
 
-Your goal is to write a ${docType} targeting ${targetAudience || 'the general public'}.
 Tone: ${style}.
+
+${contextBlock}
+
+**CORE FRAMEWORK (MANDATORY - ERICKSON PERSUASIVE CYCLE)**
+
+Use the Persuasive Cycle in EVERY section:
+1. **Statement** (clear claim)
+2. **Impact** (why it matters)
+3. **Evidence** (proof)
+4. **Relevance** (why THIS audience should care now)
+
+Never skip relevance. Every section must answer: "Why should this reader care, in their specific situation?"
+
+**COMMUNICATION STYLE BALANCE (ERICKSON MODEL)**
+
+Write so all four audience styles feel addressed:
+1. **Direct** (results-driven): Clear promises, short decisive language, action-focused CTAs
+2. **Analytical** (logic-driven): Explain mechanism, provide structure and reasoning, clear logic chains
+3. **Social** (connection-driven): Trust-based language, emphasize support/guidance, make reader feel understood
+4. **Expressive** (vision-driven): Paint transformation, future-oriented language, highlight identity evolution
+
+Balance all four styles naturally.
+
+**RELEVANCE RULE (CRITICAL)**
+
+Speak to specific situations, not generic audiences.
+Use patterns like: "If you're someone who…", "This matters especially when…", "You might be experiencing…"
+Avoid broad statements like "For anyone who wants success."
+
+**RELEVANCE LADDER** – Move messaging through levels:
+1. General problem
+2. Specific situation
+3. Identity-level relevance
+
+Example: General → "Sales feel hard." Situation → "You're over-explaining your offer." Identity → "You're a thoughtful expert who doesn't want to sound pushy."
+Aim for identity-level relevance often.
+
+**RAPPORT PRINCIPLE**
+
+Persuasion should feel collaborative, not aggressive.
+Tone: Clear, calm confidence, respectful authority, human and direct.
+Avoid: Hype, manipulation language, pressure tactics.
 
 **CRITICAL: AVOID WEAK, EXPLANATORY COPY**
 The copy must NOT:
@@ -902,9 +975,18 @@ This is mandatory. Multiple icons in the gutter are expected and required when m
 ${docType.includes('Sales Page') ? `For Sales Pages: (1) The eyebrow-headline-subheadline sequence at the top is MANDATORY. (2) Use multiple h2/h3 headlines throughout (every 3-5 paragraphs) to break up sections and maintain readability. (3) Use multiple icons in gutter when blocks use mechanics (block type + loop/interrupt icons).` : ''}
 `;
 
+    const objectionGuidance = objectionList.length ? `
+**OBJECTION HANDLING (REQUIRED)**
+The user provided these objections. Treat each as a credibility opportunity:
+${objectionList.map(o => `* ${o}`).join('\n')}
+
+For each objection: (1) Restate it calmly, (2) Validate the concern, (3) Provide insight or proof, (4) Show why it helps the audience.
+Reframe objections as buying signals. Include an FAQ or objection section addressing these.
+` : '';
+
     const userPrompt = `${docType.includes('Sales Page') ? `CRITICAL: Generate the COMPLETE, FULL-LENGTH sales page (3000-6000+ words) in this single response. Do NOT provide a condensed version, draft, or abbreviated content. Generate the entire sales page with all sections, all content, and all required elements now.
 
-` : ''}Instructions: ${instructions}`;
+` : ''}Instructions: ${instructions}${objectionGuidance}`;
 
     try {
         const completion = await openai.chat.completions.create({

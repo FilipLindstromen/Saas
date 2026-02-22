@@ -17,8 +17,22 @@ const Sidebar = ({
     setBigIdea,
     onGenerateBigIdeas,
     bigIdeaLoading,
-    persuasionFramework,
-    setPersuasionFramework,
+    specificSituation,
+    setSpecificSituation,
+    situationsList,
+    setSituationsList,
+    painPoints,
+    setPainPoints,
+    desiredOutcomes,
+    setDesiredOutcomes,
+    objections,
+    setObjections,
+    beliefShift,
+    setBeliefShift,
+    desiredEmotion,
+    setDesiredEmotion,
+    primaryCta,
+    setPrimaryCta,
     onGenerateWeirdStoryIdeas
 }) => {
     const [loading, setLoading] = useState(false);
@@ -37,18 +51,6 @@ const Sidebar = ({
     const styles = [
         'Aggressive', 'Story-driven', 'Direct', 'Educational', 'Empathetic',
         'Funny', 'Curiosity', 'Relatable', 'Personal', '🔮 Weird stories'
-    ];
-
-    const persuasionFrameworks = [
-        'None',
-        'PAS (Problem-Agitate-Solve)',
-        'AIDA',
-        'Jobs-to-Be-Done',
-        'Hormozi Value Equation',
-        'Cialdini Principles',
-        'BAB (Before-After-Bridge)',
-        '4 U\'s (Urgent, Unique, Useful, Ultra-specific)',
-        'Star-Story-Solution'
     ];
 
     // 10+ Legends
@@ -72,7 +74,11 @@ const Sidebar = ({
         if (!apiKey) return;
         setLoading(true);
         try {
-            const content = await generateCopy(apiKey, { docType, style, instructions, targetAudience, copywriter, bigIdea });
+            const content = await generateCopy(apiKey, {
+                docType, style, instructions, targetAudience, copywriter, bigIdea,
+                specificSituation, situationsList, painPoints, desiredOutcomes,
+                objections, beliefShift, desiredEmotion, primaryCta
+            });
             onGenerated(content);
         } catch (e) {
             console.error(e);
@@ -165,19 +171,6 @@ const Sidebar = ({
 
             <div className="control-group">
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                    Persuasion Framework Overlay
-                </label>
-                <select
-                    value={persuasionFramework}
-                    onChange={(e) => setPersuasionFramework(e.target.value)}
-                    style={{ width: '100%' }}
-                >
-                    {persuasionFrameworks.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-            </div>
-
-            <div className="control-group">
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                     Target Audience
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -189,6 +182,90 @@ const Sidebar = ({
                         style={{ width: '100%', paddingLeft: '2.25rem' }}
                     />
                 </div>
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="What specific situation is this offer about?">
+                    Offer Situation
+                </label>
+                <input
+                    value={specificSituation}
+                    onChange={(e) => setSpecificSituation(e.target.value)}
+                    placeholder="e.g. Launching a course, selling a coaching program..."
+                    style={{ width: '100%' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="Specific situations to target (one per line)">
+                    Situations to Target
+                </label>
+                <textarea
+                    value={situationsList}
+                    onChange={(e) => setSituationsList(e.target.value)}
+                    placeholder={'• Situation 1\n• Situation 2\n• Situation 3'}
+                    style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Pain Points</label>
+                <textarea
+                    value={painPoints}
+                    onChange={(e) => setPainPoints(e.target.value)}
+                    placeholder={'• Pain 1\n• Pain 2\n• Pain 3'}
+                    style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Desired Outcomes</label>
+                <textarea
+                    value={desiredOutcomes}
+                    onChange={(e) => setDesiredOutcomes(e.target.value)}
+                    placeholder={'• Outcome 1\n• Outcome 2\n• Outcome 3'}
+                    style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Common Objections</label>
+                <textarea
+                    value={objections}
+                    onChange={(e) => setObjections(e.target.value)}
+                    placeholder={'• Objection 1\n• Objection 2\n• Objection 3'}
+                    style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }} title="Old belief → New belief">Belief Shift</label>
+                <input
+                    value={beliefShift}
+                    onChange={(e) => setBeliefShift(e.target.value)}
+                    placeholder="e.g. 'I'm broken' → 'It's a biological state I can change'"
+                    style={{ width: '100%' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Desired Emotion After Reading</label>
+                <input
+                    value={desiredEmotion}
+                    onChange={(e) => setDesiredEmotion(e.target.value)}
+                    placeholder="e.g. Relief, Hope, Confidence"
+                    style={{ width: '100%' }}
+                />
+            </div>
+
+            <div className="control-group">
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Primary CTA</label>
+                <input
+                    value={primaryCta}
+                    onChange={(e) => setPrimaryCta(e.target.value)}
+                    placeholder="e.g. Get instant access, Book a call"
+                    style={{ width: '100%' }}
+                />
             </div>
 
             <div className="control-group" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>

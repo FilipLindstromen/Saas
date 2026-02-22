@@ -215,8 +215,15 @@ function App() {
   // Legendary Copywriter Selection
   const [copywriter, setCopywriter] = usePersistentState('cw_copywriter', 'None');
 
-  // Persuasion Framework Overlay
-  const [persuasionFramework, setPersuasionFramework] = usePersistentState('cw_persuasionFramework', 'None');
+  // Erickson framework inputs
+  const [specificSituation, setSpecificSituation] = usePersistentState('cw_specificSituation', '');
+  const [situationsList, setSituationsList] = usePersistentState('cw_situationsList', '');
+  const [painPoints, setPainPoints] = usePersistentState('cw_painPoints', '');
+  const [desiredOutcomes, setDesiredOutcomes] = usePersistentState('cw_desiredOutcomes', '');
+  const [objections, setObjections] = usePersistentState('cw_objections', '');
+  const [beliefShift, setBeliefShift] = usePersistentState('cw_beliefShift', '');
+  const [desiredEmotion, setDesiredEmotion] = usePersistentState('cw_desiredEmotion', '');
+  const [primaryCta, setPrimaryCta] = usePersistentState('cw_primaryCta', '');
 
   // Show/Hide Background Colors Toggle
   const [showColors, setShowColors] = usePersistentState('cw_showColors', 'true');
@@ -562,8 +569,22 @@ function App() {
             setBigIdea={setBigIdea}
             onGenerateBigIdeas={handleGenerateBigIdeas}
             bigIdeaLoading={bigIdeaLoading}
-            persuasionFramework={persuasionFramework}
-            setPersuasionFramework={setPersuasionFramework}
+            specificSituation={specificSituation}
+            setSpecificSituation={setSpecificSituation}
+            situationsList={situationsList}
+            setSituationsList={setSituationsList}
+            painPoints={painPoints}
+            setPainPoints={setPainPoints}
+            desiredOutcomes={desiredOutcomes}
+            setDesiredOutcomes={setDesiredOutcomes}
+            objections={objections}
+            setObjections={setObjections}
+            beliefShift={beliefShift}
+            setBeliefShift={setBeliefShift}
+            desiredEmotion={desiredEmotion}
+            setDesiredEmotion={setDesiredEmotion}
+            primaryCta={primaryCta}
+            setPrimaryCta={setPrimaryCta}
             onGenerateWeirdStoryIdeas={handleGenerateWeirdStoryIdeas}
           />
 
