@@ -27,6 +27,36 @@ import { createTestAudio } from '../utils/testAudio'
 import { TransparentTextarea } from '../components/TransparentTextarea'
 import { generateVoiceOverFromOpenAI } from '../services/voiceApi'
 
+function aspectStyle(ar: AspectRatio) {
+  const map: Record<AspectRatio, string> = { '1:1': '1/1', '3:4': '3/4', '9:16': '9/16' }
+  const ratio = map[ar]
+  return { aspectRatio: ratio as any, width: '100%', maxWidth: '800px', maxHeight: '70vh' }
+}
+
+function computeExactDuration(quiz: QuizData): number {
+  const settings = quiz.settings!
+  if (settings.animationType === 'meme') {
+    const meme = (quiz as any).meme || { settings: {} }
+    const memeSettings = meme.settings || {}
+    const topTextInMs = memeSettings.topTextInMs || 500
+    const bottomTextInMs = memeSettings.bottomTextInMs || 500
+    const topTextHoldMs = memeSettings.topTextHoldMs || 3000
+    const bottomTextHoldMs = memeSettings.bottomTextHoldMs || 3000
+    const topTextFadeOutMs = memeSettings.topTextFadeOutMs || 500
+    const bottomTextFadeOutMs = memeSettings.bottomTextFadeOutMs || 500
+    const topTextFadeOutStartTime = topTextInMs + topTextHoldMs
+    const bottomTextFadeOutStartTime = topTextInMs + bottomTextInMs + bottomTextHoldMs
+    const contentDuration = Math.max(
+      topTextFadeOutStartTime + topTextFadeOutMs,
+      bottomTextFadeOutStartTime + bottomTextFadeOutMs
+    )
+    const ctaDuration = settings.cta?.enabled ? (settings.cta.durationMs ?? 3000) : 0
+    return contentDuration + ctaDuration
+  }
+  const timeline = computeQuizTimeline(quiz)
+  return timeline.totalContentDuration + timeline.ctaDuration + timeline.endDelay
+}
+
 export function App() {
   const {
     quiz,
@@ -2095,7 +2125,7 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
         onSave={() => setOpenaiApiKey(loadApiKeys().openai || '')}
       />
     </div>
-  )
+  );
 }
 
 // Helper functions

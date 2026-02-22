@@ -56,7 +56,11 @@ function InfographicPicker({ isOpen, onClose, onSelect, currentProjectId, curren
         <div className="infographic-picker-header">
           <h3>Use Infographic as Background</h3>
           <p className="infographic-picker-hint">
-            Select an infographic from the InfoGraphics generator. Timeline animations will play during presentation.
+            Select an infographic from the{' '}
+            <a href="https://filiplindstromen.github.io/Saas/InfoGraphics/" target="_blank" rel="noopener noreferrer">
+              InfoGraphics generator
+            </a>
+            . Timeline animations will play during presentation.
           </p>
           <button type="button" className="infographic-picker-close" onClick={onClose} aria-label="Close">
             ×
