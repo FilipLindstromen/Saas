@@ -7,6 +7,8 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
   const [selectedTags, setSelectedTags] = useState([])
   const [worstTag, setWorstTag] = useState(null)
   const [selectedAnswer, setSelectedAnswer] = useState(null)
+  const [answerHistory, setAnswerHistory] = useState([]) // { question, answer } for personalized results
+  const [transitionDir, setTransitionDir] = useState('next') // 'next' | 'prev' for slide animation
 
   const typo = typography || {}
   const th = theme || {}
@@ -29,6 +31,8 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
     setSelectedTags([])
     setWorstTag(null)
     setSelectedAnswer(null)
+    setAnswerHistory([])
+    setTransitionDir('next')
   }
 
   const handleStart = () => {
@@ -53,6 +57,10 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
       setWorstTag(tag)
     }
 
+    const q = quizData.questions[currentQuestion]
+    setAnswerHistory(prev => [...prev, { question: q?.q, answer: selectedAnswer.label }])
+    setTransitionDir('next')
+
     if (currentQuestion < quizData.questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1)
       setSelectedAnswer(null)
@@ -60,6 +68,50 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
       setStep('result')
     }
   }
+
+  const handlePrev = () => {
+    if (currentQuestion === 0) return
+    const prevQ = quizData.questions[currentQuestion - 1]
+    const lastEntry = answerHistory[answerHistory.length - 1]
+    const prevAnswer = prevQ?.answers?.find(a => a.label === lastEntry?.answer)
+    if (prevAnswer?.tag) setSelectedTags(prev => prev.filter(t => t !== prevAnswer.tag))
+    if (currentQuestion - 1 === 2) setWorstTag(null)
+    setTransitionDir('prev')
+    setCurrentQuestion(currentQuestion - 1)
+    setAnswerHistory(prev => prev.slice(0, -1))
+    setSelectedAnswer(prevAnswer || null)
+  }
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (step === 'title') {
+        if (e.key === 'Enter') handleStart()
+        return
+      }
+      if (step === 'result') return
+      if (!quizData.questions?.length) return
+      const q = quizData.questions[currentQuestion]
+      const answers = q?.answers || []
+      if (e.key === 'Enter' && selectedAnswer) {
+        e.preventDefault()
+        handleNext()
+      } else if (e.key === 'ArrowLeft' && currentQuestion > 0) {
+        handlePrev()
+      } else if (e.key === 'ArrowUp' && answers.length > 0) {
+        e.preventDefault()
+        const idx = selectedAnswer ? answers.findIndex(a => a.tag === selectedAnswer.tag) : -1
+        const nextIdx = idx <= 0 ? answers.length - 1 : idx - 1
+        setSelectedAnswer(answers[nextIdx])
+      } else if (e.key === 'ArrowDown' && answers.length > 0) {
+        e.preventDefault()
+        const idx = selectedAnswer ? answers.findIndex(a => a.tag === selectedAnswer.tag) : -1
+        const nextIdx = idx < 0 || idx >= answers.length - 1 ? 0 : idx + 1
+        setSelectedAnswer(answers[nextIdx])
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [step, currentQuestion, selectedAnswer, quizData.questions, handleStart, handleNext, handlePrev])
 
   const renderTitle = () => (
     <div className="preview-title-screen" style={backgroundStyle}>
@@ -82,46 +134,61 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
     const question = quizData.questions[currentQuestion]
     if (!question) return null
 
+    const progressPct = ((currentQuestion + 1) / quizData.questions.length) * 100
+
     return (
       <div className="preview-quiz-screen" style={backgroundStyle}>
-        <div className="preview-progress">
-          {currentQuestion + 1}/{quizData.questions.length}
+        <div className="preview-progress-bar-wrap">
+          <div className="preview-progress-bar" style={{ width: `${progressPct}%` }} />
         </div>
-        <div
-          className="preview-question-text"
-          style={{ fontFamily: typo.questionFont, fontSize: typo.questionSize }}
-        >
-          {question.q}
-        </div>
-        <div className="preview-answers">
-          {question.answers.map((answer, idx) => (
-            <div
-              key={idx}
-              className={`preview-answer ${selectedAnswer?.tag === answer.tag ? 'active' : ''}`}
-              style={{ fontFamily: typo.answerFont, fontSize: typo.answerSize }}
-              onClick={() => handleAnswerSelect(answer)}
+        <div key={currentQuestion} className={`preview-question-slide preview-slide-${transitionDir}`}>
+          <div className="preview-progress-text">
+            {currentQuestion + 1} of {quizData.questions.length}
+          </div>
+          <div
+            className="preview-question-text"
+            style={{ fontFamily: typo.questionFont, fontSize: typo.questionSize }}
+          >
+            {question.q}
+          </div>
+          <div className="preview-answers">
+            {question.answers.map((answer, idx) => (
+              <div
+                key={idx}
+                className={`preview-answer preview-answer-stagger ${selectedAnswer?.tag === answer.tag ? 'active' : ''}`}
+                style={{
+                  fontFamily: typo.answerFont,
+                  fontSize: typo.answerSize,
+                  animationDelay: `${idx * 0.06}s`
+                }}
+                onClick={() => handleAnswerSelect(answer)}
+              >
+                {answer.label}
+              </div>
+            ))}
+          </div>
+          <div className="preview-quiz-actions">
+            {currentQuestion > 0 && (
+              <button type="button" className="preview-back-btn" onClick={handlePrev} aria-label="Go back">
+                ← Back
+              </button>
+            )}
+            <button
+              className="preview-next-btn"
+              onClick={handleNext}
+              disabled={!selectedAnswer}
             >
-              {answer.label}
-            </div>
-          ))}
+              →
+            </button>
+          </div>
         </div>
-        <button
-          className="preview-next-btn"
-          onClick={handleNext}
-          disabled={!selectedAnswer}
-        >
-          →
-        </button>
       </div>
     )
   }
 
   const renderResult = () => {
-    if (!selectedTags.length) {
-      selectedTags.push('default')
-    }
-
-    const dominantTag = selectedTags[0]
+    const tags = selectedTags.length ? selectedTags : ['default']
+    const dominantTag = tags[0]
     const labels = quizData.tagLabels || {}
     const headlines = quizData.headlines || {}
     const insights = quizData.tagInsights || {}
@@ -139,7 +206,7 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
     let bodyText = ''
     let extraText = ''
 
-    selectedTags.forEach(tag => {
+    tags.forEach(tag => {
       const block = insights[tag]
       if (!block) return
       if (mindTags.has(tag)) {
@@ -173,8 +240,18 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
             className="preview-result-subtitle"
             style={{ fontFamily: typo.feedbackFont }}
           >
-            Here's what your answers reveal.
+            Based on your answers
           </div>
+          {answerHistory.length > 0 && (
+            <div className="preview-result-summary">
+              {answerHistory.map((entry, i) => (
+                <div key={i} className="preview-result-summary-item">
+                  <span className="preview-result-summary-q">{entry.question}</span>
+                  <span className="preview-result-summary-a">→ {entry.answer}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="preview-result-card">
             <h3>Your Pattern</h3>
             <div
