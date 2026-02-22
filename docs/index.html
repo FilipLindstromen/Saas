@@ -550,6 +550,16 @@
           <input type="password" id="key-pexels" class="settings-input" placeholder="Optional" autocomplete="off" autocapitalize="off" autocorrect="off">
           <span class="settings-label-hint">For InfoGraphics image search</span>
         </div>
+        <div class="settings-field">
+          <label class="settings-label" for="key-googleClientId">Google Client ID</label>
+          <input type="text" id="key-googleClientId" class="settings-input" placeholder="For YouTube upload (optional)" autocomplete="off" autocapitalize="off" autocorrect="off">
+          <span class="settings-label-hint">For ReelRecorder YouTube upload. OAuth 2.0 Client ID from Google Cloud Console.</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="key-elevenlabs">ElevenLabs API Key</label>
+          <input type="password" id="key-elevenlabs" class="settings-input" placeholder="Optional" autocomplete="off" autocapitalize="off" autocorrect="off">
+          <span class="settings-label-hint">For Sound Effects Generator. Get at elevenlabs.io</span>
+        </div>
       </div>
       <div class="settings-modal-footer">
         <button type="button" class="settings-btn settings-btn-secondary" id="settings-cancel">Cancel</button>
@@ -589,7 +599,7 @@
 
       // Settings modal - API keys
       const modal = document.getElementById('settings-modal');
-      const keys = ['openai', 'unsplash', 'giphy', 'pixabay', 'pexels'];
+      const keys = ['openai', 'unsplash', 'giphy', 'pixabay', 'pexels', 'googleClientId', 'elevenlabs'];
 
       function openSettings() {
         if (window.SaasApiKeys) {

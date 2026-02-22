@@ -1264,7 +1264,6 @@ function App() {
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        fields={['openai', 'giphy', 'pixabay', 'pexels']}
         onSave={() => setApiKeys(loadApiKeys())}
       />
       <ShortcutsModal

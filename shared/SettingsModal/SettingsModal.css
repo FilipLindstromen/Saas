@@ -59,6 +59,15 @@
   line-height: 1.5;
 }
 
+.shared-settings-link {
+  color: var(--accent, #ff6b35);
+  text-decoration: none;
+}
+
+.shared-settings-link:hover {
+  text-decoration: underline;
+}
+
 .shared-settings-field {
   margin-bottom: 1rem;
 }

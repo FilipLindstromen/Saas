@@ -1,43 +1,18 @@
 import { useState, useEffect } from 'react'
 import { IconX, IconCheck } from './Icons'
 import { getYouTubeAccessToken, fetchYouTubeChannels } from '../services/youtubeUpload'
+import { loadApiKeys } from '../utils/apiKeys'
 import styles from './SettingsModal.module.css'
 
-const OPENAI_KEY_STORAGE = 'videoRecorder_openaiApiKey'
-const GOOGLE_CLIENT_ID_STORAGE = 'videoRecorder_googleClientId'
 const YOUTUBE_CHANNEL_ID_STORAGE = 'videoRecorder_youtubeChannelId'
 const YOUTUBE_CHANNEL_TITLE_STORAGE = 'videoRecorder_youtubeChannelTitle'
-const UNSPLASH_ACCESS_KEY_STORAGE = 'videoRecorder_unsplashAccessKey'
-const PEXELS_API_KEY_STORAGE = 'videoRecorder_pexelsApiKey'
-const PIXABAY_API_KEY_STORAGE = 'videoRecorder_pixabayApiKey'
-const GIPHY_API_KEY_STORAGE = 'videoRecorder_giphyApiKey'
 
 export function getStoredOpenAIKey(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(OPENAI_KEY_STORAGE) ?? ''
-}
-
-export function setStoredOpenAIKey(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(OPENAI_KEY_STORAGE, value)
-  } else {
-    window.localStorage.removeItem(OPENAI_KEY_STORAGE)
-  }
+  return loadApiKeys().openai ?? ''
 }
 
 export function getStoredGoogleClientId(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(GOOGLE_CLIENT_ID_STORAGE) ?? ''
-}
-
-export function setStoredGoogleClientId(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(GOOGLE_CLIENT_ID_STORAGE, value.trim())
-  } else {
-    window.localStorage.removeItem(GOOGLE_CLIENT_ID_STORAGE)
-  }
+  return loadApiKeys().googleClientId ?? ''
 }
 
 export function getStoredYouTubeChannel(): { id: string; title: string } | null {
@@ -59,80 +34,37 @@ function setStoredYouTubeChannel(channel: { id: string; title: string } | null):
 }
 
 export function getStoredUnsplashAccessKey(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(UNSPLASH_ACCESS_KEY_STORAGE) ?? ''
-}
-
-export function setStoredUnsplashAccessKey(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(UNSPLASH_ACCESS_KEY_STORAGE, value.trim())
-  } else {
-    window.localStorage.removeItem(UNSPLASH_ACCESS_KEY_STORAGE)
-  }
+  return loadApiKeys().unsplash ?? ''
 }
 
 export function getStoredPexelsApiKey(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(PEXELS_API_KEY_STORAGE) ?? ''
-}
-
-export function setStoredPexelsApiKey(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(PEXELS_API_KEY_STORAGE, value.trim())
-  } else {
-    window.localStorage.removeItem(PEXELS_API_KEY_STORAGE)
-  }
+  return loadApiKeys().pexels ?? ''
 }
 
 export function getStoredPixabayApiKey(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(PIXABAY_API_KEY_STORAGE) ?? ''
-}
-
-export function setStoredPixabayApiKey(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(PIXABAY_API_KEY_STORAGE, value.trim())
-  } else {
-    window.localStorage.removeItem(PIXABAY_API_KEY_STORAGE)
-  }
+  return loadApiKeys().pixabay ?? ''
 }
 
 export function getStoredGiphyApiKey(): string {
-  if (typeof window === 'undefined' || !window.localStorage) return ''
-  return window.localStorage.getItem(GIPHY_API_KEY_STORAGE) ?? ''
-}
-
-export function setStoredGiphyApiKey(value: string): void {
-  if (typeof window === 'undefined' || !window.localStorage) return
-  if (value) {
-    window.localStorage.setItem(GIPHY_API_KEY_STORAGE, value.trim())
-  } else {
-    window.localStorage.removeItem(GIPHY_API_KEY_STORAGE)
-  }
+  return loadApiKeys().giphy ?? ''
 }
 
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
-  onApiKeyChange: (key: string) => void
+  onApiKeyChange?: (key: string) => void
 }
 
 export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModalProps) {
-  const [apiKey, setApiKey] = useState('')
-  const [googleClientId, setGoogleClientId] = useState('')
-  const [unsplashAccessKey, setUnsplashAccessKey] = useState('')
-  const [pexelsApiKey, setPexelsApiKey] = useState('')
-  const [pixabayApiKey, setPixabayApiKey] = useState('')
-  const [giphyApiKey, setGiphyApiKey] = useState('')
   const [youtubeChannel, setYoutubeChannel] = useState<{ id: string; title: string } | null>(null)
   const [youtubeConnecting, setYoutubeConnecting] = useState(false)
   const [youtubeError, setYoutubeError] = useState<string | null>(null)
   const [originCopied, setOriginCopied] = useState(false)
 
   const appOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+  const saasAppsUrl = typeof window !== 'undefined'
+    ? new URL('../index.html', window.location.href).href
+    : '/index.html'
 
   const copyOrigin = () => {
     if (!appOrigin) return
@@ -144,20 +76,15 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
 
   useEffect(() => {
     if (isOpen) {
-      setApiKey(getStoredOpenAIKey())
-      setGoogleClientId(getStoredGoogleClientId())
-      setUnsplashAccessKey(getStoredUnsplashAccessKey())
-      setPexelsApiKey(getStoredPexelsApiKey())
-      setPixabayApiKey(getStoredPixabayApiKey())
       setYoutubeChannel(getStoredYouTubeChannel())
       setYoutubeError(null)
     }
   }, [isOpen])
 
   const handleConnectYouTube = async () => {
-    const clientId = getStoredGoogleClientId() || googleClientId.trim()
+    const clientId = getStoredGoogleClientId()
     if (!clientId) {
-      setYoutubeError('Enter and save Google Client ID first.')
+      setYoutubeError('Add Google Client ID in the SaaS Apps screen first.')
       return
     }
     setYoutubeError(null)
@@ -186,13 +113,9 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
   }
 
   const handleSave = () => {
-    setStoredOpenAIKey(apiKey.trim())
-    setStoredGoogleClientId(googleClientId)
-    setStoredUnsplashAccessKey(unsplashAccessKey)
-    setStoredPexelsApiKey(pexelsApiKey)
-    setStoredPixabayApiKey(pixabayApiKey)
-    setStoredGiphyApiKey(giphyApiKey)
-    onApiKeyChange(apiKey.trim())
+    // Google Client ID is stored in the shared SaaS API keys - user must configure in SaaS apps screen
+    // For now we only support reading; editing happens in docs/index.html
+    onApiKeyChange?.(getStoredOpenAIKey())
     onClose()
   }
 
@@ -208,78 +131,13 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
           </button>
         </div>
         <div className={styles.body}>
-          <label className={styles.label}>
-            OpenAI API key
-            <span className={styles.hint}>Used for burn-in captions (Whisper) and YouTube description. Stored only in your browser.</span>
-          </label>
-          <input
-            type="password"
-            className={styles.input}
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-..."
-            autoComplete="off"
-          />
-          <label className={styles.label}>
-            Google Client ID (for YouTube upload)
-            <span className={styles.hint}>Optional. From Google Cloud Console: create OAuth 2.0 Client ID (Web application), add your site to Authorized JavaScript origins, then paste the Client ID here.</span>
-          </label>
-          <input
-            type="text"
-            className={styles.input}
-            value={googleClientId}
-            onChange={(e) => setGoogleClientId(e.target.value)}
-            placeholder="xxxxx.apps.googleusercontent.com"
-            autoComplete="off"
-          />
-          <label className={styles.label}>
-            Unsplash Access Key (for image overlays)
-            <span className={styles.hint}>Optional. From unsplash.com/developers. Used when adding images from Unsplash in the timeline.</span>
-          </label>
-          <input
-            type="password"
-            className={styles.input}
-            value={unsplashAccessKey}
-            onChange={(e) => setUnsplashAccessKey(e.target.value)}
-            placeholder="Your Unsplash Access Key"
-            autoComplete="off"
-          />
-          <label className={styles.label}>
-            Pexels API key (for stock video overlays)
-            <span className={styles.hint}>Optional. From pexels.com/api. Used when adding stock videos from Pexels.</span>
-          </label>
-          <input
-            type="password"
-            className={styles.input}
-            value={pexelsApiKey}
-            onChange={(e) => setPexelsApiKey(e.target.value)}
-            placeholder="Your Pexels API key"
-            autoComplete="off"
-          />
-          <label className={styles.label}>
-            Pixabay API key (for stock video overlays)
-            <span className={styles.hint}>Optional. From pixabay.com/api/docs. Used when adding stock videos from Pixabay.</span>
-          </label>
-          <input
-            type="password"
-            className={styles.input}
-            value={pixabayApiKey}
-            onChange={(e) => setPixabayApiKey(e.target.value)}
-            placeholder="Your Pixabay API key"
-            autoComplete="off"
-          />
-          <label className={styles.label}>
-            GIPHY API key (for animated stickers)
-            <span className={styles.hint}>Optional. From developers.giphy.com. Used when adding animated stickers from GIPHY.</span>
-          </label>
-          <input
-            type="password"
-            className={styles.input}
-            value={giphyApiKey}
-            onChange={(e) => setGiphyApiKey(e.target.value)}
-            placeholder="Your GIPHY API key"
-            autoComplete="off"
-          />
+          <p className={styles.apiKeysHint}>
+            API keys (OpenAI, GIPHY, Pexels, Pixabay, Unsplash) are configured in the{' '}
+            <a href={saasAppsUrl} target="_blank" rel="noopener noreferrer" className={styles.apiKeysLink}>
+              SaaS Apps screen
+            </a>
+            . They are shared across all apps.
+          </p>
           <div className={styles.oauthSetup} aria-label="OAuth redirect_uri_mismatch fix">
             <p className={styles.oauthTitle}>Fix <strong>Error 400: redirect_uri_mismatch</strong></p>
             <ol className={styles.oauthSteps}>
@@ -305,7 +163,7 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
           <section className={styles.youtubeSection}>
             <label className={styles.label}>
               YouTube account & channel
-              <span className={styles.hint}>Connect to verify upload access and set the channel used for uploads.</span>
+              <span className={styles.hint}>Connect to verify upload access and set the channel used for uploads. Configure Google Client ID in the SaaS Apps screen.</span>
             </label>
             {youtubeChannel ? (
               <div className={styles.youtubeConnected}>
@@ -325,13 +183,13 @@ export function SettingsModal({ isOpen, onClose, onApiKeyChange }: SettingsModal
                   type="button"
                   className={styles.connectBtn}
                   onClick={handleConnectYouTube}
-                  disabled={youtubeConnecting || !googleClientId.trim()}
+                  disabled={youtubeConnecting || !getStoredGoogleClientId().trim()}
                   aria-label="Connect YouTube account"
                 >
                   {youtubeConnecting ? 'Connecting…' : 'Connect YouTube account'}
                 </button>
-                {!googleClientId.trim() && (
-                  <span className={styles.hint}>Save Google Client ID above first, then connect.</span>
+                {!getStoredGoogleClientId().trim() && (
+                  <span className={styles.hint}>Add Google Client ID in the SaaS Apps screen first, then connect.</span>
                 )}
               </>
             )}

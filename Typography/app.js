@@ -234,6 +234,7 @@ class TypographyAnimationApp {
             animSpeed: this.elements.animSpeed.value,
             cameraDistance: this.elements.cameraDistance.value,
             zoomOutFinale: this.elements.zoomOutFinale.checked,
+            allowRotation: this.elements.allowRotation.checked,
             bgColor: this.elements.bgColor.value,
             textColor: this.elements.textColor.value,
             fonts: selectedFonts
@@ -271,6 +272,7 @@ class TypographyAnimationApp {
                 this.updateDistanceDisplay();
             }
             if (settings.zoomOutFinale !== undefined) this.elements.zoomOutFinale.checked = settings.zoomOutFinale;
+            if (settings.allowRotation !== undefined) this.elements.allowRotation.checked = settings.allowRotation;
 
             if (settings.bgColor !== undefined) {
                 this.elements.bgColor.value = settings.bgColor;
@@ -305,6 +307,7 @@ class TypographyAnimationApp {
             cameraDistance: document.getElementById('cameraDistance'),
             distanceValue: document.getElementById('distanceValue'),
             zoomOutFinale: document.getElementById('zoomOutFinale'),
+            allowRotation: document.getElementById('allowRotation'),
             bgColor: document.getElementById('bgColor'),
             bgColorText: document.getElementById('bgColorText'),
             textColor: document.getElementById('textColor'),
@@ -393,6 +396,12 @@ class TypographyAnimationApp {
         this.elements.zoomOutFinale.addEventListener('change', () => {
             this.saveSettings();
             this.cameraController.setZoomOutFinale(this.elements.zoomOutFinale.checked);
+        });
+
+        // 90° rotation
+        this.elements.allowRotation.addEventListener('change', () => {
+            this.saveSettings();
+            this.generatePreview();
         });
 
         // Background color
@@ -484,7 +493,8 @@ class TypographyAnimationApp {
         }
 
         // Generate word cloud
-        this.words = this.wordCloud.generate(text, minSize, maxSize, selectedFonts);
+        const allowRotation = this.elements.allowRotation.checked;
+        this.words = this.wordCloud.generate(text, minSize, maxSize, selectedFonts, allowRotation);
 
         // Initialize animation
         const speed = parseFloat(this.elements.animSpeed.value);

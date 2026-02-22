@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+import { loadApiKeys } from '@shared/apiKeys';
 import { getTheme, setTheme as applyTheme, initThemeSync } from '@shared/theme';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
@@ -613,7 +613,6 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        fields={['openai']}
         onSave={() => setApiKey(loadApiKeys().openai || '')}
       />
 

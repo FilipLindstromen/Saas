@@ -1,4 +1,4 @@
-import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+import { loadApiKeys } from '@shared/apiKeys';
 
 const STORAGE_KEY = 'storywriter_settings';
 
@@ -91,17 +91,15 @@ export function saveSettings(settings) {
   const font = String(settings.presentationFont ?? defaults.presentationFont).trim();
   const size = String(settings.presentationFontSize ?? defaults.presentationFontSize).trim();
   const opacity = settings.presentationBackgroundOpacity;
-  const openaiApiKey = String(settings.openaiApiKey ?? '').trim();
-  const unsplashAccessKey = String(settings.unsplashAccessKey ?? '').trim();
-  saveApiKeys({ openai: openaiApiKey, unsplash: unsplashAccessKey });
+  const apiKeys = loadApiKeys();
   const next = {
-    openaiApiKey,
+    openaiApiKey: apiKeys.openai || '',
+    unsplashAccessKey: apiKeys.unsplash || '',
     presentationFont: PRESENTATION_FONTS.includes(font) ? font : defaults.presentationFont,
     presentationFontSize: ['small', 'medium', 'large'].includes(size) ? size : defaults.presentationFontSize,
     presentationLineHeight: LINE_HEIGHT_OPTIONS.some((o) => o.value === settings.presentationLineHeight)
       ? settings.presentationLineHeight
       : defaults.presentationLineHeight,
-    unsplashAccessKey,
     presentationBackgroundOpacity:
       typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
     presentationWebcamEnabled: Boolean(settings.presentationWebcamEnabled),

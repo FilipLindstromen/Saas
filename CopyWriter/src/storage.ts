@@ -1,4 +1,4 @@
-import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+import { loadApiKeys } from '@shared/apiKeys';
 
 const STORAGE_KEYS = {
   INSTRUCTIONS: 'copywriter_instructions',
@@ -32,10 +32,6 @@ export interface ProjectData {
 
 export function getApiKey(): string {
   return loadApiKeys().openai ?? '';
-}
-
-export function setApiKey(key: string): void {
-  saveApiKeys({ openai: key });
 }
 
 export function getInstructions(): string {

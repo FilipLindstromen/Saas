@@ -7,7 +7,7 @@ class WordCloud {
     }
 
     // Generate word cloud from text input
-    generate(text, minSize, maxSize, fonts) {
+    generate(text, minSize, maxSize, fonts, allowRotation = true) {
         const allWords = text
             .toUpperCase()
             .replace(/[^\w\s]/g, ' ')
@@ -33,12 +33,14 @@ class WordCloud {
             const font = fonts[Math.floor(Math.random() * fonts.length)];
 
             // Artistic rotation: Long words prefer 0 degrees, 
-            // short words provide vertical variety.
+            // short words provide vertical variety. Only if allowRotation is true.
             let rotation = 0;
-            if (word.length <= 4) {
-                rotation = Math.random() > 0.5 ? 90 : 0;
-            } else {
-                rotation = Math.random() > 0.85 ? 90 : 0;
+            if (allowRotation) {
+                if (word.length <= 4) {
+                    rotation = Math.random() > 0.5 ? 90 : 0;
+                } else {
+                    rotation = Math.random() > 0.85 ? 90 : 0;
+                }
             }
 
             return {
@@ -55,6 +57,7 @@ class WordCloud {
             };
         });
 
+        this.allowRotation = allowRotation;
         this.calculatePositions();
         return this.words;
     }
@@ -107,13 +110,13 @@ class WordCloud {
                 startPos = { x: prev.x, y: prev.y };
             }
 
-            // EXPERT FIT: Try current rotation, then alternative rotation for best density
+            // EXPERT FIT: Try current rotation, then alternative rotation for best density (only if allowRotation)
             let bestPos = this.findContextualPosition(word, placed, startPos);
 
-            if (!bestPos) {
-                // Try rotating to find a better fit
+            if (!bestPos && this.allowRotation) {
+                // Try rotating to find a better fit (swap width/height for 90°)
                 word.rotation = word.rotation === 0 ? 90 : 0;
-                this.setWordDimensions(word, word.rotation === 0 ? word.width : word.height, word.rotation === 90 ? word.width : word.height);
+                this.setWordDimensions(word, word.width, word.height);
                 bestPos = this.findContextualPosition(word, placed, startPos);
             }
 
@@ -121,9 +124,15 @@ class WordCloud {
                 word.x = bestPos.x;
                 word.y = bestPos.y;
             } else {
-                // Hard fallback if still no fit
-                word.x = margin + Math.random() * (this.width - margin * 2);
-                word.y = margin + Math.random() * (this.height - margin * 2);
+                // Fallback: place outside combined bounding box of placed words
+                bestPos = this.findPositionOutsideBoundingBox(word, placed, margin);
+                if (bestPos) {
+                    word.x = bestPos.x;
+                    word.y = bestPos.y;
+                } else {
+                    word.x = margin + Math.random() * (this.width - margin * 2);
+                    word.y = margin + Math.random() * (this.height - margin * 2);
+                }
             }
             placed.push(word);
         });
@@ -167,8 +176,37 @@ class WordCloud {
         return null;
     }
 
+    findPositionOutsideBoundingBox(word, placed, margin) {
+        if (placed.length === 0) {
+            return { x: margin + 200, y: margin + 300 };
+        }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const w of placed) {
+            const hw = (w.width || 0) / 2, hh = (w.height || 0) / 2;
+            minX = Math.min(minX, w.x - hw);
+            minY = Math.min(minY, w.y - hh);
+            maxX = Math.max(maxX, w.x + hw);
+            maxY = Math.max(maxY, w.y + hh);
+        }
+        const pad = 16;
+        const hw = (word.width || 0) / 2, hh = (word.height || 0) / 2;
+        const candidates = [
+            [maxX + pad + hw, (minY + maxY) / 2],
+            [minX - pad - hw, (minY + maxY) / 2],
+            [(minX + maxX) / 2, maxY + pad + hh],
+            [(minX + maxX) / 2, minY - pad - hh],
+        ];
+        for (const [cx, cy] of candidates) {
+            if (cx >= margin && cx <= this.width - margin && cy >= margin && cy <= this.height - margin) {
+                const overlaps = placed.some(p => this.checkOverlap(word, cx, cy, p));
+                if (!overlaps) return { x: cx, y: cy };
+            }
+        }
+        return null;
+    }
+
     checkOverlap(word1, x1, y1, word2) {
-        const padding = 4; // PUZZLE-FIT: TIGHTER SPACING
+        const padding = 12;
         const l1 = x1 - word1.width / 2 - padding;
         const r1 = x1 + word1.width / 2 + padding;
         const t1 = y1 - word1.height / 2 - padding;

@@ -14,7 +14,8 @@ const DEFAULT_KEYS = {
   pixabay: '',
   pexels: '',
   unsplash: '',
-  googleClientId: ''
+  googleClientId: '',
+  elevenlabs: ''
 }
 
 /** Migrate keys from legacy app-specific storage into the shared store. */
@@ -75,12 +76,27 @@ function migrateFromLegacy() {
     const vrOpenai = localStorage.getItem('openai_api_key')
     if (vrOpenai) merged.openai = merged.openai || vrOpenai
 
+    // ReelRecorder (videoRecorder_* keys)
+    const rrOpenai = localStorage.getItem('videoRecorder_openaiApiKey')
+    const rrGoogle = localStorage.getItem('videoRecorder_googleClientId')
+    const rrUnsplash = localStorage.getItem('videoRecorder_unsplashAccessKey')
+    const rrPexels = localStorage.getItem('videoRecorder_pexelsApiKey')
+    const rrPixabay = localStorage.getItem('videoRecorder_pixabayApiKey')
+    const rrGiphy = localStorage.getItem('videoRecorder_giphyApiKey')
+    if (rrOpenai) merged.openai = merged.openai || rrOpenai
+    if (rrGoogle) merged.googleClientId = merged.googleClientId || rrGoogle
+    if (rrUnsplash) merged.unsplash = merged.unsplash || rrUnsplash
+    if (rrPexels) merged.pexels = merged.pexels || rrPexels
+    if (rrPixabay) merged.pixabay = merged.pixabay || rrPixabay
+    if (rrGiphy) merged.giphy = merged.giphy || rrGiphy
+
     // SoundEffectsGenerator
     const seRaw = localStorage.getItem('soundeffects_settings')
     if (seRaw) {
       try {
         const parsed = JSON.parse(seRaw)
         if (parsed.openaiApiKey) merged.openai = merged.openai || parsed.openaiApiKey
+        if (parsed.elevenlabsApiKey) merged.elevenlabs = merged.elevenlabs || parsed.elevenlabsApiKey
       } catch {}
     }
 

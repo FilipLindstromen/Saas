@@ -347,12 +347,14 @@
   line-height: 1.4;
 }
 
-.settings-hint a {
+.settings-hint a,
+.settings-link {
   color: var(--accent);
   text-decoration: none;
 }
 
-.settings-hint a:hover {
+.settings-hint a:hover,
+.settings-link:hover {
   text-decoration: underline;
 }
 

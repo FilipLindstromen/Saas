@@ -2638,7 +2638,6 @@ ${idea.trim() ? '- Focus on the specific idea/topic provided above' : ''}`
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        fields={['openai', 'pexels', 'pixabay', 'unsplash']}
         onSave={() => setOpenaiApiKey(loadApiKeys().openai || '')}
       />
     </div>

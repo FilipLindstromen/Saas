@@ -24,7 +24,6 @@ import ProjectSelector from '@shared/ProjectSelector/ProjectSelector';
 import { DEFAULT_INSTRUCTIONS } from './constants';
 import {
   getApiKey,
-  setApiKey,
   getInstructions,
   setInstructions,
   getProjects,
@@ -74,10 +73,9 @@ export default function App() {
   const [projects, setProjectsState] = useState<ProjectData[]>([]);
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [activeDocId, setActiveDocIdState] = useState<string | null>(null);
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() => getTheme());
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => getTheme() as 'light' | 'dark');
   const [showSettings, setShowSettings] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
   const [instructionsInput, setInstructionsInput] = useState('');
 
   // Load from storage
@@ -109,14 +107,13 @@ export default function App() {
       setActiveProjectIdState(activeProj ?? migrated[0]?.id ?? null);
       setActiveDocIdState(activeDoc ?? migrated[0]?.documents[0]?.id ?? null);
     }
-    setThemeState(getTheme());
-    setApiKeyInput(getApiKey());
+    setThemeState(getTheme() as 'light' | 'dark');
     setInstructionsInput(getInstructions() || DEFAULT_INSTRUCTIONS);
   }, []);
 
   useEffect(() => {
     const unsub = initThemeSync();
-    const handler = () => setThemeState(getTheme());
+    const handler = () => setThemeState(getTheme() as 'light' | 'dark');
     window.addEventListener('saas-theme-change', handler);
     return () => {
       unsub?.();
@@ -198,19 +195,16 @@ export default function App() {
   };
 
   const saveSettings = () => {
-    setApiKey(apiKeyInput);
     setShowSettings(false);
   };
+
+  const saasAppsUrl = typeof window !== 'undefined'
+    ? new URL('../index.html', window.location.href).href
+    : '/index.html';
 
   const saveInstructions = () => {
     setInstructions(instructionsInput);
     setShowInstructions(false);
-  };
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    setThemeState(next);
   };
 
   return (
@@ -225,7 +219,7 @@ export default function App() {
             projects={projects.map((p) => ({ id: p.id, name: p.name }))}
             currentProjectId={activeProjectId ?? ''}
             currentProjectName={activeProject?.name ?? 'Untitled'}
-            onSwitchProject={(id) => {
+            onSwitchProject={(id: string) => {
               setActiveProjectIdState(id);
               setActiveProjectId(id);
               const proj = projects.find((p) => p.id === id);
@@ -242,12 +236,12 @@ export default function App() {
               setActiveProjectId(proj.id);
               setActiveDocId(proj.documents[0].id);
             }}
-            onRenameProject={(id, name) => {
+            onRenameProject={(id: string, name: string) => {
               setProjectsState((prev) =>
                 prev.map((p) => (p.id === id ? { ...p, name } : p))
               );
             }}
-            onDeleteProject={(id) => {
+            onDeleteProject={(id: string) => {
               if (projects.length <= 1) return;
               const idx = projects.findIndex((p) => p.id === id);
               const nextId = idx > 0 ? projects[idx - 1].id : projects[idx + 1]?.id;
@@ -384,23 +378,17 @@ export default function App() {
               </button>
             </div>
             <div className="modalBody">
-              <div className="formGroup">
-                <label className="label">OpenAI API Key</label>
-                <input
-                  type="password"
-                  className="input"
-                  placeholder="sk-..."
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                />
-              </div>
+              <p className="modalHint">
+                API keys are configured in the{' '}
+                <a href={saasAppsUrl} target="_blank" rel="noopener noreferrer" className="modalLink">
+                  SaaS Apps screen
+                </a>
+                . They are shared across all apps.
+              </p>
             </div>
             <div className="modalFooter">
-              <button className="btn btnSecondary" onClick={() => setShowSettings(false)}>
-                Cancel
-              </button>
               <button className="btn btnPrimary" onClick={saveSettings}>
-                Save
+                Close
               </button>
             </div>
           </div>

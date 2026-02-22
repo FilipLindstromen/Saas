@@ -11,7 +11,8 @@
     pixabay: '',
     pexels: '',
     unsplash: '',
-    googleClientId: ''
+    googleClientId: '',
+    elevenlabs: ''
   };
 
   window.SaasApiKeys = {

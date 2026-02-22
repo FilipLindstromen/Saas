@@ -18,14 +18,16 @@
     </div>
     
     <div class="app-container">
-        <!-- Top Toolbar - matches InfoGraphics/ColorWriter style -->
-        <header class="app-toolbar">
-            <button type="button" class="toolbar-btn toolbar-btn-icon" id="hamburger-btn" aria-label="Menu" title="Menu">
+        <!-- Header - matches Typography/InfoGraphics style -->
+        <header class="app-header">
+            <button type="button" class="header-btn" id="hamburger-btn" aria-label="Menu" title="Menu">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-            <span class="toolbar-logo">CONVERSATION ANIMATOR PRO</span>
-            <div class="toolbar-spacer"></div>
-            <div class="toolbar-project-area">
+            <h1 class="app-title">
+                <span class="title-icon">💬</span>
+                CONVERSATION ANIMATOR PRO
+            </h1>
+            <div class="header-project-area">
                 <div class="project-selector" id="project-selector">
                     <button type="button" class="project-selector-trigger" id="project-trigger">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
@@ -42,11 +44,11 @@
                     <button type="button" class="tab-bar-add" id="tab-add" title="Add conversation">+</button>
                 </div>
             </div>
-            <div class="toolbar-spacer"></div>
-            <button type="button" class="toolbar-btn toolbar-btn-icon" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+            <div class="header-spacer"></div>
+            <button type="button" class="header-btn" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
                 <span class="theme-icon-svg"></span>
             </button>
-            <button type="button" class="toolbar-btn toolbar-btn-icon" id="settings-btn" aria-label="Settings" title="Settings">
+            <button type="button" class="header-btn" id="settings-btn" aria-label="Settings" title="Settings">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
         </header>
@@ -177,9 +179,22 @@
                 
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-icon">⏱️</span>
-                        <h3>Timing</h3>
+                        <span class="card-icon">💬</span>
+                        <h3>Messages</h3>
                     </div>
+                    <div id="messages-script"></div>
+                    <button class="btn-primary" id="add-message-btn">
+                        <span>➕</span> Add Message
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Inspector Panel: Timing -->
+            <aside class="right-inspector-panel">
+                <div class="inspector-panel-header">
+                    <h3 class="inspector-panel-title">Timing</h3>
+                </div>
+                <div class="inspector-panel-content">
                     <div class="slider-group">
                         <label>
                             <span>Sender Delay</span>
@@ -216,18 +231,7 @@
                         <input type="range" id="typing-speed" min="10" max="200" step="10" value="50">
                     </div>
                 </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-icon">💬</span>
-                        <h3>Messages</h3>
-                    </div>
-                    <div id="messages-script"></div>
-                    <button class="btn-primary" id="add-message-btn">
-                        <span>➕</span> Add Message
-                    </button>
-                </div>
-            </div>
+            </aside>
             
             <!-- Right Panel: Preview -->
             <div class="preview-panel">

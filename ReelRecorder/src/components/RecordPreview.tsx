@@ -434,14 +434,15 @@ export function RecordPreview({
           ctx.scale(-1, 1)
         }
 
-        // Handle Portrait Fill Height - center-crop (mask) the video to fill the canvas
-        if (portraitFillHeight) {
-          const vw = video.videoWidth
-          const vh = video.videoHeight
-          if (vw > 0 && vh > 0) {
-            const videoRatio = vw / vh
-            const canvasRatio = width / height
+        const vw = video.videoWidth
+        const vh = video.videoHeight
 
+        if (vw > 0 && vh > 0) {
+          const videoRatio = vw / vh
+          const canvasRatio = width / height
+
+          if (portraitFillHeight) {
+            // Center-crop: fill canvas by cropping video to match canvas aspect ratio
             let sx = 0
             let sy = 0
             let sw = vw
@@ -459,7 +460,29 @@ export function RecordPreview({
 
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height)
           } else {
-            ctx.drawImage(video, 0, 0, width, height)
+            // Contain: preserve video aspect ratio, letterbox/pillarbox when different
+            let drawW: number
+            let drawH: number
+            let drawX: number
+            let drawY: number
+
+            if (videoRatio > canvasRatio) {
+              // Video is wider than canvas -> fit to width, letterbox top/bottom
+              drawW = width
+              drawH = width / videoRatio
+              drawX = 0
+              drawY = (height - drawH) / 2
+            } else {
+              // Video is taller than canvas -> fit to height, pillarbox left/right
+              drawH = height
+              drawW = height * videoRatio
+              drawX = (width - drawW) / 2
+              drawY = 0
+            }
+
+            ctx.fillStyle = '#1a1a1e'
+            ctx.fillRect(0, 0, width, height)
+            ctx.drawImage(video, 0, 0, vw, vh, drawX, drawY, drawW, drawH)
           }
         } else {
           ctx.drawImage(video, 0, 0, width, height)

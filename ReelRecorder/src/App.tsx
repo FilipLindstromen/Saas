@@ -18,7 +18,8 @@ import { InspectorPanel, type InspectorTabId } from './components/InspectorPanel
 import { ClipLibraryPanel } from './components/ClipLibraryPanel'
 import type { CaptionSegment } from './services/captions'
 import { transcribeAudioFromVideo } from './services/captions'
-import { SettingsModal, getStoredOpenAIKey } from './components/SettingsModal'
+import { SettingsModal } from './components/SettingsModal'
+import { loadApiKeys } from './utils/apiKeys'
 import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import TabBar from '@shared/TabBar/TabBar'
 import ThemeToggle from '@shared/ThemeToggle'
@@ -73,7 +74,7 @@ export default function App() {
   const [colorContrast, setColorContrast] = useState(() => initialState?.colorContrast ?? 100)
   const [colorSaturation, setColorSaturation] = useState(() => initialState?.colorSaturation ?? 100)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [openaiApiKey, setOpenaiApiKey] = useState(() => getStoredOpenAIKey())
+  const openaiApiKey = loadApiKeys().openai ?? ''
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [cameraCapabilities, setCameraCapabilities] = useState<ReturnType<typeof getVideoTrackCapabilities>>(null)
   const [captionPreviewStyle, setCaptionPreviewStyle] = useState<CaptionStyle>(() => initialState?.captionPreviewStyle ?? 'lower-third')
@@ -1107,7 +1108,6 @@ export default function App() {
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onApiKeyChange={setOpenaiApiKey}
       />
 
       {exportPanelOpen && recordedBlob && (

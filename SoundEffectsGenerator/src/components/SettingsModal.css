@@ -63,6 +63,15 @@
   line-height: 1.45;
 }
 
+.settings-link {
+  color: #f97316;
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
 .settings-label {
   display: block;
   font-size: 0.9rem;

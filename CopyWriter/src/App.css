@@ -190,6 +190,22 @@
   flex: 1;
 }
 
+.modalHint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modalLink {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.modalLink:hover {
+  text-decoration: underline;
+}
+
 .modalFooter {
   display: flex;
   justify-content: flex-end;

@@ -1,12 +1,25 @@
 import { useState } from 'react'
+import { loadApiKeys } from '@shared/apiKeys'
 import './Settings.css'
 
 function Settings({ settings, onUpdate, onClose }) {
   const [localSettings, setLocalSettings] = useState(settings)
   const [activeTab, setActiveTab] = useState('api') // 'api' only (Colors/Typography/Text Effects are in header foldouts)
 
+  const saasAppsUrl = typeof window !== 'undefined'
+    ? new URL('../index.html', window.location.href).href
+    : '/index.html'
+
   const handleSave = () => {
-    onUpdate(localSettings)
+    const apiKeys = loadApiKeys()
+    onUpdate({
+      ...localSettings,
+      openaiKey: apiKeys.openai || '',
+      unsplashKey: apiKeys.unsplash || '',
+      pexelsKey: apiKeys.pexels || '',
+      pixabayKey: apiKeys.pixabay || '',
+      googleClientId: apiKeys.googleClientId || ''
+    })
     onClose()
   }
 
@@ -33,91 +46,15 @@ function Settings({ settings, onUpdate, onClose }) {
           {activeTab === 'api' && (
             <>
               <p className="settings-hint" style={{ marginBottom: '1rem', gridColumn: '1 / -1' }}>
-                API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, StoryWriter, etc.).
+                API keys (OpenAI, Unsplash, Pexels, Pixabay, Google Client ID) are configured in the{' '}
+                <a href={saasAppsUrl} target="_blank" rel="noopener noreferrer" className="settings-link">
+                  SaaS Apps screen
+                </a>
+                . They are shared across all apps.
               </p>
-              <div className="settings-field">
-                <label htmlFor="openai-key">OpenAI API Key</label>
-                <input
-                  id="openai-key"
-                  type="password"
-                  value={localSettings.openaiKey || ''}
-                  onChange={(e) => handleChange('openaiKey', e.target.value)}
-                  placeholder="sk-..."
-                />
-                <p className="settings-hint">
-                  Required for automatically selecting images based on slide content
-                </p>
-              </div>
-              <div className="settings-field">
-                <label htmlFor="unsplash-key">Unsplash API Key</label>
-                <input
-                  id="unsplash-key"
-                  type="password"
-                  value={localSettings.unsplashKey || ''}
-                  onChange={(e) => handleChange('unsplashKey', e.target.value)}
-                  placeholder="Your Unsplash Access Key"
-                />
-                <p className="settings-hint">
-                  Get your free API key from{' '}
-                  <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer">
-                    unsplash.com/developers
-                  </a>
-                </p>
-              </div>
-              <div className="settings-field">
-                <label htmlFor="pexels-key">Pexels API Key</label>
-                <input
-                  id="pexels-key"
-                  type="password"
-                  value={localSettings.pexelsKey || ''}
-                  onChange={(e) => handleChange('pexelsKey', e.target.value)}
-                  placeholder="Your Pexels API Key"
-                />
-                <p className="settings-hint">
-                  For video backgrounds. Get a free key at{' '}
-                  <a href="https://www.pexels.com/api/" target="_blank" rel="noopener noreferrer">
-                    pexels.com/api
-                  </a>
-                </p>
-              </div>
-              <div className="settings-field">
-                <label htmlFor="pixabay-key">Pixabay API Key</label>
-                <input
-                  id="pixabay-key"
-                  type="password"
-                  value={localSettings.pixabayKey || ''}
-                  onChange={(e) => handleChange('pixabayKey', e.target.value)}
-                  placeholder="Your Pixabay API Key"
-                />
-                <p className="settings-hint">
-                  For more free video backgrounds. Get a free key at{' '}
-                  <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener noreferrer">
-                    pixabay.com/api/docs
-                  </a>
-                </p>
-              </div>
-              <div className="settings-field">
-                <label htmlFor="google-client-id">Google Client ID</label>
-                <input
-                  id="google-client-id"
-                  type="password"
-                  value={localSettings.googleClientId || ''}
-                  onChange={(e) => handleChange('googleClientId', e.target.value)}
-                  placeholder="xxxxx.apps.googleusercontent.com"
-                />
-                <p className="settings-hint">
-                  Required for saving and opening projects from Google Drive. Create an OAuth 2.0 Client ID (Web application) in the{' '}
-                  <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
-                    Google Cloud Console
-                  </a>
-                  . To fix &quot;redirect_uri_mismatch&quot;, add this exact URL in your OAuth client:
-                </p>
-                <p className="settings-origin-hint">
-                  <strong>Authorized JavaScript origins:</strong> add <code>{typeof window !== 'undefined' ? window.location.origin : 'https://your-app-url.com'}</code>
-                  <br />
-                  <strong>Authorized redirect URIs:</strong> add <code>{typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://your-app-url.com/'}</code>
-                </p>
-              </div>
+              <p className="settings-hint" style={{ marginBottom: '1rem', gridColumn: '1 / -1' }}>
+                For Google Drive: add <code>{typeof window !== 'undefined' ? window.location.origin : 'https://your-app-url.com'}</code> to Authorized JavaScript origins in your OAuth client.
+              </p>
             </>
           )}
         </div>

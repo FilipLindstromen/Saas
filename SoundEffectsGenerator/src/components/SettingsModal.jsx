@@ -3,22 +3,22 @@ import { getSettings, saveSettings } from '../utils/settings';
 import './SettingsModal.css';
 
 export default function SettingsModal({ isOpen, onClose }) {
-  const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [elevenlabsApiKey, setElevenlabsApiKey] = useState('');
   const [apiBaseUrl, setApiBaseUrl] = useState('');
+
+  const saasAppsUrl = typeof window !== 'undefined'
+    ? new URL('../index.html', window.location.href).href
+    : '/index.html';
 
   useEffect(() => {
     if (isOpen) {
       const s = getSettings();
-      setOpenaiApiKey(s.openaiApiKey || '');
-      setElevenlabsApiKey(s.elevenlabsApiKey || '');
       setApiBaseUrl(s.apiBaseUrl || '');
     }
   }, [isOpen]);
 
   const handleSave = (e) => {
     e.preventDefault();
-    saveSettings({ openaiApiKey, elevenlabsApiKey, apiBaseUrl });
+    saveSettings({ ...getSettings(), apiBaseUrl });
     onClose();
   };
 
@@ -39,30 +39,12 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
         <form onSubmit={handleSave} className="settings-form">
           <p className="settings-hint">
-            API keys are stored in your browser only and sent to the backend with each request. Leave blank to use keys set in the server&apos;s .env.
+            API keys (OpenAI, ElevenLabs) are configured in the{' '}
+            <a href={saasAppsUrl} target="_blank" rel="noopener noreferrer" className="settings-link">
+              SaaS Apps screen
+            </a>
+            . They are shared across all apps.
           </p>
-          <label className="settings-label">
-            OpenAI API Key
-            <input
-              type="password"
-              className="settings-input"
-              placeholder="sk-..."
-              value={openaiApiKey}
-              onChange={(e) => setOpenaiApiKey(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-          <label className="settings-label">
-            ElevenLabs API Key
-            <input
-              type="password"
-              className="settings-input"
-              placeholder="Your ElevenLabs API key"
-              value={elevenlabsApiKey}
-              onChange={(e) => setElevenlabsApiKey(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
           <label className="settings-label">
             API base URL <span className="settings-optional">(optional)</span>
             <input

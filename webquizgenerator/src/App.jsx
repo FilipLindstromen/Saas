@@ -90,8 +90,6 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        fields={['openai']}
-        onSave={() => {}}
       />
     </div>
   )

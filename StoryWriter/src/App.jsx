@@ -687,7 +687,6 @@ function App() {
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        fields={['openai', 'unsplash']}
         onSave={() => {
           saveSettings({
             ...getSettings(),

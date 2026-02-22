@@ -53,6 +53,22 @@
   padding: 20px;
 }
 
+.apiKeysHint {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.apiKeysLink {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.apiKeysLink:hover {
+  text-decoration: underline;
+}
+
 .label {
   display: block;
   font-size: 0.9rem;

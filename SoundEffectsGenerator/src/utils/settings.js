@@ -1,11 +1,6 @@
-import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
+import { loadApiKeys } from '@shared/apiKeys';
 
 const STORAGE_KEY = 'soundeffects_settings';
-
-const defaults = {
-  elevenlabsApiKey: '',
-  apiBaseUrl: '',
-};
 
 export function getSettings() {
   const apiKeys = loadApiKeys();
@@ -14,26 +9,25 @@ export function getSettings() {
     const parsed = raw ? JSON.parse(raw) : {};
     return {
       openaiApiKey: apiKeys.openai ?? '',
-      elevenlabsApiKey: parsed.elevenlabsApiKey ?? '',
+      elevenlabsApiKey: apiKeys.elevenlabs ?? '',
       apiBaseUrl: parsed.apiBaseUrl ?? '',
     };
   } catch {
     return {
       openaiApiKey: apiKeys.openai ?? '',
-      elevenlabsApiKey: '',
+      elevenlabsApiKey: apiKeys.elevenlabs ?? '',
       apiBaseUrl: '',
     };
   }
 }
 
 export function saveSettings(settings) {
-  saveApiKeys({ openai: String(settings.openaiApiKey ?? '').trim() });
+  const apiKeys = loadApiKeys();
   const next = {
-    elevenlabsApiKey: String(settings.elevenlabsApiKey ?? '').trim(),
     apiBaseUrl: String(settings.apiBaseUrl ?? '').trim(),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  return { openaiApiKey: loadApiKeys().openai, ...next };
+  return { openaiApiKey: apiKeys.openai, elevenlabsApiKey: apiKeys.elevenlabs, ...next };
 }
 
 /** Base URL for API requests (empty = use relative /api) */
