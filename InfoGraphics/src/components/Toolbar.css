@@ -94,10 +94,16 @@
 
 .toolbar-btn-element {
   padding: 0.4rem;
+  border-left: 3px solid var(--element-color, var(--text-tertiary));
 }
 
 .toolbar-btn-element svg {
   display: block;
+  color: var(--element-color, var(--text-primary));
+}
+
+.toolbar-btn-element:hover svg {
+  color: var(--element-color, var(--text-primary));
 }
 
 .toolbar-btn-icon {

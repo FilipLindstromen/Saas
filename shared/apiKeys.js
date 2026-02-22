@@ -55,6 +55,10 @@ function migrateFromLegacy() {
       if (parsed.unsplashAccessKey) merged.unsplash = merged.unsplash || parsed.unsplashAccessKey
     }
 
+    // PowerWriter
+    const pwOpenai = localStorage.getItem('powerwriter.openaiKey')
+    if (pwOpenai) merged.openai = merged.openai || pwOpenai
+
     return merged
   } catch (e) {
     return merged

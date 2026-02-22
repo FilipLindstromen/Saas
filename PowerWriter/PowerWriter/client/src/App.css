@@ -1,50 +1,71 @@
-.app,
+/* Theme Variables - PitchDeck-style (Dark Mode) */
+:root[data-theme="dark"],
 :root {
-  color: #e2e8f0;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #1f1f1f;
+  --bg-hover: #252525;
+  --bg-active: #2a2a2a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.9);
+  --text-tertiary: rgba(255, 255, 255, 0.65);
+  --text-quaternary: rgba(255, 255, 255, 0.45);
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-active: #e55a2b;
+  --accent-secondary: #ff4757;
+  --accent-gradient: linear-gradient(135deg, #ff6b35 0%, #ff4757 100%);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.7);
+  --card-radius: 16px;
+  --button-radius: 12px;
 }
 
+/* Compatibility mappings for PowerWriter components */
 :root {
-  --bg-body: radial-gradient(circle at 20% -10%, rgba(107, 133, 255, 0.18), transparent),
-    radial-gradient(circle at 80% -20%, rgba(168, 86, 255, 0.16), transparent),
-    #0b0c11;
-  --bg-sidebar: rgba(24, 27, 36, 0.88);
-  --bg-main: rgba(14, 16, 23, 0.86);
-  --bg-panel: rgba(24, 27, 38, 0.72);
-  --bg-panel-elevated: rgba(29, 32, 45, 0.78);
-  --bg-overlay: rgba(7, 8, 12, 0.78);
-  --border-strong: rgba(118, 125, 158, 0.28);
-  --border-subtle: rgba(88, 93, 120, 0.24);
-  --border-soft: rgba(110, 118, 150, 0.18);
-  --text-primary: #d9dceb;
-  --text-secondary: rgba(196, 201, 226, 0.76);
-  --text-muted: rgba(156, 160, 186, 0.62);
-  --button-bg: rgba(33, 36, 47, 0.78);
-  --button-border: rgba(120, 126, 158, 0.28);
-  --button-hover-bg: rgba(42, 45, 60, 0.92);
-  --button-hover-border: rgba(170, 180, 218, 0.45);
-  --status-bg: rgba(16, 17, 24, 0.88);
+  --bg-body: var(--bg-primary);
+  --bg-sidebar: var(--bg-secondary);
+  --bg-main: var(--bg-primary);
+  --bg-panel: var(--bg-elevated);
+  --bg-panel-elevated: var(--bg-elevated);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --border-soft: var(--border-subtle);
+  --text-muted: var(--text-tertiary);
+  --button-bg: var(--bg-elevated);
+  --button-border: var(--border-default);
+  --button-hover-bg: var(--bg-hover);
+  --button-hover-border: var(--border-strong);
+  --status-bg: var(--bg-secondary);
   --status-success: #46d68c;
-  --status-error: #ff6b7d;
-  --accent-blue: #5b7cfa;
-  --accent-indigo: #706dff;
-  --accent-border: rgba(122, 133, 255, 0.5);
-  --accent-glow: rgba(107, 120, 255, 0.32);
-  --field-bg: rgba(23, 24, 33, 0.86);
-  --field-border: rgba(112, 118, 154, 0.26);
-  --field-border-hover: rgba(164, 172, 207, 0.46);
-  --field-border-active: rgba(121, 154, 255, 0.82);
-  --field-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 18px 28px -24px rgba(12, 16, 28, 0.9);
-  --panel-shadow-lg: 0 42px 80px -38px rgba(5, 8, 18, 0.74),
-    0 16px 40px -24px rgba(9, 13, 28, 0.6);
-  --panel-shadow-md: 0 26px 48px -32px rgba(8, 11, 24, 0.68),
-    0 8px 22px -16px rgba(9, 11, 26, 0.45);
-  --glow-primary: 0 0 0 1px rgba(120, 132, 255, 0.24), 0 18px 38px rgba(94, 132, 255, 0.35);
+  --status-error: var(--accent-secondary);
+  --accent-blue: var(--accent);
+  --accent-indigo: var(--accent);
+  --accent-border: rgba(255, 107, 53, 0.5);
+  --accent-glow: rgba(255, 107, 53, 0.25);
+  --field-bg: var(--bg-tertiary);
+  --field-border: var(--border-default);
+  --field-border-hover: var(--border-strong);
+  --field-border-active: var(--accent);
+  --field-shadow: var(--shadow-sm);
+  --panel-shadow-lg: var(--shadow-xl);
+  --panel-shadow-md: var(--shadow-lg);
+  --glow-primary: 0 0 0 1px rgba(255, 107, 53, 0.2), var(--shadow-md);
   --blur-heavy: saturate(180%) blur(28px);
   --blur-light: saturate(160%) blur(18px);
-  --scrollbar-thumb: rgba(114, 126, 184, 0.6);
-  --scrollbar-thumb-hover: rgba(140, 151, 210, 0.78);
-  --scrollbar-track: rgba(22, 24, 34, 0.65);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+  --scrollbar-track: rgba(0, 0, 0, 0.2);
+}
+
+.app,
+:root {
+  color: var(--text-primary);
 }
 
 .icon {
@@ -1381,13 +1402,13 @@
 }
 
 .settings-dialog {
-  background: var(--bg-panel-elevated);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   padding: 0;
   min-width: 400px;
   max-width: 500px;
-  box-shadow: var(--panel-shadow-lg);
+  box-shadow: var(--shadow-xl);
 }
 
 .settings-dialog-header {
@@ -1412,7 +1433,7 @@
 .settings-panel {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-panel);
+  background: var(--bg-elevated);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1428,25 +1449,27 @@
 .settings-row label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .settings-row input {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
   padding: 10px 12px;
-  background: var(--bg-panel-elevated);
+  background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
 .settings-row input:focus {
-  outline: 3px solid rgba(99, 102, 241, 0.35);
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
 }
 
 .settings-hint {
   margin: 0;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
 }
 
 .main-content {
@@ -1577,7 +1600,7 @@
 }
 
 .selection-menu button:hover {
-  background: rgba(99, 102, 241, 0.2);
+  background: rgba(255, 107, 53, 0.2);
 }
 
 .selection-menu button + button {
@@ -1654,15 +1677,15 @@
   align-self: flex-start;
   border-radius: 6px;
   border: 1px solid var(--accent-border);
-  background: rgba(99, 102, 241, 0.16);
+  background: rgba(255, 107, 53, 0.16);
   color: #cbd5f5;
   padding: 6px 10px;
   font-size: 13px;
 }
 
 .variant-card button:hover {
-  background: rgba(99, 102, 241, 0.28);
-  border-color: rgba(99, 102, 241, 0.6);
+  background: rgba(255, 107, 53, 0.28);
+  border-color: rgba(255, 107, 53, 0.6);
   color: #e0e7ff;
 }
 
@@ -1754,8 +1777,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(255, 107, 53, 0.35);
+  background: rgba(255, 107, 53, 0.14);
   color: #dbe4ff;
   padding: 8px;
   transition: background 0.2s ease, border-color 0.2s ease,
@@ -1763,10 +1786,10 @@
 }
 
 .paragraph-card-actions button:hover {
-  background: rgba(99, 102, 241, 0.32);
-  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(255, 107, 53, 0.32);
+  border-color: rgba(255, 107, 53, 0.55);
   color: #f1f5ff;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.35);
   transform: translateY(-1px);
 }
 
@@ -1909,9 +1932,9 @@
 }
 
 .toolbar button.primary {
-  background: linear-gradient(135deg, var(--accent-indigo), var(--accent-blue));
+  background: var(--accent-gradient);
   color: var(--text-primary);
-  border-color: rgba(99, 102, 241, 0.8);
+  border-color: var(--accent);
   box-shadow: 0 18px 28px var(--accent-glow);
   backdrop-filter: blur(12px);
 }

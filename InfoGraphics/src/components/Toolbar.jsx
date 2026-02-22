@@ -1,6 +1,6 @@
 import ExportButtons from './ExportButtons'
 import ProjectSelector from './ProjectSelector'
-import { ELEMENT_TYPES } from '../constants/elementTypes'
+import { ELEMENT_TYPES, getElementTypeColor } from '../constants/elementTypes'
 import './Toolbar.css'
 
 export default function Toolbar({ projects = [], currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject, onOpenSettings, onShowShortcuts, onToggleTheme, theme = 'dark', onAddElement, showTimeline = true, onToggleTimeline, canvasRef, includeBackgroundInExport = true, onBeforeExport, canvasData }) {
@@ -23,6 +23,7 @@ export default function Toolbar({ projects = [], currentProjectId, currentProjec
             key={type}
             type="button"
             className="toolbar-btn toolbar-btn-element"
+            style={{ '--element-color': getElementTypeColor(type) }}
             onClick={() => onAddElement?.(type)}
             title={title}
           >

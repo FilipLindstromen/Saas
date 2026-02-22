@@ -25,6 +25,7 @@ import {
 } from "./api";
 import { AudioEditor } from "./AudioEditor";
 import type { Transcription } from "./types";
+import { loadApiKeys, saveApiKeys } from "./apiKeys";
 
 type Selection =
   | {
@@ -67,7 +68,6 @@ const SELECTION_MENU_HEIGHT = 48;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const STORAGE_KEYS = {
-  openAiApiKey: "powerwriter.openaiKey",
   lastSelection: "powerwriter.lastSelection"
 } as const;
 const LS_KEYS = {
@@ -2355,15 +2355,19 @@ export default function App() {
   }, [audioEditorRatio]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storedKey = window.localStorage.getItem(
-      STORAGE_KEYS.openAiApiKey
-    );
-    if (storedKey) {
-      setUserApiKey(storedKey);
-      setSettingsKey(storedKey);
+    const keys = loadApiKeys();
+    if (keys.openai) {
+      setUserApiKey(keys.openai);
+      setSettingsKey(keys.openai);
     }
   }, []);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      const keys = loadApiKeys();
+      setSettingsKey(keys.openai);
+    }
+  }, [isSettingsOpen]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -2981,26 +2985,22 @@ export default function App() {
       });
       return;
     }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEYS.openAiApiKey, trimmed);
-    }
+    saveApiKeys({ openai: trimmed });
     setUserApiKey(trimmed);
     setStatus({
       type: "success",
-      message: "OpenAI API key saved in this browser"
+      message: "OpenAI API key saved (shared across Saas apps)"
     });
     setIsSettingsOpen(false);
   };
 
   const handleClearApiKey = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEYS.openAiApiKey);
-    }
+    saveApiKeys({ openai: "" });
     setSettingsKey("");
     setUserApiKey("");
     setStatus({
       type: "success",
-      message: "OpenAI API key cleared from this browser"
+      message: "OpenAI API key cleared from shared storage"
     });
   };
 
@@ -3350,7 +3350,7 @@ export default function App() {
               </button>
             </div>
             <p className="settings-hint">
-              Stored only in this browser and included with generation requests.
+              API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, StoryWriter, etc.).
             </p>
           </div>
         ) : null}

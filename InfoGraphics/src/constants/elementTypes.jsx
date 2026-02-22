@@ -1,3 +1,17 @@
+/** Color for each element type - used in toolbar, layers, timeline */
+export const ELEMENT_TYPE_COLORS = {
+  image: '#0ea5e9',      /* sky */
+  'image-text': '#3b82f6', /* blue */
+  headline: '#22c55e',   /* green */
+  arrow: '#f97316',     /* orange */
+  cta: '#8b5cf6',       /* violet */
+  gradient: '#ec4899'   /* pink */
+}
+
+export function getElementTypeColor(type) {
+  return ELEMENT_TYPE_COLORS[type] ?? '#6b7280'
+}
+
 export const ELEMENT_TYPES = [
   { type: 'image', label: 'Image', title: 'Image only', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -34,6 +34,7 @@
   border-radius: var(--button-radius);
   cursor: grab;
   margin-bottom: 2px;
+  border-left: 3px solid var(--element-color, transparent);
 }
 
 .layers-item:active {
@@ -62,7 +63,7 @@
 }
 
 .layers-item.selected {
-  background: rgba(255, 107, 53, 0.2);
+  background: color-mix(in srgb, var(--element-color) 20%, transparent);
 }
 
 .layers-visibility {
@@ -87,8 +88,12 @@
   color: var(--text-tertiary);
 }
 
-.layers-item:hover .layers-type-icon {
-  color: var(--text-secondary);
+.layers-type-icon-colored {
+  color: var(--element-color, var(--text-tertiary));
+}
+
+.layers-item:hover .layers-type-icon-colored {
+  color: var(--element-color, var(--text-secondary));
 }
 
 .layers-label {

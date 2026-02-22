@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { getElementTypeColor } from '../constants/elementTypes'
+import ElementTypeIcon from './ElementTypeIcon'
 import './Timeline.css'
 
 function getElementLabel(el) {
@@ -316,13 +318,19 @@ export default function Timeline({
               <div
                 key={el.id}
                 className="timeline-track"
+                style={{ '--element-color': getElementTypeColor(el.type) }}
                 onClick={(e) => handleClipClick(e, el)}
               >
-                <span className="timeline-track-label">{getElementLabel(el)}</span>
+                <div className="timeline-track-label">
+                  <span className="timeline-track-icon" title={el.type}>
+                    <ElementTypeIcon type={el.type} id={el.id} size={14} />
+                  </span>
+                  <span className="timeline-track-text">{getElementLabel(el)}</span>
+                </div>
                 <div className="timeline-track-clips">
                   <div
                     className={`timeline-clip ${selectedIds.includes(el.id) ? 'selected' : ''}`}
-                    style={{ left: `${left}%`, width: `${width}%` }}
+                    style={{ left: `${left}%`, width: `${width}%`, '--element-color': getElementTypeColor(el.type) }}
                     onPointerDown={(e) => handleClipPointerDown(e, el, 'move')}
                   >
                     <div
