@@ -387,13 +387,20 @@ Statement → Impact → Evidence → Relevance → Statement → Impact → Evi
 
 Do NOT skip or reorder. Each content-row must be the next block in the cycle. If you just wrote block-relevance, the next block MUST be block-statement. If you just wrote block-statement, the next MUST be block-impact, then block-evidence, then block-relevance. This cycle repeats for every paragraph, section, and the entire document.
 
-Structure:
+Structure: ONE content-row per block. Each block on its own line. No columns or side-by-side layout.
 <div class="content-row">
   <div class="gutter"><i type="statement"></i></div>
   <div class="content-body">
     <div class="block-statement"><h1><span>Your headline here</span></h1></div>
   </div>
 </div>
+<div class="content-row">
+  <div class="gutter"><i type="impact"></i></div>
+  <div class="content-body">
+    <div class="block-impact"><p><span>Why it matters...</span></p></div>
+  </div>
+</div>
+(Continue with one content-row per block. Vertical stack only.)
 
 Gutter icon types: statement, impact, evidence, relevance (match the block type).
 
@@ -401,6 +408,7 @@ FORMATTING:
 - Wrap inner text of every <h1>, <h2>, <h3>, <p> in <span> tag
 - No extra whitespace inside block divs
 - Use h1, h2, h3 for headlines; p for paragraphs
+- NEVER use columns, multi-column layout, or side-by-side blocks. Each block must be on its own line. One content-row per block. Regular vertical flow with line breaks between blocks.
 
 {{docTypeExtension}}
 
@@ -593,6 +601,7 @@ Your task is to re-format the provided text into the "ColorWriter" Row Layout us
 Gutter icon types: statement, impact, evidence, relevance (match the block type).
 
 **Formatting Constraints**:
+- **ONE ROW PER BLOCK**: Each content-row must contain exactly ONE block. No columns, no side-by-side layout. Vertical stack only.
 - **SPAN WRAPPERS**: Wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag.
 - **NO EXTRA SPACE**: Do not add newlines or spaces inside the block-[type] div.
 - **TIGHT HTML**: Write compact HTML on single lines where possible.

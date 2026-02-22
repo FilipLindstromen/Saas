@@ -301,21 +301,36 @@ input[type="range"]::-ms-fill-upper {
   background: transparent;
 }
 
-/* Row Layout */
+/* Row Layout - single column, no newspaper-style columns */
 .content-row {
   display: flex !important;
   align-items: flex-start;
   gap: 1rem;
   width: 100%;
   margin-bottom: 2rem;
-  /* ONE full line break between color blocks */
+  column-count: 1 !important;
+  columns: 1 !important;
+}
+
+/* Force single-column layout - override any AI-generated column styles */
+.editor-content,
+.editor-content .content-body {
+  column-count: 1 !important;
+  columns: 1 !important;
+}
+
+.editor-content [class*="block-"] {
+  display: block !important;
+  width: 100% !important;
 }
 
 /* Content Body Wrapper (Right Side) */
 .content-body {
   flex-grow: 1;
   width: 100%;
-  /* display: block; - Let it be block to allow inline flow inside */
+  display: block;
+  column-count: 1 !important;
+  columns: 1 !important;
 }
 
 /* Gutter (Icons) */
