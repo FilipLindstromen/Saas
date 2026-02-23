@@ -41,6 +41,65 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
       .replace(/\n/g, '<br>')
   }
 
+  // Escape HTML entities for use in stored content (same as plainTextToStorage but without \n)
+  const escapeForStorage = (text) => {
+    if (!text || typeof text !== 'string') return ''
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+  }
+
+  // Extract formatted segments from HTML (serif spans, b, i, mark) to preserve when merging
+  const extractFormattedSegments = (html) => {
+    if (!html || typeof html !== 'string') return []
+    const segments = []
+    const stripInner = (s) => s
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim()
+    // font-pairing-serif spans
+    const serifRegex = /<span\s+class="font-pairing-serif"[^>]*>([\s\S]*?)<\/span>/gi
+    let m
+    while ((m = serifRegex.exec(html)) !== null) {
+      const text = stripInner(m[1])
+      if (text.length > 0) segments.push({ text, wrap: 'font-pairing-serif' })
+    }
+    // b, i, mark - use separate regexes to avoid nested tag issues
+    for (const tag of ['b', 'i', 'mark']) {
+      const tagRegex = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'gi')
+      while ((m = tagRegex.exec(html)) !== null) {
+        const text = stripInner(m[1])
+        if (text.length > 0) segments.push({ text, wrap: tag })
+      }
+    }
+    return segments
+  }
+
+  // Merge new plain text with existing formatting - preserves serif, bold, italic, mark
+  const mergeContentWithFormatting = (oldContent, newPlainText) => {
+    let base = plainTextToStorage(newPlainText)
+    const segments = extractFormattedSegments(oldContent)
+    if (segments.length === 0) return base
+    // Sort by text length descending so longer matches are replaced first
+    const sorted = [...segments].sort((a, b) => b.text.length - a.text.length)
+    for (const { text, wrap } of sorted) {
+      const escaped = escapeForStorage(text)
+      if (!base.includes(escaped)) continue
+      const wrapped = wrap === 'font-pairing-serif'
+        ? `<span class="font-pairing-serif">${escaped}</span>`
+        : wrap === 'mark'
+          ? `<mark>${escaped}</mark>`
+          : `<${wrap}>${escaped}</${wrap}>`
+      base = base.replace(escaped, wrapped)
+    }
+    return base
+  }
+
   const handleEdit = (slide) => {
     setEditingId(slide.id)
     setEditContent(getPlainText(slide.content))
@@ -51,8 +110,11 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
   const handleChange = (e, id) => {
     const newContent = e.target.value
     setEditContent(newContent)
-    // Convert \n to <br> for storage so line breaks work in presentation mode
-    onUpdate(id, { content: plainTextToStorage(newContent) })
+    const slide = slides.find(s => s.id === id)
+    const oldContent = slide?.content || ''
+    // Merge new text with existing formatting (serif, bold, italic, mark) so styling is preserved
+    const mergedContent = mergeContentWithFormatting(oldContent, newContent)
+    onUpdate(id, { content: mergedContent })
   }
 
   const handleBlur = () => {

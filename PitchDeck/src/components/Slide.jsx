@@ -477,7 +477,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     isEditingSubtitleRef.current = true
   }
 
-  // Both Enter and Shift+Enter insert <br> so edit mode and presentation show identical line breaks
+  // Both Enter and Shift+Enter insert <br> so preview matches slide list behavior (one Enter = one line break)
   const handleLineBreakKey = (e, focusRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
