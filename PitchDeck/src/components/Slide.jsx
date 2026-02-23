@@ -492,18 +492,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }
 
   // Normalize content on save: convert <div>/<p> blocks to <br> so presentation matches edit mode.
-  // Only add <br> between blocks, not at the start, to avoid extra line breaks when applying H1/H2/H3.
+  // Chrome creates <div> on Enter; we must convert to <br> or line breaks are lost when stripping tags.
   const normalizeLineBreaksForStorage = (html) => {
     if (!html || typeof html !== 'string') return html
-    return html
+    let out = html
       .replace(/<\/p>\s*<p[^>]*>/gi, '<br>')
       .replace(/<\/div>\s*<div[^>]*>/gi, '<br>')
       .replace(/<\/p>\s*<div[^>]*>/gi, '<br>')
       .replace(/<\/div>\s*<p[^>]*>/gi, '<br>')
-      .replace(/<p[^>]*>\s*/gi, '')
+      .replace(/<p[^>]*>\s*/gi, '<br>')
       .replace(/<\/p>\s*/gi, '')
-      .replace(/<div[^>]*>\s*/gi, '')
+      .replace(/<div[^>]*>\s*/gi, '<br>')
       .replace(/<\/div>\s*/gi, '')
+    return out.replace(/^(<br\s*\/?>\s*)+/i, '')
   }
 
   // Font pairing: only active in edit mode when textStyleMode is fontPairing
@@ -564,9 +565,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const syncFontPairingContentToState = (target) => {
     if (!target || !onUpdate) return
     if (target.field === 'content') {
-      if (contentRef.current) onUpdate({ content: contentRef.current.innerHTML })
+      if (contentRef.current) onUpdate({ content: normalizeLineBreaksForStorage(contentRef.current.innerHTML) })
     } else if (target.field === 'subtitle') {
-      if (subtitleRef.current) onUpdate({ subtitle: subtitleRef.current.innerHTML })
+      if (subtitleRef.current) onUpdate({ subtitle: normalizeLineBreaksForStorage(subtitleRef.current.innerHTML) })
     } else if (target.field === 'bullet' && typeof target.bulletIndex === 'number') {
       const bullets = (slide.content || '').split('\n').map(line => line.trim()).filter(Boolean).map(line => line.replace(/^[-•*]\s*/, ''))
       const bulletEl = slideRef.current?.querySelector(`.slide-bullet:nth-child(${target.bulletIndex + 1}) .bullet-text`)
