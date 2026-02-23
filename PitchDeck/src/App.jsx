@@ -21,6 +21,11 @@ import InspectorPanel from './components/InspectorPanel'
 import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
+import {
+  hasConnectedFolder,
+  saveProjectToConnectedFolder,
+  loadProjectFromConnectedFolder
+} from '@shared/projectFolderStorage'
 import { preloadFFmpeg } from './utils/ffmpegExport'
 import './App.css'
 
@@ -682,6 +687,11 @@ function App() {
           await saveToProjectFolder(() => exportData, data.projectName)
           setLastSaved(new Date())
         }
+        if (await hasConnectedFolder()) {
+          const projName = (data.projectName || '').trim() || 'Untitled Project'
+          await saveProjectToConnectedFolder('PitchDeck', projName, () => exportData)
+          localStorage.setItem('pitchDeckLastModified', String(Date.now()))
+        }
       } catch (e) {
         console.warn('Auto-save to project folder failed:', e)
       } finally {
@@ -819,8 +829,12 @@ function App() {
           const filtered = prev.filter(f => f.path !== filename)
           return [fileInfo, ...filtered].slice(0, 10)
         })
-        return
       }
+      if (await hasConnectedFolder()) {
+        await saveProjectToConnectedFolder('PitchDeck', (projectName || '').trim() || 'Untitled Project', () => exportData)
+        localStorage.setItem('pitchDeckLastModified', String(Date.now()))
+      }
+      if (folder) return
     } catch (e) {
       console.warn('Save to project folder failed, falling back to download:', e)
     }
@@ -1383,6 +1397,23 @@ function App() {
     if (importData.recordSettings) setRecordSettings(importData.recordSettings)
     if (importData.analysisFolded !== undefined) setAnalysisFolded(importData.analysisFolded)
   }, [normalizeSlide])
+
+  // On mount: if connected folder has project newer than browser, load from folder
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!(await hasConnectedFolder())) return
+      const projName = localStorage.getItem('pitchDeckProjectName') || 'Untitled Project'
+      const result = await loadProjectFromConnectedFolder('PitchDeck', projName)
+      if (cancelled || !result?.data) return
+      const browserLastModified = parseInt(localStorage.getItem('pitchDeckLastModified') || '0', 10)
+      if (result.modifiedTime > browserLastModified) {
+        loadProjectFromData(result.data)
+      }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Import data from a file
   const handleImportFile = () => {

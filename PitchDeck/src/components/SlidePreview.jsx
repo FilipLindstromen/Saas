@@ -379,7 +379,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       </div>
       <div className="preview-content">
         <div
-          className="preview-zoom-wrap"
+          className={`preview-zoom-wrap ${settings.textAnimation && settings.textAnimation !== 'none' ? 'has-text-animation' : ''}`}
           style={{
             transform: `scale(${previewZoom})`,
             transformOrigin: 'center center'

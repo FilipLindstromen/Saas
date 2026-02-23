@@ -423,6 +423,10 @@
   min-height: 0;
 }
 
+.preview-zoom-wrap.has-text-animation {
+  overflow: visible;
+}
+
 .preview-slide-wrap {
   flex: 1;
   display: flex;

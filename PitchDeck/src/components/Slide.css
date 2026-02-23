@@ -12,6 +12,11 @@
   font-size: var(--slide-base-font-size, 1rem);
 }
 
+/* Allow text animation (translateY) to not be clipped for centered/word animations */
+.slide[class*="text-animation-"]:not(.text-animation-none) {
+  overflow: visible;
+}
+
 .slide-background {
   position: absolute;
   top: 0;
@@ -29,7 +34,7 @@
   pointer-events: auto;
 }
 
-/* Video sits above background color and background image, below gradient and content */
+/* Video sits above background image, below gradient and content (video layout: text on top) */
 .slide-background-video {
   position: absolute;
   top: 0;
@@ -293,12 +298,17 @@
 }
 
 .slide-content-video {
-  /* Text overlay for video layout - uses typography bottom and edge */
+  /* Text overlay for video layout - must be above video (z-index 1) and gradient (z-index 2) */
   position: relative;
   z-index: 1001;
   display: flex;
   align-items: flex-end;
   padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+/* Play mode: ensure text stays in front of video and gradient */
+.slide.play-mode .slide-content-video {
+  z-index: 1001;
 }
 
 /* Left with Video: typography bottom and edge; text area is narrower */

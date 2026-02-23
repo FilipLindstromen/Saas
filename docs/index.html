@@ -680,7 +680,7 @@
             </button>
             <button type="button" class="settings-storage-disconnect" id="storage-disconnect-folder" style="display: none;">Clear</button>
           </div>
-          <span class="settings-label-hint">Access files from a folder on your computer. Chrome/Edge only. Re-pick after page reload.</span>
+          <span class="settings-label-hint">Projects save to this folder. Persists across reloads. Chrome/Edge only.</span>
         </div>
       </div>
       <div class="settings-modal-footer">
@@ -691,6 +691,7 @@
   </div>
 
   <script src="apiKeys.js"></script>
+  <script src="saasStorage.js"></script>
   <script>
     (function() {
       const STORAGE_KEY = 'saas-apps-theme';
@@ -833,7 +834,11 @@
         try {
           var handle = await window.showDirectoryPicker();
           var name = handle.name;
-          window.SaasStorage = { localFolderHandle: handle, localFolderName: name };
+          window.SaasStorage.localFolderHandle = handle;
+          window.SaasStorage.localFolderName = name;
+          if (window.SaasStorage.setConnectedLocalFolder) {
+            await window.SaasStorage.setConnectedLocalFolder(handle, name);
+          }
           if (window.SaasApiKeys) {
             window.SaasApiKeys.save({ localFolderName: name });
           }
@@ -843,8 +848,12 @@
         }
       });
 
-      document.getElementById('storage-disconnect-folder').addEventListener('click', function() {
-        window.SaasStorage = { localFolderHandle: null, localFolderName: '' };
+      document.getElementById('storage-disconnect-folder').addEventListener('click', async function() {
+        window.SaasStorage.localFolderHandle = null;
+        window.SaasStorage.localFolderName = '';
+        if (window.SaasStorage.clearConnectedLocalFolder) {
+          await window.SaasStorage.clearConnectedLocalFolder();
+        }
         if (window.SaasApiKeys) {
           window.SaasApiKeys.save({ localFolderName: '' });
         }

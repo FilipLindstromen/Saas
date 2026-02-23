@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadApiKeys } from '@shared/apiKeys';
+import {
+  hasConnectedFolder,
+  saveProjectToConnectedFolder,
+  loadProjectFromConnectedFolder
+} from '@shared/projectFolderStorage';
 import { getTheme, setTheme as applyTheme, initThemeSync } from '@shared/theme';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
@@ -150,12 +155,56 @@ function App() {
     if (currentProjectId) saveProjectData(currentProjectId, tabs, activeTabId);
   }, [currentProjectId, tabs, activeTabId]);
 
+  // Save to connected folder (debounced)
+  const saveToFolderTimeoutRef = useRef(null);
+  useEffect(() => {
+    if (!currentProjectId || !projects.length) return;
+    if (saveToFolderTimeoutRef.current) clearTimeout(saveToFolderTimeoutRef.current);
+    saveToFolderTimeoutRef.current = setTimeout(async () => {
+      saveToFolderTimeoutRef.current = null;
+      if (!(await hasConnectedFolder())) return;
+      const proj = projects.find(p => p.id === currentProjectId);
+      const projName = (proj?.name || 'Default').trim() || 'Default';
+      const data = { tabs, activeTabId };
+      try {
+        await saveProjectToConnectedFolder('ColorWriter', projName, data);
+        localStorage.setItem(`cw_projectLastModified_${currentProjectId}`, String(Date.now()));
+      } catch (e) {
+        console.warn('Save to project folder failed:', e);
+      }
+    }, 1500);
+    return () => {
+      if (saveToFolderTimeoutRef.current) clearTimeout(saveToFolderTimeoutRef.current);
+    };
+  }, [currentProjectId, projects, tabs, activeTabId]);
+
   // Load project data when switching projects
   useEffect(() => {
     const data = loadProjectData(currentProjectId);
     setTabs(data.tabs);
     setActiveTabId(data.activeTabId);
   }, [currentProjectId]);
+
+  // If connected folder has project newer than browser, load from folder
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!(await hasConnectedFolder()) || !currentProjectId || !projects.length) return;
+      const proj = projects.find(p => p.id === currentProjectId);
+      const projName = (proj?.name || 'Default').trim() || 'Default';
+      const result = await loadProjectFromConnectedFolder('ColorWriter', projName);
+      if (cancelled || !result?.data) return;
+      const browserLastModified = parseInt(localStorage.getItem(`cw_projectLastModified_${currentProjectId}`) || '0', 10);
+      if (result.modifiedTime > browserLastModified && result.data.tabs) {
+        setTabs(result.data.tabs.map(tab => ({
+          ...tab,
+          content: normalizeToSingleColumn(tab.content || '')
+        })));
+        if (result.data.activeTabId) setActiveTabId(result.data.activeTabId);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentProjectId, projects]);
 
   // Get current tab content
   const currentTab = tabs.find(tab => tab.id === activeTabId) || tabs[0];

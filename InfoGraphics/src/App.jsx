@@ -16,6 +16,11 @@ import ShortcutsModal from './components/ShortcutsModal'
 import TemplateEditBanner from './components/TemplateEditBanner'
 import { LAYOUTS, applyLayout, applyLayoutWithContent, getLayoutSlotCount } from './layouts'
 import * as projectStorage from './utils/projectStorage'
+import {
+  hasConnectedFolder,
+  saveProjectToConnectedFolder,
+  loadProjectFromConnectedFolder
+} from '@shared/projectFolderStorage'
 import { searchImages } from './api/imageSearch'
 import { loadCustomTemplates, saveCustomTemplate, getCustomTemplate, updateCustomTemplateName } from './utils/customTemplates'
 import './App.css'
@@ -259,6 +264,31 @@ function App() {
 
     queueMicrotask(() => { hasHydrated.current = true })
 
+    // If connected folder has project newer than browser, load from folder
+    ;(async () => {
+      if (!(await hasConnectedFolder()) || !projectId || !projectList.length) return
+      const proj = projectList.find(p => p.id === projectId)
+      const projName = (proj?.name || 'Untitled').trim() || 'Untitled'
+      const result = await loadProjectFromConnectedFolder('InfoGraphics', projName)
+      if (!result?.data) return
+      const browserLastModified = parseInt(localStorage.getItem(`infographicsProjectLastModified_${projectId}`) || '0', 10)
+      if (result.modifiedTime > browserLastModified) {
+        projectStorage.saveProjectData(projectId, result.data)
+        const tabs = projectStorage.getProjectTabs(projectId)
+        const tabToUse = tabId && tabs.some(t => t.id === tabId) ? tabId : tabs[0]?.id || null
+        if (tabToUse) {
+          const data = projectStorage.getDocumentDataForProject(projectId, tabToUse)
+          if (data) {
+            try {
+              applyProjectData(data)
+            } catch (e) {
+              console.error('Error applying folder data:', e)
+            }
+          }
+        }
+      }
+    })()
+
     const savedLatest = localStorage.getItem('infographicsLatestImages')
     if (savedLatest) {
       try {
@@ -294,6 +324,30 @@ function App() {
     }
     projectStorage.saveTabData(currentProjectId, currentTabId, currentTabName, data)
   }, [currentProjectId, currentTabId, currentTabName, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
+
+  // Save to connected folder (debounced)
+  const saveToFolderTimeoutRef = useRef(null)
+  useEffect(() => {
+    if (!hasHydrated.current || !currentProjectId || !projects.length) return
+    if (saveToFolderTimeoutRef.current) clearTimeout(saveToFolderTimeoutRef.current)
+    saveToFolderTimeoutRef.current = setTimeout(async () => {
+      saveToFolderTimeoutRef.current = null
+      if (!(await hasConnectedFolder())) return
+      const proj = projects.find(p => p.id === currentProjectId)
+      const projName = (proj?.name || 'Untitled').trim() || 'Untitled'
+      const fullData = projectStorage.loadProjectData(currentProjectId)
+      if (!fullData) return
+      try {
+        await saveProjectToConnectedFolder('InfoGraphics', projName, fullData)
+        localStorage.setItem(`infographicsProjectLastModified_${currentProjectId}`, String(Date.now()))
+      } catch (e) {
+        console.warn('Save to project folder failed:', e)
+      }
+    }, 1500)
+    return () => {
+      if (saveToFolderTimeoutRef.current) clearTimeout(saveToFolderTimeoutRef.current)
+    }
+  }, [currentProjectId, projects, elements, aspectRatio, resolution, backgroundColor, zoom, selectedIds, leftPanelTab, rightPanelTab, leftPanelWidth, rightPanelWidth, includeBackgroundInExport, defaultFontFamily, defaultFontSize, timelineDuration, showTimeline, timelineHeight, brandPrimaryColor, brandSecondaryColor, brandFontFamily])
 
   const createProject = useCallback(() => {
     const id = projectStorage.generateProjectId()

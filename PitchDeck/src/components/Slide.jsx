@@ -1820,11 +1820,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             style={{ 
               color: textColor,
               fontFamily: `"${fontFamily}", sans-serif`,
-              zIndex: 1001, // Higher than webcam overlay (1000) to appear on top
+              zIndex: 1001, // Above video (1) and gradient (2) - text must be on top
               ...(isPlayMode ? {
-                position: 'fixed',
+                position: 'absolute',
+                inset: 0,
                 top: 0,
                 left: 0,
+                right: 0,
+                bottom: 0,
                 width: '100%',
                 height: '100%',
                 pointerEvents: 'none'
