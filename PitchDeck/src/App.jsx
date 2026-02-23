@@ -858,8 +858,8 @@ function App() {
     })
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
 
-  // Export slides as plain text (Slide 1: ... Slide 2: ...)
-  const exportSlidesAsText = useCallback(() => {
+  // Copy slides as plain text to clipboard (Slide 1: ... Slide 2: ...)
+  const exportSlidesAsText = useCallback(async () => {
     const getPlainText = (content) => {
       if (!content || typeof content !== 'string') return ''
       return content
@@ -886,19 +886,12 @@ function App() {
     })
     const output = lines.join('\n\n')
 
-    const filename = projectName.trim()
-      ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}-slides.txt`
-      : `slides-${new Date().toISOString().split('T')[0]}.txt`
-    const blob = new Blob([output], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }, [chapters, projectName])
+    try {
+      await navigator.clipboard.writeText(output)
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
+  }, [chapters])
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
@@ -2400,7 +2393,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   type="button"
                   className="btn-icon-header"
                   onClick={exportSlidesAsText}
-                  title="Export slides as text"
+                  title="Copy slides to clipboard"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2409,7 +2402,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <line x1="16" y1="17" x2="8" y2="17" />
                     <polyline points="10 9 9 9 8 9" />
                   </svg>
-                  <span className="btn-tooltip">Export text</span>
+                  <span className="btn-tooltip">Copy text</span>
                 </button>
                 <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
@@ -2709,7 +2702,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   type="button"
                   className="btn-icon-header"
                   onClick={exportSlidesAsText}
-                  title="Export slides as text"
+                  title="Copy slides to clipboard"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2718,7 +2711,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <line x1="16" y1="17" x2="8" y2="17" />
                     <polyline points="10 9 9 9 8 9" />
                   </svg>
-                  <span className="btn-tooltip">Export text</span>
+                  <span className="btn-tooltip">Copy text</span>
                 </button>
                 <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
