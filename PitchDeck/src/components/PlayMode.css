@@ -81,6 +81,14 @@
   z-index: 1001;
 }
 
+/* First slide: 2 second delay before text shows - hide text initially, then fade in */
+.play-slide-container.first-slide-text-delayed .slide .slide-content {
+  opacity: 0;
+}
+.play-slide-container .slide .slide-content {
+  transition: opacity 0.5s ease;
+}
+
 /* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory).
    Use clip-path to ensure content is never visible on screen, even if layout shifts. */
 .play-preload-zone {

@@ -411,6 +411,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     if (unit === 'sentence') return getSentencesWithFormatting(html)
     return getWordsWithFormatting(html)
   }
+  // Ensure we always use word/sentence unit (default to word if undefined)
+  const effectiveTextAnimationUnit = textAnimationUnit === 'sentence' ? 'sentence' : 'word'
 
   // Render chunked content with h1/h2/h3 wrappers so present-mode text animation preserves heading styling
   const renderChunksWithHeadings = (chunks, chunkDelay, offset = 0) => {
@@ -549,8 +551,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const span = container.nodeType === Node.TEXT_NODE ? container.parentElement?.closest('.font-pairing-serif') : container.closest?.('.font-pairing-serif')
       if (span && span.classList.contains('font-pairing-serif')) {
         const parent = span.parentNode
-        while (span.firstChild) parent.insertBefore(span.firstChild, span)
-        parent.removeChild(span)
+        if (parent) {
+          while (span.firstChild) parent.insertBefore(span.firstChild, span)
+          if (span.parentNode === parent) parent.removeChild(span)
+        }
         syncFontPairingContentToState(target)
       }
     } catch (err) {}
@@ -769,8 +773,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const markEl = startEl?.closest?.('mark')
       if (markEl?.tagName === 'MARK') {
         const parent = markEl.parentNode
-        while (markEl.firstChild) parent.insertBefore(markEl.firstChild, markEl)
-        parent.removeChild(markEl)
+        if (parent) {
+          while (markEl.firstChild) parent.insertBefore(markEl.firstChild, markEl)
+          if (markEl.parentNode === parent) parent.removeChild(markEl)
+        }
       } else {
         const mark = document.createElement('mark')
         // Always set a visible highlight color so the toolbar action always shows feedback
@@ -870,7 +876,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           const parent = span.parentNode
           if (parent) {
             while (span.firstChild) parent.insertBefore(span.firstChild, span)
-            parent.removeChild(span)
+            if (span.parentNode === parent) parent.removeChild(span)
           }
         })
       } else {
@@ -900,7 +906,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         const parent = node.parentNode
         if (parent) {
           while (node.firstChild) parent.insertBefore(node.firstChild, node)
-          parent.removeChild(node)
+          if (node.parentNode === parent) parent.removeChild(node)
           unwrapColorSpans(parent) // reprocess so nested color spans are also unwrapped
         }
         return
@@ -1001,7 +1007,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         const parent = el.parentNode
         if (!parent) return
         while (el.firstChild) parent.insertBefore(el.firstChild, el)
-        parent.removeChild(el)
+        if (el.parentNode === parent) parent.removeChild(el)
       }
       toProcess.forEach((node) => {
         if (!node.parentNode) return
@@ -1184,7 +1190,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     const useChunkedText = (isPlayMode || previewTextAnimation) && textAnimation && textAnimation !== 'none'
-    const chunkDelay = textAnimationUnit === 'word' ? 0.07 : 0.2
+    const chunkDelay = effectiveTextAnimationUnit === 'word' ? 0.07 : 0.2
 
     if (layout === 'bulletpoints') {
       // Edit mode: single text field (one line per bullet)
@@ -1212,7 +1218,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
       // View / play mode: list of bullets (with optional showBullets, animations)
       const bullets = getBulletPoints()
-      const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, textAnimationUnit).length); return acc }, [0]) : []
+      const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, effectiveTextAnimationUnit).length); return acc }, [0]) : []
       const getBulletStyle = (index) => {
         const base = { pointerEvents: undefined, lineHeight: bulletLineHeight }
         if (!isPlayMode || !textAnimation || textAnimation === 'none') return base
@@ -1231,7 +1237,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             >
               {useChunkedText ? (
                 <span className="bullet-text slide-text-words" style={{ lineHeight: bulletLineHeight }}>
-                  {getChunksWithFormatting(bullet, textAnimationUnit).map((item, wi) =>
+                  {getChunksWithFormatting(bullet, effectiveTextAnimationUnit).map((item, wi) =>
                     item.lineBreak ? (
                       <br key={wi} />
                     ) : (
@@ -1284,7 +1290,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     if (layout === 'centered') {
-      const centeredChunks = useChunkedText ? getChunksWithFormatting(slide.content || '', textAnimationUnit) : []
+      const centeredChunks = useChunkedText ? getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit) : []
 
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
@@ -1362,8 +1368,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     // For play mode (or preview animation), render as div with formatted content (or chunk spans when text animation is on)
-    // When "show one line at a time" is on (visibleLineIndex !== null), always use line-by-line reveal
+    // Prefer word/sentence chunked animation when text animation is on; line reveal only when no text animation
     if (isPlayMode || previewTextAnimation) {
+      if (useChunkedText) {
+        const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
+        return (
+          <div
+            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+            style={textStyle}
+          >
+            {renderChunksWithHeadings(chunks, chunkDelay)}
+          </div>
+        )
+      }
       if (visibleLineIndex !== null) {
         const lines = getContentLines(slide.content || '')
         return (
@@ -1379,17 +1396,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 dangerouslySetInnerHTML={{ __html: formatContentForDisplay(line) }}
               />
             ))}
-          </div>
-        )
-      }
-      if (useChunkedText) {
-        const chunks = getChunksWithFormatting(slide.content || '', textAnimationUnit)
-        return (
-          <div
-            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
-            style={textStyle}
-          >
-            {renderChunksWithHeadings(chunks, chunkDelay)}
           </div>
         )
       }

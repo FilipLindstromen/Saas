@@ -616,6 +616,7 @@ function App() {
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
+    localStorage.setItem('textAnimationUnit', settings.textAnimationUnit || 'word')
     localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
     localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
     localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
