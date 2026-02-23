@@ -477,12 +477,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     isEditingSubtitleRef.current = true
   }
 
-  // Both Enter and Shift+Enter insert <br> so preview matches slide list behavior (one Enter = one line break)
+  // Both Enter and Shift+Enter insert <br> so preview matches slide list behavior (one Enter = one line break).
+  // Use insertHTML to force <br> - Chrome's insertLineBreak creates <div> which can lose line breaks.
   const handleLineBreakKey = (e, focusRef) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       e.stopPropagation()
-      document.execCommand('insertLineBreak')
+      document.execCommand('insertHTML', false, '<br>')
       const target = e.target
       setTimeout(() => {
         const el = focusRef?.current ?? target

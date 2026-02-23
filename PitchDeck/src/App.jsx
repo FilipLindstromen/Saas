@@ -1837,7 +1837,13 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
 
   // Present: open present view and fullscreen (one button, one action)
   const handlePresentClick = () => {
-    setMode('present')
+    // Blur any focused contentEditable so line breaks and edits are saved before switching
+    if (document.activeElement?.isContentEditable) {
+      document.activeElement.blur()
+      setTimeout(() => setMode('present'), 0)
+    } else {
+      setMode('present')
+    }
   }
 
   const handleCommandPaletteAction = (action, arg) => {
@@ -1853,7 +1859,14 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
       case 'settings': setShowSettings(true); break
       case 'transitions': setInspectorTab('transitions'); break
       case 'toggleTheme': setSharedTheme(theme === 'dark' ? 'light' : 'dark'); break
-      case 'present': setMode('present'); break
+      case 'present':
+        if (document.activeElement?.isContentEditable) {
+          document.activeElement.blur()
+          setTimeout(() => setMode('present'), 0)
+        } else {
+          setMode('present')
+        }
+        break
       case 'goToSlide': if (arg) setSelectedSlideId(arg); break
       case 'switchChapter': if (arg) setCurrentChapterId(arg); break
       default: break
