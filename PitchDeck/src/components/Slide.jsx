@@ -1290,20 +1290,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     if (layout === 'centered') {
-      const centeredChunks = useChunkedText ? getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit) : []
-
+      if (!useChunkedText) {
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
           {(isPlayMode || previewTextAnimation) ? (
-            useChunkedText ? (
-              <div
-                ref={contentRef}
-                className={`slide-text slide-text-words centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`}
-                style={textStyle}
-              >
-                {renderChunksWithHeadings(centeredChunks, chunkDelay)}
-              </div>
-            ) : visibleLineIndex !== null ? (
+            visibleLineIndex !== null ? (
               <div className={`slide-text slide-reveal-lines centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`} style={textStyle}>
                 {getContentLines(slide.content || '').map((line, i) => (
                   <div
@@ -1365,14 +1356,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           )}
         </div>
       )
+      }
     }
 
     // For play mode (or preview animation), render as div with formatted content (or chunk spans when text animation is on)
+    // Centered layout uses same path as left/default for word animation (useChunkedText) - no separate branch
     // Prefer word/sentence chunked animation when text animation is on; line reveal only when no text animation
     if (isPlayMode || previewTextAnimation) {
       if (useChunkedText) {
         const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
-        return (
+        const textContent = (
           <div
             className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
             style={textStyle}
@@ -1380,6 +1373,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             {renderChunksWithHeadings(chunks, chunkDelay)}
           </div>
         )
+        return layout === 'centered' ? (
+          <div key={slide.id} className="slide-text-centered-wrapper">{textContent}</div>
+        ) : textContent
       }
       if (visibleLineIndex !== null) {
         const lines = getContentLines(slide.content || '')

@@ -1079,12 +1079,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   const currentSlideLayout = currentSlide?.layout || 'default'
   const nextSlideLayout = presentationSlides[currentIndex + 1]?.layout || currentSlideLayout
-  const nextSlide = presentationSlides[currentIndex + 1]
 
   // Per-slide webcam: slide.webcamEnabled ?? recordSettings.webcamEnabled, slide.selectedCameraId || recordSettings.selectedCameraId
   const currentSlideHasWebcam = (currentSlide?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId)
-  const nextSlideHasWebcam = nextSlide && (nextSlide?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlide?.selectedCameraId || recordSettings?.selectedCameraId)
-  const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlide?.selectedCameraId || recordSettings?.selectedCameraId)) || ''
+  const nextSlideHasWebcam = nextSlideData && (nextSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
+  const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)) || ''
   const webcamShouldPreload = nextSlideHasWebcam && !currentSlideHasWebcam
 
   // Common Slide props (shared by visible and preload slides)
@@ -1232,8 +1231,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           webcamSize={recordSettings.webcamSize || 'large'}
           isVisible={currentSlideHasWebcam}
           shouldPreload={webcamShouldPreload}
-          cameraOverrideEnabled={(webcamShouldPreload ? nextSlide : currentSlide)?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
-          cameraOverridePosition={(webcamShouldPreload ? nextSlide : currentSlide)?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
+          cameraOverrideEnabled={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
+          cameraOverridePosition={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
           recordSettings={recordSettings}
         />
       )}
