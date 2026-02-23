@@ -3,7 +3,7 @@ import LayoutSelector from './LayoutSelector'
 import ContextMenu from './ContextMenu'
 import './SlideList.css'
 
-function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
+function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [editingSubtitle, setEditingSubtitle] = useState(false)
@@ -314,14 +314,30 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
         selectedLayout={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.layout || 'default'}
         cameraOverrideEnabled={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverrideEnabled ?? false}
         cameraOverridePosition={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverridePosition || 'fullscreen'}
+        selectedCount={getIdsToUpdate().length}
         onCameraOverrideChange={(enabled) => {
           const ids = getIdsToUpdate()
-          const currentPos = slides.find(s => s.id === selectedSlideId)?.cameraOverridePosition || 'fullscreen'
-          ids.forEach((id) => onUpdate(id, { cameraOverrideEnabled: enabled, cameraOverridePosition: enabled ? currentPos : undefined }))
+          if (ids.length === 0) return
+          const refId = selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId
+          const currentPos = slides.find(s => s.id === refId)?.cameraOverridePosition || 'fullscreen'
+          const updates = { cameraOverrideEnabled: enabled, cameraOverridePosition: enabled ? currentPos : undefined }
+          if (ids.length > 1 && onBatchUpdate) {
+            const updatesById = Object.fromEntries(ids.map(id => [id, updates]))
+            onBatchUpdate(updatesById)
+          } else {
+            ids.forEach((id) => onUpdate(id, updates))
+          }
         }}
         onCameraOverridePositionSelect={(position) => {
           const ids = getIdsToUpdate()
-          ids.forEach((id) => onUpdate(id, { cameraOverridePosition: position }))
+          if (ids.length === 0) return
+          const updates = { cameraOverridePosition: position }
+          if (ids.length > 1 && onBatchUpdate) {
+            const updatesById = Object.fromEntries(ids.map(id => [id, updates]))
+            onBatchUpdate(updatesById)
+          } else {
+            ids.forEach((id) => onUpdate(id, updates))
+          }
         }}
       />
       <div className="slide-list-items">

@@ -99,11 +99,14 @@ const CAMERA_OVERRIDE_POSITIONS = [
   { id: 'circle-top-right', title: 'Circle top right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="6" r="4" /></svg> }
 ]
 
-function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect }) {
+function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1 }) {
   return (
     <div className="layout-selector">
       <div className="layout-selector-header">
         <span className="layout-selector-title">Layouts</span>
+        {selectedCount > 1 && (
+          <span className="layout-selector-multi-hint">Applying to {selectedCount} slides</span>
+        )}
       </div>
       <div className="layout-thumbnails">
         {LAYOUTS.map((layout) => (

@@ -563,6 +563,25 @@
   cursor: not-allowed;
 }
 
+.plan-paste-section .plan-ramble-label {
+  margin-bottom: 0.25rem;
+}
+
+.plan-paste-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0 0 0.5rem;
+  line-height: 1.4;
+}
+
+.plan-paste-input {
+  margin-bottom: 0.75rem;
+}
+
+.plan-paste-btn {
+  margin-top: 0;
+}
+
 /* Standard Plan view: column with tips row (full width) + title bar + row (list | optional tips panel) */
 .plan-standard-column {
   display: flex;

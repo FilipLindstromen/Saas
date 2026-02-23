@@ -128,6 +128,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [showGenerate, setShowGenerate] = useState(false)
   const [slideCount, setSlideCount] = useState(() => localStorage.getItem('pitchDeckSlideCount') || '')
+  const [pasteTextInput, setPasteTextInput] = useState('')
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
@@ -816,6 +817,36 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     }
   }
 
+  const handlePasteToSlides = () => {
+    const text = pasteTextInput.trim()
+    if (!text) return
+    // Split by blank lines (one or more newlines) - each paragraph = one slide
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+    if (paragraphs.length === 0) return
+    const contextKey = isOverview ? (currentChapter?.id ?? currentChapterId) : null
+    let nextId = maxSlideId() + 1
+    const newSlides = paragraphs.map(content => ({
+      id: nextId++,
+      content: plainTextToStorage(content),
+      subtitle: '',
+      imageUrl: '',
+      layout: 'default',
+      gradientStrength: 0.7,
+      flipHorizontal: false,
+      backgroundOpacity: 0.6,
+      gradientFlipped: false,
+      imageScale: 1.0,
+      imagePositionX: 50,
+      imagePositionY: 50,
+      textHeadingLevel: null,
+      subtitleHeadingLevel: null,
+    }))
+    applyUpdate(contextKey, newSlides)
+    setPasteTextInput('')
+    setEditingId(newSlides[0]?.id ?? null)
+    setEditContent(paragraphs[0] ?? '')
+  }
+
   const handleGenerateSlides = async () => {
     if (!settings?.openaiKey || !generateInput.trim()) {
       alert('Please enter content and ensure OpenAI API key is set in settings.')
@@ -1189,6 +1220,24 @@ Example format:
                     disabled={!generateInput.trim() || !selectedTemplate || isGenerating || !settings?.openaiKey}
                   >
                     {isGenerating ? 'Generating...' : 'Generate'}
+                  </button>
+                </div>
+                <div className="plan-generate-section plan-paste-section">
+                  <label className="plan-ramble-label">Paste text</label>
+                  <p className="plan-paste-hint">Each paragraph (separated by blank lines) becomes one slide.</p>
+                  <textarea
+                    className="plan-generate-input plan-paste-input"
+                    placeholder="If you operate at a high level during the day…&#10;&#10;make decisions… carry responsibility… solve problems…&#10;&#10;…but when you lie down at night your brain won't shut off…&#10;&#10;this training is for you."
+                    value={pasteTextInput}
+                    onChange={(e) => setPasteTextInput(e.target.value)}
+                    rows={5}
+                  />
+                  <button
+                    className="plan-generate-btn plan-paste-btn"
+                    onClick={handlePasteToSlides}
+                    disabled={!pasteTextInput.trim()}
+                  >
+                    Create slides from text
                   </button>
                 </div>
               </div>

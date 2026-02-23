@@ -6,6 +6,16 @@
 
 .layout-selector-header {
   margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.layout-selector-multi-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
 }
 
 .layout-selector-title {

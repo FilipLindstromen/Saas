@@ -1090,6 +1090,29 @@ function App() {
     }, 1000)
   }
 
+  const updateSlidesBatch = (updatesById) => {
+    setSlides(prevSlides => {
+      return prevSlides.map(s => {
+        const updates = updatesById[s.id]
+        if (!updates) return s
+        const updated = { ...s, ...updates }
+        if (updates.layout === 'section' && updated.imageUrl) {
+          updated.imageUrl = ''
+        }
+        return updated
+      })
+    })
+    if (updateSlideTimeoutRef.current) {
+      clearTimeout(updateSlideTimeoutRef.current)
+    }
+    updateSlideTimeoutRef.current = setTimeout(() => {
+      const latest = latestStateRef.current
+      if (latest) {
+        saveToHistory({ ...latest })
+      }
+    }, 1000)
+  }
+
   const updateSlides = (newSlides) => {
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
@@ -2698,6 +2721,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 onDelete={deleteSlide}
                 onDuplicate={duplicateSlide}
                 onUpdate={updateSlide}
+                onBatchUpdate={updateSlidesBatch}
                 onReorder={updateSlides}
               />
             </div>
