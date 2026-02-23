@@ -92,7 +92,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamFlipHorizontal = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamFlipHorizontal = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -1283,7 +1283,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     if (layout === 'centered') {
-      const subtitleHasContent = hasSubtitleContent()
       const centeredChunks = useChunkedText ? getChunksWithFormatting(slide.content || '', textAnimationUnit) : []
 
       return (
@@ -1338,7 +1337,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
             />
           )}
-          {subtitleHasContent ? (
+          {null && (
             <div 
               ref={subtitleRef}
               className={`slide-subtitle ${subtitleHeadingLevel ? `text-heading-${subtitleHeadingLevel}` : ''}`}
@@ -1356,28 +1355,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               onKeyDown={(e) => handleLineBreakKey(e, subtitleRef)}
               dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.subtitle) }}
             />
-          ) : isEditable ? (
-            <div 
-              className="slide-subtitle slide-subtitle-placeholder"
-              style={textStyle}
-              contentEditable="true"
-              suppressContentEditableWarning={true}
-              onBlur={(e) => {
-                const text = e.target.textContent || e.target.innerText || ''
-                // Only save if there's actual content (not just placeholder)
-                if (text.trim() && text.trim() !== 'Subtitle (optional)') {
-                  handleSubtitleChange(e)
-                }
-              }}
-              onKeyDown={(e) => handleLineBreakKey(e, null)}
-              data-placeholder="Subtitle (optional)"
-              onFocus={(e) => {
-                if (e.target.textContent === 'Subtitle (optional)') {
-                  e.target.textContent = ''
-                }
-              }}
-            />
-          ) : null}
+          )}
         </div>
       )
     }
@@ -1880,6 +1858,28 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           <button type="button" className="slide-font-pairing-menu-item" onClick={removeSerifFromSelection}>
             Remove serif font
           </button>
+        </div>
+      )}
+      {Array.isArray(slide.graphicOverlays) && slide.graphicOverlays.length > 0 && (
+        <div className="slide-graphic-overlays" aria-hidden="true">
+          {slide.graphicOverlays.map((g) => (
+            <div
+              key={g.id}
+              className={`slide-graphic-overlay ${selectedGraphicId === g.id ? 'selected' : ''}`}
+              style={{
+                left: `${g.x ?? 50}%`,
+                top: `${g.y ?? 50}%`,
+                width: `${g.width ?? 80}px`,
+                height: `${g.height ?? 80}px`,
+                transform: `translate(-50%, -50%) rotate(${g.rotation ?? 0}deg)${g.flipHorizontal ? ' scaleX(-1)' : ''}`,
+                transformOrigin: 'center center',
+                cursor: onSelectGraphic ? 'pointer' : undefined
+              }}
+              onClick={onSelectGraphic ? (e) => { e.stopPropagation(); onSelectGraphic(selectedGraphicId === g.id ? null : g.id) } : undefined}
+            >
+              <img src={g.url} alt="" draggable={false} />
+            </div>
+          ))}
         </div>
       )}
       {textFormatToolbar && createPortal(

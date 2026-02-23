@@ -1106,7 +1106,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const scale = Math.min(viewportSize.w / canvasSize.w, viewportSize.h / canvasSize.h)
 
   return (
-    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0' }}>
+    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a' }}>
       <div
         className="play-canvas-wrapper"
         style={{

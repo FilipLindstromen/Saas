@@ -1,0 +1,145 @@
+.graphic-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.graphic-picker-modal {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  width: 90%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.graphic-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.graphic-picker-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.graphic-picker-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.graphic-picker-close:hover {
+  color: var(--text-primary);
+}
+
+.graphic-picker-body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.graphic-picker-type-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.graphic-picker-type-btn {
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.graphic-picker-type-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.graphic-picker-search-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.graphic-picker-search-row input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.graphic-picker-search-row button {
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.graphic-picker-search-row button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.graphic-picker-search-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.graphic-picker-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.graphic-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.graphic-picker-item {
+  aspect-ratio: 1;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.graphic-picker-item:hover {
+  border-color: var(--accent);
+}
+
+.graphic-picker-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

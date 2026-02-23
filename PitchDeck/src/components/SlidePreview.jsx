@@ -3,6 +3,7 @@ import Slide from './Slide'
 import ImagePicker from './ImagePicker'
 import VideoPicker from './VideoPicker'
 import InfographicPicker from './InfographicPicker'
+import GraphicPicker from './GraphicPicker'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -14,13 +15,14 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '' }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [showVideoPicker, setShowVideoPicker] = useState(false)
   const [showInfographicPicker, setShowInfographicPicker] = useState(false)
+  const [showGraphicPicker, setShowGraphicPicker] = useState(null) // 'giphy' | 'icon' | null
   const [previewZoom, setPreviewZoom] = useState(() => {
     try {
       const saved = localStorage.getItem('pitchDeckPreviewZoom')
@@ -178,6 +180,25 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
     setShowInfographicPicker(false)
   }
 
+  const handleGraphicSelect = (url, source) => {
+    const overlays = Array.isArray(slide.graphicOverlays) ? [...slide.graphicOverlays] : []
+    const id = 'g' + Date.now()
+    overlays.push({
+      id,
+      type: source === 'iconify' ? 'icon' : 'giphy',
+      url,
+      x: 50,
+      y: 50,
+      width: 80,
+      height: 80,
+      rotation: 0,
+      flipHorizontal: false
+    })
+    onUpdate({ graphicOverlays: overlays })
+    setShowGraphicPicker(null)
+    onSelectGraphic?.(id)
+  }
+
   return (
     <div className="slide-preview">
       <div className="preview-header">
@@ -198,6 +219,34 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             />
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
+          {(slide.layout || 'default') !== 'section' && (
+            <div className="preview-header-graphic-btns">
+              <button
+                className="btn-icon btn-add-giphy"
+                onClick={() => setShowGraphicPicker('giphy')}
+                title="Add Giphy"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="12" r="1.5" />
+                  <circle cx="15.5" cy="12" r="1.5" />
+                  <path d="M8.5 12h7" />
+                </svg>
+                <span className="btn-tooltip">Add Giphy</span>
+              </button>
+              <button
+                className="btn-icon btn-add-icon"
+                onClick={() => setShowGraphicPicker('icon')}
+                title="Add icon"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v8M8 12h8" />
+                </svg>
+                <span className="btn-tooltip">Add icon</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="preview-header-actions">
           {(slide.layout || 'default') !== 'section' && (
@@ -390,6 +439,8 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
+            selectedGraphicId={selectedGraphicId}
+            onSelectGraphic={onSelectGraphic}
           />
           {safeRecordSettings.captionsEnabled && (
             <div className="caption-preview-in-slide">
@@ -444,6 +495,19 @@ function SlidePreview({ slide, onUpdate, settings, backgroundColor = '#1a1a1a', 
         onSelect={handleInfographicSelect}
         currentProjectId={slide.infographicProjectId}
         currentTabId={slide.infographicTabId}
+      />
+      <GraphicPicker
+        isOpen={showGraphicPicker === 'giphy'}
+        onClose={() => setShowGraphicPicker(null)}
+        onSelect={handleGraphicSelect}
+        presetService="giphy"
+        presetType="stickers"
+      />
+      <GraphicPicker
+        isOpen={showGraphicPicker === 'icon'}
+        onClose={() => setShowGraphicPicker(null)}
+        onSelect={handleGraphicSelect}
+        presetService="iconify"
       />
       <ImagePicker
         isOpen={showImagePicker}

@@ -43,22 +43,78 @@ function App() {
   const [instructions, setInstructions] = usePersistentState('cw_instructions', '');
   const [targetAudience, setTargetAudience] = usePersistentState('cw_targetAudience', '');
   
-  // Tab Management
-  const [tabs, setTabs] = useState(() => {
-    const saved = localStorage.getItem('cw_tabs');
-    if (saved) {
-      try {
+  // Project storage helpers
+  const PROJECTS_KEY = 'cw_projects';
+  const CURRENT_PROJECT_KEY = 'cw_currentProjectId';
+  const getProjectDataKey = (id) => `cw_project_${id}`;
+
+  const loadProjectData = (projectId) => {
+    try {
+      const saved = localStorage.getItem(getProjectDataKey(projectId));
+      if (saved) {
+        const data = JSON.parse(saved);
+        return {
+          tabs: (data.tabs || []).map(tab => ({
+            ...tab,
+            content: normalizeToSingleColumn(tab.content || '')
+          })),
+          activeTabId: data.activeTabId || (data.tabs?.[0]?.id) || '1'
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load project data:', e);
+    }
+    return { tabs: [{ id: '1', name: 'Sales Page', content: '' }], activeTabId: '1' };
+  };
+
+  const saveProjectData = (projectId, tabs, activeTabId) => {
+    try {
+      localStorage.setItem(getProjectDataKey(projectId), JSON.stringify({ tabs, activeTabId }));
+    } catch (e) {
+      console.error('Failed to save project data:', e);
+    }
+  };
+
+  // Projects state
+  const [projects, setProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PROJECTS_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.map(tab => ({
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load projects:', e);
+    }
+    return [{ id: 'default', name: 'Default' }];
+  });
+
+  const [currentProjectId, setCurrentProjectId] = useState(() => {
+    return localStorage.getItem(CURRENT_PROJECT_KEY) || 'default';
+  });
+
+  const currentProjectName = projects.find(p => p.id === currentProjectId)?.name || 'Default';
+
+  // Tab Management - per project
+  const [tabs, setTabs] = useState(() => {
+    // Migration: if old cw_tabs exists, migrate to project default
+    const oldTabs = localStorage.getItem('cw_tabs');
+    if (oldTabs) {
+      try {
+        const parsed = JSON.parse(oldTabs);
+        const migrated = parsed.map(tab => ({
           ...tab,
           content: normalizeToSingleColumn(tab.content || '')
         }));
+        const oldActive = localStorage.getItem('cw_activeTabId') || migrated[0]?.id || '1';
+        saveProjectData('default', migrated, oldActive);
+        localStorage.removeItem('cw_tabs');
+        localStorage.removeItem('cw_activeTabId');
+        return migrated;
       } catch (e) {
-        console.error('Failed to parse saved tabs:', e);
+        console.error('Failed to migrate tabs:', e);
       }
     }
-    
-    // Migration: Check if old content exists and migrate it
     const oldContent = localStorage.getItem('cw_content');
     if (oldContent) {
       const migratedTab = {
@@ -66,34 +122,40 @@ function App() {
         name: 'Sales Page',
         content: normalizeToSingleColumn(oldContent)
       };
-      // Clear old content key after migration
       localStorage.removeItem('cw_content');
+      saveProjectData('default', [migratedTab], '1');
       return [migratedTab];
     }
-    
-    // Default: one tab named "Sales Page"
-    return [{ id: '1', name: 'Sales Page', content: '' }];
+    return loadProjectData(currentProjectId).tabs;
   });
 
   const [activeTabId, setActiveTabId] = useState(() => {
-    const saved = localStorage.getItem('cw_activeTabId');
-    return saved || '1';
+    const oldActive = localStorage.getItem('cw_activeTabId');
+    if (oldActive && localStorage.getItem('cw_tabs')) return oldActive;
+    return loadProjectData(currentProjectId).activeTabId;
   });
 
-  // Project state - single "Default" project for now (tabs live under it)
-  const [projects] = useState([{ id: 'default', name: 'Default' }]);
-  const currentProjectId = 'default';
-  const currentProjectName = 'Default';
-
-  // Save tabs to localStorage whenever they change
+  // Save projects list
   useEffect(() => {
-    localStorage.setItem('cw_tabs', JSON.stringify(tabs));
-  }, [tabs]);
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  }, [projects]);
 
-  // Save active tab ID
+  // Save current project ID
   useEffect(() => {
-    localStorage.setItem('cw_activeTabId', activeTabId);
-  }, [activeTabId]);
+    if (currentProjectId) localStorage.setItem(CURRENT_PROJECT_KEY, currentProjectId);
+  }, [currentProjectId]);
+
+  // Save tabs and activeTabId for current project whenever they change
+  useEffect(() => {
+    if (currentProjectId) saveProjectData(currentProjectId, tabs, activeTabId);
+  }, [currentProjectId, tabs, activeTabId]);
+
+  // Load project data when switching projects
+  useEffect(() => {
+    const data = loadProjectData(currentProjectId);
+    setTabs(data.tabs);
+    setActiveTabId(data.activeTabId);
+  }, [currentProjectId]);
 
   // Get current tab content
   const currentTab = tabs.find(tab => tab.id === activeTabId) || tabs[0];
@@ -147,6 +209,43 @@ function App() {
         tab.id === tabId ? { ...tab, name: newName } : tab
       )
     );
+  };
+
+  // Project handlers
+  const handleCreateProject = () => {
+    saveProjectData(currentProjectId, tabs, activeTabId);
+    const newId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    const newProject = { id: newId, name: 'Untitled' };
+    setProjects(prev => [...prev, newProject]);
+    setCurrentProjectId(newId);
+  };
+
+  const handleRenameProject = (id, newName) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) return;
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, name: trimmed } : p));
+  };
+
+  const handleDeleteProject = (id) => {
+    if (projects.length <= 1) return;
+    const remaining = projects.filter(p => p.id !== id);
+    if (currentProjectId === id && remaining.length > 0) {
+      saveProjectData(currentProjectId, tabs, activeTabId);
+      setCurrentProjectId(remaining[0].id);
+    }
+    setProjects(remaining);
+    try {
+      localStorage.removeItem(getProjectDataKey(id));
+    } catch (e) {
+      console.error('Failed to remove project data:', e);
+    }
+  };
+
+  const handleSwitchProject = (id) => {
+    if (id !== currentProjectId) {
+      saveProjectData(currentProjectId, tabs, activeTabId);
+      setCurrentProjectId(id);
+    }
   };
 
   // Theme - use shared theme for consistency across apps
@@ -460,6 +559,10 @@ function App() {
             projects,
             currentProjectId,
             currentProjectName,
+            onSwitchProject: handleSwitchProject,
+            onCreateProject: handleCreateProject,
+            onRenameProject: handleRenameProject,
+            onDeleteProject: handleDeleteProject,
           }}
           showTabs={true}
           tabProps={{

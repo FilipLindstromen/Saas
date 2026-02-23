@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Drive - Connecting...</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    p { color: #666; }
+  </style>
+</head>
+<body>
+  <p id="msg">Connecting to Google Drive...</p>
+  <script>
+    (function() {
+      var hash = window.location.hash || '';
+      var params = {};
+      hash.slice(1).split('&').forEach(function(p) {
+        var kv = p.split('=');
+        if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1] || '').replace(/\+/g, ' '));
+      });
+      var token = params.access_token;
+      var error = params.error || (window.location.search.match(/[?&]error=([^&]+)/) || [])[1];
+      if (token && window.opener) {
+        window.opener.postMessage({ type: 'saas-google-drive-token', token: token }, window.location.origin);
+        document.getElementById('msg').textContent = 'Connected! You can close this window.';
+      } else if (error && window.opener) {
+        window.opener.postMessage({ type: 'saas-google-drive-error', error: error }, window.location.origin);
+        document.getElementById('msg').textContent = 'Connection failed. You can close this window.';
+      } else {
+        document.getElementById('msg').textContent = 'No token received. You can close this window.';
+      }
+    })();
+  </script>
+</body>
+</html>

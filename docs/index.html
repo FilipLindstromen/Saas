@@ -280,6 +280,64 @@
       background: var(--accent-hover);
     }
 
+    .settings-section-divider {
+      margin: 1.5rem 0 1rem;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .settings-section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 1rem;
+    }
+
+    .settings-storage-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .settings-storage-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-default);
+      border-radius: var(--button-radius);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .settings-storage-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+
+    .settings-storage-btn svg {
+      flex-shrink: 0;
+    }
+
+    .settings-storage-disconnect {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      background: transparent;
+      border: 1px solid var(--border-default);
+      border-radius: var(--button-radius);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .settings-storage-disconnect:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
     .header-text h1 {
       font-size: 2rem;
       font-weight: 700;
@@ -599,6 +657,31 @@
           <input type="password" id="key-elevenlabs" class="settings-input" placeholder="Optional" autocomplete="off" autocapitalize="off" autocorrect="off">
           <span class="settings-label-hint">For Sound Effects Generator. Get at elevenlabs.io</span>
         </div>
+
+        <div class="settings-section-divider"></div>
+        <h3 class="settings-section-title">Storage</h3>
+        <div class="settings-field">
+          <label class="settings-label">Google Drive</label>
+          <div class="settings-storage-row">
+            <button type="button" class="settings-storage-btn" id="storage-connect-drive" title="Connect to Google Drive">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l3.42 6h6.84L7.71 3.5zm9.14 0L12 10.5 7.71 3.5h9.14zM22.85 15l-3.42 6H7.71l3.42-6h11.72z"/></svg>
+              <span id="storage-drive-status">Connect to Google Drive</span>
+            </button>
+            <button type="button" class="settings-storage-disconnect" id="storage-disconnect-drive" style="display: none;">Disconnect</button>
+          </div>
+          <span class="settings-label-hint">Access files from your Google Drive. Requires Google Client ID with Drive API scope.</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">Local folder</label>
+          <div class="settings-storage-row">
+            <button type="button" class="settings-storage-btn" id="storage-choose-folder" title="Choose a folder on your computer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span id="storage-folder-status">Choose local folder</span>
+            </button>
+            <button type="button" class="settings-storage-disconnect" id="storage-disconnect-folder" style="display: none;">Clear</button>
+          </div>
+          <span class="settings-label-hint">Access files from a folder on your computer. Chrome/Edge only. Re-pick after page reload.</span>
+        </div>
       </div>
       <div class="settings-modal-footer">
         <button type="button" class="settings-btn settings-btn-secondary" id="settings-cancel">Cancel</button>
@@ -640,14 +723,42 @@
       const modal = document.getElementById('settings-modal');
       const keys = ['openai', 'unsplash', 'giphy', 'pixabay', 'pexels', 'googleClientId', 'elevenlabs'];
 
+      function updateStorageStatus() {
+        var data = window.SaasApiKeys ? window.SaasApiKeys.load() : {};
+        var driveStatus = document.getElementById('storage-drive-status');
+        var driveDisconnect = document.getElementById('storage-disconnect-drive');
+        var folderStatus = document.getElementById('storage-folder-status');
+        var folderDisconnect = document.getElementById('storage-disconnect-folder');
+        if (driveStatus) {
+          if (data.googleDriveAccessToken) {
+            driveStatus.textContent = 'Connected to Google Drive';
+            if (driveDisconnect) driveDisconnect.style.display = 'inline-block';
+          } else {
+            driveStatus.textContent = 'Connect to Google Drive';
+            if (driveDisconnect) driveDisconnect.style.display = 'none';
+          }
+        }
+        var folderName = data.localFolderName || (window.SaasStorage && window.SaasStorage.localFolderName);
+        if (folderStatus) {
+          if (folderName) {
+            folderStatus.textContent = folderName.length > 30 ? folderName.slice(0, 27) + '...' : folderName;
+            if (folderDisconnect) folderDisconnect.style.display = 'inline-block';
+          } else {
+            folderStatus.textContent = 'Choose local folder';
+            if (folderDisconnect) folderDisconnect.style.display = 'none';
+          }
+        }
+      }
+
       function openSettings() {
         if (window.SaasApiKeys) {
-          const data = window.SaasApiKeys.load();
+          var data = window.SaasApiKeys.load();
           keys.forEach(function(k) {
-            const el = document.getElementById('key-' + k);
+            var el = document.getElementById('key-' + k);
             if (el) el.value = data[k] || '';
           });
         }
+        updateStorageStatus();
         modal.style.display = 'flex';
       }
 
@@ -675,6 +786,69 @@
       });
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && modal.style.display === 'flex') closeSettings();
+      });
+
+      // Storage: Google Drive
+      document.getElementById('storage-connect-drive').addEventListener('click', function() {
+        if (!window.SaasApiKeys) return;
+        var data = window.SaasApiKeys.load();
+        var clientId = (data.googleClientId || '').trim();
+        if (!clientId) {
+          alert('Please enter a Google Client ID in the API Keys section first. Add the Drive API scope in Google Cloud Console.');
+          return;
+        }
+        var base = window.location.href.replace(/\/[^/]*$/, '');
+        var redirectUri = (base.endsWith('/') ? base : base + '/') + 'google-drive-callback.html';
+        var scope = 'https://www.googleapis.com/auth/drive.readonly';
+        var url = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=' + encodeURIComponent(clientId) +
+          '&redirect_uri=' + encodeURIComponent(redirectUri) +
+          '&response_type=token&scope=' + encodeURIComponent(scope);
+        window.open(url, 'saas-google-drive', 'width=500,height=600');
+      });
+
+      document.getElementById('storage-disconnect-drive').addEventListener('click', function() {
+        if (!window.SaasApiKeys) return;
+        window.SaasApiKeys.save({ googleDriveAccessToken: '' });
+        updateStorageStatus();
+      });
+
+      window.addEventListener('message', function(e) {
+        if (e.origin !== window.location.origin) return;
+        if (e.data && e.data.type === 'saas-google-drive-token' && e.data.token) {
+          window.SaasApiKeys.save({ googleDriveAccessToken: e.data.token });
+          updateStorageStatus();
+        } else if (e.data && e.data.type === 'saas-google-drive-error') {
+          alert('Google Drive connection failed: ' + (e.data.error || 'Unknown error'));
+        }
+      });
+
+      // Storage: Local folder
+      window.SaasStorage = window.SaasStorage || { localFolderHandle: null, localFolderName: '' };
+
+      document.getElementById('storage-choose-folder').addEventListener('click', async function() {
+        if (!('showDirectoryPicker' in window)) {
+          alert('Local folder picker is only supported in Chrome or Edge. Please use a supported browser.');
+          return;
+        }
+        try {
+          var handle = await window.showDirectoryPicker();
+          var name = handle.name;
+          window.SaasStorage = { localFolderHandle: handle, localFolderName: name };
+          if (window.SaasApiKeys) {
+            window.SaasApiKeys.save({ localFolderName: name });
+          }
+          updateStorageStatus();
+        } catch (err) {
+          if (err.name !== 'AbortError') console.error('Folder picker error:', err);
+        }
+      });
+
+      document.getElementById('storage-disconnect-folder').addEventListener('click', function() {
+        window.SaasStorage = { localFolderHandle: null, localFolderName: '' };
+        if (window.SaasApiKeys) {
+          window.SaasApiKeys.save({ localFolderName: '' });
+        }
+        updateStorageStatus();
       });
     })();
   </script>

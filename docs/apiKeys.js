@@ -12,7 +12,9 @@
     pexels: '',
     unsplash: '',
     googleClientId: '',
-    elevenlabs: ''
+    elevenlabs: '',
+    googleDriveAccessToken: '',
+    localFolderName: ''
   };
 
   window.SaasApiKeys = {

@@ -6,10 +6,7 @@ import './SlideList.css'
 function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
-  const [editingSubtitle, setEditingSubtitle] = useState(false)
-  const [editSubtitle, setEditSubtitle] = useState('')
   const [textAreaRef, setTextAreaRef] = useState(null)
-  const [subtitleTextAreaRef, setSubtitleTextAreaRef] = useState(null)
   const [foldedSections, setFoldedSections] = useState(new Set())
   const [draggedId, setDraggedId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
@@ -47,8 +44,6 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
   const handleEdit = (slide) => {
     setEditingId(slide.id)
     setEditContent(getPlainText(slide.content))
-    setEditSubtitle(getPlainText(slide.subtitle || ''))
-    setEditingSubtitle(false)
     setSelectedSlides(new Set([slide.id]))
     if (onSelect) onSelect(slide.id)
   }
@@ -60,37 +55,12 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
     onUpdate(id, { content: plainTextToStorage(newContent) })
   }
 
-  const handleSubtitleChange = (e, id) => {
-    const newSubtitle = e.target.value
-    setEditSubtitle(newSubtitle)
-    onUpdate(id, { subtitle: plainTextToStorage(newSubtitle) })
-  }
-
-  const handleBlur = (e) => {
-    // Don't close edit mode if focus is moving to another input in the same edit session
+  const handleBlur = () => {
     setTimeout(() => {
-      const activeElement = document.activeElement
-      const isFocusingSubtitle = activeElement === subtitleTextAreaRef
-      const isFocusingMain = activeElement === textAreaRef
-      if (!isFocusingSubtitle && !isFocusingMain) {
+      if (document.activeElement !== textAreaRef) {
         setEditingId(null)
-        setEditingSubtitle(false)
       }
     }, 100)
-  }
-
-  const handleSubtitleBlur = (e) => {
-    // Don't close edit mode if focus is moving to main textarea
-    setTimeout(() => {
-      const activeElement = document.activeElement
-      const isFocusingMain = activeElement === textAreaRef
-      
-      // Only close edit mode if focus is not on main textarea
-      if (!isFocusingMain) {
-        setEditingId(null)
-        setEditingSubtitle(false)
-      }
-    }, 0)
   }
 
   const handleKeyDown = (e, id) => {
@@ -456,33 +426,6 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
                     className="slide-edit-input"
                     placeholder="Main text"
                   />
-                  {isCentered && (
-                    <textarea
-                      ref={(ref) => setSubtitleTextAreaRef(ref)}
-                      value={editSubtitle}
-                      onChange={(e) => handleSubtitleChange(e, slide.id)}
-                      onBlur={handleSubtitleBlur}
-                      onClick={(e) => e.stopPropagation()}
-                      onFocus={(e) => {
-                        e.stopPropagation()
-                        setEditingSubtitle(true)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          return
-                        }
-                        if (e.key === 'Escape') {
-                          e.preventDefault()
-                          subtitleTextAreaRef?.blur()
-                          return
-                        }
-                        handleKeyDown(e, slide.id)
-                      }}
-                      className="slide-edit-input slide-edit-subtitle"
-                      placeholder="Subtitle (optional)"
-                    />
-                  )}
                 </div>
               ) : (
                 <div className="slide-item-content">
@@ -495,11 +438,6 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
                     style={{ whiteSpace: 'pre-line' }}
                   >
                     <div>{getPlainText(slide.content || 'Empty slide')}</div>
-                    {isCentered && slide.subtitle && (
-                      <div className="slide-item-subtitle">
-                        {getPlainText(slide.subtitle)}
-                      </div>
-                    )}
                   </div>
                   <div className="slide-item-actions">
                     <button

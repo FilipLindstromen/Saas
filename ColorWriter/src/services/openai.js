@@ -585,6 +585,84 @@ ${objectionGuidance}
     }
 };
 
+/**
+ * Split text into 3-5 chunks at paragraph boundaries for chunked analysis.
+ */
+function splitIntoChunks(text, targetChunkCount = 4) {
+    if (!text || !text.trim()) return [text || ''];
+    const trimmed = text.trim();
+    const len = trimmed.length;
+    if (len < 2000) return [trimmed];
+
+    const paragraphs = trimmed.split(/\n\s*\n/);
+    const maxChunkSize = 3500;
+    const minChunks = 3;
+    const maxChunks = 5;
+    const chunkCount = Math.min(maxChunks, Math.max(minChunks, Math.ceil(len / maxChunkSize)));
+
+    if (paragraphs.length <= 1) {
+        const lines = trimmed.split(/\n/);
+        if (lines.length <= 1) {
+            const perChunk = Math.ceil(len / chunkCount);
+            const chunks = [];
+            for (let i = 0; i < len; ) {
+                let end = Math.min(i + perChunk, len);
+                if (end < len) {
+                    const lastBreak = Math.max(
+                        trimmed.lastIndexOf('\n', end),
+                        trimmed.lastIndexOf('. ', end) + 1,
+                        trimmed.lastIndexOf('! ', end) + 1,
+                        trimmed.lastIndexOf('? ', end) + 1
+                    );
+                    if (lastBreak > i) end = lastBreak;
+                }
+                chunks.push(trimmed.slice(i, end).trim());
+                i = end;
+            }
+            return chunks.filter(Boolean);
+        }
+        const perChunk = Math.ceil(lines.length / chunkCount);
+        const chunks = [];
+        for (let i = 0; i < lines.length; i += perChunk) {
+            chunks.push(lines.slice(i, i + perChunk).join('\n'));
+        }
+        return chunks;
+    }
+
+    const targetPerChunk = Math.ceil(paragraphs.length / chunkCount);
+    const chunks = [];
+    let current = [];
+    let currentLen = 0;
+    for (const p of paragraphs) {
+        current.push(p);
+        currentLen += p.length;
+        if (current.length >= targetPerChunk || currentLen >= maxChunkSize) {
+            chunks.push(current.join('\n\n'));
+            current = [];
+            currentLen = 0;
+        }
+    }
+    if (current.length) chunks.push(current.join('\n\n'));
+    return chunks;
+}
+
+/**
+ * Analyze a single chunk of text and return ColorWriter HTML.
+ */
+async function analyzeCopyChunk(openai, systemPrompt, chunk, chunkIndex, totalChunks) {
+    const chunkNote = totalChunks > 1
+        ? `\n\n[This is section ${chunkIndex + 1} of ${totalChunks}. Output ONLY the ColorWriter HTML for this section. No intro, outro, or explanation.]`
+        : '';
+    const completion = await openai.chat.completions.create({
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: chunk + chunkNote }
+        ],
+        model: "gpt-4o",
+    });
+    return cleanContent(completion.choices[0].message.content);
+}
+
 export const analyzeCopy = async (apiKey, text) => {
     const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
@@ -627,15 +705,16 @@ CRITICAL: Use ONLY block-statement, block-impact, block-evidence, block-relevanc
 `;
 
     try {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: text }
-            ],
-            model: "gpt-4o",
-        });
-
-        return cleanContent(completion.choices[0].message.content);
+        const chunks = splitIntoChunks(text);
+        if (chunks.length === 1) {
+            return await analyzeCopyChunk(openai, systemPrompt, chunks[0], 0, 1);
+        }
+        const results = [];
+        for (let i = 0; i < chunks.length; i++) {
+            const html = await analyzeCopyChunk(openai, systemPrompt, chunks[i], i, chunks.length);
+            results.push(html);
+        }
+        return results.join('');
     } catch (error) {
         console.error("OpenAI Analysis Error:", error);
         throw error;

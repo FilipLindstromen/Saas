@@ -432,6 +432,12 @@
   position: relative;
 }
 
+.preview-header-graphic-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .preview-slide-wrap.has-caption-preview .caption-preview-in-slide {
   position: absolute;
   bottom: 0;

@@ -49,7 +49,8 @@ function App() {
             imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
             textHeadingLevel: slide.textHeadingLevel || null,
             subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-            analysis: slide.analysis || null
+            analysis: slide.analysis || null,
+            graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : []
           }))
           return {
             slides: slidesWithLayout,
@@ -63,7 +64,7 @@ function App() {
     
     // Default template if no saved data
     return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined, infographicTabId: undefined }],
+      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined, infographicTabId: undefined, graphicOverlays: [] }],
       selectedId: 1
     }
   }
@@ -129,6 +130,7 @@ function App() {
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedSlides, setSelectedSlides] = useState(new Set())
+  const [selectedGraphicId, setSelectedGraphicId] = useState(null)
   const [history, setHistory] = useState([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [isSaving, setIsSaving] = useState(false)
@@ -343,6 +345,12 @@ function App() {
 
   // Switch to slide settings tab when user selects a different slide (edit/plan mode)
   const prevSelectedSlideIdRef = useRef(selectedSlideId)
+  useEffect(() => {
+    setSelectedGraphicId(null)
+  }, [selectedSlideId])
+  useEffect(() => {
+    if (selectedGraphicId) setInspectorTab('active-object')
+  }, [selectedGraphicId])
   useEffect(() => {
     if ((mode === 'edit' || mode === 'plan') && selectedSlideId != null && prevSelectedSlideIdRef.current !== selectedSlideId) {
       setInspectorTab('slide')
@@ -858,11 +866,7 @@ function App() {
     const allSlides = chapters.flatMap(ch => ch.slides)
     const lines = allSlides.map((slide, i) => {
       const num = i + 1
-      let text = getPlainText(slide.content || '')
-      if (slide.layout === 'centered' && slide.subtitle) {
-        const sub = getPlainText(slide.subtitle)
-        if (sub) text = text ? `${text}\n${sub}` : sub
-      }
+      const text = getPlainText(slide.content || '')
       return `Slide ${num}:\n${text || '(empty)'}`
     })
     const output = lines.join('\n\n')
@@ -2734,6 +2738,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             <SlidePreview
           slide={selectedSlide}
           onUpdate={(updates) => updateSlide(selectedSlideId, updates)}
+          selectedGraphicId={selectedGraphicId}
+          onSelectGraphic={setSelectedGraphicId}
+          onDeselectGraphic={() => setSelectedGraphicId(null)}
           settings={settings}
           slideFormat={settings.slideFormat || '16:9'}
           onUpdateSettings={setSettings}
@@ -2805,6 +2812,8 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     selectedSlide={selectedSlide}
                     selectedSlideId={selectedSlideId}
                     selectedSlides={selectedSlides}
+                    selectedGraphicId={selectedGraphicId}
+                    onDeselectGraphic={() => setSelectedGraphicId(null)}
                     backgroundColor={settings.backgroundColor}
                   />
                 </div>
