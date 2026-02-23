@@ -301,19 +301,41 @@ input[type="range"]::-ms-fill-upper {
   background: transparent;
 }
 
-/* Row Layout - single column, no newspaper-style columns */
+/* Row Layout - single column, vertical stack only. NO side-by-side columns. */
 .content-row {
-  display: flex !important;
-  align-items: flex-start;
-  gap: 1rem;
+  display: block !important;
   width: 100%;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   column-count: 1 !important;
   columns: 1 !important;
 }
 
-/* Force single-column layout - override any AI-generated column styles */
-.editor-content,
+/* Gutter and content-body stack vertically within each row */
+.content-row .gutter {
+  display: block !important;
+  width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+.content-row .content-body {
+  display: block !important;
+  width: 100%;
+}
+
+/* Force editor to stack all content vertically - no columns, line breaks between blocks */
+.editor-content {
+  display: flex !important;
+  flex-direction: column !important;
+  column-count: 1 !important;
+  columns: 1 !important;
+}
+
+/* Force any direct children (including wrappers) to stack vertically */
+.editor-content > * {
+  display: block !important;
+  width: 100% !important;
+}
+
 .editor-content .content-body {
   column-count: 1 !important;
   columns: 1 !important;
@@ -341,16 +363,12 @@ input[type="range"]::-ms-fill-upper {
   columns: 1 !important;
 }
 
-/* Gutter (Icons) */
+/* Gutter (Icons) - inline with block type, stacks above content */
 .gutter {
-  width: 2rem;
-  flex-shrink: 0;
-  display: flex !important;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding-top: 0.4rem;
-  /* Align with text */
-  align-items: center;
+  display: block !important;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0;
 }
 
 /* Content Blocks - Persuasive Cycle only */

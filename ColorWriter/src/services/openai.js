@@ -618,7 +618,7 @@ Gutter icon types: statement, impact, evidence, relevance (match the block type)
 
 **Formatting Constraints**:
 - **ONE ROW PER BLOCK**: Each content-row must contain exactly ONE block. No columns, no side-by-side layout. Vertical stack only.
-- **SINGLE COLUMN**: All text must flow vertically. NEVER use display:flex, display:grid, column-count, or any layout that creates columns. Use line breaks and paragraphs.
+- **SINGLE COLUMN**: All text must flow vertically in ONE column. NEVER use display:flex, display:grid, column-count, or any layout that creates columns or side-by-side text. Use line breaks (<br>) and new paragraphs (<p>) between sections. Each block must appear on its own line, stacked vertically.
 - **SPAN WRAPPERS**: Wrap the inner text of every &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt;, and &lt;p&gt; in a &lt;span&gt; tag.
 - **NO EXTRA SPACE**: Do not add newlines or spaces inside the block-[type] div.
 - **TIGHT HTML**: Write compact HTML on single lines where possible.

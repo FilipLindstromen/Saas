@@ -39,9 +39,10 @@ function drawSafeZoneOverlay(
   drawRect(title, 'rgba(255, 200, 0, 0.8)', [2, 2])
 }
 
-const RESIZE_HANDLE_SIZE = 24
-const ROTATE_HANDLE_SIZE = 28
-const FLIP_ICON_SIZE = 22
+const RESIZE_HANDLE_SIZE = 28
+const ROTATE_HANDLE_SIZE = 32
+const FLIP_ICON_SIZE = 26
+const HANDLE_HIT_PADDING = 6
 const SELECTION_STROKE = 2
 const SNAP_THRESHOLD = 8
 const GUIDE_COLOR = '#f97316' // Orange, matches InfoGraphics accent
@@ -49,6 +50,40 @@ const MIN_FONT_SIZE_PCT = 0.5
 const MAX_FONT_SIZE_PCT = 20
 const MIN_IMAGE_SCALE = 0.1
 const MAX_IMAGE_SCALE = 3
+
+/** Compute AABB of a rotated rectangle (center cx,cy; half-size hw,hh; angle in radians). */
+function getRotatedRectAABB(
+  cx: number,
+  cy: number,
+  hw: number,
+  hh: number,
+  angleRad: number
+): { x: number; y: number; w: number; h: number } {
+  if (Math.abs(angleRad) < 1e-6) {
+    return { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 }
+  }
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  const corners = [
+    { x: -hw * cos + hh * sin, y: -hw * sin - hh * cos },
+    { x: hw * cos + hh * sin, y: hw * sin - hh * cos },
+    { x: hw * cos - hh * sin, y: hw * sin + hh * cos },
+    { x: -hw * cos - hh * sin, y: -hw * sin + hh * cos },
+  ]
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of corners) {
+    const px = cx + p.x
+    const py = cy + p.y
+    minX = Math.min(minX, px)
+    minY = Math.min(minY, py)
+    maxX = Math.max(maxX, px)
+    maxY = Math.max(maxY, py)
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
 
 /** Get canvas rect (x, y, w, h) for an overlay for selection/resize hit-test and drawing. */
 function getOverlayRect(
@@ -84,17 +119,19 @@ function getOverlayRect(
     const h = o.naturalHeight != null && o.naturalWidth != null
       ? o.naturalHeight * scale
       : (o.imageHeight ?? 200)
-    const x = (o.x ?? 0.5) * width - w / 2
-    const y = (o.y ?? 0.5) * height - h / 2
-    return { x, y, w, h }
+    const cx = (o.x ?? 0.5) * width
+    const cy = (o.y ?? 0.5) * height
+    const rot = (o.rotation ?? 0) * (Math.PI / 180)
+    return getRotatedRectAABB(cx, cy, w / 2, h / 2, rot)
   }
   if (o.type === 'video' && o.videoUrl) {
     const scale = o.imageScale ?? 1
     const w = (o.naturalWidth ?? 1920) * scale
     const h = (o.naturalHeight ?? 1080) * scale
-    const x = (o.x ?? 0.5) * width - w / 2
-    const y = (o.y ?? 0.5) * height - h / 2
-    return { x, y, w, h }
+    const cx = (o.x ?? 0.5) * width
+    const cy = (o.y ?? 0.5) * height
+    const rot = (o.rotation ?? 0) * (Math.PI / 180)
+    return getRotatedRectAABB(cx, cy, w / 2, h / 2, rot)
   }
   if (o.type === 'infographic' && o.infographicProjectId) {
     const scale = o.imageScale ?? 1
@@ -102,9 +139,10 @@ function getOverlayRect(
     const baseH = height
     const w = baseW * scale
     const h = baseH * scale
-    const x = (o.x ?? 0.5) * width - w / 2
-    const y = (o.y ?? 0.5) * height - h / 2
-    return { x, y, w, h }
+    const cx = (o.x ?? 0.5) * width
+    const cy = (o.y ?? 0.5) * height
+    const rot = (o.rotation ?? 0) * (Math.PI / 180)
+    return getRotatedRectAABB(cx, cy, w / 2, h / 2, rot)
   }
   return null
 }
@@ -724,9 +762,10 @@ export function RecordPreview({
         const o = active[i]
         const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
         if (rect) {
+          const pad = HANDLE_HIT_PADDING
           const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
           const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
-          if (canvasX >= handleX && canvasX <= rect.x + rect.w && canvasY >= handleY && canvasY <= rect.y + rect.h) {
+          if (canvasX >= handleX - pad && canvasX <= rect.x + rect.w + pad && canvasY >= handleY - pad && canvasY <= rect.y + rect.h + pad) {
             return { type: 'resize', id: o.id }
           }
           const showRotateFlip = o.type === 'image' || o.type === 'video' || o.type === 'infographic'
@@ -734,10 +773,10 @@ export function RecordPreview({
             const cx = rect.x + rect.w / 2
             const rotateY = rect.y - ROTATE_HANDLE_SIZE / 2 - 4
             const dist = Math.hypot(canvasX - cx, canvasY - rotateY)
-            if (dist <= ROTATE_HANDLE_SIZE / 2) return { type: 'rotate', id: o.id }
+            if (dist <= ROTATE_HANDLE_SIZE / 2 + pad) return { type: 'rotate', id: o.id }
             const flipX = rect.x + FLIP_ICON_SIZE / 2 + 4
             const flipY = rect.y + FLIP_ICON_SIZE / 2 + 4
-            const flipHalf = FLIP_ICON_SIZE / 2
+            const flipHalf = FLIP_ICON_SIZE / 2 + pad
             if (canvasX >= flipX - flipHalf && canvasX <= flipX + flipHalf && canvasY >= flipY - flipHalf && canvasY <= flipY + flipHalf) {
               return { type: 'flip', id: o.id }
             }
@@ -846,13 +885,8 @@ export function RecordPreview({
       onOverlaySelect?.(hit.id)
       const o = overlays.find((ov) => ov.id === hit.id)
       if (!o) return
-      const canvas = canvasRef.current
-      const ctx2 = canvas?.getContext('2d')
-      if (!ctx2) return
-      const rect = getOverlayRect(ctx2, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
-      if (!rect) return
-      const centerX = rect.x + rect.w / 2
-      const centerY = rect.y + rect.h / 2
+      const centerX = (o.x ?? 0.5) * width
+      const centerY = (o.y ?? 0.5) * height
       const startAngle = Math.atan2(y - centerY, x - centerX)
       setRotateState({
         overlayId: hit.id,
@@ -862,7 +896,7 @@ export function RecordPreview({
         centerY,
       })
       setCursor('grabbing')
-      ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
+      ;(e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
     if (hit?.type === 'resize' && onOverlayEdit && !isRecording) {
@@ -913,12 +947,11 @@ export function RecordPreview({
     if (resizeState && onOverlayEdit) {
       const deltaX = x - resizeState.startX
       const deltaY = y - resizeState.startY
-      const sensitivity = 0.005 // Adjusted sensitivity
-      // For font size, maybe just deltaY? For scale, diagonal?
-      // Let's use max delta for consistency
-      const delta = (Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY) * sensitivity
+      const diagonal = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+      const sign = deltaX + deltaY >= 0 ? 1 : -1
+      const scaleFactor = 1 + (sign * diagonal) / 200
 
-      let newValue = resizeState.startValue + delta
+      let newValue = resizeState.startValue * scaleFactor
 
       if (resizeState.kind === 'fontSize') {
         newValue = Math.max(MIN_FONT_SIZE_PCT, Math.min(MAX_FONT_SIZE_PCT, newValue))
