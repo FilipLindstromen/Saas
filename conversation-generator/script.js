@@ -53,6 +53,96 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingsBtn) {
         settingsBtn.addEventListener('click', () => openSettingsOverlay());
     }
+
+    // Left panel tabs - Profile / Conversation
+    document.querySelectorAll('.left-settings-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            const tabId = this.getAttribute('data-tab');
+            document.querySelectorAll('.left-settings-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.left-settings-section').forEach(function (s) { s.classList.remove('active'); });
+            this.classList.add('active');
+            const section = document.getElementById('section-' + tabId);
+            if (section) section.classList.add('active');
+        });
+    });
+
+    // Panel resize - adjustable left and right panel widths
+    const PANEL_STORAGE_KEY = 'conversationAnimator_panelWidths';
+    const LEFT_MIN = 200;
+    const LEFT_MAX = 500;
+    const RIGHT_MIN = 220;
+    const RIGHT_MAX = 500;
+    const LEFT_DEFAULT = 280;
+    const RIGHT_DEFAULT = 300;
+
+    function loadPanelWidths() {
+        try {
+            const raw = localStorage.getItem(PANEL_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    left: Math.max(LEFT_MIN, Math.min(LEFT_MAX, Number(parsed.left) || LEFT_DEFAULT)),
+                    right: Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, Number(parsed.right) || RIGHT_DEFAULT))
+                };
+            }
+        } catch (e) { /* ignore */ }
+        return { left: LEFT_DEFAULT, right: RIGHT_DEFAULT };
+    }
+
+    function savePanelWidths(left, right) {
+        try {
+            localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify({ left, right }));
+        } catch (e) { /* ignore */ }
+    }
+
+    const leftPanel = document.getElementById('left-panel');
+    const rightPanel = document.getElementById('right-panel');
+    const resizeHandleLeft = document.getElementById('resize-handle-left');
+    const resizeHandleRight = document.getElementById('resize-handle-right');
+
+    let panelWidths = loadPanelWidths();
+    if (leftPanel) leftPanel.style.width = panelWidths.left + 'px';
+    if (rightPanel) rightPanel.style.width = panelWidths.right + 'px';
+
+    function setupResize(handle, isLeft) {
+        if (!handle) return;
+        handle.addEventListener('pointerdown', function (e) {
+            e.preventDefault();
+            handle.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            const startX = e.clientX;
+            const startW = isLeft ? panelWidths.left : panelWidths.right;
+
+            function onMove(ev) {
+                const dx = ev.clientX - startX;
+                const delta = isLeft ? dx : -dx;
+                const newW = Math.max(isLeft ? LEFT_MIN : RIGHT_MIN, Math.min(isLeft ? LEFT_MAX : RIGHT_MAX, startW + delta));
+                if (isLeft) {
+                    panelWidths.left = newW;
+                    if (leftPanel) leftPanel.style.width = newW + 'px';
+                } else {
+                    panelWidths.right = newW;
+                    if (rightPanel) rightPanel.style.width = newW + 'px';
+                }
+            }
+
+            function onUp() {
+                handle.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                savePanelWidths(panelWidths.left, panelWidths.right);
+            }
+
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        });
+    }
+
+    setupResize(resizeHandleLeft, true);
+    setupResize(resizeHandleRight, false);
     
     const messagesScriptContainer = document.getElementById('messages-script');
     const addMessageBtn = document.getElementById('add-message-btn');

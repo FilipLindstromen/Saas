@@ -464,6 +464,39 @@ body {
     line-height: 1.4;
 }
 
+/* ========== Resize Handles ========== */
+.resize-handle {
+    width: 6px;
+    flex-shrink: 0;
+    background: transparent;
+    cursor: col-resize;
+    position: relative;
+    transition: background 0.15s ease;
+}
+
+.resize-handle:hover,
+.resize-handle.resizing {
+    background: var(--accent);
+    opacity: 0.6;
+}
+
+.resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -2px;
+    right: -2px;
+}
+
+.resize-handle-left {
+    border-right: 1px solid var(--border-subtle);
+}
+
+.resize-handle-right {
+    border-left: 1px solid var(--border-subtle);
+}
+
 /* ========== Main Content Layout (Left | Middle | Right) ========== */
 .left-settings-panel {
     display: flex;
@@ -500,6 +533,36 @@ body {
 
 .left-settings-content {
     padding: 1rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.left-settings-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.left-settings-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.left-settings-content::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    border: 2px solid var(--bg-secondary);
+}
+
+.left-settings-content::-webkit-scrollbar-thumb:hover {
+    background: var(--bg-active);
+}
+
+.left-settings-section {
+    display: none;
+}
+
+.left-settings-section.active {
+    display: block;
 }
 
 .left-settings-section .form-group {
@@ -612,18 +675,23 @@ body {
 .left-panel .left-settings-panel {
     border-right: none;
     border-radius: 0;
-    flex-shrink: 0;
-}
-
-.left-panel .left-settings-content {
-    overflow: visible;
-}
-
-.left-panel .control-panel {
     flex: 1;
-    padding: 1rem;
-    gap: 1rem;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.left-settings-section .quick-actions {
+    margin-top: 1rem;
+}
+
+.left-settings-section .card {
+    margin-bottom: 1rem;
+}
+
+.left-settings-section .card:last-of-type {
+    margin-bottom: 0;
 }
 
 /* ========== Control Panel ========== */
@@ -1290,10 +1358,14 @@ input[type="range"]::-moz-range-thumb {
     }
     
     .left-panel {
-        width: 100%;
+        width: 100% !important;
         max-height: 40vh;
         border-right: none;
         border-bottom: 1px solid var(--border-default);
+    }
+    
+    .resize-handle {
+        display: none;
     }
     
     .preview-panel {
@@ -1302,7 +1374,7 @@ input[type="range"]::-moz-range-thumb {
     }
     
     .right-inspector-panel {
-        width: 100%;
+        width: 100% !important;
         max-height: 40vh;
         border-left: none;
         border-top: 1px solid var(--border-default);

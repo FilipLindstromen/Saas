@@ -1,9 +1,11 @@
+import OpenAI from "openai";
 import type {
   DocumentDetails,
   FolderDetails,
   TreeNode,
   Transcription
 } from "./types";
+import { loadApiKeys } from "./apiKeys";
 import {
   isApiAvailable,
   storageCreateDocument,
@@ -19,6 +21,15 @@ import {
   storageSaveDocumentTranscription,
   storageSaveFolderInstructions
 } from "./storage";
+
+const VARIANT_MODE_INSTRUCTIONS: Record<string, string> = {
+  simplify:
+    "Simplify the text while preserving its meaning, tone, and key details. Make it easier to read without losing important information.",
+  expand:
+    "Expand the text with additional sensory detail and context while keeping the original voice and intent. Avoid repeating sentences verbatim.",
+  rephrase:
+    "Rephrase the text using different wording while keeping the same meaning, tone, and approximate length."
+};
 
 const baseHeaders = {
   "Content-Type": "application/json"
@@ -234,26 +245,87 @@ export async function reorderItem(
   return handleResponse<{ success: true }>(response);
 }
 
+function isApiUnavailableError(response: Response | null, err: unknown): boolean {
+  if (response) {
+    return response.status === 404 || response.status === 405;
+  }
+  return err instanceof TypeError && (err.message === "Failed to fetch" || err.message.includes("NetworkError"));
+}
+
 export async function generateAnswer(params: {
   path: string | null;
   prompt: string;
   apiKey?: string;
 }): Promise<{ message: string }> {
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: buildHeaders(
-      params.apiKey
-        ? {
-            "x-openai-key": params.apiKey
-          }
-        : undefined
-    ),
-    body: JSON.stringify({
-      path: params.path,
-      prompt: params.prompt
-    })
+  let response: Response | null = null;
+  try {
+    response = await fetch("/api/generate", {
+      method: "POST",
+      headers: buildHeaders(
+        params.apiKey
+          ? {
+              "x-openai-key": params.apiKey
+            }
+          : undefined
+      ),
+      body: JSON.stringify({
+        path: params.path,
+        prompt: params.prompt
+      })
+    });
+    if (!isApiUnavailableError(response, null)) {
+      return handleResponse<{ message: string }>(response);
+    }
+  } catch (err) {
+    if (!isApiUnavailableError(null, err)) {
+      throw err;
+    }
+  }
+
+  const apiKey = params.apiKey || loadApiKeys().openai;
+  if (!apiKey?.trim()) {
+    throw new Error(
+      "OpenAI API key is not configured. Add one in settings or run the server with OPENAI_API_KEY."
+    );
+  }
+
+  const pathString = typeof params.path === "string" ? params.path : "";
+  let aggregated = "";
+  let documentContent = "";
+  if (pathString) {
+    if (pathString.endsWith(".txt")) {
+      const doc = storageGetDocumentDetails(pathString);
+      aggregated = doc.aggregatedInstructions || "";
+      documentContent = doc.content || "";
+    } else {
+      const folder = storageGetFolderDetails(pathString);
+      aggregated = folder.aggregatedInstructions || "";
+    }
+  }
+
+  const openai = new OpenAI({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
+  const systemContent =
+    aggregated ||
+    "You are a writing assistant that helps create calm, mindful meditations.";
+  const userContent = [
+    params.prompt.trim(),
+    documentContent ? `\nCurrent document:\n${documentContent}`.trim() : null
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemContent },
+      { role: "user", content: userContent }
+    ],
+    temperature: 0.7
   });
-  return handleResponse<{ message: string }>(response);
+
+  const message =
+    completion.choices?.[0]?.message?.content ?? "No response generated.";
+  return { message };
 }
 
 export async function generateVariants(params: {
@@ -262,22 +334,97 @@ export async function generateVariants(params: {
   mode: "simplify" | "expand" | "rephrase";
   apiKey?: string;
 }): Promise<{ variants: string[] }> {
-  const response = await fetch("/api/generate-variants", {
-    method: "POST",
-    headers: buildHeaders(
-      params.apiKey
-        ? {
-            "x-openai-key": params.apiKey
-          }
-        : undefined
-    ),
-    body: JSON.stringify({
-      path: params.path,
-      text: params.text,
-      mode: params.mode
-    })
+  let response: Response | null = null;
+  try {
+    response = await fetch("/api/generate-variants", {
+      method: "POST",
+      headers: buildHeaders(
+        params.apiKey
+          ? {
+              "x-openai-key": params.apiKey
+            }
+          : undefined
+      ),
+      body: JSON.stringify({
+        path: params.path,
+        text: params.text,
+        mode: params.mode
+      })
+    });
+    if (!isApiUnavailableError(response, null)) {
+      return handleResponse<{ variants: string[] }>(response);
+    }
+  } catch (err) {
+    if (!isApiUnavailableError(null, err)) {
+      throw err;
+    }
+  }
+
+  const apiKey = params.apiKey || loadApiKeys().openai;
+  if (!apiKey?.trim()) {
+    throw new Error(
+      "OpenAI API key is not configured. Add one in settings or run the server with OPENAI_API_KEY."
+    );
+  }
+
+  const taskInstruction = VARIANT_MODE_INSTRUCTIONS[params.mode];
+  if (!taskInstruction) {
+    throw new Error("Invalid mode. Use: simplify, expand, rephrase.");
+  }
+
+  const pathString = typeof params.path === "string" ? params.path : "";
+  let aggregated = "";
+  if (pathString) {
+    if (pathString.endsWith(".txt")) {
+      const doc = storageGetDocumentDetails(pathString);
+      aggregated = doc.aggregatedInstructions || "";
+    } else {
+      const folder = storageGetFolderDetails(pathString);
+      aggregated = folder.aggregatedInstructions || "";
+    }
+  }
+
+  const systemPrompt =
+    aggregated ||
+    "You are a helpful writing assistant that rewrites user-provided passages.";
+  const userPrompt = [
+    `Task: ${taskInstruction}`,
+    "Original text:",
+    params.text.trim(),
+    "",
+    "Provide exactly three distinct variations that satisfy the task.",
+    "Respond strictly as JSON in the format:",
+    '["Variant 1", "Variant 2", "Variant 3"]',
+    "Do not include any additional commentary."
+  ].join("\n");
+
+  const openai = new OpenAI({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.7
   });
-  return handleResponse<{ variants: string[] }>(response);
+
+  const rawContent =
+    completion.choices?.[0]?.message?.content?.trim() ?? "[]";
+  let variants: string[];
+  try {
+    const parsed = JSON.parse(rawContent);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Expected JSON array");
+    }
+    variants = parsed
+      .filter((v: unknown) => typeof v === "string")
+      .slice(0, 3);
+  } catch {
+    throw new Error(
+      `Unable to parse response from OpenAI. Received: ${rawContent.slice(0, 200)}`
+    );
+  }
+  return { variants };
 }
 
 export async function uploadDocumentAudio(

@@ -55,13 +55,14 @@
         
         <div class="main-content">
             <!-- Left Panel - Content -->
-            <div class="left-panel">
+            <div class="left-panel" id="left-panel">
                 <div class="left-settings-panel" id="left-settings-panel">
                     <div class="left-settings-tabs">
                         <button type="button" class="left-settings-tab active" data-tab="profile">Profile</button>
+                        <button type="button" class="left-settings-tab" data-tab="conversation">Conversation</button>
                     </div>
                     <div class="left-settings-content">
-                        <div class="left-settings-section" id="section-profile">
+                        <div class="left-settings-section active" id="section-profile">
                             <div class="form-group">
                                 <label>Profile Name</label>
                                 <input type="text" id="panel-profile-name" placeholder="My Brain">
@@ -78,49 +79,50 @@
                                 <label>Time Display</label>
                                 <input type="time" id="panel-time-display" value="14:47">
                             </div>
+                            <div class="quick-actions">
+                                <button class="action-btn secondary" id="save-load-menu-btn">
+                                    <span class="btn-icon">💾</span>
+                                    <span class="btn-text">Export/Import</span>
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <div class="control-panel">
-                    <div class="quick-actions">
-                        <button class="action-btn secondary" id="save-load-menu-btn">
-                            <span class="btn-icon">💾</span>
-                            <span class="btn-text">Export/Import</span>
-                        </button>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-icon">✨</span>
-                            <h3>Generate with AI</h3>
+                        <div class="left-settings-section" id="section-conversation">
+                            <div class="card">
+                                <div class="card-header">
+                                    <span class="card-icon">✨</span>
+                                    <h3>Generate with AI</h3>
+                                </div>
+                                <p class="card-hint">Describe the conversation you want. Requires OpenAI API key in Settings.</p>
+                                <textarea id="generate-input" placeholder="e.g. A customer asking about a refund, and a support agent helping them resolve it. 6-8 messages." rows="3"></textarea>
+                                <button class="btn-primary" id="generate-btn">
+                                    <span>✨</span> Generate Conversation
+                                </button>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <span class="card-icon">📝</span>
+                                    <h3>Import Conversation</h3>
+                                </div>
+                                <textarea id="import-text" placeholder="Paste your conversation here...&#10;Format: Me: message / Name: message"></textarea>
+                                <button class="btn-primary" id="import-btn">
+                                    <span>📥</span> Import
+                                </button>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <span class="card-icon">💬</span>
+                                    <h3>Messages</h3>
+                                </div>
+                                <div id="messages-script"></div>
+                                <button class="btn-primary" id="add-message-btn">
+                                    <span>➕</span> Add Message
+                                </button>
+                            </div>
                         </div>
-                        <p class="card-hint">Describe the conversation you want. Requires OpenAI API key in Settings.</p>
-                        <textarea id="generate-input" placeholder="e.g. A customer asking about a refund, and a support agent helping them resolve it. 6-8 messages." rows="3"></textarea>
-                        <button class="btn-primary" id="generate-btn">
-                            <span>✨</span> Generate Conversation
-                        </button>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-icon">📝</span>
-                            <h3>Import Conversation</h3>
-                        </div>
-                        <textarea id="import-text" placeholder="Paste your conversation here...&#10;Format: Me: message / Name: message"></textarea>
-                        <button class="btn-primary" id="import-btn">
-                            <span>📥</span> Import
-                        </button>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-icon">💬</span>
-                            <h3>Messages</h3>
-                        </div>
-                        <div id="messages-script"></div>
-                        <button class="btn-primary" id="add-message-btn">
-                            <span>➕</span> Add Message
-                        </button>
                     </div>
                 </div>
             </div>
+            <div class="resize-handle resize-handle-left" id="resize-handle-left" title="Drag to resize"></div>
 
             <!-- Middle Panel - Preview -->
             <div class="preview-panel">
@@ -163,9 +165,10 @@
                     </div>
                 </div>
             </div>
+            <div class="resize-handle resize-handle-right" id="resize-handle-right" title="Drag to resize"></div>
 
             <!-- Right Panel - Settings -->
-            <aside class="right-inspector-panel">
+            <aside class="right-inspector-panel" id="right-panel">
                 <div class="inspector-panel-header">
                     <h3 class="inspector-panel-title">Timing</h3>
                 </div>
