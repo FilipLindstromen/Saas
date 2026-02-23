@@ -128,6 +128,20 @@
   min-width: 0;
 }
 
+.transition-options-checkbox-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.transition-options-checkbox-disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.transition-options-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
 .transition-options-slider {
   width: 100%;
   height: 6px;

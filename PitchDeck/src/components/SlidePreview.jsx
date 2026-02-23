@@ -439,6 +439,9 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
+            textAnimation={settings.textAnimation || 'none'}
+            textAnimationUnit={settings.textAnimationUnit || 'word'}
+            previewTextAnimation={!!(settings.textAnimation && settings.textAnimation !== 'none')}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}
           />

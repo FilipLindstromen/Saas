@@ -126,14 +126,18 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               </select>
             </div>
             <div className="transition-options-field">
-              <label className="transition-options-checkbox">
+              <label className={`transition-options-checkbox ${localSettings.textAnimation === 'none' ? 'transition-options-checkbox-disabled' : ''}`}>
                 <input
                   type="checkbox"
                   checked={localSettings.textAnimationUnit === 'word'}
                   onChange={(e) => handleChange('textAnimationUnit', e.target.checked ? 'word' : 'sentence')}
+                  disabled={localSettings.textAnimation === 'none'}
                 />
                 <span>Animate per word (uncheck for whole sentences)</span>
               </label>
+              {localSettings.textAnimation === 'none' && (
+                <span className="transition-options-hint">Select a text animation above first</span>
+              )}
             </div>
           </div>
 
