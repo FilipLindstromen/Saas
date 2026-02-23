@@ -1189,7 +1189,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       pointerEvents: isEditable ? 'auto' : undefined
     }
 
-    const useChunkedText = (isPlayMode || previewTextAnimation) && textAnimation && textAnimation !== 'none'
+    const useChunkedText = isPlayMode && textAnimation && textAnimation !== 'none'
     const chunkDelay = effectiveTextAnimationUnit === 'word' ? 0.07 : 0.2
 
     if (layout === 'bulletpoints') {
@@ -1293,7 +1293,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       if (!useChunkedText) {
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
-          {(isPlayMode || previewTextAnimation) ? (
+          {isPlayMode ? (
             visibleLineIndex !== null ? (
               <div className={`slide-text slide-reveal-lines centered ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''}`} style={textStyle}>
                 {getContentLines(slide.content || '').map((line, i) => (
@@ -1359,10 +1359,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
     }
 
-    // For play mode (or preview animation), render as div with formatted content (or chunk spans when text animation is on)
-    // Centered layout uses same path as left/default for word animation (useChunkedText) - no separate branch
-    // Prefer word/sentence chunked animation when text animation is on; line reveal only when no text animation
-    if (isPlayMode || previewTextAnimation) {
+    // For play mode only: render as div with formatted content (or chunk spans when text animation is on)
+    // In preview/edit mode we use contentEditable below so text can be edited
+    if (isPlayMode) {
       if (useChunkedText) {
         const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
         const textContent = (
@@ -1563,7 +1562,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [isDragging, handleImageMouseMove, handleImageMouseUp])
 
-  const textAnimationClass = (isPlayMode || previewTextAnimation) && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
+  // Only apply text animation in play mode; in preview/edit mode keep text static so it stays editable
+  const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
 
   const aspectRatioValue = slideFormat === '1:1' ? '1/1' : slideFormat === '9:16' ? '9/16' : '16/9'
   const formatClass = slideFormat === '1:1' ? 'slide-format-1-1' : slideFormat === '9:16' ? 'slide-format-9-16' : 'slide-format-16-9'
