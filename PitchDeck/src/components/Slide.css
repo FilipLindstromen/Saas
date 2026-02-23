@@ -196,7 +196,7 @@
 
 .slide-content {
   position: relative;
-  z-index: 10;
+  z-index: 1001;
   height: 100%;
   display: flex;
   align-items: flex-end;

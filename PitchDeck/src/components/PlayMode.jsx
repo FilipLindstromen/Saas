@@ -105,8 +105,8 @@ function getVideoFilterString(recordSettings) {
 }
 
 // Webcam overlay component - separate from slide transitions
-// isVisible: show the video. shouldPreload: start stream hidden (next slide needs webcam).
-function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true, shouldPreload = false, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', recordSettings }) {
+// isVisible: show the video. shouldPreload: start stream hidden (next slide needs webcam). shouldKeepAlive: keep stream running when no slide needs it yet (avoids activation delay).
+function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true, shouldPreload = false, shouldKeepAlive = false, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', recordSettings }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const containerRef = useRef(null)
@@ -133,8 +133,8 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     return () => clearTimeout(t)
   }, [isTransitioningOut])
 
-  // Start stream when visible, preloading, or transitioning out (keep stream during fade-out)
-  const shouldHaveStream = cameraId && (isVisible || shouldPreload || isTransitioningOut) && !(cameraOverrideEnabled && cameraOverridePosition === 'disabled')
+  // Start stream when visible, preloading, transitioning out, or keeping alive (avoids delay when later slides need webcam)
+  const shouldHaveStream = cameraId && (isVisible || shouldPreload || isTransitioningOut || shouldKeepAlive) && !(cameraOverrideEnabled && cameraOverridePosition === 'disabled')
 
   // Update dimensions on resize
   useEffect(() => {
@@ -248,7 +248,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     }
   }, [effectiveLayout, dimensions, cameraOverrideEnabled, cameraOverridePosition])
 
-  if ((!isVisible && !shouldPreload && !isTransitioningOut) || !cameraId) return null
+  if ((!isVisible && !shouldPreload && !isTransitioningOut && !shouldKeepAlive) || !cameraId) return null
   if (cameraOverrideEnabled && cameraOverridePosition === 'disabled') return null
 
   const size = getWebcamSize()
@@ -256,7 +256,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   const useCircle = position.isCircle
   const isFullscreen = position.width >= dimensions.width - 2 && position.height >= dimensions.height - 2
 
-  const isHidden = (shouldPreload && !isVisible) || isTransitioningOut
+  const isHidden = (shouldPreload && !isVisible) || isTransitioningOut || shouldKeepAlive
 
   const style = {
     position: 'fixed',
@@ -1083,8 +1083,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   // Per-slide webcam: slide.webcamEnabled ?? recordSettings.webcamEnabled, slide.selectedCameraId || recordSettings.selectedCameraId
   const currentSlideHasWebcam = (currentSlide?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId)
   const nextSlideHasWebcam = nextSlideData && (nextSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
-  const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)) || ''
+  const firstSlideWithWebcam = presentationSlides.find(s => (s?.webcamEnabled ?? recordSettings?.webcamEnabled) && (s?.selectedCameraId || recordSettings?.selectedCameraId))
+  const anySlideHasWebcam = !!firstSlideWithWebcam
+  const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)) || (firstSlideWithWebcam?.selectedCameraId || recordSettings?.selectedCameraId) || ''
   const webcamShouldPreload = nextSlideHasWebcam && !currentSlideHasWebcam
+  const webcamShouldKeepAlive = anySlideHasWebcam && !currentSlideHasWebcam && !nextSlideHasWebcam
 
   // Common Slide props (shared by visible and preload slides)
   const commonSlideProps = {
@@ -1224,13 +1227,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       )}
       {/* Webcam overlay - outside slide transitions */}
       </div>
-      {(currentSlideHasWebcam || nextSlideHasWebcam) && webcamCameraId && (
+      {anySlideHasWebcam && webcamCameraId && (
         <WebcamOverlay
           cameraId={webcamCameraId}
           layout={webcamShouldPreload ? nextSlideLayout : currentSlideLayout}
           webcamSize={recordSettings.webcamSize || 'large'}
           isVisible={currentSlideHasWebcam}
           shouldPreload={webcamShouldPreload}
+          shouldKeepAlive={webcamShouldKeepAlive}
           cameraOverrideEnabled={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
           cameraOverridePosition={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
           recordSettings={recordSettings}

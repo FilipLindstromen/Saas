@@ -13,11 +13,13 @@
   overflow: hidden;
 }
 
-/* Canvas wrapper: fixed pixel dimensions (1920×1080, 1080×1080, 1080×1920) scaled to fit viewport */
+/* Canvas wrapper: fixed pixel dimensions (1920×1080, 1080×1080, 1080×1920) scaled to fit viewport.
+   z-index 1001 ensures slide content (text) is always above the webcam overlay (z-index 1000). */
 .play-canvas-wrapper {
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
+  z-index: 1001;
 }
 
 /* Persistent background layer: sits behind slide content when consecutive slides share the same background */
