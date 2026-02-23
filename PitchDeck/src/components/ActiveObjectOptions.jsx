@@ -1,26 +1,43 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { searchImages } from '../api/imageSearch'
 import { loadApiKeys } from '@shared/apiKeys'
 import './ActiveObjectOptions.css'
 
-function ActiveObjectOptions({ graphic, onUpdate, onDeselect, onDelete }) {
+const SOURCES = [
+  { id: 'giphy', label: 'Giphy' },
+  { id: 'icon', label: 'Iconify' }
+]
+
+const GIPHY_TYPES = [
+  { id: 'stickers', label: 'stickers' },
+  { id: 'gifs', label: 'gifs' }
+]
+
+function ActiveObjectOptions({ graphic, overlays = [], onUpdate, onDeselect, onDelete }) {
   const apiKeys = loadApiKeys()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(null)
-  const [showSearch, setShowSearch] = useState(false)
+  const [service, setService] = useState(graphic?.type === 'icon' ? 'icon' : 'giphy')
+  const [giphyType, setGiphyType] = useState('stickers')
+
+  useEffect(() => {
+    if (graphic) {
+      setService(graphic.type === 'icon' ? 'icon' : 'giphy')
+    }
+  }, [graphic?.id, graphic?.type])
 
   const search = useCallback(async () => {
     if (!searchQuery.trim()) return
     setSearchLoading(true)
     setSearchError(null)
     try {
-      const service = graphic?.type === 'icon' ? 'iconify' : 'giphy'
-      const type = graphic?.type === 'icon' ? 'icons' : 'stickers'
+      const s = service === 'icon' ? 'iconify' : 'giphy'
+      const t = service === 'giphy' ? giphyType : 'icons'
       const { results, error } = await searchImages({
-        service,
-        type,
+        service: s,
+        type: t,
         q: searchQuery.trim(),
         apiKeys,
         offset: 0
@@ -33,7 +50,9 @@ function ActiveObjectOptions({ graphic, onUpdate, onDeselect, onDelete }) {
     } finally {
       setSearchLoading(false)
     }
-  }, [searchQuery, graphic?.type, apiKeys])
+  }, [searchQuery, service, giphyType, apiKeys])
+
+  const recentGraphics = overlays.filter((g) => g.id !== graphic?.id)
 
   if (!graphic) {
     return (
@@ -43,125 +62,140 @@ function ActiveObjectOptions({ graphic, onUpdate, onDeselect, onDelete }) {
     )
   }
 
-  const handleReplace = (url) => {
-    onUpdate({ url })
-    setShowSearch(false)
+  const handleReplace = (url, type) => {
+    onUpdate({ url, type: type ?? graphic.type })
     setSearchResults([])
     setSearchQuery('')
   }
 
+  const tintColor = graphic.tintColor ?? null
+  const tintOpacity = graphic.tintOpacity ?? 100
+
   return (
-    <div className="active-object-options">
+    <div className="active-object-options active-object-image-panel">
       <div className="active-object-header">
-        <span className="active-object-label">Active object</span>
-        <button type="button" className="active-object-remove" onClick={onDeselect} title="Deselect">
-          ×
-        </button>
+        <span className="active-object-label">Image</span>
+        {onDelete && (
+          <button type="button" className="active-object-delete-icon" onClick={onDelete} title="Delete">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </button>
+        )}
       </div>
+
       <div className="active-object-section">
-        <button
-          type="button"
-          className="active-object-search-toggle"
-          onClick={() => setShowSearch(!showSearch)}
-        >
-          {showSearch ? 'Hide search' : 'Search to replace'}
-        </button>
-        {showSearch && (
-          <div className="active-object-search">
-            <div className="active-object-search-row">
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && search()}
-              />
-              <button type="button" onClick={search} disabled={searchLoading}>
-                {searchLoading ? '…' : 'Search'}
-              </button>
-            </div>
-            {searchError && <p className="active-object-error">{searchError}</p>}
-            <div className="active-object-search-grid">
-              {searchResults.map((item, i) => (
-                <button key={i} type="button" className="active-object-search-item" onClick={() => handleReplace(item.url)}>
-                  <img src={item.url} alt="" />
-                </button>
-              ))}
-            </div>
+        <label className="active-object-section-label">RECOLOR</label>
+        <div className="active-object-recolor">
+          <input
+            type="color"
+            value={tintColor || '#ffffff'}
+            onChange={(e) => onUpdate({ tintColor: e.target.value })}
+            className="active-object-recolor-swatch"
+          />
+          <input
+            type="text"
+            value={tintColor || ''}
+            onChange={(e) => onUpdate({ tintColor: e.target.value || null })}
+            placeholder="None"
+            className="active-object-recolor-input"
+          />
+        </div>
+        {tintColor && (
+          <div className="active-object-recolor-opacity">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={tintOpacity}
+              onChange={(e) => onUpdate({ tintOpacity: parseInt(e.target.value, 10) })}
+            />
+            <span>{tintOpacity}%</span>
           </div>
         )}
       </div>
+
       <div className="active-object-section">
-        <label>Position</label>
-        <div className="active-object-row">
-          <div className="active-object-field">
-            <span>X</span>
-            <input
-              type="number"
-              value={Math.round(graphic.x ?? 0)}
-              onChange={(e) => onUpdate({ x: parseFloat(e.target.value) || 0 })}
-            />
+        <label className="active-object-section-label">IMAGE</label>
+        <div className="active-object-image-preview-wrap">
+          <div className="active-object-image-preview">
+            <img src={graphic.url} alt="" />
           </div>
-          <div className="active-object-field">
-            <span>Y</span>
-            <input
-              type="number"
-              value={Math.round(graphic.y ?? 0)}
-              onChange={(e) => onUpdate({ y: parseFloat(e.target.value) || 0 })}
-            />
+          <div className="active-object-image-controls">
+            <select
+              value={service}
+              onChange={(e) => setService(e.target.value)}
+              className="active-object-select"
+            >
+              {SOURCES.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+            {service === 'giphy' && (
+              <select
+                value={giphyType}
+                onChange={(e) => setGiphyType(e.target.value)}
+                className="active-object-select"
+              >
+                {GIPHY_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
-      </div>
-      <div className="active-object-section">
-        <label>Size</label>
-        <div className="active-object-row">
-          <div className="active-object-field">
-            <span>W</span>
-            <input
-              type="number"
-              value={Math.round(graphic.width ?? 80)}
-              onChange={(e) => onUpdate({ width: Math.max(20, parseFloat(e.target.value) || 80) })}
-            />
-          </div>
-          <div className="active-object-field">
-            <span>H</span>
-            <input
-              type="number"
-              value={Math.round(graphic.height ?? 80)}
-              onChange={(e) => onUpdate({ height: Math.max(20, parseFloat(e.target.value) || 80) })}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="active-object-section">
-        <label>Rotation</label>
-        <div className="active-object-row">
+        <div className="active-object-search-row">
           <input
-            type="number"
-            className="active-object-rotation"
-            value={Math.round(graphic.rotation ?? 0)}
-            onChange={(e) => onUpdate({ rotation: parseFloat(e.target.value) || 0 })}
+            type="text"
+            placeholder="Search images..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+            className="active-object-search-input"
           />
-          <span>°</span>
-        </div>
-      </div>
-      <div className="active-object-section">
-        <label className="active-object-checkbox">
-          <input
-            type="checkbox"
-            checked={graphic.flipHorizontal === true}
-            onChange={(e) => onUpdate({ flipHorizontal: e.target.checked })}
-          />
-          Flip horizontal
-        </label>
-      </div>
-      {onDelete && (
-        <div className="active-object-section">
-          <button type="button" className="active-object-delete" onClick={onDelete}>
-            Delete graphic
+          <button type="button" className="active-object-search-btn" onClick={search} disabled={searchLoading}>
+            {searchLoading ? '…' : 'Search'}
           </button>
         </div>
+      </div>
+
+      {recentGraphics.length > 0 && (
+        <div className="active-object-section">
+          <label className="active-object-section-label">RECENT</label>
+          <div className="active-object-recent-grid">
+            {recentGraphics.slice(0, 6).map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                className="active-object-recent-item"
+                onClick={() => handleReplace(g.url, g.type)}
+              >
+                <img src={g.url} alt="" />
+              </button>
+            ))}
+          </div>
+        </div>
       )}
+
+      <div className="active-object-section">
+        <label className="active-object-section-label">RESULTS</label>
+        {searchError && <p className="active-object-error">{searchError}</p>}
+        <div className="active-object-results-grid">
+          {searchResults.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              className="active-object-result-item"
+              onClick={() => handleReplace(item.url, service === 'icon' ? 'icon' : 'giphy')}
+            >
+              <img src={item.url} alt="" />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

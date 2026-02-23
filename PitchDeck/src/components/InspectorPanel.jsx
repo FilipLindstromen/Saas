@@ -133,6 +133,7 @@ function InspectorPanel({
         {activeTab === 'active-object' && (
           <ActiveObjectOptions
             graphic={selectedGraphic}
+            overlays={overlays}
             onUpdate={handleUpdateGraphic}
             onDeselect={onDeselectGraphic}
             onDelete={selectedGraphic ? handleDeleteGraphic : undefined}

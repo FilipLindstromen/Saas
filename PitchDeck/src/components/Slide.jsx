@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
+import GraphicOverlay from './GraphicOverlay'
 import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
 
@@ -1863,22 +1864,22 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {Array.isArray(slide.graphicOverlays) && slide.graphicOverlays.length > 0 && (
         <div className="slide-graphic-overlays" aria-hidden="true">
           {slide.graphicOverlays.map((g) => (
-            <div
+            <GraphicOverlay
               key={g.id}
-              className={`slide-graphic-overlay ${selectedGraphicId === g.id ? 'selected' : ''}`}
-              style={{
-                left: `${g.x ?? 50}%`,
-                top: `${g.y ?? 50}%`,
-                width: `${g.width ?? 80}px`,
-                height: `${g.height ?? 80}px`,
-                transform: `translate(-50%, -50%) rotate(${g.rotation ?? 0}deg)${g.flipHorizontal ? ' scaleX(-1)' : ''}`,
-                transformOrigin: 'center center',
-                cursor: onSelectGraphic ? 'pointer' : undefined
-              }}
-              onClick={onSelectGraphic ? (e) => { e.stopPropagation(); onSelectGraphic(selectedGraphicId === g.id ? null : g.id) } : undefined}
-            >
-              <img src={g.url} alt="" draggable={false} />
-            </div>
+              graphic={g}
+              isSelected={selectedGraphicId === g.id}
+              onSelect={() => onSelectGraphic?.(selectedGraphicId === g.id ? null : g.id)}
+              onUpdate={onUpdate ? (updates) => {
+                const overlays = [...(slide.graphicOverlays || [])]
+                const idx = overlays.findIndex(o => o.id === g.id)
+                if (idx >= 0) {
+                  overlays[idx] = { ...overlays[idx], ...updates }
+                  onUpdate({ graphicOverlays: overlays })
+                }
+              } : undefined}
+              containerRef={slideRef}
+              isEditing={!!onSelectGraphic && !!onUpdate}
+            />
           ))}
         </div>
       )}
