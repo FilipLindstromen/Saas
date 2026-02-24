@@ -339,7 +339,36 @@
   transition: background-position 0.5s ease, background-size 0.5s ease, object-position 0.5s ease, transform 0.5s ease;
 }
 
-/* Crossfade Transition - one bg fades out while next fades in (simultaneous) */
+/* Crossfade Transition - both layers in same container, fade at exactly the same time */
+.play-crossfade-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.play-crossfade-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation-duration: 0.5s;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: forwards;
+}
+
+.play-crossfade-layer.play-crossfade-out {
+  z-index: 1;
+  animation-name: crossfadeOut;
+}
+
+.play-crossfade-layer.play-crossfade-in {
+  z-index: 2;
+  opacity: 0;
+  animation-name: crossfadeIn;
+}
+
+/* Legacy: when crossfade used with slide container (different bg path) */
 .play-background-transition-wrapper.transition-crossfade.crossfade-out,
 .play-slide-container.crossfade-out .slide .slide-background,
 .play-slide-container.crossfade-out .slide .slide-background-video {

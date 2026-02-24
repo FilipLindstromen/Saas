@@ -26,11 +26,11 @@
   --header-inset: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   --card-radius: 16px;
   --button-radius: 12px;
-  /* Color analyze (statement, impact, evidence, relevance) */
-  --color-statement: #f87171;
-  --color-impact: #fb923c;
-  --color-evidence: #facc15;
-  --color-relevance: #4ade80;
+  /* Color analyze - match ColorWriter persuasive cycle colors */
+  --color-statement: #fecaca;
+  --color-impact: #fed7aa;
+  --color-evidence: #fef08a;
+  --color-relevance: #bbf7d0;
 }
 
 /* Theme Variables - Light Mode - Banking App Style */
@@ -60,11 +60,11 @@
   --header-inset: 0 1px 0 rgba(0, 0, 0, 0.06) inset;
   --card-radius: 16px;
   --button-radius: 12px;
-  /* Color analyze (statement, impact, evidence, relevance) */
-  --color-statement: #dc2626;
-  --color-impact: #ea580c;
-  --color-evidence: #ca8a04;
-  --color-relevance: #16a34a;
+  /* Color analyze - match ColorWriter persuasive cycle colors */
+  --color-statement: #fecaca;
+  --color-impact: #fed7aa;
+  --color-evidence: #fef08a;
+  --color-relevance: #bbf7d0;
 }
 
 * {
