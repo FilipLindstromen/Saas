@@ -6,6 +6,7 @@ import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
+const WEBCAM_TRANSITION_MS = 500
 
 // Two slides share the same background if they use the same image, video, or infographic
 function sameBackground(a, b) {
@@ -123,8 +124,9 @@ function getVideoFilterString(recordSettings) {
 
 // Webcam overlay component - separate from slide transitions
 // isVisible: show the video. shouldPreload: start stream hidden (next slide needs webcam). shouldKeepAlive: keep stream running when no slide needs it yet (avoids activation delay).
+// isSlidingOff: animate webcam out to the right. isSlidingIn: animate webcam in from the right.
 // When canvasSize is provided, positions relative to canvas (inside play-mode layer stack); otherwise uses viewport (legacy).
-function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true, shouldPreload = false, shouldKeepAlive = false, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', recordSettings, canvasSize }) {
+function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = true, shouldPreload = false, shouldKeepAlive = false, isSlidingOff = false, isSlidingIn = false, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', recordSettings, canvasSize }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const containerRef = useRef(null)
@@ -139,13 +141,13 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
 
   if (isVisible) layoutWhenVisibleRef.current = layout
 
-  // When isVisible goes from true to false, start transition-out before stopping stream
+  // When isVisible goes from true to false (and not using isSlidingOff), start transition-out before stopping stream
   useEffect(() => {
-    if (prevVisibleRef.current && !isVisible) {
+    if (!isSlidingOff && prevVisibleRef.current && !isVisible) {
       setIsTransitioningOut(true)
     }
     prevVisibleRef.current = isVisible
-  }, [isVisible])
+  }, [isVisible, isSlidingOff])
 
   useEffect(() => {
     if (!isTransitioningOut) return
@@ -153,8 +155,8 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     return () => clearTimeout(t)
   }, [isTransitioningOut])
 
-  // Start stream when visible, preloading, transitioning out, or keeping alive (avoids delay when later slides need webcam)
-  const shouldHaveStream = cameraId && (isVisible || shouldPreload || isTransitioningOut || shouldKeepAlive) && !(cameraOverrideEnabled && cameraOverridePosition === 'disabled')
+  // Start stream when visible, preloading, transitioning out, sliding off/in, or keeping alive (avoids delay when later slides need webcam)
+  const shouldHaveStream = cameraId && (isVisible || shouldPreload || isTransitioningOut || shouldKeepAlive || isSlidingOff || isSlidingIn) && !(cameraOverrideEnabled && cameraOverridePosition === 'disabled')
 
   // Update viewport dimensions on resize (only when not using canvas coords)
   useEffect(() => {
@@ -178,7 +180,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
 
   // Get webcam position: when camera override is enabled use cameraOverridePosition; otherwise use layout
   // Use stored layout when transitioning out so overlay doesn't jump
-  const effectiveLayout = isTransitioningOut ? layoutWhenVisibleRef.current : layout
+  const effectiveLayout = (isTransitioningOut || isSlidingOff) ? layoutWhenVisibleRef.current : layout
   const getWebcamPosition = () => {
     const webcamWidth = dimensions.width * (webcamSize === 'small' ? 0.15 : webcamSize === 'medium' ? 0.20 : 0.25)
     const webcamHeight = webcamWidth
@@ -269,7 +271,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
     }
   }, [effectiveLayout, dimensions, cameraOverrideEnabled, cameraOverridePosition])
 
-  if ((!isVisible && !shouldPreload && !isTransitioningOut && !shouldKeepAlive) || !cameraId) return null
+  if ((!isVisible && !shouldPreload && !isTransitioningOut && !shouldKeepAlive && !isSlidingOff && !isSlidingIn) || !cameraId) return null
   if (cameraOverrideEnabled && cameraOverridePosition === 'disabled') return null
 
   const size = getWebcamSize()
@@ -277,7 +279,15 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   const useCircle = position.isCircle
   const isFullscreen = position.width >= dimensions.width - 2 && position.height >= dimensions.height - 2
 
-  const isHidden = (shouldPreload && !isVisible) || isTransitioningOut || shouldKeepAlive
+  const isHidden = (shouldPreload && !isVisible) || (isTransitioningOut && !isSlidingOff)
+  const webcamOffRight = shouldKeepAlive && !isVisible && !isSlidingOff && !isSlidingIn
+  const slideStyle = useCanvasCoords ? {
+    position: 'absolute',
+    inset: 0,
+    transform: isSlidingOff || webcamOffRight ? 'translateX(100%)' : 'translateX(0)',
+    transition: isSlidingIn ? 'none' : `transform ${WEBCAM_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+    animation: isSlidingIn ? `play-webcam-slide-in ${WEBCAM_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards` : 'none',
+  } : undefined
 
   const style = {
     position: useCanvasCoords ? 'absolute' : 'fixed',
@@ -300,28 +310,30 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="play-webcam-overlay"
-      style={style}
-    >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          borderRadius: 'inherit',
-          filter: getVideoFilterString(recordSettings),
-          transform: recordSettings?.webcamFlipHorizontal ? 'scaleX(-1)' : 'none'
-        }}
-      />
+    <div className="play-webcam-overlay-wrapper" style={slideStyle}>
+      <div
+        ref={containerRef}
+        className="play-webcam-overlay"
+        style={style}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: 'inherit',
+            filter: getVideoFilterString(recordSettings),
+            transform: recordSettings?.webcamFlipHorizontal ? 'scaleX(-1)' : 'none'
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -577,6 +589,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isSlidingOff, setIsSlidingOff] = useState(false)
   const [isSlidingIn, setIsSlidingIn] = useState(false)
   const videoSlideForTransitionRef = useRef(null) // Slide we're leaving when isSlidingOff
+  // Webcam: slide out to right when leaving webcam slide, slide in from right when returning
+  const [isWebcamSlidingOff, setIsWebcamSlidingOff] = useState(false)
+  const [isWebcamSlidingIn, setIsWebcamSlidingIn] = useState(false)
+  // Two-phase transition: text/background out first, then switch slide, then in
+  const [pendingIndex, setPendingIndex] = useState(null)
+  const pendingDirectionRef = useRef(1) // 1 = next, -1 = prev
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
@@ -681,79 +699,147 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     if (isTransitioning) return
 
     const nextIndex = currentIndex + 1
-    const currentHasVideo = hasVideoLayoutWithMedia(presentationSlides[currentIndex])
-    const nextHasVideo = hasVideoLayoutWithMedia(presentationSlides[nextIndex])
+    const currentSlideData = presentationSlides[currentIndex]
+    const nextSlideDataForNav = presentationSlides[nextIndex]
+    const currentHasVideo = hasVideoLayoutWithMedia(currentSlideData)
+    const nextHasVideo = hasVideoLayoutWithMedia(nextSlideDataForNav)
+    const currentHasWebcam = (currentSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
+    const nextHasWebcam = nextSlideDataForNav && (nextSlideDataForNav?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlideDataForNav?.selectedCameraId || recordSettings?.selectedCameraId)
 
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
     if (currentHasVideo && !nextHasVideo) {
-      // Video → no video: slide video off to right, then show new content
+      // Video → no video: slide video off to right, webcam off if needed
       setIsTransitioning(true)
-      videoSlideForTransitionRef.current = presentationSlides[currentIndex]
+      videoSlideForTransitionRef.current = currentSlideData
+      if (currentHasWebcam && !nextHasWebcam) setIsWebcamSlidingOff(true)
       setCurrentIndex(nextIndex)
       setIsSlidingOff(true)
       setTimeout(() => {
         setIsSlidingOff(false)
+        setIsWebcamSlidingOff(false)
         videoSlideForTransitionRef.current = null
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
-      }, VIDEO_TRANSITION_MS)
+      }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !nextHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
     } else if (!currentHasVideo && nextHasVideo) {
-      // No video → video: slide video in from right
+      // No video → video: slide video in from right, webcam in if needed
       setIsTransitioning(true)
       setIsSlidingIn(true)
+      if (!currentHasWebcam && nextHasWebcam) setIsWebcamSlidingIn(true)
       setCurrentIndex(nextIndex)
       setSlideKey(k => k + 1)
       setTimeout(() => {
         setIsSlidingIn(false)
+        setIsWebcamSlidingIn(false)
         setIsTransitioning(false)
-      }, VIDEO_TRANSITION_MS)
+      }, Math.max(VIDEO_TRANSITION_MS, !currentHasWebcam && nextHasWebcam ? WEBCAM_TRANSITION_MS : 0))
     } else {
-      // Same format (both video or both non-video): instant change, content transitions
-      setCurrentIndex(nextIndex)
-      setSlideKey(k => k + 1)
+      // Same format: two-phase transition (text out + background out, then switch, then in)
+      const hasWebcamChange = currentHasWebcam !== nextHasWebcam
+      const transitionDuration = getTransitionDuration(transitionStyle)
+
+      if (currentHasWebcam && !nextHasWebcam) {
+        setIsWebcamSlidingOff(true)
+      }
+      if (!currentHasWebcam && nextHasWebcam) {
+        setIsWebcamSlidingIn(true)
+      }
+
+      setIsTransitioning(true)
+      setTransitionPhase('fade-out')
+      setPendingIndex(nextIndex)
+      pendingDirectionRef.current = 1
+
+      // Phase 1: text out + background out
+      const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+      setTimeout(() => {
+        setCurrentIndex(nextIndex)
+        setSlideKey(k => k + 1)
+        setPendingIndex(null)
+        setTransitionPhase('fade-in')
+
+        setTimeout(() => {
+          setTransitionPhase('idle')
+          setIsWebcamSlidingOff(false)
+          setIsWebcamSlidingIn(false)
+          setIsTransitioning(false)
+        }, transitionDuration)
+      }, phase1Duration)
     }
-  }, [presentationSlides, currentIndex, isTransitioning])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, recordSettings])
 
   const prevSlide = useCallback(() => {
     if (currentIndex <= 0) return
     if (isTransitioning) return
 
     const prevIndex = currentIndex - 1
-    const currentHasVideo = hasVideoLayoutWithMedia(presentationSlides[currentIndex])
-    const prevHasVideo = hasVideoLayoutWithMedia(presentationSlides[prevIndex])
+    const currentSlideData = presentationSlides[currentIndex]
+    const prevSlideDataForNav = presentationSlides[prevIndex]
+    const currentHasVideo = hasVideoLayoutWithMedia(currentSlideData)
+    const prevHasVideo = hasVideoLayoutWithMedia(prevSlideDataForNav)
+    const currentHasWebcam = (currentSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
+    const prevHasWebcam = prevSlideDataForNav && (prevSlideDataForNav?.webcamEnabled ?? recordSettings?.webcamEnabled) && (prevSlideDataForNav?.selectedCameraId || recordSettings?.selectedCameraId)
 
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
     if (currentHasVideo && !prevHasVideo) {
-      // Video → no video (going back): slide video off to right
+      // Video → no video (going back): slide video off to right, webcam off if needed
       setIsTransitioning(true)
-      videoSlideForTransitionRef.current = presentationSlides[currentIndex]
+      videoSlideForTransitionRef.current = currentSlideData
+      if (currentHasWebcam && !prevHasWebcam) setIsWebcamSlidingOff(true)
       setCurrentIndex(prevIndex)
       setIsSlidingOff(true)
       setTimeout(() => {
         setIsSlidingOff(false)
+        setIsWebcamSlidingOff(false)
         videoSlideForTransitionRef.current = null
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
-      }, VIDEO_TRANSITION_MS)
+      }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !prevHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
     } else if (!currentHasVideo && prevHasVideo) {
-      // No video → video (going back): slide video in from right
+      // No video → video (going back): slide video in from right, webcam in if needed
       setIsTransitioning(true)
       setIsSlidingIn(true)
+      if (!currentHasWebcam && prevHasWebcam) setIsWebcamSlidingIn(true)
       setCurrentIndex(prevIndex)
       setSlideKey(k => k + 1)
       setTimeout(() => {
         setIsSlidingIn(false)
+        setIsWebcamSlidingIn(false)
         setIsTransitioning(false)
-      }, VIDEO_TRANSITION_MS)
+      }, Math.max(VIDEO_TRANSITION_MS, (!currentHasWebcam && prevHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
     } else {
-      setCurrentIndex(prevIndex)
-      setSlideKey(k => k + 1)
+      // Same format: two-phase transition
+      const hasWebcamChange = currentHasWebcam !== prevHasWebcam
+      const transitionDuration = getTransitionDuration(transitionStyle)
+
+      if (currentHasWebcam && !prevHasWebcam) setIsWebcamSlidingOff(true)
+      if (!currentHasWebcam && prevHasWebcam) setIsWebcamSlidingIn(true)
+
+      setIsTransitioning(true)
+      setTransitionPhase('fade-out')
+      setPendingIndex(prevIndex)
+      pendingDirectionRef.current = -1
+
+      const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+      setTimeout(() => {
+        setCurrentIndex(prevIndex)
+        setSlideKey(k => k + 1)
+        setPendingIndex(null)
+        setTransitionPhase('fade-in')
+
+        setTimeout(() => {
+          setTransitionPhase('idle')
+          setIsWebcamSlidingOff(false)
+          setIsWebcamSlidingIn(false)
+          setIsTransitioning(false)
+        }, transitionDuration)
+      }, phase1Duration)
     }
-  }, [presentationSlides, currentIndex, isTransitioning])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, recordSettings])
 
   // Reset bullet index when slide changes
   useEffect(() => {
@@ -1118,7 +1204,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const anySlideHasWebcam = !!firstSlideWithWebcam
   const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)) || (firstSlideWithWebcam?.selectedCameraId || recordSettings?.selectedCameraId) || ''
   const webcamShouldPreload = nextSlideHasWebcam && !currentSlideHasWebcam
-  const webcamShouldKeepAlive = anySlideHasWebcam && !currentSlideHasWebcam && !nextSlideHasWebcam
+  // Keep webcam stream running when on non-webcam slides (for smooth slide-in when returning to webcam slide)
+  const webcamShouldKeepAlive = anySlideHasWebcam && !currentSlideHasWebcam
 
   // Common Slide props (shared by visible and preload slides)
   const commonSlideProps = {
