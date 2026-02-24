@@ -18,10 +18,14 @@ function getKey(apiKey) {
  * @param {number} [options.temperature]
  * @param {number} [options.max_tokens]
  * @param {string} [options.apiKey]
+ * @param {Object} [options.response_format] - e.g. { type: 'json_object' } for structured JSON
  */
-export async function chatCompletion({ messages, model = 'gpt-4o-mini', temperature = 0.6, max_tokens = 1000, apiKey }) {
+export async function chatCompletion({ messages, model = 'gpt-4o-mini', temperature = 0.6, max_tokens = 1000, apiKey, response_format }) {
   const key = getKey(apiKey);
   if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
+
+  const body = { model, messages, temperature, max_tokens };
+  if (response_format) body.response_format = response_format;
 
   const res = await fetch(`${OPENAI_API}/chat/completions`, {
     method: 'POST',
@@ -29,12 +33,7 @@ export async function chatCompletion({ messages, model = 'gpt-4o-mini', temperat
       'Content-Type': 'application/json',
       Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

@@ -207,8 +207,10 @@ function App() {
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
+      transitionSpeed: parseFloat(localStorage.getItem('transitionSpeed')) || 1,
       textAnimation: localStorage.getItem('textAnimation') || 'none',
       textAnimationUnit: localStorage.getItem('textAnimationUnit') || 'word',
+      textAnimationSpeed: parseFloat(localStorage.getItem('textAnimationSpeed')) || 1,
       backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
       backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
       backgroundScaleAmount: parseFloat(localStorage.getItem('backgroundScaleAmount')) || 20,
@@ -616,8 +618,10 @@ function App() {
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
+    localStorage.setItem('transitionSpeed', (settings.transitionSpeed ?? 1).toString())
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('textAnimationUnit', settings.textAnimationUnit || 'word')
+    localStorage.setItem('textAnimationSpeed', (settings.textAnimationSpeed ?? 1).toString())
     localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
     localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
     localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
@@ -2067,8 +2071,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           showMenu={true}
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
+          transitionSpeed={settings.transitionSpeed ?? 1}
           textAnimation={settings.textAnimation || 'none'}
           textAnimationUnit={settings.textAnimationUnit || 'word'}
+          textAnimationSpeed={settings.textAnimationSpeed ?? 1}
           backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
           backgroundScaleTime={settings.backgroundScaleTime || 10}
           backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}

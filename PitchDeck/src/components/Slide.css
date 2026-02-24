@@ -901,7 +901,7 @@
 .slide[class*="text-animation-"] .slide-text-centered-wrapper .slide-subtitle,
 .slide[class*="text-animation-"] .slide-section-name,
 .slide[class*="text-animation-"] .slide-bullet .bullet-text {
-  animation-duration: 0.7s;
+  animation-duration: var(--text-animation-duration, 0.7s);
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   animation-fill-mode: both;
 }
@@ -910,7 +910,7 @@
 .slide[class*="text-animation-"] .slide-text .text-animation-word,
 .slide[class*="text-animation-"] .slide-text-centered-wrapper .slide-text .text-animation-word,
 .slide[class*="text-animation-"] .slide-bullet .bullet-text .text-animation-word {
-  animation-duration: 0.6s;
+  animation-duration: var(--text-animation-duration, 0.6s);
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   animation-fill-mode: both;
 }
@@ -922,7 +922,7 @@
   display: inline-block;
   opacity: 0;
   transform: translateY(24px);
-  animation: text-word-fade-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: text-word-fade-up var(--text-animation-duration, 0.6s) cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 @keyframes text-word-fade-up {
@@ -1085,7 +1085,7 @@
   border-right: 0.08em solid currentColor;
   white-space: nowrap;
   width: 0;
-  animation: text-typewriter 1.2s steps(40, end) 0.3s both;
+  animation: text-typewriter calc(2 * var(--text-animation-duration, 0.6s)) steps(40, end) calc(0.5 * var(--text-animation-duration, 0.6s)) both;
 }
 
 .slide.text-animation-typewriter .slide-content br,
@@ -1142,7 +1142,7 @@
 .slide.text-animation-bounce-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
   opacity: 0;
   transform: scale(0.3);
-  animation: text-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: text-bounce-in calc(1.333 * var(--text-animation-duration, 0.6s)) cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 .slide.text-animation-bounce-in .slide-text .text-animation-word,
 .slide.text-animation-bounce-in .slide-text-centered-wrapper .slide-text .text-animation-word,
@@ -1150,7 +1150,7 @@
   display: inline-block;
   opacity: 0;
   transform: scale(0.3);
-  animation: text-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: text-bounce-in calc(1.333 * var(--text-animation-duration, 0.6s)) cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 @keyframes text-bounce-in {

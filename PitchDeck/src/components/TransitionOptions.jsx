@@ -5,8 +5,10 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
   const panelRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
+    transitionSpeed: settings?.transitionSpeed ?? 1,
     textAnimation: settings?.textAnimation || 'none',
     textAnimationUnit: settings?.textAnimationUnit || 'word',
+    textAnimationSpeed: settings?.textAnimationSpeed ?? 1,
     backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
     backgroundScaleTime: settings?.backgroundScaleTime || 10,
     backgroundScaleAmount: settings?.backgroundScaleAmount ?? 20,
@@ -101,6 +103,21 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
                 <option value="sequence">Object Sequence</option>
               </select>
             </div>
+            <div className="transition-options-field">
+              <label htmlFor="transition-speed-slider">
+                Transition speed: {localSettings.transitionSpeed === 1 ? 'Normal' : `${Math.round(localSettings.transitionSpeed * 100)}%`}
+              </label>
+              <input
+                id="transition-speed-slider"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={localSettings.transitionSpeed}
+                onChange={(e) => handleChange('transitionSpeed', parseFloat(e.target.value))}
+                className="transition-options-slider"
+              />
+            </div>
           </div>
 
           <div className="transition-options-section">
@@ -140,6 +157,23 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
                 <span className="transition-options-hint">Select a text animation above first</span>
               )}
             </div>
+            {localSettings.textAnimation !== 'none' && (
+              <div className="transition-options-field">
+                <label htmlFor="text-animation-speed-slider">
+                  Animation speed: {localSettings.textAnimationSpeed === 1 ? 'Normal' : localSettings.textAnimationSpeed < 1 ? 'Slower' : 'Faster'}
+                </label>
+                <input
+                  id="text-animation-speed-slider"
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={localSettings.textAnimationSpeed}
+                  onChange={(e) => handleChange('textAnimationSpeed', parseFloat(e.target.value))}
+                  className="transition-options-slider"
+                />
+              </div>
+            )}
           </div>
 
           <div className="transition-options-section">

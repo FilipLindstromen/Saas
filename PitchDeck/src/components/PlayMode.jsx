@@ -573,7 +573,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', textAnimation = 'none', textAnimationUnit = 'word', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -689,22 +689,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   // Get transition duration based on style
   const getTransitionDuration = (style) => {
-    switch (style) {
-      case 'dissolve':
-        return 500 // 0.5s
-      case 'crossfade':
-        return 500 // 0.5s
-      case 'sequence':
-        return 600 // 0.6s
-      case 'blur':
-        return 400 // 0.4s
-      case 'zoom':
-        return 300 // 0.3s
-      case 'slide':
-        return 300 // 0.3s
-      default:
-        return 300 // 0.3s
-    }
+    const base = (() => {
+      switch (style) {
+        case 'dissolve': return 500
+        case 'crossfade': return 500
+        case 'sequence': return 600
+        case 'blur': return 400
+        case 'zoom': return 300
+        case 'slide': return 300
+        default: return 300
+      }
+    })()
+    return Math.round(base * (transitionSpeed ?? 1))
   }
 
   const nextSlide = useCallback(() => {
@@ -825,7 +821,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phase1Duration)
       }
     }
-  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, recordSettings])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings])
 
   const prevSlide = useCallback(() => {
     if (currentIndex <= 0) return
@@ -936,7 +932,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phase1Duration)
       }
     }
-  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, recordSettings])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings])
 
   // Reset bullet index when slide changes
   useEffect(() => {
@@ -1357,6 +1353,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     backgroundScaleAmount,
     textAnimation,
     textAnimationUnit,
+    textAnimationSpeed: textAnimationSpeed ?? 1,
     textStyleMode: textStyleMode || 'standard',
     fontPairingSerifFont: fontPairingSerifFont || 'Playfair Display',
     slideFormat
@@ -1376,10 +1373,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const sameBgNoTransition = targetSlide && sameBackground(currentSlide, targetSlide)
   // Use target slide for background during transition so position/scale animates smoothly from current to target
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
-  const posScaleTransitionMs = getTransitionDuration(transitionStyle)
+  const transitionDurationMs = getTransitionDuration(transitionStyle)
 
   return (
-    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a' }}>
+    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a', '--transition-duration': `${transitionDurationMs}ms` }}>
       <div
         className="play-canvas-wrapper"
         style={{
@@ -1453,7 +1450,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       ) : (
         <div
           className={`play-background-transition-wrapper ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${!sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
-          style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6, '--pos-scale-duration': `${posScaleTransitionMs}ms` }}
+          style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6, '--pos-scale-duration': `${transitionDurationMs}ms` }}
         >
           {usePersistentVideo && videoSlideForLayer && (
             <PersistentVideoLayer
