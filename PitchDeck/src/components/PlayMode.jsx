@@ -1291,31 +1291,31 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         style={{ backgroundColor: backgroundColor || '#1a1a1a' }}
         aria-hidden="true"
       />
-      {/* Layer 1: Background image (when persistent, non-video) */}
-      {/* Layer 2: Video */}
-      {usePersistentVideo && videoSlideForLayer && (
-        <PersistentVideoLayer
-          videoSlide={videoSlideForLayer}
-          layout={videoLayoutForLayer}
-          isSlidingOff={isSlidingOff}
-          isSlidingIn={isSlidingIn}
-          canvasSize={canvasSize}
-          recordSettings={recordSettings}
-        />
-      )}
-      {/* Persistent background layer: when consecutive slides share same image/infographic (non-video) */}
-      {usePersistentBackground && (
-        <div className="play-background-layer" aria-hidden="true">
-          <SlideBackground
-            slide={currentSlide}
-            backgroundScaleAnimation={backgroundScaleAnimation}
-            backgroundScaleTime={backgroundScaleTime}
-            backgroundScaleAmount={backgroundScaleAmount}
-            isPreload={false}
-            isPlayMode={true}
+      {/* Layer 1: Background image/video - transition applied here (not webcam) */}
+      <div className={`play-background-transition-wrapper ${transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''}`}>
+        {usePersistentVideo && videoSlideForLayer && (
+          <PersistentVideoLayer
+            videoSlide={videoSlideForLayer}
+            layout={videoLayoutForLayer}
+            isSlidingOff={isSlidingOff}
+            isSlidingIn={isSlidingIn}
+            canvasSize={canvasSize}
+            recordSettings={recordSettings}
           />
-        </div>
-      )}
+        )}
+        {usePersistentBackground && (
+          <div className="play-background-layer" aria-hidden="true">
+            <SlideBackground
+              slide={currentSlide}
+              backgroundScaleAnimation={backgroundScaleAnimation}
+              backgroundScaleTime={backgroundScaleTime}
+              backgroundScaleAmount={backgroundScaleAmount}
+              isPreload={false}
+              isPlayMode={true}
+            />
+          </div>
+        )}
+      </div>
       {/* Layer 2: Webcam - inside canvas for correct layer order */}
       {anySlideHasWebcam && webcamCameraId && (
         <div className="play-webcam-layer" aria-hidden="true">
@@ -1326,6 +1326,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             isVisible={currentSlideHasWebcam}
             shouldPreload={webcamShouldPreload}
             shouldKeepAlive={webcamShouldKeepAlive}
+            isSlidingOff={isWebcamSlidingOff}
+            isSlidingIn={isWebcamSlidingIn}
             cameraOverrideEnabled={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
             cameraOverridePosition={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
             recordSettings={recordSettings}
@@ -1339,10 +1341,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           backgroundColor={backgroundColor}
         />
       )}
-      {/* Content layer: no slide-level transition; content (background, text, images) transitions */}
+      {/* Content layer: transition on background (not webcam); text-out before new text in */}
       <div 
         key={slideKey}
-        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''}`}
+        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''} ${transitionPhase === 'fade-out' ? 'fade-out text-out' : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''}`}
       >
         <Slide 
           slide={presentationSlides[currentIndex]} 
