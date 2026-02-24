@@ -634,10 +634,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlideHasVideo = hasVideoLayoutWithMedia(currentSlide)
   const nextSlideHasVideo = hasVideoLayoutWithMedia(nextSlideData)
   const prevSlideHasVideo = hasVideoLayoutWithMedia(prevSlideData)
-  // Use persistent video layer: current has video, or we're sliding off/in
-  const usePersistentVideo = currentSlideHasVideo || isSlidingOff || isSlidingIn
-  // Use persistent background for non-video: consecutive slides share same image/infographic bg (not video)
-  const usePersistentBackground = !usePersistentVideo && ((nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData)))
+  // When consecutive slides share same bg (image/video), use persistent background - no transition, just keep it
+  const hasSameBgWithAdjacent = (nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData))
+  // Use persistent background when same bg: single layer for both video and image, no swap/flash
+  const usePersistentBackground = !!hasSameBgWithAdjacent
+  // Use persistent video layer only when different bg: current has video, or we're sliding off/in
+  const usePersistentVideo = !usePersistentBackground && (currentSlideHasVideo || isSlidingOff || isSlidingIn)
   const usePersistentGradient = usePersistentBackground || usePersistentVideo
   // Which slide's video to show in PersistentVideoLayer
   const videoSlideForLayer = isSlidingOff ? videoSlideForTransitionRef.current : (currentSlideHasVideo ? currentSlide : null)
@@ -720,7 +722,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
-    if (currentHasVideo && !nextHasVideo) {
+    const sameBgForNav = sameBackground(currentSlideData, nextSlideDataForNav)
+    // When crossfade selected, use crossfade for all transitions (including video) - bg fades out as new fades in
+    const useCrossfadeForVideo = transitionStyle === 'crossfade'
+    // When same bg, skip video slide-off/slide-in - keep background, only transition content
+    if (currentHasVideo && !nextHasVideo && !sameBgForNav && !useCrossfadeForVideo) {
       // Video → no video: slide video off to right, webcam off if needed
       setIsTransitioning(true)
       videoSlideForTransitionRef.current = currentSlideData
@@ -734,7 +740,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !nextHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
-    } else if (!currentHasVideo && nextHasVideo) {
+    } else if (!currentHasVideo && nextHasVideo && !sameBgForNav && !useCrossfadeForVideo) {
       // No video → video: slide video in from right, webcam in if needed
       setIsTransitioning(true)
       setIsSlidingIn(true)
@@ -836,7 +842,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
-    if (currentHasVideo && !prevHasVideo) {
+    const sameBgForNavPrev = sameBackground(currentSlideData, prevSlideDataForNav)
+    const useCrossfadeForVideoPrev = transitionStyle === 'crossfade'
+    // When same bg, skip video slide-off/slide-in - keep background, only transition content
+    if (currentHasVideo && !prevHasVideo && !sameBgForNavPrev && !useCrossfadeForVideoPrev) {
       // Video → no video (going back): slide video off to right, webcam off if needed
       setIsTransitioning(true)
       videoSlideForTransitionRef.current = currentSlideData
@@ -850,7 +859,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !prevHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
-    } else if (!currentHasVideo && prevHasVideo) {
+    } else if (!currentHasVideo && prevHasVideo && !sameBgForNavPrev && !useCrossfadeForVideoPrev) {
       // No video → video (going back): slide video in from right, webcam in if needed
       setIsTransitioning(true)
       setIsSlidingIn(true)
