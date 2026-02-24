@@ -32,8 +32,20 @@
   }
 }
 
-/* Layer order (back to front): 0=bg, 1=image, 2=video, 3=gradient, 4=graphics, 5=text */
-/* Persistent background layer: image/infographic when consecutive slides share same background */
+/* Present mode layer order (back to front):
+   0 = background color, 1 = background image, 2 = video, 3 = gradient, 4 = graphic overlays, 5 = text */
+
+/* Layer 0: Background color - base of canvas */
+.play-layer-bg-color {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Layer 1: Background image/infographic */
 .play-background-layer {
   position: absolute;
   inset: 0;
@@ -43,7 +55,9 @@
   pointer-events: none;
 }
 
-/* Persistent gradient layer: above video, below content */
+/* Layer 2: Video - PersistentVideoLayer has z-index 2 inline */
+
+/* Layer 3: Gradient */
 .play-gradient-layer {
   position: absolute;
   inset: 0;
@@ -62,6 +76,7 @@
   z-index: 1;
 }
 
+/* Layer 4 & 5: Graphic overlays + text - slide container must be transparent, pointer-events none so video shows through */
 .play-slide-container {
   width: 100%;
   height: 100%;
@@ -74,11 +89,19 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1;
-  /* No slide-level transition - content transitions only */
+  z-index: 4;
+  /* Critical: transparent so video/gradient show through; pointer-events none so layer doesn't block */
+  background: transparent !important;
+  background-color: transparent !important;
+  pointer-events: none;
   opacity: 1;
   transform: none;
   filter: none;
+}
+
+/* Slide content needs pointer-events for click-through navigation (handled by parent play-mode) */
+.play-slide-container .slide {
+  pointer-events: auto;
 }
 
 /* Content (background, text, images) fades in when slide changes */
@@ -95,7 +118,7 @@
   }
 }
 
-/* Video layout: same z-index, ensures content above gradient */
+/* Video layout: content layer above gradient (z-index 5 for text to be on top) */
 .play-slide-container-video-layout {
   z-index: 5;
 }
@@ -346,10 +369,16 @@
 }
 
 /* Video layouts: slide and content must be fully transparent so video shows through */
+.play-mode .slide.layout-left-video,
+.play-mode .slide.layout-right-video {
+  background-color: transparent !important;
+  background: transparent !important;
+}
 .play-mode .slide.layout-left-video .slide-content,
 .play-mode .slide.layout-right-video .slide-content,
 .play-mode .slide .slide-content-video {
   background: transparent !important;
+  background-color: transparent !important;
 }
 
 .play-mode .slide.slide-format-16-9,

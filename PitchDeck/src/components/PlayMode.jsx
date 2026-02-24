@@ -1194,7 +1194,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           transformOrigin: 'center center'
         }}
       >
-      {/* Persistent video layer: video persists across slides, slides off when going to non-video */}
+      {/* Layer 0: Background color */}
+      <div
+        className="play-layer-bg-color"
+        style={{ backgroundColor: backgroundColor || '#1a1a1a' }}
+        aria-hidden="true"
+      />
+      {/* Layer 1: Background image (when persistent, non-video) */}
+      {/* Layer 2: Video */}
       {usePersistentVideo && videoSlideForLayer && (
         <PersistentVideoLayer
           videoSlide={videoSlideForLayer}
