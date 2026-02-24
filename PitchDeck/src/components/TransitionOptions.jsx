@@ -96,6 +96,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
                 <option value="slide">Slide</option>
                 <option value="zoom">Zoom</option>
                 <option value="dissolve">Dissolve</option>
+                <option value="crossfade">Crossfade</option>
                 <option value="blur">Blur</option>
                 <option value="sequence">Object Sequence</option>
               </select>

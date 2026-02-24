@@ -143,6 +143,24 @@
   transform: scaleY(1);
 }
 
+/* Color analyze outline (statement, impact, evidence, relevance) */
+.slide-item.color-analyze-statement {
+  border-color: var(--color-statement);
+  border-width: 2px;
+}
+.slide-item.color-analyze-impact {
+  border-color: var(--color-impact);
+  border-width: 2px;
+}
+.slide-item.color-analyze-evidence {
+  border-color: var(--color-evidence);
+  border-width: 2px;
+}
+.slide-item.color-analyze-relevance {
+  border-color: var(--color-relevance);
+  border-width: 2px;
+}
+
 .slide-item-thumbnail {
   width: 60px;
   height: 40px;

@@ -188,7 +188,7 @@
     opacity: 0;
   }
   to {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
   }
 }
 
@@ -267,7 +267,7 @@
 
 @keyframes slideOut {
   from {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
     transform: translateX(0);
   }
   to {
@@ -282,7 +282,7 @@
     transform: translateX(-100%);
   }
   to {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
     transform: translateX(0);
   }
 }
@@ -331,6 +331,40 @@
   }
 }
 
+/* Same bg, different position/scale: smooth transition (no fade) */
+.play-bg-pos-scale-transition .play-background-layer .slide-background,
+.play-bg-pos-scale-transition .play-background-layer .slide-background-video .slide-background-video-el,
+.play-bg-pos-scale-transition .play-persistent-video-el,
+.play-bg-pos-scale-transition .play-persistent-video-bg-image {
+  transition: background-position 0.5s ease, background-size 0.5s ease, object-position 0.5s ease, transform 0.5s ease;
+}
+
+/* Crossfade Transition - one bg fades out while next fades in (simultaneous) */
+.play-background-transition-wrapper.transition-crossfade.crossfade-out,
+.play-slide-container.crossfade-out .slide .slide-background,
+.play-slide-container.crossfade-out .slide .slide-background-video {
+  animation: crossfadeOut 0.5s ease-in-out forwards;
+}
+
+.play-crossfade-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  animation: crossfadeIn 0.5s ease-in-out forwards;
+}
+
+@keyframes crossfadeOut {
+  from { opacity: var(--bg-opacity, 1); }
+  to { opacity: 0; }
+}
+
+@keyframes crossfadeIn {
+  from { opacity: 0; }
+  to { opacity: var(--bg-opacity, 1); }
+}
+
 /* Dissolve Transition */
 .play-background-transition-wrapper.transition-dissolve.fade-out,
 .play-slide-container.transition-dissolve.fade-out .slide .slide-background,
@@ -353,7 +387,7 @@
 
 @keyframes dissolveOut {
   from {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
   }
   to {
     opacity: 0;
@@ -365,7 +399,7 @@
     opacity: 0;
   }
   to {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
   }
 }
 
@@ -437,7 +471,7 @@
 
 @keyframes sequenceOut {
   from {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
     transform: scale(1) translateY(0);
   }
   to {
@@ -452,11 +486,11 @@
     transform: scale(1.1) translateY(-20px);
   }
   50% {
-    opacity: 0.8;
+    opacity: calc(var(--bg-opacity, 1) * 0.8);
     transform: scale(0.95) translateY(10px);
   }
   100% {
-    opacity: 1;
+    opacity: var(--bg-opacity, 1);
     transform: scale(1) translateY(0);
   }
 }

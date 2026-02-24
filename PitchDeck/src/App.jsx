@@ -232,7 +232,8 @@ function App() {
       pixabayKey: apiKeys.pixabay || '',
       showBullets: localStorage.getItem('showBullets') !== 'false',
       autoAdvance: localStorage.getItem('autoAdvance') === 'true',
-      autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5
+      autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5,
+      colorAnalyzeEnabled: localStorage.getItem('colorAnalyzeEnabled') === 'true'
     }
     return savedSettings
   })
@@ -638,6 +639,7 @@ function App() {
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
     localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
+    localStorage.setItem('colorAnalyzeEnabled', settings.colorAnalyzeEnabled ? 'true' : 'false')
   }, [settings])
 
   // Save workspace data when it changes
@@ -1037,7 +1039,9 @@ function App() {
         e.preventDefault()
         const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
         const nextIndex = (currentIndex + 1) % slides.length
-        setSelectedSlideId(slides[nextIndex].id)
+        const newId = slides[nextIndex].id
+        setSelectedSlideId(newId)
+        setSelectedSlides(new Set([newId]))
         return
       }
 
@@ -1046,7 +1050,9 @@ function App() {
         e.preventDefault()
         const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
         const prevIndex = currentIndex === 0 ? slides.length - 1 : currentIndex - 1
-        setSelectedSlideId(slides[prevIndex].id)
+        const newId = slides[prevIndex].id
+        setSelectedSlideId(newId)
+        setSelectedSlides(new Set([newId]))
         return
       }
 
@@ -1056,13 +1062,17 @@ function App() {
           e.preventDefault()
           const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
           if (currentIndex > 0) {
-            setSelectedSlideId(slides[currentIndex - 1].id)
+            const newId = slides[currentIndex - 1].id
+            setSelectedSlideId(newId)
+            setSelectedSlides(new Set([newId]))
           }
         } else if (e.key === 'ArrowDown') {
           e.preventDefault()
           const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
           if (currentIndex < slides.length - 1) {
-            setSelectedSlideId(slides[currentIndex + 1].id)
+            const newId = slides[currentIndex + 1].id
+            setSelectedSlideId(newId)
+            setSelectedSlides(new Set([newId]))
           }
         }
       }
@@ -2765,6 +2775,9 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 onUpdate={updateSlide}
                 onBatchUpdate={updateSlidesBatch}
                 onReorder={updateSlides}
+                colorAnalyzeEnabled={settings.colorAnalyzeEnabled}
+                onColorAnalyzeChange={(enabled) => setSettings(prev => ({ ...prev, colorAnalyzeEnabled: enabled }))}
+                openaiKey={settings.openaiKey}
               />
             </div>
             <div 

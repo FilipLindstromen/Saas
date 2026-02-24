@@ -17,7 +17,7 @@
   overflow: visible;
 }
 
-/* Layer order (back to front): 0=bg color (slide), 1=bg image, 2=video, 3=gradient, 4=graphic overlays, 5=text, 6=webcam */
+/* Layer order (back to front): 0=bg color (slide), 1=bg image, 2=video, 3=gradient, 4=graphic overlays, 5=webcam, 6=text (text always on top) */
 .slide-background {
   position: absolute;
   top: 0;
@@ -196,7 +196,7 @@
 
 .slide-content {
   position: relative;
-  z-index: 5;
+  z-index: 10;
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -298,9 +298,9 @@
 }
 
 .slide-content-video {
-  /* Text overlay for video layout - layer 5 (above gradient and graphic overlays) */
+  /* Text overlay for video layout - above webcam/video in all modes */
   position: relative;
-  z-index: 5;
+  z-index: 10;
   display: flex;
   align-items: flex-end;
   padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
@@ -308,7 +308,7 @@
 
 /* Play mode: ensure text stays in front of video and gradient */
 .slide.play-mode .slide-content-video {
-  z-index: 5;
+  z-index: 10;
 }
 
 /* Left with Video: typography bottom and edge; text area is narrower */
@@ -720,7 +720,7 @@
 /* Webcam is positioned inside the slide - above text for visibility */
 .slide-webcam {
   position: absolute;
-  z-index: 6;
+  z-index: 5;
   border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);

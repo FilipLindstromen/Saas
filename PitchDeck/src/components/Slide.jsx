@@ -1849,7 +1849,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,
             pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined,
-            ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 5 } : {})
+            ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 10 } : {})
           }}
         >
           {renderContent()}

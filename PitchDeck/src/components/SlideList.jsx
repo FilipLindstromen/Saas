@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import LayoutSelector from './LayoutSelector'
 import ContextMenu from './ContextMenu'
+import { analyzeSlides } from '../services/slideColorAnalysis'
 import './SlideList.css'
 
-function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
+function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter, colorAnalyzeEnabled = false, onColorAnalyzeChange, openaiKey }) {
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [textAreaRef, setTextAreaRef] = useState(null)
@@ -11,9 +12,11 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
   const [draggedId, setDraggedId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
+  const [slideColorAnalysis, setSlideColorAnalysis] = useState({})
+  const [colorAnalyzeLoading, setColorAnalyzeLoading] = useState(false)
   const dragStartTimeRef = useRef(null)
 
-  // Strip HTML to plain text so edit fields show readable text, not raw tags
+  // Strip HTML to plain text (defined early for use in effect)
   const getPlainText = (content) => {
     if (!content || typeof content !== 'string') return ''
     return content
@@ -30,6 +33,24 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
   }
+
+  // Run color analysis when toggle is on and we have API key
+  useEffect(() => {
+    if (!colorAnalyzeEnabled || !openaiKey?.trim() || !slides?.length) {
+      if (!colorAnalyzeEnabled) setSlideColorAnalysis({})
+      return
+    }
+    const toAnalyze = slides.map((s) => ({
+      id: s.id,
+      text: getPlainText(s.content || (s.layout === 'section' ? 'Section Name' : '')),
+    }))
+    if (toAnalyze.every((s) => !s.text.trim())) return
+    setColorAnalyzeLoading(true)
+    analyzeSlides(openaiKey, toAnalyze)
+      .then(setSlideColorAnalysis)
+      .catch(() => setSlideColorAnalysis({}))
+      .finally(() => setColorAnalyzeLoading(false))
+  }, [colorAnalyzeEnabled, openaiKey, slides])
 
   // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
   const plainTextToStorage = (text) => {
@@ -347,6 +368,9 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
         cameraOverrideEnabled={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverrideEnabled ?? false}
         cameraOverridePosition={(slides.find(s => s.id === (selectedSlides.size > 0 ? Array.from(selectedSlides)[0] : selectedSlideId)) || {})?.cameraOverridePosition || 'fullscreen'}
         selectedCount={getIdsToUpdate().length}
+        colorAnalyzeEnabled={colorAnalyzeEnabled}
+        onColorAnalyzeChange={onColorAnalyzeChange}
+        colorAnalyzeLoading={colorAnalyzeLoading}
         onCameraOverrideChange={(enabled) => {
           const ids = getIdsToUpdate()
           if (ids.length === 0) return
@@ -392,7 +416,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
                 onDrop={(e) => handleDrop(e, slide.id)}
                 onDragEnd={handleDragEnd}
               >
-                <div className="slide-item slide-item-section">
+                <div className={`slide-item slide-item-section ${colorAnalyzeEnabled && slideColorAnalysis[slide.id] ? `color-analyze-${slideColorAnalysis[slide.id]}` : ''}`}>
                   <div className="slide-item-content">
                   <div className="slide-item-text slide-item-section-text" style={{ whiteSpace: 'pre-line' }}>
                     {getPlainText(slide.content || 'Section Name')}
@@ -459,7 +483,7 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', width: '100%' }}>
                 <div className="slide-item-number">{originalIndex + 1}</div>
                 <div
-                  className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''} ${selectedSlides.has(slide.id) ? 'multi-selected' : ''}`}
+                  className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''} ${selectedSlides.has(slide.id) ? 'multi-selected' : ''} ${colorAnalyzeEnabled && slideColorAnalysis[slide.id] ? `color-analyze-${slideColorAnalysis[slide.id]}` : ''}`}
                   onClick={(e) => {
                     // Don't select if we just finished dragging (within 200ms)
                     const timeSinceDragStart = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : Infinity

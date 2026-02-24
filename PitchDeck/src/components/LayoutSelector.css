@@ -191,6 +191,13 @@
   gap: 0.5rem;
 }
 
+.camera-override-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
 .camera-override-toggle {
   display: flex;
   align-items: center;
