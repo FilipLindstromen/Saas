@@ -52,19 +52,48 @@ export async function analyzeSlides(apiKey, slides) {
     apiKey,
   })
 
-  let arr
+  let arr = []
+  let rawText = (response || '').trim()
+  // Strip markdown code blocks if present
+  const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeBlockMatch) rawText = codeBlockMatch[1].trim()
   try {
-    const parsed = JSON.parse(response.trim())
-    arr = Array.isArray(parsed) ? parsed : [parsed]
+    const parsed = JSON.parse(rawText)
+    if (Array.isArray(parsed)) {
+      arr = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      // Handle object format: {"1":"statement","2":"impact"} or {classifications: [...]}
+      arr = parsed.classifications || Object.keys(parsed).sort((a, b) => Number(a) - Number(b)).map(k => parsed[k])
+    } else {
+      arr = [parsed]
+    }
   } catch {
-    const match = response.match(/\[[\s\S]*?\]/)
-    arr = match ? JSON.parse(match[0]) : []
+    const match = rawText.match(/\[[\s\S]*\]/)
+    if (match) {
+      try {
+        arr = JSON.parse(match[0])
+      } catch {
+        arr = []
+      }
+    }
   }
 
   const result = {}
+  const types = [...VALID_TYPES]
   slides.forEach((slide, i) => {
-    const raw = (arr[i] || 'statement').toString().toLowerCase().trim()
-    result[slide.id] = VALID_TYPES.includes(raw) ? raw : 'statement'
+    let raw = arr[i]
+    if (raw != null && typeof raw === 'object') raw = raw.type || raw.classification || raw
+    raw = (raw || 'statement').toString().toLowerCase().trim()
+    let type = VALID_TYPES.includes(raw) ? raw : 'statement'
+    result[slide.id] = type
   })
+
+  // If all results are the same, enforce the Persuasive Cycle based on position
+  const unique = [...new Set(Object.values(result))]
+  if (unique.length === 1 && slides.length > 1) {
+    slides.forEach((slide, i) => {
+      result[slide.id] = types[i % types.length]
+    })
+  }
   return result
 }
