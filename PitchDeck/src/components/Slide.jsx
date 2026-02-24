@@ -1806,17 +1806,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           cameraOverridePosition={cameraOverridePosition}
         />
       )}
-      {!hideGradient && slide.gradientEnabled !== false && (layout === 'video' || layout === 'left-video' || layout === 'right-video') && (
-        <div 
-          className="slide-gradient-overlay slide-gradient-overlay-video"
-          style={{
-            background: gradientFlipped
-              ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
-              : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
-            pointerEvents: 'none'
-          }}
-        />
-      )}
+      {!hideGradient && slide.gradientEnabled !== false && (layout === 'video' || layout === 'left-video' || layout === 'right-video') && (() => {
+        // left-video: darken left (text), transparent right (video). right-video: darken right (text), transparent left (video).
+        const darkOnLeft = layout === 'left-video' ? true : layout === 'right-video' ? false : gradientFlipped
+        const gradientBg = darkOnLeft
+          ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+          : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+        return (
+          <div
+            className="slide-gradient-overlay slide-gradient-overlay-video"
+            style={{ background: gradientBg, pointerEvents: 'none' }}
+          />
+        )
+      })()}
       {layout === 'video' ? (
         slide.content && (
           <div 

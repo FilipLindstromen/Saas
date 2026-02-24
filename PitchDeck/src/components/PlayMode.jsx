@@ -73,6 +73,14 @@ function GradientOverlay({ slide, backgroundColor = '#1a1a1a' }) {
   const maxOpacity = 1
   const midOpacity = 0.57
 
+  // For left-video: text on left, video on right. Gradient must darken left (text side), leave right (video) transparent.
+  // For right-video: text on right, video on left. Gradient must darken right (text side), leave left (video) transparent.
+  // For video: use gradientFlipped as is.
+  const darkOnLeft = layout === 'left-video' ? true : layout === 'right-video' ? false : gradientFlipped
+  const gradientCss = darkOnLeft
+    ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+    : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
+
   return (
     <div
       className="play-gradient-layer"
@@ -84,9 +92,7 @@ function GradientOverlay({ slide, backgroundColor = '#1a1a1a' }) {
       <div
         className="slide-gradient-overlay"
         style={{
-          background: gradientFlipped
-            ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
-            : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
+          background: gradientCss,
           pointerEvents: 'none'
         }}
       />

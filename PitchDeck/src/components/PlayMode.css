@@ -345,6 +345,13 @@
   aspect-ratio: auto !important;
 }
 
+/* Video layouts: slide and content must be fully transparent so video shows through */
+.play-mode .slide.layout-left-video .slide-content,
+.play-mode .slide.layout-right-video .slide-content,
+.play-mode .slide .slide-content-video {
+  background: transparent !important;
+}
+
 .play-mode .slide.slide-format-16-9,
 .play-mode .slide.slide-format-1-1,
 .play-mode .slide.slide-format-9-16 {
