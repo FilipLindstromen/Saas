@@ -202,7 +202,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     } : { r: 26, g: 26, b: 26 } // Default dark grey
   }
 
-  const slideBgColor = (layout === 'video' && isPlayMode)
+  const isVideoLayoutPlayMode = isPlayMode && ['video', 'left-video', 'right-video'].includes(layout)
+  const slideBgColor = (isVideoLayoutPlayMode && (slide.backgroundVideoUrl || slide.imageUrl))
     ? 'transparent'
     : (slide.backgroundColorOverride && slide.backgroundColorOverrideValue)
       ? slide.backgroundColorOverrideValue
@@ -1805,15 +1806,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           cameraOverridePosition={cameraOverridePosition}
         />
       )}
-      {!hideGradient && slide.gradientEnabled !== false && layout === 'video' && (
+      {!hideGradient && slide.gradientEnabled !== false && (layout === 'video' || layout === 'left-video' || layout === 'right-video') && (
         <div 
           className="slide-gradient-overlay slide-gradient-overlay-video"
           style={{
             background: gradientFlipped
               ? `linear-gradient(to right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`
               : `linear-gradient(to left, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${maxOpacity}) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${midOpacity}) 30%, transparent 100%)`,
-            pointerEvents: 'none',
-            zIndex: 1000
+            pointerEvents: 'none'
           }}
         />
       )}
@@ -1824,7 +1824,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             style={{ 
               color: textColor,
               fontFamily: `"${fontFamily}", sans-serif`,
-              zIndex: 1001, // Above video (1) and gradient (2) - text must be on top
               ...(isPlayMode ? {
                 position: 'absolute',
                 inset: 0,
@@ -1848,7 +1847,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,
             pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined,
-            ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 1001 } : {})
+            ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 5 } : {})
           }}
         >
           {renderContent()}

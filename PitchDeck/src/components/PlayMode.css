@@ -32,23 +32,24 @@
   }
 }
 
-/* Persistent background layer: sits behind slide content when consecutive slides share the same background */
+/* Layer order (back to front): 0=bg, 1=image, 2=video, 3=gradient, 4=graphics, 5=text */
+/* Persistent background layer: image/infographic when consecutive slides share same background */
 .play-background-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
-/* Persistent gradient layer: when consecutive slides have gradient in same position, keep it visible and only fade opacity if it differs */
+/* Persistent gradient layer: above video, below content */
 .play-gradient-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -94,9 +95,9 @@
   }
 }
 
-/* Video-only layout: slide container (and text overlay) must sit above webcam overlay (z-index 1000) */
+/* Video layout: same z-index, ensures content above gradient */
 .play-slide-container-video-layout {
-  z-index: 1001;
+  z-index: 5;
 }
 
 /* First slide: 2 second delay before text shows - hide text initially, then fade in */

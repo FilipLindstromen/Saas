@@ -1222,7 +1222,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       <div 
         key={slideKey}
         className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''}`}
-        style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 1001 } : undefined}
+        style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 5 } : undefined}
       >
         <Slide 
           slide={presentationSlides[currentIndex]} 
