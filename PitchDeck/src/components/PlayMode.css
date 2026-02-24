@@ -22,6 +22,16 @@
   z-index: 10001 !important;
 }
 
+/* Persistent video layer: video slides in from right when returning to video slide */
+@keyframes play-video-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Persistent background layer: sits behind slide content when consecutive slides share the same background */
 .play-background-layer {
   position: absolute;
@@ -64,18 +74,24 @@
   right: 0;
   bottom: 0;
   z-index: 1;
-  /* Initial state - visible */
+  /* No slide-level transition - content transitions only */
   opacity: 1;
-  transform: translateX(0) scale(1);
-  filter: blur(0);
-  /* Ensure transitions are smooth */
-  will-change: opacity, transform, filter;
+  transform: none;
+  filter: none;
 }
 
-.play-slide-container.visible {
-  opacity: 1;
-  transform: translateX(0) scale(1);
-  filter: blur(0);
+/* Content (background, text, images) fades in when slide changes */
+.play-slide-content-transition .slide {
+  animation: playContentFadeIn 0.3s ease-out;
+}
+
+@keyframes playContentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Video-only layout: slide container (and text overlay) must sit above webcam overlay (z-index 1000) */

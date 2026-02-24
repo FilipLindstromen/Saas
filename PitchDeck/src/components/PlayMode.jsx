@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import SlideBackground from './SlideBackground'
+import PersistentVideoLayer from './PersistentVideoLayer'
 import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
+
+const VIDEO_TRANSITION_MS = 500
 
 // Two slides share the same background if they use the same image, video, or infographic
 function sameBackground(a, b) {
@@ -24,10 +27,18 @@ function sameBackground(a, b) {
 // Both slides use video layout with background video - keep video layer persistent to avoid fade/flicker
 function bothVideoLayoutWithMedia(a, b) {
   if (!a || !b) return false
-  const layoutA = (a.layout || 'default') === 'video'
-  const layoutB = (b.layout || 'default') === 'video'
-  if (!layoutA || !layoutB) return false
+  const layoutA = (a.layout || 'default')
+  const layoutB = (b.layout || 'default')
+  const isVideoLayout = (l) => ['video', 'left-video', 'right-video'].includes(l)
+  if (!isVideoLayout(layoutA) || !isVideoLayout(layoutB)) return false
   return !!(a.backgroundVideoUrl || a.imageUrl) && !!(b.backgroundVideoUrl || b.imageUrl)
+}
+
+// Slide has video layout with media (video or image as background)
+function hasVideoLayoutWithMedia(slide) {
+  if (!slide) return false
+  const layout = slide.layout || 'default'
+  return ['video', 'left-video', 'right-video'].includes(layout) && !!(slide.backgroundVideoUrl || slide.imageUrl)
 }
 
 // Two slides have gradient in the same position (gradientFlipped). Gradient shows for default, bulletpoints, video layouts.
@@ -52,7 +63,7 @@ function GradientOverlay({ slide, backgroundColor = '#1a1a1a' }) {
   if (!slide || (slide.layout || 'default') === 'section') return null
   const hasMedia = !!(slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl)
   const layout = slide.layout || 'default'
-  if (!hasMedia || !['default', 'bulletpoints', 'video'].includes(layout)) return null
+  if (!hasMedia || !['default', 'bulletpoints', 'video', 'left-video', 'right-video'].includes(layout)) return null
   if (slide.gradientEnabled === false) return null
 
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
@@ -552,6 +563,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
   const [preloadReady, setPreloadReady] = useState(false) // Defer preload until after first paint to avoid overlapping text on play start
   const [firstSlideTextVisible, setFirstSlideTextVisible] = useState(false)
+  // Video persistence: when transitioning from video slide to non-video, slide video off to right
+  const [isSlidingOff, setIsSlidingOff] = useState(false)
+  const [isSlidingIn, setIsSlidingIn] = useState(false)
+  const videoSlideForTransitionRef = useRef(null) // Slide we're leaving when isSlidingOff
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
@@ -579,10 +594,17 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlide = presentationSlides[currentIndex]
   const nextSlideData = presentationSlides[currentIndex + 1]
   const prevSlideData = presentationSlides[currentIndex - 1]
-  // Use persistent background when: consecutive slides share same bg, both are video layout, OR current slide is fullscreen video (keeps video in stable layer to avoid flicker)
-  const isCurrentVideoLayout = (currentSlide?.layout || 'default') === 'video' && !!(currentSlide?.backgroundVideoUrl || currentSlide?.imageUrl)
-  const usePersistentBackground = isCurrentVideoLayout || (nextSlideData && (sameBackground(currentSlide, nextSlideData) || bothVideoLayoutWithMedia(currentSlide, nextSlideData))) || (prevSlideData && (sameBackground(currentSlide, prevSlideData) || bothVideoLayoutWithMedia(currentSlide, prevSlideData)))
-  const usePersistentGradient = usePersistentBackground && ((nextSlideData && sameGradientPosition(currentSlide, nextSlideData)) || (prevSlideData && sameGradientPosition(currentSlide, prevSlideData)))
+  const currentSlideHasVideo = hasVideoLayoutWithMedia(currentSlide)
+  const nextSlideHasVideo = hasVideoLayoutWithMedia(nextSlideData)
+  const prevSlideHasVideo = hasVideoLayoutWithMedia(prevSlideData)
+  // Use persistent video layer: current has video, or we're sliding off/in
+  const usePersistentVideo = currentSlideHasVideo || isSlidingOff || isSlidingIn
+  // Use persistent background for non-video: consecutive slides share same image/infographic bg (not video)
+  const usePersistentBackground = !usePersistentVideo && ((nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData)))
+  const usePersistentGradient = usePersistentBackground || usePersistentVideo
+  // Which slide's video to show in PersistentVideoLayer
+  const videoSlideForLayer = isSlidingOff ? videoSlideForTransitionRef.current : (currentSlideHasVideo ? currentSlide : null)
+  const videoLayoutForLayer = (videoSlideForLayer?.layout || 'video') === 'title' ? 'centered' : (videoSlideForLayer?.layout || 'video')
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
   const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
@@ -645,84 +667,83 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prevIndex) => {
-      if (prevIndex < presentationSlides.length - 1) {
-        const nextIndex = prevIndex + 1
-        const currentLayout = (presentationSlides[prevIndex]?.layout || 'default') === 'video'
-        const nextLayout = (presentationSlides[nextIndex]?.layout || 'default') === 'video'
-        const isVideoTransition = currentLayout || nextLayout
+    if (currentIndex >= presentationSlides.length - 1) return
+    if (isTransitioning) return
 
-        if (isVideoTransition) {
-          // Video layout: switch immediately, no delay or remount to avoid flicker
-          setVisibleBulletIndex(-1)
-          setTransitionPhase('idle')
-          return nextIndex
-        }
+    const nextIndex = currentIndex + 1
+    const currentHasVideo = hasVideoLayoutWithMedia(presentationSlides[currentIndex])
+    const nextHasVideo = hasVideoLayoutWithMedia(presentationSlides[nextIndex])
 
-        setIsTransitioning(true)
-        setVisibleBulletIndex(-1) // Reset bullet animation
-        const duration = getTransitionDuration(transitionStyle)
-        setTransitionPhase('fade-out')
+    setVisibleBulletIndex(-1)
+    setTransitionPhase('idle')
 
-        setTimeout(() => {
-          setTransitionPhase('fade-in')
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setCurrentIndex(nextIndex)
-              setSlideKey(prev => prev + 1)
-              setTimeout(() => {
-                setIsTransitioning(false)
-                setTransitionPhase('idle')
-              }, duration)
-            })
-          })
-        }, duration)
-
-        return prevIndex
-      }
-      return prevIndex
-    })
-  }, [presentationSlides, transitionStyle])
+    if (currentHasVideo && !nextHasVideo) {
+      // Video → no video: slide video off to right, then show new content
+      setIsTransitioning(true)
+      videoSlideForTransitionRef.current = presentationSlides[currentIndex]
+      setCurrentIndex(nextIndex)
+      setIsSlidingOff(true)
+      setTimeout(() => {
+        setIsSlidingOff(false)
+        videoSlideForTransitionRef.current = null
+        setSlideKey(k => k + 1)
+        setIsTransitioning(false)
+      }, VIDEO_TRANSITION_MS)
+    } else if (!currentHasVideo && nextHasVideo) {
+      // No video → video: slide video in from right
+      setIsTransitioning(true)
+      setIsSlidingIn(true)
+      setCurrentIndex(nextIndex)
+      setSlideKey(k => k + 1)
+      setTimeout(() => {
+        setIsSlidingIn(false)
+        setIsTransitioning(false)
+      }, VIDEO_TRANSITION_MS)
+    } else {
+      // Same format (both video or both non-video): instant change, content transitions
+      setCurrentIndex(nextIndex)
+      setSlideKey(k => k + 1)
+    }
+  }, [presentationSlides, currentIndex, isTransitioning])
 
   const prevSlide = useCallback(() => {
-    setCurrentIndex((prevIndex) => {
-      if (prevIndex > 0) {
-        const nextIndex = prevIndex - 1
-        const currentLayout = (presentationSlides[prevIndex]?.layout || 'default') === 'video'
-        const prevLayout = (presentationSlides[nextIndex]?.layout || 'default') === 'video'
-        const isVideoTransition = currentLayout || prevLayout
+    if (currentIndex <= 0) return
+    if (isTransitioning) return
 
-        if (isVideoTransition) {
-          // Video layout: switch immediately, no delay or remount to avoid flicker
-          setVisibleBulletIndex(-1)
-          setTransitionPhase('idle')
-          return nextIndex
-        }
+    const prevIndex = currentIndex - 1
+    const currentHasVideo = hasVideoLayoutWithMedia(presentationSlides[currentIndex])
+    const prevHasVideo = hasVideoLayoutWithMedia(presentationSlides[prevIndex])
 
-        setIsTransitioning(true)
-        setVisibleBulletIndex(-1)
-        const duration = getTransitionDuration(transitionStyle)
-        setTransitionPhase('fade-out')
+    setVisibleBulletIndex(-1)
+    setTransitionPhase('idle')
 
-        setTimeout(() => {
-          setTransitionPhase('fade-in')
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setCurrentIndex(nextIndex)
-              setSlideKey(prev => prev + 1)
-              setTimeout(() => {
-                setIsTransitioning(false)
-                setTransitionPhase('idle')
-              }, duration)
-            })
-          })
-        }, duration)
-
-        return prevIndex
-      }
-      return prevIndex
-    })
-  }, [presentationSlides, transitionStyle])
+    if (currentHasVideo && !prevHasVideo) {
+      // Video → no video (going back): slide video off to right
+      setIsTransitioning(true)
+      videoSlideForTransitionRef.current = presentationSlides[currentIndex]
+      setCurrentIndex(prevIndex)
+      setIsSlidingOff(true)
+      setTimeout(() => {
+        setIsSlidingOff(false)
+        videoSlideForTransitionRef.current = null
+        setSlideKey(k => k + 1)
+        setIsTransitioning(false)
+      }, VIDEO_TRANSITION_MS)
+    } else if (!currentHasVideo && prevHasVideo) {
+      // No video → video (going back): slide video in from right
+      setIsTransitioning(true)
+      setIsSlidingIn(true)
+      setCurrentIndex(prevIndex)
+      setSlideKey(k => k + 1)
+      setTimeout(() => {
+        setIsSlidingIn(false)
+        setIsTransitioning(false)
+      }, VIDEO_TRANSITION_MS)
+    } else {
+      setCurrentIndex(prevIndex)
+      setSlideKey(k => k + 1)
+    }
+  }, [presentationSlides, currentIndex, isTransitioning])
 
   // Reset bullet index when slide changes
   useEffect(() => {
@@ -1167,7 +1188,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           transformOrigin: 'center center'
         }}
       >
-      {/* Persistent background layer: when consecutive slides share the same background, keep it visible during transitions */}
+      {/* Persistent video layer: video persists across slides, slides off when going to non-video */}
+      {usePersistentVideo && videoSlideForLayer && (
+        <PersistentVideoLayer
+          videoSlide={videoSlideForLayer}
+          layout={videoLayoutForLayer}
+          isSlidingOff={isSlidingOff}
+          isSlidingIn={isSlidingIn}
+          canvasSize={canvasSize}
+          recordSettings={recordSettings}
+        />
+      )}
+      {/* Persistent background layer: when consecutive slides share same image/infographic (non-video) */}
       {usePersistentBackground && (
         <div className="play-background-layer" aria-hidden="true">
           <SlideBackground
@@ -1186,9 +1218,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           backgroundColor={backgroundColor}
         />
       )}
+      {/* Content layer: no slide-level transition; content (background, text, images) transitions */}
       <div 
-        key={currentSlideLayout === 'video' ? 'video-persistent' : slideKey}
-        className={`play-slide-container transition-${transitionStyle} ${transitionPhase === 'fade-out' && currentSlideLayout !== 'video' ? 'fade-out' : transitionPhase === 'fade-in' && currentSlideLayout !== 'video' ? 'fade-in' : 'visible'} ${currentSlideLayout === 'video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''}`}
+        key={slideKey}
+        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''}`}
         style={(currentSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true) && (currentSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen') === 'fullscreen' ? { zIndex: 1001 } : undefined}
       >
         <Slide 
@@ -1199,7 +1232,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           isPreload={false}
-          hideBackground={usePersistentBackground}
+          hideBackground={usePersistentBackground || usePersistentVideo}
           hideGradient={usePersistentGradient}
         />
       </div>
