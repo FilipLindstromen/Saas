@@ -334,9 +334,10 @@
 /* Same bg, different position/scale: smooth transition (no fade) */
 .play-bg-pos-scale-transition .play-background-layer .slide-background,
 .play-bg-pos-scale-transition .play-background-layer .slide-background-video .slide-background-video-el,
+.play-bg-pos-scale-transition .play-background-layer .infographic-background-canvas,
 .play-bg-pos-scale-transition .play-persistent-video-el,
 .play-bg-pos-scale-transition .play-persistent-video-bg-image {
-  transition: background-position 0.5s ease, background-size 0.5s ease, object-position 0.5s ease, transform 0.5s ease;
+  transition: background-position var(--pos-scale-duration, 500ms) ease-in-out, background-size var(--pos-scale-duration, 500ms) ease-in-out, object-position var(--pos-scale-duration, 500ms) ease-in-out, transform var(--pos-scale-duration, 500ms) ease-in-out;
 }
 
 /* Crossfade Transition - both layers in same container, fade at exactly the same time */

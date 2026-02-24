@@ -1374,6 +1374,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   // When transitioning with same bg (different pos/scale), skip background fade - only animate position/scale
   const targetSlide = pendingIndex != null ? presentationSlides[pendingIndex] : null
   const sameBgNoTransition = targetSlide && sameBackground(currentSlide, targetSlide)
+  // Use target slide for background during transition so position/scale animates smoothly from current to target
+  const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
+  const posScaleTransitionMs = getTransitionDuration(transitionStyle)
 
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a' }}>
@@ -1450,7 +1453,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       ) : (
         <div
           className={`play-background-transition-wrapper ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${!sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
-          style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
+          style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6, '--pos-scale-duration': `${posScaleTransitionMs}ms` }}
         >
           {usePersistentVideo && videoSlideForLayer && (
             <PersistentVideoLayer
@@ -1465,7 +1468,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           {usePersistentBackground && (
             <div className="play-background-layer" aria-hidden="true">
               <SlideBackground
-                slide={currentSlide}
+                slide={backgroundSlideForPosScale}
                 backgroundScaleAnimation={backgroundScaleAnimation}
                 backgroundScaleTime={backgroundScaleTime}
                 backgroundScaleAmount={backgroundScaleAmount}
