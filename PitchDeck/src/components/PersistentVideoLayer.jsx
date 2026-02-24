@@ -128,7 +128,7 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
       style={{
         position: 'absolute',
         inset: 0,
-        zIndex: 2,
+        zIndex: 1,
         overflow: 'hidden',
         pointerEvents: 'none',
       }}
