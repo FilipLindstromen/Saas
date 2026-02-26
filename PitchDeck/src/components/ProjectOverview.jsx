@@ -1,21 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  isLocalFolderSupported,
+  hasConnectedFolder,
+  getConnectedLocalFolder,
   openProjectFolder,
-  getProjectFolder,
-  clearProjectFolder,
-  listFromProjectFolder,
-  saveToProjectFolder,
-  renameProjectInFolder,
-  deleteFileFromProjectFolder,
-  readFromFileHandle,
-  resolveProjectImageUrls,
-  connectGoogleDrive,
-  listDriveProjects,
-  saveToDrive,
-  readFromDrive
-} from '../services/projectStorage'
+  clearConnectedLocalFolder,
+  listProjectsInConnectedFolder,
+  loadProjectFromConnectedFolder,
+  saveProjectToConnectedFolder,
+  isLocalFolderSupported
+} from '@shared/projectFolderStorage'
 import './ProjectOverview.css'
+
+const APP_NAME = 'PitchDeck'
 
 /** Get the first background image URL from a project's chapters/slides (first slide with imageUrl). */
 function getFirstSlideImageUrl(data) {
@@ -40,127 +36,96 @@ function ProjectOverview({
   projectName,
   googleClientId
 }) {
-  const [localProjects, setLocalProjects] = useState([])
-  const [localFolderName, setLocalFolderName] = useState(null) // display name of open project folder, or null
-  const [driveProjects, setDriveProjects] = useState([])
-  const [driveToken, setDriveToken] = useState(null)
+  const [connectedProjects, setConnectedProjects] = useState([])
+  const [folderName, setFolderName] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
   const [loading, setLoading] = useState('')
   const [error, setError] = useState('')
   const [showNewProjectOverlay, setShowNewProjectOverlay] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
-  const [showRenameProjectOverlay, setShowRenameProjectOverlay] = useState(false)
-  const [renameProjectValue, setRenameProjectValue] = useState('')
-  const [thumbnails, setThumbnails] = useState({}) // project id -> thumbnail URL (object URL or data URL)
-  const thumbnailUrlsRef = useRef(new Set()) // track object URLs we created so we can revoke on cleanup
+  const [thumbnails, setThumbnails] = useState({})
+  const thumbnailUrlsRef = useRef(new Set())
 
-  // Restore project folder on mount and list its files
+  // Load projects from connected folder (SaaS settings)
   useEffect(() => {
-    if (!isLocalFolderSupported()) return
     let cancelled = false
-    getProjectFolder()
+    hasConnectedFolder()
+      .then((has) => {
+        if (cancelled || !has) return
+        return getConnectedLocalFolder()
+      })
       .then((folder) => {
-        if (cancelled || !folder) return
-        setLocalFolderName(folder.name)
-        return listFromProjectFolder()
+        if (cancelled) return
+        if (folder) {
+          setFolderName(folder.name)
+          return listProjectsInConnectedFolder(APP_NAME)
+        }
+        setFolderName(null)
+        return []
       })
       .then((list) => {
         if (cancelled) return
-        if (Array.isArray(list)) setLocalProjects(list)
+        setConnectedProjects(Array.isArray(list) ? list : [])
       })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
-  // Load thumbnails (first background image) for local and drive projects
+  // Load thumbnails for projects
   useEffect(() => {
-    const localList = localFolderName != null ? localProjects : []
-    const driveList = driveToken != null ? driveProjects : []
-    if (localList.length === 0 && driveList.length === 0) {
+    if (connectedProjects.length === 0) {
       setThumbnails({})
       return
     }
     let cancelled = false
     thumbnailUrlsRef.current = new Set()
-
-    const loadLocalThumbnails = async () => {
-      const folder = await getProjectFolder()
-      if (!folder?.handle || cancelled) return
-      for (const p of localList) {
-        if (cancelled) break
-        try {
-          const data = await readFromFileHandle(p.handle)
-          const resolved = await resolveProjectImageUrls(data, folder.handle)
-          const url = getFirstSlideImageUrl(resolved)
-          if (cancelled) {
-            if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
-            break
-          }
+    connectedProjects.forEach((p) => {
+      if (cancelled) return
+      loadProjectFromConnectedFolder(APP_NAME, p.name)
+        .then((result) => {
+          if (cancelled) return
+          const url = result ? getFirstSlideImageUrl(result.data) : null
           if (url?.startsWith('blob:')) thumbnailUrlsRef.current.add(url)
-          setThumbnails((prev) => ({ ...prev, [`local-${p.name}`]: url || null }))
-        } catch (_) {
-          if (!cancelled) setThumbnails((prev) => ({ ...prev, [`local-${p.name}`]: null }))
-        }
-      }
-    }
-
-    const loadDriveThumbnails = async () => {
-      if (!driveToken || cancelled) return
-      for (const p of driveList) {
-        if (cancelled) break
-        try {
-          const data = await readFromDrive(driveToken, p.id)
-          const url = getFirstSlideImageUrl(data)
-          if (cancelled) break
-          setThumbnails((prev) => ({ ...prev, [`drive-${p.id}`]: url || null }))
-        } catch (_) {
-          if (!cancelled) setThumbnails((prev) => ({ ...prev, [`drive-${p.id}`]: null }))
-        }
-      }
-    }
-
-    loadLocalThumbnails().then(() => loadDriveThumbnails())
-
+          setThumbnails((prev) => ({ ...prev, [p.name]: url || null }))
+        })
+        .catch(() => {
+          if (!cancelled) setThumbnails((prev) => ({ ...prev, [p.name]: null }))
+        })
+    })
     return () => {
       cancelled = true
       thumbnailUrlsRef.current.forEach((u) => URL.revokeObjectURL(u))
       thumbnailUrlsRef.current = new Set()
-      setThumbnails({})
     }
-  }, [localFolderName, localProjects, driveToken, driveProjects])
+  }, [connectedProjects])
 
-  const hasFolderOrDrive = localFolderName != null || driveToken != null
-  const recentOnlyWhenNoFolder = localFolderName == null && driveToken != null
-  const allProjects = !hasFolderOrDrive
-    ? []
-    : [
-        ...(recentOnlyWhenNoFolder
-          ? recentFiles.map((f) => ({
-              type: 'recent',
-              id: `recent-${f.path}`,
-              name: f.name || f.path,
-              data: f.data,
-              modifiedTime: f.lastOpened
-            }))
-          : []),
-        ...localProjects.map((p) => ({ type: 'local', id: `local-${p.name}`, name: p.name, handle: p.handle })),
-        ...driveProjects.map((p) => ({
-          type: 'drive',
-          id: `drive-${p.id}`,
-          driveId: p.id,
-          name: p.name,
-          modifiedTime: p.modifiedTime
+  const hasFolder = folderName != null
+  const allProjects = [
+    ...(folderName == null && recentFiles?.length
+      ? recentFiles.map((f) => ({
+          type: 'recent',
+          id: `recent-${f.path}`,
+          name: f.name || f.path,
+          data: f.data,
+          modifiedTime: f.lastOpened
         }))
-      ]
+      : []),
+    ...connectedProjects.map((p) => ({
+      type: 'connected',
+      id: `connected-${p.name}`,
+      name: p.name,
+      modifiedTime: p.modifiedTime || 0
+    }))
+  ]
 
   const handleOpenProjectFolder = async () => {
     setError('')
     setLoading('Opening folder…')
     try {
-      const { handle, name } = await openProjectFolder()
-      setLocalFolderName(name)
-      const list = await listFromProjectFolder()
-      setLocalProjects(list)
+      const { name } = await openProjectFolder()
+      setFolderName(name)
+      const list = await listProjectsInConnectedFolder(APP_NAME)
+      setConnectedProjects(list)
     } catch (e) {
       setError(e?.message || 'Failed to open folder')
     } finally {
@@ -171,76 +136,28 @@ function ProjectOverview({
   const handleDisconnectFolder = async () => {
     setError('')
     try {
-      await clearProjectFolder()
-      setLocalFolderName(null)
-      setLocalProjects([])
-      setShowRenameProjectOverlay(false)
-      setSelectedProject((p) => (p?.type === 'local' ? null : p))
+      await clearConnectedLocalFolder()
+      setFolderName(null)
+      setConnectedProjects([])
+      setSelectedProject((p) => (p?.type === 'connected' ? null : p))
     } catch (e) {
       setError(e?.message || 'Failed to disconnect folder')
     }
   }
 
-  const handleRenameProjectClick = () => {
-    if (!selectedProject?.name) return
-    setRenameProjectValue(selectedProject.name)
-    setShowRenameProjectOverlay(true)
-  }
-
-  const handleRenameProjectSave = async () => {
-    if (!selectedProject || selectedProject.type !== 'local' || !selectedProject.handle) return
+  const handleSaveToFolder = async () => {
     setError('')
-    setLoading('Renaming…')
+    if (!getExportData) return
+    setLoading('Saving…')
     try {
-      const { name } = await renameProjectInFolder(selectedProject.handle, renameProjectValue)
-      const list = await listFromProjectFolder()
-      setLocalProjects(list)
-      const updated = list.find((p) => p.name === name)
-      setSelectedProject(updated ? { type: 'local', id: `local-${name}`, name, handle: updated.handle } : null)
-      setShowRenameProjectOverlay(false)
+      const projName = (projectName || '').trim() || 'Untitled Project'
+      const result = await saveProjectToConnectedFolder(APP_NAME, projName, getExportData)
+      if (result) {
+        const list = await listProjectsInConnectedFolder(APP_NAME)
+        setConnectedProjects(list)
+      }
     } catch (e) {
-      setError(e?.message || 'Failed to rename project')
-    } finally {
-      setLoading('')
-    }
-  }
-
-  const handleRenameProjectCancel = () => {
-    setShowRenameProjectOverlay(false)
-    setRenameProjectValue('')
-  }
-
-  const handleDeleteProject = async () => {
-    if (!selectedProject || selectedProject.type !== 'local' || !selectedProject.handle) return
-    if (!window.confirm(`Delete project "${selectedProject.name}" from the folder? This cannot be undone.`)) return
-    setError('')
-    setLoading('Deleting…')
-    try {
-      await deleteFileFromProjectFolder(selectedProject.handle)
-      const list = await listFromProjectFolder()
-      setLocalProjects(list)
-      setSelectedProject(null)
-    } catch (e) {
-      setError(e?.message || 'Failed to delete project')
-    } finally {
-      setLoading('')
-    }
-  }
-
-  const handleConnectDrive = async () => {
-    setError('')
-    if (!googleClientId?.trim()) {
-      setError('Add Google Client ID in Settings (API Keys) first.')
-      return
-    }
-    setLoading('Connecting to Google Drive…')
-    try {
-      const token = await connectGoogleDrive(googleClientId.trim())
-      setDriveToken(token)
-      const list = await listDriveProjects(token)
-      setDriveProjects(list)
-    } catch (e) {
-      setError(e?.message || 'Google Drive connection failed')
+      setError(e?.message || 'Failed to save')
     } finally {
       setLoading('')
     }
@@ -256,55 +173,18 @@ function ProjectOverview({
         onClose()
         return
       }
-      if (selectedProject.type === 'local' && selectedProject.handle) {
-        const data = await readFromFileHandle(selectedProject.handle)
-        const folder = await getProjectFolder()
-        const resolvedData = folder?.handle
-          ? await resolveProjectImageUrls(data, folder.handle)
-          : data
-        onLoadProject(resolvedData)
-        onClose()
-        return
-      }
-      if (selectedProject.type === 'drive' && selectedProject.driveId && driveToken) {
-        const data = await readFromDrive(driveToken, selectedProject.driveId)
-        onLoadProject(data)
-        onClose()
-        return
+      if (selectedProject.type === 'connected' && selectedProject.name) {
+        const result = await loadProjectFromConnectedFolder(APP_NAME, selectedProject.name)
+        if (result?.data) {
+          onLoadProject(result.data)
+          onClose()
+        } else {
+          setError('Project not found')
+        }
       }
     } catch (e) {
       setError(e?.message || 'Failed to open project')
     } finally {
-      setLoading('')
-    }
-  }
-
-  const handleSaveToFolder = async () => {
-    setError('')
-    if (!getExportData) return
-    setLoading('Saving…')
-    try {
-      await saveToProjectFolder(getExportData, projectName)
-      const list = await listFromProjectFolder()
-      setLocalProjects(list)
-      setLoading('')
-    } catch (e) {
-      setError(e?.message || 'Failed to save')
-      setLoading('')
-    }
-  }
-
-  const handleSaveToDrive = async () => {
-    setError('')
-    if (!driveToken || !getExportData) return
-    setLoading('Saving to Google Drive…')
-    try {
-      await saveToDrive(driveToken, getExportData(), projectName || 'Untitled Project', null)
-      const list = await listDriveProjects(driveToken)
-      setDriveProjects(list)
-      setLoading('')
-    } catch (e) {
-      setError(e?.message || 'Failed to save to Drive')
       setLoading('')
     }
   }
@@ -353,7 +233,10 @@ function ProjectOverview({
           {allProjects.length === 0 && !loading && (
             <div className="project-overview-empty">
               <p>No projects yet.</p>
-              <p className="project-overview-empty-hint">Use <strong>Open project folder</strong> to read and save directly to a folder on your computer, or <strong>Connect Google Drive</strong>, or create a <strong>New Project</strong>.</p>
+              <p className="project-overview-empty-hint">
+                Use <strong>Open project folder</strong> to connect the folder from SaaS Apps settings, or create a <strong>New Project</strong>.
+                Projects save to <code>PitchDeck/[project name]/project.json</code>.
+              </p>
             </div>
           )}
           {allProjects.map((proj) => (
@@ -364,8 +247,8 @@ function ProjectOverview({
               onClick={() => setSelectedProject(proj)}
             >
               <div className="project-overview-card-thumb">
-                {(thumbnails[proj.id] ?? getFirstSlideImageUrl(proj.data)) ? (
-                  <img src={thumbnails[proj.id] ?? getFirstSlideImageUrl(proj.data)} alt="" />
+                {(thumbnails[proj.name] ?? getFirstSlideImageUrl(proj.data)) ? (
+                  <img src={thumbnails[proj.name] ?? getFirstSlideImageUrl(proj.data)} alt="" />
                 ) : (
                   <div className="project-overview-card-placeholder" />
                 )}
@@ -376,8 +259,7 @@ function ProjectOverview({
               <span className="project-overview-card-name">{proj.name || 'Untitled Project'}</span>
               <span className="project-overview-card-badge">
                 {proj.type === 'recent' && 'Recent'}
-                {proj.type === 'local' && 'Folder'}
-                {proj.type === 'drive' && 'Google Drive'}
+                {proj.type === 'connected' && 'Folder'}
               </span>
             </button>
           ))}
@@ -387,10 +269,10 @@ function ProjectOverview({
           <div className="project-overview-actions-left">
             {localSupported && (
               <>
-                {localFolderName !== null ? (
+                {folderName !== null ? (
                   <>
-                    <span className="project-overview-folder-label" title="Current project folder">
-                      Folder: {localFolderName || 'Unnamed'}
+                    <span className="project-overview-folder-label" title="Connected folder from SaaS settings">
+                      Folder: {folderName || 'Unnamed'}
                     </span>
                     <button type="button" className="btn-project-overview secondary" onClick={handleSaveToFolder} disabled={!!loading}>
                       Save
@@ -406,37 +288,8 @@ function ProjectOverview({
                 )}
               </>
             )}
-            {driveToken ? (
-              <button type="button" className="btn-project-overview secondary" onClick={handleSaveToDrive} disabled={!!loading}>
-                Save to Google Drive
-              </button>
-            ) : (
-              <button type="button" className="btn-project-overview secondary" onClick={handleConnectDrive} disabled={!!loading}>
-                Connect Google Drive
-              </button>
-            )}
           </div>
           <div className="project-overview-actions-right">
-            {selectedProject?.type === 'local' && (
-              <>
-                <button
-                  type="button"
-                  className="btn-project-overview secondary"
-                  onClick={handleRenameProjectClick}
-                  disabled={!!loading}
-                >
-                  Rename project
-                </button>
-                <button
-                  type="button"
-                  className="btn-project-overview danger"
-                  onClick={handleDeleteProject}
-                  disabled={!!loading}
-                >
-                  Delete project
-                </button>
-              </>
-            )}
             <button type="button" className="btn-project-overview primary" onClick={handleNewClick}>
               New Project
             </button>
@@ -475,36 +328,6 @@ function ProjectOverview({
                 </button>
                 <button type="button" className="btn-project-overview primary" onClick={handleNewProjectCreate}>
                   Create
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showRenameProjectOverlay && (
-          <div className="project-overview-new-overlay" onClick={handleRenameProjectCancel}>
-            <div className="project-overview-new-modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="project-overview-new-title">Rename project</h3>
-              <label htmlFor="rename-project-name" className="project-overview-new-label">Project name</label>
-              <input
-                id="rename-project-name"
-                type="text"
-                className="project-overview-new-input"
-                value={renameProjectValue}
-                onChange={(e) => setRenameProjectValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRenameProjectSave()
-                  if (e.key === 'Escape') handleRenameProjectCancel()
-                }}
-                placeholder="e.g. Q4 Pitch"
-                autoFocus
-              />
-              <div className="project-overview-new-actions">
-                <button type="button" className="btn-project-overview secondary" onClick={handleRenameProjectCancel}>
-                  Cancel
-                </button>
-                <button type="button" className="btn-project-overview primary" onClick={handleRenameProjectSave} disabled={!!loading}>
-                  Save
                 </button>
               </div>
             </div>

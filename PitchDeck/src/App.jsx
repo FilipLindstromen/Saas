@@ -20,7 +20,6 @@ import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
 import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
-import { getProjectFolder, saveToProjectFolder } from './services/projectStorage'
 import {
   hasConnectedFolder,
   saveProjectToConnectedFolder,
@@ -248,6 +247,7 @@ function App() {
           ...parsed,
           webcamSize: parsed.webcamSize || 'large',
           webcamFlipHorizontal: parsed.webcamFlipHorizontal === true,
+          webcamFlipVertical: parsed.webcamFlipVertical === true,
           recordingFileFormat: parsed.recordingFileFormat || 'webm-vp9',
           recordingResolution: parsed.recordingResolution || '1080p',
           recordingQuality: parsed.recordingQuality || 'high',
@@ -267,6 +267,7 @@ function App() {
       webcamEnabled: false,
       webcamSize: 'large',
       webcamFlipHorizontal: false,
+      webcamFlipVertical: false,
       selectedCameraId: '',
       microphoneEnabled: false,
       selectedMicrophoneId: '',
@@ -688,15 +689,11 @@ function App() {
         exportedAt: new Date().toISOString()
       }
       try {
-        const folder = await getProjectFolder()
-        if (folder) {
-          setIsSaving(true)
-          await saveToProjectFolder(() => exportData, data.projectName)
-          setLastSaved(new Date())
-        }
         if (await hasConnectedFolder()) {
+          setIsSaving(true)
           const projName = (data.projectName || '').trim() || 'Untitled Project'
           await saveProjectToConnectedFolder('PitchDeck', projName, () => exportData)
+          setLastSaved(new Date())
           localStorage.setItem('pitchDeckLastModified', String(Date.now()))
         }
       } catch (e) {
@@ -802,6 +799,22 @@ function App() {
     if (nextState.analysisFolded !== undefined) setAnalysisFolded(nextState.analysisFolded)
   }, [history, historyIndex, slides, chapters, currentChapterId, selectedSlideId])
 
+  // Save current project to connected folder (PitchDeck/[projectName]/project.json)
+  const handleSaveToFolder = useCallback(async () => {
+    if (!(await hasConnectedFolder())) {
+      setShowProjectOverview(true)
+      return
+    }
+    try {
+      const projName = (projectName || '').trim() || 'Untitled Project'
+      await saveProjectToConnectedFolder('PitchDeck', projName, getExportData)
+      setLastSaved(new Date())
+      localStorage.setItem('pitchDeckLastModified', String(Date.now()))
+    } catch (e) {
+      console.warn('Save to folder failed:', e)
+    }
+  }, [projectName, getExportData])
+
   // Save to project folder when one is open, otherwise download to Downloads
   const handleExportFile = useCallback(async () => {
     const exportData = {
@@ -829,19 +842,15 @@ function App() {
     }
 
     try {
-      const folder = await getProjectFolder()
-      if (folder) {
-        await saveToProjectFolder(() => exportData, projectName)
+      if (await hasConnectedFolder()) {
+        await saveProjectToConnectedFolder('PitchDeck', (projectName || '').trim() || 'Untitled Project', () => exportData)
+        localStorage.setItem('pitchDeckLastModified', String(Date.now()))
         setRecentFiles(prev => {
           const filtered = prev.filter(f => f.path !== filename)
           return [fileInfo, ...filtered].slice(0, 10)
         })
+        return
       }
-      if (await hasConnectedFolder()) {
-        await saveProjectToConnectedFolder('PitchDeck', (projectName || '').trim() || 'Untitled Project', () => exportData)
-        localStorage.setItem('pitchDeckLastModified', String(Date.now()))
-      }
-      if (folder) return
     } catch (e) {
       console.warn('Save to project folder failed, falling back to download:', e)
     }
@@ -2433,6 +2442,19 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   </svg>
                   <span className="btn-tooltip">Copy text</span>
                 </button>
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={handleSaveToFolder}
+                  title="Save to connected folder (PitchDeck/[project]/project.json)"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  <span className="btn-tooltip">Save to folder</span>
+                </button>
                 <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2741,6 +2763,19 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <polyline points="10 9 9 9 8 9" />
                   </svg>
                   <span className="btn-tooltip">Copy text</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header"
+                  onClick={handleSaveToFolder}
+                  title="Save to connected folder (PitchDeck/[project]/project.json)"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  <span className="btn-tooltip">Save to folder</span>
                 </button>
                 <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
                 <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">

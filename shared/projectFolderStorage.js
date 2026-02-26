@@ -68,8 +68,22 @@ export async function clearConnectedLocalFolder() {
   })
 }
 
-function isLocalFolderSupported() {
+export function isLocalFolderSupported() {
   return typeof window !== 'undefined' && 'showDirectoryPicker' in window
+}
+
+/**
+ * Open a project folder (user picks). Stores handle in shared SaasProjectFolder DB.
+ * Use this when the folder is connected from SaaS Apps settings or from within an app.
+ * @returns {Promise<{ handle: FileSystemDirectoryHandle, name: string }>}
+ */
+export async function openProjectFolder() {
+  if (!isLocalFolderSupported()) {
+    throw new Error('Folder access is not supported in this browser. Try Chrome or Edge.')
+  }
+  const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' })
+  await setConnectedLocalFolder(dirHandle, dirHandle.name)
+  return { handle: dirHandle, name: dirHandle.name }
 }
 
 /**

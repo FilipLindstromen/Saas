@@ -8,6 +8,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
     webcamEnabled: recordSettings?.webcamEnabled || false,
     webcamSize: recordSettings?.webcamSize || 'large',
     webcamFlipHorizontal: recordSettings?.webcamFlipHorizontal || false,
+    webcamFlipVertical: recordSettings?.webcamFlipVertical || false,
     selectedCameraId: recordSettings?.selectedCameraId || '',
     microphoneEnabled: recordSettings?.microphoneEnabled || false,
     selectedMicrophoneId: recordSettings?.selectedMicrophoneId || '',
@@ -106,6 +107,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
       webcamEnabled: newSettings.webcamEnabled,
       webcamSize: newSettings.webcamSize,
       webcamFlipHorizontal: newSettings.webcamFlipHorizontal ?? false,
+      webcamFlipVertical: newSettings.webcamFlipVertical ?? false,
       selectedCameraId: newSettings.selectedCameraId,
       microphoneEnabled: newSettings.microphoneEnabled,
       selectedMicrophoneId: newSettings.selectedMicrophoneId,
@@ -234,6 +236,19 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
                   onChange={(e) => handleChange('webcamFlipHorizontal', e.target.checked)}
                 />
                 <span>Flip camera horizontally</span>
+              </label>
+            </div>
+          )}
+
+          {localSettings.webcamEnabled && (
+            <div className="recording-options-field">
+              <label className="recording-options-checkbox">
+                <input
+                  type="checkbox"
+                  checked={localSettings.webcamFlipVertical}
+                  onChange={(e) => handleChange('webcamFlipVertical', e.target.checked)}
+                />
+                <span>Flip camera vertically</span>
               </label>
             </div>
           )}

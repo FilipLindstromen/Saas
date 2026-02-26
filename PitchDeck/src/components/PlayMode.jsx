@@ -339,7 +339,12 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
             objectFit: 'cover',
             borderRadius: 'inherit',
             filter: getVideoFilterString(recordSettings),
-            transform: recordSettings?.webcamFlipHorizontal ? 'scaleX(-1)' : 'none'
+            transform: (() => {
+              const h = recordSettings?.webcamFlipHorizontal
+              const v = recordSettings?.webcamFlipVertical
+              if (!h && !v) return 'none'
+              return [h && 'scaleX(-1)', v && 'scaleY(-1)'].filter(Boolean).join(' ')
+            })()
           }}
         />
       </div>
@@ -1321,6 +1326,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     webcamEnabled: false,
     selectedCameraId: recordSettings?.selectedCameraId ?? '',
     webcamFlipHorizontal: recordSettings?.webcamFlipHorizontal === true,
+    webcamFlipVertical: recordSettings?.webcamFlipVertical === true,
     videoBrightness: typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1,
     videoContrast: typeof recordSettings?.videoContrast === 'number' ? recordSettings.videoContrast : 1,
     videoSaturation: typeof recordSettings?.videoSaturation === 'number' ? recordSettings.videoSaturation : 1,

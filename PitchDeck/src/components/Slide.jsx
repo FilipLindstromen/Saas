@@ -25,7 +25,7 @@ function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, video
 }
 
 // Webcam component - defined outside to avoid hooks issues. Uses layout or camera override for position/scale.
-function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', flipHorizontal = false }) {
+function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContrast, videoSaturation, videoShadows, videoMidtones, videoHighlights, videoShadowHue, videoMidHue, videoHighlightHue, cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', flipHorizontal = false, flipVertical = false }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -88,12 +88,12 @@ function WebcamVideo({ cameraId, layout, isPlayMode, videoBrightness, videoContr
       playsInline
       muted
       className={`slide-webcam ${getWebcamClass()} ${isPlayMode ? 'play-mode' : ''}`}
-      style={{ filter, transform: flipHorizontal ? 'scaleX(-1)' : 'none' }}
+      style={{ filter, transform: (flipHorizontal || flipVertical) ? [flipHorizontal && 'scaleX(-1)', flipVertical && 'scaleY(-1)'].filter(Boolean).join(' ') : 'none' }}
     />
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamFlipHorizontal = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -1795,6 +1795,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           layout={layout}
           isPlayMode={isPlayMode}
           flipHorizontal={webcamFlipHorizontal}
+          flipVertical={webcamFlipVertical}
           videoBrightness={videoBrightness}
           videoContrast={videoContrast}
           videoSaturation={videoSaturation}
