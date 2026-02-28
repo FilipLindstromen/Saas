@@ -126,9 +126,7 @@
   font-size: 0.75rem;
   margin: 0.25rem 0 0;
   color: var(--text-tertiary);
-}
-
-.app-toolbar-btn {
+}.app-toolbar-btn {
   display: flex;
   align-items: center;
   justify-content: center;
