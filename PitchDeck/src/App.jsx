@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
 import { getTheme, setTheme as setSharedTheme, initThemeSync } from '@shared/theme'
 import ThemeToggle from '@shared/ThemeToggle'
@@ -15,17 +15,14 @@ import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
 import VideoEditingMode from './components/VideoEditingMode'
-import ProjectOverview from './components/ProjectOverview'
+const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
 import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
-import {
-  hasConnectedFolder,
-  saveProjectToConnectedFolder,
-  loadProjectFromConnectedFolder
-} from '@shared/projectFolderStorage'
-import { preloadFFmpeg } from './utils/ffmpegExport'
+// Dynamic imports to avoid circular dependency / initialization order issues
+const getProjectFolderStorage = () => import('@shared/projectFolderStorage')
+const getFfmpegExport = () => import('./utils/ffmpegExport')
 import './App.css'
 
 function App() {
@@ -296,7 +293,7 @@ function App() {
 
   // Preload FFmpeg on app load so it's ready when user opens video editing (Transcribe/Export)
   useEffect(() => {
-    preloadFFmpeg()
+    getFfmpegExport().then(({ preloadFFmpeg }) => preloadFFmpeg())
   }, [])
 
   // Update current chapter's slides when slides change
@@ -689,6 +686,7 @@ function App() {
         exportedAt: new Date().toISOString()
       }
       try {
+        const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
         if (await hasConnectedFolder()) {
           setIsSaving(true)
           const projName = (data.projectName || '').trim() || 'Untitled Project'
@@ -801,6 +799,7 @@ function App() {
 
   // Save current project to connected folder (PitchDeck/[projectName]/project.json)
   const handleSaveToFolder = useCallback(async () => {
+    const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
     if (!(await hasConnectedFolder())) {
       setShowProjectOverview(true)
       return
@@ -842,6 +841,7 @@ function App() {
     }
 
     try {
+      const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
       if (await hasConnectedFolder()) {
         await saveProjectToConnectedFolder('PitchDeck', (projectName || '').trim() || 'Untitled Project', () => exportData)
         localStorage.setItem('pitchDeckLastModified', String(Date.now()))
@@ -1419,6 +1419,7 @@ function App() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      const { hasConnectedFolder, loadProjectFromConnectedFolder } = await getProjectFolderStorage()
       if (!(await hasConnectedFolder())) return
       const projName = localStorage.getItem('pitchDeckProjectName') || 'Untitled Project'
       const result = await loadProjectFromConnectedFolder('PitchDeck', projName)
@@ -2470,15 +2471,17 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} currentChapterId={currentChapterId} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} projectName={projectName} onProjectNameChange={setProjectName} />
         </div>
         {showProjectOverview && (
-          <ProjectOverview
-            onClose={() => setShowProjectOverview(false)}
-            recentFiles={recentFiles}
-            getExportData={getExportData}
-            onLoadProject={loadProjectFromData}
-            onNewProject={handleNewPresentation}
-            projectName={projectName}
-            googleClientId={settings.googleClientId}
-          />
+          <Suspense fallback={null}>
+            <ProjectOverview
+              onClose={() => setShowProjectOverview(false)}
+              recentFiles={recentFiles}
+              getExportData={getExportData}
+              onLoadProject={loadProjectFromData}
+              onNewProject={handleNewPresentation}
+              projectName={projectName}
+              googleClientId={settings.googleClientId}
+            />
+          </Suspense>
         )}
         {showSettings && (
           <Settings
@@ -2947,15 +2950,17 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         />
       )}
       {showProjectOverview && (
-        <ProjectOverview
-          onClose={() => setShowProjectOverview(false)}
-          recentFiles={recentFiles}
-          getExportData={getExportData}
-          onLoadProject={loadProjectFromData}
-          onNewProject={handleNewPresentation}
-          projectName={projectName}
-          googleClientId={settings.googleClientId}
-        />
+        <Suspense fallback={null}>
+          <ProjectOverview
+            onClose={() => setShowProjectOverview(false)}
+            recentFiles={recentFiles}
+            getExportData={getExportData}
+            onLoadProject={loadProjectFromData}
+            onNewProject={handleNewPresentation}
+            projectName={projectName}
+            googleClientId={settings.googleClientId}
+          />
+        </Suspense>
       )}
       {showSettings && (
         <Settings

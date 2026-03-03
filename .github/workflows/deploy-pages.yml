@@ -74,6 +74,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PostIt/
           cp -r dist ../deploy/PostIt
 
+      - name: Build Bullet Generator
+        run: |
+          cd BulletGenerator
+          npm install
+          npx tsc -b && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/BulletGenerator/
+          cp -r dist ../deploy/BulletGenerator
+
       - name: Build Pitch Deck
         run: |
           cd PitchDeck
