@@ -1,0 +1,55 @@
+// ContentGenerator - Personal Development Video Question Generator
+// Database schema for signals, comments, and generated results
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Reddit post stored as a "signal" - raw pain-point content
+model Signal {
+  id           String   @id @default(cuid())
+  subreddit    String
+  title        String
+  selftext     String   @default("")
+  score        Int      @default(0)
+  numComments  Int      @default(0)
+  permalink    String
+  createdUtc   Int
+  signalScore  Float    @default(0) // Computed: emotion + relatability + engagement
+  themeTags    String   @default("") // Comma-separated extracted theme keywords
+  flagged      Boolean  @default(false) // Safety: exclude self-harm etc.
+  scannedAt    DateTime @default(now())
+
+  comments Comment[]
+
+  @@index([subreddit, createdUtc])
+  @@index([signalScore])
+}
+
+// Top comments for each post - additional signal context
+model Comment {
+  id        String  @id @default(cuid())
+  signalId  String
+  body      String
+  score     Int     @default(0)
+
+  signal Signal @relation(fields: [signalId], references: [id], onDelete: Cascade)
+
+  @@index([signalId])
+}
+
+// Generated video questions + hooks stored in library
+model GeneratedResult {
+  id            String   @id @default(cuid())
+  questions     String   // JSON array of question objects
+  settings      String   // JSON of generation settings used
+  signalIds     String   @default("") // Comma-separated IDs of signals used
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}

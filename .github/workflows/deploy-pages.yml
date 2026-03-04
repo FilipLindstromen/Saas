@@ -38,6 +38,7 @@ jobs:
           cp -r conversation-generator deploy/
           cp -r Typography deploy/
           cp -r VSLWriter deploy/
+          cp -r docs/ContentGenerator deploy/
 
       - name: Build Web Quiz Generator
         run: |

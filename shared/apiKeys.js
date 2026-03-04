@@ -68,6 +68,10 @@ function migrateFromLegacy() {
     const cwApiKey = localStorage.getItem('copywriter_api_key')
     if (cwApiKey) merged.openai = merged.openai || cwApiKey
 
+    // ContentGenerator
+    const cgOpenai = localStorage.getItem('contentgenerator_openai_key')
+    if (cgOpenai) merged.openai = merged.openai || cgOpenai
+
     // VSLWriter
     const vslOpenai = localStorage.getItem('vsl_openai_key') || localStorage.getItem('openai_api_key')
     if (vslOpenai) merged.openai = merged.openai || vslOpenai
