@@ -1,11 +1,9 @@
 <!DOCTYPE html>
-<!-- Update the URL below if your Content Generator is deployed elsewhere -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <meta http-equiv="refresh" content="0;url=https://content-generator.vercel.app">
   <title>Content Generator - Saas Apps</title>
   <style>
     :root { --bg: #0a0a0a; --bg2: #1f1f1f; --text: #fff; --accent: #ff6b35; --border: rgba(255,255,255,0.1); }
@@ -16,6 +14,7 @@
     h1 { font-size: 1.5rem; margin: 0 0 1rem; }
     p { color: var(--text); opacity: 0.9; line-height: 1.6; margin: 0 0 1rem; }
     .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    code { background: rgba(0,0,0,0.2); padding: 0.2em 0.4em; border-radius: 6px; font-size: 0.9em; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .btn { display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background: var(--accent); color: white; border-radius: 8px; font-weight: 500; }
@@ -25,10 +24,14 @@
 <body>
   <div class="container">
     <h1>Content Generator</h1>
-    <p>Redirecting to Content Generator…</p>
-    <p>If you are not redirected, <a href="https://content-generator.vercel.app" id="app-link">open the app here</a>.</p>
+    <p>Content Generator turns Reddit pain points into video questions for personal development (stress, anxiety, overthinking, burnout, motivation, self-worth).</p>
+    <div class="card">
+      <p><strong>Run locally</strong> — Content Generator is a Next.js app and needs a Node.js server. From the project root:</p>
+      <p><code>cd ContentGenerator</code><br><code>npm install</code><br><code>npm run dev</code></p>
+      <p>Then open <a href="http://localhost:3000" target="_blank" rel="noopener">http://localhost:3000</a></p>
+    </div>
+    <p class="text-sm" style="opacity:0.8">If you deploy to Vercel, use your project&apos;s URL (e.g. <code>https://your-project.vercel.app</code>)—avoid generic URLs that may point to other apps.</p>
     <a href="../" class="btn">← Back to Saas Apps</a>
   </div>
-  <script>window.location.href = document.getElementById('app-link').href;</script>
 </body>
 </html>

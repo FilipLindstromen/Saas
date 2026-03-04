@@ -51,11 +51,14 @@ export async function scanReddit(input: ScanRedditInput = {}): Promise<ScanReddi
   }
 
   try {
+    // Clear existing signals so each scan shows only the current search results
+    await prisma.signal.deleteMany({});
+
     for (const sub of subreddits) {
       const posts = await fetchSubredditPosts(sub, sort, time, postsPerSub);
 
       for (const post of posts) {
-        // Skip if we already have this post (by permalink)
+        // Skip if we already have this post in this scan (same permalink)
         const existing = await prisma.signal.findFirst({
           where: { permalink: post.permalink },
         });
