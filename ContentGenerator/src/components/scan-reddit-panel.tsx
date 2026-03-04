@@ -91,7 +91,7 @@ export function ScanRedditPanel({ onScanComplete }: { onScanComplete?: () => voi
           className="w-full"
         />
         <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-          Comma- or space-separated. Leave empty for personal development defaults.
+          Comma- or space-separated. Leave empty for personal development defaults. No Reddit API key needed—uses public data.
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-4">
