@@ -52,15 +52,21 @@ export async function generateQuestions(input: GenerateInput): Promise<GenerateR
   const saveToLibrary = input.saveToLibrary ?? true;
 
   try {
-    // Fetch top signals (excluding flagged)
-    const signals = await prisma.signal.findMany({
+    // Fetch top signals (excluding flagged), dedupe by permalink
+    const raw = await prisma.signal.findMany({
       where: { flagged: false },
       orderBy: { signalScore: "desc" },
-      take: topN,
+      take: topN * 2, // fetch extra to allow for deduplication
       include: {
         comments: { orderBy: { score: "desc" }, take: 5 },
       },
     });
+    const seen = new Set<string>();
+    const signals = raw.filter((s) => {
+      if (seen.has(s.permalink)) return false;
+      seen.add(s.permalink);
+      return true;
+    }).slice(0, topN);
 
     if (signals.length === 0) {
       return {

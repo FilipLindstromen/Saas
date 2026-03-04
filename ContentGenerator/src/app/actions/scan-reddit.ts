@@ -55,6 +55,12 @@ export async function scanReddit(input: ScanRedditInput = {}): Promise<ScanReddi
       const posts = await fetchSubredditPosts(sub, sort, time, postsPerSub);
 
       for (const post of posts) {
+        // Skip if we already have this post (by permalink)
+        const existing = await prisma.signal.findFirst({
+          where: { permalink: post.permalink },
+        });
+        if (existing) continue;
+
         const { signalScore, themeTags, flagged } = computeSignalScore(
           post.title,
           post.selftext,
