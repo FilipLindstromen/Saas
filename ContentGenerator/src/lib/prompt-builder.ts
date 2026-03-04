@@ -114,12 +114,14 @@ Requirements:
 - Each question must be 8–16 words max (like a punchy video title).
 - Each question must be anchored in a common real-life moment (work, relationships, sleep, phone scrolling, guilt, avoidance, etc).
 - Avoid clinical terms (e.g., "generalized anxiety disorder", "diagnosis", "therapy modalities").
-- Make the question feel intimate and spoken: "Why do I…" "Why can't I…" "Is it normal that…"
-${settings.generateHooks ? `- For each question, generate 4 hooks:
+${settings.format.includes("audience prompt") ? `- AUDIENCE PROMPT format (OVERRIDE other patterns): Generate LIGHT, FUN, easy-going questions—the kind you'd ask in a comment or poll to get people chatting. AVOID heavy introspection ("Why do I…", "Is it normal…", "Why can't I…"). Instead use: "What's your favorite…", "What's the weirdest…", "Honestly, what do you…", "Quick poll: …", "What do you do when…". Hint at the topic playfully. Examples: "What's your favorite thing to do instead of sitting still and meditating?", "What's the weirdest place you've doomscrolled?", "Honestly, what do you do when you're supposed to be working?"` : settings.format.includes("podcast deep") ? "" : "- Make the question feel intimate and spoken: \"Why do I…\" \"Why can't I…\" \"Is it normal that…\""}
+${settings.format.includes("podcast deep") ? `- PODCAST DEEP format (OVERRIDE other patterns): Generate TOPIC-EXPLORATION questions—the kind a podcaster would ask to dive deep into the subject. AVOID personal introspection ("Why do I…", "Is it normal…"). Instead use: "What are the root causes of [topic]?", "What is the one main thing people don't know about [topic]?", "What actually drives [topic]?", "What's the biggest misconception about [topic]?". Examples: "What are the root causes of anxiety?", "What is the one main thing people don't know about burnout?", "What's the biggest misconception about overthinking?". Focus on the topic itself, not personal scenarios. Always generate 4 hooks per question.` : ""}
+${(settings.generateHooks || settings.format.includes("podcast deep")) ? `- For each question, generate 4 hooks:
   1) Pattern interrupt hook (contrarian or surprising)
   2) Validation hook ("You're not broken/lazy…")
   3) Curiosity hook ("The real reason is…")
-  4) Scenario hook ("If you…")` : "- Do not include hooks."}
+  4) Scenario hook ("If you…")
+${settings.format.includes("audience prompt") ? "  Keep hooks light and playful to match the easy-going question style." : ""}` : "- Do not include hooks."}
 
 - Add 2–4 tags per question chosen from: ${ALLOWED_TAGS.join(", ")}
 
@@ -167,6 +169,8 @@ Constraints:
 - 8–16 words max.
 - Do not repeat wording; each variation should feel distinct.
 - Generate 4 hooks per variation using the same 4 hook types.
+${settings.format.includes("audience prompt") ? "- AUDIENCE PROMPT style: Light, fun, easy-going. Use \"What's your favorite…\", \"What's the weirdest…\", \"Honestly…\"—avoid heavy \"Why do I…\" or \"Is it normal…\" patterns." : ""}
+${settings.format.includes("podcast deep") ? "- PODCAST DEEP style: Topic-exploration questions like 'What are the root causes of X?', 'What is the one main thing people don't know about X?'—avoid personal 'Why do I…' patterns. Always generate 4 hooks per variation." : ""}
 - Return JSON only in the same schema as before.
 
 Optional extra direction from user:

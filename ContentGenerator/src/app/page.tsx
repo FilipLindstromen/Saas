@@ -21,7 +21,7 @@ const THEMES = [
 ] as const;
 
 const TONES = ["warm", "blunt", "funny", "calm", "scientific"] as const;
-const FORMATS = ["myth-bust", "story", "checklist", "truth bomb", "you're not broken"] as const;
+const FORMATS = ["myth-bust", "story", "checklist", "truth bomb", "you're not broken", "audience prompt", "podcast deep"] as const;
 const PLATFORMS = ["TikTok", "Reels", "Shorts", "YouTube"] as const;
 
 export default function HomePage() {
@@ -30,7 +30,7 @@ export default function HomePage() {
   const [showSettings, setShowSettings] = useState(false);
 
   return (
-    <main className="mx-auto max-w-[1600px] px-4 py-8 md:px-6 md:py-10">
+    <main className="w-full px-4 py-8 md:px-6 md:py-10">
       {/* Header */}
       <header className="mb-10">
         <div className="flex items-start justify-between gap-4">
