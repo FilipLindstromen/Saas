@@ -37,6 +37,8 @@ interface InspectorPanelProps {
   onBurnOverlaysIntoExportChange: (value: boolean) => void
   flipVideo: boolean
   onFlipVideoChange: (value: boolean) => void
+  roundMask?: boolean
+  onRoundMaskChange?: (value: boolean) => void
   selectedOverlay: OverlayItem | null
   onOverlayUpdate: (patch: Partial<OverlayItem>) => void
   onOverlayRemove: (id: string) => void
@@ -124,6 +126,8 @@ export function InspectorPanel({
   onBurnOverlaysIntoExportChange,
   flipVideo = false,
   onFlipVideoChange = () => { },
+  roundMask = false,
+  onRoundMaskChange = () => { },
   selectedOverlay,
   onOverlayUpdate,
   onOverlayRemove,
@@ -358,6 +362,16 @@ export function InspectorPanel({
               <span>Flip video</span>
             </label>
             <p className={styles.hint}>Mirror the video horizontally in preview and recording.</p>
+            <label className={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={roundMask ?? false}
+                onChange={(e) => onRoundMaskChange?.(e.target.checked)}
+                aria-label="Round mask"
+              />
+              <span>Round mask</span>
+            </label>
+            <p className={styles.hint}>Show video in a circular frame. Applies to webcam and recording playback.</p>
           </section>
         </div>
       )}

@@ -246,6 +246,15 @@ export function IconCamera(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+/** Circle mask – represents circular video frame */
+export function IconCircleMask(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)} aria-hidden viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  )
+}
+
 /** Film reel – represents recorded footage / playback */
 export function IconFilmReel(props: SVGProps<SVGSVGElement>) {
   return (

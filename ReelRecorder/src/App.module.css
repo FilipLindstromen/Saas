@@ -63,6 +63,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 16px;
   pointer-events: none;
 }
 
@@ -70,33 +71,8 @@
   pointer-events: auto;
 }
 
-.headerCenterOverlay .editPreviewSourceBtn,
-.headerCenterOverlay .editPreviewSourceBtnActive {
-  position: absolute;
-  right: 50%;
-  margin-right: 68px;
-  transform: translateX(-100%);
-}
-
-.headerCenterOverlay .recordStopToggleRecord,
-.headerCenterOverlay .recordStopToggleStop {
-  position: absolute;
-  right: 50%;
-  margin-right: 12px;
-  transform: translateX(-100%);
-}
-
-.headerCenterOverlay .recordTimer {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
 .headerCenterOverlay .headerError {
-  position: absolute;
-  left: 50%;
-  margin-left: 76px;
-  transform: translateX(0);
+  margin-left: 8px;
   margin-top: 0;
   margin-bottom: 0;
   white-space: nowrap;
@@ -905,12 +881,15 @@
   width: 100%;
 }
 
-/* When portrait + fill height: fill available space between header and timeline */
+/* When portrait + fill height: fill available height, maintain aspect ratio (9:16 or 1:1) */
 .previewWrap.previewConstrained.previewFillHeight {
-  max-height: none;
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  max-height: none;
   align-items: stretch;
+  align-self: center;
+  overflow: hidden;
+  /* aspect-ratio set via inline style in App.tsx for 9/16 or 1 */
 }
 
 .previewWrap.previewConstrained>div {
@@ -921,11 +900,14 @@
   flex-shrink: 1;
 }
 
-/* When fill height, inner wrap fills container for cover behavior */
-.previewWrap.previewFillHeight>div {
+/* When fill height, inner wrap fills container and stretches child so preview fills height (recording + recorded clip) */
+.previewWrap.previewFillHeight > div {
   height: 100%;
   width: 100%;
   max-height: none;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: center;
 }
 
 .timelineWrap {

@@ -24,7 +24,7 @@ import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import TabBar from '@shared/TabBar/TabBar'
 import ThemeToggle from '@shared/ThemeToggle'
 import AppTopBar from '@shared/AppTopBar/AppTopBar'
-import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconFilmReel, IconCamera } from './components/Icons'
+import { IconRecord, IconStop, IconThumbnail, IconExport, IconTrash, IconFilmReel, IconCamera, IconCircleMask } from './components/Icons'
 import { getStoredTheme, setStoredTheme, applyTheme, initThemeSync, type Theme } from './utils/theme'
 import styles from './App.module.css'
 
@@ -69,6 +69,7 @@ export default function App() {
   const [defaultBold, setDefaultBold] = useState(() => initialState?.defaultBold ?? false)
   const [burnOverlaysIntoExport, setBurnOverlaysIntoExport] = useState(() => initialState?.burnOverlaysIntoExport ?? true)
   const [flipVideo, setFlipVideo] = useState(() => initialState?.flipVideo ?? false)
+  const [roundMask, setRoundMask] = useState(() => initialState?.roundMask ?? false)
   const [colorAdjustmentsEnabled, setColorAdjustmentsEnabled] = useState(() => initialState?.colorAdjustmentsEnabled ?? false)
   const [colorBrightness, setColorBrightness] = useState(() => initialState?.colorBrightness ?? 100)
   const [colorContrast, setColorContrast] = useState(() => initialState?.colorContrast ?? 100)
@@ -420,6 +421,7 @@ export default function App() {
       defaultBold,
       burnOverlaysIntoExport,
       flipVideo,
+      roundMask,
       colorAdjustmentsEnabled,
       colorBrightness,
       colorContrast,
@@ -433,7 +435,7 @@ export default function App() {
       noiseRemovalAmount,
       previewScale,
     })
-  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount, previewScale])
+  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount, previewScale])
 
   const handleThumbnailChange = useCallback((blob: Blob | null, dataUrl?: string | null) => {
     setThumbnailBlob(blob)
@@ -895,6 +897,9 @@ export default function App() {
         </div>
         <div
           className={`${styles.previewWrap} ${aspectRatio === '9:16' || aspectRatio === '1:1' ? styles.previewConstrained : ''} ${(aspectRatio === '9:16' || aspectRatio === '1:1') && portraitFillHeight ? styles.previewFillHeight : ''}`}
+          style={(aspectRatio === '9:16' || aspectRatio === '1:1') && portraitFillHeight
+            ? { aspectRatio: aspectRatio === '9:16' ? '9/16' : '1' }
+            : undefined}
         >
           <div
             className={styles.previewInner}
@@ -939,6 +944,7 @@ export default function App() {
             defaultBold={defaultBold}
             burnOverlaysIntoExport={burnOverlaysIntoExport}
             flipVideo={flipVideo}
+            roundMask={roundMask}
             colorAdjustmentsEnabled={colorAdjustmentsEnabled}
             colorBrightness={colorBrightness}
             colorContrast={colorContrast}
@@ -1028,13 +1034,30 @@ export default function App() {
           <button
               type="button"
               className={editPreviewSource === 'recording' ? styles.editPreviewSourceBtnActive : styles.editPreviewSourceBtn}
-              onClick={() => setEditPreviewSource((s) => (s === 'recording' ? 'webcam' : 'recording'))}
+              onClick={() => {
+                if (editPreviewSource === 'recording') {
+                  setEditPreviewSource('webcam')
+                  if (!videoStream) connectMedia()
+                } else {
+                  setEditPreviewSource('recording')
+                }
+              }}
               title={editPreviewSource === 'recording' ? 'Preview: recording. Click to use webcam.' : 'Preview: webcam. Click to use recording.'}
               aria-label={editPreviewSource === 'recording' ? 'Use recording in preview' : 'Use webcam in preview'}
               aria-pressed={editPreviewSource === 'webcam'}
             >
               {editPreviewSource === 'recording' ? <IconFilmReel /> : <IconCamera />}
             </button>
+          <button
+            type="button"
+            className={roundMask ? styles.editPreviewSourceBtnActive : styles.editPreviewSourceBtn}
+            onClick={() => setRoundMask((r) => !r)}
+            title={roundMask ? 'Round mask on. Click to disable.' : 'Round mask off. Click to show video in circular frame.'}
+            aria-label={roundMask ? 'Round mask on' : 'Round mask off'}
+            aria-pressed={roundMask}
+          >
+            <IconCircleMask />
+          </button>
           <button
             type="button"
             className={countdown != null ? styles.recordStopToggleStop : isRecording ? styles.recordStopToggleStop : styles.recordStopToggleRecord}
@@ -1343,7 +1366,10 @@ export default function App() {
             burnOverlaysIntoExport={burnOverlaysIntoExport}
             onBurnOverlaysIntoExportChange={setBurnOverlaysIntoExport}
             flipVideo={flipVideo}
+            roundMask={roundMask}
             onFlipVideoChange={setFlipVideo}
+            roundMask={roundMask}
+            onRoundMaskChange={setRoundMask}
             selectedOverlay={selectedOverlay}
             onOverlayUpdate={(patch) => selectedOverlay && handleEditOverlay(selectedOverlay.id, patch)}
             onOverlayRemove={handleRemoveOverlay}

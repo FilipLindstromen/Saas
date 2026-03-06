@@ -41,6 +41,8 @@ export interface PersistedState {
   burnOverlaysIntoExport: boolean
   /** When true, video is mirrored horizontally (flip) in preview and recording */
   flipVideo: boolean
+  /** When true, video is shown with a circular mask in preview and recording */
+  roundMask: boolean
   /** When true, show/apply camera color adjustments in preview and export (never in raw recording) */
   colorAdjustmentsEnabled: boolean
   /** 100 = normal. Used for preview display and export when enabled. */
@@ -87,6 +89,7 @@ const defaults: PersistedState = {
   defaultBold: false,
   burnOverlaysIntoExport: true,
   flipVideo: false,
+  roundMask: false,
   colorAdjustmentsEnabled: false,
   colorBrightness: 100,
   colorContrast: 100,
@@ -243,6 +246,7 @@ function validateState(raw: unknown): PersistedState | null {
     defaultBold: typeof o.defaultBold === 'boolean' ? o.defaultBold : defaults.defaultBold,
     burnOverlaysIntoExport: typeof o.burnOverlaysIntoExport === 'boolean' ? o.burnOverlaysIntoExport : defaults.burnOverlaysIntoExport,
     flipVideo: typeof o.flipVideo === 'boolean' ? o.flipVideo : defaults.flipVideo,
+    roundMask: typeof o.roundMask === 'boolean' ? o.roundMask : defaults.roundMask,
     colorAdjustmentsEnabled: typeof o.colorAdjustmentsEnabled === 'boolean' ? o.colorAdjustmentsEnabled : defaults.colorAdjustmentsEnabled,
     colorBrightness: typeof o.colorBrightness === 'number' && Number.isFinite(o.colorBrightness) ? Math.max(0, Math.min(200, o.colorBrightness)) : defaults.colorBrightness,
     colorContrast: typeof o.colorContrast === 'number' && Number.isFinite(o.colorContrast) ? Math.max(0, Math.min(200, o.colorContrast)) : defaults.colorContrast,

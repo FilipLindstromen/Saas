@@ -295,6 +295,8 @@ interface RecordPreviewProps {
   burnOverlaysIntoExport?: boolean
   /** When true, mirror the video horizontally in preview and recording */
   flipVideo?: boolean
+  /** When true, show video with a circular mask in preview and recording */
+  roundMask?: boolean
   /** When set (e.g. after recording), draw caption sample on preview so user can see how burn-in will look */
   captionPreview?: { style: CaptionStyle; fontSizePercent: number; captionY: number }
   /** When set (edit mode + transcription), show these segments at the right times instead of sample text */
@@ -348,6 +350,7 @@ export function RecordPreview({
   defaultBold = false,
   burnOverlaysIntoExport = true,
   flipVideo = false,
+  roundMask = false,
   captionPreview,
   captionSegments,
   onCaptionYChange,
@@ -595,9 +598,22 @@ export function RecordPreview({
         const vw = video.videoWidth
         const vh = video.videoHeight
 
+        if (roundMask) {
+          ctx.fillStyle = '#1a1a1e'
+          ctx.fillRect(0, 0, width, height)
+        }
+
         if (vw > 0 && vh > 0) {
           const videoRatio = vw / vh
           const canvasRatio = width / height
+
+          if (roundMask) {
+            ctx.save()
+            ctx.beginPath()
+            const r = Math.min(width, height) / 2
+            ctx.arc(width / 2, height / 2, r, 0, 2 * Math.PI)
+            ctx.clip()
+          }
 
           if (portraitFillHeight) {
             // Center-crop: fill canvas by cropping video to match canvas aspect ratio
@@ -642,6 +658,7 @@ export function RecordPreview({
             ctx.fillRect(0, 0, width, height)
             ctx.drawImage(video, 0, 0, vw, vh, drawX, drawY, drawW, drawH)
           }
+          if (roundMask) ctx.restore()
         } else {
           ctx.drawImage(video, 0, 0, width, height)
         }
@@ -717,7 +734,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {
