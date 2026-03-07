@@ -549,7 +549,7 @@
   bottom: 0;
   left: 0;
   width: 2px;
-  background: #fff;
+  background: var(--text-primary);
   background-clip: content-box;
   box-sizing: content-box;
   transform: translateX(-50%);
@@ -570,7 +570,7 @@
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-bottom: 8px solid #fff;
+  border-bottom: 8px solid var(--text-primary);
   pointer-events: none;
 }
 

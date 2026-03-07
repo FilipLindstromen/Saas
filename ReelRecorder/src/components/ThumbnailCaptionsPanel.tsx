@@ -119,6 +119,7 @@ export function ThumbnailCaptionsPanel({
   } | null>(null)
   const [webcamLive, setWebcamLive] = useState(false)
   const [webcamError, setWebcamError] = useState<string | null>(null)
+  const [clipboardMessage, setClipboardMessage] = useState<string | null>(null)
   const [previewWidth, setPreviewWidth] = useState(0)
   const [previewScale, setPreviewScale] = useState(100) // 25–200%, scales preview size, keeps aspect ratio
   const [thumbnailBrightness, setThumbnailBrightness] = useState(100)
@@ -425,6 +426,123 @@ export function ThumbnailCaptionsPanel({
     )
   }, [texts, thumbWidth, thumbHeight, webcamImageUrl, thumbnailColorFilter, drawTextsOnCanvas, onThumbnailChange])
 
+  const exportThumbnailAsPng = useCallback(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = thumbWidth
+    canvas.height = thumbHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const triggerDownload = () => {
+      const dataUrl = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = 'thumbnail.png'
+      a.click()
+    }
+
+    if (webcamImageUrl) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
+        ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight)
+        ctx.filter = 'none'
+        drawTextsOnCanvas(ctx)
+        triggerDownload()
+      }
+      img.onerror = () => {}
+      img.src = webcamImageUrl
+      return
+    }
+
+    if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
+    const video = videoRef.current
+    if (video && video.readyState >= 2) {
+      ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight)
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, thumbWidth, thumbHeight)
+    }
+    ctx.filter = 'none'
+    drawTextsOnCanvas(ctx)
+    triggerDownload()
+  }, [texts, thumbWidth, thumbHeight, webcamImageUrl, thumbnailColorFilter, drawTextsOnCanvas])
+
+  const copyThumbnailToClipboard = useCallback(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = thumbWidth
+    canvas.height = thumbHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      setClipboardMessage('Failed to create canvas')
+      setTimeout(() => setClipboardMessage(null), 3000)
+      return
+    }
+
+    const copyBlobToClipboard = (blob: Blob) => {
+      if (!navigator.clipboard?.write) {
+        setClipboardMessage('Clipboard not supported')
+        setTimeout(() => setClipboardMessage(null), 3000)
+        return
+      }
+      navigator.clipboard
+        .write([new ClipboardItem({ 'image/png': blob })])
+        .then(() => {
+          setClipboardMessage('Copied to clipboard')
+          setTimeout(() => setClipboardMessage(null), 3000)
+        })
+        .catch(() => {
+          setClipboardMessage('Copy failed')
+          setTimeout(() => setClipboardMessage(null), 3000)
+        })
+    }
+
+    const triggerCopy = () => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) copyBlobToClipboard(blob)
+          else {
+            setClipboardMessage('Copy failed')
+            setTimeout(() => setClipboardMessage(null), 3000)
+          }
+        },
+        'image/png',
+        0.95
+      )
+    }
+
+    if (webcamImageUrl) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
+        ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight)
+        ctx.filter = 'none'
+        drawTextsOnCanvas(ctx)
+        triggerCopy()
+      }
+      img.onerror = () => {
+        setClipboardMessage('Failed to load image')
+        setTimeout(() => setClipboardMessage(null), 3000)
+      }
+      img.src = webcamImageUrl
+      return
+    }
+
+    if (thumbnailColorFilter !== 'none') ctx.filter = thumbnailColorFilter
+    const video = videoRef.current
+    if (video && video.readyState >= 2) {
+      ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight)
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, thumbWidth, thumbHeight)
+    }
+    ctx.filter = 'none'
+    drawTextsOnCanvas(ctx)
+    triggerCopy()
+  }, [texts, thumbWidth, thumbHeight, webcamImageUrl, thumbnailColorFilter, drawTextsOnCanvas])
+
   const generateCaption = useCallback(async () => {
     if (!captionSegments || captionSegments.length === 0) {
       setCaptionError('Transcribe the video first in Edit mode (Captions panel).')
@@ -511,9 +629,9 @@ export function ThumbnailCaptionsPanel({
                 Choose a frame (seek), add text and position it in the preview. Thumbnail uses the aspect ratio set in the Inspector (Format & quality): {aspectRatio} — {thumbWidth}×{thumbHeight}.
               </p>
               {webcamError && <p className={styles.error}>{webcamError}</p>}
-              {!webcamLive && !webcamImageUrl && (
+              {!webcamLive && (
                 <>
-                  {hasVideo && (
+                  {!webcamImageUrl && hasVideo && (
                     <>
                       <label className={styles.label}>Frame time</label>
                       <input
@@ -528,12 +646,17 @@ export function ThumbnailCaptionsPanel({
                       <span className={styles.timeValue}>{seekTime.toFixed(1)}s</span>
                     </>
                   )}
-                  {!hasVideo && (
+                  {!webcamImageUrl && !hasVideo && (
                     <p className={styles.hint}>No recording yet. Use webcam or add text to create a thumbnail.</p>
                   )}
-                  <button type="button" className={styles.btn} onClick={startWebcam}>
-                    Take photo with webcam
+                  <button type="button" className={styles.btn} onClick={startWebcam} aria-label={webcamImageUrl ? 'Take new image with webcam' : 'Take photo with webcam'}>
+                    {webcamImageUrl ? 'Take new image with webcam' : 'Take photo with webcam'}
                   </button>
+                  {webcamImageUrl && hasVideo && (
+                    <button type="button" className={styles.btn} onClick={clearWebcamPhoto}>
+                      Use video frame instead
+                    </button>
+                  )}
                 </>
               )}
               {webcamLive && (
@@ -545,11 +668,6 @@ export function ThumbnailCaptionsPanel({
                     Cancel
                   </button>
                 </>
-              )}
-              {webcamImageUrl && hasVideo && (
-                <button type="button" className={styles.btn} onClick={clearWebcamPhoto}>
-                  Use video frame instead
-                </button>
               )}
               <div className={styles.thumbColorRow}>
                 <label className={styles.label}>Thumbnail color</label>
@@ -638,6 +756,15 @@ export function ThumbnailCaptionsPanel({
               <button type="button" className={styles.btnPrimary} onClick={generateThumbnail}>
                 Generate thumbnail
               </button>
+              <button type="button" className={styles.btn} onClick={exportThumbnailAsPng} aria-label="Export thumbnail as PNG">
+                Export as PNG
+              </button>
+              <button type="button" className={styles.btn} onClick={copyThumbnailToClipboard} aria-label="Copy thumbnail to clipboard">
+                Copy to clipboard
+              </button>
+              {clipboardMessage && (
+                <p className={clipboardMessage.startsWith('Copied') ? styles.doneHint : styles.error}>{clipboardMessage}</p>
+              )}
               {thumbnailBlob && (
                 <p className={styles.doneHint}>Thumbnail saved. It will be used when you upload to YouTube.</p>
               )}
