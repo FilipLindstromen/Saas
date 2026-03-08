@@ -1,11 +1,9 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Next.js
 .next/
 out/
-build/
-dist/
 
 # Env and secrets
 .env
@@ -14,14 +12,7 @@ dist/
 
 # Debug and logs
 *.log
-npm-debug.log*
 
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+# Prisma
+*.db
+*.db-journal
