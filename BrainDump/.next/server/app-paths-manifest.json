@@ -1,0 +1,8 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/api/organized-items/reminders/route": "app/api/organized-items/reminders/route.js",
+  "/api/projects/route": "app/api/projects/route.js",
+  "/api/organized-items/counts/route": "app/api/organized-items/counts/route.js",
+  "/api/organized-items/route": "app/api/organized-items/route.js"
+}

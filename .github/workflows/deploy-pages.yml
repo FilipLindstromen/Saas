@@ -40,6 +40,15 @@ jobs:
           cp -r VSLWriter deploy/
           cp -r docs/ContentGenerator deploy/
 
+      - name: Add BrainDump landing page
+        env:
+          REPO_FULL_NAME: ${{ github.event.repository.full_name }}
+        run: |
+          mkdir -p deploy/BrainDump
+          REPO_URL="https://github.com/${REPO_FULL_NAME}"
+          ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''${REPO_URL}''', safe=''))")
+          sed "s|REPO_URL_ENCODED|${ENCODED}|g" docs/brain-dump-landing.html > deploy/BrainDump/index.html
+
       - name: Build Web Quiz Generator
         run: |
           cd webquizgenerator

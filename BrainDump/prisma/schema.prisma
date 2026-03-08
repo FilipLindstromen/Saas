@@ -1,0 +1,100 @@
+// BrainDump - Voice capture and thought organization
+// Database schema for dumps, organized items, projects, and tags
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Dump {
+  id                String    @id @default(cuid())
+  mode              String    @default("inbox") // inbox | work | personal
+  audioUrl          String?   // reference to stored audio (URL or blob key)
+  transcriptRaw     String    @default("")
+  transcriptEdited  String    @default("")
+  status            String    @default("draft") // draft | transcribed | organized | saved
+  createdAt         DateTime  @default(now())
+  organizedAt       DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  organizedItems OrganizedItem[]
+
+  @@index([mode, status])
+  @@index([createdAt])
+}
+
+model OrganizedItem {
+  id               String    @id @default(cuid())
+  dumpId           String
+  domain           String    // inbox | work | personal
+  category         String
+  subcategory      String    @default("")
+  projectId        String?
+  itemType         String    // task | note | idea | emotion | reflection | reminder | problem | decision | journal_entry | project_update
+  title            String
+  content          String    @default("")
+  emotionLabel     String?
+  status           String    @default("draft") // draft | needs_review | approved | saved
+  progress         String    @default("todo")  // todo | started | completed
+  priority         Int?      // nullable
+  recommendedView  String    @default("note_cards")
+  confidenceScore   Float     @default(0)
+  positionX        Float?    // for kanban/post-its layout
+  positionY        Float?
+  kanbanColumn     String?   // e.g. todo | started | completed
+  scheduledAt      DateTime? // date/time for calendar (date part = day, time optional)
+  scheduledTime    String?   // e.g. "09:00" for display/notification
+  recurrence       String?   // none | daily | weekly | monthly
+  sendNotification Boolean?  @default(false)
+  reminderAt             DateTime? // when to send the main reminder notification
+  reminderMinutesBefore  Int?     // also notify this many minutes before (0 = no early notification)
+  reminderNotifiedAt     DateTime? // set when main reminder was sent
+  reminderEarlyNotifiedAt DateTime? // set when early (X min before) reminder was sent
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  dump     Dump   @relation(fields: [dumpId], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tags     OrganizedItemTag[]
+
+  @@index([dumpId])
+  @@index([domain, category])
+  @@index([projectId])
+  @@index([itemType])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  domain      String    @default("work") // work | personal
+  description String    @default("")
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items OrganizedItem[]
+}
+
+model Tag {
+  id   String @id @default(cuid())
+  name String @unique
+
+  items OrganizedItemTag[]
+}
+
+model OrganizedItemTag {
+  itemId String
+  tagId  String
+
+  item OrganizedItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag  Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+  @@index([tagId])
+}

@@ -21,6 +21,7 @@ A collection of SaaS applications and tools. This project is configured to deplo
 | VSL Writer | `/VSLWriter` | Video sales letter writer |
 | Content Generator | `/ContentGenerator` | Reddit pain points → video questions for personal development |
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
+| BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 
 ## Deploying to GitHub Pages
 

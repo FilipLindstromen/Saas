@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainDump – Run or deploy</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      color: #fff;
+      padding: 1.5rem;
+    }
+    .card {
+      max-width: 420px;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+    p { color: rgba(255,255,255,0.75); margin: 0 0 1.5rem; font-size: 0.9375rem; line-height: 1.5; }
+    a {
+      display: inline-block;
+      padding: 0.6rem 1.25rem;
+      border-radius: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      margin: 0.25rem;
+      font-size: 0.9375rem;
+    }
+    .btn-primary {
+      background: #ff6b35;
+      color: #fff;
+      border: none;
+    }
+    .btn-primary:hover { background: #ff8555; }
+    .btn-secondary {
+      background: transparent;
+      color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-secondary:hover { border-color: #ff6b35; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>BrainDump</h1>
+    <p>Voice capture &amp; thought organization. This app needs a server and database to run. Deploy to Vercel (free) or run locally.</p>
+    <a href="https://vercel.com/new/clone?repository-url=REPO_URL_ENCODED&project-name=braindump&root-directory=BrainDump" class="btn-primary" target="_blank" rel="noopener">Deploy with Vercel</a>
+    <a href="../" class="btn-secondary">Back to Saas Apps</a>
+  </div>
+</body>
+</html>
