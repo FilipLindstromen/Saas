@@ -2032,7 +2032,7 @@ function ListView({
             <select
               className="bd-input"
               value={it.progress || "todo"}
-              onChange={(e) => onProgress(it.id, e.target.value, e.target.value)}
+              onChange={(e) => onProgress(it.id, e.target.value)}
               onClick={(e) => e.stopPropagation()}
               style={{ width: "auto", minWidth: "6rem", marginTop: "0.25rem", fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
             >
@@ -2747,7 +2747,7 @@ function PostitsView({
                     <select
                       className="bd-input"
                       value={it.progress || "todo"}
-                      onChange={(e) => onProgress(it.id, e.target.value, e.target.value)}
+                      onChange={(e) => onProgress(it.id, e.target.value)}
                       style={{ width: "100%", fontSize: "0.7rem", padding: "0.25rem 0.5rem" }}
                       onClick={(e) => e.stopPropagation()}
                     >

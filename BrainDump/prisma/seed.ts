@@ -1,9 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaClient } from "./generated/prisma/client";
 
-const prisma = new PrismaClient();
+const url = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+const adapter = new PrismaBetterSqlite3({ url });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // Optional: create a sample project for demo
   const existing = await prisma.project.findFirst();
   if (!existing) {
     await prisma.project.create({

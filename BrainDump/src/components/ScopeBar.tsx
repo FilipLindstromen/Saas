@@ -8,7 +8,7 @@ interface Project {
   domain: string;
 }
 
-type Mode = "inbox" | "work" | "personal";
+type Mode = "inbox" | "work" | "personal" | "all";
 
 interface ScopeBarProps {
   mode: Mode;

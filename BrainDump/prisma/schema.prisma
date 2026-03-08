@@ -2,12 +2,12 @@
 // Database schema for dumps, organized items, projects, and tags
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "generated/prisma"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model Dump {
