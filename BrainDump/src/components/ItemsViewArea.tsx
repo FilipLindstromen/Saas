@@ -679,7 +679,8 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     style={{
                       padding: "0.35rem 0.6rem",
                       fontSize: "0.8125rem",
-                      background: isSelected ? "var(--bg-hover)" : undefined,
+                      background: isSelected ? "var(--accent)" : undefined,
+                      color: isSelected ? "#fff" : undefined,
                       borderColor: "transparent",
                     }}
                     onClick={() => onItemTypeSelect(opt.value || null)}
@@ -752,8 +753,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
           {(mode === "work" || mode === "personal" || mode === "all") && (
             <button
               type="button"
-              className="bd-btn bd-btn-primary"
-              style={{ padding: "0.35rem 0.6rem", fontSize: "0.8125rem", marginLeft: "0.5rem" }}
+              className="bd-btn"
+              title="Add new entry"
+              style={{ padding: "0.35rem 0.6rem", marginLeft: "0.5rem" }}
               onClick={() => {
                 const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
                 setAddEntryForm({
@@ -770,7 +772,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 setAddEntryOpen(true);
               }}
             >
-              Add new Entry
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             </button>
           )}
         </div>
