@@ -6,6 +6,7 @@ import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type OrganizedItemPreview } from "@/components/CenterPanel";
 import { RightPanel } from "@/components/RightPanel";
 import { SettingsModal } from "@/components/SettingsModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
@@ -145,8 +146,9 @@ export default function BrainDumpPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg-primary)" }}>
-      <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
+    <ErrorBoundary>
+      <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg-primary)" }}>
+        <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
 
       <div
         style={{
@@ -290,5 +292,6 @@ export default function BrainDumpPage() {
       </div>
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
+    </ErrorBoundary>
   );
 }

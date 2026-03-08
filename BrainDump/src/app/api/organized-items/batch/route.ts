@@ -55,17 +55,17 @@ export async function POST(request: NextRequest) {
 
       const item = await prisma.organizedItem.create({
         data: {
-          dumpId,
-          domain: it.domain,
-          category: it.category ?? "",
-          subcategory: it.subcategory ?? "",
-          projectId,
-          itemType: it.item_type,
-          title: it.title,
-          content: it.content ?? "",
-          emotionLabel: it.emotion_label ?? null,
+          dumpId: String(dumpId),
+          domain: String(it.domain),
+          category: String(it.category ?? ""),
+          subcategory: String(it.subcategory ?? ""),
+          ...(projectId != null ? { projectId } : {}),
+          itemType: String(it.item_type),
+          title: String(it.title),
+          content: String(it.content ?? ""),
+          emotionLabel: it.emotion_label != null ? String(it.emotion_label) : null,
           status: "draft",
-          recommendedView: it.recommended_view ?? "note_cards",
+          recommendedView: String(it.recommended_view ?? "note_cards"),
           confidenceScore: typeof it.confidence_score === "number" ? it.confidence_score : 0.8,
         },
       });

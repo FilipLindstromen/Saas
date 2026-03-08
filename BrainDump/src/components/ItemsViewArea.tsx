@@ -110,6 +110,57 @@ const TYPE_BAR_COLORS: Record<string, string> = {
   default: "#6b7280",
 };
 
+/** Icon for each entry type (work & personal). Use on every entry and in type filters. */
+function EntryTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
+  const t = type || "note";
+  const iconProps = { width: size, height: size, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (t) {
+    case "task":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+        </svg>
+      );
+    case "idea":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5S10 14.09 11 14.25" />
+        </svg>
+      );
+    case "emotion":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+        </svg>
+      );
+    case "reflection":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+      );
+    case "calendar":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      );
+    case "note":
+    default:
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+        </svg>
+      );
+  }
+}
+
 export function loadViewPreference(): ItemsViewType {
   if (typeof window === "undefined") return "list";
   try {
@@ -224,12 +275,29 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const [lineToolActive, setLineToolActive] = useState(false);
   const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
 
+  const FETCH_TIMEOUT_MS = 15000;
+
+  const fetchWithTimeout = useCallback((url: string) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    return fetch(url, { signal: controller.signal })
+      .then((r) => {
+        clearTimeout(timeoutId);
+        return r.json();
+      })
+      .catch((e) => {
+        clearTimeout(timeoutId);
+        if (e.name === "AbortError") return { items: [] };
+        throw e;
+      });
+  }, []);
+
   const fetchItems = useCallback(() => {
     if (mode === "all") {
       setLoading(true);
       Promise.all([
-        fetch("/api/organized-items?domain=work").then((r) => r.json()).then((d) => d.items || []),
-        fetch("/api/organized-items?domain=personal").then((r) => r.json()).then((d) => d.items || []),
+        fetchWithTimeout("/api/organized-items?domain=work").then((d) => d.items || []),
+        fetchWithTimeout("/api/organized-items?domain=personal").then((d) => d.items || []),
       ])
         .then(([workItems, personalItems]) => {
           const merged: ViewItem[] = [...workItems, ...personalItems];
@@ -245,12 +313,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     if (projectId) params.set("projectId", projectId);
     if (category) params.set("category", category);
     setLoading(true);
-    fetch(`/api/organized-items?${params}`)
-      .then((r) => r.json())
+    fetchWithTimeout(`/api/organized-items?${params}`)
       .then((d) => setItems(d.items || []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [mode, projectId, category]);
+  }, [mode, projectId, category, fetchWithTimeout]);
 
   useEffect(() => {
     fetchItems();
@@ -1756,9 +1823,13 @@ function FlowchartView({
           style={{
             ...entryNodeStyle,
             borderLeft: `3px solid ${barColor}`,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
           }}
         >
-          {it.title}
+          <EntryTypeIcon type={it.itemType} size={14} />
+          <span style={{ flex: 1, minWidth: 0 }}>{it.title}</span>
           {it.content?.trim() && (
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
               {it.content.slice(0, 50)}{it.content.length > 50 ? "…" : ""}
@@ -1782,6 +1853,7 @@ function FlowchartView({
           onClick={() => toggleType(typeKey)}
           style={{ ...secondaryNodeStyle, borderColor: typeColor, color: typeColor }}
         >
+          <EntryTypeIcon type={type} size={14} />
           <span style={{ width: 4, height: 14, borderRadius: 2, background: typeColor, flexShrink: 0 }} />
           <span style={{ width: 16, fontSize: "0.7rem" }}>{isCollapsed ? "▶" : "▼"}</span>
           {label}
@@ -1919,7 +1991,8 @@ function ListView({
         <div style={{ width: 4, flexShrink: 0, background: barColor }} />
         <div style={{ flex: 1, minWidth: 0, padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
+            <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <EntryTypeIcon type={it.itemType} size={14} />
               {entryTypeLabel(it.itemType)}
             </span>
             {onItemContextMenu && (
@@ -2006,8 +2079,13 @@ function ListView({
                 fontSize: "0.8125rem",
                 fontWeight: 600,
                 textAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.35rem",
               }}
             >
+              <EntryTypeIcon type={type} size={14} />
               {formatTypeLabel(type)} ({typeItems.length})
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -2327,7 +2405,10 @@ function KanbanView({
               >
                 {it.content?.trim() || "—"}
               </div>
-              <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.25rem" }}>{entryTypeLabel(it.itemType)}</div>
+              <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <EntryTypeIcon type={it.itemType} size={12} />
+                {entryTypeLabel(it.itemType)}
+              </div>
             </div>
           ))}
         </div>
@@ -2350,51 +2431,6 @@ const POSTIT_COLORS: Record<string, string> = {
   reminder: "#10b981",
   default: "#6b7280",
 };
-
-function PostitIcon({ type }: { type: string }) {
-  const iconProps = { width: 20, height: 20, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  switch (type) {
-    case "task":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-        </svg>
-      );
-    case "idea":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5S10 14.09 11 14.25" />
-        </svg>
-      );
-    case "emotion":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-        </svg>
-      );
-    case "reflection":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-      );
-    case "reminder":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" />
-        </svg>
-      );
-    default:
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-        </svg>
-      );
-  }
-}
 
 function PostitsView({
   items,
