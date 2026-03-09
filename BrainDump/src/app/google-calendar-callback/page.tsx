@@ -54,7 +54,7 @@ export default function GoogleCalendarCallbackPage() {
         style={{
           background: "var(--bg-elevated, #fff)",
           border: "1px solid var(--border-default, #e5e5e5)",
-          borderRadius: 12,
+          borderRadius: 18,
           padding: "1.5rem",
           maxWidth: 360,
           textAlign: "center",
@@ -74,10 +74,11 @@ export default function GoogleCalendarCallbackPage() {
               onClick={() => window.close()}
               style={{
                 padding: "0.5rem 1rem",
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                background: "#fff",
+                borderRadius: 999,
+                border: "1px solid var(--border-default, #ccc)",
+                background: "linear-gradient(140deg, var(--bg-elevated, #fff), var(--bg-tertiary, #eee))",
                 cursor: "pointer",
+                boxShadow: "var(--shadow-sm, 0 4px 10px rgba(0,0,0,0.12))",
               }}
             >
               Close window

@@ -6,6 +6,9 @@ const nextConfig = {
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || "",
   // Next 16: Turbopack is default; set root so workspace is inferred correctly (avoids multiple lockfile warning)
+  experimental: {
+    externalDir: true,
+  },
   turbopack: {
     root: __dirname,
     resolveAlias: {

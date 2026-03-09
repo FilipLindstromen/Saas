@@ -124,6 +124,7 @@ export function CenterPanel({
   const [unclearItems, setUnclearItems] = useState<{ items: OrganizedItemPreview[]; allItems: OrganizedItemPreview[]; transcript: string } | null>(null);
   const [showDumpOverlay, setShowDumpOverlay] = useState(false);
   const [audioReadyTick, setAudioReadyTick] = useState(0);
+  const [itemsReloadKey, setItemsReloadKey] = useState(0);
   const notifyAudioReadyRef = useRef(() => setAudioReadyTick((t) => t + 1));
   notifyAudioReadyRef.current = () => setAudioReadyTick((t) => t + 1);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -602,7 +603,7 @@ export function CenterPanel({
           value={transcript}
           onChange={(e) => saveTranscriptToStorage(e.target.value)}
           placeholder="Recording transcript will appear here after Transcribe. You can also paste or type."
-          style={{ minHeight: "160px", minBlockSize: "160px", fontSize: "16px" }}
+          style={{ minHeight: "160px", minBlockSize: "160px", fontSize: "16px", borderRadius: 18 }}
           aria-label="Transcript"
         />
       </section>
@@ -716,7 +717,10 @@ export function CenterPanel({
                 overflow: "auto",
                 WebkitOverflowScrolling: "touch",
               }}
-              onClick={() => setShowDumpOverlay(false)}
+              onClick={() => {
+                setShowDumpOverlay(false);
+                if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+              }}
             >
               <div
                 className="bd-panel"
@@ -735,7 +739,10 @@ export function CenterPanel({
                   <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>New dump</h2>
                   <button
                     type="button"
-                    onClick={() => setShowDumpOverlay(false)}
+                    onClick={() => {
+                      setShowDumpOverlay(false);
+                      if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+                    }}
                     aria-label="Close"
                     style={{
                       width: 32,
@@ -771,6 +778,7 @@ export function CenterPanel({
           viewType={viewType}
           onViewTypeChange={onViewTypeChange}
           searchFilter={searchFilter}
+          reloadKey={itemsReloadKey}
         />
       )}
       {isInbox && unclearItems && (

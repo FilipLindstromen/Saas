@@ -387,7 +387,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
               placeholder="What you said (description)"
-              style={{ width: "100%", minHeight: 120, marginBottom: "1rem" }}
+            style={{ width: "100%", minHeight: 120, marginBottom: "1rem", borderRadius: 18 }}
             />
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
               <button type="button" className="bd-btn" onClick={() => setEditingEntry(null)}>

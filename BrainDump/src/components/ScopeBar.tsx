@@ -133,14 +133,43 @@ export function ScopeBar({
   }, [loadProjects]);
 
   useEffect(() => {
+    setCounts(null);
     if (mode === "work" || mode === "personal") {
-      setCounts(null);
       fetchCounts(mode).then(setCounts);
+    } else if (mode === "all") {
+      Promise.all([fetchCounts("work"), fetchCounts("personal")])
+        .then(([work, personal]) => {
+          const combined: CountsResponse = {
+            projectCounts: {},
+            categoryCounts: {},
+            itemTypeCounts: {},
+          };
+          for (const source of [work.projectCounts, personal.projectCounts]) {
+            if (!source) continue;
+            for (const [key, value] of Object.entries(source)) {
+              combined.projectCounts![key] = (combined.projectCounts![key] ?? 0) + value;
+            }
+          }
+          for (const source of [work.categoryCounts, personal.categoryCounts]) {
+            if (!source) continue;
+            for (const [key, value] of Object.entries(source)) {
+              combined.categoryCounts![key] = (combined.categoryCounts![key] ?? 0) + value;
+            }
+          }
+          for (const source of [work.itemTypeCounts, personal.itemTypeCounts]) {
+            if (!source) continue;
+            for (const [key, value] of Object.entries(source)) {
+              combined.itemTypeCounts![key] = (combined.itemTypeCounts![key] ?? 0) + value;
+            }
+          }
+          setCounts(combined);
+        })
+        .catch(() => setCounts(null));
     }
   }, [mode]);
 
   useEffect(() => {
-    if (mode === "personal") setCustomAreasState(loadCustomAreas());
+    if (mode === "personal" || mode === "all") setCustomAreasState(loadCustomAreas());
   }, [mode]);
 
   useEffect(() => {
@@ -456,7 +485,7 @@ export function ScopeBar({
     );
   }
 
-  if (mode === "personal") {
+  if (mode === "personal" || mode === "all") {
     const apiCategories = counts?.categoryCounts ? Object.keys(counts.categoryCounts).filter((k) => (counts!.categoryCounts![k] ?? 0) > 0) : [];
     const customAreas = (customAreasState.length ? customAreasState : loadCustomAreas()).filter((c) => !apiCategories.includes(c));
     const allAreas = [...apiCategories, ...customAreas].sort((a, b) => a.localeCompare(b));

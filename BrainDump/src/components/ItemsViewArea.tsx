@@ -41,6 +41,7 @@ interface ItemsViewAreaProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  reloadKey?: number;
 }
 
 const PROGRESS_OPTIONS = ["todo", "started", "completed"] as const;
@@ -179,6 +180,16 @@ function entryTypeLabel(itemType: string): string {
   return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function entryContextLabel(it: ViewItem): string {
+  const projectName = it.project?.name?.trim();
+  if (projectName) return projectName;
+  const category = (it.category ?? "").trim();
+  if (category) return formatAreaLabel(category);
+  const domain = (it.domain ?? "").trim();
+  if (!domain) return "";
+  return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
 function formatCalendarScheduleLabel(it: { scheduledAt?: string | null; scheduledTime?: string | null; recurrence?: string | null }): string | null {
   const hasSchedule = it.scheduledAt || (it.recurrence && it.recurrence !== "none");
   if (!hasSchedule) return null;
@@ -215,7 +226,7 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
   return items.filter((it) => it.itemType === itemType);
 }
 
-export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeSelect, viewType: controlledViewType, onViewTypeChange, searchFilter = "" }: ItemsViewAreaProps) {
+export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeSelect, viewType: controlledViewType, onViewTypeChange, searchFilter = "", reloadKey = 0 }: ItemsViewAreaProps) {
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const filteredItems = filterItemsBySearch(filterItemsByType(items, itemType), searchFilter);
@@ -300,7 +311,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
         fetchWithTimeout("/api/organized-items?domain=personal").then((d) => d.items || []),
       ])
         .then(([workItems, personalItems]) => {
-          const merged: ViewItem[] = [...workItems, ...personalItems];
+          let merged: ViewItem[] = [...workItems, ...personalItems];
+          if (category) {
+            merged = merged.filter((it) => it.category === category);
+          }
           merged.sort((a, b) => new Date((b as { createdAt?: string }).createdAt ?? 0).getTime() - new Date((a as { createdAt?: string }).createdAt ?? 0).getTime());
           setItems(merged);
         })
@@ -317,7 +331,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       .then((d) => setItems(d.items || []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [mode, projectId, category, fetchWithTimeout]);
+  }, [mode, projectId, category, fetchWithTimeout, reloadKey]);
 
   useEffect(() => {
     fetchItems();
@@ -351,6 +365,26 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       .then((d) => setCounts({ itemTypeCounts: d.itemTypeCounts ?? {} }))
       .catch(() => setCounts(null));
   }, [mode, projectId, category]);
+
+  const typeColor = (value: string | ""): string | undefined => {
+    if (!value) return undefined;
+    switch (value) {
+      case "task":
+        return "#ff9f1c";
+      case "note":
+        return "#2472ff";
+      case "idea":
+        return "#a855ff";
+      case "calendar":
+        return "#16a34a";
+      case "emotion":
+        return "#f97373";
+      case "reflection":
+        return "#14b8a6";
+      default:
+        return undefined;
+    }
+  };
 
   const typeOptions = (() => {
     const base = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
@@ -648,7 +682,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   if (loading) {
     return (
-      <div className="bd-panel" style={{ padding: "1.5rem", background: "var(--bg-primary)" }}>
+      <div style={{ padding: "1.5rem" }}>
         <p className="bd-empty">Loading…</p>
       </div>
     );
@@ -664,13 +698,14 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   ];
 
   return (
-    <div className="bd-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", minHeight: 0, flex: 1, background: "var(--bg-primary)" }}>
+    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", minHeight: 0, flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
             <div style={{ display: "flex", gap: "0.25rem", alignItems: "center", flexWrap: "wrap" }}>
               {typeOptions.map((opt) => {
                 const isSelected = (itemType ?? "") === opt.value;
+                const color = typeColor(opt.value);
                 return (
                   <button
                     key={opt.value || "all"}
@@ -679,9 +714,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     style={{
                       padding: "0.35rem 0.6rem",
                       fontSize: "0.8125rem",
-                      background: isSelected ? "var(--accent)" : undefined,
+                      background: isSelected ? (color ?? "var(--accent)") : undefined,
                       color: isSelected ? "#fff" : undefined,
-                      borderColor: "transparent",
+                      borderColor: color ?? "transparent",
                     }}
                     onClick={() => onItemTypeSelect(opt.value || null)}
                   >
@@ -785,9 +820,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               title={label}
               style={{
                 padding: "0.4rem",
-                background: viewType === value ? "var(--bg-hover)" : undefined,
-                borderColor: "transparent",
-                color: "var(--text-primary)",
+                background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
+                borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
+                color: viewType === value ? "#fff" : "var(--text-primary)",
               }}
               onClick={() => setViewType(value)}
             >
@@ -1107,7 +1142,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
               placeholder="What you said (description)"
-              style={{ width: "100%", minHeight: 100, marginBottom: "1rem" }}
+              style={{ width: "100%", minHeight: 100, marginBottom: "1rem", borderRadius: 18 }}
             />
             {items.find((i) => i.id === editingEntry.id)?.itemType === "task" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
@@ -1769,7 +1804,7 @@ function FlowchartView({
   const secondaryNodeStyle: CSSProperties = {
     padding: "0.4rem 0.75rem",
     borderRadius: 8,
-    background: "#fff",
+    background: "var(--bg-elevated)",
     color: "var(--accent)",
     fontWeight: 500,
     fontSize: "0.8125rem",
@@ -1785,7 +1820,7 @@ function FlowchartView({
   const entryNodeStyle: CSSProperties = {
     padding: "0.35rem 0.65rem",
     borderRadius: 8,
-    background: "#fff",
+    background: "var(--bg-elevated)",
     color: "var(--text-primary)",
     fontWeight: 400,
     fontSize: "0.8125rem",
@@ -1995,7 +2030,7 @@ function ListView({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <EntryTypeIcon type={it.itemType} size={14} />
-              {entryTypeLabel(it.itemType)}
+              {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
             </span>
             {onItemContextMenu && (
               <button
@@ -2142,8 +2177,18 @@ function TextView({
       {items.map((it) => {
         const isEditingTitle = editing?.id === it.id && editing?.field === "title";
         const isEditingContent = editing?.id === it.id && editing?.field === "content";
+        const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
         return (
-          <div key={it.id} style={{ display: "flex", flexDirection: "column", background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
+          <div
+            key={it.id}
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              background: "transparent",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ width: 4, borderRadius: 999, background: barColor, flexShrink: 0 }} />
             <article
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
               style={{
@@ -2153,11 +2198,15 @@ function TextView({
                 flexDirection: "column",
                 gap: "0.5rem",
                 padding: "0.75rem 1rem",
+                background: "var(--bg-elevated)",
+                borderRadius: 12,
+                boxShadow: "var(--shadow-sm)",
+                border: "1px solid var(--border-subtle)",
               }}
             >
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
-                {entryTypeLabel(it.itemType)}
+                {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </span>
               {isEditingTitle ? (
                 <input
@@ -2409,7 +2458,7 @@ function KanbanView({
               </div>
               <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
                 <EntryTypeIcon type={it.itemType} size={12} />
-                {entryTypeLabel(it.itemType)}
+                {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </div>
             </div>
           ))}
@@ -2717,7 +2766,7 @@ function PostitsView({
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 0.75rem 0.25rem", gap: "0.5rem" }}>
                   <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
-                    {entryTypeLabel(it.itemType)}
+                    {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
                   </span>
                   {onItemContextMenu && (
                     <button
