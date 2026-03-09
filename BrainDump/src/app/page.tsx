@@ -165,6 +165,7 @@ export default function BrainDumpPage() {
         <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
 
       <div
+        className="bd-layout-main"
         style={{
           display: "flex",
           flex: 1,
@@ -173,6 +174,7 @@ export default function BrainDumpPage() {
         }}
       >
         <aside
+          className="bd-mobile-hide"
           style={{
             width: 56,
             flexShrink: 0,
@@ -304,6 +306,37 @@ export default function BrainDumpPage() {
           )}
         </div>
       </div>
+
+      <div className="bd-bottom-bar">
+        <button
+          type="button"
+          className={`bd-bottom-secondary${mode === "work" ? " bd-bottom-secondary-active" : ""}`}
+          onClick={() => setMode("work")}
+        >
+          Work
+        </button>
+        <button
+          type="button"
+          className="bd-bottom-primary"
+          onClick={() => {
+            if (typeof document === "undefined") return;
+            const fab = document.getElementById("bd-dump-fab");
+            if (fab && "click" in fab) {
+              (fab as HTMLButtonElement).click();
+            }
+          }}
+        >
+          Dump
+        </button>
+        <button
+          type="button"
+          className={`bd-bottom-secondary${mode === "personal" ? " bd-bottom-secondary-active" : ""}`}
+          onClick={() => setMode("personal")}
+        >
+          Personal
+        </button>
+      </div>
+
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
     </ErrorBoundary>

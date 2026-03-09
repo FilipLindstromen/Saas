@@ -17,6 +17,7 @@ export interface ViewItem {
   status: string;
   progress: string;
   recommendedView: string;
+   createdAt?: string;
   positionX?: number | null;
   positionY?: number | null;
   kanbanColumn?: string | null;
@@ -188,6 +189,15 @@ function entryContextLabel(it: ViewItem): string {
   const domain = (it.domain ?? "").trim();
   if (!domain) return "";
   return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
+const NEW_ENTRY_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function isNewEntry(it: ViewItem): boolean {
+  if (!it.createdAt) return false;
+  const ts = new Date(it.createdAt).getTime();
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts < NEW_ENTRY_WINDOW_MS;
 }
 
 function formatCalendarScheduleLabel(it: { scheduledAt?: string | null; scheduledTime?: string | null; recurrence?: string | null }): string | null {
@@ -730,6 +740,33 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             {filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""}
           </span>
           {(mode === "work" || mode === "personal" || mode === "all") && (
+            <button
+              type="button"
+              className="bd-btn"
+              title="Add new entry"
+              style={{ padding: "0.35rem 0.6rem", marginLeft: "0.5rem" }}
+              onClick={() => {
+                const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                setAddEntryForm({
+                  itemType: types[0]?.value ?? "note",
+                  title: "",
+                  content: "",
+                  progress: "todo",
+                  projectId: projectId ?? "",
+                  scheduledAt: "",
+                  scheduledTime: "",
+                  recurrence: "none",
+                  sendNotification: false,
+                });
+                setAddEntryOpen(true);
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            </button>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {(mode === "work" || mode === "personal" || mode === "all") && (
             <span style={{ position: "relative", display: "inline-flex" }}>
               <button
                 type="button"
@@ -751,7 +788,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   <div
                     style={{
                       position: "absolute",
-                      left: 0,
+                      right: 0,
                       top: "100%",
                       marginTop: 4,
                       zIndex: 1000,
@@ -785,33 +822,6 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               )}
             </span>
           )}
-          {(mode === "work" || mode === "personal" || mode === "all") && (
-            <button
-              type="button"
-              className="bd-btn"
-              title="Add new entry"
-              style={{ padding: "0.35rem 0.6rem", marginLeft: "0.5rem" }}
-              onClick={() => {
-                const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
-                setAddEntryForm({
-                  itemType: types[0]?.value ?? "note",
-                  title: "",
-                  content: "",
-                  progress: "todo",
-                  projectId: projectId ?? "",
-                  scheduledAt: "",
-                  scheduledTime: "",
-                  recurrence: "none",
-                  sendNotification: false,
-                });
-                setAddEntryOpen(true);
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            </button>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
           {viewButtons.map(({ value, label, icon }) => (
             <button
               key={value}
@@ -1851,6 +1861,7 @@ function FlowchartView({
 
   const renderEntry = (it: ViewItem) => {
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
+    const isNew = isNewEntry(it);
     return (
       <div key={it.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
         <FlowConnector dashed />
@@ -1863,8 +1874,24 @@ function FlowchartView({
             display: "flex",
             alignItems: "center",
             gap: "0.5rem",
+            position: "relative",
           }}
         >
+          {isNew && (
+            <span
+              style={{
+                position: "absolute",
+                top: 4,
+                right: 6,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "var(--accent)",
+                boxShadow: "0 0 8px rgba(255,255,255,0.4)",
+              }}
+              aria-hidden
+            />
+          )}
           <EntryTypeIcon type={it.itemType} size={14} />
           <span style={{ flex: 1, minWidth: 0 }}>{it.title}</span>
           {it.content?.trim() && (
@@ -2178,6 +2205,7 @@ function TextView({
         const isEditingTitle = editing?.id === it.id && editing?.field === "title";
         const isEditingContent = editing?.id === it.id && editing?.field === "content";
         const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
+        const isNew = isNewEntry(it);
         return (
           <div
             key={it.id}
@@ -2199,11 +2227,27 @@ function TextView({
                 gap: "0.5rem",
                 padding: "0.75rem 1rem",
                 background: "var(--bg-elevated)",
-                borderRadius: 12,
+                borderRadius: 10,
                 boxShadow: "var(--shadow-sm)",
                 border: "1px solid var(--border-subtle)",
+                position: "relative",
               }}
             >
+            {isNew && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 8,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "var(--accent)",
+                  boxShadow: "0 0 8px rgba(255,255,255,0.4)",
+                }}
+                aria-hidden
+              />
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
                 {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
@@ -2751,7 +2795,7 @@ function PostitsView({
                 zIndex: 1,
                 background: "var(--bg-elevated)",
                 border: "1px solid var(--border-default)",
-                borderRadius: 12,
+                borderRadius: 10,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
                 cursor: lineToolActive ? "crosshair" : dragState?.id === it.id ? "grabbing" : "grab",
                 userSelect: "none",

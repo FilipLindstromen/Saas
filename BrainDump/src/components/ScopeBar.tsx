@@ -303,14 +303,43 @@ export function ScopeBar({
           {onSearchFilterChange && (
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginLeft: "auto", flexShrink: 0 }}>
               <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)" }}>Filter:</span>
-              <input
-                type="text"
-                className="bd-input"
-                value={searchFilter}
-                onChange={(e) => onSearchFilterChange(e.target.value)}
-                placeholder="Search entries…"
-                style={{ width: 160, padding: "0.35rem 0.5rem", fontSize: "0.8125rem" }}
-              />
+              <div style={{ position: "relative", width: 180, flexShrink: 0 }}>
+                <input
+                  type="text"
+                  className="bd-input"
+                  value={searchFilter}
+                  onChange={(e) => onSearchFilterChange(e.target.value)}
+                  placeholder="Search entries…"
+                  style={{ width: "100%", padding: "0.35rem 1.9rem 0.35rem 0.5rem", fontSize: "0.8125rem" }}
+                />
+                {searchFilter && (
+                  <button
+                    type="button"
+                    aria-label="Clear filter"
+                    onClick={() => onSearchFilterChange("")}
+                    style={{
+                      position: "absolute",
+                      right: 6,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 18,
+                      height: 18,
+                      borderRadius: "999px",
+                      border: "none",
+                      background: "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--text-tertiary)",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                      padding: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -574,19 +603,48 @@ export function ScopeBar({
               </button>
             )}
           </div>
-          {onSearchFilterChange && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginLeft: "auto", flexShrink: 0 }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)" }}>Filter:</span>
+        {onSearchFilterChange && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginLeft: "auto", flexShrink: 0 }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)" }}>Filter:</span>
+            <div style={{ position: "relative", width: 180, flexShrink: 0 }}>
               <input
                 type="text"
                 className="bd-input"
                 value={searchFilter}
                 onChange={(e) => onSearchFilterChange(e.target.value)}
                 placeholder="Search entries…"
-                style={{ width: 160, padding: "0.35rem 0.5rem", fontSize: "0.8125rem" }}
+                style={{ width: "100%", padding: "0.35rem 1.9rem 0.35rem 0.5rem", fontSize: "0.8125rem" }}
               />
+              {searchFilter && (
+                <button
+                  type="button"
+                  aria-label="Clear filter"
+                  onClick={() => onSearchFilterChange("")}
+                  style={{
+                    position: "absolute",
+                    right: 6,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 18,
+                    height: 18,
+                    borderRadius: "999px",
+                    border: "none",
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-tertiary)",
+                    cursor: "pointer",
+                    fontSize: "0.75rem",
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              )}
             </div>
-          )}
+          </div>
+        )}
         </div>
         {areaContextMenu?.isCustom && (
           <div

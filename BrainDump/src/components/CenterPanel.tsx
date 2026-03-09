@@ -670,6 +670,8 @@ export function CenterPanel({
         </p>
       )}
       <button
+        id="bd-dump-fab"
+        className="bd-dump-fab"
         type="button"
         onClick={() => setShowDumpOverlay(true)}
         title="Record a new dump"
