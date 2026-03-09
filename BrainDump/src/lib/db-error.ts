@@ -1,8 +1,8 @@
 const DB_SETUP_HINT =
-  'Database not set up. In the BrainDump folder run: npm run db:push (and ensure .env has DATABASE_URL="file:./dev.db").';
+  'Database not set up. In the BrainDump folder run: npm run db:push (and set DATABASE_URL to your Postgres connection string).';
 
 const DB_ERROR_PATTERN =
-  /no such table|SQLITE_ERROR|Can't reach database|PrismaClientInitializationError|Environment variable not found: DATABASE_URL/i;
+  /no such table|Can't reach database|PrismaClientInitializationError|Environment variable not found: DATABASE_URL|connection|ECONNREFUSED/i;
 
 export function getDbErrorMessage(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e);

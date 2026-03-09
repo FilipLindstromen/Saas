@@ -27,6 +27,7 @@ export type AggregateDump = {
 export type DumpMinAggregateOutputType = {
   id: string | null
   mode: string | null
+  userId: string | null
   audioUrl: string | null
   transcriptRaw: string | null
   transcriptEdited: string | null
@@ -39,6 +40,7 @@ export type DumpMinAggregateOutputType = {
 export type DumpMaxAggregateOutputType = {
   id: string | null
   mode: string | null
+  userId: string | null
   audioUrl: string | null
   transcriptRaw: string | null
   transcriptEdited: string | null
@@ -51,6 +53,7 @@ export type DumpMaxAggregateOutputType = {
 export type DumpCountAggregateOutputType = {
   id: number
   mode: number
+  userId: number
   audioUrl: number
   transcriptRaw: number
   transcriptEdited: number
@@ -65,6 +68,7 @@ export type DumpCountAggregateOutputType = {
 export type DumpMinAggregateInputType = {
   id?: true
   mode?: true
+  userId?: true
   audioUrl?: true
   transcriptRaw?: true
   transcriptEdited?: true
@@ -77,6 +81,7 @@ export type DumpMinAggregateInputType = {
 export type DumpMaxAggregateInputType = {
   id?: true
   mode?: true
+  userId?: true
   audioUrl?: true
   transcriptRaw?: true
   transcriptEdited?: true
@@ -89,6 +94,7 @@ export type DumpMaxAggregateInputType = {
 export type DumpCountAggregateInputType = {
   id?: true
   mode?: true
+  userId?: true
   audioUrl?: true
   transcriptRaw?: true
   transcriptEdited?: true
@@ -174,6 +180,7 @@ export type DumpGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 export type DumpGroupByOutputType = {
   id: string
   mode: string
+  userId: string
   audioUrl: string | null
   transcriptRaw: string
   transcriptEdited: string
@@ -207,6 +214,7 @@ export type DumpWhereInput = {
   NOT?: Prisma.DumpWhereInput | Prisma.DumpWhereInput[]
   id?: Prisma.StringFilter<"Dump"> | string
   mode?: Prisma.StringFilter<"Dump"> | string
+  userId?: Prisma.StringFilter<"Dump"> | string
   audioUrl?: Prisma.StringNullableFilter<"Dump"> | string | null
   transcriptRaw?: Prisma.StringFilter<"Dump"> | string
   transcriptEdited?: Prisma.StringFilter<"Dump"> | string
@@ -214,12 +222,14 @@ export type DumpWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
   organizedAt?: Prisma.DateTimeNullableFilter<"Dump"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   organizedItems?: Prisma.OrganizedItemListRelationFilter
 }
 
 export type DumpOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   mode?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   audioUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   transcriptRaw?: Prisma.SortOrder
   transcriptEdited?: Prisma.SortOrder
@@ -227,6 +237,7 @@ export type DumpOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   organizedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  user?: Prisma.UserOrderByWithRelationInput
   organizedItems?: Prisma.OrganizedItemOrderByRelationAggregateInput
 }
 
@@ -236,6 +247,7 @@ export type DumpWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.DumpWhereInput[]
   NOT?: Prisma.DumpWhereInput | Prisma.DumpWhereInput[]
   mode?: Prisma.StringFilter<"Dump"> | string
+  userId?: Prisma.StringFilter<"Dump"> | string
   audioUrl?: Prisma.StringNullableFilter<"Dump"> | string | null
   transcriptRaw?: Prisma.StringFilter<"Dump"> | string
   transcriptEdited?: Prisma.StringFilter<"Dump"> | string
@@ -243,12 +255,14 @@ export type DumpWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
   organizedAt?: Prisma.DateTimeNullableFilter<"Dump"> | Date | string | null
   updatedAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   organizedItems?: Prisma.OrganizedItemListRelationFilter
 }, "id">
 
 export type DumpOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   mode?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   audioUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   transcriptRaw?: Prisma.SortOrder
   transcriptEdited?: Prisma.SortOrder
@@ -267,6 +281,7 @@ export type DumpScalarWhereWithAggregatesInput = {
   NOT?: Prisma.DumpScalarWhereWithAggregatesInput | Prisma.DumpScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Dump"> | string
   mode?: Prisma.StringWithAggregatesFilter<"Dump"> | string
+  userId?: Prisma.StringWithAggregatesFilter<"Dump"> | string
   audioUrl?: Prisma.StringNullableWithAggregatesFilter<"Dump"> | string | null
   transcriptRaw?: Prisma.StringWithAggregatesFilter<"Dump"> | string
   transcriptEdited?: Prisma.StringWithAggregatesFilter<"Dump"> | string
@@ -286,12 +301,14 @@ export type DumpCreateInput = {
   createdAt?: Date | string
   organizedAt?: Date | string | null
   updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutDumpsInput
   organizedItems?: Prisma.OrganizedItemCreateNestedManyWithoutDumpInput
 }
 
 export type DumpUncheckedCreateInput = {
   id?: string
   mode?: string
+  userId: string
   audioUrl?: string | null
   transcriptRaw?: string
   transcriptEdited?: string
@@ -312,12 +329,14 @@ export type DumpUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organizedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutDumpsNestedInput
   organizedItems?: Prisma.OrganizedItemUpdateManyWithoutDumpNestedInput
 }
 
 export type DumpUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transcriptRaw?: Prisma.StringFieldUpdateOperationsInput | string
   transcriptEdited?: Prisma.StringFieldUpdateOperationsInput | string
@@ -331,6 +350,7 @@ export type DumpUncheckedUpdateInput = {
 export type DumpCreateManyInput = {
   id?: string
   mode?: string
+  userId: string
   audioUrl?: string | null
   transcriptRaw?: string
   transcriptEdited?: string
@@ -355,6 +375,7 @@ export type DumpUpdateManyMutationInput = {
 export type DumpUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transcriptRaw?: Prisma.StringFieldUpdateOperationsInput | string
   transcriptEdited?: Prisma.StringFieldUpdateOperationsInput | string
@@ -367,6 +388,7 @@ export type DumpUncheckedUpdateManyInput = {
 export type DumpCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mode?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   audioUrl?: Prisma.SortOrder
   transcriptRaw?: Prisma.SortOrder
   transcriptEdited?: Prisma.SortOrder
@@ -379,6 +401,7 @@ export type DumpCountOrderByAggregateInput = {
 export type DumpMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mode?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   audioUrl?: Prisma.SortOrder
   transcriptRaw?: Prisma.SortOrder
   transcriptEdited?: Prisma.SortOrder
@@ -391,6 +414,7 @@ export type DumpMaxOrderByAggregateInput = {
 export type DumpMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mode?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   audioUrl?: Prisma.SortOrder
   transcriptRaw?: Prisma.SortOrder
   transcriptEdited?: Prisma.SortOrder
@@ -403,6 +427,16 @@ export type DumpMinOrderByAggregateInput = {
 export type DumpScalarRelationFilter = {
   is?: Prisma.DumpWhereInput
   isNot?: Prisma.DumpWhereInput
+}
+
+export type DumpListRelationFilter = {
+  every?: Prisma.DumpWhereInput
+  some?: Prisma.DumpWhereInput
+  none?: Prisma.DumpWhereInput
+}
+
+export type DumpOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type StringFieldUpdateOperationsInput = {
@@ -435,6 +469,48 @@ export type DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.DumpUpdateToOneWithWhereWithoutOrganizedItemsInput, Prisma.DumpUpdateWithoutOrganizedItemsInput>, Prisma.DumpUncheckedUpdateWithoutOrganizedItemsInput>
 }
 
+export type DumpCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput> | Prisma.DumpCreateWithoutUserInput[] | Prisma.DumpUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.DumpCreateOrConnectWithoutUserInput | Prisma.DumpCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.DumpCreateManyUserInputEnvelope
+  connect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+}
+
+export type DumpUncheckedCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput> | Prisma.DumpCreateWithoutUserInput[] | Prisma.DumpUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.DumpCreateOrConnectWithoutUserInput | Prisma.DumpCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.DumpCreateManyUserInputEnvelope
+  connect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+}
+
+export type DumpUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput> | Prisma.DumpCreateWithoutUserInput[] | Prisma.DumpUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.DumpCreateOrConnectWithoutUserInput | Prisma.DumpCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.DumpUpsertWithWhereUniqueWithoutUserInput | Prisma.DumpUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.DumpCreateManyUserInputEnvelope
+  set?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  disconnect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  delete?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  connect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  update?: Prisma.DumpUpdateWithWhereUniqueWithoutUserInput | Prisma.DumpUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.DumpUpdateManyWithWhereWithoutUserInput | Prisma.DumpUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.DumpScalarWhereInput | Prisma.DumpScalarWhereInput[]
+}
+
+export type DumpUncheckedUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput> | Prisma.DumpCreateWithoutUserInput[] | Prisma.DumpUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.DumpCreateOrConnectWithoutUserInput | Prisma.DumpCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.DumpUpsertWithWhereUniqueWithoutUserInput | Prisma.DumpUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.DumpCreateManyUserInputEnvelope
+  set?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  disconnect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  delete?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  connect?: Prisma.DumpWhereUniqueInput | Prisma.DumpWhereUniqueInput[]
+  update?: Prisma.DumpUpdateWithWhereUniqueWithoutUserInput | Prisma.DumpUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.DumpUpdateManyWithWhereWithoutUserInput | Prisma.DumpUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.DumpScalarWhereInput | Prisma.DumpScalarWhereInput[]
+}
+
 export type DumpCreateWithoutOrganizedItemsInput = {
   id?: string
   mode?: string
@@ -445,11 +521,13 @@ export type DumpCreateWithoutOrganizedItemsInput = {
   createdAt?: Date | string
   organizedAt?: Date | string | null
   updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutDumpsInput
 }
 
 export type DumpUncheckedCreateWithoutOrganizedItemsInput = {
   id?: string
   mode?: string
+  userId: string
   audioUrl?: string | null
   transcriptRaw?: string
   transcriptEdited?: string
@@ -485,9 +563,129 @@ export type DumpUpdateWithoutOrganizedItemsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organizedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutDumpsNestedInput
 }
 
 export type DumpUncheckedUpdateWithoutOrganizedItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  transcriptRaw?: Prisma.StringFieldUpdateOperationsInput | string
+  transcriptEdited?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organizedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DumpCreateWithoutUserInput = {
+  id?: string
+  mode?: string
+  audioUrl?: string | null
+  transcriptRaw?: string
+  transcriptEdited?: string
+  status?: string
+  createdAt?: Date | string
+  organizedAt?: Date | string | null
+  updatedAt?: Date | string
+  organizedItems?: Prisma.OrganizedItemCreateNestedManyWithoutDumpInput
+}
+
+export type DumpUncheckedCreateWithoutUserInput = {
+  id?: string
+  mode?: string
+  audioUrl?: string | null
+  transcriptRaw?: string
+  transcriptEdited?: string
+  status?: string
+  createdAt?: Date | string
+  organizedAt?: Date | string | null
+  updatedAt?: Date | string
+  organizedItems?: Prisma.OrganizedItemUncheckedCreateNestedManyWithoutDumpInput
+}
+
+export type DumpCreateOrConnectWithoutUserInput = {
+  where: Prisma.DumpWhereUniqueInput
+  create: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput>
+}
+
+export type DumpCreateManyUserInputEnvelope = {
+  data: Prisma.DumpCreateManyUserInput | Prisma.DumpCreateManyUserInput[]
+  skipDuplicates?: boolean
+}
+
+export type DumpUpsertWithWhereUniqueWithoutUserInput = {
+  where: Prisma.DumpWhereUniqueInput
+  update: Prisma.XOR<Prisma.DumpUpdateWithoutUserInput, Prisma.DumpUncheckedUpdateWithoutUserInput>
+  create: Prisma.XOR<Prisma.DumpCreateWithoutUserInput, Prisma.DumpUncheckedCreateWithoutUserInput>
+}
+
+export type DumpUpdateWithWhereUniqueWithoutUserInput = {
+  where: Prisma.DumpWhereUniqueInput
+  data: Prisma.XOR<Prisma.DumpUpdateWithoutUserInput, Prisma.DumpUncheckedUpdateWithoutUserInput>
+}
+
+export type DumpUpdateManyWithWhereWithoutUserInput = {
+  where: Prisma.DumpScalarWhereInput
+  data: Prisma.XOR<Prisma.DumpUpdateManyMutationInput, Prisma.DumpUncheckedUpdateManyWithoutUserInput>
+}
+
+export type DumpScalarWhereInput = {
+  AND?: Prisma.DumpScalarWhereInput | Prisma.DumpScalarWhereInput[]
+  OR?: Prisma.DumpScalarWhereInput[]
+  NOT?: Prisma.DumpScalarWhereInput | Prisma.DumpScalarWhereInput[]
+  id?: Prisma.StringFilter<"Dump"> | string
+  mode?: Prisma.StringFilter<"Dump"> | string
+  userId?: Prisma.StringFilter<"Dump"> | string
+  audioUrl?: Prisma.StringNullableFilter<"Dump"> | string | null
+  transcriptRaw?: Prisma.StringFilter<"Dump"> | string
+  transcriptEdited?: Prisma.StringFilter<"Dump"> | string
+  status?: Prisma.StringFilter<"Dump"> | string
+  createdAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
+  organizedAt?: Prisma.DateTimeNullableFilter<"Dump"> | Date | string | null
+  updatedAt?: Prisma.DateTimeFilter<"Dump"> | Date | string
+}
+
+export type DumpCreateManyUserInput = {
+  id?: string
+  mode?: string
+  audioUrl?: string | null
+  transcriptRaw?: string
+  transcriptEdited?: string
+  status?: string
+  createdAt?: Date | string
+  organizedAt?: Date | string | null
+  updatedAt?: Date | string
+}
+
+export type DumpUpdateWithoutUserInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  transcriptRaw?: Prisma.StringFieldUpdateOperationsInput | string
+  transcriptEdited?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organizedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organizedItems?: Prisma.OrganizedItemUpdateManyWithoutDumpNestedInput
+}
+
+export type DumpUncheckedUpdateWithoutUserInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  transcriptRaw?: Prisma.StringFieldUpdateOperationsInput | string
+  transcriptEdited?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organizedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organizedItems?: Prisma.OrganizedItemUncheckedUpdateManyWithoutDumpNestedInput
+}
+
+export type DumpUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   audioUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -533,6 +731,7 @@ export type DumpCountOutputTypeCountOrganizedItemsArgs<ExtArgs extends runtime.T
 export type DumpSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mode?: boolean
+  userId?: boolean
   audioUrl?: boolean
   transcriptRaw?: boolean
   transcriptEdited?: boolean
@@ -540,6 +739,7 @@ export type DumpSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   organizedAt?: boolean
   updatedAt?: boolean
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   organizedItems?: boolean | Prisma.Dump$organizedItemsArgs<ExtArgs>
   _count?: boolean | Prisma.DumpCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dump"]>
@@ -547,6 +747,7 @@ export type DumpSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
 export type DumpSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mode?: boolean
+  userId?: boolean
   audioUrl?: boolean
   transcriptRaw?: boolean
   transcriptEdited?: boolean
@@ -554,11 +755,13 @@ export type DumpSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   createdAt?: boolean
   organizedAt?: boolean
   updatedAt?: boolean
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dump"]>
 
 export type DumpSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mode?: boolean
+  userId?: boolean
   audioUrl?: boolean
   transcriptRaw?: boolean
   transcriptEdited?: boolean
@@ -566,11 +769,13 @@ export type DumpSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   createdAt?: boolean
   organizedAt?: boolean
   updatedAt?: boolean
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dump"]>
 
 export type DumpSelectScalar = {
   id?: boolean
   mode?: boolean
+  userId?: boolean
   audioUrl?: boolean
   transcriptRaw?: boolean
   transcriptEdited?: boolean
@@ -580,22 +785,29 @@ export type DumpSelectScalar = {
   updatedAt?: boolean
 }
 
-export type DumpOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mode" | "audioUrl" | "transcriptRaw" | "transcriptEdited" | "status" | "createdAt" | "organizedAt" | "updatedAt", ExtArgs["result"]["dump"]>
+export type DumpOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mode" | "userId" | "audioUrl" | "transcriptRaw" | "transcriptEdited" | "status" | "createdAt" | "organizedAt" | "updatedAt", ExtArgs["result"]["dump"]>
 export type DumpInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   organizedItems?: boolean | Prisma.Dump$organizedItemsArgs<ExtArgs>
   _count?: boolean | Prisma.DumpCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type DumpIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type DumpIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type DumpIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+}
+export type DumpIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+}
 
 export type $DumpPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Dump"
   objects: {
+    user: Prisma.$UserPayload<ExtArgs>
     organizedItems: Prisma.$OrganizedItemPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     mode: string
+    userId: string
     audioUrl: string | null
     transcriptRaw: string
     transcriptEdited: string
@@ -997,6 +1209,7 @@ readonly fields: DumpFieldRefs;
  */
 export interface Prisma__DumpClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   organizedItems<T extends Prisma.Dump$organizedItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Dump$organizedItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrganizedItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1029,6 +1242,7 @@ export interface Prisma__DumpClient<T, Null = never, ExtArgs extends runtime.Typ
 export interface DumpFieldRefs {
   readonly id: Prisma.FieldRef<"Dump", 'String'>
   readonly mode: Prisma.FieldRef<"Dump", 'String'>
+  readonly userId: Prisma.FieldRef<"Dump", 'String'>
   readonly audioUrl: Prisma.FieldRef<"Dump", 'String'>
   readonly transcriptRaw: Prisma.FieldRef<"Dump", 'String'>
   readonly transcriptEdited: Prisma.FieldRef<"Dump", 'String'>
@@ -1265,6 +1479,7 @@ export type DumpCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * The data used to create many Dumps.
    */
   data: Prisma.DumpCreateManyInput | Prisma.DumpCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1283,6 +1498,11 @@ export type DumpCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many Dumps.
    */
   data: Prisma.DumpCreateManyInput | Prisma.DumpCreateManyInput[]
+  skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DumpIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1353,6 +1573,10 @@ export type DumpUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many Dumps to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DumpIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**

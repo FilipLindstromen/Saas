@@ -73,7 +73,14 @@ Next.js automatically loads `.env.local` in development, and the server-side cod
    - `GOOGLE_CLIENT_SECRET`
    - (Optional) `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `GIPHY_API_KEY`
 
-4. Redeploy the project.
+4. **Create tables in Postgres (first time only):**  
+   With `DATABASE_URL` set to your Postgres URL (e.g. in `.env.local`), run once in the BrainDump folder:
+   ```bash
+   npm run db:push
+   ```
+   This creates all tables in your Postgres database. After that, redeploy if needed.
+
+5. Redeploy the project.
 
 The deployed app then reads these values from the environment; nothing secret lives in the Git repo.
 

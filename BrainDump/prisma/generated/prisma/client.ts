@@ -66,3 +66,23 @@ export type Tag = Prisma.TagModel
  * 
  */
 export type OrganizedItemTag = Prisma.OrganizedItemTagModel
+/**
+ * Model User
+ * Auth.js / NextAuth user model
+ */
+export type User = Prisma.UserModel
+/**
+ * Model Account
+ * Auth.js / NextAuth account model
+ */
+export type Account = Prisma.AccountModel
+/**
+ * Model Session
+ * Auth.js / NextAuth session model
+ */
+export type Session = Prisma.SessionModel
+/**
+ * Model VerificationToken
+ * Auth.js / NextAuth email verification / magic link tokens
+ */
+export type VerificationToken = Prisma.VerificationTokenModel

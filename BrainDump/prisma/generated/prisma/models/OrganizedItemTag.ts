@@ -359,6 +359,7 @@ export type OrganizedItemTagCreateOrConnectWithoutItemInput = {
 
 export type OrganizedItemTagCreateManyItemInputEnvelope = {
   data: Prisma.OrganizedItemTagCreateManyItemInput | Prisma.OrganizedItemTagCreateManyItemInput[]
+  skipDuplicates?: boolean
 }
 
 export type OrganizedItemTagUpsertWithWhereUniqueWithoutItemInput = {
@@ -400,6 +401,7 @@ export type OrganizedItemTagCreateOrConnectWithoutTagInput = {
 
 export type OrganizedItemTagCreateManyTagInputEnvelope = {
   data: Prisma.OrganizedItemTagCreateManyTagInput | Prisma.OrganizedItemTagCreateManyTagInput[]
+  skipDuplicates?: boolean
 }
 
 export type OrganizedItemTagUpsertWithWhereUniqueWithoutTagInput = {
@@ -1157,6 +1159,7 @@ export type OrganizedItemTagCreateManyArgs<ExtArgs extends runtime.Types.Extensi
    * The data used to create many OrganizedItemTags.
    */
   data: Prisma.OrganizedItemTagCreateManyInput | Prisma.OrganizedItemTagCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1175,6 +1178,7 @@ export type OrganizedItemTagCreateManyAndReturnArgs<ExtArgs extends runtime.Type
    * The data used to create many OrganizedItemTags.
    */
   data: Prisma.OrganizedItemTagCreateManyInput | Prisma.OrganizedItemTagCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

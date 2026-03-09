@@ -45,6 +45,7 @@ export type OrganizedItemSumAggregateOutputType = {
 export type OrganizedItemMinAggregateOutputType = {
   id: string | null
   dumpId: string | null
+  userId: string | null
   domain: string | null
   category: string | null
   subcategory: string | null
@@ -76,6 +77,7 @@ export type OrganizedItemMinAggregateOutputType = {
 export type OrganizedItemMaxAggregateOutputType = {
   id: string | null
   dumpId: string | null
+  userId: string | null
   domain: string | null
   category: string | null
   subcategory: string | null
@@ -107,6 +109,7 @@ export type OrganizedItemMaxAggregateOutputType = {
 export type OrganizedItemCountAggregateOutputType = {
   id: number
   dumpId: number
+  userId: number
   domain: number
   category: number
   subcategory: number
@@ -156,6 +159,7 @@ export type OrganizedItemSumAggregateInputType = {
 export type OrganizedItemMinAggregateInputType = {
   id?: true
   dumpId?: true
+  userId?: true
   domain?: true
   category?: true
   subcategory?: true
@@ -187,6 +191,7 @@ export type OrganizedItemMinAggregateInputType = {
 export type OrganizedItemMaxAggregateInputType = {
   id?: true
   dumpId?: true
+  userId?: true
   domain?: true
   category?: true
   subcategory?: true
@@ -218,6 +223,7 @@ export type OrganizedItemMaxAggregateInputType = {
 export type OrganizedItemCountAggregateInputType = {
   id?: true
   dumpId?: true
+  userId?: true
   domain?: true
   category?: true
   subcategory?: true
@@ -336,6 +342,7 @@ export type OrganizedItemGroupByArgs<ExtArgs extends runtime.Types.Extensions.In
 export type OrganizedItemGroupByOutputType = {
   id: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory: string
@@ -390,6 +397,7 @@ export type OrganizedItemWhereInput = {
   NOT?: Prisma.OrganizedItemWhereInput | Prisma.OrganizedItemWhereInput[]
   id?: Prisma.StringFilter<"OrganizedItem"> | string
   dumpId?: Prisma.StringFilter<"OrganizedItem"> | string
+  userId?: Prisma.StringFilter<"OrganizedItem"> | string
   domain?: Prisma.StringFilter<"OrganizedItem"> | string
   category?: Prisma.StringFilter<"OrganizedItem"> | string
   subcategory?: Prisma.StringFilter<"OrganizedItem"> | string
@@ -417,6 +425,7 @@ export type OrganizedItemWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
   tags?: Prisma.OrganizedItemTagListRelationFilter
 }
@@ -424,6 +433,7 @@ export type OrganizedItemWhereInput = {
 export type OrganizedItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   dumpId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   domain?: Prisma.SortOrder
   category?: Prisma.SortOrder
   subcategory?: Prisma.SortOrder
@@ -451,6 +461,7 @@ export type OrganizedItemOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   dump?: Prisma.DumpOrderByWithRelationInput
+  user?: Prisma.UserOrderByWithRelationInput
   project?: Prisma.ProjectOrderByWithRelationInput
   tags?: Prisma.OrganizedItemTagOrderByRelationAggregateInput
 }
@@ -461,6 +472,7 @@ export type OrganizedItemWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.OrganizedItemWhereInput[]
   NOT?: Prisma.OrganizedItemWhereInput | Prisma.OrganizedItemWhereInput[]
   dumpId?: Prisma.StringFilter<"OrganizedItem"> | string
+  userId?: Prisma.StringFilter<"OrganizedItem"> | string
   domain?: Prisma.StringFilter<"OrganizedItem"> | string
   category?: Prisma.StringFilter<"OrganizedItem"> | string
   subcategory?: Prisma.StringFilter<"OrganizedItem"> | string
@@ -488,6 +500,7 @@ export type OrganizedItemWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
   tags?: Prisma.OrganizedItemTagListRelationFilter
 }, "id">
@@ -495,6 +508,7 @@ export type OrganizedItemWhereUniqueInput = Prisma.AtLeast<{
 export type OrganizedItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   dumpId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   domain?: Prisma.SortOrder
   category?: Prisma.SortOrder
   subcategory?: Prisma.SortOrder
@@ -534,6 +548,7 @@ export type OrganizedItemScalarWhereWithAggregatesInput = {
   NOT?: Prisma.OrganizedItemScalarWhereWithAggregatesInput | Prisma.OrganizedItemScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
   dumpId?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
+  userId?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
   domain?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
   category?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
   subcategory?: Prisma.StringWithAggregatesFilter<"OrganizedItem"> | string
@@ -590,6 +605,7 @@ export type OrganizedItemCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
+  user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
 }
@@ -597,6 +613,7 @@ export type OrganizedItemCreateInput = {
 export type OrganizedItemUncheckedCreateInput = {
   id?: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -654,6 +671,7 @@ export type OrganizedItemUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
 }
@@ -661,6 +679,7 @@ export type OrganizedItemUpdateInput = {
 export type OrganizedItemUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -693,6 +712,7 @@ export type OrganizedItemUncheckedUpdateInput = {
 export type OrganizedItemCreateManyInput = {
   id?: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -753,6 +773,7 @@ export type OrganizedItemUpdateManyMutationInput = {
 export type OrganizedItemUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -794,6 +815,7 @@ export type OrganizedItemOrderByRelationAggregateInput = {
 export type OrganizedItemCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   dumpId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   domain?: Prisma.SortOrder
   category?: Prisma.SortOrder
   subcategory?: Prisma.SortOrder
@@ -833,6 +855,7 @@ export type OrganizedItemAvgOrderByAggregateInput = {
 export type OrganizedItemMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   dumpId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   domain?: Prisma.SortOrder
   category?: Prisma.SortOrder
   subcategory?: Prisma.SortOrder
@@ -864,6 +887,7 @@ export type OrganizedItemMaxOrderByAggregateInput = {
 export type OrganizedItemMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   dumpId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   domain?: Prisma.SortOrder
   category?: Prisma.SortOrder
   subcategory?: Prisma.SortOrder
@@ -1031,6 +1055,48 @@ export type OrganizedItemUpdateOneRequiredWithoutTagsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganizedItemUpdateToOneWithWhereWithoutTagsInput, Prisma.OrganizedItemUpdateWithoutTagsInput>, Prisma.OrganizedItemUncheckedUpdateWithoutTagsInput>
 }
 
+export type OrganizedItemCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput> | Prisma.OrganizedItemCreateWithoutUserInput[] | Prisma.OrganizedItemUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.OrganizedItemCreateOrConnectWithoutUserInput | Prisma.OrganizedItemCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.OrganizedItemCreateManyUserInputEnvelope
+  connect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+}
+
+export type OrganizedItemUncheckedCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput> | Prisma.OrganizedItemCreateWithoutUserInput[] | Prisma.OrganizedItemUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.OrganizedItemCreateOrConnectWithoutUserInput | Prisma.OrganizedItemCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.OrganizedItemCreateManyUserInputEnvelope
+  connect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+}
+
+export type OrganizedItemUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput> | Prisma.OrganizedItemCreateWithoutUserInput[] | Prisma.OrganizedItemUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.OrganizedItemCreateOrConnectWithoutUserInput | Prisma.OrganizedItemCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.OrganizedItemUpsertWithWhereUniqueWithoutUserInput | Prisma.OrganizedItemUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.OrganizedItemCreateManyUserInputEnvelope
+  set?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  disconnect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  delete?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  connect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  update?: Prisma.OrganizedItemUpdateWithWhereUniqueWithoutUserInput | Prisma.OrganizedItemUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.OrganizedItemUpdateManyWithWhereWithoutUserInput | Prisma.OrganizedItemUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.OrganizedItemScalarWhereInput | Prisma.OrganizedItemScalarWhereInput[]
+}
+
+export type OrganizedItemUncheckedUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput> | Prisma.OrganizedItemCreateWithoutUserInput[] | Prisma.OrganizedItemUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.OrganizedItemCreateOrConnectWithoutUserInput | Prisma.OrganizedItemCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.OrganizedItemUpsertWithWhereUniqueWithoutUserInput | Prisma.OrganizedItemUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.OrganizedItemCreateManyUserInputEnvelope
+  set?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  disconnect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  delete?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  connect?: Prisma.OrganizedItemWhereUniqueInput | Prisma.OrganizedItemWhereUniqueInput[]
+  update?: Prisma.OrganizedItemUpdateWithWhereUniqueWithoutUserInput | Prisma.OrganizedItemUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.OrganizedItemUpdateManyWithWhereWithoutUserInput | Prisma.OrganizedItemUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.OrganizedItemScalarWhereInput | Prisma.OrganizedItemScalarWhereInput[]
+}
+
 export type OrganizedItemCreateWithoutDumpInput = {
   id?: string
   domain: string
@@ -1058,12 +1124,14 @@ export type OrganizedItemCreateWithoutDumpInput = {
   reminderEarlyNotifiedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
 }
 
 export type OrganizedItemUncheckedCreateWithoutDumpInput = {
   id?: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -1100,6 +1168,7 @@ export type OrganizedItemCreateOrConnectWithoutDumpInput = {
 
 export type OrganizedItemCreateManyDumpInputEnvelope = {
   data: Prisma.OrganizedItemCreateManyDumpInput | Prisma.OrganizedItemCreateManyDumpInput[]
+  skipDuplicates?: boolean
 }
 
 export type OrganizedItemUpsertWithWhereUniqueWithoutDumpInput = {
@@ -1124,6 +1193,7 @@ export type OrganizedItemScalarWhereInput = {
   NOT?: Prisma.OrganizedItemScalarWhereInput | Prisma.OrganizedItemScalarWhereInput[]
   id?: Prisma.StringFilter<"OrganizedItem"> | string
   dumpId?: Prisma.StringFilter<"OrganizedItem"> | string
+  userId?: Prisma.StringFilter<"OrganizedItem"> | string
   domain?: Prisma.StringFilter<"OrganizedItem"> | string
   category?: Prisma.StringFilter<"OrganizedItem"> | string
   subcategory?: Prisma.StringFilter<"OrganizedItem"> | string
@@ -1180,12 +1250,14 @@ export type OrganizedItemCreateWithoutProjectInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
+  user: Prisma.UserCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
 }
 
 export type OrganizedItemUncheckedCreateWithoutProjectInput = {
   id?: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -1221,6 +1293,7 @@ export type OrganizedItemCreateOrConnectWithoutProjectInput = {
 
 export type OrganizedItemCreateManyProjectInputEnvelope = {
   data: Prisma.OrganizedItemCreateManyProjectInput | Prisma.OrganizedItemCreateManyProjectInput[]
+  skipDuplicates?: boolean
 }
 
 export type OrganizedItemUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1267,12 +1340,14 @@ export type OrganizedItemCreateWithoutTagsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
+  user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
 }
 
 export type OrganizedItemUncheckedCreateWithoutTagsInput = {
   id?: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -1345,12 +1420,14 @@ export type OrganizedItemUpdateWithoutTagsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
 }
 
 export type OrganizedItemUncheckedUpdateWithoutTagsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1379,8 +1456,99 @@ export type OrganizedItemUncheckedUpdateWithoutTagsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+export type OrganizedItemCreateWithoutUserInput = {
+  id?: string
+  domain: string
+  category: string
+  subcategory?: string
+  itemType: string
+  title: string
+  content?: string
+  emotionLabel?: string | null
+  status?: string
+  progress?: string
+  priority?: number | null
+  recommendedView?: string
+  confidenceScore?: number
+  positionX?: number | null
+  positionY?: number | null
+  kanbanColumn?: string | null
+  scheduledAt?: Date | string | null
+  scheduledTime?: string | null
+  recurrence?: string | null
+  sendNotification?: boolean | null
+  reminderAt?: Date | string | null
+  reminderMinutesBefore?: number | null
+  reminderNotifiedAt?: Date | string | null
+  reminderEarlyNotifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
+  project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
+  tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
+}
+
+export type OrganizedItemUncheckedCreateWithoutUserInput = {
+  id?: string
+  dumpId: string
+  domain: string
+  category: string
+  subcategory?: string
+  projectId?: string | null
+  itemType: string
+  title: string
+  content?: string
+  emotionLabel?: string | null
+  status?: string
+  progress?: string
+  priority?: number | null
+  recommendedView?: string
+  confidenceScore?: number
+  positionX?: number | null
+  positionY?: number | null
+  kanbanColumn?: string | null
+  scheduledAt?: Date | string | null
+  scheduledTime?: string | null
+  recurrence?: string | null
+  sendNotification?: boolean | null
+  reminderAt?: Date | string | null
+  reminderMinutesBefore?: number | null
+  reminderNotifiedAt?: Date | string | null
+  reminderEarlyNotifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
+}
+
+export type OrganizedItemCreateOrConnectWithoutUserInput = {
+  where: Prisma.OrganizedItemWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput>
+}
+
+export type OrganizedItemCreateManyUserInputEnvelope = {
+  data: Prisma.OrganizedItemCreateManyUserInput | Prisma.OrganizedItemCreateManyUserInput[]
+  skipDuplicates?: boolean
+}
+
+export type OrganizedItemUpsertWithWhereUniqueWithoutUserInput = {
+  where: Prisma.OrganizedItemWhereUniqueInput
+  update: Prisma.XOR<Prisma.OrganizedItemUpdateWithoutUserInput, Prisma.OrganizedItemUncheckedUpdateWithoutUserInput>
+  create: Prisma.XOR<Prisma.OrganizedItemCreateWithoutUserInput, Prisma.OrganizedItemUncheckedCreateWithoutUserInput>
+}
+
+export type OrganizedItemUpdateWithWhereUniqueWithoutUserInput = {
+  where: Prisma.OrganizedItemWhereUniqueInput
+  data: Prisma.XOR<Prisma.OrganizedItemUpdateWithoutUserInput, Prisma.OrganizedItemUncheckedUpdateWithoutUserInput>
+}
+
+export type OrganizedItemUpdateManyWithWhereWithoutUserInput = {
+  where: Prisma.OrganizedItemScalarWhereInput
+  data: Prisma.XOR<Prisma.OrganizedItemUpdateManyMutationInput, Prisma.OrganizedItemUncheckedUpdateManyWithoutUserInput>
+}
+
 export type OrganizedItemCreateManyDumpInput = {
   id?: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -1436,12 +1604,14 @@ export type OrganizedItemUpdateWithoutDumpInput = {
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
 }
 
 export type OrganizedItemUncheckedUpdateWithoutDumpInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1473,6 +1643,7 @@ export type OrganizedItemUncheckedUpdateWithoutDumpInput = {
 
 export type OrganizedItemUncheckedUpdateManyWithoutDumpInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1504,6 +1675,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutDumpInput = {
 export type OrganizedItemCreateManyProjectInput = {
   id?: string
   dumpId: string
+  userId: string
   domain: string
   category: string
   subcategory?: string
@@ -1559,12 +1731,14 @@ export type OrganizedItemUpdateWithoutProjectInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
 }
 
 export type OrganizedItemUncheckedUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1596,9 +1770,136 @@ export type OrganizedItemUncheckedUpdateWithoutProjectInput = {
 export type OrganizedItemUncheckedUpdateManyWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   domain?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
   subcategory?: Prisma.StringFieldUpdateOperationsInput | string
+  itemType?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  emotionLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  progress?: Prisma.StringFieldUpdateOperationsInput | string
+  priority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  recommendedView?: Prisma.StringFieldUpdateOperationsInput | string
+  confidenceScore?: Prisma.FloatFieldUpdateOperationsInput | number
+  positionX?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  positionY?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  kanbanColumn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrence?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sendNotification?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  reminderAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrganizedItemCreateManyUserInput = {
+  id?: string
+  dumpId: string
+  domain: string
+  category: string
+  subcategory?: string
+  projectId?: string | null
+  itemType: string
+  title: string
+  content?: string
+  emotionLabel?: string | null
+  status?: string
+  progress?: string
+  priority?: number | null
+  recommendedView?: string
+  confidenceScore?: number
+  positionX?: number | null
+  positionY?: number | null
+  kanbanColumn?: string | null
+  scheduledAt?: Date | string | null
+  scheduledTime?: string | null
+  recurrence?: string | null
+  sendNotification?: boolean | null
+  reminderAt?: Date | string | null
+  reminderMinutesBefore?: number | null
+  reminderNotifiedAt?: Date | string | null
+  reminderEarlyNotifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type OrganizedItemUpdateWithoutUserInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  subcategory?: Prisma.StringFieldUpdateOperationsInput | string
+  itemType?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  emotionLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  progress?: Prisma.StringFieldUpdateOperationsInput | string
+  priority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  recommendedView?: Prisma.StringFieldUpdateOperationsInput | string
+  confidenceScore?: Prisma.FloatFieldUpdateOperationsInput | number
+  positionX?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  positionY?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  kanbanColumn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrence?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sendNotification?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  reminderAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
+  project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
+  tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
+}
+
+export type OrganizedItemUncheckedUpdateWithoutUserInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  subcategory?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemType?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  emotionLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  progress?: Prisma.StringFieldUpdateOperationsInput | string
+  priority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  recommendedView?: Prisma.StringFieldUpdateOperationsInput | string
+  confidenceScore?: Prisma.FloatFieldUpdateOperationsInput | number
+  positionX?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  positionY?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  kanbanColumn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  scheduledTime?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrence?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sendNotification?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  reminderAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
+}
+
+export type OrganizedItemUncheckedUpdateManyWithoutUserInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  dumpId?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  subcategory?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemType?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1657,6 +1958,7 @@ export type OrganizedItemCountOutputTypeCountTagsArgs<ExtArgs extends runtime.Ty
 export type OrganizedItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   dumpId?: boolean
+  userId?: boolean
   domain?: boolean
   category?: boolean
   subcategory?: boolean
@@ -1684,6 +1986,7 @@ export type OrganizedItemSelect<ExtArgs extends runtime.Types.Extensions.Interna
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
   tags?: boolean | Prisma.OrganizedItem$tagsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizedItemCountOutputTypeDefaultArgs<ExtArgs>
@@ -1692,6 +1995,7 @@ export type OrganizedItemSelect<ExtArgs extends runtime.Types.Extensions.Interna
 export type OrganizedItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   dumpId?: boolean
+  userId?: boolean
   domain?: boolean
   category?: boolean
   subcategory?: boolean
@@ -1719,12 +2023,14 @@ export type OrganizedItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
 }, ExtArgs["result"]["organizedItem"]>
 
 export type OrganizedItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   dumpId?: boolean
+  userId?: boolean
   domain?: boolean
   category?: boolean
   subcategory?: boolean
@@ -1752,12 +2058,14 @@ export type OrganizedItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
 }, ExtArgs["result"]["organizedItem"]>
 
 export type OrganizedItemSelectScalar = {
   id?: boolean
   dumpId?: boolean
+  userId?: boolean
   domain?: boolean
   category?: boolean
   subcategory?: boolean
@@ -1786,19 +2094,22 @@ export type OrganizedItemSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["organizedItem"]>
+export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "userId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["organizedItem"]>
 export type OrganizedItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
   tags?: boolean | Prisma.OrganizedItem$tagsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizedItemCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrganizedItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
 }
 export type OrganizedItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
 }
 
@@ -1806,12 +2117,14 @@ export type $OrganizedItemPayload<ExtArgs extends runtime.Types.Extensions.Inter
   name: "OrganizedItem"
   objects: {
     dump: Prisma.$DumpPayload<ExtArgs>
+    user: Prisma.$UserPayload<ExtArgs>
     project: Prisma.$ProjectPayload<ExtArgs> | null
     tags: Prisma.$OrganizedItemTagPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     dumpId: string
+    userId: string
     domain: string
     category: string
     subcategory: string
@@ -2233,6 +2546,7 @@ readonly fields: OrganizedItemFieldRefs;
 export interface Prisma__OrganizedItemClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   dump<T extends Prisma.DumpDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DumpDefaultArgs<ExtArgs>>): Prisma.Prisma__DumpClient<runtime.Types.Result.GetResult<Prisma.$DumpPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   project<T extends Prisma.OrganizedItem$projectArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganizedItem$projectArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   tags<T extends Prisma.OrganizedItem$tagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganizedItem$tagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrganizedItemTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -2266,6 +2580,7 @@ export interface Prisma__OrganizedItemClient<T, Null = never, ExtArgs extends ru
 export interface OrganizedItemFieldRefs {
   readonly id: Prisma.FieldRef<"OrganizedItem", 'String'>
   readonly dumpId: Prisma.FieldRef<"OrganizedItem", 'String'>
+  readonly userId: Prisma.FieldRef<"OrganizedItem", 'String'>
   readonly domain: Prisma.FieldRef<"OrganizedItem", 'String'>
   readonly category: Prisma.FieldRef<"OrganizedItem", 'String'>
   readonly subcategory: Prisma.FieldRef<"OrganizedItem", 'String'>
@@ -2521,6 +2836,7 @@ export type OrganizedItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many OrganizedItems.
    */
   data: Prisma.OrganizedItemCreateManyInput | Prisma.OrganizedItemCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -2539,6 +2855,7 @@ export type OrganizedItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.E
    * The data used to create many OrganizedItems.
    */
   data: Prisma.OrganizedItemCreateManyInput | Prisma.OrganizedItemCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */
