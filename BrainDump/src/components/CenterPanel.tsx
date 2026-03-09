@@ -359,17 +359,17 @@ export function CenterPanel({
     }
   }, []);
 
-  const transcribe = useCallback(async () => {
+  const transcribe = useCallback(async (): Promise<string | null> => {
     const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string };
     const blob = win.__lastAudioBlob;
     const fileName = win.__lastAudioFileName || "recording.webm";
     if (!blob) {
       setError("Record audio first, then click Transcribe.");
-      return;
+      return null;
     }
     if (blob.size === 0) {
       setError("Recording is empty. Record again and wait a few seconds before stopping.");
-      return;
+      return null;
     }
     setError(null);
     setTranscribeLoading(true);
@@ -391,8 +391,10 @@ export function CenterPanel({
       setTranscript((prev) => (prev ? prev + "\n\n" + text : text));
       saveFormState({ transcriptRaw: text, transcriptEdited: (transcript || "") + (transcript ? "\n\n" + text : text) });
       onTranscriptReady(text);
+      return text;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Transcription failed");
+      return null;
     } finally {
       setTranscribeLoading(false);
     }
@@ -413,8 +415,8 @@ export function CenterPanel({
     [organizeMode, onAutoSave, onOrganized]
   );
 
-  const organize = useCallback(async () => {
-    const text = transcript.trim();
+  const organize = useCallback(async (transcriptOverride?: string) => {
+    const text = (transcriptOverride ?? transcript).trim();
     if (!text) {
       setError("Enter or paste a transcript, then click Organize.");
       return;
@@ -465,6 +467,17 @@ export function CenterPanel({
       setOrganizeLoading(false);
     }
   }, [transcript, sessionFocus, projectNames, onOrganized, onOpenSettings, organizeMode, onAutoSave, applyOrganizeResult]);
+
+  const handleStopAndProcess = useCallback(async () => {
+    stopRecording();
+    await new Promise((r) => setTimeout(r, 350));
+    const text = await transcribe();
+    if (text) await organize(text);
+  }, [stopRecording, transcribe, organize]);
+
+  const handleCancelRecording = useCallback(() => {
+    stopRecording();
+  }, [stopRecording]);
 
   const handleUnclearConfirm = useCallback(
     (resolvedUnclear: OrganizedItemPreview[]) => {
@@ -578,19 +591,36 @@ export function CenterPanel({
               <span style={{ fontSize: "1.25rem", fontVariantNumeric: "tabular-nums", color: "var(--text-primary)", fontWeight: 500 }} aria-live="polite">
                 {recordingElapsed}
               </span>
-              <button type="button" className="bd-btn bd-btn-danger" onClick={stopRecording} style={{ minHeight: "44px" }}>
-                Stop
+              <button
+                type="button"
+                className="bd-btn bd-btn-primary"
+                onClick={handleStopAndProcess}
+                disabled={transcribeLoading || organizeLoading}
+                title="Stop and transcribe + organize"
+                aria-label="Stop and transcribe + organize"
+                style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={handleCancelRecording}
+                disabled={transcribeLoading || organizeLoading}
+                title="Cancel recording (don't transcribe)"
+                aria-label="Cancel recording"
+                style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
               </button>
             </>
           )}
           <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title="Refresh microphone list" style={{ minHeight: "44px" }}>
             Refresh mics
-          </button>
-          <button type="button" className="bd-btn" onClick={playLatestRecording} disabled={!hasAudio} title="Play latest recording" style={{ minHeight: "44px" }}>
-            Play
-          </button>
-          <button type="button" className="bd-btn" onClick={transcribe} disabled={!canTranscribe} style={{ minHeight: "44px" }}>
-            {transcribeLoading ? "Transcribing…" : "Transcribe"}
           </button>
         </div>
       </section>
