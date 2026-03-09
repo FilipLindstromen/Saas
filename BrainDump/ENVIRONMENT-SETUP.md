@@ -1,0 +1,76 @@
+### BrainDump environment setup (developer-managed secrets)
+
+All real API keys are set by the developer as environment variables and are **never committed to Git**.
+
+This app expects at least:
+
+- `DATABASE_URL`
+- `OPENAI_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+
+Optional (for stock media in ReelRecorder or shared pickers):
+
+- `UNSPLASH_ACCESS_KEY` (Unsplash)
+- `PEXELS_API_KEY` (Pexels)
+- `GIPHY_API_KEY` (Giphy)
+
+See `.env.example` for the full list of variables and placeholder values.
+
+---
+
+#### 1. Local development (`.env.local`)
+
+1. Go to the `BrainDump` folder.
+
+2. Create a file named `.env.local` (this file is already git-ignored):
+
+```bash
+DATABASE_URL="file:./prisma/dev.db"
+OPENAI_API_KEY="sk-your-openai-key"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# Optional: stock media (Unsplash, Pexels, Giphy)
+UNSPLASH_ACCESS_KEY="your-unsplash-access-key"
+PEXELS_API_KEY="your-pexels-api-key"
+GIPHY_API_KEY="your-giphy-api-key"
+```
+
+3. Run the app as usual:
+
+```bash
+npm install
+npm run dev
+```
+
+Next.js automatically loads `.env.local` in development, and the server-side code reads values via `process.env.*` (centralized in `src/config/env.server.ts`).
+
+---
+
+#### 2. Production (e.g. Vercel)
+
+In your hosting provider (Vercel steps shown here):
+
+1. Open the **BrainDump** project in the Vercel dashboard.
+2. Go to **Settings → Environment Variables**.
+3. Add each variable with the same names as in `.env.example`:
+
+   - `DATABASE_URL`
+   - `OPENAI_API_KEY`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - (Optional) `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `GIPHY_API_KEY`
+
+4. Redeploy the project.
+
+The deployed app then reads these values from the environment; nothing secret lives in the Git repo.
+
+---
+
+#### 3. Keeping Git free of secrets
+
+- `.env`, `.env.local`, and `.env.*.local` are ignored in both the repo root and the `BrainDump` folder.
+- Do **not** commit any `.env*` files.
+- Optionally enable secret scanning in your Git host (e.g. GitHub → Settings → Code security & analysis) to detect accidental leaks.
+
