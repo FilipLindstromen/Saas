@@ -26,7 +26,8 @@ See `.env.example` for the full list of variables and placeholder values.
 2. Create a file named `.env.local` (this file is already git-ignored):
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db"
+# Use your Postgres URL (same as production, or a local Postgres instance)
+DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 OPENAI_API_KEY="sk-your-openai-key"
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
@@ -48,9 +49,19 @@ Next.js automatically loads `.env.local` in development, and the server-side cod
 
 ---
 
-#### 2. Production (e.g. Vercel)
+#### 2. Production (e.g. Vercel) – and where to get the Postgres URL
 
-In your hosting provider (Vercel steps shown here):
+**Getting the Postgres connection URL (Vercel):**
+
+1. In the Vercel dashboard, open your project.
+2. Go to the **Storage** tab (or **Create** → **Database**).
+3. Open your **Postgres** database.
+4. Go to the **`.env`** or **Connection string** / **Quickstart** section.
+5. Copy the variable that looks like:  
+   `POSTGRES_URL="postgresql://..."` or `DATABASE_URL="postgresql://..."`  
+   Use the **full string** (including `postgresql://`, username, password, host, database, and `?sslmode=require` if present) as your `DATABASE_URL` value.
+
+**Adding env vars:**
 
 1. Open the **BrainDump** project in the Vercel dashboard.
 2. Go to **Settings → Environment Variables**.

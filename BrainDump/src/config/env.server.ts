@@ -2,28 +2,47 @@
 // Real values are provided via:
 // - .env.local in local development (git-ignored)
 // - Environment variables in the hosting provider (e.g. Vercel)
-
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+// Uses getters so validation runs at runtime, not at build time (Vercel build may not have env vars).
 
 function optional(name: string): string | undefined {
   const value = process.env[name];
   return value && value.trim() ? value : undefined;
 }
 
+function getRequired(name: string): string {
+  const value = process.env[name];
+  if (!value || !value.trim()) {
+    // During Vercel build, env vars may not be available; return placeholder so build succeeds.
+    // At runtime, missing vars will cause auth/DB to fail with a clear error.
+    if (process.env.VERCEL === "1") {
+      return "";
+    }
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value.trim();
+}
+
 export const env = {
-  DATABASE_URL: required("DATABASE_URL"),
-  OPENAI_API_KEY: required("OPENAI_API_KEY"),
-  GOOGLE_CLIENT_ID: required("GOOGLE_CLIENT_ID"),
-  GOOGLE_CLIENT_SECRET: required("GOOGLE_CLIENT_SECRET"),
-  // Optional: stock media (Unsplash, Pexels, Giphy) – used by ReelRecorder / shared pickers
-  UNSPLASH_ACCESS_KEY: optional("UNSPLASH_ACCESS_KEY"),
-  PEXELS_API_KEY: optional("PEXELS_API_KEY"),
-  GIPHY_API_KEY: optional("GIPHY_API_KEY"),
+  get DATABASE_URL() {
+    return getRequired("DATABASE_URL");
+  },
+  get OPENAI_API_KEY() {
+    return getRequired("OPENAI_API_KEY");
+  },
+  get GOOGLE_CLIENT_ID() {
+    return getRequired("GOOGLE_CLIENT_ID");
+  },
+  get GOOGLE_CLIENT_SECRET() {
+    return getRequired("GOOGLE_CLIENT_SECRET");
+  },
+  get UNSPLASH_ACCESS_KEY() {
+    return optional("UNSPLASH_ACCESS_KEY");
+  },
+  get PEXELS_API_KEY() {
+    return optional("PEXELS_API_KEY");
+  },
+  get GIPHY_API_KEY() {
+    return optional("GIPHY_API_KEY");
+  },
 };
 
