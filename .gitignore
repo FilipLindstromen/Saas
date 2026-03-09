@@ -7,10 +7,10 @@ out/
 build/
 dist/
 
-# Env and secrets
+# Env and secrets (never commit real keys)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Debug and logs
 *.log
