@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { mode, transcriptRaw, transcriptEdited, status, audioUrl } = body;
+    const safeMode = typeof mode === "string" && (mode === "inbox" || mode === "work" || mode === "personal") ? mode : "inbox";
 
     const dump = await prisma.dump.create({
       data: {
-        mode: mode ?? "inbox",
+        mode: safeMode,
         transcriptRaw: transcriptRaw ?? "",
         transcriptEdited: transcriptEdited ?? "",
         status: status ?? "draft",

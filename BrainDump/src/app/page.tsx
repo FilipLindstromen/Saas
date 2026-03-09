@@ -12,6 +12,17 @@ import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewAr
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
 type Mode = "inbox" | "work" | "personal" | "all";
+type DumpMode = "inbox" | "work" | "personal";
+
+function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMode = "inbox"): DumpMode {
+  const domains = new Set(items.map((it) => it.domain).filter(Boolean));
+  if (domains.size === 1) {
+    const only = Array.from(domains)[0];
+    if (only === "inbox" || only === "work" || only === "personal") return only;
+  }
+  if (domains.has("work") && domains.has("personal")) return "inbox";
+  return fallback;
+}
 
 export default function BrainDumpPage() {
   const [mode, setMode] = useState<Mode>("work");
@@ -90,17 +101,20 @@ export default function BrainDumpPage() {
         return;
       }
       try {
+        const dumpMode: DumpMode = mode === "all" ? inferDumpModeFromItems(items, "inbox") : mode;
         const resDump = await fetch("/api/dumps", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            mode,
+            mode: dumpMode,
             transcriptRaw: transcript,
             transcriptEdited: transcript,
             status: "organized",
           }),
         });
-        const { dump } = await resDump.json();
+        const dataDump = await resDump.json();
+        if (!resDump.ok) throw new Error((dataDump as { error?: string }).error || "Failed to create dump");
+        const dump = (dataDump as { dump?: { id: string } }).dump;
         if (!dump?.id) throw new Error("Failed to create dump");
         const payload = items.map((it) => ({
           domain: it.domain,
