@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 /**
  * POST /api/organized-items/batch
@@ -9,6 +10,12 @@ import { getDbErrorMessage } from "@/lib/db-error";
  */
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
     const body = await request.json();
     const { dumpId, items } = body as {
       dumpId: string;
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dump = await prisma.dump.findUnique({ where: { id: dumpIdStr } });
+    const dump = await prisma.dump.findUnique({ where: { id: dumpIdStr, userId } });
     if (!dump) {
       return NextResponse.json(
         { error: "Dump not found. Create the dump first (e.g. POST /api/dumps)." },
@@ -52,12 +59,12 @@ export async function POST(request: NextRequest) {
         if (it.project_name && !projectId) {
           const domain = it.domain === "work" ? "work" : "personal";
           const existing = await tx.project.findFirst({
-            where: { name: it.project_name, domain },
+            where: { name: it.project_name, domain, userId },
           });
           if (existing) projectId = existing.id;
           else {
             const proj = await tx.project.create({
-              data: { name: it.project_name, domain, status: "active" },
+              data: { name: it.project_name, domain, status: "active", userId },
             });
             projectId = proj.id;
           }
@@ -66,6 +73,7 @@ export async function POST(request: NextRequest) {
         const item = await tx.organizedItem.create({
           data: {
             dumpId: dumpIdStr,
+            userId,
             domain: String(it.domain ?? ""),
             category: String(it.category ?? ""),
             subcategory: String(it.subcategory ?? ""),
@@ -86,8 +94,8 @@ export async function POST(request: NextRequest) {
           for (const tagName of it.tags) {
             const name = String(tagName).trim();
             if (!name) continue;
-            let tag = await tx.tag.findUnique({ where: { name } });
-            if (!tag) tag = await tx.tag.create({ data: { name } });
+            let tag = await tx.tag.findFirst({ where: { name, userId } });
+            if (!tag) tag = await tx.tag.create({ data: { name, userId } });
             await tx.organizedItemTag.upsert({
               where: { itemId_tagId: { itemId: item.id, tagId: tag.id } },
               create: { itemId: item.id, tagId: tag.id },

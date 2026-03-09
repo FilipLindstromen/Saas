@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type OrganizedItemPreview } from "@/components/CenterPanel";
@@ -25,6 +26,7 @@ function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMod
 }
 
 export default function BrainDumpPage() {
+  const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("work");
   const [organizedItems, setOrganizedItems] = useState<OrganizedItemPreview[]>([]);
   const [organizedTranscript, setOrganizedTranscript] = useState<string>("");
@@ -158,6 +160,95 @@ export default function BrainDumpPage() {
     setOrganizedItems([]);
     setOrganizedTranscript("");
   }, []);
+
+  if (status === "loading") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg-primary)",
+          color: "var(--text-primary)",
+        }}
+      >
+        <p style={{ fontSize: "0.95rem", color: "var(--text-secondary)" }}>Loading your workspace…</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg-primary)",
+          color: "var(--text-primary)",
+          padding: "1.5rem",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            padding: "1.75rem 1.5rem",
+            borderRadius: "var(--card-radius)",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-md)",
+            border: "1px solid var(--border-subtle)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+          }}
+        >
+          <div>
+            <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>BrainDump</h1>
+            <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
+              Sign in with Google to keep your dumps, projects and organized items private to your account.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => signIn("google")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              padding: "0.7rem 1.2rem",
+              borderRadius: "999px",
+              border: "1px solid var(--border-default)",
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+              fontSize: "0.95rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: "#fff",
+                display: "inline-block",
+              }}
+              aria-hidden
+            />
+            <span>Continue with Google</span>
+          </button>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-tertiary)" }}>
+            We use a secure cookie-based session lasting up to 30 days so you can come back without logging in every time.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>

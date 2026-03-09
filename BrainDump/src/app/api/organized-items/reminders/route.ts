@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 /**
  * GET /api/organized-items/reminders
@@ -8,8 +9,14 @@ import { getDbErrorMessage } from "@/lib/db-error";
  */
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ items: [] });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
     const items = await prisma.organizedItem.findMany({
-      where: { reminderAt: { not: null } },
+      where: { userId, reminderAt: { not: null } },
       select: {
         id: true,
         title: true,

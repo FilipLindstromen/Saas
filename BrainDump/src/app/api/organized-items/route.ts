@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get("domain");
     const category = searchParams.get("category");
@@ -13,13 +20,14 @@ export async function GET(request: NextRequest) {
     const dumpId = searchParams.get("dumpId");
 
     const where: {
+      userId: string;
       domain?: string;
       category?: string;
       itemType?: string;
       projectId?: string | null;
       status?: string;
       dumpId?: string;
-    } = {};
+    } = { userId };
     if (domain) where.domain = domain;
     if (category) where.category = category;
     if (itemType) where.itemType = itemType;
@@ -47,6 +55,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
     const body = await request.json();
     const {
       dumpId,
@@ -81,6 +95,7 @@ export async function POST(request: NextRequest) {
     const item = await prisma.organizedItem.create({
       data: {
         dumpId,
+        userId,
         domain,
         category: category ?? "",
         subcategory: subcategory ?? "",

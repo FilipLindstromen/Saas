@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 /**
  * GET /api/organized-items/counts?domain=work|personal&projectId=optional&category=optional
@@ -8,6 +9,11 @@ import { getDbErrorMessage } from "@/lib/db-error";
  */
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get("domain");
     const projectId = searchParams.get("projectId");
@@ -20,14 +26,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where: { domain: string; projectId?: string | null; category?: string } = { domain };
+    const where: { userId: string; domain: string; projectId?: string | null; category?: string } = {
+      userId,
+      domain,
+    };
     if (projectId != null && projectId !== "") where.projectId = projectId;
     if (category != null && category !== "") where.category = category;
 
     const [byProject, byCategory, byItemType] = await Promise.all([
       prisma.organizedItem.groupBy({
         by: ["projectId"],
-        where: { domain },
+        where: { userId, domain },
         _count: { id: true },
       }),
       prisma.organizedItem.groupBy({

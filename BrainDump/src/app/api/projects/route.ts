@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get("domain");
 
-    const where = domain ? { domain } : {};
+    const where = domain ? { userId, domain } : { userId };
     const projects = await prisma.project.findMany({
       where,
       orderBy: { name: "asc" },
@@ -22,6 +28,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
     const body = await request.json();
     const { name, domain, description, status } = body;
 
@@ -31,6 +42,7 @@ export async function POST(request: NextRequest) {
 
     const project = await prisma.project.create({
       data: {
+        userId,
         name: String(name),
         domain: domain ?? "work",
         description: description ?? "",

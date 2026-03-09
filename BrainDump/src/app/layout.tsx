@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 
 export const metadata: Metadata = {
   title: "BrainDump | Voice capture & thought organization",
@@ -28,7 +29,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthSessionProvider>{children}</AuthSessionProvider>
+      </body>
     </html>
   );
 }

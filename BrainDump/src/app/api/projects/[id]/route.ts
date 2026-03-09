@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = (session.user as { id?: string }).id!;
+
     const { id } = await params;
     const body = await request.json();
     const { name, description, status } = body;
@@ -14,7 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
     const project = await prisma.project.update({
-      where: { id },
+      where: { id, userId },
       data: {
         name: name.trim(),
         ...(description !== undefined && { description: String(description) }),
@@ -34,10 +39,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = (session.user as { id?: string }).id!;
+
     const { id } = await params;
     await prisma.$transaction(async (tx) => {
-      await tx.organizedItem.deleteMany({ where: { projectId: id } });
-      await tx.project.delete({ where: { id } });
+      await tx.organizedItem.deleteMany({ where: { projectId: id, userId } });
+      await tx.project.delete({ where: { id, userId } });
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

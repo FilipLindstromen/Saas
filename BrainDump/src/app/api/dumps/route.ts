@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
+import { auth } from "@/auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id;
+
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode"); // inbox | work | personal
     const status = searchParams.get("status");
 
-    const where: { mode?: string; status?: string } = {};
+    const where: { userId: string; mode?: string; status?: string } = { userId: userId! };
     if (mode) where.mode = mode;
     if (status) where.status = status;
 
@@ -30,12 +37,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
     const body = await request.json();
     const { mode, transcriptRaw, transcriptEdited, status, audioUrl } = body;
     const safeMode = typeof mode === "string" && (mode === "inbox" || mode === "work" || mode === "personal") ? mode : "inbox";
 
     const dump = await prisma.dump.create({
       data: {
+        userId,
         mode: safeMode,
         transcriptRaw: transcriptRaw ?? "",
         transcriptEdited: transcriptEdited ?? "",
