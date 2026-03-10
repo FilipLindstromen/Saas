@@ -1,9 +1,9 @@
 import { PrismaClient } from "./generated/prisma/client";
 
 const url = process.env.DATABASE_URL;
-const prisma = new PrismaClient(
-  url ? { datasources: { db: { url } } } : {}
-);
+const prisma = new PrismaClient({
+  ...(url ? { datasources: { db: { url } } } : {}),
+});
 
 async function main() {
   const user = await prisma.user.findFirst();
