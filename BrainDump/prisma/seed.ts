@@ -2,7 +2,7 @@ import { PrismaClient } from "./generated/prisma/client";
 
 const url = process.env.DATABASE_URL;
 const prisma = new PrismaClient(
-  url ? { datasources: { db: { url } } } : undefined
+  url ? { datasources: { db: { url } } } : {}
 );
 
 async function main() {
