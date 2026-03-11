@@ -10,6 +10,8 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
+  secret: env.AUTH_SECRET,
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   session: {
     // Sliding session valid for 30 days (standard web remember-me duration)

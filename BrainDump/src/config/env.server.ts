@@ -12,9 +12,10 @@ function optional(name: string): string | undefined {
 function getRequired(name: string): string {
   const value = process.env[name];
   if (!value || !value.trim()) {
-    // During Vercel build, env vars may not be available; return placeholder so build succeeds.
-    // At runtime, missing vars will cause auth/DB to fail with a clear error.
-    if (process.env.VERCEL === "1") {
+    // During Vercel *build* only, return placeholder so the build succeeds.
+    // At runtime (NEXT_PHASE is set during build), always throw so auth fails with a clear message.
+    const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+    if (process.env.VERCEL === "1" && isBuild) {
       return "";
     }
     throw new Error(`Missing required environment variable: ${name}`);
@@ -28,6 +29,17 @@ export const env = {
   },
   get OPENAI_API_KEY() {
     return getRequired("OPENAI_API_KEY");
+  },
+  /** Required by NextAuth v5 for signing cookies/tokens. Set AUTH_SECRET on Vercel. */
+  get AUTH_SECRET() {
+    const v = getRequired("AUTH_SECRET");
+    const isBuild = process.env.VERCEL === "1" && process.env.NEXT_PHASE === "phase-production-build";
+    if (!isBuild && v.length < 16) {
+      throw new Error(
+        "AUTH_SECRET must be at least 16 characters. In Vercel: Settings → Environment Variables → add AUTH_SECRET (e.g. run: openssl rand -base64 32)"
+      );
+    }
+    return v;
   },
   get GOOGLE_CLIENT_ID() {
     return getRequired("GOOGLE_CLIENT_ID");

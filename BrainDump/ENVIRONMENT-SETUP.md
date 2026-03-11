@@ -6,6 +6,7 @@ This app expects at least:
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
+- `AUTH_SECRET` (NextAuth v5: use e.g. `openssl rand -base64 32` to generate)
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 
@@ -29,6 +30,7 @@ See `.env.example` for the full list of variables and placeholder values.
 # Use your Postgres URL (same as production, or a local Postgres instance)
 DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 OPENAI_API_KEY="sk-your-openai-key"
+AUTH_SECRET="generate-with-openssl-rand-base64-32"
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
 
@@ -69,6 +71,7 @@ Next.js automatically loads `.env.local` in development, and the server-side cod
 
    - `DATABASE_URL`
    - `OPENAI_API_KEY`
+   - `AUTH_SECRET` (required for auth; generate with `openssl rand -base64 32`)
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
    - (Optional) `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `GIPHY_API_KEY`
