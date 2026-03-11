@@ -669,7 +669,7 @@ export function CenterPanel({
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button type="button" className="bd-btn bd-btn-primary" onClick={organize} disabled={!canOrganize} style={{ minHeight: "44px" }}>
+          <button type="button" className="bd-btn bd-btn-primary" onClick={() => organize()} disabled={!canOrganize} style={{ minHeight: "44px" }}>
             {organizeLoading ? "Organizing…" : "Organize"}
           </button>
         </div>
