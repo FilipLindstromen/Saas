@@ -2,8 +2,20 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Load env from repo root (localhost: one .env for all apps)
+const rootEnv = path.resolve(__dirname, '..')
+try {
+  require('dotenv').config({ path: path.join(rootEnv, '.env') })
+  require('dotenv').config({ path: path.join(rootEnv, '.env.local') })
+} catch {}
+
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: rootEnv,
+  define: {
+    'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
+    'import.meta.env.VITE_ELEVENLABS_API_KEY': JSON.stringify(process.env.ELEVENLABS_API_KEY || ''),
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../shared'),

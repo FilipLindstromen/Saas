@@ -1,6 +1,7 @@
 /**
  * Centralized API key storage for all Saas apps.
- * Keys are stored in a single localStorage entry so you only need to enter them once.
+ * On localhost, API keys are read from the root .env first; then localStorage.
+ * In production, use your host's env (e.g. Vercel) or localStorage.
  *
  * Security: Keys are stored locally in your browser only. They are never sent to our servers.
  * They are only used when you make requests to the respective APIs (OpenAI, Unsplash, etc.).
@@ -16,6 +17,38 @@ const DEFAULT_KEYS = {
   unsplash: '',
   googleClientId: '',
   elevenlabs: ''
+}
+
+/** Read API keys from environment (root .env on localhost). Only returns keys that are set. */
+function getEnvKeys() {
+  const out = {}
+  try {
+    // Vite: import.meta.env.VITE_*
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      const e = import.meta.env
+      if (e.VITE_OPENAI_API_KEY) out.openai = String(e.VITE_OPENAI_API_KEY).trim()
+      if (e.VITE_GIPHY_API_KEY) out.giphy = String(e.VITE_GIPHY_API_KEY).trim()
+      if (e.VITE_PIXABAY_API_KEY) out.pixabay = String(e.VITE_PIXABAY_API_KEY).trim()
+      if (e.VITE_PEXELS_API_KEY) out.pexels = String(e.VITE_PEXELS_API_KEY).trim()
+      if (e.VITE_UNSPLASH_ACCESS_KEY) out.unsplash = String(e.VITE_UNSPLASH_ACCESS_KEY).trim()
+      if (e.VITE_ELEVENLABS_API_KEY) out.elevenlabs = String(e.VITE_ELEVENLABS_API_KEY).trim()
+      if (e.VITE_GOOGLE_CLIENT_ID) out.googleClientId = String(e.VITE_GOOGLE_CLIENT_ID).trim()
+    }
+    // Next.js client: process.env.NEXT_PUBLIC_*
+    if (typeof process !== 'undefined' && process.env) {
+      const e = process.env
+      if (e.NEXT_PUBLIC_OPENAI_API_KEY) out.openai = out.openai || String(e.NEXT_PUBLIC_OPENAI_API_KEY).trim()
+      if (e.NEXT_PUBLIC_GIPHY_API_KEY) out.giphy = out.giphy || String(e.NEXT_PUBLIC_GIPHY_API_KEY).trim()
+      if (e.NEXT_PUBLIC_PIXABAY_API_KEY) out.pixabay = out.pixabay || String(e.NEXT_PUBLIC_PIXABAY_API_KEY).trim()
+      if (e.NEXT_PUBLIC_PEXELS_API_KEY) out.pexels = out.pexels || String(e.NEXT_PUBLIC_PEXELS_API_KEY).trim()
+      if (e.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY) out.unsplash = out.unsplash || String(e.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY).trim()
+      if (e.NEXT_PUBLIC_ELEVENLABS_API_KEY) out.elevenlabs = out.elevenlabs || String(e.NEXT_PUBLIC_ELEVENLABS_API_KEY).trim()
+      if (e.NEXT_PUBLIC_GOOGLE_CLIENT_ID) out.googleClientId = out.googleClientId || String(e.NEXT_PUBLIC_GOOGLE_CLIENT_ID).trim()
+    }
+  } catch (err) {
+    // ignore
+  }
+  return out
 }
 
 /** Migrate keys from legacy app-specific storage into the shared store. */
@@ -111,21 +144,25 @@ function migrateFromLegacy() {
 }
 
 /**
- * Load all API keys. Migrates from legacy storage on first load.
- * @returns {{ openai, giphy, pixabay, pexels, unsplash, googleClientId }}
+ * Load all API keys. Env (root .env on localhost) overrides localStorage.
+ * Migrates from legacy storage on first load when nothing in storage.
+ * @returns {{ openai, giphy, pixabay, pexels, unsplash, googleClientId, elevenlabs }}
  */
 export function loadApiKeys() {
   try {
+    const envKeys = getEnvKeys()
+    let fromStorage = { ...DEFAULT_KEYS }
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw)
-      return { ...DEFAULT_KEYS, ...parsed }
+      fromStorage = { ...DEFAULT_KEYS, ...JSON.parse(raw) }
+    } else {
+      const migrated = migrateFromLegacy()
+      saveApiKeys(migrated)
+      fromStorage = { ...DEFAULT_KEYS, ...migrated }
     }
-    const migrated = migrateFromLegacy()
-    saveApiKeys(migrated)
-    return migrated
+    return { ...fromStorage, ...envKeys }
   } catch (e) {
-    return { ...DEFAULT_KEYS }
+    return { ...DEFAULT_KEYS, ...getEnvKeys() }
   }
 }
 

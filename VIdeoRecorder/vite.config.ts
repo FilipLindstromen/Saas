@@ -3,6 +3,13 @@ import react from '@vitejs/plugin-react'
 import { copyFileSync, mkdirSync, existsSync } from 'fs'
 import path, { join } from 'path'
 
+// Load env from repo root (localhost: one .env for all apps)
+const rootEnv = path.resolve(__dirname, '..')
+try {
+  require('dotenv').config({ path: path.join(rootEnv, '.env') })
+  require('dotenv').config({ path: path.join(rootEnv, '.env.local') })
+} catch {}
+
 // Helper function to copy FFmpeg files
 function copyFFmpegFilesToPublic() {
   try {
@@ -65,6 +72,10 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
   
   return {
+    envDir: rootEnv,
+    define: {
+      'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
+    },
     resolve: {
       alias: {
         '@shared': path.resolve(__dirname, '../shared'),

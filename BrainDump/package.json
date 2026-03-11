@@ -28,6 +28,7 @@
     "formdata-node": "^6.0.0"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "@eslint/eslintrc": "^3.2.0",
     "@types/node": "^20.17.6",
     "@types/react": "^19.0.0",
