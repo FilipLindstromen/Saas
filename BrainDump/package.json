@@ -13,8 +13,10 @@
     "db:seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@auth/prisma-adapter": "^2.11.1",
+    "pg": "^8.13.0",
     "next": "16.1.6",
     "next-auth": "5.0.0-beta.30",
     "openai": "^4.73.0",
