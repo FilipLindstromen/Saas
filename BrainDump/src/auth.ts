@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import Credentials from "next-auth/providers/credentials";
+import { compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { env } from "@/config/env.server";
 
@@ -12,26 +12,55 @@ export const {
 } = NextAuth({
   secret: env.AUTH_SECRET,
   trustHost: true,
-  adapter: PrismaAdapter(prisma),
   session: {
-    // Sliding session valid for 30 days (standard web remember-me duration)
-    strategy: "database",
-    maxAge: 30 * 24 * 60 * 60,
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days; "remember me" can extend this
   },
   providers: [
-    Google({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    Credentials({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        remember: { label: "Remember me", type: "checkbox" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const email = String(credentials.email).trim().toLowerCase();
+        const password = String(credentials.password);
+        const user = await prisma.user.findUnique({
+          where: { email },
+        });
+        if (!user?.passwordHash) return null;
+        const ok = await compare(password, user.passwordHash);
+        if (!ok) return null;
+        return {
+          id: user.id,
+          email: user.email ?? undefined,
+          name: user.name ?? undefined,
+        };
+      },
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
-      if (session.user && user) {
-        // Expose user id to the client so we can associate records
-        (session.user as typeof session.user & { id: string }).id = user.id;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as typeof session.user & { id: string }).id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
       }
       return session;
     },
   },
+  pages: {
+    signIn: "/login",
+  },
 });
-

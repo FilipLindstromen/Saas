@@ -41,11 +41,12 @@ export const env = {
     }
     return v;
   },
+  // Google OAuth disabled; using email/password only
   get GOOGLE_CLIENT_ID() {
-    return getRequired("GOOGLE_CLIENT_ID");
+    return optional("GOOGLE_CLIENT_ID") ?? "";
   },
   get GOOGLE_CLIENT_SECRET() {
-    return getRequired("GOOGLE_CLIENT_SECRET");
+    return optional("GOOGLE_CLIENT_SECRET") ?? "";
   },
   get UNSPLASH_ACCESS_KEY() {
     return optional("UNSPLASH_ACCESS_KEY");

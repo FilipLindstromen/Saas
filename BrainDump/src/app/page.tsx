@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type OrganizedItemPreview } from "@/components/CenterPanel";
@@ -208,42 +209,31 @@ export default function BrainDumpPage() {
           <div>
             <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>BrainDump</h1>
             <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
-              Sign in with Google to keep your dumps, projects and organized items private to your account.
+              Sign in to keep your dumps, projects and organized items private to your account.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => signIn("google")}
+          <Link
+            href="/login"
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: "0.5rem",
               padding: "0.7rem 1.2rem",
-              borderRadius: "999px",
-              border: "1px solid var(--border-default)",
-              background: "var(--bg-secondary)",
-              color: "var(--text-primary)",
+              borderRadius: "var(--button-radius)",
+              border: "none",
+              background: "var(--accent)",
+              color: "#fff",
               fontSize: "0.95rem",
-              fontWeight: 500,
-              cursor: "pointer",
+              fontWeight: 600,
+              textDecoration: "none",
               boxShadow: "var(--shadow-sm)",
             }}
           >
-            <span
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                background: "#fff",
-                display: "inline-block",
-              }}
-              aria-hidden
-            />
-            <span>Continue with Google</span>
-          </button>
+            Sign in
+          </Link>
           <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-tertiary)" }}>
-            We use a secure cookie-based session lasting up to 30 days so you can come back without logging in every time.
+            Use a secure cookie-based session (up to 30 days with &quot;Remember me&quot;).
           </p>
         </div>
       </div>

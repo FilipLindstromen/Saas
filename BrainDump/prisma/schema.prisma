@@ -110,13 +110,14 @@ model OrganizedItemTag {
   @@index([tagId])
 }
 
-/// Auth.js / NextAuth user model
+/// Auth.js / NextAuth user model (credentials: passwordHash set; OAuth: accounts used)
 model User {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String?
-  email         String?  @unique
+  email         String?    @unique
   emailVerified DateTime?
   image         String?
+  passwordHash  String?    // for email/password sign-in only
 
   accounts  Account[]
   sessions  Session[]
