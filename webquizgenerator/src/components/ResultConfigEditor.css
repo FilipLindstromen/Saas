@@ -1,0 +1,77 @@
+.result-config-editor {
+  margin-top: 0.5rem;
+}
+
+.result-config-editor h3,
+.result-config-editor h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.result-config-editor .section-description {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.result-config-card {
+  border: 1px solid var(--border-default, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.result-config-card.inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+}
+
+.result-config-card.inline .form-input {
+  flex: 1;
+}
+
+.result-config-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary, rgba(255,255,255,0.05));
+  cursor: pointer;
+}
+
+.result-config-card-body {
+  padding: 0.75rem;
+}
+
+.result-config-editor .form-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.result-config-editor .form-row .form-group {
+  flex: 1;
+}
+
+.result-config-editor .form-group {
+  margin-bottom: 0.5rem;
+}
+
+.result-config-editor .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.result-config-editor .form-group label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.9;
+}
+
+.result-config-editor .form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}

@@ -1,6 +1,12 @@
 # Saas Apps
 
-A collection of SaaS applications and tools. This project is configured to deploy to **GitHub Pages**.
+A collection of SaaS applications and tools. You can deploy the **SaaS hub and all apps on Vercel** (recommended) or use **GitHub Pages**.
+
+## Deploying to Vercel (recommended)
+
+Deploy the hub and all apps on Vercel so everything runs there (like BrainDump). One Vercel project serves the hub + all static/Vite apps; BrainDump stays a separate project (Next.js with API/database).
+
+See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root project for hub + apps, and a second project for BrainDump with Root Directory `BrainDump`).
 
 ## Apps in this project
 
@@ -23,7 +29,7 @@ A collection of SaaS applications and tools. This project is configured to deplo
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 
-## Deploying to GitHub Pages
+## Deploying to GitHub Pages (optional)
 
 **Automatic deployment** — the project includes a GitHub Actions workflow that builds all apps and deploys them when you push.
 
@@ -81,6 +87,10 @@ Use the default base path (`/`) for local development; only use the `--base` fla
 
 ```
 /
+├── vercel.json           # Vercel: build hub + apps, output to deploy/
+├── package.json          # Root build script for Vercel
+├── scripts/
+│   └── vercel-build.mjs  # Builds hub + all Vite apps for one deployment
 ├── _config.yml
 ├── README.md
 ├── docs/                 # Landing page & static assets for deployment

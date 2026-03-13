@@ -6,6 +6,7 @@ node_modules/
 out/
 build/
 dist/
+deploy/
 
 # Env and secrets (never commit real keys)
 .env

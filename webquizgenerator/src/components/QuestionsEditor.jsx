@@ -1,7 +1,7 @@
 import React from 'react'
 import './QuestionsEditor.css'
 
-function QuestionsEditor({ questions, onUpdate }) {
+function QuestionsEditor({ questions, onUpdate, responseModel = 'percentage', attributeLabels = [], categories = [] }) {
   const moveItem = (list, from, to) => {
     const updated = [...list]
     const [removed] = updated.splice(from, 1)
@@ -57,12 +57,15 @@ function QuestionsEditor({ questions, onUpdate }) {
     e.currentTarget.classList.remove('drag-over')
   }
   const addQuestion = () => {
+    const id1 = Date.now() + 1
+    const id2 = Date.now() + 2
     const newQuestion = {
       id: Date.now(),
       q: '',
+      correctAnswerId: null,
       answers: [
-        { id: Date.now() + 1, label: '', tag: '' },
-        { id: Date.now() + 2, label: '', tag: '' }
+        { id: id1, label: '', tag: '', weight: 1, category: '', points: 2, attributes: {} },
+        { id: id2, label: '', tag: '', weight: 1, category: '', points: 2, attributes: {} }
       ]
     }
     onUpdate([...questions, newQuestion])
@@ -86,7 +89,7 @@ function QuestionsEditor({ questions, onUpdate }) {
         q.id === questionId
           ? {
               ...q,
-              answers: [...q.answers, { id: Date.now(), label: '', tag: '' }]
+              answers: [...q.answers, { id: Date.now(), label: '', tag: '', weight: 1, category: '', points: 2, attributes: {} }]
             }
           : q
       )
@@ -105,6 +108,26 @@ function QuestionsEditor({ questions, onUpdate }) {
             }
           : q
       )
+    )
+  }
+
+  const updateAnswerAttributes = (questionId, answerId, attrKey, delta) => {
+    onUpdate(
+      questions.map(q => {
+        if (q.id !== questionId) return q
+        const answer = q.answers.find(a => a.id === answerId)
+        if (!answer) return q
+        const attrs = { ...(answer.attributes || {}) }
+        const num = Number(delta)
+        if (num === 0) delete attrs[attrKey]
+        else attrs[attrKey] = num
+        return {
+          ...q,
+          answers: q.answers.map(a =>
+            a.id === answerId ? { ...a, attributes: attrs } : a
+          )
+        }
+      })
     )
   }
 
@@ -166,6 +189,22 @@ function QuestionsEditor({ questions, onUpdate }) {
             />
           </div>
 
+          {responseModel === 'percentage' && (
+            <div className="form-group">
+              <label>Correct answer</label>
+              <select
+                value={question.correctAnswerId ?? ''}
+                onChange={(e) => updateQuestion(question.id, 'correctAnswerId', e.target.value ? Number(e.target.value) : null)}
+                className="form-input"
+              >
+                <option value="">— None —</option>
+                {(question.answers || []).map(a => (
+                  <option key={a.id} value={a.id}>{a.label || 'Answer ' + a.id}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="answers-section">
             <div className="answers-header">
               <label>Answers</label>
@@ -202,14 +241,64 @@ function QuestionsEditor({ questions, onUpdate }) {
                   />
                   <input
                     type="text"
-                    value={answer.tag}
+                    value={answer.tag ?? ''}
                     onChange={(e) =>
                       updateAnswer(question.id, answer.id, 'tag', e.target.value)
                     }
-                    placeholder="Tag (e.g., 'random', 'pressure')"
+                    placeholder="Tag (optional)"
                     className="form-input tag-input"
                   />
+                  {responseModel === 'percentage' && (
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={answer.weight ?? 1}
+                      onChange={(e) => updateAnswer(question.id, answer.id, 'weight', Number(e.target.value) || 1)}
+                      placeholder="Weight"
+                      className="form-input weight-input"
+                      title="Points if this is the correct answer"
+                    />
+                  )}
+                  {responseModel === 'category' && (
+                    <>
+                      <input
+                        type="text"
+                        value={answer.category ?? answer.tag ?? ''}
+                        onChange={(e) => updateAnswer(question.id, answer.id, 'category', e.target.value)}
+                        placeholder="Category"
+                        className="form-input"
+                        list="categories-list"
+                      />
+                      <datalist id="categories-list">
+                        {(categories || []).map(c => <option key={c.id} value={c.id || c.name} />)}
+                      </datalist>
+                      <input
+                        type="number"
+                        min={0}
+                        value={answer.points ?? 2}
+                        onChange={(e) => updateAnswer(question.id, answer.id, 'points', Number(e.target.value) || 0)}
+                        placeholder="Points"
+                        className="form-input points-input"
+                      />
+                    </>
+                  )}
                 </div>
+                {responseModel === 'profile' && (attributeLabels || []).length > 0 && (
+                  <div className="answer-attributes">
+                    {(attributeLabels || []).map(attr => (
+                      <input
+                        key={attr.key}
+                        type="number"
+                        value={answer.attributes?.[attr.key] ?? ''}
+                        onChange={(e) => updateAnswerAttributes(question.id, answer.id, attr.key, e.target.value === '' ? 0 : Number(e.target.value))}
+                        placeholder={attr.label}
+                        className="form-input attr-input"
+                        title={attr.label}
+                      />
+                    ))}
+                  </div>
+                )}
                 {question.answers.length > 2 && (
                   <button
                     onClick={() => deleteAnswer(question.id, answer.id)}

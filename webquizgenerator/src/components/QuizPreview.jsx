@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react'
+import { computeResult } from '../lib/responseModels'
 import './QuizPreview.css'
 
-function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = false }) {
+function QuizPreview({ quizData, responseModel: propResponseModel, isOpen, onClose, typography, theme, embedded = false }) {
+  const responseModel = propResponseModel || quizData?.responseModel || 'percentage'
   const [step, setStep] = useState('title')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedTags, setSelectedTags] = useState([])
   const [worstTag, setWorstTag] = useState(null)
   const [selectedAnswer, setSelectedAnswer] = useState(null)
-  const [answerHistory, setAnswerHistory] = useState([]) // { question, answer } for personalized results
+  const [answerHistory, setAnswerHistory] = useState([]) // { questionId, answerId, question, answer } for display + result
+  const [selections, setSelections] = useState([]) // [{ questionId, answerId }] for computeResult
   const [transitionDir, setTransitionDir] = useState('next') // 'next' | 'prev' for slide animation
 
   const typo = typography || {}
@@ -32,6 +35,7 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
     setWorstTag(null)
     setSelectedAnswer(null)
     setAnswerHistory([])
+    setSelections([])
     setTransitionDir('next')
   }
 
@@ -49,16 +53,15 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
 
     const tag = selectedAnswer.tag
     if (tag && !selectedTags.includes(tag)) {
-      setSelectedTags([...selectedTags, tag])
+      setSelectedTags(prev => [...prev, tag])
     }
-
-    // Question 3 (index 2) = "which feels WORST"
     if (currentQuestion === 2) {
       setWorstTag(tag)
     }
 
     const q = quizData.questions[currentQuestion]
-    setAnswerHistory(prev => [...prev, { question: q?.q, answer: selectedAnswer.label }])
+    setAnswerHistory(prev => [...prev, { questionId: q?.id, answerId: selectedAnswer.id, question: q?.q, answer: selectedAnswer.label }])
+    setSelections(prev => [...prev, { questionId: q?.id, answerId: selectedAnswer.id }])
     setTransitionDir('next')
 
     if (currentQuestion < quizData.questions.length - 1) {
@@ -71,14 +74,15 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
 
   const handlePrev = () => {
     if (currentQuestion === 0) return
-    const prevQ = quizData.questions[currentQuestion - 1]
     const lastEntry = answerHistory[answerHistory.length - 1]
-    const prevAnswer = prevQ?.answers?.find(a => a.label === lastEntry?.answer)
+    const prevQ = quizData.questions[currentQuestion - 1]
+    const prevAnswer = prevQ?.answers?.find(a => a.id === lastEntry?.answerId)
     if (prevAnswer?.tag) setSelectedTags(prev => prev.filter(t => t !== prevAnswer.tag))
     if (currentQuestion - 1 === 2) setWorstTag(null)
     setTransitionDir('prev')
     setCurrentQuestion(currentQuestion - 1)
     setAnswerHistory(prev => prev.slice(0, -1))
+    setSelections(prev => prev.slice(0, -1))
     setSelectedAnswer(prevAnswer || null)
   }
 
@@ -99,12 +103,12 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
         handlePrev()
       } else if (e.key === 'ArrowUp' && answers.length > 0) {
         e.preventDefault()
-        const idx = selectedAnswer ? answers.findIndex(a => a.tag === selectedAnswer.tag) : -1
+        const idx = selectedAnswer ? answers.findIndex(a => a.id === selectedAnswer.id) : -1
         const nextIdx = idx <= 0 ? answers.length - 1 : idx - 1
         setSelectedAnswer(answers[nextIdx])
       } else if (e.key === 'ArrowDown' && answers.length > 0) {
         e.preventDefault()
-        const idx = selectedAnswer ? answers.findIndex(a => a.tag === selectedAnswer.tag) : -1
+        const idx = selectedAnswer ? answers.findIndex(a => a.id === selectedAnswer.id) : -1
         const nextIdx = idx < 0 || idx >= answers.length - 1 ? 0 : idx + 1
         setSelectedAnswer(answers[nextIdx])
       }
@@ -155,7 +159,7 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
             {question.answers.map((answer, idx) => (
               <div
                 key={idx}
-                className={`preview-answer preview-answer-stagger ${selectedAnswer?.tag === answer.tag ? 'active' : ''}`}
+                className={`preview-answer preview-answer-stagger ${selectedAnswer?.id === answer.id ? 'active' : ''}`}
                 style={{
                   fontFamily: typo.answerFont,
                   fontSize: typo.answerSize,
@@ -187,61 +191,115 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
   }
 
   const renderResult = () => {
-    const tags = selectedTags.length ? selectedTags : ['default']
-    const dominantTag = tags[0]
-    const labels = quizData.tagLabels || {}
-    const headlines = quizData.headlines || {}
-    const insights = quizData.tagInsights || {}
-    const ctas = quizData.cta || {}
-
-    const headline = headlines[dominantTag] || headlines.default || 'Your Results'
-    const cta = ctas[dominantTag] || ctas.default || 'Learn More'
-    const worstLabel = labels[worstTag] || labels.default || 'anxiety'
-
-    // Group tags
-    const mindTags = new Set(['racingMind', 'thinking', 'lossOfControl', 'random', 'social', 'nighttime'])
-    const bodyTags = new Set(['body', 'cortisol', 'pressure', 'avoidance', 'presence'])
-
-    let mindText = ''
-    let bodyText = ''
-    let extraText = ''
-
-    tags.forEach(tag => {
-      const block = insights[tag]
-      if (!block) return
-      if (mindTags.has(tag)) {
-        mindText += (mindText ? '\n\n' : '') + block
-      } else if (bodyTags.has(tag)) {
-        bodyText += (bodyText ? '\n\n' : '') + block
-      } else {
-        extraText += (extraText ? '\n\n' : '') + block
-      }
-    })
-
-    const feelsText = `For you, anxiety hits hardest as **${worstLabel}**.\n\nThat's the part your system turns up the loudest when it feels overwhelmed — which is why it can feel so intense, so fast, and so hard to switch off.`
-
-    let nextStepsText = feelsText
-    if (mindText) nextStepsText += `\n\n${mindText}`
-    if (bodyText) nextStepsText += `\n\n${bodyText}`
-    if (extraText) nextStepsText += `\n\n${extraText}`
-    nextStepsText += `\n\n${quizData.summary || ''}`
+    const result = computeResult(responseModel, quizData || {}, selections)
+    const typo = typography || {}
 
     return (
       <div className="preview-result-screen" style={backgroundStyle}>
         <div className="preview-result-container">
           <div className="preview-result-close" onClick={resetPreview}>×</div>
-          <div
-            className="preview-result-title"
-            style={{ fontFamily: typo.titleFont, fontSize: typo.titleSize }}
-          >
-            {headline}
-          </div>
-          <div
-            className="preview-result-subtitle"
-            style={{ fontFamily: typo.feedbackFont }}
-          >
-            Based on your answers
-          </div>
+
+          {result.result_type === 'percentage' && (
+            <>
+              <div className="preview-result-title" style={{ fontFamily: typo.titleFont, fontSize: typo.titleSize }}>
+                {result.title}
+              </div>
+              <div className="preview-result-subtitle" style={{ fontFamily: typo.feedbackFont }}>
+                Score: {result.percentage}% ({result.score}/{result.maxScore})
+              </div>
+              <div className="preview-result-card">
+                <h3>{result.level}</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.message}
+                </div>
+              </div>
+              <div className="preview-result-card">
+                <h3>Suggestion</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.suggestion}
+                </div>
+              </div>
+              {result.next_step && (
+                <div className="preview-result-card">
+                  <h3>Next step</h3>
+                  <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                    {result.next_step}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {result.result_type === 'category' && (
+            <>
+              <div className="preview-result-title" style={{ fontFamily: typo.titleFont, fontSize: typo.titleSize }}>
+                {result.category}{result.category2 ? ` / ${result.category2}` : ''}
+              </div>
+              <div className="preview-result-subtitle" style={{ fontFamily: typo.feedbackFont }}>
+                Your profile
+              </div>
+              <div className="preview-result-card">
+                <h3>Description</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.description}
+                </div>
+              </div>
+              {result.strengths && result.strengths.length > 0 && (
+                <div className="preview-result-card">
+                  <h3>Strengths</h3>
+                  <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                    {result.strengths.join(', ')}
+                  </div>
+                </div>
+              )}
+              <div className="preview-result-card">
+                <h3>Recommendation</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.recommendation}
+                </div>
+              </div>
+            </>
+          )}
+
+          {result.result_type === 'profile' && (
+            <>
+              <div className="preview-result-title" style={{ fontFamily: typo.titleFont, fontSize: typo.titleSize }}>
+                Your insight profile
+              </div>
+              <div className="preview-result-subtitle" style={{ fontFamily: typo.feedbackFont }}>
+                Based on your answers
+              </div>
+              <div className="preview-result-card">
+                <h3>Strongest trait</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.strongest_trait}
+                </div>
+              </div>
+              <div className="preview-result-card">
+                <h3>Weakest trait</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.weakest_trait}
+                </div>
+              </div>
+              <div className="preview-result-card">
+                <h3>Summary</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.summary}
+                </div>
+              </div>
+              <div className="preview-result-card">
+                <h3>Recommendation</h3>
+                <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}>
+                  {result.recommendation}
+                </div>
+              </div>
+            </>
+          )}
+
+          {result.result_type === 'unknown' && (
+            <div className="preview-result-body" style={{ fontFamily: typo.feedbackFont }}>{result.message}</div>
+          )}
+
           {answerHistory.length > 0 && (
             <div className="preview-result-summary">
               {answerHistory.map((entry, i) => (
@@ -252,25 +310,12 @@ function QuizPreview({ quizData, isOpen, onClose, typography, theme, embedded = 
               ))}
             </div>
           )}
-          <div className="preview-result-card">
-            <h3>Your Pattern</h3>
-            <div
-              className="preview-result-body"
-              style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}
-            >
-              {feelsText}
-            </div>
-          </div>
-          <div className="preview-result-card">
-            <h3>Next Steps</h3>
-            <div
-              className="preview-result-body"
-              style={{ fontFamily: typo.feedbackFont, fontSize: typo.feedbackSize }}
-            >
-              {nextStepsText}
-            </div>
-          </div>
-          <button className="preview-result-cta" style={{ fontFamily: typo.feedbackFont }}>{cta}</button>
+
+          {(quizData.cta?.default || result.result_type) && (
+            <button className="preview-result-cta" style={{ fontFamily: typo.feedbackFont }}>
+              {quizData.cta?.default || 'Continue'}
+            </button>
+          )}
         </div>
       </div>
     )

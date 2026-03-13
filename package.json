@@ -1,0 +1,8 @@
+{
+  "name": "saas-apps",
+  "private": true,
+  "description": "Hub and static/Vite apps built for a single Vercel deployment",
+  "scripts": {
+    "build": "node scripts/vercel-build.mjs"
+  }
+}

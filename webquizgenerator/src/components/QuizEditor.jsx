@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import QuizBasicInfo from './QuizBasicInfo'
+import ResultConfigEditor from './ResultConfigEditor'
 import QuestionsEditor from './QuestionsEditor'
 import FeedbackEditor from './FeedbackEditor'
 import ExportButton from './ExportButton'
@@ -42,20 +43,41 @@ function QuizEditor() {
   }
 
   const [quizData, setQuizData] = useState({
+    responseModel: 'percentage', // 'percentage' | 'category' | 'profile'
     quizTitle: 'Discover your anxiety type.',
     quizSubtitle: '\nHow Are You Doing? \nTake this Anxiety Test to discover your anxiety patterns.\n\n Discover how anxiety is affecting your daily life and receive a personalized roadmap to feel more calm, clear, and in control.\n\n',
     questions: [
       {
         id: 1,
         q: 'When does anxiety usually show up for you?',
+        correctAnswerId: null,
         answers: [
-          { id: 1, label: 'Out of nowhere, random moments', tag: 'random' },
-          { id: 2, label: 'When things get quiet (morning/night)', tag: 'racingMind' },
-          { id: 3, label: 'During work, expectations, pressure', tag: 'pressure' },
-          { id: 4, label: 'In social or unfamiliar situations', tag: 'social' }
+          { id: 1, label: 'Out of nowhere, random moments', tag: 'random', weight: 1, category: 'Creator', points: 2, attributes: {} },
+          { id: 2, label: 'When things get quiet (morning/night)', tag: 'racingMind', weight: 1, category: 'Strategist', points: 2, attributes: {} },
+          { id: 3, label: 'During work, expectations, pressure', tag: 'pressure', weight: 1, category: 'Builder', points: 2, attributes: {} },
+          { id: 4, label: 'In social or unfamiliar situations', tag: 'social', weight: 1, category: 'Creator', points: 2, attributes: {} }
         ]
       }
     ],
+    percentageTiers: [
+      { min: 0, max: 40, level: 'Beginner', title: 'Beginner', message: 'You\'re just getting started. Keep learning!', suggestion: 'Focus on the fundamentals and take your time.', nextStep: 'Review key concepts and try again.' },
+      { min: 41, max: 75, level: 'Intermediate', title: 'Intermediate', message: 'You understand the basics but still have gaps in some key areas.', suggestion: 'Focus on strengthening your core knowledge before moving to advanced topics.', nextStep: 'Practice more in your weaker areas.' },
+      { min: 76, max: 100, level: 'Advanced', title: 'Advanced', message: 'You have a strong grasp of the material.', suggestion: 'Challenge yourself with advanced topics or help others learn.', nextStep: 'Explore deeper or teach others.' }
+    ],
+    categories: [
+      { id: 'Creator', name: 'Creator', description: 'You think in systems and long-term planning.', strengths: ['planning', 'analysis', 'optimization'], recommendation: 'Focus on building execution speed to match your strategy skills.' },
+      { id: 'Strategist', name: 'Strategist', description: 'You thrive on ideas and new possibilities.', strengths: ['ideation', 'vision', 'adaptability'], recommendation: 'Pair with someone who can help you execute on your ideas.' },
+      { id: 'Builder', name: 'Builder', description: 'You get things done and love execution.', strengths: ['execution', 'reliability', 'focus'], recommendation: 'Step back occasionally to align execution with strategy.' }
+    ],
+    categoryHybridThreshold: 2,
+    attributeLabels: [
+      { key: 'experience', label: 'Experience level' },
+      { key: 'confidence', label: 'Confidence' },
+      { key: 'knowledge', label: 'Knowledge depth' },
+      { key: 'riskTolerance', label: 'Risk tolerance' },
+      { key: 'learningStyle', label: 'Learning style' }
+    ],
+    profileConfig: { summary: '', recommendation: 'Spend time strengthening foundational concepts before making large strategic moves.' },
     tagLabels: {
       random: 'the physical intensity in your body',
       racingMind: 'the racing, overwhelming thoughts',
@@ -105,6 +127,14 @@ function QuizEditor() {
 
   const updateBasicInfo = (field, value) => {
     setQuizData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const updateResponseModel = (model) => {
+    setQuizData(prev => ({ ...prev, responseModel: model }))
+  }
+
+  const updateResultConfig = (config) => {
+    setQuizData(prev => ({ ...prev, ...config }))
   }
 
   const updateQuestions = (questions) => {
@@ -237,7 +267,20 @@ function QuizEditor() {
               title={quizData.quizTitle}
               subtitle={quizData.quizSubtitle}
               summary={quizData.summary}
+              responseModel={quizData.responseModel}
               onUpdate={updateBasicInfo}
+              onResponseModelChange={updateResponseModel}
+            />
+          </div>
+          <div className="panel-section">
+            <ResultConfigEditor
+              responseModel={quizData.responseModel}
+              percentageTiers={quizData.percentageTiers}
+              categories={quizData.categories}
+              categoryHybridThreshold={quizData.categoryHybridThreshold}
+              attributeLabels={quizData.attributeLabels}
+              profileConfig={quizData.profileConfig}
+              onUpdate={updateResultConfig}
             />
           </div>
         </div>
@@ -255,6 +298,7 @@ function QuizEditor() {
       <div className="app-center">
         <QuizPreview
           quizData={quizData}
+          responseModel={quizData.responseModel}
           typography={quizData.typography}
           theme={quizData.theme}
           embedded={true}
@@ -274,7 +318,10 @@ function QuizEditor() {
         <div className="panel-scroll">
           <div className="panel-section">
             <QuestionsEditor
+              responseModel={quizData.responseModel}
               questions={quizData.questions}
+              attributeLabels={quizData.attributeLabels}
+              categories={quizData.categories}
               onUpdate={updateQuestions}
             />
           </div>
@@ -305,6 +352,7 @@ function QuizEditor() {
 
       <QuizPreview
         quizData={quizData}
+        responseModel={quizData.responseModel}
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         typography={quizData.typography}

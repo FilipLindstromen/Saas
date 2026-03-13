@@ -5,28 +5,40 @@ function ExportButton({ quizData }) {
   const [copied, setCopied] = useState(false)
 
   const generateCode = () => {
+    const responseModel = quizData.responseModel || 'percentage'
     const questionsCode = quizData.questions.map(q => {
-      const answersCode = q.answers.map(a => 
-        `          { label: ${JSON.stringify(a.label)}, tag: ${JSON.stringify(a.tag)} }`
-      ).join(',\n')
-      return `      {\n        q: ${JSON.stringify(q.q)},\n        answers: [\n${answersCode}\n        ]\n      }`
+      const answersCode = q.answers.map(a => {
+        const base = `id: ${a.id}, label: ${JSON.stringify(a.label)}, tag: ${JSON.stringify(a.tag || '')}`
+        const extra = []
+        if (responseModel === 'percentage') extra.push(`weight: ${a.weight != null ? a.weight : 1}`)
+        if (responseModel === 'category') extra.push(`category: ${JSON.stringify(a.category || a.tag || '')}`, `points: ${a.points != null ? a.points : 2}`)
+        if (responseModel === 'profile') extra.push(`attributes: ${JSON.stringify(a.attributes || {})}`)
+        return `          { ${[base, ...extra].join(', ')} }`
+      }).join(',\n')
+      const correctLine = responseModel === 'percentage' ? `\n        correctAnswerId: ${q.correctAnswerId ?? 'null'},` : ''
+      return `      {\n        id: ${q.id}, q: ${JSON.stringify(q.q)},${correctLine}\n        answers: [\n${answersCode}\n        ]\n      }`
     }).join(',\n')
 
-    const tagLabelsCode = Object.entries(quizData.tagLabels)
+    const tagLabelsCode = Object.entries(quizData.tagLabels || {})
       .map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`)
       .join(',\n')
 
-    const headlinesCode = Object.entries(quizData.headlines)
+    const headlinesCode = Object.entries(quizData.headlines || {})
       .map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`)
       .join(',\n')
 
-    const tagInsightsCode = Object.entries(quizData.tagInsights)
+    const tagInsightsCode = Object.entries(quizData.tagInsights || {})
       .map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`)
       .join(',\n')
 
-    const ctaCode = Object.entries(quizData.cta)
+    const ctaCode = Object.entries(quizData.cta || {})
       .map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`)
       .join(',\n')
+
+    const percentageTiersCode = JSON.stringify(quizData.percentageTiers || [])
+    const categoriesCode = JSON.stringify(quizData.categories || [])
+    const attributeLabelsCode = JSON.stringify(quizData.attributeLabels || [])
+    const profileConfigCode = JSON.stringify(quizData.profileConfig || {})
 
     return `<!-- ✅ GOOGLE FONTS -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -335,11 +347,17 @@ html, body {
 <script>
 (() => {
   const content = {
+    responseModel: ${JSON.stringify(responseModel)},
     quizTitle: ${JSON.stringify(quizData.quizTitle)},
     quizSubtitle: ${JSON.stringify(quizData.quizSubtitle)},
     questions: [
 ${questionsCode}
     ],
+    percentageTiers: ${percentageTiersCode},
+    categories: ${categoriesCode},
+    categoryHybridThreshold: ${quizData.categoryHybridThreshold ?? 2},
+    attributeLabels: ${attributeLabelsCode},
+    profileConfig: ${profileConfigCode},
     tagLabels: {
 ${tagLabelsCode}
     },
@@ -349,7 +367,7 @@ ${headlinesCode}
     tagInsights: {
 ${tagInsightsCode}
     },
-    summary: ${JSON.stringify(quizData.summary)},
+    summary: ${JSON.stringify(quizData.summary || '')},
     cta: {
 ${ctaCode}
     }
@@ -357,8 +375,7 @@ ${ctaCode}
 
   const questions = content.questions || [];
   let step = 0;
-  let selectedTags = [];
-  let worstTag = null;
+  let selections = [];
 
   const app = document.getElementById("quizApp");
 
@@ -375,10 +392,64 @@ ${ctaCode}
     \`;
     document.getElementById("startQuiz").onclick = () => {
       step = 0;
-      selectedTags = [];
-      worstTag = null;
+      selections = [];
       renderQuestion();
     };
+  }
+
+  function computeResult(model, data, sel){
+    const qs = data.questions || [];
+    const map = new Map(sel.map(s => [s.questionId, s.answerId]));
+    if (model === "percentage") {
+      let userScore = 0, maxScore = 0;
+      qs.forEach(q => {
+        const w = (q.answers || []).map(a => (a.weight != null ? a.weight : 1));
+        maxScore += w.reduce((s,x) => s+x, 0);
+        const sid = map.get(q.id);
+        if (q.correctAnswerId != null && sid === q.correctAnswerId) {
+          const i = (q.answers || []).findIndex(a => a.id === sid);
+          userScore += (i >= 0 && w[i] != null) ? w[i] : 1;
+        }
+      });
+      const pct = maxScore > 0 ? Math.round((userScore/maxScore)*100) : 0;
+      const tiers = (data.percentageTiers || []).sort((a,b) => (b.min||0) - (a.min||0));
+      let t = tiers.find(t => pct >= (t.min||0) && pct <= (t.max||100));
+      if (!t && tiers.length) t = pct <= (tiers[tiers.length-1].max||40) ? tiers[tiers.length-1] : tiers[0];
+      return { result_type: "percentage", score: userScore, maxScore, percentage: pct, level: t?.level || (pct<=40?"Beginner":pct<=75?"Intermediate":"Advanced"), title: t?.title || "Result", message: t?.message || "You scored " + pct + "%.", suggestion: t?.suggestion || "", next_step: t?.nextStep || "" };
+    }
+    if (model === "category") {
+      const scores = {};
+      qs.forEach(q => {
+        const sid = map.get(q.id);
+        const a = (q.answers || []).find(x => x.id === sid);
+        if (!a) return;
+        const c = a.category || a.tag || "default";
+        scores[c] = (scores[c]||0) + (a.points != null ? a.points : 2);
+      });
+      const ent = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+      const first = ent[0], second = ent[1];
+      const cfg = (id) => (data.categories || []).find(c => c.id === id) || {};
+      const th = data.categoryHybridThreshold ?? 2;
+      const hybrid = second && (first[1]-second[1]) <= th;
+      const primary = first?.[0] || "default", secondary = hybrid ? second?.[0] : null;
+      const c1 = cfg(primary), c2 = secondary ? cfg(secondary) : {};
+      return { result_type: "category", category: primary, category2: secondary, description: hybrid && secondary ? [c1.description,c2.description].filter(Boolean).join(" ") : (c1.description || "You align with " + primary), strengths: hybrid && secondary ? [...(c1.strengths||[]),...(c2.strengths||[])].slice(0,5) : (c1.strengths||[]), recommendation: c1.recommendation || "" };
+    }
+    if (model === "profile") {
+      const attrs = {};
+      (data.attributeLabels || []).forEach(a => { attrs[a.key] = 0; });
+      qs.forEach(q => {
+        const a = (q.answers || []).find(x => x.id === map.get(q.id));
+        if (!a || !a.attributes) return;
+        Object.entries(a.attributes).forEach(([k,v]) => { if (typeof v === "number" && attrs[k] !== undefined) attrs[k] += v; });
+      });
+      const ent = Object.entries(attrs).sort((a,b) => b[1]-a[1]);
+      const strong = ent[0]?.[0] || "", weak = ent[ent.length-1]?.[0] || "";
+      const label = (k) => (data.attributeLabels || []).find(a => a.key === k)?.label || k;
+      const pc = data.profileConfig || {};
+      return { result_type: "profile", strongest_trait: label(strong), weakest_trait: label(weak), summary: pc.summary || ("Strength: " + label(strong) + ". Grow: " + label(weak) + "."), recommendation: pc.recommendation || "" };
+    }
+    return { result_type: "unknown", message: "Unknown model." };
   }
 
   function renderQuestion(){
@@ -386,7 +457,7 @@ ${ctaCode}
     if(!q){ showResult(); return; }
 
     const answersHTML = q.answers.map(a =>
-      \`<div class="answer" data-tag="\${a.tag || ""}">\${a.label}</div>\`
+      \`<div class="answer" data-question-id="\${q.id}" data-answer-id="\${a.id}" data-tag="\${a.tag || ""}">\${a.label}</div>\`
     ).join("");
 
     app.innerHTML = \`
@@ -454,13 +525,9 @@ ${ctaCode}
   function goNext(){
     const active = document.querySelector(".answer.active");
     if(!active) return;
-    const tag = active.dataset.tag;
-    if(tag && !selectedTags.includes(tag)){
-      selectedTags.push(tag);
-    }
-    if(step === 2){
-      worstTag = tag;
-    }
+    const qid = Number(active.dataset.questionId);
+    const aid = Number(active.dataset.answerId);
+    if (!isNaN(qid) && !isNaN(aid)) selections.push({ questionId: qid, answerId: aid });
     step++;
     (step < questions.length) ? renderQuestion() : showResult();
   }
@@ -468,50 +535,24 @@ ${ctaCode}
   function showResult(){
     document.body.style.overflow = "auto";
     document.documentElement.style.overflow = "auto";
-    if (!selectedTags.length) selectedTags = ["default"];
-    const dominantTag = selectedTags[0];
-    const labels = content.tagLabels || {};
-    const headlines = content.headlines || {};
-    const insights = content.tagInsights || {};
+    const result = computeResult(content.responseModel || "percentage", content, selections);
     const ctas = content.cta || {};
-    const headline = headlines[dominantTag] || headlines.default;
-    const cta = ctas[dominantTag] || ctas.default;
-    const worstLabel = labels[worstTag] || labels.default;
-    const mindTags = new Set(["racingMind","thinking","lossOfControl","random","social","nighttime"]);
-    const bodyTags = new Set(["body","cortisol","pressure","avoidance","presence"]);
-    let mindText = "";
-    let bodyText = "";
-    let extraText = "";
-    selectedTags.forEach(tag => {
-      const block = insights[tag];
-      if (!block) return;
-      if (mindTags.has(tag)) mindText += (mindText ? "\\n\\n" : "") + block;
-      else if (bodyTags.has(tag)) bodyText += (bodyText ? "\\n\\n" : "") + block;
-      else extraText += (extraText ? "\\n\\n" : "") + block;
-    });
-    const feelsText = \`For you, anxiety hits hardest as **\${worstLabel}**.\\n\\nThat's the part your system turns up the loudest when it feels overwhelmed — which is why it can feel so intense, so fast, and so hard to switch off.\\n\`.trim();
-    let nextStepsText = feelsText;
-    if (mindText) nextStepsText += \`\\n\\n\${mindText}\`;
-    if (bodyText) nextStepsText += \`\\n\\n\${bodyText}\`;
-    if (extraText) nextStepsText += \`\\n\\n\${extraText}\`;
-    nextStepsText += \`\\n\\n\${content.summary}\`;
-    app.innerHTML = \`
-<div class="quiz-scale result-noscale result-screen">
-  <div class="result-container">
-    <div class="result-close">×</div>
-    <div class="result-title">\${headline}</div>
-    <div class="result-subtitle">Here's what your answers reveal.</div>
-    <div class="result-card">
-      <h3>Your Pattern</h3>
-      <div class="result-body">\${feelsText}</div>
-    </div>
-    <div class="result-card">
-      <h3>Next Steps</h3>
-      <div class="result-body">\${nextStepsText}</div>
-    </div>
-    <button class="result-cta">\${cta}</button>
-  </div>
-</div>\`;
+    const cta = ctas.default || "Continue";
+    let html = '<div class="quiz-scale result-noscale result-screen"><div class="result-container"><div class="result-close">×</div>';
+    if (result.result_type === "percentage") {
+      html += \`<div class="result-title">\${result.title}</div><div class="result-subtitle">Score: \${result.percentage}% (\${result.score}/\${result.maxScore})</div><div class="result-card"><h3>\${result.level}</h3><div class="result-body">\${result.message}</div></div><div class="result-card"><h3>Suggestion</h3><div class="result-body">\${result.suggestion}</div></div>\`;
+      if (result.next_step) html += \`<div class="result-card"><h3>Next step</h3><div class="result-body">\${result.next_step}</div></div>\`;
+    } else if (result.result_type === "category") {
+      html += \`<div class="result-title">\${result.category}\${result.category2 ? " / " + result.category2 : ""}</div><div class="result-subtitle">Your profile</div><div class="result-card"><h3>Description</h3><div class="result-body">\${result.description}</div></div>\`;
+      if (result.strengths && result.strengths.length) html += \`<div class="result-card"><h3>Strengths</h3><div class="result-body">\${result.strengths.join(", ")}</div></div>\`;
+      html += \`<div class="result-card"><h3>Recommendation</h3><div class="result-body">\${result.recommendation}</div></div>\`;
+    } else if (result.result_type === "profile") {
+      html += \`<div class="result-title">Your insight profile</div><div class="result-subtitle">Based on your answers</div><div class="result-card"><h3>Strongest trait</h3><div class="result-body">\${result.strongest_trait}</div></div><div class="result-card"><h3>Weakest trait</h3><div class="result-body">\${result.weakest_trait}</div></div><div class="result-card"><h3>Summary</h3><div class="result-body">\${result.summary}</div></div><div class="result-card"><h3>Recommendation</h3><div class="result-body">\${result.recommendation}</div></div>\`;
+    } else {
+      html += \`<div class="result-body">\${result.message}</div>\`;
+    }
+    html += \`<button class="result-cta">\${cta}</button></div></div>\`;
+    app.innerHTML = html;
   }
 
   showTitle();

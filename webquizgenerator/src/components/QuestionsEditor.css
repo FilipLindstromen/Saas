@@ -118,8 +118,34 @@
 }
 
 .tag-input {
-  flex: 0 0 200px;
+  flex: 0 0 140px;
   font-size: 0.9rem;
+}
+
+.weight-input,
+.points-input {
+  flex: 0 0 60px;
+  font-size: 0.9rem;
+}
+
+.answer-attributes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.attr-input {
+  width: 56px;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+}
+
+.btn-icon.small {
+  width: 24px;
+  height: 24px;
+  font-size: 1rem;
 }
 
 .btn-icon {
