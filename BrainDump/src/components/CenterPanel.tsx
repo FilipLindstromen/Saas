@@ -6,7 +6,6 @@ import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
-const ORGANIZE_PREFS_KEY = "braindump-organize-prefs";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
 
 type RecordState = "idle" | "recording";
@@ -51,9 +50,6 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-type OrganizeMode = "review" | "automatic";
-type SessionFocus = "all" | "work" | "personal";
-
 interface CenterPanelProps {
   mode: string;
   onTranscriptReady: (text: string) => void;
@@ -69,28 +65,6 @@ interface CenterPanelProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
-}
-
-function loadOrganizePrefs(): { organizeMode: OrganizeMode; sessionFocus: SessionFocus } {
-  if (typeof window === "undefined") return { organizeMode: "review", sessionFocus: "all" };
-  try {
-    const raw = localStorage.getItem(ORGANIZE_PREFS_KEY);
-    if (!raw) return { organizeMode: "review", sessionFocus: "all" };
-    const p = JSON.parse(raw);
-    return {
-      organizeMode: p.organizeMode === "automatic" ? "automatic" : "review",
-      sessionFocus: p.sessionFocus === "work" || p.sessionFocus === "personal" ? p.sessionFocus : "all",
-    };
-  } catch {
-    return { organizeMode: "review", sessionFocus: "all" };
-  }
-}
-
-function saveOrganizePrefs(prefs: { organizeMode: OrganizeMode; sessionFocus: SessionFocus }) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(ORGANIZE_PREFS_KEY, JSON.stringify(prefs));
-  } catch {}
 }
 
 export function CenterPanel({
@@ -109,7 +83,6 @@ export function CenterPanel({
   onViewTypeChange,
   searchFilter = "",
 }: CenterPanelProps) {
-  const prefs = loadOrganizePrefs();
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [transcript, setTranscript] = useState("");
   const [transcribeLoading, setTranscribeLoading] = useState(false);
@@ -118,11 +91,10 @@ export function CenterPanel({
   const [audioDevices, setAudioDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [recordingElapsed, setRecordingElapsed] = useState("0:00");
-  const [organizeMode, setOrganizeMode] = useState<OrganizeMode>(prefs.organizeMode);
-  const [sessionFocus, setSessionFocus] = useState<SessionFocus>(prefs.sessionFocus);
   const [organizeSuccess, setOrganizeSuccess] = useState<string | null>(null);
   const [unclearItems, setUnclearItems] = useState<{ items: OrganizedItemPreview[]; allItems: OrganizedItemPreview[]; transcript: string } | null>(null);
   const [showDumpOverlay, setShowDumpOverlay] = useState(false);
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false);
   const [audioReadyTick, setAudioReadyTick] = useState(0);
   const [itemsReloadKey, setItemsReloadKey] = useState(0);
   const notifyAudioReadyRef = useRef(() => setAudioReadyTick((t) => t + 1));
@@ -166,10 +138,6 @@ export function CenterPanel({
   useEffect(() => {
     if (showDumpOverlay) loadDevices(true);
   }, [showDumpOverlay, loadDevices]);
-
-  useEffect(() => {
-    saveOrganizePrefs({ organizeMode, sessionFocus });
-  }, [organizeMode, sessionFocus]);
 
   useEffect(() => {
     if (recordState !== "recording") return;
@@ -403,7 +371,7 @@ export function CenterPanel({
   const applyOrganizeResult = useCallback(
     (items: OrganizedItemPreview[], text: string) => {
       const n = items.length;
-      if (organizeMode === "automatic" && onAutoSave) {
+      if (onAutoSave) {
         onAutoSave(items, text);
         setOrganizeSuccess(n ? `Organized and saved ${n} item${n !== 1 ? "s" : ""}.` : null);
       } else {
@@ -412,7 +380,7 @@ export function CenterPanel({
       }
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [organizeMode, onAutoSave, onOrganized]
+    [onAutoSave, onOrganized]
   );
 
   const organize = useCallback(async (transcriptOverride?: string) => {
@@ -426,7 +394,6 @@ export function CenterPanel({
     setUnclearItems(null);
     try {
       const key = getStoredOpenAIKey();
-      const defaultDomain = sessionFocus === "all" ? undefined : sessionFocus;
       let customCategories: string[] | undefined;
       try {
         const raw = localStorage.getItem("braindump_custom_areas");
@@ -442,7 +409,6 @@ export function CenterPanel({
           transcript: text,
           ...(key ? { apiKey: key } : {}),
           projectNames: projectNames.length > 0 ? projectNames : undefined,
-          defaultDomain,
           ...(customCategories?.length ? { customCategories } : {}),
         }),
       });
@@ -466,7 +432,7 @@ export function CenterPanel({
     } finally {
       setOrganizeLoading(false);
     }
-  }, [transcript, sessionFocus, projectNames, onOrganized, onOpenSettings, organizeMode, onAutoSave, applyOrganizeResult]);
+  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();
@@ -496,8 +462,6 @@ export function CenterPanel({
 
   const hasAudio = typeof window !== "undefined" && !!(window as unknown as { __lastAudioBlob?: Blob }).__lastAudioBlob;
   const canTranscribe = hasAudio && !transcribeLoading;
-  const canOrganize = transcript.trim().length > 0 && !organizeLoading;
-
   const playbackUrlRef = useRef<string | null>(null);
   const playLatestRecording = useCallback(() => {
     const win = window as unknown as { __lastAudioBlob?: Blob };
@@ -535,6 +499,18 @@ export function CenterPanel({
   }, []);
 
   const isInbox = mode === "inbox";
+  const reflectionQuestions = [
+    "How are you feeling right now?",
+    "What is the most important thing you need to do next?",
+    "Is there anything you have been avoiding?",
+    "What unfinished task is taking up mental space?",
+    "What would make today feel successful?",
+    "Is there a small step you can take in the next 10 minutes?",
+    "What can you delegate, defer, or delete?",
+    "Is there anything you need to communicate to someone?",
+    "What are you grateful for in this moment?",
+    "What do you want to remember from this brain dump?",
+  ] as const;
 
   const dumpPanelContent = (
     <>
@@ -637,43 +613,6 @@ export function CenterPanel({
           aria-label="Transcript"
         />
       </section>
-      <section>
-        <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-          Organize options
-        </h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.75rem" }}>
-          <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Mode</label>
-            <select
-              className="bd-input"
-              value={organizeMode}
-              onChange={(e) => setOrganizeMode(e.target.value as OrganizeMode)}
-              style={{ width: "auto", minWidth: "8rem" }}
-            >
-              <option value="review">Review each</option>
-              <option value="automatic">Automatic</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Session focus</label>
-            <select
-              className="bd-input"
-              value={sessionFocus}
-              onChange={(e) => setSessionFocus(e.target.value as SessionFocus)}
-              style={{ width: "auto", minWidth: "8rem" }}
-            >
-              <option value="all">All</option>
-              <option value="work">Work</option>
-              <option value="personal">Personal</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button type="button" className="bd-btn bd-btn-primary" onClick={() => organize()} disabled={!canOrganize} style={{ minHeight: "44px" }}>
-            {organizeLoading ? "Organizing…" : "Organize"}
-          </button>
-        </div>
-      </section>
       {organizeSuccess && (
         <div style={{ padding: "0.5rem 0.75rem", background: "rgba(34,197,94,0.12)", borderRadius: "var(--button-radius)", color: "var(--text-primary)", fontSize: "0.875rem" }}>
           {organizeSuccess}
@@ -769,36 +708,104 @@ export function CenterPanel({
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
                   <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>New dump</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDumpOverlay(false);
-                      if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-                    }}
-                    aria-label="Close"
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "var(--button-radius)",
-                      border: "1px solid var(--border-default)",
-                      background: "var(--bg-tertiary)",
-                      color: "var(--text-secondary)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDumpOverlay(false);
+                        if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+                      }}
+                      aria-label="Close"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "var(--button-radius)",
+                        border: "1px solid var(--border-default)",
+                        background: "var(--bg-tertiary)",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setShowHelpOverlay(true)}
+                      style={{ minHeight: "36px", paddingInline: "0.75rem" }}
+                    >
+                      Help
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {dumpPanelContent}
                 </div>
               </div>
             </div>
+      )}
+      {showDumpOverlay && showHelpOverlay && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={() => setShowHelpOverlay(false)}
+        >
+          <div
+            className="bd-panel"
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "min(85vh, 85dvh)",
+              overflow: "auto",
+              padding: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>Reflection help</h3>
+              <button
+                type="button"
+                className="bd-btn"
+                onClick={() => setShowHelpOverlay(false)}
+                aria-label="Close help"
+                style={{ minHeight: "36px", paddingInline: "0.75rem" }}
+              >
+                Close
+              </button>
+            </div>
+            <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+              Use these prompts to get a clearer brain dump before organizing.
+            </p>
+            <ol style={{ margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem", color: "var(--text-primary)" }}>
+              {reflectionQuestions.map((q) => (
+                <li key={q} style={{ fontSize: "0.9375rem", lineHeight: 1.5 }}>
+                  {q}
+                </li>
+              ))}
+            </ol>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="bd-btn bd-btn-primary" onClick={() => setShowHelpOverlay(false)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {!isInbox && (
         <ItemsViewArea
