@@ -2454,7 +2454,7 @@ function KanbanView({
             minWidth: 160,
             minHeight: 120,
             background: dragOverColumn === col.key ? "var(--bg-hover)" : "var(--bg-secondary)",
-            borderRadius: "var(--button-radius)",
+            borderRadius: "16px",
             padding: "0.75rem",
             display: "flex",
             flexDirection: "column",
@@ -2480,7 +2480,7 @@ function KanbanView({
                 padding: "0.5rem 0.75rem",
                 background: "var(--bg-tertiary)",
                 border: "1px solid var(--border-default)",
-                borderRadius: "var(--button-radius)",
+                borderRadius: "12px",
                 cursor: "grab",
                 opacity: draggedId === it.id ? 0.6 : 1,
               }}
