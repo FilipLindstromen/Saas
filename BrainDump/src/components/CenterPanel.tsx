@@ -67,6 +67,12 @@ interface CenterPanelProps {
   searchFilter?: string;
 }
 
+function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
+  if (mode === "work") return "work";
+  if (mode === "personal") return "personal";
+  return undefined;
+}
+
 export function CenterPanel({
   mode,
   onTranscriptReady,
@@ -394,6 +400,7 @@ export function CenterPanel({
     setUnclearItems(null);
     try {
       const key = getStoredOpenAIKey();
+      const defaultDomain = getDefaultDomainFromMode(mode);
       let customCategories: string[] | undefined;
       try {
         const raw = localStorage.getItem("braindump_custom_areas");
@@ -409,6 +416,7 @@ export function CenterPanel({
           transcript: text,
           ...(key ? { apiKey: key } : {}),
           projectNames: projectNames.length > 0 ? projectNames : undefined,
+          ...(defaultDomain ? { defaultDomain } : {}),
           ...(customCategories?.length ? { customCategories } : {}),
         }),
       });
@@ -432,7 +440,7 @@ export function CenterPanel({
     } finally {
       setOrganizeLoading(false);
     }
-  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult]);
+  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();

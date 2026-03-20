@@ -60,6 +60,7 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
 export function SavedItemsList({ mode, projectId, category, itemType }: SavedItemsListProps) {
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   const fetchItems = useCallback(() => {
     const params = new URLSearchParams();
@@ -170,7 +171,16 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
     reminderMinutesBefore: number;
   } | null>(null);
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setIsMobile(window.matchMedia("(max-width: 768px)").matches);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
     if (!itemContextMenu) return;
+    if (isMobile) return;
     const close = () => setItemContextMenu(null);
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
@@ -178,7 +188,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
       window.removeEventListener("click", close);
       window.removeEventListener("scroll", close, true);
     };
-  }, [itemContextMenu]);
+  }, [itemContextMenu, isMobile]);
 
   if (loading) {
     return (
@@ -255,6 +265,18 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   </select>
                 </div>
               )}
+              <button
+                type="button"
+                className="bd-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setItemContextMenu({ id: it.id, x: e.clientX, y: e.clientY, domain: it.domain, currentType: it.itemType });
+                }}
+                aria-label="More actions"
+                style={{ minWidth: 32, padding: "0.2rem 0.45rem", lineHeight: 1 }}
+              >
+                ⋮
+              </button>
             </div>
           </div>
         ))}
@@ -262,19 +284,34 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
 
       {itemContextMenu && (() => {
         const types = ENTRY_TYPES_BY_DOMAIN[itemContextMenu.domain] ?? ENTRY_TYPES_BY_DOMAIN.inbox;
+        const closeMenu = () => setItemContextMenu(null);
         return (
           <div
-            style={{
+            style={isMobile ? {
               position: "fixed",
-              left: itemContextMenu.x,
-              top: itemContextMenu.y,
+              inset: 0,
+              zIndex: 1100,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: "0.75rem",
+            } : undefined}
+            onClick={isMobile ? closeMenu : undefined}
+          >
+          <div
+            style={{
+              position: isMobile ? "relative" : "fixed",
+              left: isMobile ? undefined : itemContextMenu.x,
+              top: isMobile ? undefined : itemContextMenu.y,
               zIndex: 1000,
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
-              borderRadius: "var(--button-radius)",
+              borderRadius: isMobile ? "16px" : "var(--button-radius)",
               boxShadow: "var(--shadow-md)",
               padding: "0.25rem 0",
               minWidth: "140px",
+              width: isMobile ? "min(100%, 420px)" : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -293,7 +330,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 }}
                 onClick={() => {
                   updateItemType(itemContextMenu.id, value);
-                  setItemContextMenu(null);
+                  closeMenu();
                 }}
               >
                 {label}
@@ -307,7 +344,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
               onClick={() => {
                 const it = items.find((i) => i.id === itemContextMenu.id);
                 if (it) setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" });
-                setItemContextMenu(null);
+                closeMenu();
               }}
             >
               Edit
@@ -330,7 +367,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                     reminderMinutesBefore: it.reminderMinutesBefore ?? 0,
                   });
                 }
-                setItemContextMenu(null);
+                closeMenu();
               }}
             >
               Set reminder
@@ -342,12 +379,18 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
                 onClick={() => {
                   deleteItem(itemContextMenu.id, true);
-                  setItemContextMenu(null);
+                  closeMenu();
                 }}
               >
                 Delete
               </button>
             </div>
+            {isMobile && (
+              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                Cancel
+              </button>
+            )}
+          </div>
           </div>
         );
       })()}

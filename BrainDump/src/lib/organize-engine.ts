@@ -40,6 +40,7 @@ Rules:
 4. domain is critical — separate personal from work:
    - personal: Hobby projects, creative pursuits the user does for themselves ("personal thing", "not work-related"), how they feel (tired, body feelings, emotional state), reflections about life or wellbeing, personal goals, health, relationships, shopping. If the user says something is a "personal" thing or a "hobby project", it is always personal.
    - work: Work projects, work tasks, professional courses, business/marketing tasks, deliverables for a job or business. If a project name is clearly work (e.g. LumiRush as a product/tool), tasks for that project are work. "Set up a sales page" or "create one video each day for marketing" are work when tied to a work project.
+   - If a task does not mention a specific work project and has no clear work context, classify it as personal (e.g. home errands like changing windshield wipers).
 5. item_type is critical:
    - Use "task" ONLY when the user explicitly says something is a task, todo, or something to do (e.g. "add a to-do", "I need to...", "todo: ..."). Do NOT use "task" for general notes or ideas.
    - Use "idea" for ideas, concepts, "I want to..." creative/hobby ideas, method explanations. A hobby project the user "wants to start" (e.g. paint abstract paintings once a week) is an idea under personal.
@@ -145,18 +146,41 @@ export async function organizeTranscript(
     return category ?? "";
   }
 
+  function shouldTreatAsWorkTask(item: OrganizedItemInput): boolean {
+    const text = `${item.title ?? ""} ${item.content ?? ""}`.toLowerCase();
+    const hasWorkKeyword = /\b(work|job|office|client|meeting|sprint|deadline|ticket|deploy|repo|code|marketing|sales|campaign|boss|team|company|business)\b/.test(text);
+    const mentionsKnownProject = (options.projectNames ?? []).some((p) => text.includes(p.toLowerCase()));
+    return hasWorkKeyword || mentionsKnownProject;
+  }
+
   try {
     const parsed = JSON.parse(text) as { items?: OrganizedItemInput[] };
     const items = Array.isArray(parsed.items) ? parsed.items : [];
     return items.map((item) => {
-      const domain = item.domain ?? "inbox";
+      let domain = item.domain ?? "inbox";
       const rawType = item.item_type ?? "note";
       const item_type = normalizeItemType(domain, rawType) as ItemType;
+      const hasProjectName = typeof item.project_name === "string" && item.project_name.trim().length > 0;
+      // Guardrail: ambiguous non-project tasks should default to personal unless clearly work.
+      if (
+        domain === "work" &&
+        item_type === "task" &&
+        !hasProjectName &&
+        options.defaultDomain !== "work" &&
+        !shouldTreatAsWorkTask(item)
+      ) {
+        domain = "personal";
+      }
       const category = normalizeCategory(domain, item.category ?? "");
+      const normalizedCategory =
+        domain === "personal" && item_type === "task" && (!category || category === "projects")
+          ? "tasks"
+          : category;
       return {
         ...item,
+        domain,
         item_type,
-        category,
+        category: normalizedCategory,
         subcategory: item.subcategory ?? "",
         confidence_score: typeof item.confidence_score === "number" ? item.confidence_score : 0.8,
         recommended_view: item.recommended_view ?? "note_cards",

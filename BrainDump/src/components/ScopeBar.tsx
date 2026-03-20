@@ -53,30 +53,45 @@ function ScopeChip({
   selected,
   onClick,
   onContextMenu,
+  onMore,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  onMore?: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      className="bd-btn"
-      style={{
-        padding: "0.4rem 0.75rem",
-        fontSize: "0.8125rem",
-        borderRadius: "var(--button-radius)",
-        whiteSpace: "nowrap",
-        background: selected ? "var(--accent)" : "var(--bg-elevated)",
-        borderColor: selected ? "var(--accent)" : "var(--border-default)",
-        color: selected ? "#fff" : "var(--text-primary)",
-      }}
-    >
-      {label}
-    </button>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+      <button
+        type="button"
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+        className="bd-btn"
+        style={{
+          padding: "0.4rem 0.75rem",
+          fontSize: "0.8125rem",
+          borderRadius: "var(--button-radius)",
+          whiteSpace: "nowrap",
+          background: selected ? "var(--accent)" : "var(--bg-elevated)",
+          borderColor: selected ? "var(--accent)" : "var(--border-default)",
+          color: selected ? "#fff" : "var(--text-primary)",
+        }}
+      >
+        {label}
+      </button>
+      {onMore && (
+        <button
+          type="button"
+          className="bd-btn"
+          onClick={onMore}
+          aria-label={`More actions for ${label}`}
+          style={{ minWidth: 32, padding: "0.4rem 0.45rem", fontSize: "0.9rem", lineHeight: 1 }}
+        >
+          ⋮
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -121,7 +136,16 @@ export function ScopeBar({
   const [areaContextMenu, setAreaContextMenu] = useState<{ value: string; x: number; y: number; isCustom: boolean } | null>(null);
   const [showAddProject, setShowAddProject] = useState(false);
   const [addProjectName, setAddProjectName] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setIsMobile(window.matchMedia("(max-width: 768px)").matches);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const loadProjects = useCallback(() => {
     if (mode !== "work") return;
@@ -174,6 +198,7 @@ export function ScopeBar({
 
   useEffect(() => {
     if (!contextMenu) return;
+    if (isMobile) return;
     const close = () => setContextMenu(null);
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
@@ -181,7 +206,7 @@ export function ScopeBar({
       window.removeEventListener("click", close);
       window.removeEventListener("scroll", close, true);
     };
-  }, [contextMenu]);
+  }, [contextMenu, isMobile]);
 
   useEffect(() => {
     if (!areaContextMenu) return;
@@ -247,6 +272,7 @@ export function ScopeBar({
                     e.preventDefault();
                     setContextMenu({ x: e.clientX, y: e.clientY, project: p });
                   }}
+                  onMore={isMobile ? () => setContextMenu({ x: window.innerWidth / 2, y: window.innerHeight, project: p }) : undefined}
                 />
               ))}
             {showAddProject ? (
@@ -346,18 +372,32 @@ export function ScopeBar({
 
         {contextMenu && (
           <div
+            style={isMobile ? {
+              position: "fixed",
+              inset: 0,
+              zIndex: 1090,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: "0.75rem",
+            } : undefined}
+            onClick={isMobile ? () => setContextMenu(null) : undefined}
+          >
+          <div
             ref={menuRef}
             style={{
-              position: "fixed",
-              left: contextMenu.x,
-              top: contextMenu.y,
+              position: isMobile ? "relative" : "fixed",
+              left: isMobile ? undefined : contextMenu.x,
+              top: isMobile ? undefined : contextMenu.y,
               zIndex: 1000,
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
-              borderRadius: "var(--button-radius)",
+              borderRadius: isMobile ? "16px" : "var(--button-radius)",
               boxShadow: "var(--shadow-md)",
               padding: "0.25rem 0",
               minWidth: "120px",
+              width: isMobile ? "min(100%, 420px)" : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -381,6 +421,12 @@ export function ScopeBar({
             >
               Delete project
             </button>
+            {isMobile && (
+              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setContextMenu(null)}>
+                Cancel
+              </button>
+            )}
+          </div>
           </div>
         )}
 
@@ -556,6 +602,17 @@ export function ScopeBar({
                     isCustom: customAreas.includes(value),
                   });
                 }}
+                onMore={
+                  isMobile && customAreas.includes(value)
+                    ? () =>
+                        setAreaContextMenu({
+                          value,
+                          x: window.innerWidth / 2,
+                          y: window.innerHeight,
+                          isCustom: true,
+                        })
+                    : undefined
+                }
               />
             ))}
             {showAddArea ? (
@@ -648,17 +705,31 @@ export function ScopeBar({
         </div>
         {areaContextMenu?.isCustom && (
           <div
-            style={{
+            style={isMobile ? {
               position: "fixed",
-              left: areaContextMenu.x,
-              top: areaContextMenu.y,
+              inset: 0,
+              zIndex: 1090,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: "0.75rem",
+            } : undefined}
+            onClick={isMobile ? () => setAreaContextMenu(null) : undefined}
+          >
+          <div
+            style={{
+              position: isMobile ? "relative" : "fixed",
+              left: isMobile ? undefined : areaContextMenu.x,
+              top: isMobile ? undefined : areaContextMenu.y,
               zIndex: 1000,
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
-              borderRadius: "var(--button-radius)",
+              borderRadius: isMobile ? "16px" : "var(--button-radius)",
               boxShadow: "var(--shadow-md)",
               padding: "0.25rem 0",
               minWidth: "120px",
+              width: isMobile ? "min(100%, 420px)" : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -676,6 +747,12 @@ export function ScopeBar({
             >
               Remove area
             </button>
+            {isMobile && (
+              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setAreaContextMenu(null)}>
+                Cancel
+              </button>
+            )}
+          </div>
           </div>
         )}
       </>

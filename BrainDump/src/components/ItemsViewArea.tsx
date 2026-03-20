@@ -271,6 +271,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     reminderMinutesBefore: number;
   } | null>(null);
   const [addEntryOpen, setAddEntryOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [addEntryForm, setAddEntryForm] = useState({
     itemType: "note",
     title: "",
@@ -295,6 +296,14 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   }), []);
   const [lineToolActive, setLineToolActive] = useState(false);
   const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => setIsMobile(window.matchMedia("(max-width: 768px)").matches);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const FETCH_TIMEOUT_MS = 15000;
 
@@ -438,6 +447,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   useEffect(() => {
     if (!itemContextMenu) return;
+    if (isMobile) return;
     const close = () => {
       setItemContextMenu(null);
       setMoveToProjectForId(null);
@@ -449,7 +459,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       window.removeEventListener("click", close);
       window.removeEventListener("scroll", close, true);
     };
-  }, [itemContextMenu]);
+  }, [itemContextMenu, isMobile]);
 
   const updateProgress = useCallback((id: string, progress: string, kanbanColumn?: string) => {
     const col = kanbanColumn ?? progress;
@@ -903,24 +913,47 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
       {itemContextMenu && (() => {
         const types = ENTRY_TYPES_BY_DOMAIN[itemContextMenu.domain] ?? ENTRY_TYPES_BY_DOMAIN.work;
+        const selectedItem = items.find((i) => i.id === itemContextMenu.id);
+        const personalAreas = getPersonalAreasList(items);
+        const closeMenu = () => {
+          setItemContextMenu(null);
+          setMoveToProjectForId(null);
+          setMoveToAreaForId(null);
+        };
         return (
           <div
-            style={{
+            style={isMobile ? {
               position: "fixed",
-              left: itemContextMenu.x,
-              top: itemContextMenu.y,
+              inset: 0,
+              zIndex: 1100,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: "0.75rem",
+            } : undefined}
+            onClick={isMobile ? closeMenu : undefined}
+          >
+          <div
+            style={{
+              position: isMobile ? "relative" : "fixed",
+              left: isMobile ? undefined : itemContextMenu.x,
+              top: isMobile ? undefined : itemContextMenu.y,
               zIndex: 1000,
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
-              borderRadius: "var(--button-radius)",
+              borderRadius: isMobile ? "16px" : "var(--button-radius)",
               boxShadow: "var(--shadow-md)",
               padding: "0.25rem 0",
               minWidth: "140px",
+              width: isMobile ? "min(100%, 560px)" : undefined,
+              maxHeight: isMobile ? "80dvh" : undefined,
+              overflow: "auto",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-              Change type
+              {isMobile ? "Actions" : "Change type"}
             </div>
             {types.map(({ value, label }) => (
               <button
@@ -934,7 +967,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 }}
                 onClick={() => {
                   updateItemType(itemContextMenu.id, value);
-                  setItemContextMenu(null);
+                  closeMenu();
                 }}
               >
                 {label}
@@ -948,7 +981,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               onClick={() => {
                 const it = items.find((i) => i.id === itemContextMenu.id);
                 if (it) setEditingEntry(toEditEntry(it));
-                setItemContextMenu(null);
+                closeMenu();
               }}
             >
               Edit
@@ -971,7 +1004,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     reminderMinutesBefore: it.reminderMinutesBefore ?? 0,
                   });
                 }
-                setItemContextMenu(null);
+                closeMenu();
               }}
             >
               Set reminder
@@ -981,7 +1014,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 type="button"
                 className="bd-btn"
                 style={{ width: "100%", justifyContent: "flex-start" }}
-                onClick={() => setMoveToProjectForId(itemContextMenu.id)}
+                onClick={() => setMoveToProjectForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
               >
                 Move to project
               </button>
@@ -991,12 +1024,12 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 type="button"
                 className="bd-btn"
                 style={{ width: "100%", justifyContent: "flex-start" }}
-                onClick={() => setMoveToAreaForId(itemContextMenu.id)}
+                onClick={() => setMoveToAreaForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
               >
                 Move to area
               </button>
             )}
-            {mode === "work" && moveToProjectForId === itemContextMenu.id && (
+            {mode === "work" && moveToProjectForId === itemContextMenu.id && !isMobile && (
               <div
                 style={{
                   position: "fixed",
@@ -1056,7 +1089,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 })()}
               </div>
             )}
-            {itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && (() => {
+            {itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && !isMobile && (() => {
               const areas = getPersonalAreasList(items);
               const it = items.find((i) => i.id === itemContextMenu.id);
               const currentCategory = it?.category ?? "";
@@ -1100,6 +1133,62 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 </div>
               );
             })()}
+            {isMobile && mode === "work" && moveToProjectForId === itemContextMenu.id && (
+              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
+                  Select project
+                </div>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.project?.id == null ? 600 : 400 }}
+                  onClick={() => {
+                    updateProject(itemContextMenu.id, null);
+                    closeMenu();
+                  }}
+                >
+                  No project
+                  {selectedItem?.project?.id == null ? " ✓" : ""}
+                </button>
+                {projectsList.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.project?.id === p.id ? 600 : 400 }}
+                    onClick={() => {
+                      updateProject(itemContextMenu.id, p.id);
+                      closeMenu();
+                    }}
+                  >
+                    {p.name}
+                    {selectedItem?.project?.id === p.id ? " ✓" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
+            {isMobile && itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && (
+              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
+                  Select area
+                </div>
+                {personalAreas.map((areaKey) => (
+                  <button
+                    key={areaKey}
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.category === areaKey ? 600 : 400 }}
+                    onClick={() => {
+                      updateCategory(itemContextMenu.id, areaKey);
+                      closeMenu();
+                    }}
+                  >
+                    {formatAreaLabel(areaKey)}
+                    {selectedItem?.category === areaKey ? " ✓" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
             <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
               <button
                 type="button"
@@ -1107,12 +1196,20 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
                 onClick={() => {
                   deleteItem(itemContextMenu.id, true);
-                  setItemContextMenu(null);
+                  closeMenu();
                 }}
               >
                 Delete
               </button>
             </div>
+            {isMobile && (
+              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
           </div>
         );
       })()}
@@ -2045,7 +2142,7 @@ function ListView({
           minHeight: 72,
           minWidth: 0,
           border: "1px solid var(--border-default)",
-          borderRadius: "var(--button-radius)",
+          borderRadius: "20px",
           background: "var(--bg-elevated)",
           cursor: onEdit ? "pointer" : undefined,
           boxShadow: "var(--shadow-sm)",
