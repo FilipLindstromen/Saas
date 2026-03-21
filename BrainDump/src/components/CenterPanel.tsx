@@ -651,7 +651,7 @@ export function CenterPanel({
   );
 
   return (
-    <div className="bd-center-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div className="bd-center-panel">
       {isInbox && !showDumpOverlay && (
         <p style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", margin: 0 }}>
           {t("center.dumpPromptInbox")}

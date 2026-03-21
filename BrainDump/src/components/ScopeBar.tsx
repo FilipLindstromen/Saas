@@ -254,8 +254,8 @@ export function ScopeBar({
             display: "flex",
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
-            gap: isMobile ? "0.65rem" : "0.5rem",
-            padding: isMobile ? "0.15rem 0" : "0.2rem 0",
+            gap: isMobile ? "0.75rem" : "1rem",
+            padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
             overflowX: isMobile ? "visible" : "auto",
           }}
@@ -271,7 +271,7 @@ export function ScopeBar({
               width: "100%",
             }}
           >
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
+          <span className="bd-scope-label">
             {t("scope.project")}
           </span>
           <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
@@ -356,7 +356,7 @@ export function ScopeBar({
                 width: isMobile ? "100%" : undefined,
               }}
             >
-              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>{t("scope.filter")}</span>
+              <span className="bd-scope-label">{t("scope.filter")}</span>
               <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
                 <input
                   type="search"
@@ -601,8 +601,8 @@ export function ScopeBar({
             display: "flex",
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
-            gap: isMobile ? "0.65rem" : "0.5rem",
-            padding: isMobile ? "0.15rem 0" : "0.2rem 0",
+            gap: isMobile ? "0.75rem" : "1rem",
+            padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
             overflowX: isMobile ? "visible" : "auto",
           }}
@@ -619,9 +619,9 @@ export function ScopeBar({
             }}
           >
             {isMobile ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                  <span className="bd-scope-label">
                     {t("scope.area")}
                   </span>
                   <button
@@ -705,7 +705,7 @@ export function ScopeBar({
               </div>
             ) : (
               <>
-                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                <span className="bd-scope-label">
                   {t("scope.area")}
                 </span>
                 <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
@@ -801,7 +801,7 @@ export function ScopeBar({
               width: isMobile ? "100%" : undefined,
             }}
           >
-            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>{t("scope.filter")}</span>
+            <span className="bd-scope-label">{t("scope.filter")}</span>
             <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
               <input
                 type="search"

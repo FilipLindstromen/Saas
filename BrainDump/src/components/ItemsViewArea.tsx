@@ -696,47 +696,15 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   }
 
   return (
-    <div
-      className="bd-items-view-root"
-      style={{
-        padding: isMobile ? "0.65rem" : "1rem",
-        display: "flex",
-        flexDirection: "column",
-        gap: isMobile ? "0.65rem" : "1rem",
-        minHeight: 0,
-        flex: 1,
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        boxSizing: "border-box",
-        overflowX: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: isMobile ? "column" : "row",
-          alignItems: isMobile ? "stretch" : "center",
-          justifyContent: "space-between",
-          gap: "0.65rem",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            gap: "0.5rem",
-            flexWrap: "wrap",
-            minWidth: 0,
-          }}
-        >
+    <div className="bd-items-view-root">
+      <div className="bd-items-toolbar">
+        <div className="bd-items-toolbar-left">
           {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
             <div
               className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
               style={{
                 display: "flex",
-                gap: "0.35rem",
+                gap: "0.4rem",
                 alignItems: "center",
                 flexWrap: isMobile ? "nowrap" : "wrap",
                 overflowX: isMobile ? "auto" : "visible",
@@ -754,7 +722,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     type="button"
                     className="bd-btn"
                     style={{
-                      padding: isMobile ? "0.45rem 0.75rem" : "0.35rem 0.6rem",
+                      padding: isMobile ? "0.45rem 0.75rem" : "0.4rem 0.65rem",
                       fontSize: "0.8125rem",
                       minHeight: isMobile ? 44 : undefined,
                       flexShrink: 0,
@@ -770,8 +738,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               })}
             </div>
           )}
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              alignItems: "center",
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
               {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
             </span>
             {(mode === "work" || mode === "personal" || mode === "all") && (
@@ -780,8 +756,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 className="bd-btn"
                 title={t("items.addEntry")}
                 style={{
-                  padding: isMobile ? "0.45rem 0.65rem" : "0.35rem 0.6rem",
-                  marginLeft: isMobile ? 0 : "0.5rem",
+                  padding: isMobile ? "0.45rem 0.65rem" : "0.4rem 0.65rem",
                   minHeight: isMobile ? 44 : undefined,
                   minWidth: isMobile ? 44 : undefined,
                 }}
@@ -807,16 +782,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
           </div>
         </div>
         <div
-          style={{
-            display: "flex",
-            gap: "0.4rem",
-            alignItems: "center",
-            flexWrap: isMobile ? "wrap" : "nowrap",
-            flexShrink: 0,
-            justifyContent: isMobile ? "flex-start" : "flex-end",
-            width: isMobile ? "100%" : "auto",
-            overflowX: "visible",
-          }}
+          className={
+            isMobile ? "bd-items-toolbar-right" : "bd-items-toolbar-right bd-items-toolbar-views"
+          }
         >
           {isMobile ? (
             <>
@@ -932,6 +900,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             </>
           )}
         </div>
+      </div>
         {isMobile && viewPickerOpen && (
           <div
             style={{
@@ -1039,7 +1008,6 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             </div>
           </div>
         )}
-      </div>
 
       {items.length === 0 ? (
         <p className="bd-empty">{t("items.emptyFilters")}</p>
@@ -2833,7 +2801,17 @@ function KanbanView({
   };
 
   return (
-    <div ref={kanbanContainerRef} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, minHeight: 200 }}>
+    <div
+      ref={kanbanContainerRef}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--bd-space-3, 0.75rem)",
+        flex: 1,
+        minHeight: 200,
+        width: "100%",
+      }}
+    >
       {taskItems.length === 0 && items.length > 0 && (
         <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", margin: 0 }}>
           {t("items.kanbanNote")}
@@ -2843,7 +2821,8 @@ function KanbanView({
         style={{
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
-          gap: isMobile ? "0.65rem" : "1rem",
+          alignItems: "stretch",
+          gap: isMobile ? "var(--bd-space-3, 0.75rem)" : "var(--bd-space-4, 1rem)",
           overflow: isMobile ? "visible" : "auto",
           flex: 1,
           width: "100%",
@@ -2860,21 +2839,30 @@ function KanbanView({
           onDrop={(e) => handleDrop(e, col.key)}
           style={{
             flex: isMobile ? "0 0 auto" : "1 1 0",
-            minWidth: isMobile ? 0 : 160,
+            minWidth: isMobile ? 0 : 0,
             width: isMobile ? "100%" : undefined,
             maxWidth: "100%",
             minHeight: 120,
             background: dragOverColumn === col.key ? "var(--bg-hover)" : "var(--bg-secondary)",
             borderRadius: "16px",
-            padding: "0.75rem",
+            padding: "var(--bd-space-4, 1rem)",
             display: "flex",
             flexDirection: "column",
-            gap: "0.5rem",
+            gap: "var(--bd-space-3, 0.75rem)",
             border: dragOverColumn === col.key ? "2px dashed var(--accent)" : "2px solid transparent",
             transition: "background 0.15s, border-color 0.15s",
           }}
         >
-          <h4 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", margin: 0 }}>
+          <h4
+            style={{
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              margin: 0,
+              paddingBottom: "var(--bd-space-1, 0.25rem)",
+              lineHeight: 1.3,
+            }}
+          >
             {col.label}
           </h4>
           {col.items.map((it) => (
@@ -2888,7 +2876,7 @@ function KanbanView({
               onDoubleClick={() => onEdit?.(it)}
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
               style={{
-                padding: "0.5rem 0.75rem",
+                padding: "0.65rem 0.85rem",
                 background: "var(--bg-tertiary)",
                 border: "1px solid var(--border-default)",
                 borderRadius: "12px",
@@ -2896,13 +2884,13 @@ function KanbanView({
                 opacity: draggedId === it.id ? 0.6 : 1,
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{it.title}</div>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.35 }}>{it.title}</div>
               <div
                 style={{
                   fontSize: "0.75rem",
                   color: "var(--text-secondary)",
-                  marginTop: "0.2rem",
-                  lineHeight: 1.3,
+                  marginTop: "0.35rem",
+                  lineHeight: 1.45,
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
@@ -2911,7 +2899,16 @@ function KanbanView({
               >
                 {it.content?.trim() || "—"}
               </div>
-              <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <div
+                style={{
+                  fontSize: "0.65rem",
+                  color: "var(--text-tertiary)",
+                  marginTop: "0.4rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                }}
+              >
                 <EntryTypeIcon type={it.itemType} size={12} />
                 {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </div>

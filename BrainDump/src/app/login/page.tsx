@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const cardStyle: React.CSSProperties = {
   width: "100%",
@@ -34,12 +35,39 @@ const labelStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
 };
 
-export default function LoginPage() {
+const overlayBackdrop: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1000,
+  background: "rgba(0, 0, 0, 0.45)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "1.25rem",
+  backdropFilter: "blur(4px)",
+};
+
+function LoginContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSuccessBanner, setResetSuccessBanner] = useState(false);
+
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotError, setForgotError] = useState("");
+  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("reset") === "success") {
+      setResetSuccessBanner(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +96,46 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const openForgot = () => {
+    setForgotEmail(email.trim());
+    setForgotMessage("");
+    setForgotError("");
+    setDevResetUrl(null);
+    setForgotOpen(true);
+  };
+
+  const submitForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotMessage("");
+    setDevResetUrl(null);
+    const em = forgotEmail.trim().toLowerCase();
+    if (!em) {
+      setForgotError("Enter your email address.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: em }),
+      });
+      const data = await res.json();
+      if (typeof data.message === "string") {
+        setForgotMessage(data.message);
+      } else {
+        setForgotMessage("If an account exists for that email, we sent password reset instructions.");
+      }
+      if (typeof data.devResetUrl === "string") {
+        setDevResetUrl(data.devResetUrl);
+      }
+    } catch {
+      setForgotError("Request failed. Try again.");
+    }
+    setForgotLoading(false);
+  };
+
   return (
     <div
       style={{
@@ -88,6 +156,22 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {resetSuccessBanner && (
+          <p
+            style={{
+              margin: 0,
+              fontSize: "0.9rem",
+              padding: "0.65rem 0.75rem",
+              borderRadius: "var(--button-radius)",
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--accent) 35%, transparent)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Your password was updated. You can sign in below.
+          </p>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <label htmlFor="login-email" style={labelStyle}>
@@ -105,9 +189,28 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label htmlFor="login-password" style={labelStyle}>
-              Password
-            </label>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+              <label htmlFor="login-password" style={labelStyle}>
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={openForgot}
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  color: "var(--accent)",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "2px",
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               id="login-password"
               type="password"
@@ -156,6 +259,163 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+
+      {forgotOpen && (
+        <div
+          style={overlayBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="forgot-password-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setForgotOpen(false);
+          }}
+        >
+          <div
+            style={{
+              ...cardStyle,
+              maxWidth: 400,
+              position: "relative",
+              zIndex: 1001,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+              <h2 id="forgot-password-title" style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600 }}>
+                Reset password
+              </h2>
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                aria-label="Close"
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: "var(--button-radius)",
+                  border: "1px solid var(--border-default)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+              Enter your email and we&apos;ll send you a link to choose a new password.
+            </p>
+
+            {!forgotMessage ? (
+              <form onSubmit={submitForgot} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div>
+                  <label htmlFor="forgot-email" style={labelStyle}>
+                    Email
+                  </label>
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    autoComplete="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                    style={{ ...inputStyle, marginTop: "0.35rem" }}
+                    placeholder="you@example.com"
+                  />
+                </div>
+                {forgotError && (
+                  <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--accent)" }}>{forgotError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    padding: "0.65rem 1rem",
+                    borderRadius: "var(--button-radius)",
+                    border: "none",
+                    background: "var(--accent)",
+                    color: "#fff",
+                    fontSize: "0.95rem",
+                    fontWeight: 600,
+                    cursor: forgotLoading ? "not-allowed" : "pointer",
+                    opacity: forgotLoading ? 0.85 : 1,
+                  }}
+                >
+                  {forgotLoading ? "Sending…" : "Send reset link"}
+                </button>
+              </form>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary)" }}>{forgotMessage}</p>
+                {devResetUrl && (
+                  <div
+                    style={{
+                      padding: "0.65rem 0.75rem",
+                      borderRadius: "var(--button-radius)",
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border-default)",
+                      fontSize: "0.75rem",
+                      wordBreak: "break-all",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    <strong style={{ color: "var(--text-secondary)", display: "block", marginBottom: "0.35rem" }}>
+                      Development only (no email configured):
+                    </strong>
+                    <a href={devResetUrl} style={{ color: "var(--accent)" }}>
+                      {devResetUrl}
+                    </a>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotOpen(false);
+                    setForgotMessage("");
+                    setDevResetUrl(null);
+                  }}
+                  style={{
+                    padding: "0.65rem 1rem",
+                    borderRadius: "var(--button-radius)",
+                    border: "1px solid var(--border-default)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    fontSize: "0.95rem",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "var(--bg-primary)",
+            color: "var(--text-tertiary)",
+          }}
+        >
+          Loading…
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

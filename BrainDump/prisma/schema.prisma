@@ -119,12 +119,26 @@ model User {
   image         String?
   passwordHash  String?    // for email/password sign-in only
 
-  accounts  Account[]
-  sessions  Session[]
-  dumps     Dump[]
-  items     OrganizedItem[]
-  projects  Project[]
-  tags      Tag[]
+  accounts           Account[]
+  sessions           Session[]
+  dumps              Dump[]
+  items              OrganizedItem[]
+  projects           Project[]
+  tags               Tag[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+/// One-time token for email/password reset flow
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 /// Auth.js / NextAuth account model
