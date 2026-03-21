@@ -2083,7 +2083,8 @@ function CalendarView({
                   padding: "0.4rem",
                   background: isCurrentMonth ? (isHovered ? "var(--bg-hover)" : "var(--bg-primary)") : "var(--bg-secondary)",
                   boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 2px var(--accent), var(--shadow-sm)" : isTodayCell ? "0 0 0 2px var(--accent)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
-                  transition: "background 0.15s, box-shadow 0.15s",
+                  transition:
+                    "background var(--bd-duration-fast) var(--bd-ease-soft), box-shadow var(--bd-duration-fast) var(--bd-ease-soft)",
                 }}
               >
                 <div
@@ -3033,7 +3034,8 @@ function KanbanView({
             flexDirection: "column",
             gap: "var(--bd-space-3, 0.75rem)",
             border: dragOverColumn === col.key ? "2px dashed var(--accent)" : "2px solid transparent",
-            transition: "background 0.15s, border-color 0.15s",
+            transition:
+              "background var(--bd-duration-fast) var(--bd-ease-soft), border-color var(--bd-duration-fast) var(--bd-ease-soft)",
           }}
         >
           <h4
@@ -3393,7 +3395,10 @@ function PostitsView({
                 display: "flex",
                 flexDirection: "row",
                 overflow: "hidden",
-                transition: dragState?.id === it.id ? "box-shadow 0.15s" : "none",
+                transition:
+                  dragState?.id === it.id
+                    ? "box-shadow var(--bd-duration-normal) var(--bd-ease-soft)"
+                    : "none",
                 ...(dragState?.id === it.id ? { boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)" } : {}),
               }}
             >

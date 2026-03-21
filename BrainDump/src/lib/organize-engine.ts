@@ -53,6 +53,7 @@ Rules:
    - thoughts: General personal thoughts that don't fit feeling/hobbies/goals/health/relationships/shopping.
    - goals, health, relationships, shopping: Use when content clearly fits.
 7. Work: Use category "projects" or "tasks" and set project_name when a work project is named (e.g. LumiRush). Work item_types: task, note, idea, calendar.
+   If the user names a project that is not in the "Existing projects" list, still set project_name to that name — the app will create the project automatically. Never omit project_name only because the project is new.
 8. recommended_view: task_list or kanban for tasks; note_cards for notes; reflection_cards for reflections.
 9. confidence_score: 0–1. title: short headline only. content: full description (what the user said); required for every item.
 
@@ -84,6 +85,7 @@ Regler:
    - thoughts: Allmänna personliga tankar som inte passar feeling/hobbies/goals/health/relationships/shopping.
    - goals, health, relationships, shopping: Använd när innehållet tydligt passar.
 7. Work: Använd category "projects" eller "tasks" och sätt project_name när ett arbetsprojekt nämns. Work item_types: task, note, idea, calendar.
+   Om användaren nämner ett projekt som inte finns i listan "Befintliga projekt", sätt ändå project_name till det namnet — appen skapar projektet. Utelämna aldrig project_name bara för att projektet är nytt.
 8. recommended_view: task_list eller kanban för tasks; note_cards för notes; reflection_cards för reflections.
 9. confidence_score: 0–1. title: kort rubrik. content: full beskrivning; krävs för varje post.
 
@@ -215,10 +217,17 @@ export async function organizeTranscript(
     const parsed = JSON.parse(text) as { items?: OrganizedItemInput[] };
     const items = Array.isArray(parsed.items) ? parsed.items : [];
     return items.map((item) => {
+      const raw = item as unknown as Record<string, unknown>;
+      const mergedProjectName =
+        (typeof raw.project_name === "string" && raw.project_name.trim()) ||
+        (typeof raw.project === "string" && raw.project.trim()) ||
+        (typeof raw.projectName === "string" && raw.projectName.trim()) ||
+        "";
+
       let domain = item.domain ?? "inbox";
       const rawType = item.item_type ?? "note";
       const item_type = normalizeItemType(domain, rawType) as ItemType;
-      const hasProjectName = typeof item.project_name === "string" && item.project_name.trim().length > 0;
+      const hasProjectName = mergedProjectName.length > 0;
       // Guardrail: ambiguous non-project tasks should default to personal unless clearly work.
       if (
         domain === "work" &&
@@ -236,6 +245,7 @@ export async function organizeTranscript(
           : category;
       return {
         ...item,
+        project_name: mergedProjectName || undefined,
         domain,
         item_type,
         category: normalizedCategory,

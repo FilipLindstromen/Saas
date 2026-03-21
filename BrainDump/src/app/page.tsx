@@ -18,35 +18,6 @@ const VIEW_STORAGE_KEY = "braindump-items-view";
 type Mode = "inbox" | "work" | "personal" | "all";
 type DumpMode = "inbox" | "work" | "personal";
 
-/** Icons for All / Work / Personal — match desktop sidebar (stroke icons). */
-function WorkspaceModeIcon({ which, size = 20 }: { which: "all" | "work" | "personal"; size?: number }) {
-  const common = { width: size, height: size, viewBox: "0 0 24 24" as const, fill: "none" as const, stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
-  if (which === "all") {
-    return (
-      <svg {...common}>
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    );
-  }
-  if (which === "work") {
-    return (
-      <svg {...common}>
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
 function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMode = "inbox"): DumpMode {
   const domains = new Set(items.map((it) => it.domain).filter(Boolean));
   if (domains.size === 1) {
@@ -70,17 +41,12 @@ export default function BrainDumpPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
-  const [mobileModeMenuOpen, setMobileModeMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, viewType);
     } catch {}
   }, [viewType]);
-
-  useEffect(() => {
-    setMobileModeMenuOpen(false);
-  }, [mode]);
 
   useEffect(() => {
     fetch("/api/projects")
@@ -483,115 +449,6 @@ export default function BrainDumpPage() {
         </div>
         <div className="bd-bottom-bar-spacer" aria-hidden />
       </div>
-
-      {mobileModeMenuOpen && (
-        <div
-          className="bd-mobile-mode-sheet-backdrop"
-          onClick={() => setMobileModeMenuOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="bd-panel bd-mobile-mode-sheet"
-            style={{
-              width: "100%",
-              maxHeight: "min(70dvh, 70vh)",
-              borderRadius: "22px 22px 0 0",
-              padding: "1rem 1rem 1.15rem",
-              overflow: "auto",
-              WebkitOverflowScrolling: "touch",
-              boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="bd-mobile-mode-sheet-title"
-          >
-            <div
-              style={{
-                width: 40,
-                height: 5,
-                borderRadius: 999,
-                background: "var(--border-strong)",
-                margin: "0 auto 0.85rem",
-                opacity: 0.85,
-              }}
-              aria-hidden
-            />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <h2 id="bd-mobile-mode-sheet-title" style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
-                {t("bottom.chooseMode")}
-              </h2>
-              <button
-                type="button"
-                className="bd-btn"
-                onClick={() => setMobileModeMenuOpen(false)}
-                aria-label={t("scope.cancel")}
-                style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {(
-                [
-                  { key: "all" as const, label: t("mode.all"), which: "all" as const },
-                  { key: "work" as const, label: t("mode.work"), which: "work" as const },
-                  { key: "personal" as const, label: t("mode.personal"), which: "personal" as const },
-                ] as const
-              ).map(({ key, label, which }) => {
-                const active = mode === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className="bd-btn bd-mobile-mode-sheet-row"
-                    onClick={() => {
-                      setMode(key);
-                      setMobileModeMenuOpen(false);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                      minHeight: 52,
-                      padding: "0.5rem 0.75rem",
-                      justifyContent: "flex-start",
-                      width: "100%",
-                      background: active ? "var(--bg-hover)" : "var(--bg-elevated)",
-                      borderColor: active ? "var(--accent)" : "var(--border-default)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        background: active ? "var(--accent)" : "transparent",
-                        color: active ? "#fff" : "var(--text-tertiary)",
-                      }}
-                    >
-                      <WorkspaceModeIcon which={which} size={20} />
-                    </span>
-                    <span style={{ flex: 1, textAlign: "left", fontSize: "0.9375rem", color: "var(--text-primary)" }}>{label}</span>
-                    {active && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>

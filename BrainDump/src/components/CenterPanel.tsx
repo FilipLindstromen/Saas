@@ -194,31 +194,75 @@ export function CenterPanel({
       audioContext = new AudioContextClass();
       source = audioContext.createMediaStreamSource(streamRef.current);
       analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.65;
+      analyser.minDecibels = -85;
+      analyser.maxDecibels = -25;
       source.connect(analyser);
     } else {
       return;
     }
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const freqData = new Uint8Array(analyser.frequencyBinCount);
+    const timeData = new Uint8Array(analyser.fftSize);
     const W = canvas.width;
     const H = canvas.height;
     const cancelled = { current: false };
+
+    const cssColor = (name: string, fallback: string) => {
+      if (typeof document === "undefined") return fallback;
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    };
+
     const runVisualizer = () => {
       if (cancelled.current || !canvasRef.current) return;
       animationRef.current = requestAnimationFrame(runVisualizer);
-      analyser.getByteFrequencyData(dataArray);
-      ctx.fillStyle = "var(--bg-primary)";
+      const bg = cssColor("--bg-tertiary", "#181f2a");
+      const accent = cssColor("--accent", "#e85d2d");
+      const grid = cssColor("--border-default", "rgba(128,128,128,0.25)");
+
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
-      const barCount = Math.min(32, Math.floor(W / 6));
-      const step = Math.floor(dataArray.length / barCount);
-      const barWidth = Math.max(2, W / barCount - 2);
+
+      /* Time-domain waveform (canvas ignores CSS `var()` — must use computed colors) */
+      analyser.getByteTimeDomainData(timeData);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = accent;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      const slice = timeData.length / W;
+      for (let x = 0; x < W; x++) {
+        const i = Math.min(timeData.length - 1, Math.floor(x * slice));
+        const v = timeData[i] ?? 128;
+        const norm = (v - 128) / 128;
+        const y = H / 2 - norm * (H / 2) * 0.92;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      /* Frequency bars (boost quiet speech) */
+      analyser.getByteFrequencyData(freqData);
+      const barCount = Math.min(40, Math.floor(W / 5));
+      const step = Math.max(1, Math.floor(freqData.length / barCount));
+      const barWidth = Math.max(1.5, W / barCount - 2);
       for (let i = 0; i < barCount; i++) {
-        const v = dataArray[i * step] ?? 0;
-        const h = Math.max(2, (v / 255) * H * 0.9);
-        ctx.fillStyle = "var(--accent)";
+        const v = freqData[i * step] ?? 0;
+        const boosted = Math.min(255, v * 1.35 + 8);
+        const h = Math.max(1, (boosted / 255) * (H / 2) * 0.85);
+        ctx.fillStyle = accent;
+        ctx.globalAlpha = 0.45;
         ctx.fillRect(i * (W / barCount) + 1, H - h, barWidth, h);
       }
+      ctx.globalAlpha = 1;
+
+      ctx.strokeStyle = grid;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, H / 2);
+      ctx.lineTo(W, H / 2);
+      ctx.stroke();
     };
     if (audioContext?.state === "suspended") {
       audioContext.resume().then(() => { if (!cancelled.current) runVisualizer(); }).catch(() => {});
@@ -571,8 +615,8 @@ export function CenterPanel({
                 <div className="bd-dump-input-label">{t("center.inputLevel")}</div>
                 <canvas
                   ref={canvasRef}
-                  width={280}
-                  height={48}
+                  width={320}
+                  height={64}
                   className="bd-dump-canvas"
                   aria-label="Audio input level"
                 />

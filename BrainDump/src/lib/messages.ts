@@ -18,6 +18,7 @@ const en: Msg = {
 
   "topBar.settings": "Settings",
   "topBar.title": "BrainDump",
+  "topBar.workspace": "Workspace",
 
   "loading.workspace": "Loading your workspace…",
   "auth.signInPrompt": "Sign in to keep your dumps, projects and organized items private to your account.",
@@ -203,6 +204,7 @@ const sv: Msg = {
 
   "topBar.settings": "Inställningar",
   "topBar.title": "BrainDump",
+  "topBar.workspace": "Arbetsyta",
 
   "loading.workspace": "Laddar din arbetsyta…",
   "auth.signInPrompt":

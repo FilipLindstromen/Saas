@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
+import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
       category,
       subcategory,
       projectId,
+      project_name,
       itemType,
       title,
       content,
@@ -110,34 +112,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const item = await prisma.organizedItem.create({
-      data: {
-        dumpId,
-        userId,
-        domain,
-        category: category ?? "",
-        subcategory: subcategory ?? "",
-        projectId: projectId ?? null,
-        itemType,
-        title,
-        content: content ?? "",
-        emotionLabel: emotionLabel ?? null,
-        status: status ?? "draft",
-        priority: priority ?? null,
-        recommendedView: recommendedView ?? "note_cards",
-        confidenceScore: typeof confidenceScore === "number" ? confidenceScore : 0,
-        ...(progress !== undefined && { progress: progress ?? "todo" }),
-        ...(kanbanColumn !== undefined && { kanbanColumn }),
-        ...(scheduledAt !== undefined && { scheduledAt: scheduledAt === null || scheduledAt === "" ? null : new Date(scheduledAt) }),
-        ...(scheduledTime !== undefined && { scheduledTime: scheduledTime ?? null }),
-        ...(recurrence !== undefined && { recurrence: recurrence === null || recurrence === "none" ? null : recurrence }),
-        ...(sendNotification !== undefined && { sendNotification: Boolean(sendNotification) }),
-        tags: Array.isArray(tagIds) && tagIds.length > 0
-          ? { create: tagIds.map((tagId: string) => ({ tagId })) }
-          : undefined,
-      },
-      include: { project: true, tags: { include: { tag: true } } },
+    const pname =
+      typeof project_name === "string" && project_name.trim() ? project_name.trim() : "";
+
+    const item = await prisma.$transaction(async (tx) => {
+      let resolvedProjectId: string | null = projectId ?? null;
+      if (pname) {
+        resolvedProjectId = await resolveOrCreateProjectByName(
+          tx,
+          userId,
+          pname,
+          String(domain),
+          String(category ?? "")
+        );
+      } else if (resolvedProjectId) {
+        const exists = await tx.project.findFirst({
+          where: { id: resolvedProjectId, userId },
+        });
+        if (!exists) resolvedProjectId = null;
+      }
+
+      return tx.organizedItem.create({
+        data: {
+          dumpId,
+          userId,
+          domain,
+          category: category ?? "",
+          subcategory: subcategory ?? "",
+          projectId: resolvedProjectId,
+          itemType,
+          title,
+          content: content ?? "",
+          emotionLabel: emotionLabel ?? null,
+          status: status ?? "draft",
+          priority: priority ?? null,
+          recommendedView: recommendedView ?? "note_cards",
+          confidenceScore: typeof confidenceScore === "number" ? confidenceScore : 0,
+          ...(progress !== undefined && { progress: progress ?? "todo" }),
+          ...(kanbanColumn !== undefined && { kanbanColumn }),
+          ...(scheduledAt !== undefined && {
+            scheduledAt: scheduledAt === null || scheduledAt === "" ? null : new Date(scheduledAt),
+          }),
+          ...(scheduledTime !== undefined && { scheduledTime: scheduledTime ?? null }),
+          ...(recurrence !== undefined && {
+            recurrence: recurrence === null || recurrence === "none" ? null : recurrence,
+          }),
+          ...(sendNotification !== undefined && { sendNotification: Boolean(sendNotification) }),
+          tags:
+            Array.isArray(tagIds) && tagIds.length > 0
+              ? { create: tagIds.map((tagId: string) => ({ tagId })) }
+              : undefined,
+        },
+        include: { project: true, tags: { include: { tag: true } } },
+      });
     });
+
     return NextResponse.json({ item });
   } catch (e) {
     console.error("Organized items POST error:", e);

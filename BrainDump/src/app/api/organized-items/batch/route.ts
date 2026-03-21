@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
+import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
 
 /**
  * POST /api/organized-items/batch
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
         category: string;
         subcategory?: string;
         project_name?: string;
+        /** Alternate keys from models — normalized server-side */
+        project?: string;
+        projectName?: string;
         projectId?: string;
         item_type: string;
         title: string;
@@ -55,19 +59,27 @@ export async function POST(request: NextRequest) {
 
     await prisma.$transaction(async (tx) => {
       for (const it of items) {
+        const name =
+          (typeof it.project_name === "string" && it.project_name.trim()) ||
+          (typeof it.project === "string" && it.project.trim()) ||
+          (typeof it.projectName === "string" && it.projectName.trim()) ||
+          "";
+
         let projectId: string | null = it.projectId ?? null;
-        if (it.project_name && !projectId) {
-          const domain = it.domain === "work" ? "work" : "personal";
-          const existing = await tx.project.findFirst({
-            where: { name: it.project_name, domain, userId },
+
+        if (name) {
+          projectId = await resolveOrCreateProjectByName(
+            tx,
+            userId,
+            name,
+            String(it.domain ?? ""),
+            String(it.category ?? "")
+          );
+        } else if (projectId) {
+          const exists = await tx.project.findFirst({
+            where: { id: projectId, userId },
           });
-          if (existing) projectId = existing.id;
-          else {
-            const proj = await tx.project.create({
-              data: { name: it.project_name, domain, status: "active", userId },
-            });
-            projectId = proj.id;
-          }
+          if (!exists) projectId = null;
         }
 
         const item = await tx.organizedItem.create({
@@ -92,10 +104,10 @@ export async function POST(request: NextRequest) {
 
         if (Array.isArray(it.tags) && it.tags.length > 0) {
           for (const tagName of it.tags) {
-            const name = String(tagName).trim();
-            if (!name) continue;
-            let tag = await tx.tag.findFirst({ where: { name, userId } });
-            if (!tag) tag = await tx.tag.create({ data: { name, userId } });
+            const tagLabel = String(tagName).trim();
+            if (!tagLabel) continue;
+            let tag = await tx.tag.findFirst({ where: { name: tagLabel, userId } });
+            if (!tag) tag = await tx.tag.create({ data: { name: tagLabel, userId } });
             await tx.organizedItemTag.upsert({
               where: { itemId_tagId: { itemId: item.id, tagId: tag.id } },
               create: { itemId: item.id, tagId: tag.id },

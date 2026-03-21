@@ -18,7 +18,9 @@ const MODE_KEY: Record<Mode, string> = {
   all: "mode.all",
 };
 
-export function TopBar({ mode, onModeChange: _onModeChange, onOpenSettings }: TopBarProps) {
+const WORKSPACE_MODES: Mode[] = ["all", "work", "personal", "inbox"];
+
+export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
   const { t } = useI18n();
 
   return (
@@ -48,9 +50,19 @@ export function TopBar({ mode, onModeChange: _onModeChange, onOpenSettings }: To
       >
         {t("topBar.title")}
       </h1>
-      <span className="bd-mobile-mode-pill" title={t(MODE_KEY[mode])}>
-        {t(MODE_KEY[mode])}
-      </span>
+      <select
+        id="bd-topbar-workspace"
+        className="bd-input bd-mobile-mode-select"
+        aria-label={t("topBar.workspace")}
+        value={mode}
+        onChange={(e) => onModeChange(e.target.value as Mode)}
+      >
+        {WORKSPACE_MODES.map((m) => (
+          <option key={m} value={m}>
+            {t(MODE_KEY[m])}
+          </option>
+        ))}
+      </select>
       <span className="bd-mobile-hide" style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", flexShrink: 0 }}>
         {t(MODE_KEY[mode])}
       </span>
