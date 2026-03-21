@@ -40,9 +40,14 @@ export async function POST(request: NextRequest) {
 
     const apiFile = await toFile(buffer, filename);
     const openai = new OpenAI({ apiKey });
+    const langRaw = (formData.get("language") as string | null)?.trim().toLowerCase() ?? "";
+    /** ISO 639-1; Whisper supports forcing language for more reliable output in that language */
+    const language = langRaw === "sv" ? "sv" : langRaw === "en" ? "en" : undefined;
+
     const transcription = await openai.audio.transcriptions.create({
       file: apiFile,
       model: "whisper-1",
+      ...(language ? { language } : {}),
     });
 
     const text = (transcription as { text?: string }).text?.trim() ?? "";

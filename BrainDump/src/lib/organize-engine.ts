@@ -62,6 +62,39 @@ When existing_categories are provided below, prefer those.
 Respond with a single JSON object: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score" } ] }
 Use only the fields listed. No extra commentary.`;
 
+const ORGANIZE_SYSTEM_PROMPT_SV = `Du är en assistent för att organisera tankar. Din uppgift är att analysera ett rått transkript (en "brain dump") och dela upp det i strukturerade poster.
+
+Regler:
+1. Varje post har en rubrik (title) och en beskrivning (content). title = kort, tydlig rubrik. content = full beskrivning: vad användaren sa, ordagrant eller troget sammanfattat. Lämna aldrig content tom när användaren sagt en hel mening — lägg deras ord (eller nära omformulering) i content.
+2. Slå ihop närhörande innehåll till EN post. Dela inte en sammanhängande tanke, känsla eller yttrande i flera poster. Skapa flera poster bara när användaren tydligt byter ämne, uppgift eller idé.
+3. Dela transkriptet i flera poster bara när det innehåller skilda ämnen, uppgifter, känslor eller idéer. En mening som uttrycker en sak = en post.
+4. domain är avgörande — skilj privat från arbete:
+   - personal: Hobbyprojekt, kreativa sysslor för sig själv ("privat", "inte jobbrelaterat"), hur man mår (trött, kropp, känsla), reflektioner om liv eller välmående, personliga mål, hälsa, relationer, shopping. Om användaren säger att något är "privat" eller hobby, ska det alltid vara personal.
+   - work: Arbetsprojekt, arbetsuppgifter, yrkeskurser, affärs-/marknadsföringsuppgifter, leveranser för jobb eller företag. Om ett projektnamn tydligt är arbete, är uppgifter för det projektet work. "Sätt upp en säljlanding" eller "gör en video om dagen för marknadsföring" är work när det kopplas till ett arbetsprojekt.
+   - Om en uppgift inte nämner ett specifikt arbetsprojekt och saknar tydlig arbetskontext, klassificera den som personal (t.ex. hemmaärenden som att byta vindrutetorkare).
+5. item_type är avgörande:
+   - Använd "task" ENDAST när användaren uttryckligen säger att något är en uppgift, todo eller något att göra. Använd INTE "task" för allmänna anteckningar eller idéer.
+   - Använd "idea" för idéer, koncept, "jag vill..." kreativa/hobbyidéer. Ett hobbyprojekt användaren "vill börja med" är en idea under personal.
+   - Använd "reflection" för hur användaren mår, kroppstillstånd, trötthet, känsloläge, eller korta reflektioner utan projekt — använd alltid category "feeling" och domain "personal". Koppla INTE dessa till projekt eller hobbies.
+   - Använd "note" för allmänna anteckningar, fakta, beslut, uppdateringar. Vid tvekan, använd "note".
+   - Använd "calendar" för tidsbundna eller återkommande saker (t.ex. "varje dag", "varje måndag", "påminn mig nästa vecka", händelser med datum/tid).
+6. Personliga sektioner (category för domain=personal): feeling, thoughts, hobbies, goals, health, relationships, shopping.
+   - feeling: Hur användaren mår, kropp, känsla. Använd item_type "reflection". Koppla aldrig till project_name.
+   - hobbies: Hobbyprojekt, personlig kreativitet (t.ex. målning, sidoprojekt för nöje).
+   - thoughts: Allmänna personliga tankar som inte passar feeling/hobbies/goals/health/relationships/shopping.
+   - goals, health, relationships, shopping: Använd när innehållet tydligt passar.
+7. Work: Använd category "projects" eller "tasks" och sätt project_name när ett arbetsprojekt nämns. Work item_types: task, note, idea, calendar.
+8. recommended_view: task_list eller kanban för tasks; note_cards för notes; reflection_cards för reflections.
+9. confidence_score: 0–1. title: kort rubrik. content: full beskrivning; krävs för varje post.
+
+Fältnamn domain, category, item_type osv ska vara på engelska som i schemat nedan. Värden i title och content ska vara på svenska när användaren pratat svenska.
+
+Kategorier är dynamiska. Föredra befintliga när de passar; du FÅR skapa nya category-namn (lowercase, snake_case) när innehållet tydligt passar någon annanstans.
+När befintliga kategorier listas nedan, föredra dem.
+
+Svara med ett enda JSON-objekt: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score" } ] }
+Använd bara listade fält. Ingen extra kommentar.`;
+
 export interface OrganizeOptions {
   projectNames?: string[];
   defaultDomain?: "work" | "personal" | null;
@@ -69,6 +102,8 @@ export interface OrganizeOptions {
   existingCategories?: string[];
   /** User-added category names (e.g. from "Add area"); AI can assign items to these. */
   customCategories?: string[];
+  /** UI locale — Swedish prompts and Swedish titles/content in output when "sv". */
+  locale?: "en" | "sv";
 }
 
 const DEFAULT_CATEGORIES_WORK = "projects, tasks, notes, ideas, meetings, opportunities";
@@ -76,12 +111,18 @@ const DEFAULT_CATEGORIES_PERSONAL = "feeling, thoughts, hobbies, goals, health, 
 const DEFAULT_CATEGORIES_INBOX = "unprocessed, needs_review";
 
 function buildSystemPrompt(options: OrganizeOptions): string {
+  const sv = options.locale === "sv";
+  const base = sv ? ORGANIZE_SYSTEM_PROMPT_SV : ORGANIZE_SYSTEM_PROMPT;
   let extra = "";
   if (options.projectNames?.length) {
-    extra += `\n\nExisting projects (use these exact names when the user mentions them, and store related items under that project): ${options.projectNames.join(", ")}.`;
+    extra += sv
+      ? `\n\nBefintliga projekt (använd exakt dessa namn när användaren nämner dem, koppla poster till projektet): ${options.projectNames.join(", ")}.`
+      : `\n\nExisting projects (use these exact names when the user mentions them, and store related items under that project): ${options.projectNames.join(", ")}.`;
   }
   if (options.defaultDomain) {
-    extra += `\n\nDefault context for this session: "${options.defaultDomain}". When classification is ambiguous, prefer this domain.`;
+    extra += sv
+      ? `\n\nStandardkontext för denna session: "${options.defaultDomain}". Vid tvekan om klassificering, föredra denna domain.`
+      : `\n\nDefault context for this session: "${options.defaultDomain}". When classification is ambiguous, prefer this domain.`;
   }
   const existing = options.existingCategories?.length
     ? options.existingCategories.join(", ")
@@ -90,11 +131,15 @@ function buildSystemPrompt(options: OrganizeOptions): string {
       : options.defaultDomain === "personal"
         ? DEFAULT_CATEGORIES_PERSONAL
         : DEFAULT_CATEGORIES_INBOX;
-  extra += `\n\nExisting categories (prefer these when they fit): ${existing}.`;
+  extra += sv
+    ? `\n\nBefintliga kategorier (föredra när de passar): ${existing}.`
+    : `\n\nExisting categories (prefer these when they fit): ${existing}.`;
   if (options.customCategories?.length) {
-    extra += ` User-added areas to consider: ${options.customCategories.join(", ")}.`;
+    extra += sv
+      ? ` Användardefinierade områden att överväga: ${options.customCategories.join(", ")}.`
+      : ` User-added areas to consider: ${options.customCategories.join(", ")}.`;
   }
-  return ORGANIZE_SYSTEM_PROMPT + extra;
+  return base + extra;
 }
 
 export async function organizeTranscript(
@@ -107,12 +152,17 @@ export async function organizeTranscript(
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey: openaiApiKey || process.env.OPENAI_API_KEY });
   const systemPrompt = buildSystemPrompt(options);
+  const locale = options.locale ?? "en";
+  const userContent =
+    locale === "sv"
+      ? `Transkript:\n\n${transcript}\n\nSkriv title och content på svenska för varje post (om transkriptet är på svenska).`
+      : `Transcript:\n\n${transcript}`;
 
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Transcript:\n\n${transcript}` },
+      { role: "user", content: userContent },
     ],
     temperature: 0.4,
     max_tokens: 2000,
@@ -148,7 +198,15 @@ export async function organizeTranscript(
 
   function shouldTreatAsWorkTask(item: OrganizedItemInput): boolean {
     const text = `${item.title ?? ""} ${item.content ?? ""}`.toLowerCase();
-    const hasWorkKeyword = /\b(work|job|office|client|meeting|sprint|deadline|ticket|deploy|repo|code|marketing|sales|campaign|boss|team|company|business)\b/.test(text);
+    const enWork =
+      /\b(work|job|office|client|meeting|sprint|deadline|ticket|deploy|repo|code|marketing|sales|campaign|boss|team|company|business)\b/.test(
+        text
+      );
+    const svWork =
+      /\b(arbete|jobb|kontor|kund|möte|deadline|sprint|marknadsföring|försäljning|kampanj|chef|team|företag|affär)\b/.test(
+        text
+      );
+    const hasWorkKeyword = enWork || svWork;
     const mentionsKnownProject = (options.projectNames ?? []).some((p) => text.includes(p.toLowerCase()));
     return hasWorkKeyword || mentionsKnownProject;
   }

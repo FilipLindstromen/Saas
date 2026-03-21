@@ -10,6 +10,7 @@ import { RightPanel } from "@/components/RightPanel";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
+import { useI18n } from "@/lib/i18n";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -27,6 +28,7 @@ function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMod
 }
 
 export default function BrainDumpPage() {
+  const { t } = useI18n();
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("work");
   const [organizedItems, setOrganizedItems] = useState<OrganizedItemPreview[]>([]);
@@ -67,14 +69,14 @@ export default function BrainDumpPage() {
           const minBefore = it.reminderMinutesBefore ?? 0;
           const earlyAt = minBefore > 0 ? at - minBefore * 60 * 1000 : 0;
           if (at && !it.reminderNotifiedAt && now >= at) {
-            new Notification("Reminder", { body: it.title });
+            new Notification(t("notification.reminder"), { body: it.title });
             await fetch(`/api/organized-items/${it.id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ reminderNotifiedAt: new Date().toISOString() }),
             });
           } else if (earlyAt && !it.reminderEarlyNotifiedAt && now >= earlyAt) {
-            new Notification("Reminder soon", { body: `${it.title} (in ${minBefore} min)` });
+            new Notification(t("notification.reminderSoon"), { body: `${it.title} (in ${minBefore} min)` });
             await fetch(`/api/organized-items/${it.id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -87,9 +89,9 @@ export default function BrainDumpPage() {
       }
     };
     check();
-    const t = setInterval(check, 60 * 1000);
-    return () => clearInterval(t);
-  }, []);
+    const intervalId = setInterval(check, 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [t]);
 
   const handleOrganized = useCallback((items: OrganizedItemPreview[], transcript: string) => {
     setOrganizedItems(items);
@@ -174,7 +176,7 @@ export default function BrainDumpPage() {
           color: "var(--text-primary)",
         }}
       >
-        <p style={{ fontSize: "0.95rem", color: "var(--text-secondary)" }}>Loading your workspace…</p>
+        <p style={{ fontSize: "0.95rem", color: "var(--text-secondary)" }}>{t("loading.workspace")}</p>
       </div>
     );
   }
@@ -207,9 +209,9 @@ export default function BrainDumpPage() {
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>BrainDump</h1>
+            <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>{t("topBar.title")}</h1>
             <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
-              Sign in to keep your dumps, projects and organized items private to your account.
+              {t("auth.signInPrompt")}
             </p>
           </div>
           <Link
@@ -246,7 +248,7 @@ export default function BrainDumpPage() {
         <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
 
       <div
-        className="bd-layout-main"
+        className="bd-layout-main bd-main-scroll"
         style={{
           display: "flex",
           flex: 1,
@@ -271,8 +273,8 @@ export default function BrainDumpPage() {
           <button
             type="button"
             onClick={() => setMode("all")}
-            title="All"
-            aria-label="All"
+            title={t("mode.all")}
+            aria-label={t("mode.all")}
             style={{
               width: 40,
               height: 40,
@@ -319,8 +321,8 @@ export default function BrainDumpPage() {
           <button
             type="button"
             onClick={() => setMode("personal")}
-            title="Personal"
-            aria-label="Personal"
+            title={t("mode.personal")}
+            aria-label={t("mode.personal")}
             style={{
               width: 40,
               height: 40,
@@ -343,7 +345,7 @@ export default function BrainDumpPage() {
 
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0" }}>
           {(mode === "work" || mode === "personal" || mode === "all") && (
-            <div style={{ flexShrink: 0, padding: "0.5rem 1rem 0", borderBottom: "1px solid var(--border-subtle)" }}>
+            <div className="bd-scope-outer-wrap" style={{ flexShrink: 0 }}>
               <ScopeBar
                 mode={mode}
                 selectedProjectId={selectedProjectId}
@@ -355,7 +357,7 @@ export default function BrainDumpPage() {
               />
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.75rem", padding: "1rem", overflow: "auto" }}>
+          <div className="bd-page-content-padding">
             <CenterPanel
               mode={mode}
               onTranscriptReady={() => {}}
@@ -388,13 +390,20 @@ export default function BrainDumpPage() {
         </div>
       </div>
 
-      <div className="bd-bottom-bar">
+      <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
+        <button
+          type="button"
+          className={`bd-bottom-secondary${mode === "all" ? " bd-bottom-secondary-active" : ""}`}
+          onClick={() => setMode("all")}
+        >
+          {t("bottom.all")}
+        </button>
         <button
           type="button"
           className={`bd-bottom-secondary${mode === "work" ? " bd-bottom-secondary-active" : ""}`}
           onClick={() => setMode("work")}
         >
-          Work
+          {t("bottom.work")}
         </button>
         <button
           type="button"
@@ -407,14 +416,14 @@ export default function BrainDumpPage() {
             }
           }}
         >
-          Dump
+          {t("bottom.dump")}
         </button>
         <button
           type="button"
           className={`bd-bottom-secondary${mode === "personal" ? " bd-bottom-secondary-active" : ""}`}
           onClick={() => setMode("personal")}
         >
-          Personal
+          {t("bottom.personal")}
         </button>
       </div>
 

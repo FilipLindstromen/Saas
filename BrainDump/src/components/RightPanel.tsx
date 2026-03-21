@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import type { OrganizedItemPreview } from "./CenterPanel";
 import { SavedItemsList } from "./SavedItemsList";
 
@@ -19,6 +20,7 @@ interface RightPanelProps {
 }
 
 export function RightPanel({ mode, items, transcript, onSaveComplete, projectId, category, itemType }: RightPanelProps) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState<EditableItem[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
 
   const handleSave = async () => {
     if (editing.length === 0) {
-      setError("No items to save.");
+      setError(t("right.noItems"));
       return;
     }
     setError(null);
@@ -120,10 +122,10 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
     <div className="bd-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-          Review & save
+          {t("right.reviewSave")}
         </h3>
         <button type="button" className="bd-btn bd-btn-primary" onClick={handleSave} disabled={saving || list.length === 0}>
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("right.saving") : t("right.save")}
         </button>
       </div>
       {error && (

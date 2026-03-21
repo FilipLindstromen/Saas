@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface Project {
   id: string;
@@ -124,6 +125,7 @@ export function ScopeBar({
   searchFilter = "",
   onSearchFilterChange,
 }: ScopeBarProps) {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [counts, setCounts] = useState<CountsResponse | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
@@ -245,20 +247,31 @@ export function ScopeBar({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: isMobile ? "0.65rem" : "0.5rem",
+            padding: isMobile ? "0.5rem 0" : "0.5rem 1rem",
             background: "var(--bg-secondary)",
-            borderBottom: "1px solid var(--border-subtle)",
-            overflowX: "auto",
+            overflowX: isMobile ? "visible" : "auto",
           }}
         >
+          <div
+            className={`bd-scope-strip${isMobile ? " bd-scope-chip-touch" : ""}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              overflowX: "auto",
+              minWidth: 0,
+              width: "100%",
+            }}
+          >
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
-            Project:
+            {t("scope.project")}
           </span>
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
             <ScopeChip
-              label="All"
+              label={t("scope.all")}
               selected={!selectedProjectId}
               onClick={() => onProjectSelect(null)}
             />
@@ -306,12 +319,12 @@ export function ScopeBar({
                       setShowAddProject(false);
                     }
                   }}
-                  placeholder="New project…"
+                  placeholder={t("scope.newProject")}
                   autoFocus
                   style={{ width: 120, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
                 />
                 <button type="button" className="bd-btn" onClick={() => { setAddProjectName(""); setShowAddProject(false); }} style={{ padding: "0.3rem 0.5rem" }}>
-                  Cancel
+                  {t("scope.cancel")}
                 </button>
               </span>
             ) : (
@@ -319,37 +332,48 @@ export function ScopeBar({
                 type="button"
                 className="bd-btn"
                 onClick={() => setShowAddProject(true)}
-                title="Add project"
+                title={t("scope.addProject")}
                 style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
               >
                 +
               </button>
             )}
           </div>
+          </div>
           {onSearchFilterChange && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginLeft: "auto", flexShrink: 0 }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)" }}>Filter:</span>
-              <div style={{ position: "relative", width: 180, flexShrink: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                marginLeft: isMobile ? 0 : "auto",
+                flexShrink: 0,
+                width: isMobile ? "100%" : undefined,
+              }}
+            >
+              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>{t("scope.filter")}</span>
+              <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
                 <input
-                  type="text"
+                  type="search"
+                  enterKeyHint="search"
                   className="bd-input"
                   value={searchFilter}
                   onChange={(e) => onSearchFilterChange(e.target.value)}
-                  placeholder="Search entries…"
-                  style={{ width: "100%", padding: "0.35rem 1.9rem 0.35rem 0.5rem", fontSize: "0.8125rem" }}
+                  placeholder={t("scope.searchPlaceholder")}
+                  style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
                 />
                 {searchFilter && (
                   <button
                     type="button"
-                    aria-label="Clear filter"
+                    aria-label={t("scope.clearFilter")}
                     onClick={() => onSearchFilterChange("")}
                     style={{
                       position: "absolute",
                       right: 6,
                       top: "50%",
                       transform: "translateY(-50%)",
-                      width: 18,
-                      height: 18,
+                      width: 28,
+                      height: 28,
                       borderRadius: "999px",
                       border: "none",
                       background: "transparent",
@@ -358,7 +382,7 @@ export function ScopeBar({
                       justifyContent: "center",
                       color: "var(--text-tertiary)",
                       cursor: "pointer",
-                      fontSize: "0.75rem",
+                      fontSize: "0.875rem",
                       padding: 0,
                     }}
                   >
@@ -411,7 +435,7 @@ export function ScopeBar({
                 setContextMenu(null);
               }}
             >
-              Rename
+              {t("scope.rename")}
             </button>
             <button
               type="button"
@@ -419,11 +443,11 @@ export function ScopeBar({
               style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
               onClick={() => handleDeleteProject(contextMenu.project)}
             >
-              Delete project
+              {t("scope.deleteProject")}
             </button>
             {isMobile && (
               <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setContextMenu(null)}>
-                Cancel
+                {t("scope.cancel")}
               </button>
             )}
           </div>
@@ -449,7 +473,7 @@ export function ScopeBar({
               style={{ padding: "1.25rem", maxWidth: 360, width: "100%" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Rename project</h3>
+              <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("scope.renameProject")}</h3>
               <input
                 className="bd-input"
                 value={renameValue}
@@ -479,13 +503,13 @@ export function ScopeBar({
                     setRenameValue("");
                   }
                 }}
-                placeholder="Project name"
+                placeholder={t("scope.projectName")}
                 autoFocus
                 style={{ width: "100%", marginBottom: "1rem" }}
               />
               <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                 <button type="button" className="bd-btn" onClick={() => { setRenameProject(null); setRenameValue(""); }}>
-                  Cancel
+                  {t("scope.cancel")}
                 </button>
                 <button
                   type="button"
@@ -510,7 +534,7 @@ export function ScopeBar({
                       .catch(() => {});
                   }}
                 >
-                  Save
+                  {t("scope.save")}
                 </button>
               </div>
             </div>
@@ -536,13 +560,13 @@ export function ScopeBar({
               style={{ padding: "1.25rem", maxWidth: 360 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Delete project?</h3>
+              <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("scope.deleteProjectConfirm")}</h3>
               <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                &ldquo;{confirmProject.name}&rdquo; and all its tasks, notes, and other items will be permanently deleted. This cannot be undone.
+                &ldquo;{confirmProject.name}&rdquo; {t("scope.deleteProjectBody")}
               </p>
               <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                 <button type="button" className="bd-btn" onClick={() => setConfirmProject(null)}>
-                  No
+                  {t("scope.no")}
                 </button>
                 <button
                   type="button"
@@ -550,7 +574,7 @@ export function ScopeBar({
                   style={{ background: "var(--text-danger, #c53030)", color: "#fff", borderColor: "var(--text-danger, #c53030)" }}
                   onClick={confirmDeleteProject}
                 >
-                  Yes, delete
+                  {t("scope.yesDelete")}
                 </button>
               </div>
             </div>
@@ -570,20 +594,31 @@ export function ScopeBar({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: isMobile ? "0.65rem" : "0.5rem",
+            padding: isMobile ? "0.5rem 0" : "0.5rem 1rem",
             background: "var(--bg-secondary)",
-            borderBottom: "1px solid var(--border-subtle)",
-            overflowX: "auto",
+            overflowX: isMobile ? "visible" : "auto",
           }}
         >
+          <div
+            className={`bd-scope-strip${isMobile ? " bd-scope-chip-touch" : ""}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              overflowX: "auto",
+              minWidth: 0,
+              width: "100%",
+            }}
+          >
           <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
-            Area:
+            {t("scope.area")}
           </span>
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
             <ScopeChip
-              label="All"
+              label={t("scope.all")}
               selected={!selectedCategory}
               onClick={() => onCategorySelect(null)}
             />
@@ -640,12 +675,12 @@ export function ScopeBar({
                       setShowAddArea(false);
                     }
                   }}
-                  placeholder="New area…"
+                  placeholder={t("scope.newArea")}
                   autoFocus
                   style={{ width: 100, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
                 />
                 <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.3rem 0.5rem" }}>
-                  Cancel
+                  {t("scope.cancel")}
                 </button>
               </span>
             ) : (
@@ -653,37 +688,48 @@ export function ScopeBar({
                 type="button"
                 className="bd-btn"
                 onClick={() => setShowAddArea(true)}
-                title="Add area"
+                title={t("scope.addArea")}
                 style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
               >
                 +
               </button>
             )}
           </div>
+          </div>
         {onSearchFilterChange && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginLeft: "auto", flexShrink: 0 }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)" }}>Filter:</span>
-            <div style={{ position: "relative", width: 180, flexShrink: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              marginLeft: isMobile ? 0 : "auto",
+              flexShrink: 0,
+              width: isMobile ? "100%" : undefined,
+            }}
+          >
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>{t("scope.filter")}</span>
+            <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 className="bd-input"
                 value={searchFilter}
                 onChange={(e) => onSearchFilterChange(e.target.value)}
-                placeholder="Search entries…"
-                style={{ width: "100%", padding: "0.35rem 1.9rem 0.35rem 0.5rem", fontSize: "0.8125rem" }}
+                placeholder={t("scope.searchPlaceholder")}
+                style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
               />
               {searchFilter && (
                 <button
                   type="button"
-                  aria-label="Clear filter"
+                  aria-label={t("scope.clearFilter")}
                   onClick={() => onSearchFilterChange("")}
                   style={{
                     position: "absolute",
                     right: 6,
                     top: "50%",
                     transform: "translateY(-50%)",
-                    width: 18,
-                    height: 18,
+                    width: 28,
+                    height: 28,
                     borderRadius: "999px",
                     border: "none",
                     background: "transparent",
@@ -692,7 +738,7 @@ export function ScopeBar({
                     justifyContent: "center",
                     color: "var(--text-tertiary)",
                     cursor: "pointer",
-                    fontSize: "0.75rem",
+                    fontSize: "0.875rem",
                     padding: 0,
                   }}
                 >
@@ -745,11 +791,11 @@ export function ScopeBar({
                 setAreaContextMenu(null);
               }}
             >
-              Remove area
+              {t("scope.removeArea")}
             </button>
             {isMobile && (
               <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setAreaContextMenu(null)}>
-                Cancel
+                {t("scope.cancel")}
               </button>
             )}
           </div>

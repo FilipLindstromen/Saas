@@ -16,6 +16,7 @@ export const maxDuration = 30;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
     const items = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
     const clientKey = (body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "").trim();
     const apiKey = process.env.OPENAI_API_KEY || clientKey;
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
       })
       .join("\n");
 
-    const systemPrompt = `You are a focused productivity coach.
+    const systemPromptEn = `You are a focused productivity coach.
 
 Given the user's current tasks, notes, calendar entries and ideas, suggest the next 1–3 concrete actions they should take.
 
@@ -65,13 +66,32 @@ Rules:
 Return ONLY JSON with this shape:
 { "suggestions": [ { "title": string, "reason": string } ] }`;
 
+    const systemPromptSv = `Du är en fokuserad produktivitetscoach.
+
+Utifrån användarens nuvarande uppgifter, anteckningar, kalenderposter och idéer: föreslå nästa 1–3 konkreta åtgärder.
+
+Regler:
+- Var specifik och handlingsbar (vad göra härnäst, inte flummiga råd).
+- Korta tydliga rubriker (3–8 ord) och en mening som förklaring.
+- Prioritera tidsbundna poster (kalender / deadlines) och uppgifter som driver viktiga projekt framåt.
+- Om allt är klart eller inget är handlingsbart: returnera en tom lista.
+
+Returnera ENDAST JSON med formen:
+{ "suggestions": [ { "title": string, "reason": string } ] }`;
+
+    const systemPrompt = locale === "sv" ? systemPromptSv : systemPromptEn;
+    const userContent =
+      locale === "sv"
+        ? `Här är användarens poster:\n\n${summary}\n\nFöreslå 1–3 nästa åtgärder. Skriv title och reason på svenska.`
+        : `Here are the user's current items:\n\n${summary}\n\nSuggest 1–3 next actions.`;
+
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Here are the user's current items:\n\n${summary}\n\nSuggest 1–3 next actions.`,
+          content: userContent,
         },
       ],
       temperature: 0.4,

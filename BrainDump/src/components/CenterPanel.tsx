@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
@@ -89,6 +90,7 @@ export function CenterPanel({
   onViewTypeChange,
   searchFilter = "",
 }: CenterPanelProps) {
+  const { t, locale } = useI18n();
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [transcript, setTranscript] = useState("");
   const [transcribeLoading, setTranscribeLoading] = useState(false);
@@ -96,6 +98,7 @@ export function CenterPanel({
   const [error, setError] = useState<string | null>(null);
   const [audioDevices, setAudioDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [isMobile, setIsMobile] = useState(false);
   const [recordingElapsed, setRecordingElapsed] = useState("0:00");
   const [organizeSuccess, setOrganizeSuccess] = useState<string | null>(null);
   const [unclearItems, setUnclearItems] = useState<{ items: OrganizedItemPreview[]; allItems: OrganizedItemPreview[]; transcript: string } | null>(null);
@@ -138,11 +141,24 @@ export function CenterPanel({
   }, []);
 
   useEffect(() => {
-    loadDevices();
-  }, [loadDevices]);
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
-    if (showDumpOverlay) loadDevices(true);
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 768px)").matches) return;
+    loadDevices();
+  }, [loadDevices, isMobile]);
+
+  useEffect(() => {
+    if (!showDumpOverlay || typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 768px)").matches) return;
+    loadDevices(true);
   }, [showDumpOverlay, loadDevices]);
 
   useEffect(() => {
@@ -229,7 +245,9 @@ export function CenterPanel({
     setError(null);
     try {
       let stream: MediaStream | null = null;
-      if (selectedDeviceId) {
+      if (isMobile) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } else if (selectedDeviceId) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { deviceId: { exact: selectedDeviceId } },
@@ -250,7 +268,7 @@ export function CenterPanel({
       if (!stream) {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
-      if (selectedDeviceId) {
+      if (!isMobile && selectedDeviceId) {
         try {
           localStorage.setItem(MIC_STORAGE_KEY, selectedDeviceId);
         } catch {}
@@ -313,9 +331,9 @@ export function CenterPanel({
       recorder.start(250);
       setRecordState("recording");
     } catch (e) {
-      setError("Microphone access denied or unavailable.");
+      setError(t("error.micDenied"));
     }
-  }, [selectedDeviceId]);
+  }, [selectedDeviceId, isMobile, t]);
 
   const stopRecording = useCallback(() => {
     const rec = mediaRecorderRef.current;
@@ -327,22 +345,22 @@ export function CenterPanel({
         const win = window as unknown as { __lastAudioBlob?: Blob };
         const blob = win.__lastAudioBlob;
         if (!blob || blob.size === 0) {
-          setError("No audio was captured. Check that the microphone is working and not muted, then try again.");
+          setError(t("error.noAudio"));
         }
       }, 200);
     }
-  }, []);
+  }, [t]);
 
   const transcribe = useCallback(async (): Promise<string | null> => {
     const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string };
     const blob = win.__lastAudioBlob;
     const fileName = win.__lastAudioFileName || "recording.webm";
     if (!blob) {
-      setError("Record audio first, then click Transcribe.");
+      setError(t("error.recordFirst"));
       return null;
     }
     if (blob.size === 0) {
-      setError("Recording is empty. Record again and wait a few seconds before stopping.");
+      setError(t("error.emptyRecording"));
       return null;
     }
     setError(null);
@@ -352,6 +370,7 @@ export function CenterPanel({
       form.append("file", blob, fileName);
       const key = getStoredOpenAIKey();
       if (key) form.append("apiKey", key);
+      if (locale === "sv") form.append("language", "sv");
       const res = await fetch("/api/transcribe", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) {
@@ -372,27 +391,27 @@ export function CenterPanel({
     } finally {
       setTranscribeLoading(false);
     }
-  }, [transcript, onTranscriptReady, onOpenSettings]);
+  }, [transcript, onTranscriptReady, onOpenSettings, locale, t]);
 
   const applyOrganizeResult = useCallback(
     (items: OrganizedItemPreview[], text: string) => {
       const n = items.length;
       if (onAutoSave) {
         onAutoSave(items, text);
-        setOrganizeSuccess(n ? `Organized and saved ${n} item${n !== 1 ? "s" : ""}.` : null);
+        setOrganizeSuccess(n ? t("center.organizedSaved", { n }) : null);
       } else {
         onOrganized(items, text);
-        setOrganizeSuccess(n ? `Organized into ${n} item${n !== 1 ? "s" : ""}. Review and save on the right.` : null);
+        setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
       }
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [onAutoSave, onOrganized]
+    [onAutoSave, onOrganized, t]
   );
 
   const organize = useCallback(async (transcriptOverride?: string) => {
     const text = (transcriptOverride ?? transcript).trim();
     if (!text) {
-      setError("Enter or paste a transcript, then click Organize.");
+      setError(t("error.enterTranscript"));
       return;
     }
     setError(null);
@@ -414,6 +433,7 @@ export function CenterPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript: text,
+          locale,
           ...(key ? { apiKey: key } : {}),
           projectNames: projectNames.length > 0 ? projectNames : undefined,
           ...(defaultDomain ? { defaultDomain } : {}),
@@ -440,7 +460,7 @@ export function CenterPanel({
     } finally {
       setOrganizeLoading(false);
     }
-  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode]);
+  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();
@@ -507,29 +527,18 @@ export function CenterPanel({
   }, []);
 
   const isInbox = mode === "inbox";
-  const reflectionQuestions = [
-    "How are you feeling right now?",
-    "What is the most important thing you need to do next?",
-    "Is there anything you have been avoiding?",
-    "What unfinished task is taking up mental space?",
-    "What would make today feel successful?",
-    "Is there a small step you can take in the next 10 minutes?",
-    "What can you delegate, defer, or delete?",
-    "Is there anything you need to communicate to someone?",
-    "What are you grateful for in this moment?",
-    "What do you want to remember from this brain dump?",
-  ] as const;
+  const reflectionQuestions = Array.from({ length: 10 }, (_, i) => t(`help.q${i + 1}`));
 
   const dumpPanelContent = (
     <>
       <section>
         <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-          Record
+          {t("center.record")}
         </h3>
-        {audioDevices.length > 0 && (
+        {!isMobile && audioDevices.length > 0 && (
           <div style={{ marginBottom: "0.75rem" }}>
             <label htmlFor="bd-mic-select" style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>
-              Microphone
+              {t("center.microphone")}
             </label>
             <select
               id="bd-mic-select"
@@ -538,7 +547,7 @@ export function CenterPanel({
               onChange={(e) => setSelectedDeviceId(e.target.value)}
               disabled={recordState === "recording"}
               style={{ width: "100%", maxWidth: "100%", minHeight: "44px" }}
-              aria-label="Microphone"
+              aria-label={t("center.microphone")}
             >
               {audioDevices.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
@@ -548,14 +557,14 @@ export function CenterPanel({
             </select>
           </div>
         )}
-        {audioDevices.length === 0 && (
+        {!isMobile && audioDevices.length === 0 && (
           <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
-            Allow microphone access to use your device&apos;s microphone.
+            {t("center.allowMic")}
           </p>
         )}
         {recordState === "recording" && (
           <div style={{ marginBottom: "0.75rem" }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Input level</div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("center.inputLevel")}</div>
             <canvas
               ref={canvasRef}
               width={280}
@@ -568,7 +577,7 @@ export function CenterPanel({
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
           {recordState === "idle" ? (
             <button type="button" className="bd-btn bd-btn-primary" onClick={startRecording} style={{ minHeight: "44px", minWidth: "44px" }}>
-              Dump
+              {t("center.dump")}
             </button>
           ) : (
             <>
@@ -580,8 +589,8 @@ export function CenterPanel({
                 className="bd-btn bd-btn-primary"
                 onClick={handleStopAndProcess}
                 disabled={transcribeLoading || organizeLoading}
-                title="Stop and transcribe + organize"
-                aria-label="Stop and transcribe + organize"
+                title={t("center.stopOrganize")}
+                aria-label={t("center.stopOrganize")}
                 style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -593,8 +602,8 @@ export function CenterPanel({
                 className="bd-btn bd-btn-danger"
                 onClick={handleCancelRecording}
                 disabled={transcribeLoading || organizeLoading}
-                title="Cancel recording (don't transcribe)"
-                aria-label="Cancel recording"
+                title={t("center.cancelRecording")}
+                aria-label={t("center.cancelRecording")}
                 style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
@@ -603,22 +612,24 @@ export function CenterPanel({
               </button>
             </>
           )}
-          <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title="Refresh microphone list" style={{ minHeight: "44px" }}>
-            Refresh mics
-          </button>
+          {!isMobile && (
+            <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title={t("center.refreshMics")} style={{ minHeight: "44px" }}>
+              {t("center.refreshMics")}
+            </button>
+          )}
         </div>
       </section>
       <section>
         <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-          Transcript
+          {t("center.transcript")}
         </h3>
         <textarea
           className="bd-textarea"
           value={transcript}
           onChange={(e) => saveTranscriptToStorage(e.target.value)}
-          placeholder="Recording transcript will appear here after Transcribe. You can also paste or type."
+          placeholder={t("center.transcriptPlaceholder")}
           style={{ minHeight: "160px", minBlockSize: "160px", fontSize: "16px", borderRadius: 18 }}
-          aria-label="Transcript"
+          aria-label={t("center.transcript")}
         />
       </section>
       {organizeSuccess && (
@@ -631,7 +642,7 @@ export function CenterPanel({
           <span>{error}</span>
           {typeof error === "string" && (error.includes(OPENAI_KEY_ERROR) || error.includes("OPENAI_API_KEY")) && onOpenSettings && (
             <button type="button" className="bd-btn bd-btn-primary" onClick={onOpenSettings} style={{ flexShrink: 0 }}>
-              Open settings
+              {t("center.openSettings")}
             </button>
           )}
         </div>
@@ -640,10 +651,10 @@ export function CenterPanel({
   );
 
   return (
-    <div className="bd-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", background: "var(--bg-primary)" }}>
+    <div className="bd-panel bd-center-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", background: "var(--bg-primary)" }}>
       {isInbox && !showDumpOverlay && (
         <p style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", margin: 0 }}>
-          Record a new dump with the button below.
+          {t("center.dumpPromptInbox")}
         </p>
       )}
       <button
@@ -651,8 +662,8 @@ export function CenterPanel({
         className="bd-dump-fab"
         type="button"
         onClick={() => setShowDumpOverlay(true)}
-        title="Record a new dump"
-        aria-label="Record a new dump"
+        title={t("center.recordNewDump")}
+        aria-label={t("center.recordNewDump")}
         style={{
           position: "fixed",
           bottom: "1.5rem",
@@ -680,6 +691,7 @@ export function CenterPanel({
       </button>
       {showDumpOverlay && (
             <div
+              className="bd-dump-overlay"
               style={{
                 position: "fixed",
                 inset: 0,
@@ -702,7 +714,7 @@ export function CenterPanel({
               }}
             >
               <div
-                className="bd-panel"
+                className="bd-panel bd-dump-sheet-inner"
                 style={{
                   padding: "1.25rem",
                   maxWidth: 520,
@@ -714,8 +726,9 @@ export function CenterPanel({
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
+                <div className="bd-dump-sheet-handle" aria-hidden />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>New dump</h2>
+                  <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{t("center.newDump")}</h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
                     <button
                       type="button"
@@ -723,7 +736,7 @@ export function CenterPanel({
                         setShowDumpOverlay(false);
                         if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
                       }}
-                      aria-label="Close"
+                      aria-label={t("center.close")}
                       style={{
                         width: 32,
                         height: 32,
@@ -747,7 +760,7 @@ export function CenterPanel({
                       onClick={() => setShowHelpOverlay(true)}
                       style={{ minHeight: "36px", paddingInline: "0.75rem" }}
                     >
-                      Help
+                      {t("center.help")}
                     </button>
                   </div>
                 </div>
@@ -759,20 +772,23 @@ export function CenterPanel({
       )}
       {showDumpOverlay && showHelpOverlay && (
         <div
+          className="bd-help-overlay-mobile"
           style={{
             position: "fixed",
             inset: 0,
             zIndex: 1100,
             background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "1rem",
+            padding: "max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))",
           }}
           onClick={() => setShowHelpOverlay(false)}
         >
           <div
-            className="bd-panel"
+            className="bd-panel bd-help-sheet-inner"
             style={{
               width: "100%",
               maxWidth: 560,
@@ -786,19 +802,19 @@ export function CenterPanel({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-              <h3 style={{ fontSize: "1rem", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>Reflection help</h3>
+              <h3 style={{ fontSize: "1rem", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>{t("center.reflectionHelp")}</h3>
               <button
                 type="button"
                 className="bd-btn"
                 onClick={() => setShowHelpOverlay(false)}
-                aria-label="Close help"
+                aria-label={t("center.closeHelp")}
                 style={{ minHeight: "36px", paddingInline: "0.75rem" }}
               >
-                Close
+                {t("center.closeHelp")}
               </button>
             </div>
             <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-              Use these prompts to get a clearer brain dump before organizing.
+              {t("center.reflectionHelpIntro")}
             </p>
             <ol style={{ margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem", color: "var(--text-primary)" }}>
               {reflectionQuestions.map((q) => (
@@ -809,7 +825,7 @@ export function CenterPanel({
             </ol>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button type="button" className="bd-btn bd-btn-primary" onClick={() => setShowHelpOverlay(false)}>
-                Got it
+                {t("center.gotIt")}
               </button>
             </div>
           </div>

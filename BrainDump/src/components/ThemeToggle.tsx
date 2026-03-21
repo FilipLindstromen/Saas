@@ -43,7 +43,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="bd-btn"
+      className="bd-btn bd-theme-toggle"
       title={theme === "dark" ? "Switch to light" : "Switch to dark"}
       aria-label="Toggle theme"
       style={{ padding: "0.5rem" }}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
+import { I18nProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "BrainDump | Voice capture & thought organization",
@@ -13,6 +14,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0d111a" },
+    { media: "(prefers-color-scheme: light)", color: "#f0f0f0" },
+  ],
 };
 
 export default function RootLayout({
@@ -30,7 +35,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <AuthSessionProvider>
+          <I18nProvider>{children}</I18nProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import type { OrganizedItemPreview } from "./CenterPanel";
 
 const DOMAINS = ["inbox", "work", "personal"] as const;
@@ -16,7 +17,14 @@ interface UnclearOverlayProps {
   onCancel: () => void;
 }
 
+const DOMAIN_LABEL: Record<string, string> = {
+  inbox: "mode.inbox",
+  work: "mode.work",
+  personal: "mode.personal",
+};
+
 export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: UnclearOverlayProps) {
+  const { t } = useI18n();
   const [edited, setEdited] = useState<OrganizedItemPreview[]>(() =>
     items.map((it) => ({ ...it, domain: it.domain || "inbox", category: it.category || "unprocessed", item_type: it.item_type || "note" }))
   );
@@ -62,10 +70,10 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
       >
         <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--border-subtle)" }}>
           <h2 id="unclear-title" style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
-            Clarify classification
+            {t("unclear.heading")}
           </h2>
           <p style={{ margin: "0.25rem 0 0", fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>
-            The following items were unclear. Set domain, category, and type for each.
+            {t("unclear.body")}
           </p>
         </div>
         <div style={{ overflow: "auto", flex: 1, padding: "1rem" }}>
@@ -100,7 +108,7 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
                   style={{ width: "auto", minWidth: "6rem" }}
                 >
                   {DOMAINS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d} value={d}>{t(DOMAIN_LABEL[d] ?? `mode.${d}`)}</option>
                   ))}
                 </select>
                 <select
@@ -130,7 +138,7 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
                     onChange={(e) => update(index, { project_name: e.target.value || undefined })}
                     style={{ width: "auto", minWidth: "6rem" }}
                   >
-                    <option value="">No project</option>
+                    <option value="">{t("menu.noProject")}</option>
                     {projectNames.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
@@ -141,8 +149,8 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
           ))}
         </div>
         <div style={{ padding: "1rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-          <button type="button" className="bd-btn" onClick={onCancel}>Cancel</button>
-          <button type="button" className="bd-btn bd-btn-primary" onClick={() => onConfirm(edited)}>Apply & continue</button>
+          <button type="button" className="bd-btn" onClick={onCancel}>{t("menu.cancel")}</button>
+          <button type="button" className="bd-btn bd-btn-primary" onClick={() => onConfirm(edited)}>{t("unclear.applyContinue")}</button>
         </div>
       </div>
     </div>

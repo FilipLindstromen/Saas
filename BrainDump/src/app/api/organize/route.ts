@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     const projectNames = Array.isArray(body.projectNames) ? body.projectNames.filter((p: unknown) => typeof p === "string") : undefined;
     const defaultDomain = body.defaultDomain === "work" || body.defaultDomain === "personal" ? body.defaultDomain : undefined;
     const customCategories = Array.isArray(body.customCategories) ? body.customCategories.filter((c: unknown) => typeof c === "string" && c.trim()) : undefined;
+    const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
 
     let existingCategories: string[] | undefined;
     if (defaultDomain === "work" || defaultDomain === "personal") {
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
       defaultDomain: defaultDomain ?? null,
       existingCategories,
       customCategories,
+      locale,
     };
 
     const items = await organizeTranscript(transcript, apiKey, options);

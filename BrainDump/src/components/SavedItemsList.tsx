@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface SavedItem {
   id: string;
@@ -58,6 +59,7 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
 };
 
 export function SavedItemsList({ mode, projectId, category, itemType }: SavedItemsListProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -193,7 +195,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   if (loading) {
     return (
       <div className="bd-panel" style={{ padding: "1.5rem" }}>
-        <p className="bd-empty">Loading…</p>
+        <p className="bd-empty">{t("items.loading")}</p>
       </div>
     );
   }
@@ -201,7 +203,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   if (items.length === 0) {
     return (
       <div className="bd-panel" style={{ padding: "1.5rem" }}>
-        <p className="bd-empty">No saved items yet. Record, transcribe, organize, then save.</p>
+        <p className="bd-empty">{t("saved.empty")}</p>
       </div>
     );
   }
@@ -209,7 +211,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   return (
     <div className="bd-panel" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
       <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-        Saved items
+        {t("saved.title")}
       </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", overflow: "auto" }}>
         {items.map((it) => (
@@ -316,7 +318,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-              Change type
+              {t("menu.changeType")}
             </div>
             {types.map(({ value, label }) => (
               <button
@@ -347,7 +349,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 closeMenu();
               }}
             >
-              Edit
+              {t("menu.edit")}
             </button>
             <button
               type="button"
@@ -370,7 +372,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 closeMenu();
               }}
             >
-              Set reminder
+              {t("menu.setReminder")}
             </button>
             <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
               <button
@@ -382,12 +384,12 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   closeMenu();
                 }}
               >
-                Delete
+                {t("menu.delete")}
               </button>
             </div>
             {isMobile && (
               <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
-                Cancel
+                {t("menu.cancel")}
               </button>
             )}
           </div>
@@ -414,27 +416,27 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             style={{ padding: "1.25rem", maxWidth: 480, width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Edit entry</h3>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Headline</label>
+            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
             <input
               className="bd-input"
               value={editingEntry.title}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, title: e.target.value })}
-              placeholder="Title"
+              placeholder={t("items.titlePlaceholder")}
               style={{ width: "100%", marginBottom: "0.75rem" }}
               autoFocus
             />
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Description</label>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.description")}</label>
             <textarea
               className="bd-textarea"
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
-              placeholder="What you said (description)"
+              placeholder={t("items.descPlaceholder")}
             style={{ width: "100%", minHeight: 120, marginBottom: "1rem", borderRadius: 18 }}
             />
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
               <button type="button" className="bd-btn" onClick={() => setEditingEntry(null)}>
-                Cancel
+                {t("scope.cancel")}
               </button>
               <button
                 type="button"
@@ -444,7 +446,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   setEditingEntry(null);
                 }}
               >
-                Save
+                {t("scope.save")}
               </button>
             </div>
           </div>
@@ -470,9 +472,9 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             style={{ padding: "1.25rem", maxWidth: 400, width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Set reminder</h3>
+            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.setReminder")}</h3>
             <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", margin: "0 0 0.75rem" }}>{reminderEntry.title}</p>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Date & time</label>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.dateTime")}</label>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
               <input
                 type="date"
@@ -489,7 +491,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 style={{ flex: "1 1 100px", padding: "0.35rem 0.5rem" }}
               />
             </div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Also notify this many minutes before</label>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.notifyMinutesBefore")}</label>
             <select
               className="bd-input"
               value={reminderEntry.reminderMinutesBefore}
@@ -504,7 +506,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             </select>
             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
               <button type="button" className="bd-btn" onClick={() => setReminderEntry(null)}>
-                Cancel
+                {t("scope.cancel")}
               </button>
               <button
                 type="button"
@@ -515,7 +517,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   setReminderEntry(null);
                 }}
               >
-                Clear reminder
+                {t("items.clearReminder")}
               </button>
               <button
                 type="button"
@@ -532,7 +534,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   setReminderEntry(null);
                 }}
               >
-                Save
+                {t("scope.save")}
               </button>
             </div>
           </div>

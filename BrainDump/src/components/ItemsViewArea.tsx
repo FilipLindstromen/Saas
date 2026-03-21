@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useI18n } from "@/lib/i18n";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -237,6 +238,7 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
 }
 
 export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeSelect, viewType: controlledViewType, onViewTypeChange, searchFilter = "", reloadKey = 0 }: ItemsViewAreaProps) {
+  const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const filteredItems = filterItemsBySearch(filterItemsByType(items, itemType), searchFilter);
@@ -405,20 +407,21 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     }
   };
 
-  const typeOptions = (() => {
+  const typeOptions = useMemo(() => {
     const base = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
     const excludeType = "reminder";
+    const allLabel = t("items.allTypes");
     if (counts?.itemTypeCounts && Object.keys(counts.itemTypeCounts).length > 0) {
       return [
-        { value: "", label: "All types" },
+        { value: "", label: allLabel },
         ...Object.keys(counts.itemTypeCounts)
           .filter((v) => v !== excludeType && (counts!.itemTypeCounts![v] ?? 0) > 0)
           .sort((a, b) => a.localeCompare(b))
           .map((value) => ({ value, label: formatTypeLabel(value) })),
       ];
     }
-    return [{ value: "", label: "All types" }, ...base.map((t) => ({ value: t.value, label: t.label }))];
-  })();
+    return [{ value: "", label: allLabel }, ...base.map((x) => ({ value: x.value, label: x.label }))];
+  }, [mode, counts?.itemTypeCounts, t]);
 
   useEffect(() => {
     try {
@@ -564,16 +567,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     fetch("/api/suggest-next-actions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: payload, ...(apiKey ? { apiKey } : {}) }),
+      body: JSON.stringify({ items: payload, locale, ...(apiKey ? { apiKey } : {}) }),
     })
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data.suggestions) ? data.suggestions : [];
         setSuggestNextList(list.slice(0, 3));
       })
-      .catch(() => setSuggestNextList([{ title: "Could not load suggestions. Check API key in Settings." }]))
+      .catch(() => setSuggestNextList([{ title: t("items.suggestError") }]))
       .finally(() => setSuggestNextLoading(false));
-  }, [items]);
+  }, [items, locale, t]);
 
   useEffect(() => {
     if (mode !== "work") return;
@@ -700,29 +703,70 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     []
   );
 
+  const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
+    () => [
+      { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
+      { value: "text", label: t("items.viewText"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><line x1="8" y1="7" x2="16" y2="7" /><line x1="8" y1="11" x2="16" y2="11" /><line x1="8" y1="15" x2="12" y2="15" /></svg> },
+      { value: "kanban", label: t("items.viewKanban"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="9.5" y="3" width="5" height="18" rx="1" /><rect x="16" y="3" width="5" height="18" rx="1" /></svg> },
+      { value: "postits", label: t("items.viewPostits"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 9h6" /><path d="M9 13h6" /><path d="M9 17h4" /></svg> },
+      { value: "calendar", label: t("items.viewCalendar"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
+      { value: "flowchart", label: t("items.viewFlowchart"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /><path d="M10 7v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7" /><path d="M10 14v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3" /></svg> },
+    ],
+    [t]
+  );
+
   if (loading) {
     return (
       <div style={{ padding: "1.5rem" }}>
-        <p className="bd-empty">Loading…</p>
+        <p className="bd-empty">{t("items.loading")}</p>
       </div>
     );
   }
 
-  const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = [
-    { value: "list", label: "List", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
-    { value: "text", label: "Text", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><line x1="8" y1="7" x2="16" y2="7" /><line x1="8" y1="11" x2="16" y2="11" /><line x1="8" y1="15" x2="12" y2="15" /></svg> },
-    { value: "kanban", label: "Kanban", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="9.5" y="3" width="5" height="18" rx="1" /><rect x="16" y="3" width="5" height="18" rx="1" /></svg> },
-    { value: "postits", label: "Post-its", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 9h6" /><path d="M9 13h6" /><path d="M9 17h4" /></svg> },
-    { value: "calendar", label: "Calendar", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
-    { value: "flowchart", label: "Flow chart", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /><path d="M10 7v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7" /><path d="M10 14v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3" /></svg> },
-  ];
-
   return (
-    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", minHeight: 0, flex: 1 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+    <div
+      style={{
+        padding: isMobile ? "0.65rem" : "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: isMobile ? "0.65rem" : "1rem",
+        minHeight: 0,
+        flex: 1,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "center",
+          justifyContent: "space-between",
+          gap: "0.65rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            minWidth: 0,
+          }}
+        >
           {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
-            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div
+              className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
+              style={{
+                display: "flex",
+                gap: "0.35rem",
+                alignItems: "center",
+                flexWrap: isMobile ? "nowrap" : "wrap",
+                overflowX: isMobile ? "auto" : "visible",
+                minWidth: 0,
+                width: isMobile ? "100%" : "auto",
+                paddingBottom: isMobile ? 2 : 0,
+              }}
+            >
               {typeOptions.map((opt) => {
                 const isSelected = (itemType ?? "") === opt.value;
                 const color = typeColor(opt.value);
@@ -732,8 +776,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     type="button"
                     className="bd-btn"
                     style={{
-                      padding: "0.35rem 0.6rem",
+                      padding: isMobile ? "0.45rem 0.75rem" : "0.35rem 0.6rem",
                       fontSize: "0.8125rem",
+                      minHeight: isMobile ? 44 : undefined,
+                      flexShrink: 0,
                       background: isSelected ? (color ?? "var(--accent)") : undefined,
                       color: isSelected ? "#fff" : undefined,
                       borderColor: color ?? "transparent",
@@ -746,47 +792,72 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               })}
             </div>
           )}
-          <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>
-            {filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""}
-          </span>
-          {(mode === "work" || mode === "personal" || mode === "all") && (
-            <button
-              type="button"
-              className="bd-btn"
-              title="Add new entry"
-              style={{ padding: "0.35rem 0.6rem", marginLeft: "0.5rem" }}
-              onClick={() => {
-                const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
-                setAddEntryForm({
-                  itemType: types[0]?.value ?? "note",
-                  title: "",
-                  content: "",
-                  progress: "todo",
-                  projectId: projectId ?? "",
-                  scheduledAt: "",
-                  scheduledTime: "",
-                  recurrence: "none",
-                  sendNotification: false,
-                });
-                setAddEntryOpen(true);
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            </button>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          {(mode === "work" || mode === "personal" || mode === "all") && (
-            <span style={{ position: "relative", display: "inline-flex" }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>
+              {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
+            </span>
+            {(mode === "work" || mode === "personal" || mode === "all") && (
               <button
                 type="button"
                 className="bd-btn"
-                style={{ padding: "0.35rem 0.6rem", fontSize: "0.8125rem" }}
+                title={t("items.addEntry")}
+                style={{
+                  padding: isMobile ? "0.45rem 0.65rem" : "0.35rem 0.6rem",
+                  marginLeft: isMobile ? 0 : "0.5rem",
+                  minHeight: isMobile ? 44 : undefined,
+                  minWidth: isMobile ? 44 : undefined,
+                }}
+                onClick={() => {
+                  const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                  setAddEntryForm({
+                    itemType: types[0]?.value ?? "note",
+                    title: "",
+                    content: "",
+                    progress: "todo",
+                    projectId: projectId ?? "",
+                    scheduledAt: "",
+                    scheduledTime: "",
+                    recurrence: "none",
+                    sendNotification: false,
+                  });
+                  setAddEntryOpen(true);
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              </button>
+            )}
+          </div>
+        </div>
+        <div
+          className={isMobile ? "bd-items-toolbar-views" : undefined}
+          style={{
+            display: "flex",
+            gap: "0.4rem",
+            alignItems: "center",
+            flexWrap: "nowrap",
+            flexShrink: 0,
+            justifyContent: isMobile ? "flex-start" : "flex-end",
+            width: isMobile ? "100%" : "auto",
+            overflowX: isMobile ? "auto" : "visible",
+            WebkitOverflowScrolling: isMobile ? "touch" : undefined,
+          }}
+        >
+          {(mode === "work" || mode === "personal" || mode === "all") && (
+            <span style={{ position: "relative", display: "inline-flex", flexShrink: 0, width: isMobile ? "100%" : undefined }}>
+              <button
+                type="button"
+                className="bd-btn"
+                style={{
+                  padding: "0.35rem 0.65rem",
+                  fontSize: "0.8125rem",
+                  minHeight: isMobile ? 44 : undefined,
+                  whiteSpace: "nowrap",
+                }}
                 onClick={fetchSuggestNext}
                 disabled={suggestNextLoading || items.length === 0}
-                title="Suggest 1–3 next actions from your tasks and calendar"
+                title={t("items.whatsNext")}
               >
-                {suggestNextLoading ? "…" : "What's next?"}
+                {suggestNextLoading ? "…" : t("items.whatsNext")}
               </button>
               {suggestNextOpen && (
                 <>
@@ -798,12 +869,12 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   <div
                     style={{
                       position: "absolute",
-                      right: 0,
+                      ...(isMobile
+                        ? { left: 0, right: 0, width: "100%", maxWidth: "100%" }
+                        : { right: 0, minWidth: 260, maxWidth: 360 }),
                       top: "100%",
                       marginTop: 4,
                       zIndex: 1000,
-                      minWidth: 260,
-                      maxWidth: 360,
                       background: "var(--bg-elevated)",
                       border: "1px solid var(--border-default)",
                       borderRadius: "var(--button-radius)",
@@ -813,10 +884,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
-                      Suggested next actions
+                      {t("items.whatsNextTitle")}
                     </div>
                     {suggestNextLoading ? (
-                      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>Thinking…</p>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>{t("items.thinking")}</p>
                     ) : (
                       <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--text-primary)" }}>
                         {suggestNextList.map((s, i) => (
@@ -838,8 +909,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
               type="button"
               className="bd-btn"
               title={label}
+              aria-label={label}
               style={{
                 padding: "0.4rem",
+                ...(isMobile ? { minWidth: 44, minHeight: 44 } : {}),
+                flexShrink: 0,
                 background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
                 borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
                 color: viewType === value ? "#fff" : "var(--text-primary)",
@@ -853,10 +927,13 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             <button
               type="button"
               className="bd-btn"
-              title="Connect post-its with arrows"
+              title={t("items.connectPostits")}
+              aria-label={t("items.connectPostits")}
               style={{
                 marginLeft: "0.25rem",
                 padding: "0.4rem",
+                ...(isMobile ? { minWidth: 44, minHeight: 44 } : {}),
+                flexShrink: 0,
                 background: lineToolActive ? "var(--accent)" : undefined,
                 color: lineToolActive ? "#fff" : undefined,
                 borderColor: "transparent",
@@ -872,9 +949,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       </div>
 
       {items.length === 0 ? (
-        <p className="bd-empty">No items match the current filters.</p>
+        <p className="bd-empty">{t("items.emptyFilters")}</p>
       ) : filteredItems.length === 0 ? (
-        <p className="bd-empty">No entries match your search.</p>
+        <p className="bd-empty">{t("items.emptySearch")}</p>
       ) : viewType === "list" ? (
         <ListView items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
       ) : viewType === "text" ? (
@@ -953,7 +1030,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-              {isMobile ? "Actions" : "Change type"}
+              {isMobile ? t("menu.actions") : t("menu.changeType")}
             </div>
             {types.map(({ value, label }) => (
               <button
@@ -984,7 +1061,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 closeMenu();
               }}
             >
-              Edit
+              {t("menu.edit")}
             </button>
             <button
               type="button"
@@ -1007,7 +1084,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 closeMenu();
               }}
             >
-              Set reminder
+              {t("menu.setReminder")}
             </button>
             {mode === "work" && (
               <button
@@ -1016,7 +1093,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 style={{ width: "100%", justifyContent: "flex-start" }}
                 onClick={() => setMoveToProjectForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
               >
-                Move to project
+                {t("menu.moveToProject")}
               </button>
             )}
             {itemContextMenu.domain === "personal" && (
@@ -1026,7 +1103,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 style={{ width: "100%", justifyContent: "flex-start" }}
                 onClick={() => setMoveToAreaForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
               >
-                Move to area
+                {t("menu.moveToArea")}
               </button>
             )}
             {mode === "work" && moveToProjectForId === itemContextMenu.id && !isMobile && (
@@ -1048,7 +1125,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-                  Select project
+                  {t("menu.selectProject")}
                 </div>
                 {(() => {
                   const it = items.find((i) => i.id === itemContextMenu.id);
@@ -1065,7 +1142,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                           setItemContextMenu(null);
                         }}
                       >
-                        No project
+                        {t("menu.noProject")}
                         {currentProjectId === null ? " ✓" : ""}
                       </button>
                       {projectsList.map((p) => (
@@ -1112,7 +1189,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-                    Select area
+                    {t("menu.selectArea")}
                   </div>
                   {areas.map((areaKey) => (
                     <button
@@ -1136,7 +1213,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             {isMobile && mode === "work" && moveToProjectForId === itemContextMenu.id && (
               <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
                 <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
-                  Select project
+                  {t("menu.selectProject")}
                 </div>
                 <button
                   type="button"
@@ -1147,7 +1224,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     closeMenu();
                   }}
                 >
-                  No project
+                  {t("menu.noProject")}
                   {selectedItem?.project?.id == null ? " ✓" : ""}
                 </button>
                 {projectsList.map((p) => (
@@ -1170,7 +1247,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             {isMobile && itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && (
               <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
                 <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
-                  Select area
+                  {t("menu.selectArea")}
                 </div>
                 {personalAreas.map((areaKey) => (
                   <button
@@ -1199,13 +1276,13 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   closeMenu();
                 }}
               >
-                Delete
+                {t("menu.delete")}
               </button>
             </div>
             {isMobile && (
               <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
                 <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
-                  Cancel
+                  {t("menu.cancel")}
                 </button>
               </div>
             )}
@@ -1842,6 +1919,7 @@ function FlowchartView({
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
 }) {
+  const { t } = useI18n();
   const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
@@ -1862,7 +1940,7 @@ function FlowchartView({
     }
     return Array.from(byProject.entries()).map(([id, list]) => ({
       key: id,
-      label: id === "__none" ? "No project" : (list[0]?.project?.name ?? id),
+      label: id === "__none" ? t("items.flowchartNoProject") : (list[0]?.project?.name ?? id),
       items: list,
     }));
   })();
@@ -2007,7 +2085,7 @@ function FlowchartView({
     const label = formatTypeLabel(type);
     const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
     return (
-      <div key={typeKey} style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
+      <div key={typeKey} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", minWidth: 260, maxWidth: 340, flex: "0 0 auto" }}>
         <FlowConnector dashed />
         <button
           type="button"
@@ -2046,7 +2124,7 @@ function FlowchartView({
           <span style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", fontWeight: 400 }}>({sectionItems.length})</span>
         </button>
         {!isCollapsed && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2, marginLeft: 12 }}>
+          <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 2, marginLeft: 12, alignItems: "flex-start" }}>
             {byType.map(({ type, entries }) => renderTypeBlock(domain, sectionKey, type, entries))}
           </div>
         )}
@@ -2092,12 +2170,12 @@ function FlowchartView({
       }}
     >
       {items.length === 0 ? (
-        <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>No items yet. Add dumps and organize to see the full chart.</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>{t("items.flowchartEmpty")}</p>
       ) : (
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
           <div style={{ display: "flex", flexDirection: "row", gap: "2rem", width: "fit-content", maxWidth: "100%", justifyContent: "center", alignItems: "flex-start" }}>
-            {workSections.some((s) => s.items.length > 0) && renderDomainColumn("work", "Work", workSections)}
-            {personalSections.some((s) => s.items.length > 0) && renderDomainColumn("personal", "Personal", personalSections)}
+            {workSections.some((s) => s.items.length > 0) && renderDomainColumn("work", t("items.flowchartWork"), workSections)}
+            {personalSections.some((s) => s.items.length > 0) && renderDomainColumn("personal", t("items.flowchartPersonal"), personalSections)}
           </div>
         </div>
       )}
@@ -2457,6 +2535,7 @@ function KanbanView({
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
 }) {
+  const { t } = useI18n();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
@@ -2536,7 +2615,7 @@ function KanbanView({
     <div ref={kanbanContainerRef} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, minHeight: 200 }}>
       {taskItems.length === 0 && items.length > 0 && (
         <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", margin: 0 }}>
-          Kanban shows only tasks. These entries are notes or ideas — use List or Post-its to view them.
+          {t("items.kanbanNote")}
         </p>
       )}
       <div style={{ display: "flex", gap: "1rem", overflow: "auto", flex: 1 }}>
