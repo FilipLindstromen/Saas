@@ -33,13 +33,12 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
       }}
     >
       <h1
-        className="bd-mobile-hide"
+        className="bd-display-heading bd-mobile-hide"
         style={{
-          fontWeight: 700,
-          fontSize: "clamp(1.05rem, 3.5vw, 1.25rem)",
+          fontWeight: 600,
+          fontSize: "clamp(1.15rem, 3.8vw, 1.45rem)",
           color: "var(--text-primary)",
           margin: 0,
-          letterSpacing: "-0.02em",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",

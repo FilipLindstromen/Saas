@@ -275,36 +275,24 @@ export default function BrainDumpPage() {
         }}
       >
         <aside
-          className="bd-mobile-hide"
+          className="bd-mobile-hide bd-sidebar-rail"
           style={{
             width: 56,
             flexShrink: 0,
-            background: "var(--bg-secondary)",
-            borderRight: "1px solid var(--border-subtle)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             padding: "0.5rem 0",
-            gap: "0.25rem",
+            gap: "0.35rem",
           }}
         >
           <button
             type="button"
+            className="bd-sidebar-rail-btn"
+            data-active={mode === "all"}
             onClick={() => setMode("all")}
             title={t("mode.all")}
             aria-label={t("mode.all")}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              border: "none",
-              background: mode === "all" ? "var(--accent)" : "transparent",
-              color: mode === "all" ? "#fff" : "var(--text-tertiary)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -315,21 +303,11 @@ export default function BrainDumpPage() {
           </button>
           <button
             type="button"
+            className="bd-sidebar-rail-btn"
+            data-active={mode === "work"}
             onClick={() => setMode("work")}
             title={t("mode.work")}
             aria-label={t("mode.work")}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              border: "none",
-              background: mode === "work" ? "var(--accent)" : "transparent",
-              color: mode === "work" ? "#fff" : "var(--text-tertiary)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
@@ -338,21 +316,11 @@ export default function BrainDumpPage() {
           </button>
           <button
             type="button"
+            className="bd-sidebar-rail-btn"
+            data-active={mode === "personal"}
             onClick={() => setMode("personal")}
             title={t("mode.personal")}
             aria-label={t("mode.personal")}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              border: "none",
-              background: mode === "personal" ? "var(--accent)" : "transparent",
-              color: mode === "personal" ? "#fff" : "var(--text-tertiary)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -410,22 +378,7 @@ export default function BrainDumpPage() {
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
-        <button
-          type="button"
-          className="bd-bottom-mode-trigger"
-          onClick={() => setMobileModeMenuOpen(true)}
-          aria-expanded={mobileModeMenuOpen}
-          aria-haspopup="dialog"
-          aria-label={t("bottom.chooseMode")}
-          title={t("bottom.chooseMode")}
-        >
-          <span className="bd-bottom-mode-trigger-inner">
-            <WorkspaceModeIcon
-              which={mode === "work" ? "work" : mode === "personal" ? "personal" : "all"}
-              size={22}
-            />
-          </span>
-        </button>
+        <div className="bd-bottom-bar-spacer" aria-hidden />
         <div className="bd-bottom-bar-center">
           <button
             type="button"

@@ -74,9 +74,9 @@ function ScopeChip({
           fontSize: "0.8125rem",
           borderRadius: "var(--button-radius)",
           whiteSpace: "nowrap",
-          background: selected ? "var(--accent)" : "var(--bg-elevated)",
-          borderColor: selected ? "var(--accent)" : "var(--border-default)",
-          color: selected ? "#fff" : "var(--text-primary)",
+          background: selected ? "var(--bd-chrome-selected-bg)" : "var(--bd-chrome-muted-bg)",
+          borderColor: selected ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+          color: selected ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
         }}
       >
         {label}
@@ -371,9 +371,9 @@ export function ScopeBar({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: scopeFilterOpen ? "var(--accent-soft)" : "var(--bg-elevated)",
-                borderColor: scopeFilterOpen ? "var(--accent)" : "var(--border-default)",
-                color: "var(--accent)",
+                background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
+                borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -682,10 +682,10 @@ export function ScopeBar({
                       borderRadius: "var(--button-radius)",
                       fontSize: "0.875rem",
                       fontWeight: 600,
-                      background: !selectedCategory ? "var(--accent)" : "var(--bg-elevated)",
-                      color: !selectedCategory ? "#fff" : "var(--text-primary)",
-                      borderColor: !selectedCategory ? "var(--accent)" : "var(--border-default)",
-                      boxShadow: "var(--shadow-sm)",
+                      background: !selectedCategory ? "var(--bd-chrome-selected-bg)" : "transparent",
+                      color: !selectedCategory ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                      borderColor: !selectedCategory ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                      boxShadow: "none",
                     }}
                   >
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
@@ -723,9 +723,9 @@ export function ScopeBar({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: scopeFilterOpen ? "var(--accent-soft)" : "var(--bg-elevated)",
-                        borderColor: scopeFilterOpen ? "var(--accent)" : "var(--border-default)",
-                        color: "var(--accent)",
+                        background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
+                        borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                        color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
                       }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -982,9 +982,9 @@ export function ScopeBar({
                     display: "flex",
                     alignItems: "center",
                     gap: "0.5rem",
-                    background: !selectedCategory ? "var(--accent)" : "var(--bg-elevated)",
-                    color: !selectedCategory ? "#fff" : "var(--text-primary)",
-                    borderColor: !selectedCategory ? "var(--accent)" : "var(--border-default)",
+                    background: !selectedCategory ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                    color: !selectedCategory ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                    borderColor: !selectedCategory ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
                     fontWeight: 600,
                   }}
                 >
@@ -1017,9 +1017,9 @@ export function ScopeBar({
                           display: "flex",
                           alignItems: "center",
                           gap: "0.5rem",
-                          background: sel ? "var(--accent)" : "var(--bg-elevated)",
-                          color: sel ? "#fff" : "var(--text-primary)",
-                          borderColor: sel ? "var(--accent)" : "var(--border-default)",
+                          background: sel ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                          color: sel ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                          borderColor: sel ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
                           fontWeight: 600,
                         }}
                       >

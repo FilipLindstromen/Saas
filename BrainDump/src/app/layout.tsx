@@ -2,6 +2,20 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { I18nProvider } from "@/lib/i18n";
+import { Cormorant_Garamond, Inter } from "next/font/google";
+
+const fontSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const fontDisplay = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "BrainDump | Voice capture & thought organization",
@@ -26,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${fontSans.variable} ${fontDisplay.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -34,7 +48,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>
+      <body className={fontSans.className}>
         <AuthSessionProvider>
           <I18nProvider>{children}</I18nProvider>
         </AuthSessionProvider>

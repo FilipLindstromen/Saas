@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
+import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
@@ -456,6 +457,7 @@ export function CenterPanel({
 
   const applyOrganizeResult = useCallback(
     async (items: OrganizedItemPreview[], text: string) => {
+      emitSuggestedItemTypesFromOrganize(items);
       const n = items.length;
       if (onAutoSave) {
         await Promise.resolve(onAutoSave(items, text));

@@ -3,6 +3,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
+import {
+  BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
+  suggestedTypeVisibleForMode,
+  type SuggestedItemTypeDetail,
+} from "@/lib/item-types";
+
+/** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
+function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
+  return {
+    className: quick ? "bd-enter bd-enter--quick" : "bd-enter",
+    style: { ["--bd-i" as string]: Math.min(Math.max(i, 0), 24) },
+  };
+}
+
+function toolbarChipProps(i: number): { className: string; style: CSSProperties } {
+  return {
+    className: "bd-btn bd-toolbar-chip",
+    style: { ["--bd-i" as string]: Math.min(Math.max(i, 0), 14) },
+  };
+}
+
+function viewChipProps(i: number): { className: string; style: CSSProperties } {
+  return {
+    className: "bd-btn bd-view-chip",
+    style: { ["--bd-i" as string]: Math.min(Math.max(i, 0), 8) },
+  };
+}
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -102,6 +129,38 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
     { value: "reflection", label: "Reflection" },
   ],
 };
+
+/** Base entry types + dynamic types from items / dump suggestions (add entry & context menu). */
+function mergeEntryTypesForDomain(
+  domain: string,
+  items: ViewItem[],
+  suggested: SuggestedItemTypeDetail[]
+): { value: string; label: string }[] {
+  const base = ENTRY_TYPES_BY_DOMAIN[domain] ?? ENTRY_TYPES_BY_DOMAIN.work;
+  const seen = new Set(base.map((b) => b.value));
+  const out = [...base];
+  const itemMatchesDomain = (it: ViewItem) =>
+    domain === "all" ? it.domain === "work" || it.domain === "personal" : it.domain === domain;
+  for (const it of items) {
+    if (!itemMatchesDomain(it) || !it.itemType || it.itemType === "reminder" || seen.has(it.itemType)) continue;
+    seen.add(it.itemType);
+    out.push({ value: it.itemType, label: formatTypeLabel(it.itemType) });
+  }
+  for (const s of suggested) {
+    if (seen.has(s.type)) continue;
+    if (domain === "all") {
+      if (!["work", "personal", "inbox"].includes(s.domain)) continue;
+    } else if (
+      s.domain !== domain &&
+      !(s.domain === "inbox" && (domain === "work" || domain === "personal"))
+    ) {
+      continue;
+    }
+    seen.add(s.type);
+    out.push({ value: s.type, label: formatTypeLabel(s.type) });
+  }
+  return out;
+}
 
 const TYPE_BAR_COLORS: Record<string, string> = {
   new: "#ea580c",
@@ -254,7 +313,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     () => filterItemsBySearch(filterItemsByType(items, itemType), searchFilter),
     [items, itemType, searchFilter, newBatchTick]
   );
-  const [counts, setCounts] = useState<{ itemTypeCounts?: Record<string, number> } | null>(null);
+  const [suggestedItemTypesFromDump, setSuggestedItemTypesFromDump] = useState<SuggestedItemTypeDetail[]>([]);
   const [internalViewType, setInternalViewType] = useState<ItemsViewType>(loadViewPreference);
   const viewType = controlledViewType ?? internalViewType;
   const setViewType = onViewTypeChange ?? setInternalViewType;
@@ -384,33 +443,50 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   }, [fetchItems]);
 
   useEffect(() => {
-    if (mode === "all") {
-      Promise.all([
-        fetch("/api/organized-items/counts?domain=work").then((r) => r.json()),
-        fetch("/api/organized-items/counts?domain=personal").then((r) => r.json()),
-      ])
-        .then(([workCounts, personalCounts]) => {
-          const merged: Record<string, number> = {};
-          for (const [k, v] of Object.entries(workCounts.itemTypeCounts ?? {})) {
-            merged[k] = (merged[k] ?? 0) + (v as number);
-          }
-          for (const [k, v] of Object.entries(personalCounts.itemTypeCounts ?? {})) {
-            merged[k] = (merged[k] ?? 0) + (v as number);
-          }
-          setCounts({ itemTypeCounts: merged });
-        })
-        .catch(() => setCounts(null));
-      return;
+    const h = (e: Event) => {
+      const detail = (e as CustomEvent<SuggestedItemTypeDetail[]>).detail;
+      if (!Array.isArray(detail)) return;
+      setSuggestedItemTypesFromDump((prev) => {
+        const map = new Map<string, SuggestedItemTypeDetail>();
+        const key = (x: SuggestedItemTypeDetail) => `${x.domain}:${x.type}`;
+        for (const x of prev) map.set(key(x), x);
+        for (const x of detail) map.set(key(x), x);
+        return [...map.values()];
+      });
+    };
+    window.addEventListener(BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT, h);
+    return () => window.removeEventListener(BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT, h);
+  }, []);
+
+  useEffect(() => {
+    setSuggestedItemTypesFromDump((prev) =>
+      prev.filter((s) => !items.some((it) => it.itemType === s.type))
+    );
+  }, [items]);
+
+  const visibleTypeValues = useMemo(() => {
+    const exclude = new Set(["reminder"]);
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.itemType && !exclude.has(it.itemType)) set.add(it.itemType);
     }
-    if (mode !== "work" && mode !== "personal") return;
-    const params = new URLSearchParams({ domain: mode });
-    if (projectId) params.set("projectId", projectId);
-    if (category) params.set("category", category);
-    fetch(`/api/organized-items/counts?${params}`)
-      .then((r) => r.json())
-      .then((d) => setCounts({ itemTypeCounts: d.itemTypeCounts ?? {} }))
-      .catch(() => setCounts(null));
-  }, [mode, projectId, category]);
+    for (const s of suggestedItemTypesFromDump) {
+      if (suggestedTypeVisibleForMode(mode, s.domain)) set.add(s.type);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [items, suggestedItemTypesFromDump, mode]);
+
+  const addEntryTypeOptions = useMemo(
+    () => mergeEntryTypesForDomain(mode, items, suggestedItemTypesFromDump),
+    [mode, items, suggestedItemTypesFromDump]
+  );
+
+  useEffect(() => {
+    if (!onItemTypeSelect) return;
+    const cur = itemType ?? "";
+    if (!cur || cur === "new") return;
+    if (!visibleTypeValues.includes(cur)) onItemTypeSelect(null);
+  }, [visibleTypeValues, itemType, onItemTypeSelect]);
 
   const typeColor = (value: string | ""): string | undefined => {
     if (!value) return undefined;
@@ -435,22 +511,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   };
 
   const typeOptions = useMemo(() => {
-    const base = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
-    const excludeType = "reminder";
     const allLabel = t("items.allTypes");
     const newOpt = { value: "new", label: t("items.typeNew") };
-    if (counts?.itemTypeCounts && Object.keys(counts.itemTypeCounts).length > 0) {
-      return [
-        { value: "", label: allLabel },
-        newOpt,
-        ...Object.keys(counts.itemTypeCounts)
-          .filter((v) => v !== excludeType && (counts!.itemTypeCounts![v] ?? 0) > 0)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: formatTypeLabel(value) })),
-      ];
-    }
-    return [{ value: "", label: allLabel }, newOpt, ...base.map((x) => ({ value: x.value, label: x.label }))];
-  }, [mode, counts?.itemTypeCounts, t]);
+    const mapped = visibleTypeValues.map((value) => ({ value, label: formatTypeLabel(value) }));
+    return [{ value: "", label: allLabel }, newOpt, ...mapped];
+  }, [visibleTypeValues, t]);
 
   const selectedTypeLabel = useMemo(() => {
     const key = itemType ?? "";
@@ -750,10 +815,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     padding: "0.4rem 0.65rem",
                     fontSize: "0.8125rem",
                     fontWeight: 600,
-                    background: "var(--accent)",
-                    borderColor: "var(--accent)",
-                    color: "#fff",
-                    boxShadow: "var(--shadow-sm)",
+                    background: "var(--bd-chrome-selected-bg)",
+                    borderColor: "var(--bd-chrome-selected-border)",
+                    color: "var(--bd-chrome-selected-text)",
+                    boxShadow: "none",
                   }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
@@ -775,7 +840,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     flexShrink: 0,
                   }}
                   onClick={() => {
-                    const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                    const types = addEntryTypeOptions;
                     setAddEntryForm({
                       itemType: types[0]?.value ?? "note",
                       title: "",
@@ -813,10 +878,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "var(--accent)",
-                  borderColor: "var(--accent)",
-                  color: "#fff",
-                  boxShadow: "var(--shadow-sm)",
+                  background: "var(--bd-chrome-selected-bg)",
+                  borderColor: "var(--bd-chrome-selected-border)",
+                  color: "var(--bd-chrome-selected-text)",
+                  boxShadow: "none",
                 }}
               >
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
@@ -834,9 +899,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     minWidth: 44,
                     minHeight: 44,
                     flexShrink: 0,
-                    background: lineToolActive ? "var(--accent)" : undefined,
-                    color: lineToolActive ? "#fff" : undefined,
-                    borderColor: "transparent",
+                    background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
+                    color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
+                    borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
                   }}
                   onClick={() => setLineToolActive((a) => !a)}
                 >
@@ -867,22 +932,26 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     paddingBottom: isMobile ? 2 : 0,
                   }}
                 >
-                  {typeOptions.map((opt) => {
+                  {typeOptions.map((opt, i) => {
                     const isSelected = (itemType ?? "") === opt.value;
                     const color = typeColor(opt.value);
+                    const chip = toolbarChipProps(i);
                     return (
                       <button
                         key={opt.value || "all"}
                         type="button"
-                        className="bd-btn"
+                        className={chip.className}
                         style={{
+                          ...chip.style,
                           padding: isMobile ? "0.45rem 0.75rem" : "0.4rem 0.65rem",
                           fontSize: "0.8125rem",
                           minHeight: isMobile ? 44 : undefined,
                           flexShrink: 0,
-                          background: isSelected ? (color ?? "var(--accent)") : undefined,
-                          color: isSelected ? "#fff" : undefined,
-                          borderColor: color ?? "transparent",
+                          background: isSelected ? "var(--bd-chrome-selected-bg)" : undefined,
+                          color: isSelected ? "var(--bd-chrome-selected-text)" : undefined,
+                          borderColor: isSelected ? "var(--bd-chrome-selected-border)" : color ?? "var(--border-default)",
+                          borderLeft: isSelected && color ? `3px solid ${color}` : undefined,
+                          paddingLeft: isSelected && color ? "0.55rem" : undefined,
                         }}
                         onClick={() => onItemTypeSelect(opt.value || null)}
                       >
@@ -915,7 +984,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                       minWidth: isMobile ? 44 : undefined,
                     }}
                     onClick={() => {
-                      const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                      const types = addEntryTypeOptions;
                       setAddEntryForm({
                         itemType: types[0]?.value ?? "note",
                         title: "",
@@ -963,10 +1032,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                       gap: "0.5rem",
                       padding: "0.4rem 0.65rem",
                       flexShrink: 1,
-                      background: "var(--accent)",
-                      borderColor: "var(--accent)",
-                      color: "#fff",
-                      boxShadow: "var(--shadow-sm)",
+                      background: "var(--bd-chrome-selected-bg)",
+                      borderColor: "var(--bd-chrome-selected-border)",
+                      color: "var(--bd-chrome-selected-text)",
+                      boxShadow: "none",
                     }}
                   >
                     <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", flex: 1, minWidth: 0 }}>
@@ -1000,9 +1069,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         minWidth: 44,
                         minHeight: 44,
                         flexShrink: 0,
-                        background: lineToolActive ? "var(--accent)" : undefined,
-                        color: lineToolActive ? "#fff" : undefined,
-                        borderColor: "transparent",
+                        background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
+                        color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
+                        borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
                       }}
                       onClick={() => setLineToolActive((a) => !a)}
                     >
@@ -1014,25 +1083,29 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 </>
               ) : (
                 <>
-                  {viewButtons.map(({ value, label, icon }) => (
+                  {viewButtons.map(({ value, label, icon }, i) => {
+                    const vc = viewChipProps(i);
+                    return (
                     <button
                       key={value}
                       type="button"
-                      className="bd-btn"
+                      className={vc.className}
                       title={label}
                       aria-label={label}
                       style={{
+                        ...vc.style,
                         padding: "0.4rem",
                         flexShrink: 0,
-                        background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
-                        borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
-                        color: viewType === value ? "#fff" : "var(--text-primary)",
+                        background: viewType === value ? "var(--bd-chrome-selected-bg)" : "transparent",
+                        borderColor: viewType === value ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                        color: viewType === value ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
                       }}
                       onClick={() => setViewType(value)}
                     >
                       {icon}
                     </button>
-                  ))}
+                    );
+                  })}
                   {viewType === "postits" && (
                     <button
                       type="button"
@@ -1043,9 +1116,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         marginLeft: "0.25rem",
                         padding: "0.4rem",
                         flexShrink: 0,
-                        background: lineToolActive ? "var(--accent)" : undefined,
-                        color: lineToolActive ? "#fff" : undefined,
-                        borderColor: "transparent",
+                        background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
+                        color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
+                        borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
                       }}
                       onClick={() => setLineToolActive((a) => !a)}
                     >
@@ -1097,13 +1170,14 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {viewButtons.map(({ value, label, icon }) => {
+                {viewButtons.map(({ value, label, icon }, i) => {
                   const sel = viewType === value;
+                  const vc = viewChipProps(i);
                   return (
                     <button
                       key={value}
                       type="button"
-                      className="bd-btn"
+                      className={`bd-btn ${vc.className}`.trim()}
                       role="option"
                       aria-selected={sel}
                       title={label}
@@ -1112,15 +1186,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         setViewPickerOpen(false);
                       }}
                       style={{
+                        ...vc.style,
                         minHeight: 52,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: "0.75rem",
                         padding: "0.5rem 0.75rem",
-                        background: sel ? "var(--accent)" : "var(--bg-elevated)",
-                        color: sel ? "#fff" : "var(--text-primary)",
-                        borderColor: sel ? "var(--accent)" : "var(--border-default)",
+                        background: sel ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                        color: sel ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                        borderColor: sel ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
                         fontWeight: 600,
                       }}
                     >
@@ -1183,14 +1258,15 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {typeOptions.map((opt) => {
+                {typeOptions.map((opt, i) => {
                   const sel = (itemType ?? "") === opt.value;
                   const color = typeColor(opt.value);
+                  const chip = toolbarChipProps(i);
                   return (
                     <button
                       key={opt.value || "all"}
                       type="button"
-                      className="bd-btn"
+                      className={chip.className}
                       role="option"
                       aria-selected={sel}
                       onClick={() => {
@@ -1198,15 +1274,18 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         setTypePickerOpen(false);
                       }}
                       style={{
+                        ...chip.style,
                         minHeight: 52,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: "0.75rem",
                         padding: "0.5rem 0.75rem",
-                        background: sel ? (color ?? "var(--accent)") : "var(--bg-elevated)",
-                        color: sel ? "#fff" : "var(--text-primary)",
-                        borderColor: sel ? (color ?? "var(--accent)") : "var(--border-default)",
+                        background: sel ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                        color: sel ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                        borderColor: sel ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                        borderLeft: sel && color ? `3px solid ${color}` : undefined,
+                        paddingLeft: sel && color ? "0.65rem" : undefined,
                         fontWeight: 600,
                       }}
                     >
@@ -1270,7 +1349,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       )}
 
       {itemContextMenu && (() => {
-        const types = ENTRY_TYPES_BY_DOMAIN[itemContextMenu.domain] ?? ENTRY_TYPES_BY_DOMAIN.work;
+        const types = mergeEntryTypesForDomain(itemContextMenu.domain, items, suggestedItemTypesFromDump);
         const selectedItem = items.find((i) => i.id === itemContextMenu.id);
         const personalAreas = getPersonalAreasList(items);
         const closeMenu = () => {
@@ -1604,7 +1683,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         padding: "0.35rem 0.6rem",
                         fontSize: "0.8125rem",
                         background: (editingEntry.progress || "todo") === p ? "var(--bg-hover)" : undefined,
-                        borderColor: (editingEntry.progress || "todo") === p ? "var(--accent)" : undefined,
+                        borderColor: (editingEntry.progress || "todo") === p ? "var(--bd-chrome-selected-border)" : undefined,
                       }}
                       onClick={() => setEditingEntry((prev) => prev ? { ...prev, progress: p } : null)}
                     >
@@ -1822,7 +1901,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Add new Entry</h3>
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Type</label>
             <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-              {(ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work).map((opt) => (
+              {addEntryTypeOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -1831,7 +1910,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     padding: "0.3rem 0.5rem",
                     fontSize: "0.8125rem",
                     background: addEntryForm.itemType === opt.value ? "var(--bg-hover)" : undefined,
-                    borderColor: addEntryForm.itemType === opt.value ? "var(--accent)" : undefined,
+                    borderColor: addEntryForm.itemType === opt.value ? "var(--bd-chrome-selected-border)" : undefined,
                   }}
                   onClick={() => setAddEntryForm((f) => ({ ...f, itemType: opt.value }))}
                 >
@@ -1885,7 +1964,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                         padding: "0.35rem 0.6rem",
                         fontSize: "0.8125rem",
                         background: addEntryForm.progress === p ? "var(--bg-hover)" : undefined,
-                        borderColor: addEntryForm.progress === p ? "var(--accent)" : undefined,
+                        borderColor: addEntryForm.progress === p ? "var(--bd-chrome-selected-border)" : undefined,
                       }}
                       onClick={() => setAddEntryForm((f) => ({ ...f, progress: p }))}
                     >
@@ -2082,7 +2161,7 @@ function CalendarView({
                   minHeight: 88,
                   padding: "0.4rem",
                   background: isCurrentMonth ? (isHovered ? "var(--bg-hover)" : "var(--bg-primary)") : "var(--bg-secondary)",
-                  boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 2px var(--accent), var(--shadow-sm)" : isTodayCell ? "0 0 0 2px var(--accent)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
+                  boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 1px var(--bd-chrome-selected-border), var(--shadow-sm)" : isTodayCell ? "0 0 0 1px var(--bd-chrome-selected-border)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
                   transition:
                     "background var(--bd-duration-fast) var(--bd-ease-soft), box-shadow var(--bd-duration-fast) var(--bd-ease-soft)",
                 }}
@@ -2116,15 +2195,15 @@ function CalendarView({
                           textAlign: "left",
                           fontSize: "0.7rem",
                           padding: "0.3rem 0.45rem",
-                          background: past ? "var(--bg-tertiary)" : "var(--accent)",
-                          color: past ? "var(--text-tertiary)" : "var(--text-primary)",
-                          border: "none",
+                          background: past ? "var(--bg-tertiary)" : "var(--bd-chrome-selected-bg)",
+                          color: past ? "var(--text-tertiary)" : "var(--bd-chrome-selected-text)",
+                          border: past ? "none" : "1px solid var(--border-default)",
                           borderRadius: 6,
                           cursor: "pointer",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          boxShadow: past ? "none" : "0 1px 2px rgba(0,0,0,0.1)",
+                          boxShadow: "none",
                         }}
                         title={`${it.title}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}`}
                       >
@@ -2157,12 +2236,15 @@ function CalendarView({
           Edit an entry and set a date (and optional time, repeat, notification) in the Calendar section to show it here.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "0.6rem", maxHeight: 140, overflow: "auto" }}>
-          {items.filter((it) => !it.scheduledAt && !it.recurrence).slice(0, 8).map((it) => (
+          {items.filter((it) => !it.scheduledAt && !it.recurrence).slice(0, 8).map((it, i) => {
+            const ep = enterStaggerProps(i);
+            return (
             <button
               key={it.id}
               type="button"
-              className="bd-btn"
+              className={`bd-btn ${ep.className}`.trim()}
               style={{
+                ...ep.style,
                 justifyContent: "flex-start",
                 fontSize: "0.8125rem",
                 padding: "0.5rem 0.75rem",
@@ -2175,7 +2257,8 @@ function CalendarView({
             >
               {it.title}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -2257,10 +2340,10 @@ function FlowchartView({
     padding: "0.5rem 1rem",
     borderRadius: 8,
     background: "var(--accent)",
-    color: "#fff",
+    color: "var(--bd-btn-primary-fg)",
     fontWeight: 600,
     fontSize: "0.9375rem",
-    border: "none",
+    border: "1px solid var(--border-strong)",
     cursor: "pointer",
     textAlign: "center",
     display: "flex",
@@ -2271,16 +2354,16 @@ function FlowchartView({
     maxWidth: isMobile ? "100%" : undefined,
     width: isMobile ? "100%" : undefined,
     boxSizing: "border-box",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+    boxShadow: "none",
   };
   const secondaryNodeStyle: CSSProperties = {
     padding: "0.4rem 0.75rem",
     borderRadius: 8,
-    background: "var(--bg-elevated)",
-    color: "var(--accent)",
+    background: "transparent",
+    color: "var(--text-primary)",
     fontWeight: 500,
     fontSize: "0.8125rem",
-    border: "1.5px solid var(--accent)",
+    border: "1px solid var(--border-default)",
     cursor: "pointer",
     textAlign: "left",
     display: "flex",
@@ -2321,16 +2404,19 @@ function FlowchartView({
     </div>
   );
 
-  const renderEntry = (it: ViewItem) => {
+  const renderEntry = (it: ViewItem, index: number) => {
+    const ep = enterStaggerProps(index);
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
     const isNew = isNewEntry(it);
     return (
       <div key={it.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
         <FlowConnector dashed />
         <div
+          className={ep.className}
           onClick={() => onEdit(it)}
           onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
           style={{
+            ...ep.style,
             ...entryNodeStyle,
             borderLeft: `3px solid ${barColor}`,
             display: "flex",
@@ -2349,8 +2435,8 @@ function FlowchartView({
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: "var(--accent)",
-                boxShadow: "0 0 8px rgba(255,255,255,0.4)",
+                background: "var(--text-primary)",
+                boxShadow: "0 0 6px rgba(255,255,255,0.25)",
               }}
               aria-hidden
             />
@@ -2400,7 +2486,7 @@ function FlowchartView({
         </button>
         {!isCollapsed && (
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2, marginLeft: 12 }}>
-            {entries.map((it) => renderEntry(it))}
+            {entries.map((it, idx) => renderEntry(it, idx))}
           </div>
         )}
       </div>
@@ -2568,15 +2654,18 @@ function ListView({
   }
   const typesInUse = [...LIST_VIEW_TYPE_ORDER.filter((t) => byType.has(t)), ...Array.from(byType.keys()).filter((t) => !LIST_VIEW_TYPE_ORDER.includes(t))];
 
-  const renderEntry = (it: ViewItem) => {
+  const renderEntry = (it: ViewItem, index: number) => {
+    const ep = enterStaggerProps(index);
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
     const scheduleLabel = (it.itemType === "calendar" || it.scheduledAt || (it.recurrence && it.recurrence !== "none")) ? formatCalendarScheduleLabel(it) : null;
     return (
       <div
         key={it.id}
+        className={ep.className}
         onDoubleClick={() => onEdit?.(it)}
         onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
         style={{
+          ...ep.style,
           display: "flex",
           alignItems: "stretch",
           minHeight: 72,
@@ -2695,7 +2784,7 @@ function ListView({
               {formatTypeLabel(type)} ({typeItems.length})
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {typeItems.map((it) => renderEntry(it))}
+              {typeItems.map((it, idx) => renderEntry(it, idx))}
             </div>
           </div>
         );
@@ -2747,7 +2836,8 @@ function TextView({
         boxSizing: "border-box",
       }}
     >
-      {items.map((it) => {
+      {items.map((it, i) => {
+        const ep = enterStaggerProps(i);
         const isEditingTitle = editing?.id === it.id && editing?.field === "title";
         const isEditingContent = editing?.id === it.id && editing?.field === "content";
         const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
@@ -2755,7 +2845,9 @@ function TextView({
         return (
           <div
             key={it.id}
+            className={ep.className}
             style={{
+              ...ep.style,
               display: "flex",
               flexDirection: "row",
               background: "transparent",
@@ -2788,8 +2880,8 @@ function TextView({
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: "var(--accent)",
-                  boxShadow: "0 0 8px rgba(255,255,255,0.4)",
+                  background: "var(--text-primary)",
+                  boxShadow: "0 0 6px rgba(255,255,255,0.25)",
                 }}
                 aria-hidden
               />
@@ -3033,7 +3125,7 @@ function KanbanView({
             display: "flex",
             flexDirection: "column",
             gap: "var(--bd-space-3, 0.75rem)",
-            border: dragOverColumn === col.key ? "2px dashed var(--accent)" : "2px solid transparent",
+            border: dragOverColumn === col.key ? "2px dashed var(--bd-chrome-selected-border)" : "2px solid transparent",
             transition:
               "background var(--bd-duration-fast) var(--bd-ease-soft), border-color var(--bd-duration-fast) var(--bd-ease-soft)",
           }}
@@ -3050,9 +3142,12 @@ function KanbanView({
           >
             {col.label}
           </h4>
-          {col.items.map((it) => (
+          {col.items.map((it, idx) => {
+            const ep = enterStaggerProps(idx);
+            return (
             <div
               key={it.id}
+              className={ep.className}
               draggable
               onDragStart={(e) => handleDragStart(e, it.id)}
               onDragEnd={handleDragEnd}
@@ -3061,6 +3156,7 @@ function KanbanView({
               onDoubleClick={() => onEdit?.(it)}
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
               style={{
+                ...ep.style,
                 padding: "0.65rem 0.85rem",
                 background: "var(--bg-tertiary)",
                 border: "1px solid var(--border-default)",
@@ -3098,7 +3194,8 @@ function KanbanView({
                 {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ))}
       </div>
@@ -3359,14 +3456,15 @@ function PostitsView({
               y1={linkFrom.y}
               x2={linkPreview.x}
               y2={linkPreview.y}
-              stroke="var(--accent)"
+              stroke="var(--text-tertiary)"
               strokeWidth="2"
               strokeDasharray="6 4"
               markerEnd="url(#arrowhead)"
             />
           )}
         </svg>
-        {items.map((it) => {
+        {items.map((it, i) => {
+          const ep = enterStaggerProps(i);
           const base = getPosition(it);
           const drag = postitPositions[it.id];
           const x = drag ? drag.x : base.x;
@@ -3376,10 +3474,12 @@ function PostitsView({
             <div
               key={it.id}
               data-postit-id={it.id}
+              className={ep.className}
               onMouseDown={(e) => handleMouseDown(e, it.id)}
               onDoubleClick={() => onEdit?.(it)}
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
               style={{
+                ...ep.style,
                 position: "absolute",
                 left: x,
                 top: y,

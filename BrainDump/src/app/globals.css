@@ -1,33 +1,39 @@
-/* Shared Saas theme — BrainDump: cool slate surfaces + warm accent (clear hierarchy) */
+/* Shared Saas theme — BrainDump: premium dark dashboard (near-black, outline-first, minimal shadow) */
 :root[data-theme="dark"],
 :root {
-  /* Canvas → chrome → inset → elevated (each step readable) */
-  --bg-primary: #090c11;
-  --bg-secondary: #0f141c;
-  --bg-tertiary: #181f2a;
-  --bg-elevated: #1c2431;
-  --bg-hover: #263041;
-  --border-subtle: rgba(255, 255, 255, 0.055);
-  --border-default: rgba(255, 255, 255, 0.11);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --text-primary: #eef1f7;
-  --text-secondary: rgba(238, 241, 247, 0.9);
-  --text-tertiary: rgba(238, 241, 247, 0.56);
-  --text-quaternary: rgba(238, 241, 247, 0.34);
-  /* Accent — coral (primary actions, recording, links to “work”) */
-  --accent: #e85d2d;
-  --accent-hover: #f0784a;
-  --accent-soft: rgba(232, 93, 45, 0.22);
-  --accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
-  /* Single soft shadows (elevation) */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.42);
-  --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.52);
-  --shadow-up: 0 -4px 20px rgba(0, 0, 0, 0.38);
-  --bd-shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04) inset, var(--shadow-sm);
-  --card-radius: 14px;
-  --button-radius: 10px;
-  --btn-bg: var(--bg-elevated);
+  /* Canvas → chrome — subtle steps, not “blue slate” */
+  --bg-primary: #050506;
+  --bg-secondary: #0a0a0c;
+  --bg-tertiary: #111113;
+  --bg-elevated: #0e0e11;
+  --bg-hover: #18181c;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #f4f4f5;
+  --text-secondary: rgba(244, 244, 245, 0.88);
+  --text-tertiary: rgba(244, 244, 245, 0.5);
+  --text-quaternary: rgba(244, 244, 245, 0.32);
+  /* Accent — reserved for strong CTAs / recording; UI chrome uses --bd-chrome-* */
+  --accent: #e8e8ea;
+  --accent-hover: #f4f4f5;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-muted: rgba(255, 255, 255, 0.06);
+  /* Monochrome outline selection (chips, toggles, sidebar) */
+  --bd-chrome-selected-bg: rgba(255, 255, 255, 0.05);
+  --bd-chrome-selected-border: rgba(255, 255, 255, 0.72);
+  --bd-chrome-selected-text: #fafafa;
+  --bd-chrome-muted-bg: transparent;
+  --bd-btn-primary-fg: #0a0a0a;
+  /* Hairline elevation — reference UI is “in the surface”, not floating cards */
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-up: 0 -1px 0 rgba(255, 255, 255, 0.06);
+  --bd-shadow-panel: none;
+  --card-radius: 12px;
+  --button-radius: 999px;
+  --btn-bg: transparent;
   --btn-border: var(--border-default);
   --btn-shadow: none;
   --btn-shadow-inset: none;
@@ -46,33 +52,39 @@
   --bd-success-border: color-mix(in srgb, var(--bd-success) 26%, transparent);
   --bd-success-text: #c8f7d4;
   /* Regions — “what belongs where” */
-  --bd-surface-scope: color-mix(in srgb, var(--accent) 6%, var(--bg-primary));
-  --bd-chrome-edge: color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  --bd-surface-scope: color-mix(in srgb, #fff 4%, var(--bg-primary));
+  --bd-chrome-edge: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="light"] {
-  --bg-primary: #e9ecf1;
+  --bg-primary: #f4f4f5;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #e4e8ef;
-  --bg-elevated: #ffffff;
-  --bg-hover: #eef1f6;
+  --bg-tertiary: #ececee;
+  --bg-elevated: #fafafa;
+  --bg-hover: #f0f0f2;
   --border-subtle: rgba(15, 23, 42, 0.06);
-  --border-default: rgba(15, 23, 42, 0.11);
-  --border-strong: rgba(15, 23, 42, 0.16);
+  --border-default: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.2);
   --text-primary: #0f172a;
   --text-secondary: rgba(15, 23, 42, 0.88);
   --text-tertiary: rgba(15, 23, 42, 0.52);
   --text-quaternary: rgba(15, 23, 42, 0.36);
-  --accent: #e85d2d;
-  --accent-hover: #d64d22;
-  --accent-soft: rgba(232, 93, 45, 0.16);
-  --accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.11);
-  --shadow-up: 0 -4px 16px rgba(15, 23, 42, 0.07);
-  --bd-shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.85) inset, var(--shadow-sm);
-  --btn-bg: #ffffff;
+  --accent: #171717;
+  --accent-hover: #262626;
+  --accent-soft: rgba(15, 23, 42, 0.08);
+  --accent-muted: rgba(15, 23, 42, 0.05);
+  --bd-chrome-selected-bg: rgba(15, 23, 42, 0.05);
+  --bd-chrome-selected-border: rgba(15, 23, 42, 0.78);
+  --bd-chrome-selected-text: #0f172a;
+  --bd-chrome-muted-bg: transparent;
+  --bd-btn-primary-fg: #fafafa;
+  --shadow-sm: 0 1px 0 rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 20px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
+  --shadow-up: 0 -1px 0 rgba(15, 23, 42, 0.06);
+  --bd-shadow-panel: none;
+  --button-radius: 999px;
+  --btn-bg: transparent;
   --btn-border: var(--border-default);
   --btn-shadow: none;
   --btn-shadow-inset: none;
@@ -88,8 +100,8 @@
   --bd-success-bg: color-mix(in srgb, var(--bd-success) 10%, transparent);
   --bd-success-border: color-mix(in srgb, var(--bd-success) 22%, transparent);
   --bd-success-text: #14532d;
-  --bd-surface-scope: color-mix(in srgb, var(--accent) 5%, var(--bg-primary));
-  --bd-chrome-edge: color-mix(in srgb, var(--accent) 28%, var(--border-default));
+  --bd-surface-scope: color-mix(in srgb, #0f172a 4%, var(--bg-primary));
+  --bd-chrome-edge: rgba(15, 23, 42, 0.1);
 }
 
 * {
@@ -128,15 +140,58 @@ html {
 }
 
 body {
-  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   background: var(--bg-primary);
   min-height: 100vh;
   min-height: 100dvh;
   color: var(--text-primary);
-  -webkit-tap-highlight-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  -webkit-tap-highlight-color: color-mix(in srgb, #fff 18%, transparent);
   overscroll-behavior-y: contain;
+}
+
+/* Serif display — hero titles, app name (reference: “Morning Viktor”) */
+.bd-display-heading {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+/* Slim icon rail — outline icons, no filled “accent blob” */
+.bd-sidebar-rail {
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.bd-sidebar-rail-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--bd-duration-fast) var(--bd-ease-soft),
+    border-color var(--bd-duration-fast) var(--bd-ease-soft),
+    color var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-sidebar-rail-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background: var(--bg-hover);
+}
+
+.bd-sidebar-rail-btn[data-active="true"] {
+  color: var(--bd-chrome-selected-text);
+  border-color: var(--bd-chrome-selected-border);
+  background: var(--bd-chrome-selected-bg);
 }
 
 button {
@@ -251,7 +306,7 @@ textarea {
 .bd-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--bd-btn-primary-fg);
 }
 .bd-btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
@@ -387,6 +442,39 @@ select.bd-input::-ms-expand {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
+}
+
+@keyframes bd-enter-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Entries, post-its — stagger with inline style --bd-i: 0…24 */
+.bd-enter {
+  animation: bd-enter-rise var(--bd-duration-normal) var(--bd-ease-soft) both;
+  animation-delay: calc(min(var(--bd-i, 0), 20) * 36ms);
+}
+
+.bd-enter.bd-enter--quick {
+  animation-duration: var(--bd-duration-fast);
+}
+
+/* Type filter & toolbar chips */
+.bd-toolbar-chip {
+  animation: bd-enter-rise var(--bd-duration-fast) var(--bd-ease-soft) both;
+  animation-delay: calc(min(var(--bd-i, 0), 14) * 30ms);
+}
+
+/* View mode icon buttons (desktop) */
+.bd-view-chip {
+  animation: bd-enter-rise var(--bd-duration-fast) var(--bd-ease-soft) both;
+  animation-delay: calc(min(var(--bd-i, 0), 8) * 28ms);
 }
 
 /* Dump overlay: backdrop + sheet (desktop centers; mobile overrides in @media) */
@@ -608,24 +696,26 @@ select.bd-input::-ms-expand {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: none;
-  background: var(--accent);
-  color: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   cursor: pointer;
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
     transform var(--bd-duration-normal) var(--bd-ease-soft),
     box-shadow var(--bd-duration-normal) var(--bd-ease-in-out),
-    filter var(--bd-duration-fast) var(--bd-ease-soft);
+    filter var(--bd-duration-fast) var(--bd-ease-soft),
+    border-color var(--bd-duration-fast) var(--bd-ease-soft);
 }
 
 .bd-dump-fab:hover {
   transform: translateX(-50%) scale(1.06);
-  box-shadow: var(--shadow-lg);
-  filter: brightness(1.04);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.06);
+  border-color: var(--bd-chrome-selected-border);
 }
 
 .bd-dump-fab:active {
@@ -704,7 +794,7 @@ select.bd-input::-ms-expand {
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--bd-chrome-edge);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   box-shadow: none;
 }
 
@@ -833,14 +923,14 @@ select.bd-input::-ms-expand {
   padding-bottom: var(--bd-space-3);
   padding-left: max(var(--bd-space-4), env(safe-area-inset-left));
   padding-right: max(var(--bd-space-4), env(safe-area-inset-right));
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--bd-chrome-edge);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: none;
   animation: bd-topbar-enter var(--bd-duration-slow) var(--bd-ease-soft) both;
 }
 
 :root[data-theme="light"] .bd-topbar {
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.05);
+  box-shadow: none;
 }
 
 .bd-mobile-mode-pill {
@@ -1081,12 +1171,10 @@ select.bd-input::-ms-expand {
     padding: 0;
     border-radius: 50%;
     aspect-ratio: 1;
-    background: linear-gradient(165deg, color-mix(in srgb, #fff 10%, var(--accent)) 0%, var(--accent) 100%);
-    color: #fff;
-    border: 1px solid color-mix(in srgb, #fff 25%, var(--accent));
-    box-shadow:
-      0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1237,5 +1325,11 @@ select.bd-input::-ms-expand {
   }
   .bd-help-sheet-inner {
     animation: none !important;
+  }
+  .bd-enter,
+  .bd-toolbar-chip,
+  .bd-view-chip {
+    animation: none !important;
+    animation-delay: 0ms !important;
   }
 }
