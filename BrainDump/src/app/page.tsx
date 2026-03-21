@@ -377,7 +377,7 @@ export default function BrainDumpPage() {
           </button>
         </aside>
 
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0" }}>
+        <div className="bd-workspace-column" style={{ gap: "0" }}>
           {(mode === "work" || mode === "personal" || mode === "all") && (
             <div className="bd-scope-outer-wrap" style={{ flexShrink: 0 }}>
               <ScopeBar

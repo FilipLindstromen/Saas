@@ -28,6 +28,13 @@ AI-powered voice capture and thought organization for personal development, jour
 
 **From the SaaS hub:** BrainDump is listed under “Personal / Productivity”. To run it from the same origin as the hub (e.g. at `/BrainDump/`), build with `NEXT_PUBLIC_BASE_PATH=/BrainDump` and serve the Next app so that path routes to it (e.g. reverse proxy or host config).
 
+## iOS app (Capacitor + TestFlight)
+
+The same Next.js app is loaded inside a native iOS shell (no duplicate UI code). See **[docs/ios/README.md](docs/ios/README.md)** for `cap sync`, **[docs/ios/APPLE_SETUP.md](docs/ios/APPLE_SETUP.md)** for Apple & signing, and **[ios/fastlane/README.md](ios/fastlane/README.md)** for local Fastlane.
+
+- **CI:** [`.github/workflows/braindump-ios.yml`](../.github/workflows/braindump-ios.yml) — runs when you **push** a commit whose message is exactly **`Build`**.
+- Before `cap sync`, set `CAPACITOR_SERVER_URL` to your **production** HTTPS URL.
+
 ## Tech
 
 - **Next.js 14** (App Router), **Prisma** (SQLite), **OpenAI** (Whisper + GPT for organize).

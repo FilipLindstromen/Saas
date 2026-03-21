@@ -1,0 +1,2 @@
+# App Store Connect / bundle ID (optional; Fastfile also reads env)
+app_identifier(ENV["APP_IDENTIFIER"] || "com.braindump.app")

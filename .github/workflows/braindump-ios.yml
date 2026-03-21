@@ -1,0 +1,79 @@
+name: BrainDump iOS (TestFlight)
+
+# Runs only when the pushed commit message is exactly "Build" (entire message, no extra characters).
+on:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: braindump-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: BrainDump
+
+jobs:
+  beta:
+    # Exact match: commit message must be only the word Build (no extra text on the first line).
+    if: ${{ github.event_name == 'push' && github.event.head_commit != null && github.event.head_commit.message == 'Build' }}
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: BrainDump/package-lock.json
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Sync Capacitor iOS
+        env:
+          CAPACITOR_SERVER_URL: ${{ secrets.BRAINDUMP_CAPACITOR_SERVER_URL }}
+        run: |
+          if [ -z "$CAPACITOR_SERVER_URL" ]; then
+            echo "::error::Set repository secret BRAINDUMP_CAPACITOR_SERVER_URL to your production HTTPS origin (e.g. https://app.example.com)."
+            exit 1
+          fi
+          npx cap sync ios
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          working-directory: BrainDump/ios
+
+      - name: Bundle install (Fastlane)
+        working-directory: BrainDump/ios
+        run: bundle install
+
+      - name: Resolve Swift packages
+        working-directory: BrainDump/ios
+        run: xcodebuild -resolvePackageDependencies -project App/App.xcodeproj -scheme App
+
+      - name: Fastlane beta
+        working-directory: BrainDump/ios
+        env:
+          CI: "true"
+          BUILD_NUMBER: ${{ github.run_number }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISION_PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_PROVISIONING_PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
+        run: bundle exec fastlane beta

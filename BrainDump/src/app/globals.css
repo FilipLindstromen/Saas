@@ -342,14 +342,24 @@ select.bd-input::-ms-expand {
   text-overflow: ellipsis;
 }
 
+/* Row: left sidebar + main column (desktop). Mobile hides sidebar via .bd-mobile-hide */
 .bd-main-scroll {
   flex: 1;
   min-height: 0;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  overflow: auto;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
   -webkit-overflow-scrolling: touch;
+}
+
+.bd-workspace-column {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .bd-scope-strip {

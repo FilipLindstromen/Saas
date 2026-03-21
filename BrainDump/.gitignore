@@ -9,6 +9,7 @@ out/
 .env
 .env.*
 !.env.example
+!.env.ios.example
 
 # Debug and logs
 *.log
@@ -16,3 +17,8 @@ out/
 # Prisma
 *.db
 *.db-journal
+
+# Tooling / test
+.turbo
+coverage/
+*.tsbuildinfo

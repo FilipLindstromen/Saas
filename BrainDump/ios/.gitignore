@@ -1,0 +1,29 @@
+App/build
+App/Pods
+App/output
+output
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/.env
+
+# Local Ruby / bundler (bundle config set path 'vendor/bundle')
+vendor/bundle/
+
+# Build artifacts & signing (never commit)
+*.ipa
+*.dSYM.zip
+*.mobileprovision
+AuthKey_*.p8
+*.p12
+App/App/public
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor
+capacitor-cordova-ios-plugins
+
+# Generated Config files
+App/App/capacitor.config.json
+App/App/config.xml

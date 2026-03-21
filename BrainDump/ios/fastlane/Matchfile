@@ -1,0 +1,7 @@
+# Set MATCH_GIT_URL in CI (GitHub secret) to a private repo for certificates.
+# Run once on a Mac: fastlane match appstore
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/ORG/braindump-certificates.git")
+storage_mode("git")
+type("appstore")
+app_identifier(["com.braindump.app"])
+username(ENV["FASTLANE_APPLE_ID"] || "your-apple-id@example.com")
