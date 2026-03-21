@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
+import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
 
 interface SavedItem {
   id: string;
@@ -65,7 +65,12 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [newBatchTick, setNewBatchTick] = useState(0);
-  useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onNewBatch = () => setNewBatchTick((n) => n + 1);
+    window.addEventListener(BRAINDUMP_NEW_BATCH_EVENT, onNewBatch);
+    return () => window.removeEventListener(BRAINDUMP_NEW_BATCH_EVENT, onNewBatch);
+  }, []);
 
   const fetchItems = useCallback(() => {
     const params = new URLSearchParams();

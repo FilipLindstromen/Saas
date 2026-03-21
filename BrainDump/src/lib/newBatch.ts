@@ -2,11 +2,12 @@
 
 export const BRAINDUMP_NEW_BATCH_IDS_KEY = "braindump_new_batch_ids";
 
-const EVENT = "braindump-new-batch";
+/** DOM event fired when the "new batch" id set changes (same as `subscribeNewBatch`). */
+export const BRAINDUMP_NEW_BATCH_EVENT = "braindump-new-batch";
 
 function notify(): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(EVENT));
+  window.dispatchEvent(new Event(BRAINDUMP_NEW_BATCH_EVENT));
 }
 
 export function saveLastNewBatchIds(ids: string[]): void {
@@ -34,6 +35,6 @@ export function getLastNewBatchIds(): Set<string> {
 /** Subscribe to changes in the last batch id set (save or clear). */
 export function subscribeNewBatch(listener: () => void): () => void {
   if (typeof window === "undefined") return () => {};
-  window.addEventListener(EVENT, listener);
-  return () => window.removeEventListener(EVENT, listener);
+  window.addEventListener(BRAINDUMP_NEW_BATCH_EVENT, listener);
+  return () => window.removeEventListener(BRAINDUMP_NEW_BATCH_EVENT, listener);
 }
