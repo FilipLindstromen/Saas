@@ -1,6 +1,6 @@
 name: BrainDump iOS (TestFlight)
 
-# Runs only when the pushed commit message is exactly "Build" (entire message, no extra characters).
+# Runs only when the commit message is exactly "Build" (one line: `git commit -m "Build"`).
 on:
   push:
     branches:
@@ -19,7 +19,6 @@ defaults:
 
 jobs:
   beta:
-    # Exact match: commit message must be only the word Build (no extra text on the first line).
     if: ${{ github.event_name == 'push' && github.event.head_commit != null && github.event.head_commit.message == 'Build' }}
     runs-on: macos-latest
     steps:

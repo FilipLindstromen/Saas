@@ -81,6 +81,7 @@ export function CenterPanel({
   onTranscriptReady,
   onOrganized,
   onAutoSave,
+  onDumpFinished,
   transcriptFromOrganize,
   onOpenSettings,
   projectNames = [],
@@ -118,6 +119,8 @@ export function CenterPanel({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const analyserRef = useRef<{ ctx: AudioContext; analyser: AnalyserNode; source: MediaStreamAudioSourceNode } | null>(null);
   const animationRef = useRef<number>(0);
+  /** False while overlay closed — aborts in-flight `startRecording` if user dismisses quickly */
+  const showDumpOverlayRef = useRef(false);
 
   const loadDevices = useCallback(async (withPermission = false) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return;
@@ -265,6 +268,10 @@ export function CenterPanel({
       if (!stream) {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
+      if (!showDumpOverlayRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       if (!isMobile && selectedDeviceId) {
         try {
           localStorage.setItem(MIC_STORAGE_KEY, selectedDeviceId);
@@ -324,6 +331,16 @@ export function CenterPanel({
           win.__lastAudioFileName = undefined;
         }
       };
+      if (!showDumpOverlayRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        if (streamToRecord !== stream) streamToRecord.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (analyserRef.current?.ctx) {
+          analyserRef.current.ctx.close().catch(() => {});
+        }
+        analyserRef.current = null;
+        return;
+      }
       mediaRecorderRef.current = recorder;
       recorder.start(250);
       setRecordState("recording");
@@ -332,19 +349,22 @@ export function CenterPanel({
     }
   }, [selectedDeviceId, isMobile, t]);
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== "inactive") {
       rec.stop();
       setRecordState("idle");
       mediaRecorderRef.current = null;
-      setTimeout(() => {
-        const win = window as unknown as { __lastAudioBlob?: Blob };
-        const blob = win.__lastAudioBlob;
-        if (!blob || blob.size === 0) {
-          setError(t("error.noAudio"));
-        }
-      }, 200);
+      if (!silent) {
+        setTimeout(() => {
+          const win = window as unknown as { __lastAudioBlob?: Blob };
+          const blob = win.__lastAudioBlob;
+          if (!blob || blob.size === 0) {
+            setError(t("error.noAudio"));
+          }
+        }, 200);
+      }
     }
   }, [t]);
 
@@ -396,6 +416,7 @@ export function CenterPanel({
       if (onAutoSave) {
         await Promise.resolve(onAutoSave(items, text));
         setOrganizeSuccess(null);
+        showDumpOverlayRef.current = false;
         setShowDumpOverlay(false);
         if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
         onDumpFinished?.();
@@ -469,10 +490,6 @@ export function CenterPanel({
     if (text) await organize(text);
   }, [stopRecording, transcribe, organize]);
 
-  const handleCancelRecording = useCallback(() => {
-    stopRecording();
-  }, [stopRecording]);
-
   const handleUnclearConfirm = useCallback(
     async (resolvedUnclear: OrganizedItemPreview[]) => {
       if (!unclearItems) return;
@@ -495,44 +512,6 @@ export function CenterPanel({
     [unclearItems, applyOrganizeResult]
   );
 
-  const hasAudio = typeof window !== "undefined" && !!(window as unknown as { __lastAudioBlob?: Blob }).__lastAudioBlob;
-  const canTranscribe = hasAudio && !transcribeLoading;
-  const playbackUrlRef = useRef<string | null>(null);
-  const playLatestRecording = useCallback(() => {
-    const win = window as unknown as { __lastAudioBlob?: Blob };
-    const blob = win.__lastAudioBlob;
-    if (!blob) return;
-    if (playbackUrlRef.current) {
-      URL.revokeObjectURL(playbackUrlRef.current);
-      playbackUrlRef.current = null;
-    }
-    const url = URL.createObjectURL(blob);
-    playbackUrlRef.current = url;
-    const audio = new Audio(url);
-    audio.onended = () => {
-      if (playbackUrlRef.current) {
-        URL.revokeObjectURL(playbackUrlRef.current);
-        playbackUrlRef.current = null;
-      }
-    };
-    audio.onerror = () => {
-      if (playbackUrlRef.current) {
-        URL.revokeObjectURL(playbackUrlRef.current);
-        playbackUrlRef.current = null;
-      }
-    };
-    audio.play().catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (playbackUrlRef.current) {
-        URL.revokeObjectURL(playbackUrlRef.current);
-        playbackUrlRef.current = null;
-      }
-    };
-  }, []);
-
   const isInbox = mode === "inbox";
   const isDumpProcessing = transcribeLoading || organizeLoading;
   const reflectionQuestions = Array.from({ length: 10 }, (_, i) => t(`help.q${i + 1}`));
@@ -541,15 +520,28 @@ export function CenterPanel({
     if (isDumpProcessing) setShowHelpOverlay(false);
   }, [isDumpProcessing]);
 
+  const openDumpOverlay = useCallback(() => {
+    setError(null);
+    showDumpOverlayRef.current = true;
+    setShowDumpOverlay(true);
+    void startRecording();
+  }, [startRecording]);
+
+  const closeDumpOverlay = useCallback(() => {
+    if (isDumpProcessing) return;
+    showDumpOverlayRef.current = false;
+    stopRecording({ silent: true });
+    setError(null);
+    setShowDumpOverlay(false);
+    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+  }, [isDumpProcessing, stopRecording, mode]);
+
   const dumpPanelContent = (
     <>
-      <section>
-        <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-          {t("center.record")}
-        </h3>
+      <section className="bd-dump-overlay-body">
         {!isMobile && audioDevices.length > 0 && (
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label htmlFor="bd-mic-select" style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>
+          <div className="bd-dump-mic-row">
+            <label htmlFor="bd-mic-select" style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem", textAlign: "center" }}>
               {t("center.microphone")}
             </label>
             <select
@@ -570,74 +562,77 @@ export function CenterPanel({
           </div>
         )}
         {!isMobile && audioDevices.length === 0 && (
-          <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
-            {t("center.allowMic")}
-          </p>
+          <p className="bd-dump-mic-hint">{t("center.allowMic")}</p>
         )}
-        {recordState === "recording" && (
-          <div style={{ marginBottom: "0.75rem" }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("center.inputLevel")}</div>
-            <canvas
-              ref={canvasRef}
-              width={280}
-              height={48}
-              style={{ width: "100%", maxWidth: "280px", height: "48px", borderRadius: "var(--button-radius)", background: "var(--bg-primary)", border: "1px solid var(--border-default)" }}
-              aria-label="Audio input level"
-            />
-          </div>
-        )}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-          {recordState === "idle" ? (
-            <button type="button" className="bd-btn bd-btn-primary" onClick={startRecording} style={{ minHeight: "44px", minWidth: "44px" }}>
-              {t("center.dump")}
-            </button>
+        <div className="bd-dump-controls">
+          {recordState === "recording" ? (
+            <>
+              <div className="bd-dump-canvas-wrap">
+                <div className="bd-dump-input-label">{t("center.inputLevel")}</div>
+                <canvas
+                  ref={canvasRef}
+                  width={280}
+                  height={48}
+                  className="bd-dump-canvas"
+                  aria-label="Audio input level"
+                />
+              </div>
+              <div className="bd-dump-actions-row">
+                <span className="bd-dump-timer" aria-live="polite">
+                  {recordingElapsed}
+                </span>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-primary bd-dump-btn-main"
+                  onClick={handleStopAndProcess}
+                  disabled={transcribeLoading || organizeLoading}
+                  title={t("center.stopOrganize")}
+                  aria-label={t("center.stopOrganize")}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-danger bd-dump-btn-main"
+                  onClick={closeDumpOverlay}
+                  disabled={transcribeLoading || organizeLoading}
+                  title={t("center.cancelRecording")}
+                  aria-label={t("center.cancelRecording")}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </>
           ) : (
             <>
-              <span style={{ fontSize: "1.25rem", fontVariantNumeric: "tabular-nums", color: "var(--text-primary)", fontWeight: 500 }} aria-live="polite">
-                {recordingElapsed}
-              </span>
-              <button
-                type="button"
-                className="bd-btn bd-btn-primary"
-                onClick={handleStopAndProcess}
-                disabled={transcribeLoading || organizeLoading}
-                title={t("center.stopOrganize")}
-                aria-label={t("center.stopOrganize")}
-                style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="bd-btn bd-btn-danger"
-                onClick={handleCancelRecording}
-                disabled={transcribeLoading || organizeLoading}
-                title={t("center.cancelRecording")}
-                aria-label={t("center.cancelRecording")}
-                style={{ minHeight: "44px", minWidth: "44px", padding: "0.5rem" }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
+              {!error && (
+                <p className="bd-dump-starting-label" aria-live="polite">
+                  {t("center.startingMic")}
+                </p>
+              )}
+              <div className="bd-dump-actions-row">
+                <button type="button" className="bd-btn bd-btn-danger bd-dump-btn-wide" onClick={closeDumpOverlay} disabled={isDumpProcessing}>
+                  {t("center.cancelDump")}
+                </button>
+              </div>
             </>
           )}
-          {!isMobile && (
-            <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title={t("center.refreshMics")} style={{ minHeight: "44px" }}>
+        </div>
+        {!isMobile && (
+          <div className="bd-dump-refresh-row">
+            <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title={t("center.refreshMics")}>
               {t("center.refreshMics")}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </section>
-      {organizeSuccess && (
-        <div style={{ padding: "0.5rem 0.75rem", background: "rgba(34,197,94,0.12)", borderRadius: "var(--button-radius)", color: "var(--text-primary)", fontSize: "0.875rem" }}>
-          {organizeSuccess}
-        </div>
-      )}
+      {organizeSuccess && <div className="bd-banner-success">{organizeSuccess}</div>}
       {error && (
-        <div style={{ padding: "0.5rem", background: "rgba(255,71,87,0.1)", borderRadius: "var(--button-radius)", color: "#ff4757", fontSize: "0.875rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+        <div className="bd-banner-error">
           <span>{error}</span>
           {typeof error === "string" && (error.includes(OPENAI_KEY_ERROR) || error.includes("OPENAI_API_KEY")) && onOpenSettings && (
             <button type="button" className="bd-btn bd-btn-primary" onClick={onOpenSettings} style={{ flexShrink: 0 }}>
@@ -660,27 +655,9 @@ export function CenterPanel({
         id="bd-dump-fab"
         className="bd-dump-fab"
         type="button"
-        onClick={() => setShowDumpOverlay(true)}
+        onClick={openDumpOverlay}
         title={t("center.recordNewDump")}
         aria-label={t("center.recordNewDump")}
-        style={{
-          position: "fixed",
-          bottom: "1.5rem",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 900,
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          border: "none",
-          background: "var(--accent)",
-          color: "#fff",
-          cursor: "pointer",
-          boxShadow: "var(--shadow-md)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
@@ -692,59 +669,35 @@ export function CenterPanel({
             <div
               className="bd-dump-overlay"
               role="presentation"
-              onClick={() => {
-                setShowDumpOverlay(false);
-                if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-              }}
+              onClick={closeDumpOverlay}
             >
               <div
                 className="bd-panel bd-dump-sheet-inner"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="bd-dump-sheet-handle" aria-hidden />
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{t("center.newDump")}</h2>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isDumpProcessing) return;
-                        setShowDumpOverlay(false);
-                        if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-                      }}
-                      disabled={isDumpProcessing}
-                      aria-label={t("center.close")}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "var(--button-radius)",
-                        border: "1px solid var(--border-default)",
-                        background: "var(--bg-tertiary)",
-                        color: "var(--text-secondary)",
-                        cursor: isDumpProcessing ? "not-allowed" : "pointer",
-                        opacity: isDumpProcessing ? 0.5 : 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      onClick={() => setShowHelpOverlay(true)}
-                      style={{ minHeight: "36px", paddingInline: "0.75rem" }}
-                    >
-                      {t("center.help")}
-                    </button>
-                  </div>
+                <div className="bd-dump-sheet-header">
+                  <button
+                    type="button"
+                    className="bd-dump-sheet-corner-btn"
+                    onClick={closeDumpOverlay}
+                    disabled={isDumpProcessing}
+                    aria-label={t("center.close")}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <h2 className="bd-dump-sheet-title">{t("center.newDump")}</h2>
+                  <button
+                    type="button"
+                    className="bd-dump-sheet-corner-btn bd-dump-sheet-help-btn"
+                    onClick={() => setShowHelpOverlay(true)}
+                  >
+                    {t("center.help")}
+                  </button>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  {dumpPanelContent}
-                </div>
+                <div className="bd-dump-sheet-content">{dumpPanelContent}</div>
               </div>
             </div>
       )}

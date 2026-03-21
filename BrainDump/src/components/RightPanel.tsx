@@ -129,11 +129,7 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
           {saving ? t("right.saving") : t("right.save")}
         </button>
       </div>
-      {error && (
-        <div style={{ padding: "0.5rem", background: "rgba(255,71,87,0.1)", borderRadius: "var(--button-radius)", color: "#ff4757", fontSize: "0.875rem" }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="bd-banner-error bd-banner-error--solo">{error}</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", overflow: "auto" }}>
         {list.map((it) => (
           <ItemCard
