@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
+import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -103,6 +104,7 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
 };
 
 const TYPE_BAR_COLORS: Record<string, string> = {
+  new: "#ea580c",
   task: "#f59e0b",
   note: "#3b82f6",
   idea: "#8b5cf6",
@@ -234,6 +236,11 @@ function filterItemsBySearch(items: ViewItem[], searchFilter: string): ViewItem[
 
 function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem[] {
   if (!itemType) return items;
+  if (itemType === "new") {
+    const ids = getLastNewBatchIds();
+    if (ids.size === 0) return [];
+    return items.filter((it) => ids.has(it.id));
+  }
   return items.filter((it) => it.itemType === itemType);
 }
 
@@ -241,7 +248,12 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const { t } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const filteredItems = filterItemsBySearch(filterItemsByType(items, itemType), searchFilter);
+  const [newBatchTick, setNewBatchTick] = useState(0);
+  useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
+  const filteredItems = useMemo(
+    () => filterItemsBySearch(filterItemsByType(items, itemType), searchFilter),
+    [items, itemType, searchFilter, newBatchTick]
+  );
   const [counts, setCounts] = useState<{ itemTypeCounts?: Record<string, number> } | null>(null);
   const [internalViewType, setInternalViewType] = useState<ItemsViewType>(loadViewPreference);
   const viewType = controlledViewType ?? internalViewType;
@@ -272,6 +284,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const [addEntryOpen, setAddEntryOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [viewPickerOpen, setViewPickerOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [addEntryForm, setAddEntryForm] = useState({
     itemType: "note",
     title: "",
@@ -307,6 +320,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   useEffect(() => {
     if (!isMobile) setViewPickerOpen(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) setTypePickerOpen(false);
   }, [isMobile]);
 
   const FETCH_TIMEOUT_MS = 15000;
@@ -398,6 +415,8 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const typeColor = (value: string | ""): string | undefined => {
     if (!value) return undefined;
     switch (value) {
+      case "new":
+        return "#ea580c";
       case "task":
         return "#ff9f1c";
       case "note":
@@ -419,17 +438,25 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     const base = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
     const excludeType = "reminder";
     const allLabel = t("items.allTypes");
+    const newOpt = { value: "new", label: t("items.typeNew") };
     if (counts?.itemTypeCounts && Object.keys(counts.itemTypeCounts).length > 0) {
       return [
         { value: "", label: allLabel },
+        newOpt,
         ...Object.keys(counts.itemTypeCounts)
           .filter((v) => v !== excludeType && (counts!.itemTypeCounts![v] ?? 0) > 0)
           .sort((a, b) => a.localeCompare(b))
           .map((value) => ({ value, label: formatTypeLabel(value) })),
       ];
     }
-    return [{ value: "", label: allLabel }, ...base.map((x) => ({ value: x.value, label: x.label }))];
+    return [{ value: "", label: allLabel }, newOpt, ...base.map((x) => ({ value: x.value, label: x.label }))];
   }, [mode, counts?.itemTypeCounts, t]);
+
+  const selectedTypeLabel = useMemo(() => {
+    const key = itemType ?? "";
+    const opt = typeOptions.find((o) => o.value === key);
+    return opt?.label ?? t("items.allTypes");
+  }, [typeOptions, itemType, t]);
 
   useEffect(() => {
     try {
@@ -695,99 +722,80 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     );
   }
 
+  const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
+
   return (
     <div className="bd-items-view-root">
       <div className="bd-items-toolbar">
-        <div className="bd-items-toolbar-left">
-          {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
-            <div
-              className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
-              style={{
-                display: "flex",
-                gap: "0.4rem",
-                alignItems: "center",
-                flexWrap: isMobile ? "nowrap" : "wrap",
-                overflowX: isMobile ? "auto" : "visible",
-                minWidth: 0,
-                width: isMobile ? "100%" : "auto",
-                paddingBottom: isMobile ? 2 : 0,
-              }}
-            >
-              {typeOptions.map((opt) => {
-                const isSelected = (itemType ?? "") === opt.value;
-                const color = typeColor(opt.value);
-                return (
-                  <button
-                    key={opt.value || "all"}
-                    type="button"
-                    className="bd-btn"
-                    style={{
-                      padding: isMobile ? "0.45rem 0.75rem" : "0.4rem 0.65rem",
-                      fontSize: "0.8125rem",
-                      minHeight: isMobile ? 44 : undefined,
-                      flexShrink: 0,
-                      background: isSelected ? (color ?? "var(--accent)") : undefined,
-                      color: isSelected ? "#fff" : undefined,
-                      borderColor: color ?? "transparent",
-                    }}
-                    onClick={() => onItemTypeSelect(opt.value || null)}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              alignItems: "center",
-              flexWrap: "wrap",
-              minWidth: 0,
-            }}
-          >
-            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
-              {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
-            </span>
-            {(mode === "work" || mode === "personal" || mode === "all") && (
-              <button
-                type="button"
-                className="bd-btn"
-                title={t("items.addEntry")}
-                style={{
-                  padding: isMobile ? "0.45rem 0.65rem" : "0.4rem 0.65rem",
-                  minHeight: isMobile ? 44 : undefined,
-                  minWidth: isMobile ? 44 : undefined,
-                }}
-                onClick={() => {
-                  const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
-                  setAddEntryForm({
-                    itemType: types[0]?.value ?? "note",
-                    title: "",
-                    content: "",
-                    progress: "todo",
-                    projectId: projectId ?? "",
-                    scheduledAt: "",
-                    scheduledTime: "",
-                    recurrence: "none",
-                    sendNotification: false,
-                  });
-                  setAddEntryOpen(true);
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </button>
-            )}
-          </div>
-        </div>
-        <div
-          className={
-            isMobile ? "bd-items-toolbar-right" : "bd-items-toolbar-right bd-items-toolbar-views"
-          }
-        >
-          {isMobile ? (
-            <>
+        {isMobile && mobileModesToolbar ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%", minWidth: 0, gridColumn: "1 / -1" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", minWidth: 0 }}>
+              {onItemTypeSelect && (
+                <button
+                  type="button"
+                  className="bd-btn"
+                  aria-haspopup="listbox"
+                  aria-expanded={typePickerOpen}
+                  aria-label={t("items.openTypeMenu")}
+                  title={selectedTypeLabel}
+                  onClick={() => setTypePickerOpen(true)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 44,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.5rem",
+                    padding: "0.4rem 0.65rem",
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                    background: "var(--accent)",
+                    borderColor: "var(--accent)",
+                    color: "#fff",
+                    boxShadow: "var(--shadow-sm)",
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              )}
+              {(mode === "work" || mode === "personal" || mode === "all") && (
+                <button
+                  type="button"
+                  className="bd-btn"
+                  title={t("items.addEntry")}
+                  aria-label={t("items.addEntry")}
+                  style={{
+                    padding: "0.45rem 0.65rem",
+                    minHeight: 44,
+                    minWidth: 44,
+                    flexShrink: 0,
+                  }}
+                  onClick={() => {
+                    const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                    setAddEntryForm({
+                      itemType: types[0]?.value ?? "note",
+                      title: "",
+                      content: "",
+                      progress: "todo",
+                      projectId: projectId ?? "",
+                      scheduledAt: "",
+                      scheduledTime: "",
+                      recurrence: "none",
+                      sendNotification: false,
+                    });
+                    setAddEntryOpen(true);
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 className="bd-btn"
@@ -797,39 +805,22 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 title={viewButtons.find((b) => b.value === viewType)?.label}
                 onClick={() => setViewPickerOpen(true)}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
+                  flexShrink: 0,
+                  minWidth: 44,
                   minHeight: 44,
+                  width: 44,
+                  padding: 0,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.5rem",
-                  padding: "0.4rem 0.65rem",
-                  flexShrink: 1,
+                  justifyContent: "center",
                   background: "var(--accent)",
                   borderColor: "var(--accent)",
                   color: "#fff",
                   boxShadow: "var(--shadow-sm)",
                 }}
               >
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-                    {viewButtons.find((b) => b.value === viewType)?.icon}
-                  </span>
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0, opacity: 0.95 }}
-                    aria-hidden
-                  >
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                  {viewButtons.find((b) => b.value === viewType)?.icon}
                 </span>
               </button>
               {viewType === "postits" && (
@@ -854,81 +845,228 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   </svg>
                 </button>
               )}
-            </>
-          ) : (
-            <>
-              {viewButtons.map(({ value, label, icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="bd-btn"
-                  title={label}
-                  aria-label={label}
+            </div>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
+              {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="bd-items-toolbar-left">
+              {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
+                <div
+                  className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
                   style={{
-                    padding: "0.4rem",
-                    flexShrink: 0,
-                    background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
-                    borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
-                    color: viewType === value ? "#fff" : "var(--text-primary)",
+                    display: "flex",
+                    gap: "0.4rem",
+                    alignItems: "center",
+                    flexWrap: isMobile ? "nowrap" : "wrap",
+                    overflowX: isMobile ? "auto" : "visible",
+                    minWidth: 0,
+                    width: isMobile ? "100%" : "auto",
+                    paddingBottom: isMobile ? 2 : 0,
                   }}
-                  onClick={() => setViewType(value)}
                 >
-                  {icon}
-                </button>
-              ))}
-              {viewType === "postits" && (
-                <button
-                  type="button"
-                  className="bd-btn"
-                  title={t("items.connectPostits")}
-                  aria-label={t("items.connectPostits")}
-                  style={{
-                    marginLeft: "0.25rem",
-                    padding: "0.4rem",
-                    flexShrink: 0,
-                    background: lineToolActive ? "var(--accent)" : undefined,
-                    color: lineToolActive ? "#fff" : undefined,
-                    borderColor: "transparent",
-                  }}
-                  onClick={() => setLineToolActive((a) => !a)}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
+                  {typeOptions.map((opt) => {
+                    const isSelected = (itemType ?? "") === opt.value;
+                    const color = typeColor(opt.value);
+                    return (
+                      <button
+                        key={opt.value || "all"}
+                        type="button"
+                        className="bd-btn"
+                        style={{
+                          padding: isMobile ? "0.45rem 0.75rem" : "0.4rem 0.65rem",
+                          fontSize: "0.8125rem",
+                          minHeight: isMobile ? 44 : undefined,
+                          flexShrink: 0,
+                          background: isSelected ? (color ?? "var(--accent)") : undefined,
+                          color: isSelected ? "#fff" : undefined,
+                          borderColor: color ?? "transparent",
+                        }}
+                        onClick={() => onItemTypeSelect(opt.value || null)}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
-            </>
-          )}
-        </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.5rem",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  minWidth: 0,
+                }}
+              >
+                <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
+                  {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
+                </span>
+                {(mode === "work" || mode === "personal" || mode === "all") && (
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    title={t("items.addEntry")}
+                    style={{
+                      padding: isMobile ? "0.45rem 0.65rem" : "0.4rem 0.65rem",
+                      minHeight: isMobile ? 44 : undefined,
+                      minWidth: isMobile ? 44 : undefined,
+                    }}
+                    onClick={() => {
+                      const types = ENTRY_TYPES_BY_DOMAIN[mode] ?? ENTRY_TYPES_BY_DOMAIN.work;
+                      setAddEntryForm({
+                        itemType: types[0]?.value ?? "note",
+                        title: "",
+                        content: "",
+                        progress: "todo",
+                        projectId: projectId ?? "",
+                        scheduledAt: "",
+                        scheduledTime: "",
+                        recurrence: "none",
+                        sendNotification: false,
+                      });
+                      setAddEntryOpen(true);
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div
+              className={
+                isMobile ? "bd-items-toolbar-right" : "bd-items-toolbar-right bd-items-toolbar-views"
+              }
+            >
+              {isMobile ? (
+                <>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    aria-haspopup="listbox"
+                    aria-expanded={viewPickerOpen}
+                    aria-label={t("items.openViewMenu")}
+                    title={viewButtons.find((b) => b.value === viewType)?.label}
+                    onClick={() => setViewPickerOpen(true)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 44,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem",
+                      padding: "0.4rem 0.65rem",
+                      flexShrink: 1,
+                      background: "var(--accent)",
+                      borderColor: "var(--accent)",
+                      color: "#fff",
+                      boxShadow: "var(--shadow-sm)",
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                        {viewButtons.find((b) => b.value === viewType)?.icon}
+                      </span>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ flexShrink: 0, opacity: 0.95 }}
+                        aria-hidden
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+                  {viewType === "postits" && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      title={t("items.connectPostits")}
+                      aria-label={t("items.connectPostits")}
+                      style={{
+                        padding: "0.4rem",
+                        minWidth: 44,
+                        minHeight: 44,
+                        flexShrink: 0,
+                        background: lineToolActive ? "var(--accent)" : undefined,
+                        color: lineToolActive ? "#fff" : undefined,
+                        borderColor: "transparent",
+                      }}
+                      onClick={() => setLineToolActive((a) => !a)}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {viewButtons.map(({ value, label, icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className="bd-btn"
+                      title={label}
+                      aria-label={label}
+                      style={{
+                        padding: "0.4rem",
+                        flexShrink: 0,
+                        background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
+                        borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
+                        color: viewType === value ? "#fff" : "var(--text-primary)",
+                      }}
+                      onClick={() => setViewType(value)}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                  {viewType === "postits" && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      title={t("items.connectPostits")}
+                      aria-label={t("items.connectPostits")}
+                      style={{
+                        marginLeft: "0.25rem",
+                        padding: "0.4rem",
+                        flexShrink: 0,
+                        background: lineToolActive ? "var(--accent)" : undefined,
+                        color: lineToolActive ? "#fff" : undefined,
+                        borderColor: "transparent",
+                      }}
+                      onClick={() => setLineToolActive((a) => !a)}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
         {isMobile && viewPickerOpen && (
           <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1100,
-              background: "rgba(0,0,0,0.45)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              padding: 0,
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
-            }}
+            className="bd-items-sheet-backdrop"
             onClick={() => setViewPickerOpen(false)}
           >
             <div
-              className="bd-panel"
-              style={{
-                width: "100%",
-                maxHeight: "min(85dvh, 85vh)",
-                borderRadius: "22px 22px 0 0",
-                padding: "1rem 1rem 1.15rem",
-                overflow: "auto",
-                WebkitOverflowScrolling: "touch",
-                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
-              }}
+              className="bd-panel bd-items-sheet-panel"
               onClick={(e) => e.stopPropagation()}
               role="listbox"
               aria-label={t("items.chooseView")}
@@ -1008,6 +1146,87 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             </div>
           </div>
         )}
+        {isMobile && typePickerOpen && onItemTypeSelect && mobileModesToolbar && (
+          <div
+            className="bd-items-sheet-backdrop"
+            onClick={() => setTypePickerOpen(false)}
+          >
+            <div
+              className="bd-panel bd-items-sheet-panel"
+              onClick={(e) => e.stopPropagation()}
+              role="listbox"
+              aria-label={t("items.chooseType")}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 5,
+                  borderRadius: 999,
+                  background: "var(--border-strong)",
+                  margin: "0 auto 0.85rem",
+                  opacity: 0.85,
+                }}
+                aria-hidden
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("items.chooseType")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setTypePickerOpen(false)}
+                  aria-label={t("scope.cancel")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {typeOptions.map((opt) => {
+                  const sel = (itemType ?? "") === opt.value;
+                  const color = typeColor(opt.value);
+                  return (
+                    <button
+                      key={opt.value || "all"}
+                      type="button"
+                      className="bd-btn"
+                      role="option"
+                      aria-selected={sel}
+                      onClick={() => {
+                        onItemTypeSelect(opt.value || null);
+                        setTypePickerOpen(false);
+                      }}
+                      style={{
+                        minHeight: 52,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.75rem",
+                        padding: "0.5rem 0.75rem",
+                        background: sel ? (color ?? "var(--accent)") : "var(--bg-elevated)",
+                        color: sel ? "#fff" : "var(--text-primary)",
+                        borderColor: sel ? (color ?? "var(--accent)") : "var(--border-default)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ fontSize: "0.9375rem", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+                        {opt.label}
+                      </span>
+                      {sel ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 18 }} aria-hidden />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
       {items.length === 0 ? (
         <p className="bd-empty">{t("items.emptyFilters")}</p>
@@ -1061,16 +1280,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
         };
         return (
           <div
-            style={isMobile ? {
-              position: "fixed",
-              inset: 0,
-              zIndex: 1100,
-              background: "rgba(0,0,0,0.35)",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              padding: "0.75rem",
-            } : undefined}
+            className={isMobile ? "bd-items-sheet-backdrop bd-items-context-menu-backdrop" : undefined}
             onClick={isMobile ? closeMenu : undefined}
           >
           <div
@@ -1355,20 +1565,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
       {editingEntry && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
+          className="bd-modal-backdrop"
           onClick={() => setEditingEntry(null)}
         >
           <div
-            className="bd-panel"
+            className="bd-panel bd-modal-panel"
             style={{ padding: "1.25rem", maxWidth: 480, width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1531,20 +1732,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
       {reminderEntry && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
+          className="bd-modal-backdrop"
           onClick={() => setReminderEntry(null)}
         >
           <div
-            className="bd-panel"
+            className="bd-panel bd-modal-panel"
             style={{ padding: "1.25rem", maxWidth: 400, width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1619,20 +1811,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
       {addEntryOpen && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
+          className="bd-modal-backdrop"
           onClick={() => setAddEntryOpen(false)}
         >
           <div
-            className="bd-panel"
+            className="bd-panel bd-modal-panel"
             style={{ padding: "1.25rem", maxWidth: 480, width: "100%", maxHeight: "90vh", overflow: "auto" }}
             onClick={(e) => e.stopPropagation()}
           >

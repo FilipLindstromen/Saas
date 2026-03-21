@@ -13,7 +13,7 @@ interface RightPanelProps {
   mode: string;
   items: EditableItem[];
   transcript?: string;
-  onSaveComplete: () => void;
+  onSaveComplete: (createdIds?: string[]) => void;
   projectId?: string | null;
   category?: string | null;
   itemType?: string | null;
@@ -88,8 +88,9 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
         body: JSON.stringify({ status: "saved", organizedAt: new Date().toISOString() }),
       });
 
+      const created = (dataBatch as { created?: { id: string }[] }).created ?? [];
       setEditing([]);
-      onSaveComplete();
+      onSaveComplete(created.map((c) => c.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {

@@ -140,6 +140,7 @@ export function ScopeBar({
   const [showAddProject, setShowAddProject] = useState(false);
   const [addProjectName, setAddProjectName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [scopeFilterOpen, setScopeFilterOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -151,8 +152,18 @@ export function ScopeBar({
   }, []);
 
   useEffect(() => {
+    if (searchFilter.trim()) setScopeFilterOpen(true);
+  }, [searchFilter]);
+
+  useEffect(() => {
     if (!isMobile) setAreaPickerOpen(false);
   }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) setScopeFilterOpen(false);
+  }, [isMobile]);
+
+  const showScopeFilterInput = !isMobile || scopeFilterOpen || searchFilter.trim().length > 0;
 
   const loadProjects = useCallback(() => {
     if (mode !== "work") return;
@@ -344,8 +355,34 @@ export function ScopeBar({
               </button>
             )}
           </div>
+          {isMobile && onSearchFilterChange && (
+            <button
+              type="button"
+              className="bd-btn"
+              onClick={() => setScopeFilterOpen((o) => !o)}
+              aria-pressed={scopeFilterOpen}
+              aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+              title={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+              style={{
+                flexShrink: 0,
+                minWidth: 44,
+                minHeight: 44,
+                padding: "0.4rem",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: scopeFilterOpen ? "var(--accent-soft)" : "var(--bg-elevated)",
+                borderColor: scopeFilterOpen ? "var(--accent)" : "var(--border-default)",
+                color: "var(--accent)",
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+            </button>
+          )}
           </div>
-          {onSearchFilterChange && (
+          {onSearchFilterChange && showScopeFilterInput && (
             <div
               style={{
                 display: "flex",
@@ -620,8 +657,8 @@ export function ScopeBar({
           >
             {isMobile ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", width: "100%" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%" }}>
-                  <span className="bd-scope-label">
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
+                  <span className="bd-scope-label" style={{ flexShrink: 0 }}>
                     {t("scope.area")}
                   </span>
                   <button
@@ -632,7 +669,9 @@ export function ScopeBar({
                     aria-label={t("scope.openAreaMenu")}
                     onClick={() => setAreaPickerOpen(true)}
                     style={{
-                      flex: 1,
+                      flex: "0 1 auto",
+                      width: "max-content",
+                      maxWidth: "min(70vw, 280px)",
                       minWidth: 0,
                       minHeight: 44,
                       display: "flex",
@@ -667,6 +706,33 @@ export function ScopeBar({
                       <path d="m6 9 6 6 6-6" />
                     </svg>
                   </button>
+                  {onSearchFilterChange && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setScopeFilterOpen((o) => !o)}
+                      aria-pressed={scopeFilterOpen}
+                      aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+                      title={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+                      style={{
+                        flexShrink: 0,
+                        marginLeft: "auto",
+                        minWidth: 44,
+                        minHeight: 44,
+                        padding: "0.4rem",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: scopeFilterOpen ? "var(--accent-soft)" : "var(--bg-elevated)",
+                        borderColor: scopeFilterOpen ? "var(--accent)" : "var(--border-default)",
+                        color: "var(--accent)",
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 {showAddArea && (
                   <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
@@ -790,7 +856,7 @@ export function ScopeBar({
               </>
             )}
           </div>
-        {onSearchFilterChange && (
+        {onSearchFilterChange && showScopeFilterInput && (
           <div
             style={{
               display: "flex",

@@ -55,7 +55,9 @@ interface CenterPanelProps {
   mode: string;
   onTranscriptReady: (text: string) => void;
   onOrganized: (items: OrganizedItemPreview[], transcript: string) => void;
-  onAutoSave?: (items: OrganizedItemPreview[], transcript: string) => void;
+  onAutoSave?: (items: OrganizedItemPreview[], transcript: string) => void | Promise<void>;
+  /** After a successful auto-save from the dump flow: e.g. switch to Work + New filter */
+  onDumpFinished?: () => void;
   transcriptFromOrganize?: string;
   onOpenSettings?: () => void;
   projectNames?: string[];
@@ -236,11 +238,6 @@ export function CenterPanel({
     if (transcriptFromOrganize != null) setTranscript(transcriptFromOrganize);
   }, [transcriptFromOrganize]);
 
-  const saveTranscriptToStorage = useCallback((value: string) => {
-    setTranscript(value);
-    saveFormState({ transcriptEdited: value, transcriptRaw: value });
-  }, []);
-
   const startRecording = useCallback(async () => {
     setError(null);
     try {
@@ -394,18 +391,21 @@ export function CenterPanel({
   }, [transcript, onTranscriptReady, onOpenSettings, locale, t]);
 
   const applyOrganizeResult = useCallback(
-    (items: OrganizedItemPreview[], text: string) => {
+    async (items: OrganizedItemPreview[], text: string) => {
       const n = items.length;
       if (onAutoSave) {
-        onAutoSave(items, text);
-        setOrganizeSuccess(n ? t("center.organizedSaved", { n }) : null);
-      } else {
-        onOrganized(items, text);
-        setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
+        await Promise.resolve(onAutoSave(items, text));
+        setOrganizeSuccess(null);
+        setShowDumpOverlay(false);
+        if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+        onDumpFinished?.();
+        return;
       }
+      onOrganized(items, text);
+      setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [onAutoSave, onOrganized, t]
+    [onAutoSave, onOrganized, onDumpFinished, mode, t]
   );
 
   const organize = useCallback(async (transcriptOverride?: string) => {
@@ -474,7 +474,7 @@ export function CenterPanel({
   }, [stopRecording]);
 
   const handleUnclearConfirm = useCallback(
-    (resolvedUnclear: OrganizedItemPreview[]) => {
+    async (resolvedUnclear: OrganizedItemPreview[]) => {
       if (!unclearItems) return;
       const { allItems, transcript: text } = unclearItems;
       const merged = allItems.map((it) => {
@@ -483,7 +483,14 @@ export function CenterPanel({
         return it;
       });
       setUnclearItems(null);
-      applyOrganizeResult(merged, text);
+      setOrganizeLoading(true);
+      try {
+        await applyOrganizeResult(merged, text);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Save failed");
+      } finally {
+        setOrganizeLoading(false);
+      }
     },
     [unclearItems, applyOrganizeResult]
   );
@@ -527,7 +534,12 @@ export function CenterPanel({
   }, []);
 
   const isInbox = mode === "inbox";
+  const isDumpProcessing = transcribeLoading || organizeLoading;
   const reflectionQuestions = Array.from({ length: 10 }, (_, i) => t(`help.q${i + 1}`));
+
+  useEffect(() => {
+    if (isDumpProcessing) setShowHelpOverlay(false);
+  }, [isDumpProcessing]);
 
   const dumpPanelContent = (
     <>
@@ -619,19 +631,6 @@ export function CenterPanel({
           )}
         </div>
       </section>
-      <section>
-        <h3 style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.75rem" }}>
-          {t("center.transcript")}
-        </h3>
-        <textarea
-          className="bd-textarea"
-          value={transcript}
-          onChange={(e) => saveTranscriptToStorage(e.target.value)}
-          placeholder={t("center.transcriptPlaceholder")}
-          style={{ minHeight: "160px", minBlockSize: "160px", fontSize: "16px", borderRadius: 18 }}
-          aria-label={t("center.transcript")}
-        />
-      </section>
       {organizeSuccess && (
         <div style={{ padding: "0.5rem 0.75rem", background: "rgba(34,197,94,0.12)", borderRadius: "var(--button-radius)", color: "var(--text-primary)", fontSize: "0.875rem" }}>
           {organizeSuccess}
@@ -689,25 +688,10 @@ export function CenterPanel({
           <line x1="12" y1="19" x2="12" y2="22" />
         </svg>
       </button>
-      {showDumpOverlay && (
+      {showDumpOverlay && !isDumpProcessing && (
             <div
               className="bd-dump-overlay"
-              style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 1000,
-                background: "rgba(0,0,0,0.5)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "1rem",
-                paddingBlock: "max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom))",
-                paddingInline: "max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right))",
-                overflow: "auto",
-                WebkitOverflowScrolling: "touch",
-              }}
+              role="presentation"
               onClick={() => {
                 setShowDumpOverlay(false);
                 if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
@@ -715,15 +699,6 @@ export function CenterPanel({
             >
               <div
                 className="bd-panel bd-dump-sheet-inner"
-                style={{
-                  padding: "1.25rem",
-                  maxWidth: 520,
-                  width: "100%",
-                  maxHeight: "min(90vh, 90dvh)",
-                  overflow: "auto",
-                  WebkitOverflowScrolling: "touch",
-                  minHeight: 0,
-                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="bd-dump-sheet-handle" aria-hidden />
@@ -733,9 +708,11 @@ export function CenterPanel({
                     <button
                       type="button"
                       onClick={() => {
+                        if (isDumpProcessing) return;
                         setShowDumpOverlay(false);
                         if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
                       }}
+                      disabled={isDumpProcessing}
                       aria-label={t("center.close")}
                       style={{
                         width: 32,
@@ -744,7 +721,8 @@ export function CenterPanel({
                         border: "1px solid var(--border-default)",
                         background: "var(--bg-tertiary)",
                         color: "var(--text-secondary)",
-                        cursor: "pointer",
+                        cursor: isDumpProcessing ? "not-allowed" : "pointer",
+                        opacity: isDumpProcessing ? 0.5 : 1,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -770,25 +748,21 @@ export function CenterPanel({
               </div>
             </div>
       )}
+      {showDumpOverlay && isDumpProcessing && (
+        <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
+          <div className="bd-dump-processing-inner">
+            <div className="bd-dump-spinner" aria-hidden />
+            <p className="bd-dump-processing-title">{t("center.organizingThoughts")}</p>
+          </div>
+        </div>
+      )}
       {showDumpOverlay && showHelpOverlay && (
         <div
-          className="bd-help-overlay-mobile"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(0,0,0,0.55)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left))",
-          }}
+          className="bd-modal-backdrop bd-help-overlay-mobile"
           onClick={() => setShowHelpOverlay(false)}
         >
           <div
-            className="bd-panel bd-help-sheet-inner"
+            className="bd-panel bd-modal-panel bd-help-sheet-inner"
             style={{
               width: "100%",
               maxWidth: 560,
@@ -849,9 +823,18 @@ export function CenterPanel({
           items={unclearItems.items}
           projectNames={projectNames}
           onConfirm={handleUnclearConfirm}
-          onCancel={() => {
-            applyOrganizeResult(unclearItems.allItems, unclearItems.transcript);
+          onCancel={async () => {
+            const u = unclearItems;
+            if (!u) return;
             setUnclearItems(null);
+            setOrganizeLoading(true);
+            try {
+              await applyOrganizeResult(u.allItems, u.transcript);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Save failed");
+            } finally {
+              setOrganizeLoading(false);
+            }
           }}
         />
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface Project {
   id: string;
@@ -31,17 +32,20 @@ function NavItem({
   selected,
   onClick,
   indent = false,
+  title,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
   indent?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       className="bd-btn"
       onClick={onClick}
+      title={title}
       style={{
         width: "100%",
         justifyContent: "flex-start",
@@ -84,6 +88,7 @@ export function LeftPanel({
   onCategorySelect,
   onItemTypeSelect,
 }: LeftPanelProps) {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [counts, setCounts] = useState<CountsResponse | null>(null);
 
@@ -169,6 +174,13 @@ export function LeftPanel({
             selected={!selectedItemType}
             onClick={() => onItemTypeSelect(null)}
             indent
+          />
+          <NavItem
+            label={t("items.typeNew")}
+            selected={selectedItemType === "new"}
+            onClick={() => onItemTypeSelect("new")}
+            indent
+            title={t("items.typeNewHint")}
           />
           {itemTypes.map(({ value, label }) => (
             <NavItem

@@ -11,6 +11,7 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import { useI18n } from "@/lib/i18n";
+import { saveLastNewBatchIds } from "@/lib/newBatch";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -173,9 +174,14 @@ export default function BrainDumpPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dumpId: dump.id, items: payload }),
         });
+        const dataBatch = await resBatch.json();
         if (!resBatch.ok) {
-          const data = await resBatch.json();
-          throw new Error(data.error ?? "Failed to save items");
+          throw new Error((dataBatch as { error?: string }).error ?? "Failed to save items");
+        }
+        const created = (dataBatch as { created?: { id: string }[] }).created ?? [];
+        saveLastNewBatchIds(created.map((c) => c.id));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("braindump-reload-items"));
         }
         await fetch(`/api/dumps/${dump.id}`, {
           method: "PATCH",
@@ -188,14 +194,26 @@ export default function BrainDumpPage() {
         console.error("Auto-save failed:", e);
         setOrganizedItems(items);
         setOrganizedTranscript(transcript);
+        throw e instanceof Error ? e : new Error("Auto-save failed");
       }
     },
     [mode]
   );
 
-  const handleSaveComplete = useCallback(() => {
+  const handleDumpFinished = useCallback(() => {
+    setMode("work");
+    setSelectedItemType("new");
+  }, []);
+
+  const handleSaveComplete = useCallback((createdIds?: string[]) => {
     setOrganizedItems([]);
     setOrganizedTranscript("");
+    if (createdIds && createdIds.length > 0) {
+      saveLastNewBatchIds(createdIds);
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("braindump-reload-items"));
+    }
   }, []);
 
   if (status === "loading") {
@@ -397,6 +415,7 @@ export default function BrainDumpPage() {
               onTranscriptReady={() => {}}
               onOrganized={handleOrganized}
               onAutoSave={handleAutoSave}
+              onDumpFinished={handleDumpFinished}
               onOpenSettings={() => setShowSettings(true)}
               projectNames={projectNames}
               projectId={selectedProjectId}
@@ -468,19 +487,6 @@ export default function BrainDumpPage() {
       {mobileModeMenuOpen && (
         <div
           className="bd-mobile-mode-sheet-backdrop"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 960,
-            background: "rgba(0,0,0,0.45)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-            padding: 0,
-            paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          }}
           onClick={() => setMobileModeMenuOpen(false)}
           role="presentation"
         >

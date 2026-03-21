@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { getLastNewBatchIds } from "@/lib/newBatch";
 
 interface SavedItem {
   id: string;
@@ -63,17 +64,26 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [newBatchTick, setNewBatchTick] = useState(0);
+  useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
 
   const fetchItems = useCallback(() => {
     const params = new URLSearchParams();
     params.set("domain", mode);
     if (projectId) params.set("projectId", projectId);
     if (category) params.set("category", category);
-    if (itemType) params.set("itemType", itemType);
+    if (itemType && itemType !== "new") params.set("itemType", itemType);
     setLoading(true);
     fetch(`/api/organized-items?${params}`)
       .then((r) => r.json())
-      .then((d) => setItems(d.items || []))
+      .then((d) => {
+        let list: SavedItem[] = d.items || [];
+        if (itemType === "new") {
+          const ids = getLastNewBatchIds();
+          list = list.filter((it) => ids.has(it.id));
+        }
+        setItems(list);
+      })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, [mode, projectId, category, itemType]);

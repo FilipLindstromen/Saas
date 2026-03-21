@@ -41,19 +41,11 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
       role="dialog"
       aria-modal="true"
       aria-labelledby="unclear-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1100,
-        padding: "1rem",
-      }}
+      className="bd-modal-backdrop"
       onClick={onCancel}
     >
       <div
+        className="bd-modal-panel"
         style={{
           background: "var(--bg-elevated)",
           border: "1px solid var(--border-default)",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
@@ -146,7 +146,7 @@ interface CalendarOption {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const [openaiKey, setOpenaiKey] = useState("");
   const [textSize, setTextSize] = useState("medium");
   const [googleCalendarSync, setGoogleCalendarSync] = useState(false);
@@ -277,19 +277,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="bd-settings-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: "1rem",
-      }}
+      className="bd-modal-backdrop"
       onClick={onClose}
     >
       <div
+        className="bd-modal-panel"
         style={{
           background: "var(--bg-elevated)",
           border: "1px solid var(--border-default)",
@@ -309,6 +301,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </div>
         <div style={{ padding: "1.5rem" }}>
+          <label htmlFor="bd-settings-locale" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+            {t("lang.label")}
+          </label>
+          <select
+            id="bd-settings-locale"
+            className="bd-input"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+            aria-label={t("lang.label")}
+            style={{ marginBottom: "1rem", width: "100%", cursor: "pointer" }}
+          >
+            <option value="en">{t("lang.english")}</option>
+            <option value="sv">{t("lang.swedish")}</option>
+          </select>
           <label htmlFor="bd-openai-key" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
             OpenAI API key
           </label>

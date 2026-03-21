@@ -1,6 +1,10 @@
 {
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/auth/forgot-password/route": "app/api/auth/forgot-password/route.js",
+  "/api/auth/register/route": "app/api/auth/register/route.js",
+  "/api/auth/reset-password/route": "app/api/auth/reset-password/route.js",
   "/api/dumps/[id]/route": "app/api/dumps/[id]/route.js",
   "/api/dumps/route": "app/api/dumps/route.js",
   "/api/organize/route": "app/api/organize/route.js",
@@ -11,8 +15,12 @@
   "/api/organized-items/route": "app/api/organized-items/route.js",
   "/api/projects/[id]/route": "app/api/projects/[id]/route.js",
   "/api/projects/route": "app/api/projects/route.js",
+  "/api/suggest-next-actions/route": "app/api/suggest-next-actions/route.js",
   "/api/tags/route": "app/api/tags/route.js",
   "/api/transcribe/route": "app/api/transcribe/route.js",
   "/google-calendar-callback/page": "app/google-calendar-callback/page.js",
-  "/page": "app/page.js"
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/register/page": "app/register/page.js",
+  "/reset-password/page": "app/reset-password/page.js"
 }
