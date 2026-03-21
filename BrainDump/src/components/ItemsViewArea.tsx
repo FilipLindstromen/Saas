@@ -238,7 +238,7 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
 }
 
 export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeSelect, viewType: controlledViewType, onViewTypeChange, searchFilter = "", reloadKey = 0 }: ItemsViewAreaProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const filteredItems = filterItemsBySearch(filterItemsByType(items, itemType), searchFilter);
@@ -252,9 +252,6 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
   const [moveToProjectForId, setMoveToProjectForId] = useState<string | null>(null);
   const [moveToAreaForId, setMoveToAreaForId] = useState<string | null>(null);
-  const [suggestNextOpen, setSuggestNextOpen] = useState(false);
-  const [suggestNextLoading, setSuggestNextLoading] = useState(false);
-  const [suggestNextList, setSuggestNextList] = useState<Array<{ title: string; reason?: string }>>([]);
   const [editingEntry, setEditingEntry] = useState<{
     id: string;
     title: string;
@@ -274,6 +271,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   } | null>(null);
   const [addEntryOpen, setAddEntryOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [viewPickerOpen, setViewPickerOpen] = useState(false);
   const [addEntryForm, setAddEntryForm] = useState({
     itemType: "note",
     title: "",
@@ -306,6 +304,10 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) setViewPickerOpen(false);
+  }, [isMobile]);
 
   const FETCH_TIMEOUT_MS = 15000;
 
@@ -356,6 +358,12 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   useEffect(() => {
     fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    const onReload = () => fetchItems();
+    window.addEventListener("braindump-reload-items", onReload);
+    return () => window.removeEventListener("braindump-reload-items", onReload);
   }, [fetchItems]);
 
   useEffect(() => {
@@ -542,42 +550,6 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       .catch(() => {});
   }, []);
 
-  const fetchSuggestNext = useCallback(() => {
-    setSuggestNextOpen(true);
-    setSuggestNextLoading(true);
-    setSuggestNextList([]);
-    let apiKey = "";
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("saasApiKeys") : null;
-      if (raw) {
-        const p = JSON.parse(raw);
-        apiKey = (p?.openai ?? "").trim();
-      }
-    } catch {}
-    const payload = items.map((it) => ({
-      title: it.title,
-      content: it.content ?? undefined,
-      itemType: it.itemType,
-      progress: it.progress ?? undefined,
-      scheduledAt: it.scheduledAt ?? undefined,
-      scheduledTime: it.scheduledTime ?? undefined,
-      recurrence: it.recurrence ?? undefined,
-      project: it.project ?? undefined,
-    }));
-    fetch("/api/suggest-next-actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: payload, locale, ...(apiKey ? { apiKey } : {}) }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data.suggestions) ? data.suggestions : [];
-        setSuggestNextList(list.slice(0, 3));
-      })
-      .catch(() => setSuggestNextList([{ title: t("items.suggestError") }]))
-      .finally(() => setSuggestNextLoading(false));
-  }, [items, locale, t]);
-
   useEffect(() => {
     if (mode !== "work") return;
     fetch("/api/projects?domain=work")
@@ -725,6 +697,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   return (
     <div
+      className="bd-items-view-root"
       style={{
         padding: isMobile ? "0.65rem" : "1rem",
         display: "flex",
@@ -732,6 +705,11 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
         gap: isMobile ? "0.65rem" : "1rem",
         minHeight: 0,
         flex: 1,
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
+        overflowX: "hidden",
       }}
     >
       <div
@@ -829,123 +807,238 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
           </div>
         </div>
         <div
-          className={isMobile ? "bd-items-toolbar-views" : undefined}
           style={{
             display: "flex",
             gap: "0.4rem",
             alignItems: "center",
-            flexWrap: "nowrap",
+            flexWrap: isMobile ? "wrap" : "nowrap",
             flexShrink: 0,
             justifyContent: isMobile ? "flex-start" : "flex-end",
             width: isMobile ? "100%" : "auto",
-            overflowX: isMobile ? "auto" : "visible",
-            WebkitOverflowScrolling: isMobile ? "touch" : undefined,
+            overflowX: "visible",
           }}
         >
-          {(mode === "work" || mode === "personal" || mode === "all") && (
-            <span style={{ position: "relative", display: "inline-flex", flexShrink: 0, width: isMobile ? "100%" : undefined }}>
+          {isMobile ? (
+            <>
               <button
                 type="button"
                 className="bd-btn"
+                aria-haspopup="listbox"
+                aria-expanded={viewPickerOpen}
+                aria-label={t("items.openViewMenu")}
+                title={viewButtons.find((b) => b.value === viewType)?.label}
+                onClick={() => setViewPickerOpen(true)}
                 style={{
-                  padding: "0.35rem 0.65rem",
-                  fontSize: "0.8125rem",
-                  minHeight: isMobile ? 44 : undefined,
-                  whiteSpace: "nowrap",
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 44,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem",
+                  padding: "0.4rem 0.65rem",
+                  flexShrink: 1,
+                  background: "var(--accent)",
+                  borderColor: "var(--accent)",
+                  color: "#fff",
+                  boxShadow: "var(--shadow-sm)",
                 }}
-                onClick={fetchSuggestNext}
-                disabled={suggestNextLoading || items.length === 0}
-                title={t("items.whatsNext")}
               >
-                {suggestNextLoading ? "…" : t("items.whatsNext")}
-              </button>
-              {suggestNextOpen && (
-                <>
-                  <div
-                    role="presentation"
-                    style={{ position: "fixed", inset: 0, zIndex: 999 }}
-                    onClick={() => setSuggestNextOpen(false)}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      ...(isMobile
-                        ? { left: 0, right: 0, width: "100%", maxWidth: "100%" }
-                        : { right: 0, minWidth: 260, maxWidth: 360 }),
-                      top: "100%",
-                      marginTop: 4,
-                      zIndex: 1000,
-                      background: "var(--bg-elevated)",
-                      border: "1px solid var(--border-default)",
-                      borderRadius: "var(--button-radius)",
-                      boxShadow: "var(--shadow-md)",
-                      padding: "0.75rem",
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                    {viewButtons.find((b) => b.value === viewType)?.icon}
+                  </span>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0, opacity: 0.95 }}
+                    aria-hidden
                   >
-                    <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
-                      {t("items.whatsNextTitle")}
-                    </div>
-                    {suggestNextLoading ? (
-                      <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>{t("items.thinking")}</p>
-                    ) : (
-                      <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--text-primary)" }}>
-                        {suggestNextList.map((s, i) => (
-                          <li key={i} style={{ marginBottom: "0.35rem" }}>
-                            {s.title}
-                            {s.reason && <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>{s.reason}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
+              {viewType === "postits" && (
+                <button
+                  type="button"
+                  className="bd-btn"
+                  title={t("items.connectPostits")}
+                  aria-label={t("items.connectPostits")}
+                  style={{
+                    padding: "0.4rem",
+                    minWidth: 44,
+                    minHeight: 44,
+                    flexShrink: 0,
+                    background: lineToolActive ? "var(--accent)" : undefined,
+                    color: lineToolActive ? "#fff" : undefined,
+                    borderColor: "transparent",
+                  }}
+                  onClick={() => setLineToolActive((a) => !a)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
               )}
-            </span>
-          )}
-          {viewButtons.map(({ value, label, icon }) => (
-            <button
-              key={value}
-              type="button"
-              className="bd-btn"
-              title={label}
-              aria-label={label}
-              style={{
-                padding: "0.4rem",
-                ...(isMobile ? { minWidth: 44, minHeight: 44 } : {}),
-                flexShrink: 0,
-                background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
-                borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
-                color: viewType === value ? "#fff" : "var(--text-primary)",
-              }}
-              onClick={() => setViewType(value)}
-            >
-              {icon}
-            </button>
-          ))}
-          {viewType === "postits" && (
-            <button
-              type="button"
-              className="bd-btn"
-              title={t("items.connectPostits")}
-              aria-label={t("items.connectPostits")}
-              style={{
-                marginLeft: "0.25rem",
-                padding: "0.4rem",
-                ...(isMobile ? { minWidth: 44, minHeight: 44 } : {}),
-                flexShrink: 0,
-                background: lineToolActive ? "var(--accent)" : undefined,
-                color: lineToolActive ? "#fff" : undefined,
-                borderColor: "transparent",
-              }}
-              onClick={() => setLineToolActive((a) => !a)}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </button>
+            </>
+          ) : (
+            <>
+              {viewButtons.map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className="bd-btn"
+                  title={label}
+                  aria-label={label}
+                  style={{
+                    padding: "0.4rem",
+                    flexShrink: 0,
+                    background: viewType === value ? "var(--accent)" : "var(--bg-elevated)",
+                    borderColor: viewType === value ? "var(--accent)" : "var(--border-default)",
+                    color: viewType === value ? "#fff" : "var(--text-primary)",
+                  }}
+                  onClick={() => setViewType(value)}
+                >
+                  {icon}
+                </button>
+              ))}
+              {viewType === "postits" && (
+                <button
+                  type="button"
+                  className="bd-btn"
+                  title={t("items.connectPostits")}
+                  aria-label={t("items.connectPostits")}
+                  style={{
+                    marginLeft: "0.25rem",
+                    padding: "0.4rem",
+                    flexShrink: 0,
+                    background: lineToolActive ? "var(--accent)" : undefined,
+                    color: lineToolActive ? "#fff" : undefined,
+                    borderColor: "transparent",
+                  }}
+                  onClick={() => setLineToolActive((a) => !a)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+            </>
           )}
         </div>
+        {isMobile && viewPickerOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1100,
+              background: "rgba(0,0,0,0.45)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: 0,
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            }}
+            onClick={() => setViewPickerOpen(false)}
+          >
+            <div
+              className="bd-panel"
+              style={{
+                width: "100%",
+                maxHeight: "min(85dvh, 85vh)",
+                borderRadius: "22px 22px 0 0",
+                padding: "1rem 1rem 1.15rem",
+                overflow: "auto",
+                WebkitOverflowScrolling: "touch",
+                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+              role="listbox"
+              aria-label={t("items.chooseView")}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 5,
+                  borderRadius: 999,
+                  background: "var(--border-strong)",
+                  margin: "0 auto 0.85rem",
+                  opacity: 0.85,
+                }}
+                aria-hidden
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("items.chooseView")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setViewPickerOpen(false)}
+                  aria-label={t("scope.cancel")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {viewButtons.map(({ value, label, icon }) => {
+                  const sel = viewType === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className="bd-btn"
+                      role="option"
+                      aria-selected={sel}
+                      title={label}
+                      onClick={() => {
+                        setViewType(value);
+                        setViewPickerOpen(false);
+                      }}
+                      style={{
+                        minHeight: 52,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.75rem",
+                        padding: "0.5rem 0.75rem",
+                        background: sel ? "var(--accent)" : "var(--bg-elevated)",
+                        color: sel ? "#fff" : "var(--text-primary)",
+                        borderColor: sel ? "var(--accent)" : "var(--border-default)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0, flex: 1 }}>
+                        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-hidden>
+                          {icon}
+                        </span>
+                        <span style={{ fontSize: "0.9375rem", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {label}
+                        </span>
+                      </span>
+                      {sel ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 18 }} aria-hidden />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -957,7 +1050,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       ) : viewType === "text" ? (
         <TextView items={filteredItems} onUpdate={updateEntryContent} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} />
       ) : viewType === "kanban" ? (
-        <KanbanView items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
+            <KanbanView items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
       ) : viewType === "calendar" ? (
         <CalendarView
           items={filteredItems}
@@ -970,6 +1063,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
           items={filteredItems}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+          isMobile={isMobile}
         />
       ) : (
         <PostitsView
@@ -1310,27 +1404,27 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
             style={{ padding: "1.25rem", maxWidth: 480, width: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Edit entry</h3>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Headline</label>
+            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
             <input
               className="bd-input"
               value={editingEntry.title}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, title: e.target.value })}
-              placeholder="Title"
+              placeholder={t("items.titlePlaceholder")}
               style={{ width: "100%", marginBottom: "0.75rem" }}
               autoFocus
             />
-            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Description</label>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.description")}</label>
             <textarea
               className="bd-textarea"
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
-              placeholder="What you said (description)"
+              placeholder={t("items.descPlaceholder")}
               style={{ width: "100%", minHeight: 100, marginBottom: "1rem", borderRadius: 18 }}
             />
             {items.find((i) => i.id === editingEntry.id)?.itemType === "task" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Progress</h4>
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.progress")}</h4>
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                   {PROGRESS_OPTIONS.map((p) => (
                     <button
@@ -1400,32 +1494,68 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-              <button type="button" className="bd-btn" onClick={() => setEditingEntry(null)}>
-                Cancel
-              </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
               <button
                 type="button"
-                className="bd-btn bd-btn-primary"
+                className="bd-btn bd-btn-danger"
                 onClick={() => {
-                  updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
-                  const currentItem = items.find((i) => i.id === editingEntry.id);
-                  if (currentItem?.itemType === "task" && editingEntry.progress) {
-                    updateProgress(editingEntry.id, editingEntry.progress, editingEntry.progress);
-                  }
-                  if (currentItem?.itemType === "calendar") {
-                    updateSchedule(editingEntry.id, {
-                      scheduledAt: editingEntry.scheduledAt || null,
-                      scheduledTime: editingEntry.scheduledTime || null,
-                      recurrence: (editingEntry.recurrence === "none" ? null : editingEntry.recurrence) || null,
-                      sendNotification: editingEntry.sendNotification ?? false,
-                    });
-                  }
+                  if (!confirm(t("items.confirmDeleteEntry"))) return;
+                  deleteItem(editingEntry.id, true);
                   setEditingEntry(null);
                 }}
+                aria-label={t("items.ariaDeleteEntry")}
+                title={t("items.ariaDeleteEntry")}
+                style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
               >
-                Save
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
               </button>
+              <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setEditingEntry(null)}
+                  aria-label={t("items.ariaCancelEdit")}
+                  title={t("items.ariaCancelEdit")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-primary"
+                  onClick={() => {
+                    updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
+                    const currentItem = items.find((i) => i.id === editingEntry.id);
+                    if (currentItem?.itemType === "task" && editingEntry.progress) {
+                      updateProgress(editingEntry.id, editingEntry.progress, editingEntry.progress);
+                    }
+                    if (currentItem?.itemType === "calendar") {
+                      updateSchedule(editingEntry.id, {
+                        scheduledAt: editingEntry.scheduledAt || null,
+                        scheduledTime: editingEntry.scheduledTime || null,
+                        recurrence: (editingEntry.recurrence === "none" ? null : editingEntry.recurrence) || null,
+                        sendNotification: editingEntry.sendNotification ?? false,
+                      });
+                    }
+                    setEditingEntry(null);
+                  }}
+                  aria-label={t("items.ariaSaveEntry")}
+                  title={t("items.ariaSaveEntry")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1914,10 +2044,12 @@ function FlowchartView({
   items,
   onEdit,
   onItemContextMenu,
+  isMobile = false,
 }: {
   items: ViewItem[];
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
+  isMobile?: boolean;
 }) {
   const { t } = useI18n();
   const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(new Set());
@@ -1983,7 +2115,10 @@ function FlowchartView({
     alignItems: "center",
     justifyContent: "center",
     gap: "0.5rem",
-    minWidth: 120,
+    minWidth: isMobile ? 0 : 120,
+    maxWidth: isMobile ? "100%" : undefined,
+    width: isMobile ? "100%" : undefined,
+    boxSizing: "border-box",
     boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
   };
   const secondaryNodeStyle: CSSProperties = {
@@ -2047,6 +2182,7 @@ function FlowchartView({
             ...entryNodeStyle,
             borderLeft: `3px solid ${barColor}`,
             display: "flex",
+            flexWrap: isMobile ? "wrap" : "nowrap",
             alignItems: "center",
             gap: "0.5rem",
             position: "relative",
@@ -2068,9 +2204,9 @@ function FlowchartView({
             />
           )}
           <EntryTypeIcon type={it.itemType} size={14} />
-          <span style={{ flex: 1, minWidth: 0 }}>{it.title}</span>
+            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</span>
           {it.content?.trim() && (
-            <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", flexShrink: 0, maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: isMobile ? "none" : undefined }}>
               {it.content.slice(0, 50)}{it.content.length > 50 ? "…" : ""}
             </span>
           )}
@@ -2085,7 +2221,19 @@ function FlowchartView({
     const label = formatTypeLabel(type);
     const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
     return (
-      <div key={typeKey} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", minWidth: 260, maxWidth: 340, flex: "0 0 auto" }}>
+      <div
+        key={typeKey}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          minWidth: isMobile ? 0 : 260,
+          maxWidth: isMobile ? "100%" : 340,
+          width: isMobile ? "100%" : undefined,
+          flex: "0 0 auto",
+          boxSizing: "border-box",
+        }}
+      >
         <FlowConnector dashed />
         <button
           type="button"
@@ -2112,7 +2260,18 @@ function FlowchartView({
     const isCollapsed = collapsedSections.has(sectionId);
     const byType = groupByType(sectionItems);
     return (
-      <div key={sectionId} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", minWidth: 200, flex: "0 0 auto" }}>
+      <div
+        key={sectionId}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          minWidth: isMobile ? 0 : 200,
+          width: isMobile ? "100%" : undefined,
+          flex: "0 0 auto",
+          boxSizing: "border-box",
+        }}
+      >
         <FlowConnector dashed />
         <button
           type="button"
@@ -2124,7 +2283,20 @@ function FlowchartView({
           <span style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", fontWeight: 400 }}>({sectionItems.length})</span>
         </button>
         {!isCollapsed && (
-          <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 2, marginLeft: 12, alignItems: "flex-start" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 12,
+              marginTop: 2,
+              marginLeft: isMobile ? 0 : 12,
+              alignItems: "flex-start",
+              width: isMobile ? "100%" : undefined,
+              maxWidth: "100%",
+              boxSizing: "border-box",
+            }}
+          >
             {byType.map(({ type, entries }) => renderTypeBlock(domain, sectionKey, type, entries))}
           </div>
         )}
@@ -2136,7 +2308,18 @@ function FlowchartView({
     const isCollapsed = collapsedDomains.has(domain);
     const total = sections.reduce((s, sec) => s + sec.items.length, 0);
     return (
-      <div key={domain} style={{ flex: "0 0 auto", minWidth: 200, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div
+        key={domain}
+        style={{
+          flex: "0 0 auto",
+          minWidth: isMobile ? 0 : 200,
+          width: isMobile ? "100%" : undefined,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: isMobile ? "stretch" : "center",
+          boxSizing: "border-box",
+        }}
+      >
         <button
           type="button"
           onClick={() => toggleDomain(domain)}
@@ -2149,7 +2332,19 @@ function FlowchartView({
         {!isCollapsed && (
           <>
             <FlowConnector />
-            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: "1rem", width: "100%", alignItems: "flex-start", justifyContent: "flex-start" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: "1rem",
+                width: "100%",
+                maxWidth: "100%",
+                alignItems: "flex-start",
+                justifyContent: "flex-start",
+                boxSizing: "border-box",
+              }}
+            >
               {sections.map((sec) => renderSection(domain, sec.key, sec.label, sec.items))}
             </div>
           </>
@@ -2166,14 +2361,29 @@ function FlowchartView({
         overflow: "auto",
         background: "var(--bg-secondary)",
         borderRadius: "var(--button-radius)",
-        padding: "1.5rem",
+        padding: isMobile ? "0.65rem" : "1.5rem",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       {items.length === 0 ? (
         <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>{t("items.flowchartEmpty")}</p>
       ) : (
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-          <div style={{ display: "flex", flexDirection: "row", gap: "2rem", width: "fit-content", maxWidth: "100%", justifyContent: "center", alignItems: "flex-start" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? "1rem" : "2rem",
+              width: isMobile ? "100%" : "fit-content",
+              maxWidth: "100%",
+              justifyContent: "center",
+              alignItems: isMobile ? "stretch" : "flex-start",
+              boxSizing: "border-box",
+            }}
+          >
             {workSections.some((s) => s.items.length > 0) && renderDomainColumn("work", t("items.flowchartWork"), workSections)}
             {personalSections.some((s) => s.items.length > 0) && renderDomainColumn("personal", t("items.flowchartPersonal"), personalSections)}
           </div>
@@ -2256,8 +2466,8 @@ function ListView({
               </button>
             )}
           </div>
-          <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--text-primary)" }}>{it.title}</div>
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--text-primary)", wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</div>
+          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
             {it.content?.trim() || "—"}
           </div>
           {scheduleLabel && (
@@ -2285,6 +2495,7 @@ function ListView({
 
   return (
     <div
+      className="bd-list-view"
       style={{
         display: "flex",
         flexDirection: "row",
@@ -2292,6 +2503,10 @@ function ListView({
         overflow: "auto",
         alignContent: "start",
         alignItems: "flex-start",
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       {typesInUse.map((type) => {
@@ -2367,6 +2582,7 @@ function TextView({
 
   return (
     <div
+      className="bd-text-view"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -2374,6 +2590,9 @@ function TextView({
         overflow: "auto",
         paddingBottom: "1rem",
         maxWidth: 720,
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
       }}
     >
       {items.map((it) => {
@@ -2528,12 +2747,14 @@ function KanbanView({
   onProgress,
   onItemContextMenu,
   onEdit,
+  isMobile = false,
 }: {
   items: ViewItem[];
   onProgress: (id: string, progress: string, kanbanColumn?: string) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
+  isMobile?: boolean;
 }) {
   const { t } = useI18n();
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -2618,7 +2839,19 @@ function KanbanView({
           {t("items.kanbanNote")}
         </p>
       )}
-      <div style={{ display: "flex", gap: "1rem", overflow: "auto", flex: 1 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          gap: isMobile ? "0.65rem" : "1rem",
+          overflow: isMobile ? "visible" : "auto",
+          flex: 1,
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+        }}
+      >
       {byColumn.map((col) => (
         <div
           key={col.key}
@@ -2626,8 +2859,10 @@ function KanbanView({
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, col.key)}
           style={{
-            flex: "1 1 0",
-            minWidth: 160,
+            flex: isMobile ? "0 0 auto" : "1 1 0",
+            minWidth: isMobile ? 0 : 160,
+            width: isMobile ? "100%" : undefined,
+            maxWidth: "100%",
             minHeight: 120,
             background: dragOverColumn === col.key ? "var(--bg-hover)" : "var(--bg-secondary)",
             borderRadius: "16px",

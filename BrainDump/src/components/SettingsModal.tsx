@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
@@ -145,6 +146,7 @@ interface CalendarOption {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  const { t } = useI18n();
   const [openaiKey, setOpenaiKey] = useState("");
   const [textSize, setTextSize] = useState("medium");
   const [googleCalendarSync, setGoogleCalendarSync] = useState(false);
@@ -155,6 +157,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [calendarList, setCalendarList] = useState<CalendarOption[]>([]);
   const [calendarListLoading, setCalendarListLoading] = useState(false);
   const [calendarListError, setCalendarListError] = useState<string | null>(null);
+  const [deleteAllBusy, setDeleteAllBusy] = useState(false);
+  const [deleteAllMessage, setDeleteAllMessage] = useState<string | null>(null);
 
   useEffect(() => {
     applyTextSizeOnLoad();
@@ -170,8 +174,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setSelectedCalendarSummary(loadGoogleCalendarSummary());
       setCalendarList([]);
       setCalendarListError(null);
+      setDeleteAllMessage(null);
     }
   }, [isOpen]);
+
+  const handleDeleteAllEntries = useCallback(async () => {
+    if (!confirm(t("settings.deleteAllConfirm"))) return;
+    setDeleteAllBusy(true);
+    setDeleteAllMessage(null);
+    try {
+      const res = await fetch("/api/organized-items", { method: "DELETE" });
+      const data = (await res.json()) as { error?: string; deleted?: number };
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setDeleteAllMessage(t("settings.deleteAllDone"));
+      window.dispatchEvent(new Event("braindump-reload-items"));
+    } catch {
+      setDeleteAllMessage(t("settings.deleteAllError"));
+    } finally {
+      setDeleteAllBusy(false);
+    }
+  }, [t]);
 
   const handleSave = () => {
     saveOpenAIKey(openaiKey.trim());
@@ -280,7 +302,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       >
         <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 id="bd-settings-title" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600, color: "var(--text-primary)" }}>
-            Settings
+            {t("settings.title")}
           </h2>
           <button type="button" onClick={onClose} className="bd-btn" style={{ padding: "0.25rem" }} aria-label="Close">
             ×
@@ -322,6 +344,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem" }}>
             Scales all text in the app. Stored in your browser only.
           </p>
+          <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
+              {t("settings.deleteAllIntro")}
+            </p>
+            <button
+              type="button"
+              className="bd-btn bd-btn-danger"
+              onClick={handleDeleteAllEntries}
+              disabled={deleteAllBusy}
+              style={{ width: "100%" }}
+            >
+              {deleteAllBusy ? t("settings.deleteAllDeleting") : t("settings.deleteAllEntries")}
+            </button>
+            {deleteAllMessage && (
+              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.5rem", marginBottom: 0 }}>{deleteAllMessage}</p>
+            )}
+          </div>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)" }}>
               <input

@@ -17,6 +17,35 @@ const VIEW_STORAGE_KEY = "braindump-items-view";
 type Mode = "inbox" | "work" | "personal" | "all";
 type DumpMode = "inbox" | "work" | "personal";
 
+/** Icons for All / Work / Personal — match desktop sidebar (stroke icons). */
+function WorkspaceModeIcon({ which, size = 20 }: { which: "all" | "work" | "personal"; size?: number }) {
+  const common = { width: size, height: size, viewBox: "0 0 24 24" as const, fill: "none" as const, stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
+  if (which === "all") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    );
+  }
+  if (which === "work") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMode = "inbox"): DumpMode {
   const domains = new Set(items.map((it) => it.domain).filter(Boolean));
   if (domains.size === 1) {
@@ -40,12 +69,17 @@ export default function BrainDumpPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
+  const [mobileModeMenuOpen, setMobileModeMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, viewType);
     } catch {}
   }, [viewType]);
+
+  useEffect(() => {
+    setMobileModeMenuOpen(false);
+  }, [mode]);
 
   useEffect(() => {
     fetch("/api/projects")
@@ -298,8 +332,8 @@ export default function BrainDumpPage() {
           <button
             type="button"
             onClick={() => setMode("work")}
-            title="Work"
-            aria-label="Work"
+            title={t("mode.work")}
+            aria-label={t("mode.work")}
             style={{
               width: 40,
               height: 40,
@@ -393,39 +427,165 @@ export default function BrainDumpPage() {
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
         <button
           type="button"
-          className={`bd-bottom-secondary${mode === "all" ? " bd-bottom-secondary-active" : ""}`}
-          onClick={() => setMode("all")}
+          className="bd-bottom-mode-trigger"
+          onClick={() => setMobileModeMenuOpen(true)}
+          aria-expanded={mobileModeMenuOpen}
+          aria-haspopup="dialog"
+          aria-label={t("bottom.chooseMode")}
+          title={t("bottom.chooseMode")}
         >
-          {t("bottom.all")}
+          <span className="bd-bottom-mode-trigger-inner">
+            <WorkspaceModeIcon
+              which={mode === "work" ? "work" : mode === "personal" ? "personal" : "all"}
+              size={22}
+            />
+          </span>
         </button>
-        <button
-          type="button"
-          className={`bd-bottom-secondary${mode === "work" ? " bd-bottom-secondary-active" : ""}`}
-          onClick={() => setMode("work")}
-        >
-          {t("bottom.work")}
-        </button>
-        <button
-          type="button"
-          className="bd-bottom-primary"
-          onClick={() => {
-            if (typeof document === "undefined") return;
-            const fab = document.getElementById("bd-dump-fab");
-            if (fab && "click" in fab) {
-              (fab as HTMLButtonElement).click();
-            }
-          }}
-        >
-          {t("bottom.dump")}
-        </button>
-        <button
-          type="button"
-          className={`bd-bottom-secondary${mode === "personal" ? " bd-bottom-secondary-active" : ""}`}
-          onClick={() => setMode("personal")}
-        >
-          {t("bottom.personal")}
-        </button>
+        <div className="bd-bottom-bar-center">
+          <button
+            type="button"
+            className="bd-bottom-dump-mic"
+            onClick={() => {
+              if (typeof document === "undefined") return;
+              const fab = document.getElementById("bd-dump-fab");
+              if (fab && "click" in fab) {
+                (fab as HTMLButtonElement).click();
+              }
+            }}
+            title={t("center.recordNewDump")}
+            aria-label={t("center.recordNewDump")}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          </button>
+        </div>
+        <div className="bd-bottom-bar-spacer" aria-hidden />
       </div>
+
+      {mobileModeMenuOpen && (
+        <div
+          className="bd-mobile-mode-sheet-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 960,
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            padding: 0,
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          }}
+          onClick={() => setMobileModeMenuOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="bd-panel bd-mobile-mode-sheet"
+            style={{
+              width: "100%",
+              maxHeight: "min(70dvh, 70vh)",
+              borderRadius: "22px 22px 0 0",
+              padding: "1rem 1rem 1.15rem",
+              overflow: "auto",
+              WebkitOverflowScrolling: "touch",
+              boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bd-mobile-mode-sheet-title"
+          >
+            <div
+              style={{
+                width: 40,
+                height: 5,
+                borderRadius: 999,
+                background: "var(--border-strong)",
+                margin: "0 auto 0.85rem",
+                opacity: 0.85,
+              }}
+              aria-hidden
+            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <h2 id="bd-mobile-mode-sheet-title" style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                {t("bottom.chooseMode")}
+              </h2>
+              <button
+                type="button"
+                className="bd-btn"
+                onClick={() => setMobileModeMenuOpen(false)}
+                aria-label={t("scope.cancel")}
+                style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {(
+                [
+                  { key: "all" as const, label: t("mode.all"), which: "all" as const },
+                  { key: "work" as const, label: t("mode.work"), which: "work" as const },
+                  { key: "personal" as const, label: t("mode.personal"), which: "personal" as const },
+                ] as const
+              ).map(({ key, label, which }) => {
+                const active = mode === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className="bd-btn bd-mobile-mode-sheet-row"
+                    onClick={() => {
+                      setMode(key);
+                      setMobileModeMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      minHeight: 52,
+                      padding: "0.5rem 0.75rem",
+                      justifyContent: "flex-start",
+                      width: "100%",
+                      background: active ? "var(--bg-hover)" : "var(--bg-elevated)",
+                      borderColor: active ? "var(--accent)" : "var(--border-default)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        background: active ? "var(--accent)" : "transparent",
+                        color: active ? "#fff" : "var(--text-tertiary)",
+                      }}
+                    >
+                      <WorkspaceModeIcon which={which} size={20} />
+                    </span>
+                    <span style={{ flex: 1, textAlign: "left", fontSize: "0.9375rem", color: "var(--text-primary)" }}>{label}</span>
+                    {active && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>

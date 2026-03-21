@@ -53,6 +53,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** Delete all organized items for the signed-in user (irreversible). */
+export async function DELETE() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as { id?: string }).id!;
+
+    const result = await prisma.organizedItem.deleteMany({ where: { userId } });
+    return NextResponse.json({ ok: true, deleted: result.count });
+  } catch (e) {
+    console.error("Organized items DELETE all error:", e);
+    const message = getDbErrorMessage(e) || "Failed to delete entries";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();

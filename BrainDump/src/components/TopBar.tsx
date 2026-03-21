@@ -31,6 +31,7 @@ export function TopBar({ mode, onModeChange: _onModeChange, onOpenSettings }: To
       }}
     >
       <h1
+        className="bd-mobile-hide"
         style={{
           fontWeight: 700,
           fontSize: "clamp(1.05rem, 3.5vw, 1.25rem)",

@@ -136,6 +136,7 @@ export function ScopeBar({
   const [addAreaValue, setAddAreaValue] = useState("");
   const [showAddArea, setShowAddArea] = useState(false);
   const [areaContextMenu, setAreaContextMenu] = useState<{ value: string; x: number; y: number; isCustom: boolean } | null>(null);
+  const [areaPickerOpen, setAreaPickerOpen] = useState(false);
   const [showAddProject, setShowAddProject] = useState(false);
   const [addProjectName, setAddProjectName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -148,6 +149,10 @@ export function ScopeBar({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) setAreaPickerOpen(false);
+  }, [isMobile]);
 
   const loadProjects = useCallback(() => {
     if (mode !== "work") return;
@@ -250,8 +255,8 @@ export function ScopeBar({
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
             gap: isMobile ? "0.65rem" : "0.5rem",
-            padding: isMobile ? "0.5rem 0" : "0.5rem 1rem",
-            background: "var(--bg-secondary)",
+            padding: isMobile ? "0.15rem 0" : "0.2rem 0",
+            background: "transparent",
             overflowX: isMobile ? "visible" : "auto",
           }}
         >
@@ -597,8 +602,8 @@ export function ScopeBar({
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
             gap: isMobile ? "0.65rem" : "0.5rem",
-            padding: isMobile ? "0.5rem 0" : "0.5rem 1rem",
-            background: "var(--bg-secondary)",
+            padding: isMobile ? "0.15rem 0" : "0.2rem 0",
+            background: "transparent",
             overflowX: isMobile ? "visible" : "auto",
           }}
         >
@@ -608,93 +613,182 @@ export function ScopeBar({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              overflowX: "auto",
+              overflowX: isMobile ? "visible" : "auto",
               minWidth: 0,
               width: "100%",
             }}
           >
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
-            {t("scope.area")}
-          </span>
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
-            <ScopeChip
-              label={t("scope.all")}
-              selected={!selectedCategory}
-              onClick={() => onCategorySelect(null)}
-            />
-            {allAreas.map((value) => (
-              <ScopeChip
-                key={value}
-                label={formatCategoryLabel(value)}
-                selected={selectedCategory === value}
-                onClick={() => onCategorySelect(value)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setAreaContextMenu({
-                    value,
-                    x: e.clientX,
-                    y: e.clientY,
-                    isCustom: customAreas.includes(value),
-                  });
-                }}
-                onMore={
-                  isMobile && customAreas.includes(value)
-                    ? () =>
+            {isMobile ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                    {t("scope.area")}
+                  </span>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    aria-haspopup="listbox"
+                    aria-expanded={areaPickerOpen}
+                    aria-label={t("scope.openAreaMenu")}
+                    onClick={() => setAreaPickerOpen(true)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 44,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem",
+                      padding: "0.45rem 0.75rem",
+                      borderRadius: "var(--button-radius)",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      background: !selectedCategory ? "var(--accent)" : "var(--bg-elevated)",
+                      color: !selectedCategory ? "#fff" : "var(--text-primary)",
+                      borderColor: !selectedCategory ? "var(--accent)" : "var(--border-default)",
+                      boxShadow: "var(--shadow-sm)",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                      {selectedCategory ? formatCategoryLabel(selectedCategory) : t("scope.all")}
+                    </span>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                      style={{ flexShrink: 0, opacity: 0.92 }}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                </div>
+                {showAddArea && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                    <input
+                      className="bd-input"
+                      value={addAreaValue}
+                      onChange={(e) => setAddAreaValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const v = addAreaValue.trim().toLowerCase().replace(/\s+/g, "_");
+                          if (v) {
+                            const current = loadCustomAreas();
+                            if (!current.includes(v)) {
+                              const next = [...current, v];
+                              saveCustomAreas(next);
+                              setCustomAreasState(next);
+                              onCategorySelect(v);
+                            }
+                            setAddAreaValue("");
+                            setShowAddArea(false);
+                          }
+                        } else if (e.key === "Escape") {
+                          setAddAreaValue("");
+                          setShowAddArea(false);
+                        }
+                      }}
+                      placeholder={t("scope.newArea")}
+                      autoFocus
+                      style={{ flex: 1, minWidth: 0, padding: "0.45rem 0.65rem", fontSize: "16px", minHeight: 44 }}
+                    />
+                    <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.4rem 0.65rem", minHeight: 44 }}>
+                      {t("scope.cancel")}
+                    </button>
+                  </span>
+                )}
+              </div>
+            ) : (
+              <>
+                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                  {t("scope.area")}
+                </span>
+                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
+                  <ScopeChip
+                    label={t("scope.all")}
+                    selected={!selectedCategory}
+                    onClick={() => onCategorySelect(null)}
+                  />
+                  {allAreas.map((value) => (
+                    <ScopeChip
+                      key={value}
+                      label={formatCategoryLabel(value)}
+                      selected={selectedCategory === value}
+                      onClick={() => onCategorySelect(value)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
                         setAreaContextMenu({
                           value,
-                          x: window.innerWidth / 2,
-                          y: window.innerHeight,
-                          isCustom: true,
-                        })
-                    : undefined
-                }
-              />
-            ))}
-            {showAddArea ? (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <input
-                  className="bd-input"
-                  value={addAreaValue}
-                  onChange={(e) => setAddAreaValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const v = addAreaValue.trim().toLowerCase().replace(/\s+/g, "_");
-                      if (v) {
-                        const current = loadCustomAreas();
-                        if (!current.includes(v)) {
-                          const next = [...current, v];
-                          saveCustomAreas(next);
-                          setCustomAreasState(next);
-                          onCategorySelect(v);
-                        }
-                        setAddAreaValue("");
-                        setShowAddArea(false);
+                          x: e.clientX,
+                          y: e.clientY,
+                          isCustom: customAreas.includes(value),
+                        });
+                      }}
+                      onMore={
+                        isMobile && customAreas.includes(value)
+                          ? () =>
+                              setAreaContextMenu({
+                                value,
+                                x: window.innerWidth / 2,
+                                y: window.innerHeight,
+                                isCustom: true,
+                              })
+                          : undefined
                       }
-                    } else if (e.key === "Escape") {
-                      setAddAreaValue("");
-                      setShowAddArea(false);
-                    }
-                  }}
-                  placeholder={t("scope.newArea")}
-                  autoFocus
-                  style={{ width: 100, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
-                />
-                <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.3rem 0.5rem" }}>
-                  {t("scope.cancel")}
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="bd-btn"
-                onClick={() => setShowAddArea(true)}
-                title={t("scope.addArea")}
-                style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
-              >
-                +
-              </button>
+                    />
+                  ))}
+                  {showAddArea ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                      <input
+                        className="bd-input"
+                        value={addAreaValue}
+                        onChange={(e) => setAddAreaValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const v = addAreaValue.trim().toLowerCase().replace(/\s+/g, "_");
+                            if (v) {
+                              const current = loadCustomAreas();
+                              if (!current.includes(v)) {
+                                const next = [...current, v];
+                                saveCustomAreas(next);
+                                setCustomAreasState(next);
+                                onCategorySelect(v);
+                              }
+                              setAddAreaValue("");
+                              setShowAddArea(false);
+                            }
+                          } else if (e.key === "Escape") {
+                            setAddAreaValue("");
+                            setShowAddArea(false);
+                          }
+                        }}
+                        placeholder={t("scope.newArea")}
+                        autoFocus
+                        style={{ width: 100, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
+                      />
+                      <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.3rem 0.5rem" }}>
+                        {t("scope.cancel")}
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setShowAddArea(true)}
+                      title={t("scope.addArea")}
+                      style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-          </div>
           </div>
         {onSearchFilterChange && (
           <div
@@ -749,6 +843,178 @@ export function ScopeBar({
           </div>
         )}
         </div>
+        {isMobile && areaPickerOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1095,
+              background: "rgba(0,0,0,0.45)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: 0,
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            }}
+            onClick={() => setAreaPickerOpen(false)}
+          >
+            <div
+              className="bd-panel"
+              style={{
+                width: "100%",
+                maxHeight: "min(85dvh, 85vh)",
+                borderRadius: "22px 22px 0 0",
+                padding: "1rem 1rem 1.15rem",
+                overflow: "auto",
+                WebkitOverflowScrolling: "touch",
+                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+              role="listbox"
+              aria-label={t("scope.chooseArea")}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 5,
+                  borderRadius: 999,
+                  background: "var(--border-strong)",
+                  margin: "0 auto 0.85rem",
+                  opacity: 0.85,
+                }}
+                aria-hidden
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("scope.chooseArea")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setAreaPickerOpen(false)}
+                  aria-label={t("scope.cancel")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  role="option"
+                  aria-selected={!selectedCategory}
+                  onClick={() => {
+                    onCategorySelect(null);
+                    setAreaPickerOpen(false);
+                  }}
+                  style={{
+                    minHeight: 48,
+                    justifyContent: "space-between",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    background: !selectedCategory ? "var(--accent)" : "var(--bg-elevated)",
+                    color: !selectedCategory ? "#fff" : "var(--text-primary)",
+                    borderColor: !selectedCategory ? "var(--accent)" : "var(--border-default)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {t("scope.all")}
+                  {!selectedCategory ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <span style={{ width: 18 }} aria-hidden />
+                  )}
+                </button>
+                {allAreas.map((value) => {
+                  const sel = selectedCategory === value;
+                  return (
+                    <div key={value} style={{ display: "flex", alignItems: "stretch", gap: "0.35rem" }}>
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        role="option"
+                        aria-selected={sel}
+                        onClick={() => {
+                          onCategorySelect(value);
+                          setAreaPickerOpen(false);
+                        }}
+                        style={{
+                          flex: 1,
+                          minHeight: 48,
+                          justifyContent: "space-between",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          background: sel ? "var(--accent)" : "var(--bg-elevated)",
+                          color: sel ? "#fff" : "var(--text-primary)",
+                          borderColor: sel ? "var(--accent)" : "var(--border-default)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                          {formatCategoryLabel(value)}
+                        </span>
+                        {sel ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <span style={{ width: 18 }} aria-hidden />
+                        )}
+                      </button>
+                      {customAreas.includes(value) && (
+                        <button
+                          type="button"
+                          className="bd-btn"
+                          aria-label={t("scope.areaOptions")}
+                          title={t("scope.areaOptions")}
+                          onClick={() => {
+                            setAreaPickerOpen(false);
+                            setAreaContextMenu({
+                              value,
+                              x: window.innerWidth / 2,
+                              y: window.innerHeight,
+                              isCustom: true,
+                            });
+                          }}
+                          style={{
+                            minWidth: 48,
+                            minHeight: 48,
+                            padding: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "1.1rem",
+                            color: "var(--text-tertiary)",
+                          }}
+                        >
+                          ⋮
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => {
+                    setAreaPickerOpen(false);
+                    setShowAddArea(true);
+                  }}
+                  style={{ minHeight: 48, marginTop: "0.35rem", justifyContent: "center" }}
+                >
+                  + {t("scope.addArea")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {areaContextMenu?.isCustom && (
           <div
             style={isMobile ? {

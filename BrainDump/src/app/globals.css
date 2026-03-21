@@ -109,6 +109,15 @@ textarea {
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border-subtle);
 }
+
+/* Main column: no card frame — chips & toolbar sit on page background */
+.bd-center-panel {
+  background: var(--bg-primary);
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  overflow: visible;
+}
 .bd-btn {
   display: inline-flex;
   align-items: center;
@@ -221,8 +230,9 @@ select.bd-input::-ms-expand {
 
 .bd-scope-outer-wrap {
   flex-shrink: 0;
-  padding: 0.5rem 1rem 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.25rem 1rem 0;
+  border-bottom: none;
+  background: transparent;
 }
 
 .bd-page-content-padding {
@@ -372,39 +382,123 @@ select.bd-input::-ms-expand {
 
 @media (max-width: 768px) {
   .bd-scope-outer-wrap {
+    padding-top: 0.15rem;
     padding-left: max(0.5rem, env(safe-area-inset-left));
     padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-bottom: 0;
   }
 
   .bd-page-content-padding {
     padding: 0.75rem;
     padding-left: max(0.65rem, env(safe-area-inset-left));
     padding-right: max(0.65rem, env(safe-area-inset-right));
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* Items list area: no horizontal spill on small screens */
+  .bd-items-view-root {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .bd-list-view {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .bd-list-view > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .bd-text-view {
+    max-width: 100% !important;
   }
 
   .bd-layout-main {
-    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    /* Room for tab bar + 56px mic button */
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
   }
 
   .bd-bottom-bar {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1.2fr 1fr;
-    align-items: stretch;
-    gap: 0.4rem;
-    padding-left: max(0.5rem, env(safe-area-inset-left));
-    padding-right: max(0.5rem, env(safe-area-inset-right));
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-left: max(0.65rem, env(safe-area-inset-left));
+    padding-right: max(0.65rem, env(safe-area-inset-right));
   }
 
-  .bd-bottom-bar button {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    padding-inline: 0.35rem;
+  .bd-bottom-mode-trigger {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease;
   }
 
-  .bd-bottom-primary {
-    font-size: 0.8125rem;
-    font-weight: 700;
+  .bd-bottom-mode-trigger:active {
+    transform: scale(0.96);
+  }
+
+  .bd-bottom-mode-trigger-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bd-bottom-bar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .bd-bottom-bar-spacer {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  /* Circular mic — matches main dump FAB (flat orange, white icon) */
+  .bd-bottom-bar .bd-bottom-dump-mic {
+    width: 56px;
+    height: 56px;
+    min-height: 56px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+    line-height: 0;
+  }
+
+  .bd-bottom-bar .bd-bottom-dump-mic svg {
+    flex-shrink: 0;
   }
 
   .bd-mobile-hide {
@@ -439,8 +533,6 @@ select.bd-input::-ms-expand {
 
   .bd-center-panel {
     padding: 0.75rem !important;
-    border-radius: min(var(--card-radius), 20px) !important;
-    box-shadow: var(--shadow-sm) !important;
   }
 
   .bd-scope-chip-touch .bd-btn {
