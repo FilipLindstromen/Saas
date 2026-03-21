@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { getLastNewBatchIds } from "@/lib/newBatch";
+import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 
 interface SavedItem {
   id: string;
@@ -86,7 +86,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
       })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [mode, projectId, category, itemType]);
+  }, [mode, projectId, category, itemType, newBatchTick]);
 
   useEffect(() => {
     fetchItems();
