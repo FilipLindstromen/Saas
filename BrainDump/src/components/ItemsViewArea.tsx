@@ -844,6 +844,12 @@ export function ItemsViewArea({
     [t]
   );
 
+  const [bottomViewSlotEl, setBottomViewSlotEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    setBottomViewSlotEl(document.getElementById("bd-bottom-view-slot"));
+  }, []);
+
   if (loading) {
     return (
       <div style={{ padding: "1.5rem" }}>
@@ -854,12 +860,6 @@ export function ItemsViewArea({
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
   const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
-
-  const [bottomViewSlotEl, setBottomViewSlotEl] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (typeof document === "undefined") return;
-    setBottomViewSlotEl(document.getElementById("bd-bottom-view-slot"));
-  }, []);
 
   const mobileViewPickerButton = (
     <button
