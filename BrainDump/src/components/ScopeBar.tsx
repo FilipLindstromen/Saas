@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 
 interface Project {
   id: string;
@@ -19,6 +20,9 @@ interface ScopeBarProps {
   onCategorySelect: (category: string | null) => void;
   searchFilter?: string;
   onSearchFilterChange?: (value: string) => void;
+  /** Filter entries by due date (tasks, calendar) — shown with search when filter is open. */
+  dueDateFilter?: DueDateFilterPreset;
+  onDueDateFilterChange?: (preset: DueDateFilterPreset) => void;
 }
 
 const CUSTOM_AREAS_KEY = "braindump_custom_areas";
@@ -116,6 +120,58 @@ function fetchCounts(domain: string): Promise<CountsResponse> {
     .catch(() => ({}));
 }
 
+const DUE_DATE_PRESETS: DueDateFilterPreset[] = ["all", "today", "tomorrow", "this_week", "no_date"];
+
+function DueDateFilterChips({
+  value,
+  onChange,
+  t,
+}: {
+  value: DueDateFilterPreset;
+  onChange: (preset: DueDateFilterPreset) => void;
+  t: (key: string) => string;
+}) {
+  const labelKey: Record<DueDateFilterPreset, string> = {
+    all: "scope.dateFilterAll",
+    today: "scope.dateFilterToday",
+    tomorrow: "scope.dateFilterTomorrow",
+    this_week: "scope.dateFilterThisWeek",
+    no_date: "scope.dateFilterNoDate",
+  };
+  return (
+    <div
+      className="bd-scope-date-filters"
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.35rem",
+        alignItems: "center",
+        width: "100%",
+      }}
+    >
+      {DUE_DATE_PRESETS.map((p) => (
+        <button
+          key={p}
+          type="button"
+          className="bd-btn"
+          aria-pressed={value === p}
+          onClick={() => onChange(p)}
+          style={{
+            padding: "0.35rem 0.65rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            background: value === p ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+            borderColor: value === p ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+            color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+          }}
+        >
+          {t(labelKey[p])}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ScopeBar({
   mode,
   selectedProjectId,
@@ -124,6 +180,8 @@ export function ScopeBar({
   onCategorySelect,
   searchFilter = "",
   onSearchFilterChange,
+  dueDateFilter = "all",
+  onDueDateFilterChange,
 }: ScopeBarProps) {
   const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -157,6 +215,10 @@ export function ScopeBar({
   }, [searchFilter]);
 
   useEffect(() => {
+    if (dueDateFilter !== "all") setScopeFilterOpen(true);
+  }, [dueDateFilter]);
+
+  useEffect(() => {
     if (!isMobile) {
       setAreaPickerOpen(false);
       setProjectPickerOpen(false);
@@ -167,7 +229,8 @@ export function ScopeBar({
     if (!isMobile) setScopeFilterOpen(false);
   }, [isMobile]);
 
-  const showScopeFilterInput = !isMobile || scopeFilterOpen || searchFilter.trim().length > 0;
+  const showScopeFilterInput =
+    !isMobile || scopeFilterOpen || searchFilter.trim().length > 0 || dueDateFilter !== "all";
 
   const loadProjects = useCallback(() => {
     if (mode !== "work") return;
@@ -474,55 +537,236 @@ export function ScopeBar({
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                flexDirection: "column",
                 gap: "0.5rem",
                 marginLeft: isMobile ? 0 : "auto",
                 flexShrink: 0,
-                width: isMobile ? "100%" : undefined,
+                width: isMobile ? "100%" : "auto",
+                maxWidth: isMobile ? "100%" : 420,
+                alignItems: isMobile ? "stretch" : "flex-end",
               }}
             >
-              {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
-              <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
-                <input
-                  type="search"
-                  enterKeyHint="search"
-                  className="bd-input"
-                  value={searchFilter}
-                  onChange={(e) => onSearchFilterChange(e.target.value)}
-                  placeholder={t("scope.searchPlaceholder")}
-                  style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
-                />
-                {searchFilter && (
-                  <button
-                    type="button"
-                    aria-label={t("scope.clearFilter")}
-                    onClick={() => onSearchFilterChange("")}
-                    style={{
-                      position: "absolute",
-                      right: 6,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 28,
-                      height: 28,
-                      borderRadius: "999px",
-                      border: "none",
-                      background: "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "var(--text-tertiary)",
-                      cursor: "pointer",
-                      fontSize: "0.875rem",
-                      padding: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  width: "100%",
+                  justifyContent: isMobile ? "stretch" : "flex-end",
+                }}
+              >
+                {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
+                <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
+                  <input
+                    type="search"
+                    enterKeyHint="search"
+                    className="bd-input"
+                    value={searchFilter}
+                    onChange={(e) => onSearchFilterChange(e.target.value)}
+                    placeholder={t("scope.searchPlaceholder")}
+                    style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
+                  />
+                  {searchFilter && (
+                    <button
+                      type="button"
+                      aria-label={t("scope.clearFilter")}
+                      onClick={() => onSearchFilterChange("")}
+                      style={{
+                        position: "absolute",
+                        right: 6,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 28,
+                        height: 28,
+                        borderRadius: "999px",
+                        border: "none",
+                        background: "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-tertiary)",
+                        cursor: "pointer",
+                        fontSize: "0.875rem",
+                        padding: 0,
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
+              {onDueDateFilterChange && (
+                <DueDateFilterChips value={dueDateFilter} onChange={onDueDateFilterChange} t={t} />
+              )}
             </div>
           )}
         </div>
+
+        {isMobile && projectPickerOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1095,
+              background: "rgba(0,0,0,0.45)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: 0,
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            }}
+            onClick={() => setProjectPickerOpen(false)}
+          >
+            <div
+              className="bd-panel"
+              style={{
+                width: "100%",
+                maxHeight: "min(85dvh, 85vh)",
+                borderRadius: "22px 22px 0 0",
+                padding: "1rem 1rem 1.15rem",
+                overflow: "auto",
+                WebkitOverflowScrolling: "touch",
+                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+              role="listbox"
+              aria-label={t("scope.chooseProject")}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 5,
+                  borderRadius: 999,
+                  background: "var(--border-strong)",
+                  margin: "0 auto 0.85rem",
+                  opacity: 0.85,
+                }}
+                aria-hidden
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("scope.chooseProject")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setProjectPickerOpen(false)}
+                  aria-label={t("scope.cancel")}
+                  style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  role="option"
+                  aria-selected={!selectedProjectId}
+                  onClick={() => {
+                    onProjectSelect(null);
+                    setProjectPickerOpen(false);
+                  }}
+                  style={{
+                    minHeight: 48,
+                    justifyContent: "space-between",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    background: !selectedProjectId ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                    color: !selectedProjectId ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                    borderColor: !selectedProjectId ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {t("scope.all")}
+                  {!selectedProjectId ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <span style={{ width: 18 }} aria-hidden />
+                  )}
+                </button>
+                {projects.map((p) => {
+                  const sel = selectedProjectId === p.id;
+                  return (
+                    <div key={p.id} style={{ display: "flex", alignItems: "stretch", gap: "0.35rem" }}>
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        role="option"
+                        aria-selected={sel}
+                        onClick={() => {
+                          onProjectSelect(p.id);
+                          setProjectPickerOpen(false);
+                        }}
+                        style={{
+                          flex: 1,
+                          minHeight: 48,
+                          justifyContent: "space-between",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          background: sel ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
+                          color: sel ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                          borderColor: sel ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                          {p.name}
+                        </span>
+                        {sel ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <span style={{ width: 18 }} aria-hidden />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        aria-label={t("scope.projectOptions")}
+                        title={t("scope.projectOptions")}
+                        onClick={() => {
+                          setProjectPickerOpen(false);
+                          setContextMenu({ x: window.innerWidth / 2, y: window.innerHeight, project: p });
+                        }}
+                        style={{
+                          minWidth: 48,
+                          minHeight: 48,
+                          padding: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "1.1rem",
+                          color: "var(--text-tertiary)",
+                        }}
+                      >
+                        ⋮
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => {
+                    setProjectPickerOpen(false);
+                    setShowAddProject(true);
+                  }}
+                  style={{ minHeight: 48, marginTop: "0.35rem", justifyContent: "center" }}
+                >
+                  + {t("scope.addProject")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {contextMenu && (
           <div

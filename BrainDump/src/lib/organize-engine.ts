@@ -78,7 +78,8 @@ Rules:
 Categories and sections are dynamic. Prefer existing ones when they fit; you MAY create new category names (lowercase, snake_case) when content clearly belongs elsewhere.
 When existing_categories are provided below, prefer those.
 
-Respond with a single JSON object: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score" } ] }
+Respond with a single JSON object: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" } ] }
+For tasks with a due day, include task_due_date (YYYY-MM-DD). For calendar items, include scheduled_date and related fields as in the rules above.
 Use only the fields listed. No extra commentary.`;
 
 const ORGANIZE_SYSTEM_PROMPT_SV = `Du är en assistent för att organisera tankar. Din uppgift är att analysera ett rått transkript (en "brain dump") och dela upp det i strukturerade poster.
@@ -295,6 +296,7 @@ export async function organizeTranscript(
           : category;
 
       let scheduled_date = pickStr(raw, "scheduled_date", "scheduledDate");
+      const task_due_raw = pickStr(raw, "task_due_date", "taskDueDate");
       let scheduled_time = pickStr(raw, "scheduled_time", "scheduledTime");
       const recurrenceRaw = pickStr(raw, "recurrence");
       const send_notification = pickBool(raw, "send_notification", "sendNotification");
@@ -332,6 +334,15 @@ export async function organizeTranscript(
             reminder_minutes_before === 0 ? 0 : reminder_minutes_before || 30;
         } else if (send_notification === false) {
           base.send_notification = false;
+        }
+      }
+
+      if (item_type === "task") {
+        const due =
+          (task_due_raw && /^\d{4}-\d{2}-\d{2}$/.test(task_due_raw) ? task_due_raw : undefined) ||
+          (scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date) ? scheduled_date : undefined);
+        if (due) {
+          base.scheduled_date = due;
         }
       }
 

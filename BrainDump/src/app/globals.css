@@ -1217,6 +1217,8 @@ select.bd-input::-ms-expand {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Fills to the bottom of the shell so background runs behind the fixed dump bar */
+  background: var(--bg-primary);
 }
 
 .bd-scope-strip {
@@ -1375,8 +1377,8 @@ select.bd-input::-ms-expand {
   }
 
   .bd-layout-main {
-    /* Room for tab bar + round mic button */
-    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+    /* Workspace column extends behind the fixed dump bar; scroll padding is on .bd-page-content-padding */
+    padding-bottom: 0;
   }
 
   .bd-bottom-bar {

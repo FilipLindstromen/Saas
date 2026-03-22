@@ -1,5 +1,5 @@
 var R=require("../../../chunks/[turbopack]_runtime.js")("server/app/api/organized-items/route.js")
-R.c("server/chunks/[root-of-the-server]__68327480._.js")
+R.c("server/chunks/[root-of-the-server]__563a9421._.js")
 R.c("server/chunks/node_modules_bcryptjs_68d01eb0._.js")
 R.c("server/chunks/[root-of-the-server]__6ac8ec31._.js")
 R.c("server/chunks/_283ea91d._.js")
