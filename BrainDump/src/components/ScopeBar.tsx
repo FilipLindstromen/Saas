@@ -137,6 +137,7 @@ export function ScopeBar({
   const [showAddArea, setShowAddArea] = useState(false);
   const [areaContextMenu, setAreaContextMenu] = useState<{ value: string; x: number; y: number; isCustom: boolean } | null>(null);
   const [areaPickerOpen, setAreaPickerOpen] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [showAddProject, setShowAddProject] = useState(false);
   const [addProjectName, setAddProjectName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
@@ -156,7 +157,10 @@ export function ScopeBar({
   }, [searchFilter]);
 
   useEffect(() => {
-    if (!isMobile) setAreaPickerOpen(false);
+    if (!isMobile) {
+      setAreaPickerOpen(false);
+      setProjectPickerOpen(false);
+    }
   }, [isMobile]);
 
   useEffect(() => {
@@ -258,6 +262,56 @@ export function ScopeBar({
   if (mode === "inbox") return null;
 
   if (mode === "work") {
+    const selectedProjectLabel =
+      !selectedProjectId
+        ? t("scope.all")
+        : projects.find((p) => p.id === selectedProjectId)?.name ?? t("scope.all");
+
+    const addProjectInline = (
+      <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+        <input
+          className="bd-input"
+          value={addProjectName}
+          onChange={(e) => setAddProjectName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              const name = addProjectName.trim();
+              if (name) {
+                fetch("/api/projects", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name, domain: "work" }),
+                })
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (d.project?.id) {
+                      loadProjects();
+                      onProjectSelect(d.project.id);
+                    }
+                  })
+                  .catch(() => {});
+                setAddProjectName("");
+                setShowAddProject(false);
+              }
+            } else if (e.key === "Escape") {
+              setAddProjectName("");
+              setShowAddProject(false);
+            }
+          }}
+          placeholder={t("scope.newProject")}
+          autoFocus
+          style={
+            isMobile
+              ? { flex: 1, minWidth: 0, padding: "0.45rem 0.65rem", fontSize: "16px", minHeight: 44 }
+              : { width: 140, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }
+          }
+        />
+        <button type="button" className="bd-btn" onClick={() => { setAddProjectName(""); setShowAddProject(false); }} style={{ padding: isMobile ? "0.4rem 0.65rem" : "0.3rem 0.5rem", minHeight: isMobile ? 44 : undefined }}>
+          {t("scope.cancel")}
+        </button>
+      </span>
+    );
+
     return (
       <>
         <div
@@ -277,113 +331,144 @@ export function ScopeBar({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              overflowX: "auto",
+              overflowX: isMobile ? "visible" : "auto",
               minWidth: 0,
               flex: isMobile ? 1 : undefined,
               width: isMobile ? "auto" : "100%",
             }}
           >
-          {!isMobile && (
-            <span className="bd-scope-label">
-              {t("scope.project")}
-            </span>
-          )}
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
-            <ScopeChip
-              label={t("scope.all")}
-              selected={!selectedProjectId}
-              onClick={() => onProjectSelect(null)}
-            />
-            {projects.map((p) => (
-                <ScopeChip
-                  key={p.id}
-                  label={p.name}
-                  selected={selectedProjectId === p.id}
-                  onClick={() => onProjectSelect(p.id)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY, project: p });
-                  }}
-                  onMore={isMobile ? () => setContextMenu({ x: window.innerWidth / 2, y: window.innerHeight, project: p }) : undefined}
-                />
-              ))}
-            {showAddProject ? (
-              <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                <input
-                  className="bd-input"
-                  value={addProjectName}
-                  onChange={(e) => setAddProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const name = addProjectName.trim();
-                      if (name) {
-                        fetch("/api/projects", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name, domain: "work" }),
-                        })
-                          .then((r) => r.json())
-                          .then((d) => {
-                            if (d.project?.id) {
-                              loadProjects();
-                              onProjectSelect(d.project.id);
-                            }
-                          })
-                          .catch(() => {});
-                        setAddProjectName("");
-                        setShowAddProject(false);
-                      }
-                    } else if (e.key === "Escape") {
-                      setAddProjectName("");
-                      setShowAddProject(false);
-                    }
-                  }}
-                  placeholder={t("scope.newProject")}
-                  autoFocus
-                  style={{ width: 120, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
-                />
-                <button type="button" className="bd-btn" onClick={() => { setAddProjectName(""); setShowAddProject(false); }} style={{ padding: "0.3rem 0.5rem" }}>
-                  {t("scope.cancel")}
-                </button>
-              </span>
+            {isMobile ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    aria-haspopup="listbox"
+                    aria-expanded={projectPickerOpen}
+                    aria-label={t("scope.openProjectMenu")}
+                    onClick={() => setProjectPickerOpen(true)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      width: "auto",
+                      maxWidth: "none",
+                      minHeight: 44,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem",
+                      padding: "0.45rem 0.75rem",
+                      borderRadius: "var(--button-radius)",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      background: !selectedProjectId ? "var(--bd-chrome-selected-bg)" : "transparent",
+                      color: !selectedProjectId ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                      borderColor: !selectedProjectId ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                      {selectedProjectLabel}
+                    </span>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                      style={{ flexShrink: 0, opacity: 0.92 }}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {onSearchFilterChange && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setScopeFilterOpen((o) => !o)}
+                      aria-pressed={scopeFilterOpen}
+                      aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+                      title={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
+                      style={{
+                        flexShrink: 0,
+                        marginLeft: "auto",
+                        minWidth: 44,
+                        minHeight: 44,
+                        padding: "0.4rem",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
+                        borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                        color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {showAddProject && addProjectInline}
+              </div>
             ) : (
-              <button
-                type="button"
-                className="bd-btn"
-                onClick={() => setShowAddProject(true)}
-                title={t("scope.addProject")}
-                style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
-              >
-                +
-              </button>
+              <>
+                <span className="bd-scope-label">{t("scope.project")}</span>
+                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
+                  <select
+                    id="bd-work-project-select"
+                    className="bd-input"
+                    aria-label={t("scope.project")}
+                    value={selectedProjectId ?? ""}
+                    onChange={(e) => onProjectSelect(e.target.value || null)}
+                    style={{
+                      flex: 1,
+                      minWidth: 140,
+                      maxWidth: 420,
+                      padding: "0.4rem 0.65rem",
+                      fontSize: "0.8125rem",
+                    }}
+                  >
+                    <option value="">{t("scope.all")}</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedProjectId && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      aria-label={t("scope.projectOptions")}
+                      title={t("scope.projectOptions")}
+                      onClick={(e) => {
+                        const p = projects.find((x) => x.id === selectedProjectId);
+                        if (p) setContextMenu({ x: e.clientX, y: e.clientY, project: p });
+                      }}
+                      style={{ minWidth: 40, minHeight: 36, padding: "0.35rem 0.5rem", flexShrink: 0 }}
+                    >
+                      ⋮
+                    </button>
+                  )}
+                  {showAddProject ? addProjectInline : (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setShowAddProject(true)}
+                      title={t("scope.addProject")}
+                      style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-          </div>
-          {isMobile && onSearchFilterChange && (
-            <button
-              type="button"
-              className="bd-btn"
-              onClick={() => setScopeFilterOpen((o) => !o)}
-              aria-pressed={scopeFilterOpen}
-              aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
-              title={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
-              style={{
-                flexShrink: 0,
-                minWidth: 44,
-                minHeight: 44,
-                padding: "0.4rem",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
-                borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-            </button>
-          )}
           </div>
           {onSearchFilterChange && showScopeFilterInput && (
             <div

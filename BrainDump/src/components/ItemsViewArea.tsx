@@ -947,18 +947,6 @@ export function ItemsViewArea({
           </svg>
         </button>
       )}
-      <span
-        style={{
-          fontSize: "0.7rem",
-          color: "var(--text-tertiary)",
-          lineHeight: 1.2,
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-          marginLeft: onItemTypeSelect ? "auto" : undefined,
-        }}
-      >
-        {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
-      </span>
     </>
   );
 
@@ -1037,9 +1025,6 @@ export function ItemsViewArea({
                   })}
                 </div>
               )}
-              <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
-                {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
-              </span>
             </div>
             <div
               className={

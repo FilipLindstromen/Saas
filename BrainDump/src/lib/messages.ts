@@ -41,6 +41,9 @@ const en: Msg = {
   "bottom.chooseMode": "Choose workspace",
 
   "scope.project": "Project:",
+  "scope.chooseProject": "Choose project",
+  "scope.openProjectMenu": "Open project menu",
+  "scope.projectOptions": "Project options",
   "scope.area": "Area:",
   "scope.chooseArea": "Choose area",
   "scope.openAreaMenu": "Open area menu",
@@ -252,6 +255,9 @@ const sv: Msg = {
   "bottom.chooseMode": "Välj vy",
 
   "scope.project": "Projekt:",
+  "scope.chooseProject": "Välj projekt",
+  "scope.openProjectMenu": "Öppna projektmeny",
+  "scope.projectOptions": "Projektalternativ",
   "scope.area": "Område:",
   "scope.chooseArea": "Välj område",
   "scope.openAreaMenu": "Öppna områdesmeny",
