@@ -30,43 +30,61 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
         display: "flex",
         alignItems: "center",
         gap: "0.5rem",
+        position: "relative",
       }}
     >
-      <h1
-        className="bd-display-heading bd-mobile-hide"
+      <div
+        className="bd-topbar-left"
         style={{
-          fontWeight: 600,
-          fontSize: "clamp(1.15rem, 3.8vw, 1.45rem)",
-          color: "var(--text-primary)",
-          margin: 0,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
           minWidth: 0,
-          flex: "0 1 auto",
-          maxWidth: "min(42vw, 11rem)",
+          justifyContent: "flex-start",
         }}
       >
-        {t("topBar.title")}
-      </h1>
-      <select
-        id="bd-topbar-workspace"
-        className="bd-input bd-mobile-mode-select"
-        aria-label={t("topBar.workspace")}
-        value={mode}
-        onChange={(e) => onModeChange(e.target.value as Mode)}
-      >
-        {WORKSPACE_MODES.map((m) => (
-          <option key={m} value={m}>
-            {t(MODE_KEY[m])}
-          </option>
-        ))}
-      </select>
-      <span className="bd-mobile-hide" style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", flexShrink: 0 }}>
-        {t(MODE_KEY[mode])}
+        <h1
+          className="bd-display-heading bd-mobile-hide"
+          style={{
+            fontWeight: 600,
+            fontSize: "clamp(1.15rem, 3.8vw, 1.45rem)",
+            color: "var(--text-primary)",
+            margin: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            minWidth: 0,
+            flex: "0 1 auto",
+            maxWidth: "min(42vw, 11rem)",
+          }}
+        >
+          {t("topBar.title")}
+        </h1>
+        <select
+          id="bd-topbar-workspace"
+          className="bd-input bd-mobile-mode-select bd-topbar-workspace-select"
+          aria-label={t("topBar.workspace")}
+          value={mode}
+          onChange={(e) => onModeChange(e.target.value as Mode)}
+        >
+          {WORKSPACE_MODES.map((m) => (
+            <option key={m} value={m}>
+              {t(MODE_KEY[m])}
+            </option>
+          ))}
+        </select>
+        <span className="bd-mobile-hide" style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", flexShrink: 0 }}>
+          {t(MODE_KEY[mode])}
+        </span>
+      </div>
+      <span className="bd-topbar-mark" aria-hidden>
+        BD
       </span>
-      <div style={{ flex: 1, minWidth: 0 }} />
-      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+      <div
+        className="bd-topbar-actions"
+        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.35rem", flexShrink: 0, minWidth: 0 }}
+      >
         <ThemeToggle />
         <button
           type="button"

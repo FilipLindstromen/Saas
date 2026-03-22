@@ -6,6 +6,8 @@ import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
 import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
+import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
+import { DumpListeningFace } from "./DumpListeningFace";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
@@ -122,6 +124,17 @@ export function CenterPanel({
   const animationRef = useRef<number>(0);
   /** False while overlay closed — aborts in-flight `startRecording` if user dismisses quickly */
   const showDumpOverlayRef = useRef(false);
+  const [showDumpFace, setShowDumpFace] = useState(() => (typeof window !== "undefined" ? loadShowDumpFace() : true));
+
+  useEffect(() => {
+    const sync = () => setShowDumpFace(loadShowDumpFace());
+    window.addEventListener(DUMP_FACE_CHANGED, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(DUMP_FACE_CHANGED, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const loadDevices = useCallback(async (withPermission = false) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return;
@@ -743,13 +756,17 @@ export function CenterPanel({
                     {t("center.help")}
                   </button>
                 </div>
-                <div className="bd-dump-sheet-content">{dumpPanelContent}</div>
+                <div className="bd-dump-sheet-content">
+                  {showDumpFace && <DumpListeningFace variant="sheet" />}
+                  {dumpPanelContent}
+                </div>
               </div>
             </div>
       )}
       {showDumpOverlay && isDumpProcessing && (
         <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
           <div className="bd-dump-processing-inner">
+            {showDumpFace && <DumpListeningFace variant="overlay" />}
             <div className="bd-dump-spinner" aria-hidden />
             <p className="bd-dump-processing-title">{t("center.organizingThoughts")}</p>
           </div>

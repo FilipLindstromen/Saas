@@ -146,12 +146,27 @@ const en: Msg = {
 
   "settings.title": "Settings",
   "settings.deleteAllEntries": "Delete all entries",
-  "settings.deleteAllIntro": "Permanently removes every organized item from your account.",
+  "settings.deleteAllIntro":
+    "Permanently remove organized entries. You can delete everything, or only Work or Personal.",
   "settings.deleteAllConfirm":
     "Permanently delete all your organized entries? This cannot be undone.",
   "settings.deleteAllDeleting": "Deleting…",
   "settings.deleteAllError": "Could not delete entries. Try again.",
   "settings.deleteAllDone": "All entries deleted.",
+  "settings.deleteWorkEntries": "Delete work entries",
+  "settings.deletePersonalEntries": "Delete personal entries",
+  "settings.deleteWorkConfirm":
+    "Permanently delete all organized entries in Work? This cannot be undone.",
+  "settings.deletePersonalConfirm":
+    "Permanently delete all organized entries in Personal? This cannot be undone.",
+  "settings.deleteWorkDone": "Work entries deleted.",
+  "settings.deletePersonalDone": "Personal entries deleted.",
+  "settings.showEntryTitles": "Show entry titles in views",
+  "settings.showEntryTitlesHelp":
+    "When off, list, text, kanban, calendar, post-its, and flowchart show description (or a snippet) instead of the title. Stored in your browser only.",
+  "settings.showDumpFace": "Show listening face when dumping",
+  "settings.showDumpFaceHelp":
+    "Simple animated face above the dump panel while you record and organize. Turn off if you prefer a minimal UI. Stored in your browser only.",
 
   "menu.changeType": "Change type",
   "menu.edit": "Edit",
@@ -332,12 +347,27 @@ const sv: Msg = {
 
   "settings.title": "Inställningar",
   "settings.deleteAllEntries": "Ta bort alla poster",
-  "settings.deleteAllIntro": "Tar permanent bort alla organiserade poster från ditt konto.",
+  "settings.deleteAllIntro":
+    "Ta permanent bort organiserade poster. Du kan ta bort allt, eller bara Arbete eller Personligt.",
   "settings.deleteAllConfirm":
     "Ta permanent bort alla organiserade poster? Det går inte att ångra.",
   "settings.deleteAllDeleting": "Tar bort…",
   "settings.deleteAllError": "Kunde inte ta bort poster. Försök igen.",
   "settings.deleteAllDone": "Alla poster har tagits bort.",
+  "settings.deleteWorkEntries": "Ta bort arbetsposter",
+  "settings.deletePersonalEntries": "Ta bort personliga poster",
+  "settings.deleteWorkConfirm":
+    "Ta permanent bort alla organiserade poster under Arbete? Det går inte att ångra.",
+  "settings.deletePersonalConfirm":
+    "Ta permanent bort alla organiserade poster under Personligt? Det går inte att ångra.",
+  "settings.deleteWorkDone": "Arbetsposter har tagits bort.",
+  "settings.deletePersonalDone": "Personliga poster har tagits bort.",
+  "settings.showEntryTitles": "Visa posttitlar i vyerna",
+  "settings.showEntryTitlesHelp":
+    "När av: visar list-, text-, kanban-, kalender-, post-it- och flödesdiagramvyer beskrivning (eller ett utdrag) i stället för titel. Sparas bara i din webbläsare.",
+  "settings.showDumpFace": "Visa lyssnaransikte vid dumpning",
+  "settings.showDumpFaceHelp":
+    "Ett enkelt animerat ansikte ovanför dumppanelen när du spelar in och organiserar. Stäng av för minimalare gränssnitt. Sparas bara i din webbläsare.",
 
   "menu.changeType": "Byt typ",
   "menu.edit": "Redigera",

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-settings";
+import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
@@ -157,8 +159,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [calendarList, setCalendarList] = useState<CalendarOption[]>([]);
   const [calendarListLoading, setCalendarListLoading] = useState(false);
   const [calendarListError, setCalendarListError] = useState<string | null>(null);
-  const [deleteAllBusy, setDeleteAllBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState<null | "all" | "work" | "personal">(null);
   const [deleteAllMessage, setDeleteAllMessage] = useState<string | null>(null);
+  const [showEntryTitles, setShowEntryTitles] = useState(true);
 
   useEffect(() => {
     applyTextSizeOnLoad();
@@ -168,6 +171,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (isOpen) {
       setOpenaiKey(loadOpenAIKey());
       setTextSize(loadTextSize());
+      setShowEntryTitles(loadShowEntryTitles());
+      setShowDumpFace(loadShowDumpFace());
       setGoogleCalendarSync(loadGoogleCalendarSync());
       setGoogleClientId(loadGoogleClientId());
       setSelectedCalendarId(loadGoogleCalendarId());
@@ -178,26 +183,44 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }, [isOpen]);
 
-  const handleDeleteAllEntries = useCallback(async () => {
-    if (!confirm(t("settings.deleteAllConfirm"))) return;
-    setDeleteAllBusy(true);
-    setDeleteAllMessage(null);
-    try {
-      const res = await fetch("/api/organized-items", { method: "DELETE" });
-      const data = (await res.json()) as { error?: string; deleted?: number };
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setDeleteAllMessage(t("settings.deleteAllDone"));
-      window.dispatchEvent(new Event("braindump-reload-items"));
-    } catch {
-      setDeleteAllMessage(t("settings.deleteAllError"));
-    } finally {
-      setDeleteAllBusy(false);
-    }
-  }, [t]);
+  const handleDeleteEntries = useCallback(
+    async (scope: "all" | "work" | "personal") => {
+      const confirmKey =
+        scope === "all"
+          ? "settings.deleteAllConfirm"
+          : scope === "work"
+            ? "settings.deleteWorkConfirm"
+            : "settings.deletePersonalConfirm";
+      if (!confirm(t(confirmKey))) return;
+      setDeleteBusy(scope);
+      setDeleteAllMessage(null);
+      try {
+        const url = scope === "all" ? "/api/organized-items" : `/api/organized-items?domain=${scope}`;
+        const res = await fetch(url, { method: "DELETE" });
+        const data = (await res.json()) as { error?: string; deleted?: number };
+        if (!res.ok) throw new Error(data.error || "Failed");
+        const doneKey =
+          scope === "all"
+            ? "settings.deleteAllDone"
+            : scope === "work"
+              ? "settings.deleteWorkDone"
+              : "settings.deletePersonalDone";
+        setDeleteAllMessage(t(doneKey));
+        window.dispatchEvent(new Event("braindump-reload-items"));
+      } catch {
+        setDeleteAllMessage(t("settings.deleteAllError"));
+      } finally {
+        setDeleteBusy(null);
+      }
+    },
+    [t]
+  );
 
   const handleSave = () => {
     saveOpenAIKey(openaiKey.trim());
     saveTextSize(textSize);
+    saveShowEntryTitles(showEntryTitles);
+    saveShowDumpFace(showDumpFace);
     saveGoogleCalendarSync(googleCalendarSync);
     saveGoogleClientId(googleClientId);
     if (selectedCalendarId && selectedCalendarSummary) {
@@ -350,19 +373,63 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem" }}>
             Scales all text in the app. Stored in your browser only.
           </p>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+            <input
+              type="checkbox"
+              checked={showEntryTitles}
+              onChange={(e) => setShowEntryTitles(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
+            />
+            <span>{t("settings.showEntryTitles")}</span>
+          </label>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem", marginLeft: "1.75rem" }}>
+            {t("settings.showEntryTitlesHelp")}
+          </p>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+            <input
+              type="checkbox"
+              checked={showDumpFace}
+              onChange={(e) => setShowDumpFace(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
+            />
+            <span>{t("settings.showDumpFace")}</span>
+          </label>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem", marginLeft: "1.75rem" }}>
+            {t("settings.showDumpFaceHelp")}
+          </p>
           <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
             <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
               {t("settings.deleteAllIntro")}
             </p>
-            <button
-              type="button"
-              className="bd-btn bd-btn-danger"
-              onClick={handleDeleteAllEntries}
-              disabled={deleteAllBusy}
-              style={{ width: "100%" }}
-            >
-              {deleteAllBusy ? t("settings.deleteAllDeleting") : t("settings.deleteAllEntries")}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={() => handleDeleteEntries("all")}
+                disabled={deleteBusy !== null}
+                style={{ width: "100%" }}
+              >
+                {deleteBusy === "all" ? t("settings.deleteAllDeleting") : t("settings.deleteAllEntries")}
+              </button>
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={() => handleDeleteEntries("work")}
+                disabled={deleteBusy !== null}
+                style={{ width: "100%" }}
+              >
+                {deleteBusy === "work" ? t("settings.deleteAllDeleting") : t("settings.deleteWorkEntries")}
+              </button>
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={() => handleDeleteEntries("personal")}
+                disabled={deleteBusy !== null}
+                style={{ width: "100%" }}
+              >
+                {deleteBusy === "personal" ? t("settings.deleteAllDeleting") : t("settings.deletePersonalEntries")}
+              </button>
+            </div>
             {deleteAllMessage && (
               <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.5rem", marginBottom: 0 }}>{deleteAllMessage}</p>
             )}

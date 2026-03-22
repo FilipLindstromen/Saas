@@ -8,6 +8,7 @@ import {
   suggestedTypeVisibleForMode,
   type SuggestedItemTypeDetail,
 } from "@/lib/item-types";
+import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -309,6 +310,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   const [loading, setLoading] = useState(true);
   const [newBatchTick, setNewBatchTick] = useState(0);
   useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
+  const [showEntryTitles, setShowEntryTitles] = useState(() => (typeof window !== "undefined" ? loadShowEntryTitles() : true));
+  useEffect(() => {
+    const sync = () => setShowEntryTitles(loadShowEntryTitles());
+    window.addEventListener(ENTRY_DISPLAY_CHANGED, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(ENTRY_DISPLAY_CHANGED, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
   const filteredItems = useMemo(
     () => filterItemsBySearch(filterItemsByType(items, itemType), searchFilter),
     [items, itemType, searchFilter, newBatchTick]
@@ -793,8 +804,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     <div className="bd-items-view-root">
       <div className="bd-items-toolbar">
         {isMobile && mobileModesToolbar ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%", minWidth: 0, gridColumn: "1 / -1" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", minWidth: 0 }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.4rem", width: "100%", minWidth: 0, gridColumn: "1 / -1", flexWrap: "nowrap" }}>
               {onItemTypeSelect && (
                 <button
                   type="button"
@@ -824,40 +834,6 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden>
                     <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-              )}
-              {(mode === "work" || mode === "personal" || mode === "all") && (
-                <button
-                  type="button"
-                  className="bd-btn"
-                  title={t("items.addEntry")}
-                  aria-label={t("items.addEntry")}
-                  style={{
-                    padding: "0.45rem 0.65rem",
-                    minHeight: 44,
-                    minWidth: 44,
-                    flexShrink: 0,
-                  }}
-                  onClick={() => {
-                    const types = addEntryTypeOptions;
-                    setAddEntryForm({
-                      itemType: types[0]?.value ?? "note",
-                      title: "",
-                      content: "",
-                      progress: "todo",
-                      projectId: projectId ?? "",
-                      scheduledAt: "",
-                      scheduledTime: "",
-                      recurrence: "none",
-                      sendNotification: false,
-                    });
-                    setAddEntryOpen(true);
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                 </button>
               )}
@@ -910,8 +886,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   </svg>
                 </button>
               )}
-            </div>
-            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
+            <span
+              style={{
+                fontSize: "0.7rem",
+                color: "var(--text-tertiary)",
+                lineHeight: 1.2,
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+                marginLeft: onItemTypeSelect ? "auto" : undefined,
+              }}
+            >
               {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
             </span>
           </div>
@@ -961,51 +945,9 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                   })}
                 </div>
               )}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  minWidth: 0,
-                }}
-              >
-                <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
-                  {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
-                </span>
-                {(mode === "work" || mode === "personal" || mode === "all") && (
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    title={t("items.addEntry")}
-                    style={{
-                      padding: isMobile ? "0.45rem 0.65rem" : "0.4rem 0.65rem",
-                      minHeight: isMobile ? 44 : undefined,
-                      minWidth: isMobile ? 44 : undefined,
-                    }}
-                    onClick={() => {
-                      const types = addEntryTypeOptions;
-                      setAddEntryForm({
-                        itemType: types[0]?.value ?? "note",
-                        title: "",
-                        content: "",
-                        progress: "todo",
-                        projectId: projectId ?? "",
-                        scheduledAt: "",
-                        scheduledTime: "",
-                        recurrence: "none",
-                        sendNotification: false,
-                      });
-                      setAddEntryOpen(true);
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.3 }}>
+                {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
+              </span>
             </div>
             <div
               className={
@@ -1312,20 +1254,23 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       ) : filteredItems.length === 0 ? (
         <p className="bd-empty">{t("items.emptySearch")}</p>
       ) : viewType === "list" ? (
-        <ListView items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
+        <ListView showEntryTitles={showEntryTitles} items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
       ) : viewType === "text" ? (
-        <TextView items={filteredItems} onUpdate={updateEntryContent} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} />
+        <TextView showEntryTitles={showEntryTitles} items={filteredItems} onUpdate={updateEntryContent} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} />
       ) : viewType === "kanban" ? (
-            <KanbanView items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
+            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
       ) : viewType === "calendar" ? (
         <CalendarView
+          showEntryTitles={showEntryTitles}
           items={filteredItems}
           onSchedule={updateSchedule}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+          isMobile={isMobile}
         />
       ) : viewType === "flowchart" ? (
         <FlowchartView
+          showEntryTitles={showEntryTitles}
           items={filteredItems}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
@@ -1333,6 +1278,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
         />
       ) : (
         <PostitsView
+          showEntryTitles={showEntryTitles}
           items={filteredItems}
           onProgress={updateProgress}
           onDelete={deleteItem}
@@ -2047,14 +1993,18 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function CalendarView({
   items,
+  showEntryTitles = true,
   onSchedule,
   onEdit,
   onItemContextMenu,
+  isMobile = false,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onSchedule: (id: string, schedule: { scheduledAt?: string | null; scheduledTime?: string | null; recurrence?: string | null; sendNotification?: boolean }) => void;
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
+  isMobile?: boolean;
 }) {
   const [month, setMonth] = useState(() => {
     const d = new Date();
@@ -2106,15 +2056,21 @@ function CalendarView({
     day: "numeric",
   });
 
+  /* Mobile: short rows so ~6 week rows + header fit without heavy scroll */
+  const cellMinH = isMobile ? 44 : 88;
+  const maxEventChips = isMobile ? 1 : 3;
+  const gridRadius = isMobile ? 0 : "var(--card-radius)";
+  const unscheduledRadius = isMobile ? 0 : "var(--card-radius)";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, minHeight: 0 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.5rem" : "1rem", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.45rem" : "0.75rem" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
+            <h2 style={{ fontSize: isMobile ? "1.05rem" : "1.25rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
               {headerDateLabel}
             </h2>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-tertiary)", margin: "0.25rem 0 0" }}>{monthLabel}</p>
+            <p style={{ fontSize: isMobile ? "0.8125rem" : "0.875rem", color: "var(--text-tertiary)", margin: "0.25rem 0 0" }}>{monthLabel}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
             <button type="button" className="bd-btn" onClick={goToday} style={{ padding: "0.4rem 0.65rem", fontSize: "0.8125rem" }}>
@@ -2129,15 +2085,25 @@ function CalendarView({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "1px", background: "var(--border-subtle)", borderRadius: "var(--button-radius)", overflow: "hidden", border: "1px solid var(--border-subtle)" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            gap: "1px",
+            background: "var(--border-subtle)",
+            borderRadius: gridRadius,
+            overflow: "hidden",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
           {WEEKDAYS.map((d) => (
             <div
               key={d}
               style={{
-                fontSize: "0.7rem",
+                fontSize: isMobile ? "0.62rem" : "0.7rem",
                 fontWeight: 600,
                 color: "var(--text-tertiary)",
-                padding: "0.5rem 0.35rem",
+                padding: isMobile ? "0.3rem 0.2rem" : "0.5rem 0.35rem",
                 textAlign: "center",
                 background: "var(--bg-secondary)",
               }}
@@ -2158,8 +2124,8 @@ function CalendarView({
                 onMouseEnter={() => setHoveredCell(i)}
                 onMouseLeave={() => setHoveredCell(null)}
                 style={{
-                  minHeight: 88,
-                  padding: "0.4rem",
+                  minHeight: cellMinH,
+                  padding: isMobile ? "0.2rem" : "0.4rem",
                   background: isCurrentMonth ? (isHovered ? "var(--bg-hover)" : "var(--bg-primary)") : "var(--bg-secondary)",
                   boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 1px var(--bd-chrome-selected-border), var(--shadow-sm)" : isTodayCell ? "0 0 0 1px var(--bd-chrome-selected-border)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
                   transition:
@@ -2168,22 +2134,22 @@ function CalendarView({
               >
                 <div
                   style={{
-                    fontSize: isCurrentMonth ? "0.9375rem" : "0.75rem",
+                    fontSize: isCurrentMonth ? (isMobile ? "0.8rem" : "0.9375rem") : isMobile ? "0.65rem" : "0.75rem",
                     fontWeight: isTodayCell ? 700 : 500,
                     color: isCurrentMonth ? "var(--text-primary)" : "var(--text-quaternary)",
-                    marginBottom: "0.3rem",
+                    marginBottom: isMobile ? "0.15rem" : "0.3rem",
                     lineHeight: 1.2,
                   }}
                 >
                   {isCurrentMonth ? day : cellDateNum}
                 </div>
-                {dayItems.length > 0 && (
+                {dayItems.length > 0 && !isMobile && (
                   <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>
                     {dayItems.length} {dayItems.length === 1 ? "item" : "items"}
                   </div>
                 )}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                  {dayItems.slice(0, 3).map((it) => {
+                <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.15rem" : "0.25rem" }}>
+                  {dayItems.slice(0, maxEventChips).map((it) => {
                     const past = it.scheduledAt && new Date(String(it.scheduledAt).slice(0, 10)) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
                     return (
                       <button
@@ -2193,8 +2159,8 @@ function CalendarView({
                         onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
                         style={{
                           textAlign: "left",
-                          fontSize: "0.7rem",
-                          padding: "0.3rem 0.45rem",
+                          fontSize: isMobile ? "0.6rem" : "0.7rem",
+                          padding: isMobile ? "0.15rem 0.3rem" : "0.3rem 0.45rem",
                           background: past ? "var(--bg-tertiary)" : "var(--bd-chrome-selected-bg)",
                           color: past ? "var(--text-tertiary)" : "var(--bd-chrome-selected-text)",
                           border: past ? "none" : "1px solid var(--border-default)",
@@ -2205,15 +2171,17 @@ function CalendarView({
                           whiteSpace: "nowrap",
                           boxShadow: "none",
                         }}
-                        title={`${it.title}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}`}
+                        title={`${it.title}${it.content?.trim() ? ` — ${it.content.trim().slice(0, 200)}` : ""}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}`}
                       >
                         {it.scheduledTime && <span style={{ marginRight: "0.25rem", opacity: 0.9 }}>{it.scheduledTime}</span>}
-                        {it.title}
+                        {entryPrimaryLine(it, showEntryTitles)}
                       </button>
                     );
                   })}
-                  {dayItems.length > 3 && (
-                    <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>+{dayItems.length - 3} more</span>
+                  {dayItems.length > maxEventChips && (
+                    <span style={{ fontSize: isMobile ? "0.58rem" : "0.65rem", color: "var(--text-tertiary)" }}>
+                      +{dayItems.length - maxEventChips} more
+                    </span>
                   )}
                 </div>
               </div>
@@ -2225,10 +2193,10 @@ function CalendarView({
       <div
         style={{
           borderTop: "1px solid var(--border-default)",
-          paddingTop: "1rem",
+          paddingTop: isMobile ? "0.65rem" : "1rem",
           background: "var(--bg-secondary)",
-          borderRadius: "var(--button-radius)",
-          padding: "1rem",
+          borderRadius: unscheduledRadius,
+          padding: isMobile ? "0.65rem" : "1rem",
         }}
       >
         <h4 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.35rem" }}>Unscheduled</h4>
@@ -2254,8 +2222,9 @@ function CalendarView({
               }}
               onClick={() => onEdit(it)}
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+              title={!showEntryTitles && it.title ? `${it.title}` : undefined}
             >
-              {it.title}
+              {entryPrimaryLine(it, showEntryTitles)}
             </button>
             );
           })}
@@ -2277,11 +2246,13 @@ const FLOW_LINE = "var(--text-tertiary)";
 
 function FlowchartView({
   items,
+  showEntryTitles = true,
   onEdit,
   onItemContextMenu,
   isMobile = false,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   isMobile?: boolean;
@@ -2442,8 +2413,8 @@ function FlowchartView({
             />
           )}
           <EntryTypeIcon type={it.itemType} size={14} />
-            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</span>
-          {it.content?.trim() && (
+            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{entryPrimaryLine(it, showEntryTitles)}</span>
+          {showEntryTitles && it.content?.trim() && (
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", flexShrink: 0, maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: isMobile ? "none" : undefined }}>
               {it.content.slice(0, 50)}{it.content.length > 50 ? "…" : ""}
             </span>
@@ -2635,12 +2606,14 @@ const LIST_VIEW_TYPE_ORDER = ["task", "note", "idea", "calendar", "reflection", 
 
 function ListView({
   items,
+  showEntryTitles = true,
   onProgress,
   onDelete,
   onItemContextMenu,
   onEdit,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onProgress: (id: string, progress: string) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
@@ -2707,7 +2680,9 @@ function ListView({
               </button>
             )}
           </div>
-          <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--text-primary)", wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</div>
+          {showEntryTitles && (
+            <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--text-primary)", wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</div>
+          )}
           <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
             {it.content?.trim() || "—"}
           </div>
@@ -2795,10 +2770,12 @@ function ListView({
 
 function TextView({
   items,
+  showEntryTitles = true,
   onUpdate,
   onItemContextMenu,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
 }) {
@@ -2811,6 +2788,10 @@ function TextView({
     if (editing.field === "title") inputRef.current?.focus();
     else textareaRef.current?.focus();
   }, [editing]);
+
+  useEffect(() => {
+    if (!showEntryTitles && editing?.field === "title") setEditing(null);
+  }, [showEntryTitles, editing?.field]);
 
   const handleBlur = (id: string, field: "title" | "content", value: string, current: string) => {
     const trimmed = value.trim();
@@ -2890,48 +2871,49 @@ function TextView({
               <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
                 {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </span>
-              {isEditingTitle ? (
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={editing?.value ?? it.title}
-                  onChange={(e) => setEditing((prev) => prev ? { ...prev, value: e.target.value } : null)}
-                  onBlur={() => editing && handleBlur(it.id, "title", editing.value, it.title)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  }}
-                  style={{
-                    flex: 1,
-                    margin: 0,
-                    fontSize: "1.25rem",
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    padding: "0.35rem 0",
-                    lineHeight: 1.35,
-                    minHeight: "1.75rem",
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                  }}
-                />
-              ) : (
-                <h2
-                  onClick={() => setEditing({ id: it.id, field: "title", value: it.title })}
-                  style={{
-                    flex: 1,
-                    margin: 0,
-                    fontSize: "1.25rem",
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    cursor: "text",
-                    padding: "0.35rem 0",
-                    lineHeight: 1.35,
-                    minHeight: "1.75rem",
-                  }}
-                >
-                  {it.title || "Untitled"}
-                </h2>
-              )}
+              {showEntryTitles &&
+                (isEditingTitle ? (
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={editing?.value ?? it.title}
+                    onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+                    onBlur={() => editing && handleBlur(it.id, "title", editing.value, it.title)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
+                    style={{
+                      flex: 1,
+                      margin: 0,
+                      fontSize: "1.25rem",
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      padding: "0.35rem 0",
+                      lineHeight: 1.35,
+                      minHeight: "1.75rem",
+                      background: "transparent",
+                      border: "none",
+                      outline: "none",
+                    }}
+                  />
+                ) : (
+                  <h2
+                    onClick={() => setEditing({ id: it.id, field: "title", value: it.title })}
+                    style={{
+                      flex: 1,
+                      margin: 0,
+                      fontSize: "1.25rem",
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      cursor: "text",
+                      padding: "0.35rem 0",
+                      lineHeight: 1.35,
+                      minHeight: "1.75rem",
+                    }}
+                  >
+                    {it.title || "Untitled"}
+                  </h2>
+                ))}
             </div>
             {isEditingContent ? (
               <textarea
@@ -2988,12 +2970,14 @@ const KANBAN_COLUMNS: { key: string; label: string }[] = [
 
 function KanbanView({
   items,
+  showEntryTitles = true,
   onProgress,
   onItemContextMenu,
   onEdit,
   isMobile = false,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onProgress: (id: string, progress: string, kanbanColumn?: string) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
@@ -3165,12 +3149,12 @@ function KanbanView({
                 opacity: draggedId === it.id ? 0.6 : 1,
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.35 }}>{it.title}</div>
+              {showEntryTitles && <div style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.35 }}>{it.title}</div>}
               <div
                 style={{
                   fontSize: "0.75rem",
                   color: "var(--text-secondary)",
-                  marginTop: "0.35rem",
+                  marginTop: showEntryTitles ? "0.35rem" : 0,
                   lineHeight: 1.45,
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
@@ -3219,6 +3203,7 @@ const POSTIT_COLORS: Record<string, string> = {
 
 function PostitsView({
   items,
+  showEntryTitles = true,
   onProgress,
   onDelete,
   onPosition,
@@ -3232,6 +3217,7 @@ function PostitsView({
   onRemoveLink,
 }: {
   items: ViewItem[];
+  showEntryTitles?: boolean;
   onProgress: (id: string, progress: string) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onPosition: (id: string, x: number, y: number) => void;
@@ -3524,9 +3510,11 @@ function PostitsView({
                   )}
                 </div>
                 <div style={{ flex: 1, padding: "0 0.75rem 0.5rem", minHeight: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem", lineHeight: 1.3 }}>
-                    {it.title}
-                  </div>
+                  {showEntryTitles && (
+                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem", lineHeight: 1.3 }}>
+                      {it.title}
+                    </div>
+                  )}
                   <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {it.content?.trim() || "—"}
                   </div>

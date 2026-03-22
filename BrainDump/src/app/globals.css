@@ -54,6 +54,11 @@
   /* Regions — “what belongs where” */
   --bd-surface-scope: color-mix(in srgb, #fff 4%, var(--bg-primary));
   --bd-chrome-edge: rgba(255, 255, 255, 0.08);
+  /* Mobile bottom dump mic — warm red-orange */
+  --bd-dump-mic-bg: linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%);
+  --bd-dump-mic-fg: #ffffff;
+  --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #c2410c);
+  --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.38);
 }
 
 :root[data-theme="light"] {
@@ -102,6 +107,10 @@
   --bd-success-text: #14532d;
   --bd-surface-scope: color-mix(in srgb, #0f172a 4%, var(--bg-primary));
   --bd-chrome-edge: rgba(15, 23, 42, 0.1);
+  --bd-dump-mic-bg: linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%);
+  --bd-dump-mic-fg: #ffffff;
+  --bd-dump-mic-border: color-mix(in srgb, #ffffff 35%, #c2410c);
+  --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.28);
 }
 
 * {
@@ -587,6 +596,82 @@ select.bd-input::-ms-expand {
   width: 100%;
 }
 
+/* Listening face above dump controls */
+.bd-dump-face {
+  flex-shrink: 0;
+  margin-bottom: 0.85rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+.bd-dump-face--sheet {
+  color: var(--text-primary);
+  opacity: 0.92;
+}
+
+.bd-dump-face--overlay {
+  color: rgba(255, 255, 255, 0.94);
+  margin-bottom: 0.5rem;
+  opacity: 1;
+}
+
+.bd-dump-face-svg {
+  display: block;
+  overflow: visible;
+}
+
+.bd-dump-face--animate.bd-dump-face--sheet .bd-dump-face-eye--l,
+.bd-dump-face--animate.bd-dump-face--overlay .bd-dump-face-eye--l {
+  transform-origin: 38px 25px;
+  animation: bd-dump-face-blink 4.1s ease-in-out infinite;
+}
+
+.bd-dump-face--animate.bd-dump-face--sheet .bd-dump-face-eye--r,
+.bd-dump-face--animate.bd-dump-face--overlay .bd-dump-face-eye--r {
+  transform-origin: 82px 25px;
+  animation: bd-dump-face-blink 4.65s ease-in-out infinite;
+}
+
+@keyframes bd-dump-face-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  93.5%,
+  96.5% {
+    transform: scaleY(0.12);
+  }
+}
+
+.bd-dump-face--animate .bd-dump-face-mouth-wrap {
+  transform-origin: 60px 52px;
+  animation: bd-dump-face-mouth-listen 3.4s ease-in-out infinite;
+}
+
+@keyframes bd-dump-face-mouth-listen {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1) rotate(0deg);
+  }
+  40% {
+    transform: translateY(0.55px) scale(1.025, 1.05) rotate(0.45deg);
+  }
+  70% {
+    transform: translateY(0.25px) scale(1.01, 1.02) rotate(-0.35deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-dump-face--animate .bd-dump-face-eye--l,
+  .bd-dump-face--animate .bd-dump-face-eye--r {
+    animation: none;
+  }
+  .bd-dump-face--animate .bd-dump-face-mouth-wrap {
+    animation: none;
+  }
+}
+
 .bd-dump-overlay-body {
   width: 100%;
   display: flex;
@@ -862,9 +947,9 @@ select.bd-input::-ms-expand {
   bottom: 0;
   padding: 0.5rem 1rem;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-default);
-  box-shadow: var(--shadow-up);
+  background: transparent;
+  border-top: none;
+  box-shadow: none;
   display: none;
   align-items: center;
   justify-content: space-between;
@@ -931,6 +1016,50 @@ select.bd-input::-ms-expand {
 
 :root[data-theme="light"] .bd-topbar {
   box-shadow: none;
+}
+
+/* Workspace dropdown: don’t stretch full width (bd-input is width:100% by default) */
+.bd-topbar-workspace-select {
+  width: auto !important;
+  max-width: 9rem;
+  min-width: 4.75rem;
+  flex-shrink: 0;
+}
+
+.bd-topbar-left,
+.bd-topbar-actions {
+  position: relative;
+  z-index: 1;
+}
+
+/* Center mark — mobile only; keeps “BD” in visual center between dropdown and actions */
+.bd-topbar-mark {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  z-index: 0;
+}
+
+@media (max-width: 768px) {
+  .bd-topbar-mark {
+    display: block;
+  }
+
+  .bd-topbar-workspace-select {
+    max-width: 6.25rem;
+    min-width: 4.25rem;
+    padding-left: 0.5rem;
+    padding-right: 1.75rem;
+    font-size: 0.8125rem;
+  }
 }
 
 .bd-mobile-mode-pill {
@@ -1171,10 +1300,10 @@ select.bd-input::-ms-expand {
     padding: 0;
     border-radius: 50%;
     aspect-ratio: 1;
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-strong);
-    box-shadow: none;
+    background: var(--bd-dump-mic-bg);
+    color: var(--bd-dump-mic-fg);
+    border: 1px solid var(--bd-dump-mic-border);
+    box-shadow: var(--bd-dump-mic-shadow);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1185,6 +1314,11 @@ select.bd-input::-ms-expand {
       transform var(--bd-duration-fast) var(--bd-ease-spring),
       box-shadow var(--bd-duration-normal) var(--bd-ease-in-out),
       filter var(--bd-duration-fast) var(--bd-ease-soft);
+  }
+
+  .bd-bottom-bar .bd-bottom-dump-mic:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 8px 28px rgba(232, 93, 45, 0.45);
   }
 
   .bd-bottom-bar .bd-bottom-dump-mic svg {

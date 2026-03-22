@@ -263,8 +263,8 @@ export function ScopeBar({
         <div
           style={{
             display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
+            flexDirection: isMobile && onSearchFilterChange && showScopeFilterInput ? "column" : "row",
+            alignItems: isMobile && onSearchFilterChange && showScopeFilterInput ? "stretch" : "center",
             gap: isMobile ? "0.75rem" : "1rem",
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
@@ -279,12 +279,15 @@ export function ScopeBar({
               gap: "0.5rem",
               overflowX: "auto",
               minWidth: 0,
-              width: "100%",
+              flex: isMobile ? 1 : undefined,
+              width: isMobile ? "auto" : "100%",
             }}
           >
-          <span className="bd-scope-label">
-            {t("scope.project")}
-          </span>
+          {!isMobile && (
+            <span className="bd-scope-label">
+              {t("scope.project")}
+            </span>
+          )}
           <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
             <ScopeChip
               label={t("scope.all")}
@@ -393,7 +396,7 @@ export function ScopeBar({
                 width: isMobile ? "100%" : undefined,
               }}
             >
-              <span className="bd-scope-label">{t("scope.filter")}</span>
+              {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
               <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
                 <input
                   type="search"
@@ -636,8 +639,8 @@ export function ScopeBar({
         <div
           style={{
             display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
+            flexDirection: isMobile && onSearchFilterChange && showScopeFilterInput ? "column" : "row",
+            alignItems: isMobile && onSearchFilterChange && showScopeFilterInput ? "stretch" : "center",
             gap: isMobile ? "0.75rem" : "1rem",
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
@@ -652,15 +655,13 @@ export function ScopeBar({
               gap: "0.5rem",
               overflowX: isMobile ? "visible" : "auto",
               minWidth: 0,
-              width: "100%",
+              flex: isMobile ? 1 : undefined,
+              width: isMobile ? "auto" : "100%",
             }}
           >
             {isMobile ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
-                  <span className="bd-scope-label" style={{ flexShrink: 0 }}>
-                    {t("scope.area")}
-                  </span>
                   <button
                     type="button"
                     className="bd-btn"
@@ -669,10 +670,10 @@ export function ScopeBar({
                     aria-label={t("scope.openAreaMenu")}
                     onClick={() => setAreaPickerOpen(true)}
                     style={{
-                      flex: "0 1 auto",
-                      width: "max-content",
-                      maxWidth: "min(70vw, 280px)",
+                      flex: 1,
                       minWidth: 0,
+                      width: "auto",
+                      maxWidth: "none",
                       minHeight: 44,
                       display: "flex",
                       alignItems: "center",
@@ -867,7 +868,7 @@ export function ScopeBar({
               width: isMobile ? "100%" : undefined,
             }}
           >
-            <span className="bd-scope-label">{t("scope.filter")}</span>
+            {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
             <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
               <input
                 type="search"

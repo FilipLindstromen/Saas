@@ -54,8 +54,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** Delete all organized items for the signed-in user (irreversible). */
-export async function DELETE() {
+/**
+ * Delete organized items for the signed-in user (irreversible).
+ * Optional `?domain=work` or `?domain=personal` limits the delete to that domain.
+ * Omit `domain` to delete every organized item.
+ */
+export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -63,10 +67,20 @@ export async function DELETE() {
     }
     const userId = (session.user as { id?: string }).id!;
 
-    const result = await prisma.organizedItem.deleteMany({ where: { userId } });
+    const { searchParams } = new URL(request.url);
+    const domainParam = searchParams.get("domain");
+    const where: { userId: string; domain?: string } = { userId };
+    if (domainParam) {
+      if (domainParam !== "work" && domainParam !== "personal") {
+        return NextResponse.json({ error: "domain must be work or personal" }, { status: 400 });
+      }
+      where.domain = domainParam;
+    }
+
+    const result = await prisma.organizedItem.deleteMany({ where });
     return NextResponse.json({ ok: true, deleted: result.count });
   } catch (e) {
-    console.error("Organized items DELETE all error:", e);
+    console.error("Organized items DELETE error:", e);
     const message = getDbErrorMessage(e) || "Failed to delete entries";
     return NextResponse.json({ error: message }, { status: 500 });
   }
