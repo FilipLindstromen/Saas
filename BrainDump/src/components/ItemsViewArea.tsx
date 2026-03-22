@@ -5,7 +5,6 @@ import { useI18n } from "@/lib/i18n";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 import {
   BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
-  suggestedTypeVisibleForMode,
   type SuggestedItemTypeDetail,
 } from "@/lib/item-types";
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
@@ -475,17 +474,22 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     );
   }, [items]);
 
-  const visibleTypeValues = useMemo(() => {
-    const exclude = new Set(["reminder"]);
-    const set = new Set<string>();
+  /** "New" filter only if at least one loaded item is in the last dump batch. */
+  const hasNewEntries = useMemo(() => {
+    const ids = getLastNewBatchIds();
+    if (ids.size === 0) return false;
+    return items.some((it) => ids.has(it.id));
+  }, [items, newBatchTick]);
+
+  /** Count entries per type in current scope — hide type chips with zero entries. */
+  const typesWithEntries = useMemo(() => {
+    const m = new Map<string, number>();
     for (const it of items) {
-      if (it.itemType && !exclude.has(it.itemType)) set.add(it.itemType);
+      if (!it.itemType || it.itemType === "reminder") continue;
+      m.set(it.itemType, (m.get(it.itemType) ?? 0) + 1);
     }
-    for (const s of suggestedItemTypesFromDump) {
-      if (suggestedTypeVisibleForMode(mode, s.domain)) set.add(s.type);
-    }
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [items, suggestedItemTypesFromDump, mode]);
+    return m;
+  }, [items]);
 
   const addEntryTypeOptions = useMemo(
     () => mergeEntryTypesForDomain(mode, items, suggestedItemTypesFromDump),
@@ -495,9 +499,13 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   useEffect(() => {
     if (!onItemTypeSelect) return;
     const cur = itemType ?? "";
-    if (!cur || cur === "new") return;
-    if (!visibleTypeValues.includes(cur)) onItemTypeSelect(null);
-  }, [visibleTypeValues, itemType, onItemTypeSelect]);
+    if (!cur) return;
+    if (cur === "new") {
+      if (!hasNewEntries) onItemTypeSelect(null);
+      return;
+    }
+    if ((typesWithEntries.get(cur) ?? 0) === 0) onItemTypeSelect(null);
+  }, [hasNewEntries, typesWithEntries, itemType, onItemTypeSelect]);
 
   const typeColor = (value: string | ""): string | undefined => {
     if (!value) return undefined;
@@ -523,10 +531,16 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
 
   const typeOptions = useMemo(() => {
     const allLabel = t("items.allTypes");
-    const newOpt = { value: "new", label: t("items.typeNew") };
-    const mapped = visibleTypeValues.map((value) => ({ value, label: formatTypeLabel(value) }));
-    return [{ value: "", label: allLabel }, newOpt, ...mapped];
-  }, [visibleTypeValues, t]);
+    const opts: { value: string; label: string }[] = [{ value: "", label: allLabel }];
+    if (hasNewEntries) {
+      opts.push({ value: "new", label: t("items.typeNew") });
+    }
+    const sorted = [...typesWithEntries.keys()].sort((a, b) => a.localeCompare(b));
+    for (const value of sorted) {
+      opts.push({ value, label: formatTypeLabel(value) });
+    }
+    return opts;
+  }, [t, hasNewEntries, typesWithEntries]);
 
   const selectedTypeLabel = useMemo(() => {
     const key = itemType ?? "";
@@ -2059,8 +2073,8 @@ function CalendarView({
   /* Mobile: short rows so ~6 week rows + header fit without heavy scroll */
   const cellMinH = isMobile ? 44 : 88;
   const maxEventChips = isMobile ? 1 : 3;
-  const gridRadius = isMobile ? 0 : "var(--card-radius)";
-  const unscheduledRadius = isMobile ? 0 : "var(--card-radius)";
+  const gridRadius = 0;
+  const unscheduledRadius = 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.5rem" : "1rem", flex: 1, minHeight: 0 }}>
@@ -2568,8 +2582,8 @@ function FlowchartView({
         flex: 1,
         minHeight: 0,
         overflow: "auto",
-        background: "var(--bg-secondary)",
-        borderRadius: "var(--button-radius)",
+        background: "var(--bg-primary)",
+        borderRadius: 0,
         padding: isMobile ? "0.65rem" : "1.5rem",
         width: "100%",
         maxWidth: "100%",
@@ -2743,9 +2757,10 @@ function ListView({
             <div
               style={{
                 padding: "0.5rem 0.75rem",
-                borderRadius: "var(--button-radius)",
-                background: typeColor,
-                color: "#fff",
+                borderRadius: "var(--card-radius)",
+                background: "var(--bg-elevated)",
+                border: `1.5px solid ${typeColor}`,
+                color: typeColor,
                 fontSize: "0.8125rem",
                 fontWeight: 600,
                 textAlign: "center",
@@ -2808,9 +2823,9 @@ function TextView({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "1.5rem",
+        gap: "0.65rem",
         overflow: "auto",
-        paddingBottom: "1rem",
+        paddingBottom: "0.5rem",
         maxWidth: 720,
         width: "100%",
         minWidth: 0,
@@ -2832,7 +2847,7 @@ function TextView({
               display: "flex",
               flexDirection: "row",
               background: "transparent",
-              gap: "0.75rem",
+              gap: "0.45rem",
             }}
           >
             <div style={{ width: 4, borderRadius: 999, background: barColor, flexShrink: 0 }} />
@@ -2843,8 +2858,8 @@ function TextView({
                 minWidth: 0,
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.5rem",
-                padding: "0.75rem 1rem",
+                gap: "0.3rem",
+                padding: "0.45rem 0.65rem",
                 background: "var(--bg-elevated)",
                 borderRadius: 6,
                 boxShadow: "var(--shadow-sm)",
@@ -2856,8 +2871,8 @@ function TextView({
               <span
                 style={{
                   position: "absolute",
-                  top: 6,
-                  right: 8,
+                  top: 4,
+                  right: 6,
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
@@ -2867,8 +2882,8 @@ function TextView({
                 aria-hidden
               />
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem" }}>
+              <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", lineHeight: 1.2 }}>
                 {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
               </span>
               {showEntryTitles &&
@@ -2885,12 +2900,12 @@ function TextView({
                     style={{
                       flex: 1,
                       margin: 0,
-                      fontSize: "1.25rem",
+                      fontSize: "1.125rem",
                       fontWeight: 600,
                       color: "var(--text-primary)",
-                      padding: "0.35rem 0",
-                      lineHeight: 1.35,
-                      minHeight: "1.75rem",
+                      padding: "0.1rem 0",
+                      lineHeight: 1.28,
+                      minHeight: "1.45rem",
                       background: "transparent",
                       border: "none",
                       outline: "none",
@@ -2902,13 +2917,13 @@ function TextView({
                     style={{
                       flex: 1,
                       margin: 0,
-                      fontSize: "1.25rem",
+                      fontSize: "1.125rem",
                       fontWeight: 600,
                       color: "var(--text-primary)",
                       cursor: "text",
-                      padding: "0.35rem 0",
-                      lineHeight: 1.35,
-                      minHeight: "1.75rem",
+                      padding: "0.1rem 0",
+                      lineHeight: 1.28,
+                      minHeight: "1.45rem",
                     }}
                   >
                     {it.title || "Untitled"}
@@ -2926,11 +2941,11 @@ function TextView({
                   width: "100%",
                   margin: 0,
                   resize: "vertical",
-                  fontSize: "0.9375rem",
-                  lineHeight: 1.5,
+                  fontSize: "0.875rem",
+                  lineHeight: 1.4,
                   color: "var(--text-secondary)",
-                  padding: "0.35rem 0",
-                  minHeight: 80,
+                  padding: "0.12rem 0",
+                  minHeight: 72,
                   background: "transparent",
                   border: "none",
                   outline: "none",
@@ -2941,12 +2956,12 @@ function TextView({
                 onClick={() => setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
                 style={{
                   margin: 0,
-                  fontSize: "0.9375rem",
-                  lineHeight: 1.5,
+                  fontSize: "0.875rem",
+                  lineHeight: 1.38,
                   color: "var(--text-secondary)",
                   cursor: "text",
-                  padding: "0.35rem 0",
-                  minHeight: "1.5em",
+                  padding: "0.08rem 0 0",
+                  minHeight: "1.25em",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
                 }}
@@ -3104,7 +3119,7 @@ function KanbanView({
             maxWidth: "100%",
             minHeight: 120,
             background: dragOverColumn === col.key ? "var(--bg-hover)" : "var(--bg-secondary)",
-            borderRadius: "16px",
+            borderRadius: 0,
             padding: "var(--bd-space-4, 1rem)",
             display: "flex",
             flexDirection: "column",
@@ -3390,7 +3405,7 @@ function PostitsView({
         flex: 1,
         overflow: "auto",
         background: "var(--bg-primary)",
-        borderRadius: "var(--button-radius)",
+        borderRadius: 0,
       }}
       onMouseLeave={() => {
         if (dragState) setDragState(null);

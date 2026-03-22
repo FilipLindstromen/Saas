@@ -636,34 +636,38 @@ export function CenterPanel({
                   aria-label="Audio input level"
                 />
               </div>
-              <div className="bd-dump-actions-row">
-                <span className="bd-dump-timer" aria-live="polite">
-                  {recordingElapsed}
-                </span>
-                <button
-                  type="button"
-                  className="bd-btn bd-btn-primary bd-dump-btn-main"
-                  onClick={handleStopAndProcess}
-                  disabled={transcribeLoading || organizeLoading}
-                  title={t("center.stopOrganize")}
-                  aria-label={t("center.stopOrganize")}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                    <rect x="6" y="6" width="12" height="12" rx="2" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="bd-btn bd-btn-danger bd-dump-btn-main"
-                  onClick={closeDumpOverlay}
-                  disabled={transcribeLoading || organizeLoading}
-                  title={t("center.cancelRecording")}
-                  aria-label={t("center.cancelRecording")}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
-                </button>
+              <div className="bd-dump-recording-actions">
+                <div className="bd-dump-timer-row">
+                  <span className="bd-dump-timer" aria-live="polite">
+                    {recordingElapsed}
+                  </span>
+                </div>
+                <div className="bd-dump-actions-row bd-dump-actions-row--split">
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn-danger bd-dump-btn-main"
+                    onClick={closeDumpOverlay}
+                    disabled={transcribeLoading || organizeLoading}
+                    title={t("center.cancelRecording")}
+                    aria-label={t("center.cancelRecording")}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn-primary bd-dump-btn-main"
+                    onClick={handleStopAndProcess}
+                    disabled={transcribeLoading || organizeLoading}
+                    title={t("center.stopOrganize")}
+                    aria-label={t("center.stopOrganize")}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </>
           ) : (

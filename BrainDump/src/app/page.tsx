@@ -185,8 +185,8 @@ export default function BrainDumpPage() {
   if (status === "loading") {
     return (
       <div
+        className="bd-page-gate"
         style={{
-          minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -202,8 +202,8 @@ export default function BrainDumpPage() {
   if (!session) {
     return (
       <div
+        className="bd-page-gate"
         style={{
-          minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -262,7 +262,7 @@ export default function BrainDumpPage() {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg-primary)" }}>
+      <div className="bd-app-shell" style={{ background: "var(--bg-primary)" }}>
         <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
 
       <div
