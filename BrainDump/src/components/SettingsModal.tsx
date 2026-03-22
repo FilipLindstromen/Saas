@@ -162,6 +162,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [deleteBusy, setDeleteBusy] = useState<null | "all" | "work" | "personal">(null);
   const [deleteAllMessage, setDeleteAllMessage] = useState<string | null>(null);
   const [showEntryTitles, setShowEntryTitles] = useState(true);
+  const [showDumpFace, setShowDumpFace] = useState(true);
 
   useEffect(() => {
     applyTextSizeOnLoad();
