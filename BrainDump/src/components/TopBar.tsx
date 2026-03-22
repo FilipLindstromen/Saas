@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import { StreaksModal } from "./StreaksModal";
 import { useI18n } from "@/lib/i18n";
+import { getDumpStreakState, STREAK_RECORDED_EVENT, type DumpStreakState } from "@/lib/dump-streak";
 
 type Mode = "inbox" | "work" | "personal" | "all";
 
@@ -22,8 +25,22 @@ const WORKSPACE_MODES: Mode[] = ["all", "work", "personal", "inbox"];
 
 export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
   const { t } = useI18n();
+  const [streakState, setStreakState] = useState<DumpStreakState>(() => getDumpStreakState());
+  const [streaksOpen, setStreaksOpen] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setStreakState(getDumpStreakState());
+    sync();
+    window.addEventListener(STREAK_RECORDED_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(STREAK_RECORDED_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   return (
+    <>
     <header
       className="bd-topbar"
       style={{
@@ -88,6 +105,51 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
         <ThemeToggle />
         <button
           type="button"
+          className="bd-btn bd-mobile-icon-btn bd-topbar-streaks-btn"
+          onClick={() => setStreaksOpen(true)}
+          title={t("topBar.streaks")}
+          aria-label={t("topBar.streaks")}
+          style={{
+            padding: "0.45rem 0.65rem",
+            fontSize: "0.8125rem",
+            minWidth: "44px",
+            minHeight: "44px",
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.25rem",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3.5a2.5 2.5 0 0 0 2.5 2.5z" />
+          </svg>
+          <span
+            className="bd-topbar-streaks-badge"
+            style={{
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              minWidth: "1.1rem",
+              height: "1.1rem",
+              padding: "0 0.35rem",
+              borderRadius: "999px",
+              background: "var(--accent-muted)",
+              color: "var(--accent)",
+              lineHeight: 1.1,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            aria-hidden
+          >
+            {streakState.currentStreak}
+          </span>
+          <span className="bd-mobile-btn-text" style={{ marginLeft: "0.35rem" }}>
+            {t("topBar.streaks")}
+          </span>
+        </button>
+        <button
+          type="button"
           className="bd-btn bd-mobile-icon-btn"
           onClick={onOpenSettings}
           title={t("topBar.settings")}
@@ -104,5 +166,7 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
         </button>
       </div>
     </header>
+    <StreaksModal isOpen={streaksOpen} onClose={() => setStreaksOpen(false)} state={streakState} />
+    </>
   );
 }

@@ -353,12 +353,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             value={openaiKey}
             onChange={(e) => setOpenaiKey(e.target.value)}
             placeholder="sk-..."
-            style={{ marginBottom: "0.5rem" }}
+            style={{ marginBottom: "1rem" }}
             autoComplete="off"
           />
-          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem" }}>
-            Used for transcription (Whisper) and organization (GPT). Stored in your browser only.
-          </p>
           <label htmlFor="bd-text-size" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
             Text size
           </label>
@@ -367,7 +364,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             className="bd-input"
             value={textSize}
             onChange={(e) => setTextSize(e.target.value)}
-            style={{ marginBottom: "0.5rem", width: "100%" }}
+            style={{ marginBottom: "1rem", width: "100%" }}
           >
             {TEXT_SIZE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -375,10 +372,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </option>
             ))}
           </select>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem" }}>
-            Scales all text in the app. Stored in your browser only.
-          </p>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
             <input
               type="checkbox"
               checked={showEntryTitles}
@@ -387,10 +381,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             />
             <span>{t("settings.showEntryTitles")}</span>
           </label>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem", marginLeft: "1.75rem" }}>
-            {t("settings.showEntryTitlesHelp")}
-          </p>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
             <input
               type="checkbox"
               checked={showDumpFace}
@@ -399,13 +390,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             />
             <span>{t("settings.showDumpFace")}</span>
           </label>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "1rem", marginLeft: "1.75rem" }}>
-            {t("settings.showDumpFaceHelp")}
-          </p>
           <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
-              {t("settings.deleteAllIntro")}
-            </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <button
                 type="button"
@@ -453,17 +438,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
               Sync with Google Calendar
             </label>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginTop: "0.35rem", marginLeft: "1.75rem" }}>
-              Sync calendar entries to your Google Calendar. Uses the shared Google Client ID from SaaS settings.
-            </p>
             {googleCalendarSync && (
               <div style={{ marginTop: "0.75rem", marginLeft: "1.75rem" }}>
                 {!googleClientId.trim() ? (
                   <div style={{ padding: "0.75rem", background: "var(--bg-tertiary)", borderRadius: 8, marginBottom: "0.5rem" }}>
-                    <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
-                      Google Client ID is required. Set it below (shared with SaaS settings).
-                    </p>
+                    <label htmlFor="bd-google-client-inline" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+                      Google Client ID
+                    </label>
                     <input
+                      id="bd-google-client-inline"
                       type="text"
                       className="bd-input"
                       value={googleClientId}
@@ -473,11 +456,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       autoComplete="off"
                     />
                   </div>
-                ) : (
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.35rem" }}>
-                    Client ID set. Connect and pick a calendar to sync to.
-                  </p>
-                )}
+                ) : null}
                 <button type="button" className="bd-btn" onClick={openGoogleOAuth} disabled={!googleClientId.trim()} style={{ marginBottom: "0.5rem" }}>
                   {calendarListLoading ? "Loading…" : calendarList.length ? "Reconnect & change calendar" : "Connect and choose calendar"}
                 </button>
@@ -485,8 +464,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: "0.25rem" }}>{calendarListError}</p>
                 )}
                 {selectedCalendarId && selectedCalendarSummary && calendarList.length === 0 && (
-                  <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.35rem" }}>
-                    Selected: {selectedCalendarSummary}
+                  <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.35rem", marginBottom: 0, fontWeight: 500 }}>
+                    {selectedCalendarSummary}
                   </p>
                 )}
                 {calendarList.length > 0 && (
@@ -548,9 +527,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
                   Google Client ID
                 </h3>
-                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
-                  BrainDump uses the shared Google Client ID from SaaS settings. Enter it below to enable Google Calendar sync.
-                </p>
                 <label htmlFor="bd-google-client-id" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
                   Client ID
                 </label>

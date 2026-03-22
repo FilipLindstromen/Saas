@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 import {
@@ -838,7 +839,7 @@ export function ItemsViewArea({
       { value: "kanban", label: t("items.viewKanban"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="9.5" y="3" width="5" height="18" rx="1" /><rect x="16" y="3" width="5" height="18" rx="1" /></svg> },
       { value: "postits", label: t("items.viewPostits"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 9h6" /><path d="M9 13h6" /><path d="M9 17h4" /></svg> },
       { value: "calendar", label: t("items.viewCalendar"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
-      { value: "flowchart", label: t("items.viewFlowchart"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /><path d="M10 7v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V7" /><path d="M10 14v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3" /></svg> },
+      { value: "flowchart", label: t("items.viewFlowchart"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="4" r="2.5" /><path d="M12 6.5v3" /><circle cx="6" cy="14" r="2.5" /><circle cx="12" cy="14" r="2.5" /><circle cx="18" cy="14" r="2.5" /><path d="M12 9.5c-2.5 0-4.5 1.2-6 3M12 9.5c2.5 0 4.5 1.2 6 3" /><path d="M12 16.5v3.5" /><circle cx="12" cy="22" r="1.5" fill="currentColor" stroke="none" /></svg> },
     ],
     [t]
   );
@@ -853,6 +854,42 @@ export function ItemsViewArea({
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
   const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
+
+  const [bottomViewSlotEl, setBottomViewSlotEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    setBottomViewSlotEl(document.getElementById("bd-bottom-view-slot"));
+  }, []);
+
+  const mobileViewPickerButton = (
+    <button
+      type="button"
+      className="bd-btn bd-bottom-view-btn"
+      aria-haspopup="listbox"
+      aria-expanded={viewPickerOpen}
+      aria-label={t("items.openViewMenu")}
+      title={viewButtons.find((b) => b.value === viewType)?.label}
+      onClick={() => setViewPickerOpen(true)}
+      style={{
+        flexShrink: 0,
+        minWidth: 44,
+        minHeight: 44,
+        width: 44,
+        padding: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--bd-chrome-selected-bg)",
+        borderColor: "var(--bd-chrome-selected-border)",
+        color: "var(--bd-chrome-selected-text)",
+        boxShadow: "none",
+      }}
+    >
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+        {viewButtons.find((b) => b.value === viewType)?.icon}
+      </span>
+    </button>
+  );
 
   const mobileToolbarCompactInner = (
     <>
@@ -888,33 +925,6 @@ export function ItemsViewArea({
           </svg>
         </button>
       )}
-      <button
-        type="button"
-        className="bd-btn"
-        aria-haspopup="listbox"
-        aria-expanded={viewPickerOpen}
-        aria-label={t("items.openViewMenu")}
-        title={viewButtons.find((b) => b.value === viewType)?.label}
-        onClick={() => setViewPickerOpen(true)}
-        style={{
-          flexShrink: 0,
-          minWidth: 44,
-          minHeight: 44,
-          width: 44,
-          padding: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bd-chrome-selected-bg)",
-          borderColor: "var(--bd-chrome-selected-border)",
-          color: "var(--bd-chrome-selected-text)",
-          boxShadow: "none",
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-          {viewButtons.find((b) => b.value === viewType)?.icon}
-        </span>
-      </button>
       {viewType === "postits" && (
         <button
           type="button"
@@ -954,6 +964,7 @@ export function ItemsViewArea({
 
   return (
     <div className="bd-items-view-root">
+      {isMobile && bottomViewSlotEl && createPortal(mobileViewPickerButton, bottomViewSlotEl)}
       {showUnifiedMobileChrome && (
         <div className="bd-mobile-unified-chrome">
           <div className="bd-mobile-unified-chrome__scope">{scopeSlot}</div>
@@ -1037,50 +1048,6 @@ export function ItemsViewArea({
             >
               {isMobile ? (
                 <>
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    aria-haspopup="listbox"
-                    aria-expanded={viewPickerOpen}
-                    aria-label={t("items.openViewMenu")}
-                    title={viewButtons.find((b) => b.value === viewType)?.label}
-                    onClick={() => setViewPickerOpen(true)}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      minHeight: 44,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "0.5rem",
-                      padding: "0.4rem 0.65rem",
-                      flexShrink: 1,
-                      background: "var(--bd-chrome-selected-bg)",
-                      borderColor: "var(--bd-chrome-selected-border)",
-                      color: "var(--bd-chrome-selected-text)",
-                      boxShadow: "none",
-                    }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-                        {viewButtons.find((b) => b.value === viewType)?.icon}
-                      </span>
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ flexShrink: 0, opacity: 0.95 }}
-                        aria-hidden
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </span>
-                  </button>
                   {viewType === "postits" && (
                     <button
                       type="button"
@@ -1351,7 +1318,7 @@ export function ItemsViewArea({
           isMobile={isMobile}
         />
       ) : viewType === "flowchart" ? (
-        <FlowchartView
+        <MindmapView
           showEntryTitles={showEntryTitles}
           items={filteredItems}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
@@ -2375,9 +2342,74 @@ function flowSectionLabel(domain: string, sectionKey: string): string {
     .join(" ");
 }
 
-const FLOW_LINE = "var(--text-tertiary)";
+const MINDMAP_BRANCH_PALETTE = ["#8b5cf6", "#22c55e", "#ef4444", "#f97316", "#171717", "#6366f1", "#ec4899", "#0ea5e9"];
 
-function FlowchartView({
+function mindmapBranchColor(key: string): string {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return MINDMAP_BRANCH_PALETTE[h % MINDMAP_BRANCH_PALETTE.length]!;
+}
+
+const MINDMAP_DOMAIN: Record<"work" | "personal", string> = {
+  work: "#2563eb",
+  personal: "#a855f7",
+};
+
+function MindmapFanDown({ n, colors }: { n: number; colors: string[] }) {
+  if (n <= 0) return null;
+  const w = 100;
+  const h = 38;
+  const cx = w / 2;
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="bd-mindmap-fan" aria-hidden>
+      {Array.from({ length: n }, (_, i) => {
+        const tx = n === 1 ? cx : ((i + 0.5) / n) * w;
+        const stroke = colors[i] ?? "var(--border-strong)";
+        const d =
+          n === 1
+            ? `M ${cx} 0 C ${cx} ${h * 0.55}, ${cx} ${h * 0.45}, ${tx} ${h}`
+            : `M ${cx} 0 C ${cx} ${h * 0.62}, ${tx} ${h * 0.38}, ${tx} ${h}`;
+        return <path key={i} d={d} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />;
+      })}
+    </svg>
+  );
+}
+
+function MindmapPill({
+  icon,
+  label,
+  count,
+  color,
+  onClick,
+  expanded,
+  variant = "branch",
+}: {
+  icon: ReactNode;
+  label: string;
+  count: number;
+  color: string;
+  onClick?: () => void;
+  expanded?: boolean;
+  variant?: "root" | "branch";
+}) {
+  const Cmp = onClick ? "button" : "div";
+  const props = onClick ? { type: "button" as const, onClick } : {};
+  return (
+    <Cmp {...props} className={`bd-mindmap-pill ${variant === "root" ? "bd-mindmap-pill--root" : ""}`}>
+      <span className="bd-mindmap-pill-icon" style={{ color }}>
+        {icon}
+      </span>
+      <span className="bd-mindmap-pill-dash" style={{ background: color }} />
+      <span className="bd-mindmap-pill-label">{label}</span>
+      <span className="bd-mindmap-pill-badge" style={{ background: color }}>
+        {count}
+      </span>
+      {onClick && expanded !== undefined && <span className="bd-mindmap-pill-chevron">{expanded ? "▼" : "▶"}</span>}
+    </Cmp>
+  );
+}
+
+function MindmapView({
   items,
   showEntryTitles = true,
   onEdit,
@@ -2395,9 +2427,27 @@ function FlowchartView({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
 
-  const toggleDomain = (key: string) => setCollapsedDomains((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  const toggleSection = (key: string) => setCollapsedSections((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  const toggleType = (key: string) => setCollapsedTypes((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const toggleDomain = (key: string) =>
+    setCollapsedDomains((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  const toggleSection = (key: string) =>
+    setCollapsedSections((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  const toggleType = (key: string) =>
+    setCollapsedTypes((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
 
   const workItems = items.filter((it) => it.domain === "work");
   const personalItems = items.filter((it) => it.domain === "personal");
@@ -2433,79 +2483,30 @@ function FlowchartView({
   const groupByType = (list: ViewItem[]) => {
     const byType = new Map<string, ViewItem[]>();
     for (const it of list) {
-      const t = it.itemType || "note";
-      if (!byType.has(t)) byType.set(t, []);
-      byType.get(t)!.push(it);
+      const ty = it.itemType || "note";
+      if (!byType.has(ty)) byType.set(ty, []);
+      byType.get(ty)!.push(it);
     }
     return Array.from(byType.entries()).map(([type, entries]) => ({ type, entries }));
   };
 
-  const primaryNodeStyle: CSSProperties = {
-    padding: "0.5rem 1rem",
-    borderRadius: 8,
-    background: "var(--accent)",
-    color: "var(--bd-btn-primary-fg)",
-    fontWeight: 600,
-    fontSize: "0.9375rem",
-    border: "1px solid var(--border-strong)",
-    cursor: "pointer",
-    textAlign: "center",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.5rem",
-    minWidth: isMobile ? 0 : 120,
-    maxWidth: isMobile ? "100%" : undefined,
-    width: isMobile ? "100%" : undefined,
-    boxSizing: "border-box",
-    boxShadow: "none",
-  };
-  const secondaryNodeStyle: CSSProperties = {
-    padding: "0.4rem 0.75rem",
-    borderRadius: 8,
-    background: "transparent",
-    color: "var(--text-primary)",
-    fontWeight: 500,
-    fontSize: "0.8125rem",
-    border: "1px solid var(--border-default)",
-    cursor: "pointer",
-    textAlign: "left",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.35rem",
-    width: "100%",
-    boxSizing: "border-box",
-  };
-  const entryNodeStyle: CSSProperties = {
-    padding: "0.35rem 0.65rem",
-    borderRadius: 8,
-    background: "var(--bg-elevated)",
-    color: "var(--text-primary)",
-    fontWeight: 400,
-    fontSize: "0.8125rem",
-    border: "1px solid var(--border-default)",
-    cursor: "pointer",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.15rem",
-    width: "100%",
-    boxSizing: "border-box",
-  };
-
-  const FlowArrow = () => (
-    <svg width={12} height={10} viewBox="0 0 12 10" style={{ flexShrink: 0 }} aria-hidden>
-      <path d="M6 0L12 10H0L6 0z" fill={FLOW_LINE} />
+  const iconBriefcase = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
     </svg>
   );
-
-  const FlowConnector = ({ dashed = false }: { dashed?: boolean }) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg width={2} height={14} style={{ display: "block" }} aria-hidden>
-        <line x1={1} y1={0} x2={1} y2={14} stroke={FLOW_LINE} strokeWidth={2} strokeDasharray={dashed ? "3 3" : "none"} />
-      </svg>
-      <FlowArrow />
-    </div>
+  const iconUser = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+  const iconRoot = (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+    </svg>
   );
 
   const renderEntry = (it: ViewItem, index: number) => {
@@ -2513,47 +2514,46 @@ function FlowchartView({
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
     const isNew = isNewEntry(it);
     return (
-      <div key={it.id} style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
-        <FlowConnector dashed />
-        <div
-          className={ep.className}
-          onClick={() => onEdit(it)}
-          onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
-          style={{
-            ...ep.style,
-            ...entryNodeStyle,
-            borderLeft: `3px solid ${barColor}`,
-            display: "flex",
-            flexWrap: isMobile ? "wrap" : "nowrap",
-            alignItems: "center",
-            gap: "0.5rem",
-            position: "relative",
-          }}
-        >
-          {isNew && (
-            <span
-              style={{
-                position: "absolute",
-                top: 4,
-                right: 6,
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: "var(--text-primary)",
-                boxShadow: "0 0 6px rgba(255,255,255,0.25)",
-              }}
-              aria-hidden
-            />
-          )}
+      <button
+        key={it.id}
+        type="button"
+        className={`bd-mindmap-entry ${ep.className}`.trim()}
+        style={{
+          ...ep.style,
+          borderLeft: `3px solid ${barColor}`,
+          position: "relative",
+        }}
+        onClick={() => onEdit(it)}
+        onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+      >
+        {isNew && (
+          <span
+            style={{
+              position: "absolute",
+              top: 6,
+              right: 8,
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--text-primary)",
+              boxShadow: "0 0 6px rgba(255,255,255,0.25)",
+            }}
+            aria-hidden
+          />
+        )}
+        <span className="bd-mindmap-entry-type">
           <EntryTypeIcon type={it.itemType} size={14} />
-            <span style={{ flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{entryPrimaryLine(it, showEntryTitles)}</span>
+        </span>
+        <span className="bd-mindmap-entry-text">
+          {entryPrimaryLine(it, showEntryTitles)}
           {showEntryTitles && it.content?.trim() && (
-            <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", flexShrink: 0, maxWidth: "40%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: isMobile ? "none" : undefined }}>
-              {it.content.slice(0, 50)}{it.content.length > 50 ? "…" : ""}
+            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
+              {it.content.slice(0, 48)}
+              {it.content.length > 48 ? "…" : ""}
             </span>
           )}
-        </div>
-      </div>
+        </span>
+      </button>
     );
   };
 
@@ -2563,36 +2563,16 @@ function FlowchartView({
     const label = formatTypeLabel(type);
     const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
     return (
-      <div
-        key={typeKey}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          minWidth: isMobile ? 0 : 260,
-          maxWidth: isMobile ? "100%" : 340,
-          width: isMobile ? "100%" : undefined,
-          flex: "0 0 auto",
-          boxSizing: "border-box",
-        }}
-      >
-        <FlowConnector dashed />
-        <button
-          type="button"
+      <div key={typeKey} className="bd-mindmap-type-col" style={{ ["--bd-mindmap-branch" as string]: typeColor }}>
+        <MindmapPill
+          icon={<EntryTypeIcon type={type} size={16} />}
+          label={label}
+          count={entries.length}
+          color={typeColor}
           onClick={() => toggleType(typeKey)}
-          style={{ ...secondaryNodeStyle, borderColor: typeColor, color: typeColor }}
-        >
-          <EntryTypeIcon type={type} size={14} />
-          <span style={{ width: 4, height: 14, borderRadius: 2, background: typeColor, flexShrink: 0 }} />
-          <span style={{ width: 16, fontSize: "0.7rem" }}>{isCollapsed ? "▶" : "▼"}</span>
-          {label}
-          <span style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", fontWeight: 400 }}>({entries.length})</span>
-        </button>
-        {!isCollapsed && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2, marginLeft: 12 }}>
-            {entries.map((it, idx) => renderEntry(it, idx))}
-          </div>
-        )}
+          expanded={!isCollapsed}
+        />
+        {!isCollapsed && <div className="bd-mindmap-entries">{entries.map((it, idx) => renderEntry(it, idx))}</div>}
       </div>
     );
   };
@@ -2601,93 +2581,27 @@ function FlowchartView({
     const sectionId = `${domain}:${sectionKey}`;
     const isCollapsed = collapsedSections.has(sectionId);
     const byType = groupByType(sectionItems);
+    const branchColor = mindmapBranchColor(sectionId);
+    const typeColors = byType.map(({ type }) => TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default);
     return (
-      <div
-        key={sectionId}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          minWidth: isMobile ? 0 : 200,
-          width: isMobile ? "100%" : undefined,
-          flex: "0 0 auto",
-          boxSizing: "border-box",
-        }}
-      >
-        <FlowConnector dashed />
-        <button
-          type="button"
+      <div key={sectionId} className="bd-mindmap-section">
+        <MindmapPill
+          icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={branchColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          }
+          label={label}
+          count={sectionItems.length}
+          color={branchColor}
           onClick={() => toggleSection(sectionId)}
-          style={{ ...secondaryNodeStyle }}
-        >
-          <span style={{ width: 16, fontSize: "0.7rem" }}>{isCollapsed ? "▶" : "▼"}</span>
-          {label}
-          <span style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", fontWeight: 400 }}>({sectionItems.length})</span>
-        </button>
-        {!isCollapsed && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 12,
-              marginTop: 2,
-              marginLeft: isMobile ? 0 : 12,
-              alignItems: "flex-start",
-              width: isMobile ? "100%" : undefined,
-              maxWidth: "100%",
-              boxSizing: "border-box",
-            }}
-          >
-            {byType.map(({ type, entries }) => renderTypeBlock(domain, sectionKey, type, entries))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderDomainColumn = (domain: "work" | "personal", label: string, sections: { key: string; label: string; items: ViewItem[] }[]) => {
-    const isCollapsed = collapsedDomains.has(domain);
-    const total = sections.reduce((s, sec) => s + sec.items.length, 0);
-    return (
-      <div
-        key={domain}
-        style={{
-          flex: "0 0 auto",
-          minWidth: isMobile ? 0 : 200,
-          width: isMobile ? "100%" : undefined,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: isMobile ? "stretch" : "center",
-          boxSizing: "border-box",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => toggleDomain(domain)}
-          style={{ ...primaryNodeStyle }}
-        >
-          <span style={{ width: 18, fontSize: "0.75rem" }}>{isCollapsed ? "▶" : "▼"}</span>
-          {label}
-          <span style={{ fontSize: "0.8rem", opacity: 0.95 }}>({total})</span>
-        </button>
-        {!isCollapsed && (
+          expanded={!isCollapsed}
+        />
+        {!isCollapsed && byType.length > 0 && (
           <>
-            <FlowConnector />
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: "1rem",
-                width: "100%",
-                maxWidth: "100%",
-                alignItems: "flex-start",
-                justifyContent: "flex-start",
-                boxSizing: "border-box",
-              }}
-            >
-              {sections.map((sec) => renderSection(domain, sec.key, sec.label, sec.items))}
+            <MindmapFanDown n={byType.length} colors={typeColors} />
+            <div className="bd-mindmap-types-row">
+              {byType.map(({ type, entries }) => renderTypeBlock(domain, sectionKey, type, entries))}
             </div>
           </>
         )}
@@ -2695,39 +2609,56 @@ function FlowchartView({
     );
   };
 
+  const renderDomainMindmap = (
+    domain: "work" | "personal",
+    label: string,
+    sections: { key: string; label: string; items: ViewItem[] }[],
+  ) => {
+    const color = MINDMAP_DOMAIN[domain];
+    const isCollapsed = collapsedDomains.has(domain);
+    const total = sections.reduce((s, sec) => s + sec.items.length, 0);
+    const filled = sections.filter((s) => s.items.length > 0);
+    const sectionColors = filled.map((s) => mindmapBranchColor(`${domain}:${s.key}`));
+    return (
+      <div className="bd-mindmap-domain" key={domain}>
+        <MindmapPill
+          icon={domain === "work" ? iconBriefcase : iconUser}
+          label={label}
+          count={total}
+          color={color}
+          onClick={() => toggleDomain(domain)}
+          expanded={!isCollapsed}
+        />
+        {!isCollapsed && filled.length > 0 && (
+          <>
+            <MindmapFanDown n={filled.length} colors={sectionColors} />
+            <div className="bd-mindmap-sections-row">{filled.map((sec) => renderSection(domain, sec.key, sec.label, sec.items))}</div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const hasWork = workSections.some((s) => s.items.length > 0);
+  const hasPersonal = personalSections.some((s) => s.items.length > 0);
+  const domainColorsList: string[] = [];
+  if (hasWork) domainColorsList.push(MINDMAP_DOMAIN.work);
+  if (hasPersonal) domainColorsList.push(MINDMAP_DOMAIN.personal);
+  const rootColor = "var(--accent)";
+
   return (
-    <div
-      style={{
-        flex: 1,
-        minHeight: 0,
-        overflow: "auto",
-        background: "var(--bg-primary)",
-        borderRadius: 0,
-        padding: isMobile ? "0.65rem" : "1.5rem",
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="bd-mindmap" style={{ padding: isMobile ? "0.65rem" : "1.25rem 1.5rem 1.75rem" }}>
       {items.length === 0 ? (
         <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>{t("items.flowchartEmpty")}</p>
       ) : (
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: isMobile ? "column" : "row",
-              gap: isMobile ? "1rem" : "2rem",
-              width: isMobile ? "100%" : "fit-content",
-              maxWidth: "100%",
-              justifyContent: "center",
-              alignItems: isMobile ? "stretch" : "flex-start",
-              boxSizing: "border-box",
-            }}
-          >
-            {workSections.some((s) => s.items.length > 0) && renderDomainColumn("work", t("items.flowchartWork"), workSections)}
-            {personalSections.some((s) => s.items.length > 0) && renderDomainColumn("personal", t("items.flowchartPersonal"), personalSections)}
+        <div className="bd-mindmap-chart">
+          <div className="bd-mindmap-level bd-mindmap-level--root">
+            <MindmapPill variant="root" icon={iconRoot} label={t("items.mindmapRoot")} count={items.length} color={rootColor} />
+          </div>
+          {domainColorsList.length > 0 && <MindmapFanDown n={domainColorsList.length} colors={domainColorsList} />}
+          <div className="bd-mindmap-domains-row">
+            {hasWork && renderDomainMindmap("work", t("items.flowchartWork"), workSections)}
+            {hasPersonal && renderDomainMindmap("personal", t("items.flowchartPersonal"), personalSections)}
           </div>
         </div>
       )}

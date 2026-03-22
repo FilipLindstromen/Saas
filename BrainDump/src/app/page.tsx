@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
+import { recordOrganizedDump } from "@/lib/dump-streak";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -169,6 +170,7 @@ export default function BrainDumpPage() {
         }
         const created = (dataBatch as { created?: { id: string }[] }).created ?? [];
         saveLastNewBatchIds(created.map((c) => c.id));
+        recordOrganizedDump();
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("braindump-reload-items"));
         }
@@ -436,7 +438,7 @@ export default function BrainDumpPage() {
             </svg>
           </button>
         </div>
-        <div className="bd-bottom-bar-spacer" aria-hidden />
+        <div id="bd-bottom-view-slot" className="bd-bottom-bar-view-slot" />
       </div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
