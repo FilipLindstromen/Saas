@@ -878,6 +878,34 @@ select.bd-input::-ms-expand {
   transform-origin: 50% 40%;
 }
 
+/* Settings: cap height on short viewports; scroll body (mobile-friendly) */
+.bd-settings-modal-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(92dvh, calc(100dvh - max(2rem, env(safe-area-inset-top) + env(safe-area-inset-bottom))));
+  overflow: hidden;
+}
+
+.bd-settings-modal-header {
+  flex-shrink: 0;
+}
+
+.bd-settings-modal-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 768px) {
+  .bd-settings-modal-backdrop {
+    align-items: flex-start;
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
+
 /* Bottom sheets in ItemsViewArea (view / type pickers) */
 .bd-items-sheet-backdrop {
   position: fixed;
@@ -988,6 +1016,44 @@ select.bd-input::-ms-expand {
   flex-shrink: 0;
 }
 
+/* Mobile: project/area + type + view + filter on one horizontal row */
+.bd-mobile-unified-chrome {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  width: calc(100% + 2 * var(--bd-space-3));
+  max-width: none;
+  margin-left: calc(-1 * var(--bd-space-3));
+  margin-right: calc(-1 * var(--bd-space-3));
+  margin-bottom: var(--bd-space-3);
+  padding: var(--bd-space-2) max(0.65rem, env(safe-area-inset-left)) var(--bd-space-2)
+    max(0.65rem, env(safe-area-inset-right));
+  border-bottom: 1px solid var(--bd-chrome-edge);
+  background: var(--bg-primary);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.bd-mobile-unified-chrome__scope {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bd-mobile-unified-chrome__scope > * {
+  min-width: 0;
+}
+
+.bd-mobile-unified-chrome__tools {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(260px, 52%);
+}
+
 /* Fixed to viewport bottom — no entrance motion so it stays visually static */
 .bd-bottom-bar {
   position: fixed;
@@ -996,7 +1062,11 @@ select.bd-input::-ms-expand {
   bottom: 0;
   padding: 0.5rem 1rem;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  background: transparent;
+  background: none;
+  background-color: transparent;
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-top: none;
   box-shadow: none;
   display: none;
@@ -1317,6 +1387,11 @@ select.bd-input::-ms-expand {
     gap: 0.5rem;
     padding-left: max(0.65rem, env(safe-area-inset-left));
     padding-right: max(0.65rem, env(safe-area-inset-right));
+    background: none;
+    background-color: transparent;
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   /* Center mic in bar regardless of left mode control + right spacer (parent is position:fixed) */

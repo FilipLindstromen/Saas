@@ -8,6 +8,7 @@ import {
   type SuggestedItemTypeDetail,
 } from "@/lib/item-types";
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
+import { localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -72,6 +73,8 @@ interface ItemsViewAreaProps {
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
   reloadKey?: number;
+  /** Mobile: render ScopeBar in one row with type / view / filter (passed from page when scope is shown). */
+  scopeSlot?: ReactNode;
 }
 
 const PROGRESS_OPTIONS = ["todo", "started", "completed"] as const;
@@ -303,7 +306,18 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
   return items.filter((it) => it.itemType === itemType);
 }
 
-export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeSelect, viewType: controlledViewType, onViewTypeChange, searchFilter = "", reloadKey = 0 }: ItemsViewAreaProps) {
+export function ItemsViewArea({
+  mode,
+  projectId,
+  category,
+  itemType,
+  onItemTypeSelect,
+  viewType: controlledViewType,
+  onViewTypeChange,
+  searchFilter = "",
+  reloadKey = 0,
+  scopeSlot,
+}: ItemsViewAreaProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -342,6 +356,8 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     scheduledTime?: string;
     recurrence?: string;
     sendNotification?: boolean;
+    /** Minutes before event for advance notification (0, 10, 30, 60) */
+    reminderMinutesBefore?: number;
   } | null>(null);
   const [reminderEntry, setReminderEntry] = useState<{
     id: string;
@@ -364,6 +380,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     scheduledTime: "",
     recurrence: "none",
     sendNotification: false,
+    reminderMinutesBefore: 30,
   });
 
   const toEditEntry = useCallback((it: ViewItem) => ({
@@ -375,6 +392,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     scheduledTime: it.scheduledTime ?? "",
     recurrence: it.recurrence ?? "none",
     sendNotification: it.sendNotification ?? false,
+    reminderMinutesBefore: normalizeReminderMinutesBefore(it.reminderMinutesBefore ?? 30),
   }), []);
   const [lineToolActive, setLineToolActive] = useState(false);
   const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
@@ -725,6 +743,14 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
         payload.scheduledTime = form.scheduledTime || null;
         payload.recurrence = form.recurrence === "none" ? null : form.recurrence;
         payload.sendNotification = form.sendNotification;
+        const rMin = normalizeReminderMinutesBefore(form.reminderMinutesBefore ?? 0);
+        if (form.sendNotification && form.scheduledAt?.trim()) {
+          const at = localDateTimeToDate(form.scheduledAt.trim(), form.scheduledTime || "09:00");
+          if (at) {
+            payload.reminderAt = at.toISOString();
+            payload.reminderMinutesBefore = rMin;
+          }
+        }
       }
       const resItem = await fetch("/api/organized-items", {
         method: "POST",
@@ -739,7 +765,18 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
     [mode, fetchItems]
   );
 
-  const updateSchedule = useCallback((id: string, schedule: { scheduledAt?: string | null; scheduledTime?: string | null; recurrence?: string | null; sendNotification?: boolean }) => {
+  const updateSchedule = useCallback(
+    (
+      id: string,
+      schedule: {
+        scheduledAt?: string | null;
+        scheduledTime?: string | null;
+        recurrence?: string | null;
+        sendNotification?: boolean;
+        reminderAt?: string | null;
+        reminderMinutesBefore?: number | null;
+      }
+    ) => {
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -754,6 +791,8 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
       .catch(() => {});
   }, []);
 
+  /** Advance notification for calendar (matches server / organize). */
+  const CALENDAR_NOTIFY_BEFORE_OPTIONS = [60, 30, 10, 0] as const;
   const REMINDER_MINUTES_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
   const updateReminder = useCallback(
     (id: string, reminderDate: string, reminderTime: string, reminderMinutesBefore: number) => {
@@ -813,105 +852,133 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
   }
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
+  const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
+
+  const mobileToolbarCompactInner = (
+    <>
+      {onItemTypeSelect && (
+        <button
+          type="button"
+          className="bd-btn"
+          aria-haspopup="listbox"
+          aria-expanded={typePickerOpen}
+          aria-label={t("items.openTypeMenu")}
+          title={selectedTypeLabel}
+          onClick={() => setTypePickerOpen(true)}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+            padding: "0.4rem 0.65rem",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            background: "var(--bd-chrome-selected-bg)",
+            borderColor: "var(--bd-chrome-selected-border)",
+            color: "var(--bd-chrome-selected-text)",
+            boxShadow: "none",
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      )}
+      <button
+        type="button"
+        className="bd-btn"
+        aria-haspopup="listbox"
+        aria-expanded={viewPickerOpen}
+        aria-label={t("items.openViewMenu")}
+        title={viewButtons.find((b) => b.value === viewType)?.label}
+        onClick={() => setViewPickerOpen(true)}
+        style={{
+          flexShrink: 0,
+          minWidth: 44,
+          minHeight: 44,
+          width: 44,
+          padding: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bd-chrome-selected-bg)",
+          borderColor: "var(--bd-chrome-selected-border)",
+          color: "var(--bd-chrome-selected-text)",
+          boxShadow: "none",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+          {viewButtons.find((b) => b.value === viewType)?.icon}
+        </span>
+      </button>
+      {viewType === "postits" && (
+        <button
+          type="button"
+          className="bd-btn"
+          title={t("items.connectPostits")}
+          aria-label={t("items.connectPostits")}
+          style={{
+            padding: "0.4rem",
+            minWidth: 44,
+            minHeight: 44,
+            flexShrink: 0,
+            background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
+            color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
+            borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
+          }}
+          onClick={() => setLineToolActive((a) => !a)}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+      <span
+        style={{
+          fontSize: "0.7rem",
+          color: "var(--text-tertiary)",
+          lineHeight: 1.2,
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          marginLeft: onItemTypeSelect ? "auto" : undefined,
+        }}
+      >
+        {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
+      </span>
+    </>
+  );
 
   return (
     <div className="bd-items-view-root">
+      {showUnifiedMobileChrome && (
+        <div className="bd-mobile-unified-chrome">
+          <div className="bd-mobile-unified-chrome__scope">{scopeSlot}</div>
+          <div className="bd-mobile-unified-chrome__tools">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: "0.4rem",
+                width: "100%",
+                minWidth: 0,
+                flexWrap: "nowrap",
+              }}
+            >
+              {mobileToolbarCompactInner}
+            </div>
+          </div>
+        </div>
+      )}
+      {!showUnifiedMobileChrome && (
       <div className="bd-items-toolbar">
         {isMobile && mobileModesToolbar ? (
           <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.4rem", width: "100%", minWidth: 0, gridColumn: "1 / -1", flexWrap: "nowrap" }}>
-              {onItemTypeSelect && (
-                <button
-                  type="button"
-                  className="bd-btn"
-                  aria-haspopup="listbox"
-                  aria-expanded={typePickerOpen}
-                  aria-label={t("items.openTypeMenu")}
-                  title={selectedTypeLabel}
-                  onClick={() => setTypePickerOpen(true)}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 44,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "0.5rem",
-                    padding: "0.4rem 0.65rem",
-                    fontSize: "0.8125rem",
-                    fontWeight: 600,
-                    background: "var(--bd-chrome-selected-bg)",
-                    borderColor: "var(--bd-chrome-selected-border)",
-                    color: "var(--bd-chrome-selected-text)",
-                    boxShadow: "none",
-                  }}
-                >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden>
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-              )}
-              <button
-                type="button"
-                className="bd-btn"
-                aria-haspopup="listbox"
-                aria-expanded={viewPickerOpen}
-                aria-label={t("items.openViewMenu")}
-                title={viewButtons.find((b) => b.value === viewType)?.label}
-                onClick={() => setViewPickerOpen(true)}
-                style={{
-                  flexShrink: 0,
-                  minWidth: 44,
-                  minHeight: 44,
-                  width: 44,
-                  padding: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "var(--bd-chrome-selected-bg)",
-                  borderColor: "var(--bd-chrome-selected-border)",
-                  color: "var(--bd-chrome-selected-text)",
-                  boxShadow: "none",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-                  {viewButtons.find((b) => b.value === viewType)?.icon}
-                </span>
-              </button>
-              {viewType === "postits" && (
-                <button
-                  type="button"
-                  className="bd-btn"
-                  title={t("items.connectPostits")}
-                  aria-label={t("items.connectPostits")}
-                  style={{
-                    padding: "0.4rem",
-                    minWidth: 44,
-                    minHeight: 44,
-                    flexShrink: 0,
-                    background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
-                    color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
-                    borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
-                  }}
-                  onClick={() => setLineToolActive((a) => !a)}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              )}
-            <span
-              style={{
-                fontSize: "0.7rem",
-                color: "var(--text-tertiary)",
-                lineHeight: 1.2,
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-                marginLeft: onItemTypeSelect ? "auto" : undefined,
-              }}
-            >
-              {filteredItems.length === 1 ? t("items.itemCount", { n: filteredItems.length }) : t("items.itemCountPlural", { n: filteredItems.length })}
-            </span>
+              {mobileToolbarCompactInner}
           </div>
         ) : (
           <>
@@ -1089,6 +1156,7 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
           </>
         )}
       </div>
+      )}
         {isMobile && viewPickerOpen && (
           <div
             className="bd-items-sheet-backdrop"
@@ -1699,6 +1767,27 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     />
                     Send notification
                   </label>
+                  {editingEntry.sendNotification && (
+                    <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: "12rem" }}>
+                      Notify before event
+                      <select
+                        className="bd-input"
+                        value={editingEntry.reminderMinutesBefore ?? 30}
+                        onChange={(e) =>
+                          setEditingEntry((prev) =>
+                            prev ? { ...prev, reminderMinutesBefore: Number(e.target.value) } : null
+                          )
+                        }
+                        style={{ padding: "0.25rem 0.5rem" }}
+                      >
+                        {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                          <option key={m} value={m}>
+                            {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
             )}
@@ -1746,11 +1835,22 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                       updateProgress(editingEntry.id, editingEntry.progress, editingEntry.progress);
                     }
                     if (currentItem?.itemType === "calendar") {
+                      const rMin = normalizeReminderMinutesBefore(editingEntry.reminderMinutesBefore ?? 0);
+                      const dateStr = editingEntry.scheduledAt?.trim();
+                      const timeStr = editingEntry.scheduledTime?.trim() || "09:00";
+                      let reminderAtIso: string | null = null;
+                      if (editingEntry.sendNotification && dateStr) {
+                        const dt = localDateTimeToDate(dateStr, timeStr);
+                        reminderAtIso = dt ? dt.toISOString() : null;
+                      }
                       updateSchedule(editingEntry.id, {
                         scheduledAt: editingEntry.scheduledAt || null,
                         scheduledTime: editingEntry.scheduledTime || null,
                         recurrence: (editingEntry.recurrence === "none" ? null : editingEntry.recurrence) || null,
                         sendNotification: editingEntry.sendNotification ?? false,
+                        reminderAt: editingEntry.sendNotification && reminderAtIso ? reminderAtIso : null,
+                        reminderMinutesBefore:
+                          editingEntry.sendNotification && reminderAtIso ? rMin : null,
                       });
                     }
                     setEditingEntry(null);
@@ -1980,6 +2080,25 @@ export function ItemsViewArea({ mode, projectId, category, itemType, onItemTypeS
                     />
                     Send notification
                   </label>
+                  {addEntryForm.sendNotification && (
+                    <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: "12rem" }}>
+                      Notify before event
+                      <select
+                        className="bd-input"
+                        value={addEntryForm.reminderMinutesBefore}
+                        onChange={(e) =>
+                          setAddEntryForm((f) => ({ ...f, reminderMinutesBefore: Number(e.target.value) }))
+                        }
+                        style={{ padding: "0.25rem 0.5rem" }}
+                      >
+                        {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                          <option key={m} value={m}>
+                            {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
             )}
@@ -2859,11 +2978,11 @@ function TextView({
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.3rem",
-                padding: "0.45rem 0.65rem",
-                background: "var(--bg-elevated)",
-                borderRadius: 6,
-                boxShadow: "var(--shadow-sm)",
-                border: "1px solid var(--border-subtle)",
+                padding: "0.35rem 0",
+                background: "transparent",
+                borderRadius: 0,
+                boxShadow: "none",
+                border: "none",
                 position: "relative",
               }}
             >
@@ -2871,8 +2990,8 @@ function TextView({
               <span
                 style={{
                   position: "absolute",
-                  top: 4,
-                  right: 6,
+                  top: 0,
+                  right: 0,
                   width: 8,
                   height: 8,
                   borderRadius: "50%",

@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
       scheduledTime,
       recurrence,
       sendNotification,
+      reminderAt,
+      reminderMinutesBefore,
     } = body;
 
     if (!dumpId || !domain || !category || !itemType || !title) {
@@ -172,6 +174,10 @@ export async function POST(request: NextRequest) {
             recurrence: recurrence === null || recurrence === "none" ? null : recurrence,
           }),
           ...(sendNotification !== undefined && { sendNotification: Boolean(sendNotification) }),
+          ...(reminderAt !== undefined && {
+            reminderAt: reminderAt === null || reminderAt === "" ? null : new Date(reminderAt),
+          }),
+          ...(reminderMinutesBefore !== undefined && { reminderMinutesBefore: reminderMinutesBefore ?? null }),
           tags:
             Array.isArray(tagIds) && tagIds.length > 0
               ? { create: tagIds.map((tagId: string) => ({ tagId })) }

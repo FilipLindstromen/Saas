@@ -72,6 +72,17 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
         recommended_view: it.recommended_view ?? "note_cards",
         confidence_score: it.confidence_score ?? 0.8,
         tags: it.tags ?? [],
+        ...(it.item_type === "calendar"
+          ? {
+              ...(it.scheduled_date ? { scheduled_date: it.scheduled_date } : {}),
+              ...(it.scheduled_time ? { scheduled_time: it.scheduled_time } : {}),
+              ...(it.recurrence ? { recurrence: it.recurrence } : {}),
+              ...(it.send_notification !== undefined ? { send_notification: it.send_notification } : {}),
+              ...(it.reminder_minutes_before !== undefined
+                ? { reminder_minutes_before: it.reminder_minutes_before }
+                : {}),
+            }
+          : {}),
       }));
 
       const resBatch = await fetch("/api/organized-items/batch", {

@@ -41,6 +41,18 @@ export default function BrainDumpPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     try {
@@ -134,6 +146,17 @@ export default function BrainDumpPage() {
           recommended_view: it.recommended_view ?? "note_cards",
           confidence_score: it.confidence_score ?? 0.8,
           tags: it.tags ?? [],
+          ...(it.item_type === "calendar"
+            ? {
+                ...(it.scheduled_date ? { scheduled_date: it.scheduled_date } : {}),
+                ...(it.scheduled_time ? { scheduled_time: it.scheduled_time } : {}),
+                ...(it.recurrence ? { recurrence: it.recurrence } : {}),
+                ...(it.send_notification !== undefined ? { send_notification: it.send_notification } : {}),
+                ...(it.reminder_minutes_before !== undefined
+                  ? { reminder_minutes_before: it.reminder_minutes_before }
+                  : {}),
+              }
+            : {}),
         }));
         const resBatch = await fetch("/api/organized-items/batch", {
           method: "POST",
@@ -330,7 +353,7 @@ export default function BrainDumpPage() {
         </aside>
 
         <div className="bd-workspace-column" style={{ gap: "0" }}>
-          {(mode === "work" || mode === "personal" || mode === "all") && (
+          {(mode === "work" || mode === "personal" || mode === "all") && !isMobile && (
             <div className="bd-scope-outer-wrap" style={{ flexShrink: 0 }}>
               <ScopeBar
                 mode={mode}
@@ -359,6 +382,19 @@ export default function BrainDumpPage() {
               viewType={viewType}
               onViewTypeChange={setViewType}
               searchFilter={searchFilter}
+              scopeSlot={
+                isMobile && (mode === "work" || mode === "personal" || mode === "all") ? (
+                  <ScopeBar
+                    mode={mode}
+                    selectedProjectId={selectedProjectId}
+                    selectedCategory={selectedCategory}
+                    onProjectSelect={setSelectedProjectId}
+                    onCategorySelect={setSelectedCategory}
+                    searchFilter={searchFilter}
+                    onSearchFilterChange={setSearchFilter}
+                  />
+                ) : null
+              }
             />
           </div>
           {mode === "inbox" && (

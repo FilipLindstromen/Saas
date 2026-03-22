@@ -3,6 +3,11 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
 import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
+import {
+  dateOnlyToStartOfDay,
+  localDateTimeToDate,
+  normalizeReminderMinutesBefore,
+} from "@/lib/calendar-schedule";
 
 /**
  * POST /api/organized-items/batch
@@ -36,6 +41,11 @@ export async function POST(request: NextRequest) {
         recommended_view?: string;
         confidence_score?: number;
         tags?: string[];
+        scheduled_date?: string;
+        scheduled_time?: string;
+        recurrence?: string;
+        send_notification?: boolean;
+        reminder_minutes_before?: number;
       }>;
     };
 
@@ -82,6 +92,28 @@ export async function POST(request: NextRequest) {
           if (!exists) projectId = null;
         }
 
+        const itemTypeStr = String(it.item_type ?? "note");
+        const isCalendar = itemTypeStr === "calendar";
+        const scheduledDateRaw =
+          typeof it.scheduled_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.scheduled_date.trim())
+            ? it.scheduled_date.trim()
+            : undefined;
+        const scheduledTimeRaw =
+          typeof it.scheduled_time === "string" && /^\d{2}:\d{2}$/.test(it.scheduled_time.trim())
+            ? it.scheduled_time.trim()
+            : undefined;
+        const scheduledAtDate = scheduledDateRaw ? dateOnlyToStartOfDay(scheduledDateRaw) : null;
+        const recurrenceVal =
+          it.recurrence && ["daily", "weekly", "monthly"].includes(it.recurrence) ? it.recurrence : null;
+        const sendNotif = Boolean(it.send_notification);
+        const rMin = normalizeReminderMinutesBefore(it.reminder_minutes_before);
+        const eventStart =
+          isCalendar && scheduledDateRaw
+            ? localDateTimeToDate(scheduledDateRaw, scheduledTimeRaw || "09:00")
+            : null;
+        const reminderAtVal =
+          isCalendar && sendNotif && eventStart ? eventStart : null;
+
         const item = await tx.organizedItem.create({
           data: {
             dumpId: dumpIdStr,
@@ -90,7 +122,7 @@ export async function POST(request: NextRequest) {
             category: String(it.category ?? ""),
             subcategory: String(it.subcategory ?? ""),
             ...(projectId != null ? { projectId } : {}),
-            itemType: String(it.item_type ?? "note"),
+            itemType: itemTypeStr,
             title: String(it.title ?? ""),
             content: String(it.content ?? ""),
             emotionLabel: it.emotion_label != null && it.emotion_label !== "" ? String(it.emotion_label) : null,
@@ -98,6 +130,13 @@ export async function POST(request: NextRequest) {
             progress: "todo",
             recommendedView: String(it.recommended_view ?? "note_cards"),
             confidenceScore: typeof it.confidence_score === "number" ? it.confidence_score : 0.8,
+            ...(isCalendar && scheduledAtDate != null && { scheduledAt: scheduledAtDate }),
+            ...(isCalendar && scheduledTimeRaw && { scheduledTime: scheduledTimeRaw }),
+            ...(isCalendar && recurrenceVal && { recurrence: recurrenceVal }),
+            ...(isCalendar && { sendNotification: sendNotif }),
+            ...(isCalendar && sendNotif && reminderAtVal
+              ? { reminderAt: reminderAtVal, reminderMinutesBefore: rMin }
+              : {}),
           },
         });
         created.push({ id: item.id, title: item.title });

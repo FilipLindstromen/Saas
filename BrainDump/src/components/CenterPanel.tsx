@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
@@ -32,6 +32,12 @@ export interface OrganizedItemPreview {
   recommended_view?: string;
   confidence_score?: number;
   tags?: string[];
+  /** Calendar — from organize / AI */
+  scheduled_date?: string;
+  scheduled_time?: string;
+  recurrence?: string;
+  send_notification?: boolean;
+  reminder_minutes_before?: number;
 }
 
 function getStoredOpenAIKey(): string {
@@ -71,6 +77,8 @@ interface CenterPanelProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
+  scopeSlot?: ReactNode;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -95,6 +103,7 @@ export function CenterPanel({
   viewType,
   onViewTypeChange,
   searchFilter = "",
+  scopeSlot = null,
 }: CenterPanelProps) {
   const { t, locale } = useI18n();
   const [recordState, setRecordState] = useState<RecordState>("idle");
@@ -445,7 +454,8 @@ export function CenterPanel({
       form.append("file", blob, fileName);
       const key = getStoredOpenAIKey();
       if (key) form.append("apiKey", key);
-      if (locale === "sv") form.append("language", "sv");
+      /** Match Whisper to UI language (sv/en); API maps to ISO 639-1 for whisper-1 */
+      form.append("language", locale);
       const res = await fetch("/api/transcribe", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) {
@@ -514,6 +524,7 @@ export function CenterPanel({
         body: JSON.stringify({
           transcript: text,
           locale,
+          referenceIso: new Date().toISOString(),
           ...(key ? { apiKey: key } : {}),
           projectNames: projectNames.length > 0 ? projectNames : undefined,
           ...(defaultDomain ? { defaultDomain } : {}),
@@ -836,6 +847,7 @@ export function CenterPanel({
           onViewTypeChange={onViewTypeChange}
           searchFilter={searchFilter}
           reloadKey={itemsReloadKey}
+          scopeSlot={scopeSlot}
         />
       )}
       {isInbox && unclearItems && (

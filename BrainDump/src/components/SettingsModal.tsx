@@ -301,11 +301,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="bd-settings-title"
-      className="bd-modal-backdrop"
+      className="bd-modal-backdrop bd-settings-modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="bd-modal-panel"
+        className="bd-modal-panel bd-settings-modal-panel"
         style={{
           background: "var(--bg-elevated)",
           border: "1px solid var(--border-default)",
@@ -316,7 +316,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div
+          className="bd-settings-modal-header"
+          style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+        >
           <h2 id="bd-settings-title" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600, color: "var(--text-primary)" }}>
             {t("settings.title")}
           </h2>
@@ -324,6 +327,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             ×
           </button>
         </div>
+        <div className="bd-settings-modal-scroll">
         <div style={{ padding: "1.5rem" }}>
           <label htmlFor="bd-settings-locale" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
             {t("lang.label")}
@@ -588,6 +592,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               Save
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

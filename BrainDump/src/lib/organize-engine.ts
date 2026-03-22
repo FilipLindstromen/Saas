@@ -3,6 +3,8 @@
  * Keeps business logic separate from UI and API.
  */
 
+import { normalizeReminderMinutesBefore } from "./calendar-schedule";
+
 export type Domain = "inbox" | "work" | "personal";
 
 export type ItemType =
@@ -29,6 +31,16 @@ export interface OrganizedItemInput {
   emotion_label?: string;
   recommended_view: string;
   confidence_score: number;
+  /** Calendar (item_type calendar): YYYY-MM-DD in user's locale relative to reference time */
+  scheduled_date?: string;
+  /** Calendar: HH:mm 24h local */
+  scheduled_time?: string;
+  /** none | daily | weekly | monthly */
+  recurrence?: string;
+  /** Whether to enable notifications for this event */
+  send_notification?: boolean;
+  /** Minutes before event for an advance notification: 0 (none), 10, 30, or 60 only */
+  reminder_minutes_before?: number;
 }
 
 const ORGANIZE_SYSTEM_PROMPT = `You are a thought organization assistant. Your job is to analyze a raw transcript (a "brain dump") and split it into structured items.
@@ -47,6 +59,12 @@ Rules:
    - Use "reflection" for how the user feels, body state, tiredness, emotional state, or brief reflections not tied to a project — always use category "feeling" and domain "personal" for these. Do NOT attach these to projects or hobbies.
    - Use "note" for general notes, facts, decisions, updates. When in doubt, use "note".
    - Use "calendar" for time-bound or recurring items (e.g. "every day", "every Monday", "remind me next week", events with a date/time). These appear only in the Calendar view.
+   - For EVERY item with item_type "calendar", you MUST extract scheduling from the transcript:
+     - scheduled_date: YYYY-MM-DD using the reference date/time below to interpret "today", "tomorrow", "next Friday", "March 20", etc.
+     - scheduled_time: HH:mm in 24-hour local time (e.g. 14:00 for 2pm). If the user says "at 2pm" use 14:00; "9 in the morning" → 09:00. If no time is mentioned, use a reasonable default (09:00) or omit only if truly all-day with no time.
+     - recurrence: "none" unless the user clearly said daily/weekly/monthly recurrence; then "daily", "weekly", or "monthly".
+     - send_notification: true if the user wants a reminder or notification for this event; false otherwise.
+     - reminder_minutes_before: if send_notification is true, pick exactly one of: 60 (one hour before), 30 (half an hour before), 10 (ten minutes before), or 0 (notify at event time only, no advance ping). Match the user's wording when possible.
 6. Personal sections (category for domain=personal): feeling, thoughts, hobbies, goals, health, relationships, shopping.
    - feeling: How the user feels, body state (tired, etc.), emotional state. Use item_type "reflection". Never attach to project_name.
    - hobbies: Hobby projects, personal creative pursuits (e.g. painting, side projects for fun).
@@ -79,6 +97,12 @@ Regler:
    - Använd "reflection" för hur användaren mår, kroppstillstånd, trötthet, känsloläge, eller korta reflektioner utan projekt — använd alltid category "feeling" och domain "personal". Koppla INTE dessa till projekt eller hobbies.
    - Använd "note" för allmänna anteckningar, fakta, beslut, uppdateringar. Vid tvekan, använd "note".
    - Använd "calendar" för tidsbundna eller återkommande saker (t.ex. "varje dag", "varje måndag", "påminn mig nästa vecka", händelser med datum/tid).
+   - För varje post med item_type "calendar": extrahera schemaläggning från transkriptet:
+     - scheduled_date: YYYY-MM-DD med referensdatum/tid nedan för "idag", "imorgon", "nästa fredag", osv.
+     - scheduled_time: HH:mm i 24-timmarsformat lokalt (t.ex. 14:00 för "klockan 2", "klockan 14"). Om ingen tid nämns, rimlig standard (09:00) eller utelämna bara vid heldag utan tid.
+     - recurrence: "none" om inte användaren sagt daglig/veckovis/månadsvis upprepning.
+     - send_notification: true om användaren vill ha påminnelse/notis.
+     - reminder_minutes_before: om send_notification är true, exakt ett av: 60, 30, 10, eller 0 (endast vid starttid, ingen tidigare notis).
 6. Personliga sektioner (category för domain=personal): feeling, thoughts, hobbies, goals, health, relationships, shopping.
    - feeling: Hur användaren mår, kropp, känsla. Använd item_type "reflection". Koppla aldrig till project_name.
    - hobbies: Hobbyprojekt, personlig kreativitet (t.ex. målning, sidoprojekt för nöje).
@@ -94,8 +118,8 @@ Fältnamn domain, category, item_type osv ska vara på engelska som i schemat ne
 Kategorier är dynamiska. Föredra befintliga när de passar; du FÅR skapa nya category-namn (lowercase, snake_case) när innehållet tydligt passar någon annanstans.
 När befintliga kategorier listas nedan, föredra dem.
 
-Svara med ett enda JSON-objekt: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score" } ] }
-Använd bara listade fält. Ingen extra kommentar.`;
+Svara med ett enda JSON-objekt: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" } ] }
+För calendar-poster: inkludera scheduled_date och scheduled_time när användaren gett datum eller tid. Använd bara listade fält. Ingen extra kommentar.`;
 
 export interface OrganizeOptions {
   projectNames?: string[];
@@ -106,6 +130,8 @@ export interface OrganizeOptions {
   customCategories?: string[];
   /** UI locale — Swedish prompts and Swedish titles/content in output when "sv". */
   locale?: "en" | "sv";
+  /** Client "now" (ISO string) so the model can resolve "today" / "tomorrow" for calendar fields. */
+  referenceIso?: string;
 }
 
 const DEFAULT_CATEGORIES_WORK = "projects, tasks, notes, ideas, meetings, opportunities";
@@ -155,10 +181,18 @@ export async function organizeTranscript(
   const client = new OpenAI({ apiKey: openaiApiKey || process.env.OPENAI_API_KEY });
   const systemPrompt = buildSystemPrompt(options);
   const locale = options.locale ?? "en";
+  const ref =
+    options.referenceIso?.trim() ||
+    new Date().toISOString();
+  const refLine =
+    locale === "sv"
+      ? `\n\nReferensdatum/tid (användarens "nu" för att tolka idag/imorgon): ${ref}`
+      : `\n\nReference date/time (user's "now" for interpreting today/tomorrow): ${ref}`;
+
   const userContent =
     locale === "sv"
-      ? `Transkript:\n\n${transcript}\n\nSkriv title och content på svenska för varje post (om transkriptet är på svenska).`
-      : `Transcript:\n\n${transcript}`;
+      ? `Transkript:\n\n${transcript}${refLine}\n\nSkriv title och content på svenska för varje post (om transkriptet är på svenska).`
+      : `Transcript:\n\n${transcript}${refLine}`;
 
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -213,6 +247,22 @@ export async function organizeTranscript(
     return hasWorkKeyword || mentionsKnownProject;
   }
 
+  function pickStr(raw: Record<string, unknown>, ...keys: string[]): string | undefined {
+    for (const k of keys) {
+      const v = raw[k];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return undefined;
+  }
+
+  function pickBool(raw: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+    for (const k of keys) {
+      const v = raw[k];
+      if (typeof v === "boolean") return v;
+    }
+    return undefined;
+  }
+
   try {
     const parsed = JSON.parse(text) as { items?: OrganizedItemInput[] };
     const items = Array.isArray(parsed.items) ? parsed.items : [];
@@ -243,7 +293,25 @@ export async function organizeTranscript(
         domain === "personal" && item_type === "task" && (!category || category === "projects")
           ? "tasks"
           : category;
-      return {
+
+      let scheduled_date = pickStr(raw, "scheduled_date", "scheduledDate");
+      let scheduled_time = pickStr(raw, "scheduled_time", "scheduledTime");
+      const recurrenceRaw = pickStr(raw, "recurrence");
+      const send_notification = pickBool(raw, "send_notification", "sendNotification");
+      const reminderRaw = raw.reminder_minutes_before ?? raw.reminderMinutesBefore;
+
+      if (item_type === "calendar" && scheduled_time && /^\d{1,2}:\d{2}$/.test(scheduled_time)) {
+        const [h, m] = scheduled_time.split(":");
+        scheduled_time = `${h!.padStart(2, "0")}:${m!}`;
+      }
+
+      const reminder_minutes_before =
+        item_type === "calendar" ? normalizeReminderMinutesBefore(reminderRaw) : undefined;
+
+      const recurrenceOut =
+        recurrenceRaw && ["daily", "weekly", "monthly"].includes(recurrenceRaw) ? recurrenceRaw : undefined;
+
+      const base: OrganizedItemInput = {
         ...item,
         project_name: mergedProjectName || undefined,
         domain,
@@ -253,6 +321,21 @@ export async function organizeTranscript(
         confidence_score: typeof item.confidence_score === "number" ? item.confidence_score : 0.8,
         recommended_view: item.recommended_view ?? "note_cards",
       };
+
+      if (item_type === "calendar") {
+        if (scheduled_date) base.scheduled_date = scheduled_date;
+        if (scheduled_time) base.scheduled_time = scheduled_time;
+        if (recurrenceOut) base.recurrence = recurrenceOut;
+        if (send_notification === true) {
+          base.send_notification = true;
+          base.reminder_minutes_before =
+            reminder_minutes_before === 0 ? 0 : reminder_minutes_before || 30;
+        } else if (send_notification === false) {
+          base.send_notification = false;
+        }
+      }
+
+      return base;
     });
   } catch {
     return [];
