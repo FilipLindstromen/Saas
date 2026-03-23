@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
 
         const itemTypeStr = String(it.item_type ?? "note");
         const isCalendar = itemTypeStr === "calendar";
-        const isTask = itemTypeStr === "task";
+        const isTaskLike = itemTypeStr === "task" || itemTypeStr === "task_completed";
+        const isShopping = itemTypeStr === "shopping";
         const scheduledDateRaw =
           typeof it.scheduled_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.scheduled_date.trim())
             ? it.scheduled_date.trim()
@@ -116,7 +117,11 @@ export async function POST(request: NextRequest) {
           isCalendar && sendNotif && eventStart ? eventStart : null;
 
         const taskDueDate =
-          isTask && scheduledAtDate != null ? scheduledAtDate : null;
+          isTaskLike && scheduledAtDate != null ? scheduledAtDate : null;
+        const taskProgress = itemTypeStr === "task_completed" ? "completed" : "todo";
+        const taskKanbanCol = itemTypeStr === "task_completed" ? "completed" : "todo";
+        const shoppingDueDate =
+          isShopping && scheduledAtDate != null ? scheduledAtDate : null;
 
         const item = await tx.organizedItem.create({
           data: {
@@ -131,11 +136,13 @@ export async function POST(request: NextRequest) {
             content: String(it.content ?? ""),
             emotionLabel: it.emotion_label != null && it.emotion_label !== "" ? String(it.emotion_label) : null,
             status: "draft",
-            progress: "todo",
+            progress: taskProgress,
             recommendedView: String(it.recommended_view ?? "note_cards"),
             confidenceScore: typeof it.confidence_score === "number" ? it.confidence_score : 0.8,
             ...(isCalendar && scheduledAtDate != null && { scheduledAt: scheduledAtDate }),
-            ...(isTask && taskDueDate != null && { scheduledAt: taskDueDate }),
+            ...(isTaskLike && taskDueDate != null && { scheduledAt: taskDueDate }),
+            ...(isTaskLike && { kanbanColumn: taskKanbanCol }),
+            ...(isShopping && shoppingDueDate != null && { scheduledAt: shoppingDueDate }),
             ...(isCalendar && scheduledTimeRaw && { scheduledTime: scheduledTimeRaw }),
             ...(isCalendar && recurrenceVal && { recurrence: recurrenceVal }),
             ...(isCalendar && { sendNotification: sendNotif }),

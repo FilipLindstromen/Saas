@@ -24,14 +24,15 @@ export async function GET(request: NextRequest) {
       userId: string;
       domain?: string;
       category?: string;
-      itemType?: string;
+      itemType?: string | { in: string[] };
       projectId?: string | null;
       status?: string;
       dumpId?: string;
     } = { userId };
     if (domain) where.domain = domain;
     if (category) where.category = category;
-    if (itemType) where.itemType = itemType;
+    if (itemType === "task") where.itemType = { in: ["task", "task_completed"] };
+    else if (itemType) where.itemType = itemType;
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
     if (dumpId) where.dumpId = dumpId;

@@ -83,6 +83,9 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
                 : {}),
             }
           : {}),
+        ...((it.item_type === "task" || it.item_type === "shopping") && it.scheduled_date
+          ? { scheduled_date: it.scheduled_date }
+          : {}),
       }));
 
       const resBatch = await fetch("/api/organized-items/batch", {

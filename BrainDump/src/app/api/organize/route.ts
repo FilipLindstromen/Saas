@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { organizeTranscript } from "@/lib/organize-engine";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
 
 export const maxDuration = 30;
 
@@ -16,7 +17,26 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    const projectNames = Array.isArray(body.projectNames) ? body.projectNames.filter((p: unknown) => typeof p === "string") : undefined;
+
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+
+    let mergedProjectNames: string[] = [];
+    if (userId) {
+      const dbProjects = await prisma.project.findMany({
+        where: { userId, domain: "work" },
+        select: { name: true },
+        orderBy: { name: "asc" },
+      });
+      mergedProjectNames = dbProjects.map((p) => p.name);
+    }
+    const fromBody = Array.isArray(body.projectNames)
+      ? body.projectNames.filter((p: unknown): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim())
+      : [];
+    for (const n of fromBody) {
+      if (!mergedProjectNames.some((x) => x.toLowerCase() === n.toLowerCase())) mergedProjectNames.push(n);
+    }
+    const projectNames = mergedProjectNames.length > 0 ? mergedProjectNames : undefined;
     const defaultDomain = body.defaultDomain === "work" || body.defaultDomain === "personal" ? body.defaultDomain : undefined;
     const customCategories = Array.isArray(body.customCategories) ? body.customCategories.filter((c: unknown) => typeof c === "string" && c.trim()) : undefined;
     const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
@@ -40,8 +60,11 @@ export async function POST(request: NextRequest) {
       ...(referenceIso ? { referenceIso } : {}),
     };
 
-    const items = await organizeTranscript(transcript, apiKey, options);
-    return NextResponse.json({ items });
+    const result = await organizeTranscript(transcript, apiKey, options);
+    return NextResponse.json({
+      items: result.items,
+      standaloneProjectCreations: result.standaloneProjectCreations,
+    });
   } catch (e) {
     console.error("Organize error:", e);
     const message = e instanceof Error ? e.message : "Organization failed";

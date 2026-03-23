@@ -14,6 +14,7 @@ interface SavedItem {
   content: string;
   status: string;
   progress?: string;
+  kanbanColumn?: string | null;
   recommendedView: string;
   reminderAt?: string | null;
   reminderMinutesBefore?: number | null;
@@ -28,15 +29,26 @@ interface SavedItemsListProps {
   itemType: string | null;
 }
 
-const PROGRESS_OPTIONS = ["todo", "started", "completed"] as const;
+function isTaskRow(it: Pick<SavedItem, "itemType">): boolean {
+  return it.itemType === "task" || it.itemType === "task_completed";
+}
 
-function entryTypeLabel(itemType: string): string {
+function isTaskCompleted(it: Pick<SavedItem, "itemType" | "progress" | "kanbanColumn">): boolean {
+  return (
+    it.itemType === "task_completed" ||
+    (it.itemType === "task" && (it.progress === "completed" || it.kanbanColumn === "completed"))
+  );
+}
+
+function entryTypeLabel(itemType: string, t?: (key: string) => string): string {
+  if (itemType === "task_completed") return t ? t("items.typeTaskCompleted") : "Task: Completed";
   return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
   work: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "calendar", label: "Calendar" },
@@ -51,6 +63,7 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
   ],
   inbox: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "emotion", label: "Emotion" },
@@ -103,14 +116,20 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
     return () => window.removeEventListener("braindump-reload-items", onReload);
   }, [fetchItems]);
 
-  const updateProgress = useCallback((id: string, progress: string) => {
+  const setTaskCompleted = useCallback((id: string, completed: boolean) => {
+    const itemType = completed ? "task_completed" : "task";
+    const progress = completed ? "completed" : "todo";
+    const kanbanColumn = completed ? "completed" : "todo";
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ progress }),
+      body: JSON.stringify({ itemType, progress, kanbanColumn }),
     })
       .then((r) => {
-        if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, progress } : it)));
+        if (r.ok)
+          setItems((prev) =>
+            prev.map((it) => (it.id === id ? { ...it, itemType, progress, kanbanColumn } : it))
+          );
       })
       .catch(() => {});
   }, []);
@@ -269,23 +288,24 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   {it.content?.trim() ? (it.content.length > 160 ? `${it.content.slice(0, 160)}…` : it.content) : "—"}
                 </div>
                 <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.25rem" }}>
-                  {entryTypeLabel(it.itemType)}
+                  {entryTypeLabel(it.itemType, t)}
                   {it.category && ` · ${it.category}`}
                   {it.project && ` · ${it.project.name}`}
                 </div>
               </div>
-              {it.itemType === "task" && (
-                <div style={{ flexShrink: 0 }}>
-                  <select
-                    className="bd-input"
-                    value={it.progress || "todo"}
-                    onChange={(e) => updateProgress(it.id, e.target.value)}
-                    style={{ width: "auto", fontSize: "0.75rem", padding: "0.2rem 0.4rem" }}
-                  >
-                    {PROGRESS_OPTIONS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+              {isTaskRow(it) && (
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", paddingTop: "0.15rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={isTaskCompleted(it)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      setTaskCompleted(it.id, e.target.checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                    style={{ width: 18, height: 18, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
+                  />
                 </div>
               )}
               <button
@@ -420,21 +440,17 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
 
       {editingEntry && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
+          className="bd-modal-backdrop bd-edit-entry-backdrop"
           onClick={() => setEditingEntry(null)}
         >
           <div
-            className="bd-panel"
-            style={{ padding: "1.25rem", maxWidth: 480, width: "100%" }}
+            className="bd-panel bd-modal-panel bd-edit-entry-panel"
+            style={{
+              padding: isMobile ? "1rem 1rem 1.1rem" : "1.25rem",
+              maxWidth: isMobile ? "100%" : 480,
+              width: "100%",
+              boxSizing: "border-box",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
@@ -444,7 +460,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
               value={editingEntry.title}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, title: e.target.value })}
               placeholder={t("items.titlePlaceholder")}
-              style={{ width: "100%", marginBottom: "0.75rem" }}
+              style={{ width: "100%", marginBottom: "0.75rem", boxSizing: "border-box" }}
               autoFocus
             />
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.description")}</label>
@@ -453,9 +469,25 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
               placeholder={t("items.descPlaceholder")}
-            style={{ width: "100%", minHeight: 120, marginBottom: "1rem", borderRadius: 18 }}
+              style={{
+                width: "100%",
+                minHeight: 120,
+                marginBottom: "1rem",
+                borderRadius: 18,
+                boxSizing: "border-box",
+              }}
             />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: isMobile ? "stretch" : "center",
+                justifyContent: "space-between",
+                gap: isMobile ? "0.75rem" : "0.5rem",
+                flexWrap: isMobile ? "nowrap" : "wrap",
+                paddingTop: isMobile ? "0.25rem" : undefined,
+              }}
+            >
               <button
                 type="button"
                 className="bd-btn bd-btn-danger"
@@ -466,7 +498,15 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 }}
                 aria-label={t("items.ariaDeleteEntry")}
                 title={t("items.ariaDeleteEntry")}
-                style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                style={{
+                  minWidth: 44,
+                  minHeight: 44,
+                  padding: "0.55rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  alignSelf: isMobile ? "flex-start" : undefined,
+                }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M3 6h18" />
@@ -476,7 +516,15 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   <line x1="14" y1="11" x2="14" y2="17" />
                 </svg>
               </button>
-              <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.5rem",
+                  marginLeft: isMobile ? 0 : "auto",
+                  justifyContent: isMobile ? "flex-end" : undefined,
+                  width: isMobile ? "100%" : undefined,
+                }}
+              >
                 <button
                   type="button"
                   className="bd-btn"

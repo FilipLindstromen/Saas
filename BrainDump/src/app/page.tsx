@@ -61,12 +61,16 @@ export default function BrainDumpPage() {
     } catch {}
   }, [viewType]);
 
-  useEffect(() => {
-    fetch("/api/projects")
+  const refreshWorkProjectNames = useCallback(() => {
+    fetch("/api/projects?domain=work")
       .then((r) => r.json())
       .then((d) => setProjectNames((d.projects ?? []).map((p: { name: string }) => p.name)))
       .catch(() => setProjectNames([]));
   }, []);
+
+  useEffect(() => {
+    refreshWorkProjectNames();
+  }, [refreshWorkProjectNames]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -157,6 +161,10 @@ export default function BrainDumpPage() {
                   ? { reminder_minutes_before: it.reminder_minutes_before }
                   : {}),
               }
+            : {}),
+          ...((it.item_type === "task" || it.item_type === "task_completed" || it.item_type === "shopping") &&
+          it.scheduled_date
+            ? { scheduled_date: it.scheduled_date }
             : {}),
         }));
         const resBatch = await fetch("/api/organized-items/batch", {
@@ -376,6 +384,7 @@ export default function BrainDumpPage() {
               onAutoSave={handleAutoSave}
               onDumpFinished={handleDumpFinished}
               onOpenSettings={() => setShowSettings(true)}
+              onWorkProjectsChanged={refreshWorkProjectNames}
               projectNames={projectNames}
               projectId={selectedProjectId}
               category={selectedCategory}

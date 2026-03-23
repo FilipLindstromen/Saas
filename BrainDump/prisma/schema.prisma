@@ -37,18 +37,18 @@ model OrganizedItem {
   category         String
   subcategory      String    @default("")
   projectId        String?
-  itemType         String    // task | note | idea | emotion | reflection | reminder | problem | decision | journal_entry | project_update
+  itemType         String    // task | shopping | note | idea | emotion | reflection | reminder | problem | decision | journal_entry | project_update
   title            String
   content          String    @default("")
   emotionLabel     String?
   status           String    @default("draft") // draft | needs_review | approved | saved
-  progress         String    @default("todo")  // todo | started | completed
+  progress         String    @default("todo")  // todo | completed (legacy: started)
   priority         Int?      // nullable
   recommendedView  String    @default("note_cards")
   confidenceScore   Float     @default(0)
   positionX        Float?    // for kanban/post-its layout
   positionY        Float?
-  kanbanColumn     String?   // e.g. todo | started | completed
+  kanbanColumn     String?   // todo | completed; itemType task_completed = done
   scheduledAt      DateTime? // date/time for calendar (date part = day, time optional)
   scheduledTime    String?   // e.g. "09:00" for display/notification
   recurrence       String?   // none | daily | weekly | monthly

@@ -6,6 +6,7 @@ import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
 import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
+import { filterNewStandaloneProjectNames } from "@/lib/project-name-match";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
 
@@ -79,6 +80,8 @@ interface CenterPanelProps {
   searchFilter?: string;
   /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
   scopeSlot?: ReactNode;
+  /** After organizing creates new work projects — refetch project list for ScopeBar / prompts. */
+  onWorkProjectsChanged?: () => void;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -104,6 +107,7 @@ export function CenterPanel({
   onViewTypeChange,
   searchFilter = "",
   scopeSlot = null,
+  onWorkProjectsChanged,
 }: CenterPanelProps) {
   const { t, locale } = useI18n();
   const [recordState, setRecordState] = useState<RecordState>("idle");
@@ -539,19 +543,38 @@ export function CenterPanel({
         }
         throw new Error(msg);
       }
+      const standaloneRaw: string[] = Array.isArray(data.standaloneProjectCreations)
+        ? data.standaloneProjectCreations.filter((x: unknown): x is string => typeof x === "string" && x.trim().length > 0)
+        : [];
+      const toCreate = filterNewStandaloneProjectNames(standaloneRaw, projectNames);
+      let createdStandalone = 0;
+      for (const name of toCreate) {
+        const resProj = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, domain: "work" }),
+        });
+        if (resProj.ok) createdStandalone += 1;
+      }
+      if (createdStandalone > 0) onWorkProjectsChanged?.();
+
       const items: OrganizedItemPreview[] = Array.isArray(data.items) ? data.items : [];
       const unclear = items.filter((it) => (it.confidence_score ?? 0.8) < UNCLEAR_CONFIDENCE_THRESHOLD);
+      if (createdStandalone > 0) {
+        setOrganizeSuccess(t("center.projectsCreatedOnly", { n: createdStandalone }));
+        setTimeout(() => setOrganizeSuccess(null), 5000);
+      }
       if (unclear.length > 0) {
         setUnclearItems({ items: unclear, allItems: items, transcript: text });
       } else {
-        applyOrganizeResult(items, text);
+        await applyOrganizeResult(items, text);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Organization failed");
     } finally {
       setOrganizeLoading(false);
     }
-  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t]);
+  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t, onWorkProjectsChanged]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();

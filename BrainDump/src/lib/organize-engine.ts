@@ -4,11 +4,19 @@
  */
 
 import { normalizeReminderMinutesBefore } from "./calendar-schedule";
+import {
+  filterNewStandaloneProjectNames,
+  resolveProjectNameToCanonical,
+  extractExplicitWorkProjectNames,
+  filterRedundantProjectCreationNotes,
+} from "./project-name-match";
 
 export type Domain = "inbox" | "work" | "personal";
 
 export type ItemType =
   | "task"
+  | "task_completed"
+  | "shopping"
   | "note"
   | "idea"
   | "emotion"
@@ -58,6 +66,7 @@ Rules:
    - Use "idea" for ideas, concepts, "I want to..." creative/hobby ideas, method explanations. A hobby project the user "wants to start" (e.g. paint abstract paintings once a week) is an idea under personal.
    - Use "reflection" for how the user feels, body state, tiredness, emotional state, or brief reflections not tied to a project — always use category "feeling" and domain "personal" for these. Do NOT attach these to projects or hobbies.
    - Use "note" for general notes, facts, decisions, updates. When in doubt, use "note".
+   - Use "shopping" for things to buy or get from a store: groceries, clothes, household items, phrases like "I need to shop", "buy socks", "pick up milk", "get from the store". Prefer "shopping" over "task" when the action is purchasing goods (e.g. "I need to shop socks tomorrow" → item_type "shopping", not "task"). Use domain "personal" and category "shopping" unless it is clearly work-related procurement (office supplies for work → domain "work", category "shopping"). When the user says when to shop (e.g. "tomorrow", "today", "next Saturday"), set shopping_due_date to YYYY-MM-DD using the reference date/time below (e.g. "tomorrow" = the calendar day after the reference date).
    - Use "calendar" for time-bound or recurring items (e.g. "every day", "every Monday", "remind me next week", events with a date/time). These appear only in the Calendar view.
    - For EVERY item with item_type "calendar", you MUST extract scheduling from the transcript:
      - scheduled_date: YYYY-MM-DD using the reference date/time below to interpret "today", "tomorrow", "next Friday", "March 20", etc.
@@ -70,16 +79,29 @@ Rules:
    - hobbies: Hobby projects, personal creative pursuits (e.g. painting, side projects for fun).
    - thoughts: General personal thoughts that don't fit feeling/hobbies/goals/health/relationships/shopping.
    - goals, health, relationships, shopping: Use when content clearly fits.
-7. Work: Use category "projects" or "tasks" and set project_name when a work project is named (e.g. LumiRush). Work item_types: task, note, idea, calendar.
+7. Work: Use category "projects" or "tasks" and set project_name when a work project is named (e.g. LumiRush). Work item_types: task, note, idea, calendar, shopping (only for clear work procurement).
    If the user names a project that is not in the "Existing projects" list, still set project_name to that name — the app will create the project automatically. Never omit project_name only because the project is new.
-8. recommended_view: task_list or kanban for tasks; note_cards for notes; reflection_cards for reflections.
+   When "Existing projects" is listed below, you MUST match the user's speech to one of those names whenever it is the same real project (see rule 10). Do not output a new spelling that differs only slightly.
+8. recommended_view: task_list or kanban for tasks; note_cards for notes, ideas, and shopping; reflection_cards for reflections.
 9. confidence_score: 0–1. title: short headline only. content: full description (what the user said); required for every item.
+10. Existing work projects (when listed below): This list is the source of truth for work project names.
+   - Before setting project_name on ANY work item, decide if the user meant one of these projects. Match despite: typos, missing spaces, extra spoken words like "and" in the middle of a name (e.g. speech "Relax and experience" → same as listed "Relaxperience"), abbreviations, or different capitalization.
+   - When it is the same project, set project_name to the EXACT string from the list, character-for-character.
+   - Never output a near-duplicate name (e.g. if the list has "Relaxperience", do NOT use "Relaxandexperience", "Relax Experience", or "Relaxandexperiance").
+   - If unsure between two listed projects, pick the closest list match; do not invent a third spelling.
+11. Explicit "create project" only: If the user mainly wants to register an empty work project (e.g. "Create a project called X", "Create a project caled X", "New project named Y", "Add a work project Z", "Skapa ett projekt som heter X") and is NOT also describing substantive tasks, notes, or ideas to store, then:
+   - Put ONLY the new project name(s) in "standalone_project_creations" (array of strings).
+   - Set "items" to [] (empty array). Do NOT create a note, idea, or task that only repeats the project-creation request or echoes the project name without other work content.
+   If the same utterance ALSO contains real tasks, meeting notes, or ideas unrelated to the shell project, put those in "items" as usual AND still add standalone_project_creations for any brand-new project shell(s) that have no items yet.
 
 Categories and sections are dynamic. Prefer existing ones when they fit; you MAY create new category names (lowercase, snake_case) when content clearly belongs elsewhere.
 When existing_categories are provided below, prefer those.
 
-Respond with a single JSON object: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" } ] }
-For tasks with a due day, include task_due_date (YYYY-MM-DD). For calendar items, include scheduled_date and related fields as in the rules above.
+Respond with a single JSON object:
+{ "items": [ ... ], "standalone_project_creations"?: string[] }
+Each "items" element: { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "shopping_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" }
+For tasks with a due day, include task_due_date (YYYY-MM-DD). For shopping items with a planned day, include shopping_due_date (YYYY-MM-DD). For calendar items, include scheduled_date and related fields as in the rules above.
+standalone_project_creations: array of strings (work project names to create as empty projects), per rule 11. Omit the key or use [] if none.
 Use only the fields listed. No extra commentary.`;
 
 const ORGANIZE_SYSTEM_PROMPT_SV = `Du är en assistent för att organisera tankar. Din uppgift är att analysera ett rått transkript (en "brain dump") och dela upp det i strukturerade poster.
@@ -97,6 +119,7 @@ Regler:
    - Använd "idea" för idéer, koncept, "jag vill..." kreativa/hobbyidéer. Ett hobbyprojekt användaren "vill börja med" är en idea under personal.
    - Använd "reflection" för hur användaren mår, kroppstillstånd, trötthet, känsloläge, eller korta reflektioner utan projekt — använd alltid category "feeling" och domain "personal". Koppla INTE dessa till projekt eller hobbies.
    - Använd "note" för allmänna anteckningar, fakta, beslut, uppdateringar. Vid tvekan, använd "note".
+   - Använd "shopping" för saker att köpa: mat, kläder, "jag måste handla", "köpa strumpor", "handla imorgon". Föredra "shopping" framför "task" när det handlar om att köpa varor (t.ex. "handla strumpor imorgon" → shopping). Använd domain "personal" och category "shopping" om det inte tydligt är inköp för jobbet. När användaren säger när (t.ex. "imorgon", "idag"), sätt shopping_due_date till YYYY-MM-DD med referensdatum nedan ("imorgon" = dagen efter referensdatum).
    - Använd "calendar" för tidsbundna eller återkommande saker (t.ex. "varje dag", "varje måndag", "påminn mig nästa vecka", händelser med datum/tid).
    - För varje post med item_type "calendar": extrahera schemaläggning från transkriptet:
      - scheduled_date: YYYY-MM-DD med referensdatum/tid nedan för "idag", "imorgon", "nästa fredag", osv.
@@ -109,18 +132,37 @@ Regler:
    - hobbies: Hobbyprojekt, personlig kreativitet (t.ex. målning, sidoprojekt för nöje).
    - thoughts: Allmänna personliga tankar som inte passar feeling/hobbies/goals/health/relationships/shopping.
    - goals, health, relationships, shopping: Använd när innehållet tydligt passar.
-7. Work: Använd category "projects" eller "tasks" och sätt project_name när ett arbetsprojekt nämns. Work item_types: task, note, idea, calendar.
+7. Work: Använd category "projects" eller "tasks" och sätt project_name när ett arbetsprojekt nämns. Work item_types: task, note, idea, calendar, shopping (endast vid tydliga jobbinköp).
    Om användaren nämner ett projekt som inte finns i listan "Befintliga projekt", sätt ändå project_name till det namnet — appen skapar projektet. Utelämna aldrig project_name bara för att projektet är nytt.
-8. recommended_view: task_list eller kanban för tasks; note_cards för notes; reflection_cards för reflections.
+   När "Befintliga projekt" listas nedan MÅSTE du matcha användarens tal till ett av namnen om det är samma verkliga projekt (se regel 10). Skapa inte en ny stavning som bara skiljer lite.
+8. recommended_view: task_list eller kanban för tasks; note_cards för notes, idéer och shopping; reflection_cards för reflections.
 9. confidence_score: 0–1. title: kort rubrik. content: full beskrivning; krävs för varje post.
+10. Befintliga arbetsprojekt (när de listas nedan): Listan är sanningen för projektnamn.
+   - Innan du sätter project_name på en work-post: avgör om användaren menar ett av dessa projekt trots stavfel, saknat mellanslag, extra uttalat "och" mitt i namnet (t.ex. "Relax och experience" = listat "Relaxperience"), förkortning eller versaler/gemener.
+   - Om det är samma projekt: använd EXAKT strängen från listan tecken för tecken.
+   - Skapa aldrig nästan-dubbletter (t.ex. om listan har "Relaxperience": använd INTE "Relaxandexperience", "Relax Experience" eller "Relaxandexperiance").
+   - Vid tvekan mellan två listade: välj närmaste listnamn; hitta inte på en tredje stavning.
+11. Bara "skapa projekt": Om användaren främst vill registrera ett tomt arbetsprojekt (t.ex. "Skapa ett projekt som heter X", "Nytt projekt Y", "Lägg till projekt Z") utan att samtidigt beskriva konkreta uppgifter, anteckningar eller idéer:
+   - Lägg ENDAST nya namn i "standalone_project_creations".
+   - Sätt "items" till []. Skapa INTE note, idea eller task som bara upprepar skapa-projekt-meningen eller ekar projektnamnet utan annat innehåll.
+   Om samma uttalande OCKSÅ innehåller riktiga uppgifter eller idéer, lägg dem i "items" som vanligt och lägg ändå in standalone_project_creations för helt nya projekt utan poster.
 
 Fältnamn domain, category, item_type osv ska vara på engelska som i schemat nedan. Värden i title och content ska vara på svenska när användaren pratat svenska.
 
 Kategorier är dynamiska. Föredra befintliga när de passar; du FÅR skapa nya category-namn (lowercase, snake_case) när innehållet tydligt passar någon annanstans.
 När befintliga kategorier listas nedan, föredra dem.
 
-Svara med ett enda JSON-objekt: { "items": [ { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" } ] }
-För calendar-poster: inkludera scheduled_date och scheduled_time när användaren gett datum eller tid. Använd bara listade fält. Ingen extra kommentar.`;
+Svara med ett enda JSON-objekt:
+{ "items": [ ... ], "standalone_project_creations"?: string[] }
+Varje element i "items": { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "shopping_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" }
+För shopping med planerad dag: shopping_due_date (YYYY-MM-DD). För calendar-poster: scheduled_date och scheduled_time när användaren gett datum eller tid.
+standalone_project_creations: strängarray enligt regel 11; utelämna eller []. Använd bara listade fält. Ingen extra kommentar.`;
+
+export interface OrganizeTranscriptResult {
+  items: OrganizedItemInput[];
+  /** Work project names to create as empty projects (no note); client creates via API. */
+  standaloneProjectCreations: string[];
+}
 
 export interface OrganizeOptions {
   projectNames?: string[];
@@ -145,8 +187,8 @@ function buildSystemPrompt(options: OrganizeOptions): string {
   let extra = "";
   if (options.projectNames?.length) {
     extra += sv
-      ? `\n\nBefintliga projekt (använd exakt dessa namn när användaren nämner dem, koppla poster till projektet): ${options.projectNames.join(", ")}.`
-      : `\n\nExisting projects (use these exact names when the user mentions them, and store related items under that project): ${options.projectNames.join(", ")}.`;
+      ? `\n\nBefintliga arbetsprojekt i appen (obligatoriskt att följa regel 10 ovan — kopiera exakt från listan när användaren menar samma projekt):\n${options.projectNames.map((n) => `- ${n}`).join("\n")}`
+      : `\n\nExisting work projects in the app (you MUST follow rule 10 above — copy exactly from this list when the user means the same project):\n${options.projectNames.map((n) => `- ${n}`).join("\n")}`;
   }
   if (options.defaultDomain) {
     extra += sv
@@ -171,12 +213,29 @@ function buildSystemPrompt(options: OrganizeOptions): string {
   return base + extra;
 }
 
+function parseStandaloneFromResponse(parsed: Record<string, unknown>): string[] {
+  const raw = parsed.standalone_project_creations ?? parsed.standaloneProjectCreations ?? [];
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const x of raw) {
+    if (typeof x !== "string") continue;
+    const s = x.trim();
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
+}
+
 export async function organizeTranscript(
   transcript: string,
   openaiApiKey: string,
   options: OrganizeOptions = {}
-): Promise<OrganizedItemInput[]> {
-  if (!transcript?.trim()) return [];
+): Promise<OrganizeTranscriptResult> {
+  if (!transcript?.trim()) return { items: [], standaloneProjectCreations: [] };
 
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey: openaiApiKey || process.env.OPENAI_API_KEY });
@@ -207,10 +266,10 @@ export async function organizeTranscript(
   });
 
   const text = response.choices?.[0]?.message?.content?.trim();
-  if (!text) return [];
+  if (!text) return { items: [], standaloneProjectCreations: [] };
 
-  const WORK_ITEM_TYPES = new Set(["task", "note", "idea", "calendar"]);
-  const PERSONAL_ITEM_TYPES = new Set(["task", "note", "idea", "emotion", "reflection", "calendar"]);
+  const WORK_ITEM_TYPES = new Set(["task", "task_completed", "shopping", "note", "idea", "calendar"]);
+  const PERSONAL_ITEM_TYPES = new Set(["task", "task_completed", "shopping", "note", "idea", "emotion", "reflection", "calendar"]);
 
   function normalizeItemType(domain: string, itemType: string): string {
     if (itemType === "reminder") return "note";
@@ -266,8 +325,23 @@ export async function organizeTranscript(
 
   try {
     const parsed = JSON.parse(text) as { items?: OrganizedItemInput[] };
+    const parsedRecord = parsed as unknown as Record<string, unknown>;
+    const rawStandalone = parseStandaloneFromResponse(parsedRecord);
+    const fromTranscript = extractExplicitWorkProjectNames(transcript);
+    const mergedStandaloneRaw: string[] = [];
+    const seenStandalone = new Set<string>();
+    for (const s of [...rawStandalone, ...fromTranscript]) {
+      const t = s.trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (seenStandalone.has(k)) continue;
+      seenStandalone.add(k);
+      mergedStandaloneRaw.push(t);
+    }
+    const standaloneProjectCreations = filterNewStandaloneProjectNames(mergedStandaloneRaw, options.projectNames ?? []);
+    const namesForEchoFilter = mergedStandaloneRaw;
     const items = Array.isArray(parsed.items) ? parsed.items : [];
-    return items.map((item) => {
+    const mappedItems = items.map((item) => {
       const raw = item as unknown as Record<string, unknown>;
       const mergedProjectName =
         (typeof raw.project_name === "string" && raw.project_name.trim()) ||
@@ -279,10 +353,14 @@ export async function organizeTranscript(
       const rawType = item.item_type ?? "note";
       const item_type = normalizeItemType(domain, rawType) as ItemType;
       const hasProjectName = mergedProjectName.length > 0;
+      const canonicalWorkProject =
+        domain === "work" && mergedProjectName
+          ? resolveProjectNameToCanonical(mergedProjectName, options.projectNames ?? [])
+          : mergedProjectName;
       // Guardrail: ambiguous non-project tasks should default to personal unless clearly work.
       if (
         domain === "work" &&
-        item_type === "task" &&
+        (item_type === "task" || item_type === "task_completed") &&
         !hasProjectName &&
         options.defaultDomain !== "work" &&
         !shouldTreatAsWorkTask(item)
@@ -291,12 +369,15 @@ export async function organizeTranscript(
       }
       const category = normalizeCategory(domain, item.category ?? "");
       const normalizedCategory =
-        domain === "personal" && item_type === "task" && (!category || category === "projects")
+        domain === "personal" && (item_type === "task" || item_type === "task_completed") && (!category || category === "projects")
           ? "tasks"
-          : category;
+          : domain === "personal" && item_type === "shopping" && (!category || category === "tasks" || category === "projects")
+            ? "shopping"
+            : category;
 
       let scheduled_date = pickStr(raw, "scheduled_date", "scheduledDate");
       const task_due_raw = pickStr(raw, "task_due_date", "taskDueDate");
+      const shopping_due_raw = pickStr(raw, "shopping_due_date", "shoppingDueDate");
       let scheduled_time = pickStr(raw, "scheduled_time", "scheduledTime");
       const recurrenceRaw = pickStr(raw, "recurrence");
       const send_notification = pickBool(raw, "send_notification", "sendNotification");
@@ -315,7 +396,7 @@ export async function organizeTranscript(
 
       const base: OrganizedItemInput = {
         ...item,
-        project_name: mergedProjectName || undefined,
+        project_name: domain === "work" ? canonicalWorkProject || undefined : mergedProjectName || undefined,
         domain,
         item_type,
         category: normalizedCategory,
@@ -337,7 +418,7 @@ export async function organizeTranscript(
         }
       }
 
-      if (item_type === "task") {
+      if (item_type === "task" || item_type === "task_completed") {
         const due =
           (task_due_raw && /^\d{4}-\d{2}-\d{2}$/.test(task_due_raw) ? task_due_raw : undefined) ||
           (scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date) ? scheduled_date : undefined);
@@ -346,9 +427,21 @@ export async function organizeTranscript(
         }
       }
 
+      if (item_type === "shopping") {
+        const due =
+          (shopping_due_raw && /^\d{4}-\d{2}-\d{2}$/.test(shopping_due_raw) ? shopping_due_raw : undefined) ||
+          (scheduled_date && /^\d{4}-\d{2}-\d{2}$/.test(scheduled_date) ? scheduled_date : undefined) ||
+          (task_due_raw && /^\d{4}-\d{2}-\d{2}$/.test(task_due_raw) ? task_due_raw : undefined);
+        if (due) {
+          base.scheduled_date = due;
+        }
+      }
+
       return base;
     });
+    const filteredItems = filterRedundantProjectCreationNotes(mappedItems, transcript, namesForEchoFilter);
+    return { items: filteredItems, standaloneProjectCreations };
   } catch {
-    return [];
+    return { items: [], standaloneProjectCreations: [] };
   }
 }

@@ -385,7 +385,8 @@ export function ScopeBar({
             gap: isMobile ? "0.75rem" : "1rem",
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
-            overflowX: isMobile ? "visible" : "auto",
+            /* visible so native <select> dropdown is not clipped */
+            overflowX: "visible",
           }}
         >
           <div
@@ -394,7 +395,7 @@ export function ScopeBar({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              overflowX: isMobile ? "visible" : "auto",
+              overflowX: "visible",
               minWidth: 0,
               flex: isMobile ? 1 : undefined,
               width: isMobile ? "auto" : "100%",
@@ -481,7 +482,19 @@ export function ScopeBar({
             ) : (
               <>
                 <span className="bd-scope-label">{t("scope.project")}</span>
-                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.35rem",
+                    flexWrap: "nowrap",
+                    alignItems: "center",
+                    flex: 1,
+                    minWidth: 0,
+                    position: "relative",
+                    zIndex: 2,
+                    overflow: "visible",
+                  }}
+                >
                   <select
                     id="bd-work-project-select"
                     className="bd-input"
@@ -494,6 +507,8 @@ export function ScopeBar({
                       maxWidth: 420,
                       padding: "0.4rem 0.65rem",
                       fontSize: "0.8125rem",
+                      position: "relative",
+                      zIndex: 2,
                     }}
                   >
                     <option value="">{t("scope.all")}</option>
@@ -973,7 +988,7 @@ export function ScopeBar({
             gap: isMobile ? "0.75rem" : "1rem",
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
-            overflowX: isMobile ? "visible" : "auto",
+            overflowX: "visible",
           }}
         >
           <div
@@ -982,7 +997,7 @@ export function ScopeBar({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              overflowX: isMobile ? "visible" : "auto",
+              overflowX: "visible",
               minWidth: 0,
               flex: isMobile ? 1 : undefined,
               width: isMobile ? "auto" : "100%",
@@ -1104,7 +1119,23 @@ export function ScopeBar({
                 <span className="bd-scope-label">
                   {t("scope.area")}
                 </span>
-                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "nowrap", alignItems: "center", flex: 1, minWidth: 0 }}>
+                <div
+                  className="bd-scope-area-chips-scroll"
+                  style={{
+                    display: "flex",
+                    gap: "0.35rem",
+                    flexWrap: "nowrap",
+                    alignItems: "center",
+                    flex: 1,
+                    minWidth: 0,
+                    overflowX: "auto",
+                    overflowY: "visible",
+                    WebkitOverflowScrolling: "touch",
+                    position: "relative",
+                    zIndex: 2,
+                    paddingBottom: 2,
+                  }}
+                >
                   <ScopeChip
                     label={t("scope.all")}
                     selected={!selectedCategory}

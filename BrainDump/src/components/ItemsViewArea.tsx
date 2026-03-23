@@ -9,7 +9,7 @@ import {
   type SuggestedItemTypeDetail,
 } from "@/lib/item-types";
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
-import { localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
+import { dateOnlyToStartOfDay, localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -78,7 +78,16 @@ interface ItemsViewAreaProps {
   scopeSlot?: ReactNode;
 }
 
-const PROGRESS_OPTIONS = ["todo", "started", "completed"] as const;
+function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
+  return it.itemType === "task" || it.itemType === "task_completed";
+}
+
+function isTaskCompleted(it: Pick<ViewItem, "itemType" | "progress" | "kanbanColumn">): boolean {
+  return (
+    it.itemType === "task_completed" ||
+    (it.itemType === "task" && (it.progress === "completed" || it.kanbanColumn === "completed"))
+  );
+}
 
 const PERSONAL_AREAS_DEFAULT = ["feeling", "thoughts", "hobbies", "goals", "health", "relationships", "shopping"];
 const CUSTOM_AREAS_KEY = "braindump_custom_areas";
@@ -104,12 +113,16 @@ function formatAreaLabel(value: string): string {
 const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
   work: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
+    { value: "shopping", label: "Shopping" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "calendar", label: "Calendar" },
   ],
   personal: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
+    { value: "shopping", label: "Shopping" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "emotion", label: "Emotion" },
@@ -118,6 +131,8 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
   ],
   inbox: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
+    { value: "shopping", label: "Shopping" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "emotion", label: "Emotion" },
@@ -126,6 +141,8 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
   ],
   all: [
     { value: "task", label: "Task" },
+    { value: "task_completed", label: "Task: Completed" },
+    { value: "shopping", label: "Shopping" },
     { value: "note", label: "Note" },
     { value: "idea", label: "Idea" },
     { value: "calendar", label: "Calendar" },
@@ -138,17 +155,18 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
 function mergeEntryTypesForDomain(
   domain: string,
   items: ViewItem[],
-  suggested: SuggestedItemTypeDetail[]
+  suggested: SuggestedItemTypeDetail[],
+  t?: (key: string) => string
 ): { value: string; label: string }[] {
   const base = ENTRY_TYPES_BY_DOMAIN[domain] ?? ENTRY_TYPES_BY_DOMAIN.work;
   const seen = new Set(base.map((b) => b.value));
-  const out = [...base];
+  const out = base.map(({ value }) => ({ value, label: formatTypeLabel(value, t) }));
   const itemMatchesDomain = (it: ViewItem) =>
     domain === "all" ? it.domain === "work" || it.domain === "personal" : it.domain === domain;
   for (const it of items) {
     if (!itemMatchesDomain(it) || !it.itemType || it.itemType === "reminder" || seen.has(it.itemType)) continue;
     seen.add(it.itemType);
-    out.push({ value: it.itemType, label: formatTypeLabel(it.itemType) });
+    out.push({ value: it.itemType, label: formatTypeLabel(it.itemType, t) });
   }
   for (const s of suggested) {
     if (seen.has(s.type)) continue;
@@ -161,7 +179,7 @@ function mergeEntryTypesForDomain(
       continue;
     }
     seen.add(s.type);
-    out.push({ value: s.type, label: formatTypeLabel(s.type) });
+    out.push({ value: s.type, label: formatTypeLabel(s.type, t) });
   }
   return out;
 }
@@ -169,6 +187,8 @@ function mergeEntryTypesForDomain(
 const TYPE_BAR_COLORS: Record<string, string> = {
   new: "#ea580c",
   task: "#f59e0b",
+  task_completed: "#22c55e",
+  shopping: "#f43f5e",
   note: "#3b82f6",
   idea: "#8b5cf6",
   emotion: "#ec4899",
@@ -188,6 +208,21 @@ function EntryTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
           <path d="M9 11l3 3L22 4" />
           <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+        </svg>
+      );
+    case "task_completed":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+          <path d="M22 4L12 14.01l-3-3" />
+        </svg>
+      );
+    case "shopping":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
         </svg>
       );
     case "idea":
@@ -238,12 +273,15 @@ export function loadViewPreference(): ItemsViewType {
   return "list";
 }
 
-function formatTypeLabel(value: string): string {
+function formatTypeLabel(value: string, t?: (key: string) => string): string {
+  if (value === "task_completed") return t ? t("items.typeTaskCompleted") : "Task: Completed";
+  if (value === "shopping") return "Shopping";
   const label = value.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
   return value === "calendar" ? "Calendar" : value === "task" ? "Tasks" : label.endsWith("s") ? label : label + "s";
 }
 
-function entryTypeLabel(itemType: string): string {
+function entryTypeLabel(itemType: string, t?: (key: string) => string): string {
+  if (itemType === "task_completed") return t ? t("items.typeTaskCompleted") : "Task: Completed";
   return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -304,6 +342,9 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
     if (ids.size === 0) return [];
     return items.filter((it) => ids.has(it.id));
   }
+  if (itemType === "task") {
+    return items.filter((it) => it.itemType === "task" || it.itemType === "task_completed");
+  }
   return items.filter((it) => it.itemType === itemType);
 }
 
@@ -352,7 +393,6 @@ export function ItemsViewArea({
     id: string;
     title: string;
     content: string;
-    progress?: string;
     scheduledAt?: string;
     scheduledTime?: string;
     recurrence?: string;
@@ -375,7 +415,6 @@ export function ItemsViewArea({
     itemType: "note",
     title: "",
     content: "",
-    progress: "todo",
     projectId: "" as string | null,
     scheduledAt: "",
     scheduledTime: "",
@@ -388,7 +427,6 @@ export function ItemsViewArea({
     id: it.id,
     title: it.title,
     content: it.content ?? "",
-    progress: it.progress || it.kanbanColumn || "todo",
     scheduledAt: it.scheduledAt ? String(it.scheduledAt).slice(0, 10) : "",
     scheduledTime: it.scheduledTime ?? "",
     recurrence: it.recurrence ?? "none",
@@ -505,14 +543,15 @@ export function ItemsViewArea({
     const m = new Map<string, number>();
     for (const it of items) {
       if (!it.itemType || it.itemType === "reminder") continue;
-      m.set(it.itemType, (m.get(it.itemType) ?? 0) + 1);
+      const key = it.itemType === "task_completed" ? "task" : it.itemType;
+      m.set(key, (m.get(key) ?? 0) + 1);
     }
     return m;
   }, [items]);
 
   const addEntryTypeOptions = useMemo(
-    () => mergeEntryTypesForDomain(mode, items, suggestedItemTypesFromDump),
-    [mode, items, suggestedItemTypesFromDump]
+    () => mergeEntryTypesForDomain(mode, items, suggestedItemTypesFromDump, t),
+    [mode, items, suggestedItemTypesFromDump, t]
   );
 
   useEffect(() => {
@@ -533,6 +572,8 @@ export function ItemsViewArea({
         return "#ea580c";
       case "task":
         return "#ff9f1c";
+      case "task_completed":
+        return "#22c55e";
       case "note":
         return "#2472ff";
       case "idea":
@@ -556,7 +597,7 @@ export function ItemsViewArea({
     }
     const sorted = [...typesWithEntries.keys()].sort((a, b) => a.localeCompare(b));
     for (const value of sorted) {
-      opts.push({ value, label: formatTypeLabel(value) });
+      opts.push({ value, label: formatTypeLabel(value, t) });
     }
     return opts;
   }, [t, hasNewEntries, typesWithEntries]);
@@ -608,18 +649,18 @@ export function ItemsViewArea({
     };
   }, [itemContextMenu, isMobile]);
 
-  const updateProgress = useCallback((id: string, progress: string, kanbanColumn?: string) => {
-    const col = kanbanColumn ?? progress;
+  const setTaskCompleted = useCallback((id: string, completed: boolean) => {
+    const itemType = completed ? "task_completed" : "task";
+    const progress = completed ? "completed" : "todo";
+    const kanbanColumn = completed ? "completed" : "todo";
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, progress, kanbanColumn: col } : it))
+      prev.map((it) => (it.id === id ? { ...it, itemType, progress, kanbanColumn } : it))
     );
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ progress, kanbanColumn: col }),
-    }).catch(() => {
-      // Keep optimistic update; state stays as user set it
-    });
+      body: JSON.stringify({ itemType, progress, kanbanColumn }),
+    }).catch(() => {});
   }, []);
 
   const updatePosition = useCallback((id: string, x: number, y: number) => {
@@ -648,13 +689,30 @@ export function ItemsViewArea({
   );
 
   const updateItemType = useCallback((id: string, newType: string) => {
+    const patch: Record<string, unknown> = { itemType: newType };
+    if (newType === "task_completed") {
+      patch.progress = "completed";
+      patch.kanbanColumn = "completed";
+    } else if (newType === "task") {
+      patch.progress = "todo";
+      patch.kanbanColumn = "todo";
+    }
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemType: newType }),
+      body: JSON.stringify(patch),
     })
       .then((r) => {
-        if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, itemType: newType } : it)));
+        if (r.ok)
+          setItems((prev) =>
+            prev.map((it) => {
+              if (it.id !== id) return it;
+              const next = { ...it, itemType: newType };
+              if (newType === "task_completed") return { ...next, progress: "completed", kanbanColumn: "completed" };
+              if (newType === "task") return { ...next, progress: "todo", kanbanColumn: "todo" };
+              return next;
+            })
+          );
       })
       .catch(() => {});
   }, []);
@@ -736,8 +794,12 @@ export function ItemsViewArea({
         content: form.content?.trim() ?? "",
       };
       if (form.itemType === "task") {
-        payload.progress = form.progress;
-        payload.kanbanColumn = form.progress;
+        payload.progress = "todo";
+        payload.kanbanColumn = "todo";
+      }
+      if (form.itemType === "task_completed") {
+        payload.progress = "completed";
+        payload.kanbanColumn = "completed";
       }
       if (form.itemType === "calendar") {
         payload.scheduledAt = form.scheduledAt || null;
@@ -752,6 +814,10 @@ export function ItemsViewArea({
             payload.reminderMinutesBefore = rMin;
           }
         }
+      }
+      if (form.itemType === "shopping" && form.scheduledAt?.trim()) {
+        const d = dateOnlyToStartOfDay(form.scheduledAt.trim());
+        if (d) payload.scheduledAt = d.toISOString();
       }
       const resItem = await fetch("/api/organized-items", {
         method: "POST",
@@ -1288,11 +1354,11 @@ export function ItemsViewArea({
       ) : filteredItems.length === 0 ? (
         <p className="bd-empty">{t("items.emptySearch")}</p>
       ) : viewType === "list" ? (
-        <ListView showEntryTitles={showEntryTitles} items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
+        <ListView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
       ) : viewType === "text" ? (
         <TextView showEntryTitles={showEntryTitles} items={filteredItems} onUpdate={updateEntryContent} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} />
       ) : viewType === "kanban" ? (
-            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onProgress={updateProgress} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
+            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
       ) : viewType === "calendar" ? (
         <CalendarView
           showEntryTitles={showEntryTitles}
@@ -1306,6 +1372,7 @@ export function ItemsViewArea({
         <MindmapView
           showEntryTitles={showEntryTitles}
           items={filteredItems}
+          onSetTaskCompleted={setTaskCompleted}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
           isMobile={isMobile}
@@ -1314,7 +1381,7 @@ export function ItemsViewArea({
         <PostitsView
           showEntryTitles={showEntryTitles}
           items={filteredItems}
-          onProgress={updateProgress}
+          onSetTaskCompleted={setTaskCompleted}
           onDelete={deleteItem}
           onPosition={updatePosition}
           postitPositions={postitPositions}
@@ -1329,7 +1396,7 @@ export function ItemsViewArea({
       )}
 
       {itemContextMenu && (() => {
-        const types = mergeEntryTypesForDomain(itemContextMenu.domain, items, suggestedItemTypesFromDump);
+        const types = mergeEntryTypesForDomain(itemContextMenu.domain, items, suggestedItemTypesFromDump, t);
         const selectedItem = items.find((i) => i.id === itemContextMenu.id);
         const personalAreas = getPersonalAreasList(items);
         const closeMenu = () => {
@@ -1624,12 +1691,17 @@ export function ItemsViewArea({
 
       {editingEntry && (
         <div
-          className="bd-modal-backdrop"
+          className="bd-modal-backdrop bd-edit-entry-backdrop"
           onClick={() => setEditingEntry(null)}
         >
           <div
-            className="bd-panel bd-modal-panel"
-            style={{ padding: "1.25rem", maxWidth: 480, width: "100%" }}
+            className="bd-panel bd-modal-panel bd-edit-entry-panel"
+            style={{
+              padding: isMobile ? "1rem 1rem 1.1rem" : "1.25rem",
+              maxWidth: isMobile ? "100%" : 480,
+              width: "100%",
+              boxSizing: "border-box",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
@@ -1639,7 +1711,7 @@ export function ItemsViewArea({
               value={editingEntry.title}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, title: e.target.value })}
               placeholder={t("items.titlePlaceholder")}
-              style={{ width: "100%", marginBottom: "0.75rem" }}
+              style={{ width: "100%", marginBottom: "0.75rem", boxSizing: "border-box" }}
               autoFocus
             />
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.description")}</label>
@@ -1648,62 +1720,137 @@ export function ItemsViewArea({
               value={editingEntry.content}
               onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
               placeholder={t("items.descPlaceholder")}
-              style={{ width: "100%", minHeight: 100, marginBottom: "1rem", borderRadius: 18 }}
+              style={{
+                width: "100%",
+                minHeight: isMobile ? 120 : 100,
+                marginBottom: "1rem",
+                borderRadius: 18,
+                boxSizing: "border-box",
+              }}
             />
-            {items.find((i) => i.id === editingEntry.id)?.itemType === "task" && (
+            {items.find((i) => i.id === editingEntry.id)?.itemType === "shopping" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.progress")}</h4>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  {PROGRESS_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className="bd-btn"
-                      style={{
-                        padding: "0.35rem 0.6rem",
-                        fontSize: "0.8125rem",
-                        background: (editingEntry.progress || "todo") === p ? "var(--bg-hover)" : undefined,
-                        borderColor: (editingEntry.progress || "todo") === p ? "var(--bd-chrome-selected-border)" : undefined,
-                      }}
-                      onClick={() => setEditingEntry((prev) => prev ? { ...prev, progress: p } : null)}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.taskDueDate")}</h4>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                    flexDirection: isMobile ? "column" : "row",
+                    alignItems: isMobile ? "stretch" : "center",
+                  }}
+                >
+                  <input
+                    type="date"
+                    className="bd-input"
+                    value={editingEntry.scheduledAt ?? ""}
+                    onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
+                    style={{
+                      padding: "0.35rem 0.5rem",
+                      fontSize: isMobile ? "max(1rem, 16px)" : "0.8125rem",
+                      width: isMobile ? "100%" : "auto",
+                      minWidth: 0,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ fontSize: "0.75rem" }}
+                    onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "" })}
+                  >
+                    {t("items.clearDueDate")}
+                  </button>
                 </div>
               </div>
             )}
             {items.find((i) => i.id === editingEntry.id)?.itemType === "calendar" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
                 <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Calendar</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", alignItems: "center" }}>
-                  <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: isMobile ? "0.65rem" : "0.5rem 1rem",
+                    alignItems: isMobile ? "stretch" : "center",
+                    flexDirection: isMobile ? "column" : "row",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--text-tertiary)",
+                      display: "flex",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "center",
+                      gap: isMobile ? "0.35rem" : 0,
+                      width: isMobile ? "100%" : "auto",
+                    }}
+                  >
                     Date
                     <input
                       type="date"
                       className="bd-input"
                       value={editingEntry.scheduledAt ?? ""}
                       onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
-                      style={{ marginLeft: "0.35rem", padding: "0.25rem 0.5rem" }}
+                      style={{
+                        marginLeft: isMobile ? 0 : "0.35rem",
+                        padding: "0.25rem 0.5rem",
+                        width: isMobile ? "100%" : "auto",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                      }}
                     />
                   </label>
-                  <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+                  <label
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--text-tertiary)",
+                      display: "flex",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "center",
+                      gap: isMobile ? "0.35rem" : 0,
+                      width: isMobile ? "100%" : "auto",
+                    }}
+                  >
                     Time
                     <input
                       type="time"
                       className="bd-input"
                       value={editingEntry.scheduledTime ?? ""}
                       onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledTime: e.target.value })}
-                      style={{ marginLeft: "0.35rem", padding: "0.25rem 0.5rem" }}
+                      style={{
+                        marginLeft: isMobile ? 0 : "0.35rem",
+                        padding: "0.25rem 0.5rem",
+                        width: isMobile ? "100%" : "auto",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                      }}
                     />
                   </label>
-                  <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+                  <label
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "var(--text-tertiary)",
+                      display: "flex",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "center",
+                      gap: isMobile ? "0.35rem" : 0,
+                      width: isMobile ? "100%" : "auto",
+                    }}
+                  >
                     Repeats
                     <select
                       className="bd-input"
                       value={editingEntry.recurrence ?? "none"}
                       onChange={(e) => setEditingEntry((prev) => prev && { ...prev, recurrence: e.target.value })}
-                      style={{ marginLeft: "0.35rem", padding: "0.25rem 0.5rem" }}
+                      style={{
+                        marginLeft: isMobile ? 0 : "0.35rem",
+                        padding: "0.25rem 0.5rem",
+                        width: isMobile ? "100%" : "auto",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                      }}
                     >
                       <option value="none">None</option>
                       <option value="daily">Daily</option>
@@ -1711,16 +1858,37 @@ export function ItemsViewArea({
                       <option value="monthly">Monthly</option>
                     </select>
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      fontSize: "0.75rem",
+                      color: "var(--text-tertiary)",
+                      width: isMobile ? "100%" : "auto",
+                      minHeight: isMobile ? 44 : undefined,
+                    }}
+                  >
                     <input
                       type="checkbox"
                       checked={editingEntry.sendNotification ?? false}
                       onChange={(e) => setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })}
+                      style={{ width: isMobile ? 22 : undefined, height: isMobile ? 22 : undefined }}
                     />
                     Send notification
                   </label>
                   {editingEntry.sendNotification && (
-                    <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: "12rem" }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "var(--text-tertiary)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                        minWidth: isMobile ? 0 : "12rem",
+                        width: isMobile ? "100%" : "auto",
+                      }}
+                    >
                       Notify before event
                       <select
                         className="bd-input"
@@ -1730,7 +1898,7 @@ export function ItemsViewArea({
                             prev ? { ...prev, reminderMinutesBefore: Number(e.target.value) } : null
                           )
                         }
-                        style={{ padding: "0.25rem 0.5rem" }}
+                        style={{ padding: "0.25rem 0.5rem", width: isMobile ? "100%" : "auto", boxSizing: "border-box" }}
                       >
                         {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
                           <option key={m} value={m}>
@@ -1743,7 +1911,17 @@ export function ItemsViewArea({
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: isMobile ? "stretch" : "center",
+                justifyContent: "space-between",
+                gap: isMobile ? "0.75rem" : "0.5rem",
+                flexWrap: isMobile ? "nowrap" : "wrap",
+                paddingTop: isMobile ? "0.25rem" : undefined,
+              }}
+            >
               <button
                 type="button"
                 className="bd-btn bd-btn-danger"
@@ -1754,7 +1932,15 @@ export function ItemsViewArea({
                 }}
                 aria-label={t("items.ariaDeleteEntry")}
                 title={t("items.ariaDeleteEntry")}
-                style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                style={{
+                  minWidth: 44,
+                  minHeight: 44,
+                  padding: "0.55rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  alignSelf: isMobile ? "flex-start" : undefined,
+                }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M3 6h18" />
@@ -1764,7 +1950,15 @@ export function ItemsViewArea({
                   <line x1="14" y1="11" x2="14" y2="17" />
                 </svg>
               </button>
-              <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.5rem",
+                  marginLeft: isMobile ? 0 : "auto",
+                  justifyContent: isMobile ? "flex-end" : undefined,
+                  width: isMobile ? "100%" : undefined,
+                }}
+              >
                 <button
                   type="button"
                   className="bd-btn"
@@ -1783,9 +1977,6 @@ export function ItemsViewArea({
                   onClick={() => {
                     updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
                     const currentItem = items.find((i) => i.id === editingEntry.id);
-                    if (currentItem?.itemType === "task" && editingEntry.progress) {
-                      updateProgress(editingEntry.id, editingEntry.progress, editingEntry.progress);
-                    }
                     if (currentItem?.itemType === "calendar") {
                       const rMin = normalizeReminderMinutesBefore(editingEntry.reminderMinutesBefore ?? 0);
                       const dateStr = editingEntry.scheduledAt?.trim();
@@ -1803,6 +1994,13 @@ export function ItemsViewArea({
                         reminderAt: editingEntry.sendNotification && reminderAtIso ? reminderAtIso : null,
                         reminderMinutesBefore:
                           editingEntry.sendNotification && reminderAtIso ? rMin : null,
+                      });
+                    }
+                    if (currentItem?.itemType === "shopping") {
+                      const due = editingEntry.scheduledAt?.trim();
+                      const dt = due ? dateOnlyToStartOfDay(due) : null;
+                      updateSchedule(editingEntry.id, {
+                        scheduledAt: dt ? dt.toISOString() : null,
                       });
                     }
                     setEditingEntry(null);
@@ -1963,27 +2161,18 @@ export function ItemsViewArea({
               placeholder="Description (optional)"
               style={{ width: "100%", minHeight: 80, marginBottom: "1rem" }}
             />
-            {addEntryForm.itemType === "task" && (
+            {addEntryForm.itemType === "shopping" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Progress</h4>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  {PROGRESS_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className="bd-btn"
-                      style={{
-                        padding: "0.35rem 0.6rem",
-                        fontSize: "0.8125rem",
-                        background: addEntryForm.progress === p ? "var(--bg-hover)" : undefined,
-                        borderColor: addEntryForm.progress === p ? "var(--bd-chrome-selected-border)" : undefined,
-                      }}
-                      onClick={() => setAddEntryForm((f) => ({ ...f, progress: p }))}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
-                </div>
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.taskDueDate")}</h4>
+                <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <input
+                    type="date"
+                    className="bd-input"
+                    value={addEntryForm.scheduledAt}
+                    onChange={(e) => setAddEntryForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                    style={{ padding: "0.35rem 0.5rem", maxWidth: "12rem" }}
+                  />
+                </label>
               </div>
             )}
             {addEntryForm.itemType === "calendar" && (
@@ -2141,8 +2330,8 @@ function CalendarView({
     day: "numeric",
   });
 
-  /* Mobile: short rows so ~6 week rows + header fit without heavy scroll */
-  const cellMinH = isMobile ? 44 : 88;
+  /* Keep every day cell at a fixed height (calendar look, no variable row growth). */
+  const cellH = isMobile ? 72 : 116;
   const maxEventChips = isMobile ? 1 : 3;
   const gridRadius = 0;
   const unscheduledRadius = 0;
@@ -2209,10 +2398,11 @@ function CalendarView({
                 onMouseEnter={() => setHoveredCell(i)}
                 onMouseLeave={() => setHoveredCell(null)}
                 style={{
-                  minHeight: cellMinH,
+                  height: cellH,
                   padding: isMobile ? "0.2rem" : "0.4rem",
                   background: isCurrentMonth ? (isHovered ? "var(--bg-hover)" : "var(--bg-primary)") : "var(--bg-secondary)",
                   boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 1px var(--bd-chrome-selected-border), var(--shadow-sm)" : isTodayCell ? "0 0 0 1px var(--bd-chrome-selected-border)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
+                  overflow: "hidden",
                   transition:
                     "background var(--bd-duration-fast) var(--bd-ease-soft), box-shadow var(--bd-duration-fast) var(--bd-ease-soft)",
                 }}
@@ -2233,7 +2423,14 @@ function CalendarView({
                     {dayItems.length} {dayItems.length === 1 ? "item" : "items"}
                   </div>
                 )}
-                <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.15rem" : "0.25rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: isMobile ? "0.15rem" : "0.25rem",
+                    overflow: "hidden",
+                  }}
+                >
                   {dayItems.slice(0, maxEventChips).map((it) => {
                     const past = it.scheduledAt && new Date(String(it.scheduledAt).slice(0, 10)) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
                     return (
@@ -2275,46 +2472,6 @@ function CalendarView({
         </div>
       </div>
 
-      <div
-        style={{
-          borderTop: "1px solid var(--border-default)",
-          paddingTop: isMobile ? "0.65rem" : "1rem",
-          background: "var(--bg-secondary)",
-          borderRadius: unscheduledRadius,
-          padding: isMobile ? "0.65rem" : "1rem",
-        }}
-      >
-        <h4 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.35rem" }}>Unscheduled</h4>
-        <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", margin: 0 }}>
-          Edit an entry and set a date (and optional time, repeat, notification) in the Calendar section to show it here.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "0.6rem", maxHeight: 140, overflow: "auto" }}>
-          {items.filter((it) => !it.scheduledAt && !it.recurrence).slice(0, 8).map((it, i) => {
-            const ep = enterStaggerProps(i);
-            return (
-            <button
-              key={it.id}
-              type="button"
-              className={`bd-btn ${ep.className}`.trim()}
-              style={{
-                ...ep.style,
-                justifyContent: "flex-start",
-                fontSize: "0.8125rem",
-                padding: "0.5rem 0.75rem",
-                borderRadius: 6,
-                background: "var(--bg-tertiary)",
-                border: "1px solid var(--border-subtle)",
-              }}
-              onClick={() => onEdit(it)}
-              onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
-              title={!showEntryTitles && it.title ? `${it.title}` : undefined}
-            >
-              {entryPrimaryLine(it, showEntryTitles)}
-            </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -2397,12 +2554,14 @@ function MindmapPill({
 function MindmapView({
   items,
   showEntryTitles = true,
+  onSetTaskCompleted,
   onEdit,
   onItemContextMenu,
   isMobile = false,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
+  onSetTaskCompleted: (id: string, completed: boolean) => void;
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   isMobile?: boolean;
@@ -2499,53 +2658,88 @@ function MindmapView({
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
     const isNew = isNewEntry(it);
     return (
-      <button
+      <div
         key={it.id}
-        type="button"
-        className={`bd-mindmap-entry ${ep.className}`.trim()}
+        className={ep.className}
         style={{
           ...ep.style,
-          borderLeft: `3px solid ${barColor}`,
-          position: "relative",
+          display: "flex",
+          alignItems: "stretch",
+          gap: "0.35rem",
+          minWidth: 0,
         }}
-        onClick={() => onEdit(it)}
-        onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
       >
-        {isNew && (
-          <span
+        {isTaskRow(it) && (
+          <label
             style={{
-              position: "absolute",
-              top: 6,
-              right: 8,
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--text-primary)",
-              boxShadow: "0 0 6px rgba(255,255,255,0.25)",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              paddingLeft: "0.15rem",
+              cursor: "pointer",
             }}
-            aria-hidden
-          />
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={isTaskCompleted(it)}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSetTaskCompleted(it.id, e.target.checked);
+              }}
+              aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+              style={{ width: 16, height: 16, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
+            />
+          </label>
         )}
-        <span className="bd-mindmap-entry-type">
-          <EntryTypeIcon type={it.itemType} size={14} />
-        </span>
-        <span className="bd-mindmap-entry-text">
-          {entryPrimaryLine(it, showEntryTitles)}
-          {showEntryTitles && it.content?.trim() && (
-            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
-              {it.content.slice(0, 48)}
-              {it.content.length > 48 ? "…" : ""}
-            </span>
+        <button
+          type="button"
+          className="bd-mindmap-entry"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            borderLeft: `3px solid ${barColor}`,
+            position: "relative",
+          }}
+          onClick={() => onEdit(it)}
+          onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+        >
+          {isNew && (
+            <span
+              style={{
+                position: "absolute",
+                top: 6,
+                right: 8,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "var(--text-primary)",
+                boxShadow: "0 0 6px rgba(255,255,255,0.25)",
+              }}
+              aria-hidden
+            />
           )}
-        </span>
-      </button>
+          <span className="bd-mindmap-entry-type">
+            <EntryTypeIcon type={it.itemType} size={14} />
+          </span>
+          <span className="bd-mindmap-entry-text">
+            {entryPrimaryLine(it, showEntryTitles)}
+            {showEntryTitles && it.content?.trim() && (
+              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
+                {it.content.slice(0, 48)}
+                {it.content.length > 48 ? "…" : ""}
+              </span>
+            )}
+          </span>
+        </button>
+      </div>
     );
   };
 
   const renderTypeBlock = (domain: string, sectionKey: string, type: string, entries: ViewItem[]) => {
     const typeKey = `${domain}:${sectionKey}:${type}`;
     const isCollapsed = collapsedTypes.has(typeKey);
-    const label = formatTypeLabel(type);
+    const label = formatTypeLabel(type, t);
     const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
     return (
       <div key={typeKey} className="bd-mindmap-type-col" style={{ ["--bd-mindmap-branch" as string]: typeColor }}>
@@ -2651,35 +2845,44 @@ function MindmapView({
   );
 }
 
-const LIST_VIEW_TYPE_ORDER = ["task", "note", "idea", "calendar", "reflection", "emotion"];
+const LIST_VIEW_TYPE_ORDER = ["task", "task_completed", "shopping", "note", "idea", "calendar", "reflection", "emotion"];
 
 function ListView({
   items,
   showEntryTitles = true,
-  onProgress,
+  onSetTaskCompleted,
   onDelete,
   onItemContextMenu,
   onEdit,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
-  onProgress: (id: string, progress: string) => void;
+  onSetTaskCompleted: (id: string, completed: boolean) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
 }) {
+  const { t } = useI18n();
   const byType = new Map<string, ViewItem[]>();
   for (const it of items) {
-    const t = it.itemType || "note";
-    if (!byType.has(t)) byType.set(t, []);
-    byType.get(t)!.push(it);
+    const ty = it.itemType || "note";
+    if (!byType.has(ty)) byType.set(ty, []);
+    byType.get(ty)!.push(it);
   }
-  const typesInUse = [...LIST_VIEW_TYPE_ORDER.filter((t) => byType.has(t)), ...Array.from(byType.keys()).filter((t) => !LIST_VIEW_TYPE_ORDER.includes(t))];
+  const typesInUse = [...LIST_VIEW_TYPE_ORDER.filter((ty) => byType.has(ty)), ...Array.from(byType.keys()).filter((ty) => !LIST_VIEW_TYPE_ORDER.includes(ty))];
 
   const renderEntry = (it: ViewItem, index: number) => {
     const ep = enterStaggerProps(index);
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
-    const scheduleLabel = (it.itemType === "calendar" || it.scheduledAt || (it.recurrence && it.recurrence !== "none")) ? formatCalendarScheduleLabel(it) : null;
+    let scheduleLabel: string | null = null;
+    if ((isTaskRow(it) || it.itemType === "shopping") && it.scheduledAt) {
+      const d = new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`);
+      const ds = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      scheduleLabel =
+        it.itemType === "shopping" ? t("items.shoppingDueShort", { date: ds }) : t("items.taskDueShort", { date: ds });
+    } else if (it.itemType === "calendar" || it.scheduledAt || (it.recurrence && it.recurrence !== "none")) {
+      scheduleLabel = formatCalendarScheduleLabel(it);
+    }
     return (
       <div
         key={it.id}
@@ -2701,11 +2904,36 @@ function ListView({
         }}
       >
         <div style={{ width: 4, flexShrink: 0, background: barColor }} />
+        {isTaskRow(it) && (
+          <label
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              paddingLeft: "0.5rem",
+              paddingRight: "0.25rem",
+              cursor: "pointer",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={isTaskCompleted(it)}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSetTaskCompleted(it.id, e.target.checked);
+              }}
+              aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+              style={{ width: 18, height: 18, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
+            />
+          </label>
+        )}
         <div style={{ flex: 1, minWidth: 0, padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <EntryTypeIcon type={it.itemType} size={14} />
-              {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
+              {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
             </span>
             {onItemContextMenu && (
               <button
@@ -2739,19 +2967,6 @@ function ListView({
             <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
               {scheduleLabel}
             </div>
-          )}
-          {it.itemType === "task" && (
-            <select
-              className="bd-input"
-              value={it.progress || "todo"}
-              onChange={(e) => onProgress(it.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: "auto", minWidth: "6rem", marginTop: "0.25rem", fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-            >
-              {PROGRESS_OPTIONS.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
           )}
         </div>
       </div>
@@ -2806,7 +3021,7 @@ function ListView({
               }}
             >
               <EntryTypeIcon type={type} size={14} />
-              {formatTypeLabel(type)} ({typeItems.length})
+              {formatTypeLabel(type, t)} ({typeItems.length})
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {typeItems.map((it, idx) => renderEntry(it, idx))}
@@ -2829,6 +3044,7 @@ function TextView({
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -2919,7 +3135,7 @@ function TextView({
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem" }}>
               <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", lineHeight: 1.2 }}>
-                {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
+                {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
               </span>
               {showEntryTitles &&
                 (isEditingTitle ? (
@@ -3012,23 +3228,17 @@ function TextView({
   );
 }
 
-const KANBAN_COLUMNS: { key: string; label: string }[] = [
-  { key: "todo", label: "To do" },
-  { key: "started", label: "Started" },
-  { key: "completed", label: "Completed" },
-];
-
 function KanbanView({
   items,
   showEntryTitles = true,
-  onProgress,
+  onSetTaskCompleted,
   onItemContextMenu,
   onEdit,
   isMobile = false,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
-  onProgress: (id: string, progress: string, kanbanColumn?: string) => void;
+  onSetTaskCompleted: (id: string, completed: boolean) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
@@ -3041,20 +3251,29 @@ function KanbanView({
   const dragOverColumnRef = useRef<string | null>(null);
   const kanbanContainerRef = useRef<HTMLDivElement | null>(null);
   dragOverColumnRef.current = dragOverColumn;
-  const taskItems = items.filter((it) => it.itemType === "task");
-  const byColumn = KANBAN_COLUMNS.map((col) => ({
-    ...col,
-    items: taskItems.filter((it) => (it.progress || it.kanbanColumn || "todo") === col.key),
-  }));
+  const taskItems = items.filter(isTaskRow);
+  const byColumn = [
+    {
+      key: "todo",
+      label: t("items.kanbanTodo"),
+      items: taskItems.filter((it) => !isTaskCompleted(it)),
+    },
+    {
+      key: "completed",
+      label: t("items.kanbanCompleted"),
+      items: taskItems.filter(isTaskCompleted),
+    },
+  ];
 
   const applyDrop = useCallback(
     (id: string, columnKey: string) => {
-      onProgress(id, columnKey, columnKey);
+      const completed = columnKey === "completed";
+      onSetTaskCompleted(id, completed);
       draggedIdRef.current = null;
       setDraggedId(null);
       setDragOverColumn(null);
     },
-    [onProgress]
+    [onSetTaskCompleted]
   );
 
   useEffect(() => {
@@ -3225,7 +3444,7 @@ function KanbanView({
                 }}
               >
                 <EntryTypeIcon type={it.itemType} size={12} />
-                {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
+                {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
               </div>
             </div>
             );
@@ -3243,6 +3462,8 @@ const PAD = 16;
 
 const POSTIT_COLORS: Record<string, string> = {
   task: "#f59e0b",
+  task_completed: "#22c55e",
+  shopping: "#f43f5e",
   note: "#3b82f6",
   idea: "#8b5cf6",
   emotion: "#ec4899",
@@ -3254,7 +3475,7 @@ const POSTIT_COLORS: Record<string, string> = {
 function PostitsView({
   items,
   showEntryTitles = true,
-  onProgress,
+  onSetTaskCompleted,
   onDelete,
   onPosition,
   postitPositions,
@@ -3268,7 +3489,7 @@ function PostitsView({
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
-  onProgress: (id: string, progress: string) => void;
+  onSetTaskCompleted: (id: string, completed: boolean) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onPosition: (id: string, x: number, y: number) => void;
   postitPositions: Record<string, { x: number; y: number }>;
@@ -3280,6 +3501,7 @@ function PostitsView({
   onAddLink: (fromId: string, toId: string) => void;
   onRemoveLink: (fromId: string, toId: string) => void;
 }) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [dragState, setDragState] = useState<{ id: string; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
@@ -3541,9 +3763,24 @@ function PostitsView({
               <div style={{ width: 4, flexShrink: 0, background: barColor }} />
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 0.75rem 0.25rem", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
-                    {`${entryContextLabel(it) || entryTypeLabel(it.itemType)}: ${entryTypeLabel(it.itemType)}`}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0, flex: 1 }}>
+                    {isTaskRow(it) && (
+                      <input
+                        type="checkbox"
+                        checked={isTaskCompleted(it)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onSetTaskCompleted(it.id, e.target.checked);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                        style={{ width: 16, height: 16, flexShrink: 0, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
+                      />
+                    )}
+                    <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)", minWidth: 0 }}>
+                      {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
+                    </span>
+                  </div>
                   {onItemContextMenu && (
                     <button
                       type="button"
@@ -3569,21 +3806,6 @@ function PostitsView({
                     {it.content?.trim() || "—"}
                   </div>
                 </div>
-                {it.itemType === "task" && (
-                  <div style={{ padding: "0 0.75rem 0.5rem" }}>
-                    <select
-                      className="bd-input"
-                      value={it.progress || "todo"}
-                      onChange={(e) => onProgress(it.id, e.target.value)}
-                      style={{ width: "100%", fontSize: "0.7rem", padding: "0.25rem 0.5rem" }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {PROGRESS_OPTIONS.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
             </div>
           );

@@ -8,7 +8,7 @@ const DOMAINS = ["inbox", "work", "personal"] as const;
 const CATEGORIES_WORK = ["projects", "tasks", "notes", "ideas", "meetings", "decisions", "problems", "opportunities"];
 const CATEGORIES_PERSONAL = ["feeling", "thoughts", "hobbies", "goals", "health", "relationships", "shopping"];
 const CATEGORIES_INBOX = ["unprocessed", "needs_review"];
-const ITEM_TYPES = ["task", "note", "idea", "emotion", "reflection", "calendar", "problem", "decision", "journal_entry", "project_update"];
+const ITEM_TYPES = ["task", "task_completed", "shopping", "note", "idea", "emotion", "reflection", "calendar", "problem", "decision", "journal_entry", "project_update"];
 
 interface UnclearOverlayProps {
   items: OrganizedItemPreview[];
