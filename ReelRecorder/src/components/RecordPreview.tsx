@@ -49,7 +49,8 @@ const GUIDE_COLOR = '#f97316' // Orange, matches InfoGraphics accent
 const MIN_FONT_SIZE_PCT = 0.5
 const MAX_FONT_SIZE_PCT = 20
 const MIN_IMAGE_SCALE = 0.1
-const MAX_IMAGE_SCALE = 3
+/** 10 = 1000% in inspector / slider */
+const MAX_IMAGE_SCALE = 10
 
 /** Compute AABB of a rotated rectangle (center cx,cy; half-size hw,hh; angle in radians). */
 function getRotatedRectAABB(
@@ -147,6 +148,82 @@ function getOverlayRect(
   return null
 }
 
+/** Center + size for image / video / infographic (same as drawOverlays). */
+function getCenterAnchoredSize(
+  o: OverlayItem,
+  width: number,
+  height: number
+): { cx: number; cy: number; w: number; h: number } | null {
+  if (o.type === 'image' && (o.imageDataUrl || o.imageUrl || o.naturalWidth)) {
+    const scale = o.imageScale ?? 1
+    const w =
+      o.naturalWidth != null && o.naturalHeight != null
+        ? o.naturalWidth * scale
+        : (o.imageWidth ?? 200)
+    const h =
+      o.naturalHeight != null && o.naturalWidth != null
+        ? o.naturalHeight * scale
+        : (o.imageHeight ?? 200)
+    return { cx: (o.x ?? 0.5) * width, cy: (o.y ?? 0.5) * height, w, h }
+  }
+  if (o.type === 'video' && o.videoUrl) {
+    const scale = o.imageScale ?? 1
+    const w = (o.naturalWidth ?? 1920) * scale
+    const h = (o.naturalHeight ?? 1080) * scale
+    return { cx: (o.x ?? 0.5) * width, cy: (o.y ?? 0.5) * height, w, h }
+  }
+  if (o.type === 'infographic' && o.infographicProjectId) {
+    const scale = o.imageScale ?? 1
+    return {
+      cx: (o.x ?? 0.5) * width,
+      cy: (o.y ?? 0.5) * height,
+      w: width * scale,
+      h: height * scale,
+    }
+  }
+  return null
+}
+
+/** Bottom-right of the drawn quad in canvas space (matches canvasCapture transform order). */
+function getCenterAnchoredBrCornerCanvas(
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  rotationDeg: number,
+  flipHorizontal: boolean
+): { x: number; y: number } {
+  let lx = w / 2
+  let ly = h / 2
+  if (flipHorizontal) lx = -lx
+  const θ = (rotationDeg * Math.PI) / 180
+  const cos = Math.cos(θ)
+  const sin = Math.sin(θ)
+  const wx = lx * cos - ly * sin
+  const wy = lx * sin + ly * cos
+  return { x: cx + wx, y: cy + wy }
+}
+
+/** Hit-test pointer inside rotated (and flipped) center-anchored rect; flip cancels out in this frame. */
+function hitTestCenterAnchoredOBB(
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  rotationDeg: number,
+  px: number,
+  py: number
+): boolean {
+  const vx = px - cx
+  const vy = py - cy
+  const θ = (rotationDeg * Math.PI) / 180
+  const cos = Math.cos(θ)
+  const sin = Math.sin(θ)
+  const mx = vx * cos + vy * sin
+  const my = -vx * sin + vy * cos
+  return Math.abs(mx) <= w / 2 && Math.abs(my) <= h / 2
+}
+
 /** Build snap points from overlay rects (exclude dragging overlay). */
 function getSnapPoints(
   rects: { x: number; y: number; w: number; h: number }[],
@@ -206,15 +283,18 @@ function findSnappedGuides(
 function drawSelectionAndHandles(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
-  showRotateAndFlip: boolean
+  showRotateAndFlip: boolean,
+  /** When set (center-anchored overlays), place the resize grip on the visual BR corner */
+  resizeHandleCenter?: { x: number; y: number }
 ) {
   ctx.strokeStyle = '#5b8def'
   ctx.lineWidth = SELECTION_STROKE
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
-  const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
-  const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
+  const half = RESIZE_HANDLE_SIZE / 2
+  const hcx = resizeHandleCenter?.x ?? rect.x + rect.w - half
+  const hcy = resizeHandleCenter?.y ?? rect.y + rect.h - half
   ctx.fillStyle = '#5b8def'
-  ctx.fillRect(handleX, handleY, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
+  ctx.fillRect(hcx - half, hcy - half, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
   if (showRotateAndFlip) {
     const cx = rect.x + rect.w / 2
     const rotateY = rect.y - ROTATE_HANDLE_SIZE / 2 - 4
@@ -389,6 +469,10 @@ export function RecordPreview({
     startY: number
     startValue: number
     kind: 'fontSize' | 'scale'
+    /** Radial resize from overlay center (image / video / infographic) */
+    centerX?: number
+    centerY?: number
+    startRadialDist?: number
   } | null>(null)
   const [rotateState, setRotateState] = useState<{
     overlayId: string
@@ -708,7 +792,22 @@ export function RecordPreview({
             const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
             if (rect) {
               const showRotateFlip = sel.type === 'image' || sel.type === 'video' || sel.type === 'infographic'
-              drawSelectionAndHandles(ctx, rect, showRotateFlip)
+              let resizeHandleCenter: { x: number; y: number } | undefined
+              if (showRotateFlip) {
+                const m = getCenterAnchoredSize(sel, width, height)
+                if (m) {
+                  const br = getCenterAnchoredBrCornerCanvas(
+                    m.cx,
+                    m.cy,
+                    m.w,
+                    m.h,
+                    sel.rotation ?? 0,
+                    !!sel.flipHorizontal
+                  )
+                  resizeHandleCenter = { x: br.x, y: br.y }
+                }
+              }
+              drawSelectionAndHandles(ctx, rect, showRotateFlip, resizeHandleCenter)
             }
           }
         }
@@ -780,9 +879,27 @@ export function RecordPreview({
         const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
         if (rect) {
           const pad = HANDLE_HIT_PADDING
-          const handleX = rect.x + rect.w - RESIZE_HANDLE_SIZE
-          const handleY = rect.y + rect.h - RESIZE_HANDLE_SIZE
-          if (canvasX >= handleX - pad && canvasX <= rect.x + rect.w + pad && canvasY >= handleY - pad && canvasY <= rect.y + rect.h + pad) {
+          const half = RESIZE_HANDLE_SIZE / 2 + pad
+          let hx: number
+          let hy: number
+          if (o.type === 'text' && o.text) {
+            hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
+            hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
+          } else if (o.type === 'image' || o.type === 'video' || o.type === 'infographic') {
+            const m = getCenterAnchoredSize(o, width, height)
+            if (!m) {
+              hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
+              hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
+            } else {
+              const br = getCenterAnchoredBrCornerCanvas(m.cx, m.cy, m.w, m.h, o.rotation ?? 0, !!o.flipHorizontal)
+              hx = br.x
+              hy = br.y
+            }
+          } else {
+            hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
+            hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
+          }
+          if (Math.abs(canvasX - hx) <= half && Math.abs(canvasY - hy) <= half) {
             return { type: 'resize', id: o.id }
           }
           const showRotateFlip = o.type === 'image' || o.type === 'video' || o.type === 'infographic'
@@ -821,40 +938,46 @@ export function RecordPreview({
           return { type: 'overlay', id: o.id, offsetX: canvasX - x, offsetY: canvasY - y }
         }
       }
-      if (o.type === 'image') {
-        const scale = o.imageScale ?? 1
-        const w = o.naturalWidth != null && o.naturalHeight != null
-          ? o.naturalWidth * scale
-          : (o.imageWidth ?? 200)
-        const h = o.naturalHeight != null && o.naturalWidth != null
-          ? o.naturalHeight * scale
-          : (o.imageHeight ?? 200)
-        const x = (o.x ?? 0.5) * width - w / 2
-        const y = (o.y ?? 0.5) * height - h / 2
-        if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
-          return { type: 'overlay', id: o.id, offsetX: canvasX - (x + w / 2), offsetY: canvasY - (y + h / 2) }
+      if (o.type === 'image' && (o.imageDataUrl || o.imageUrl || o.naturalWidth)) {
+        const m = getCenterAnchoredSize(o, width, height)
+        if (
+          m &&
+          hitTestCenterAnchoredOBB(m.cx, m.cy, m.w, m.h, o.rotation ?? 0, canvasX, canvasY)
+        ) {
+          return {
+            type: 'overlay',
+            id: o.id,
+            offsetX: canvasX - m.cx,
+            offsetY: canvasY - m.cy,
+          }
         }
       }
       if (o.type === 'video' && o.videoUrl) {
-        const scale = o.imageScale ?? 1
-        const w = (o.naturalWidth ?? 1920) * scale
-        const h = (o.naturalHeight ?? 1080) * scale
-        const x = (o.x ?? 0.5) * width - w / 2
-        const y = (o.y ?? 0.5) * height - h / 2
-        if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
-          return { type: 'overlay', id: o.id, offsetX: canvasX - (x + w / 2), offsetY: canvasY - (y + h / 2) }
+        const m = getCenterAnchoredSize(o, width, height)
+        if (
+          m &&
+          hitTestCenterAnchoredOBB(m.cx, m.cy, m.w, m.h, o.rotation ?? 0, canvasX, canvasY)
+        ) {
+          return {
+            type: 'overlay',
+            id: o.id,
+            offsetX: canvasX - m.cx,
+            offsetY: canvasY - m.cy,
+          }
         }
       }
       if (o.type === 'infographic' && o.infographicProjectId) {
-        const scale = o.imageScale ?? 1
-        const baseW = width
-        const baseH = height
-        const w = baseW * scale
-        const h = baseH * scale
-        const x = (o.x ?? 0.5) * width - w / 2
-        const y = (o.y ?? 0.5) * height - h / 2
-        if (canvasX >= x && canvasX <= x + w && canvasY >= y && canvasY <= y + h) {
-          return { type: 'overlay', id: o.id, offsetX: canvasX - (x + w / 2), offsetY: canvasY - (y + h / 2) }
+        const m = getCenterAnchoredSize(o, width, height)
+        if (
+          m &&
+          hitTestCenterAnchoredOBB(m.cx, m.cy, m.w, m.h, o.rotation ?? 0, canvasX, canvasY)
+        ) {
+          return {
+            type: 'overlay',
+            id: o.id,
+            offsetX: canvasX - m.cx,
+            offsetY: canvasY - m.cy,
+          }
         }
       }
     }
@@ -925,12 +1048,25 @@ export function RecordPreview({
         o.type === 'text'
           ? (o.fontSizePercent ?? ((o.fontSize ?? 24) / 1280) * 100)
           : (o.imageScale ?? 1)
+      let radial: { centerX: number; centerY: number; startRadialDist: number } | undefined
+      if (o.type === 'image' || o.type === 'video' || o.type === 'infographic') {
+        const m = getCenterAnchoredSize(o, width, height)
+        if (m) {
+          const d0 = Math.hypot(x - m.cx, y - m.cy)
+          radial = {
+            centerX: m.cx,
+            centerY: m.cy,
+            startRadialDist: Math.max(12, d0),
+          }
+        }
+      }
       setResizeState({
         overlayId: hit.id,
         startX: x,
         startY: y,
         startValue,
         kind: o.type === 'text' ? 'fontSize' : 'scale',
+        ...radial,
       })
       setCursor('nwse-resize')
         ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
@@ -962,13 +1098,24 @@ export function RecordPreview({
       return
     }
     if (resizeState && onOverlayEdit) {
-      const deltaX = x - resizeState.startX
-      const deltaY = y - resizeState.startY
-      const diagonal = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-      const sign = deltaX + deltaY >= 0 ? 1 : -1
-      const scaleFactor = 1 + (sign * diagonal) / 200
-
-      let newValue = resizeState.startValue * scaleFactor
+      let newValue: number
+      if (
+        resizeState.kind === 'scale' &&
+        resizeState.centerX != null &&
+        resizeState.centerY != null &&
+        resizeState.startRadialDist != null
+      ) {
+        const cur = Math.hypot(x - resizeState.centerX, y - resizeState.centerY)
+        const k = cur / resizeState.startRadialDist
+        newValue = resizeState.startValue * k
+      } else {
+        const deltaX = x - resizeState.startX
+        const deltaY = y - resizeState.startY
+        const diagonal = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+        const sign = deltaX + deltaY >= 0 ? 1 : -1
+        const scaleFactor = 1 + (sign * diagonal) / 200
+        newValue = resizeState.startValue * scaleFactor
+      }
 
       if (resizeState.kind === 'fontSize') {
         newValue = Math.max(MIN_FONT_SIZE_PCT, Math.min(MAX_FONT_SIZE_PCT, newValue))
@@ -1098,12 +1245,26 @@ export function RecordPreview({
     const overlay = overlays.find((o) => o.id === id)
     if (!overlay) return
 
+    let radial: { centerX: number; centerY: number; startRadialDist: number } | undefined
+    if (overlay.type === 'image' || overlay.type === 'video' || overlay.type === 'infographic') {
+      const m = getCenterAnchoredSize(overlay, width, height)
+      if (m) {
+        const rect = canvasRef.current?.getBoundingClientRect()
+        const scaleX = rect && rect.width > 0 ? width / rect.width : 1
+        const scaleY = rect && rect.height > 0 ? height / rect.height : 1
+        const cx = (e.clientX - (rect?.left ?? 0)) * scaleX
+        const cy = (e.clientY - (rect?.top ?? 0)) * scaleY
+        const d0 = Math.hypot(cx - m.cx, cy - m.cy)
+        radial = { centerX: m.cx, centerY: m.cy, startRadialDist: Math.max(12, d0) }
+      }
+    }
     setResizeState({
       overlayId: id,
       startX: e.clientX,
       startY: e.clientY,
       startValue: overlay.type === 'image' || overlay.type === 'video' || overlay.type === 'infographic' ? (overlay.imageScale ?? 1) : (overlay.fontSizePercent ?? 5),
-      kind: overlay.type === 'text' ? 'fontSize' : 'scale'
+      kind: overlay.type === 'text' ? 'fontSize' : 'scale',
+      ...radial,
     })
 
     const target = e.target as Element
@@ -1125,15 +1286,32 @@ export function RecordPreview({
 
   const handlePointerMoveDom = (e: React.PointerEvent) => {
     if (resizeState && onOverlayEdit) {
-      const deltaX = e.clientX - resizeState.startX
-      // Scale sensitivity
-      const scaleFactor = 1 + (deltaX / 200)
+      let newVal: number
+      if (
+        resizeState.kind === 'scale' &&
+        resizeState.centerX != null &&
+        resizeState.centerY != null &&
+        resizeState.startRadialDist != null &&
+        canvasRef.current
+      ) {
+        const rect = canvasRef.current.getBoundingClientRect()
+        const scaleX = rect.width > 0 ? width / rect.width : 1
+        const scaleY = rect.height > 0 ? height / rect.height : 1
+        const cx = (e.clientX - rect.left) * scaleX
+        const cy = (e.clientY - rect.top) * scaleY
+        const cur = Math.hypot(cx - resizeState.centerX, cy - resizeState.centerY)
+        newVal = resizeState.startValue * (cur / resizeState.startRadialDist)
+      } else {
+        const deltaX = e.clientX - resizeState.startX
+        const scaleFactor = 1 + (deltaX / 200)
+        newVal = resizeState.startValue * scaleFactor
+      }
 
       if (resizeState.kind === 'fontSize') {
-        const newVal = Math.max(0.5, Math.min(20, resizeState.startValue * scaleFactor))
+        newVal = Math.max(MIN_FONT_SIZE_PCT, Math.min(MAX_FONT_SIZE_PCT, newVal))
         onOverlayEdit(resizeState.overlayId, { fontSizePercent: newVal })
       } else {
-        const newVal = Math.max(0.1, Math.min(5, resizeState.startValue * scaleFactor))
+        newVal = Math.max(MIN_IMAGE_SCALE, Math.min(MAX_IMAGE_SCALE, newVal))
         onOverlayEdit(resizeState.overlayId, { imageScale: newVal })
       }
     }

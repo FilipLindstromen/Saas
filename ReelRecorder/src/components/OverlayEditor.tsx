@@ -253,8 +253,8 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
               type="range"
               className={styles.slider}
               min={10}
-              max={200}
-              value={Math.round((overlay.imageScale ?? 1) * 100)}
+              max={1000}
+              value={Math.min(1000, Math.round((overlay.imageScale ?? 1) * 100))}
               onChange={(e) => onUpdate({ imageScale: Number(e.target.value) / 100 })}
               aria-label="Video scale"
             />
@@ -295,8 +295,8 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
               type="range"
               className={styles.slider}
               min={10}
-              max={200}
-              value={Math.round((overlay.imageScale ?? 1) * 100)}
+              max={1000}
+              value={Math.min(1000, Math.round((overlay.imageScale ?? 1) * 100))}
               onChange={(e) => onUpdate({ imageScale: Number(e.target.value) / 100 })}
               aria-label="Infographic scale"
             />
@@ -403,8 +403,8 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
                   type="range"
                   className={styles.slider}
                   min={10}
-                  max={200}
-                  value={Math.round((overlay.imageScale ?? 1) * 100)}
+                  max={1000}
+                  value={Math.min(1000, Math.round((overlay.imageScale ?? 1) * 100))}
                   onChange={(e) => onUpdate({ imageScale: Number(e.target.value) / 100 })}
                   aria-label="Image scale"
                 />
