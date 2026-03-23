@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
       mergedProjectNames = dbProjects.map((p) => p.name);
     }
     const fromBody = Array.isArray(body.projectNames)
-      ? body.projectNames.filter((p: unknown): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim())
+      ? body.projectNames
+          .filter((p: unknown): p is string => typeof p === "string" && p.trim().length > 0)
+          .map((p: string) => p.trim())
       : [];
     for (const n of fromBody) {
       if (!mergedProjectNames.some((x) => x.toLowerCase() === n.toLowerCase())) mergedProjectNames.push(n);
