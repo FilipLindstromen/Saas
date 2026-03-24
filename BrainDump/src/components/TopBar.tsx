@@ -12,6 +12,8 @@ interface TopBarProps {
   mode: Mode;
   onModeChange: (mode: Mode) => void;
   onOpenSettings?: () => void;
+  /** When false, the inbox (uncategorized) workspace is hidden in the selector. */
+  showUncategorizedWorkspace?: boolean;
 }
 
 const MODE_KEY: Record<Mode, string> = {
@@ -38,6 +40,10 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
       window.removeEventListener("storage", sync);
     };
   }, []);
+
+  const workspaceModes = showUncategorizedWorkspace
+    ? [...BASE_WORKSPACE_MODES, INBOX_MODE]
+    : BASE_WORKSPACE_MODES;
 
   return (
     <>
@@ -85,7 +91,7 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
           value={mode}
           onChange={(e) => onModeChange(e.target.value as Mode)}
         >
-          {WORKSPACE_MODES.map((m) => (
+          {workspaceModes.map((m) => (
             <option key={m} value={m}>
               {t(MODE_KEY[m])}
             </option>

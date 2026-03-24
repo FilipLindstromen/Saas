@@ -10,6 +10,8 @@ export default function GoogleCalendarCallbackPage() {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     const params = new URLSearchParams(hash.replace(/^#/, ""));
     const accessToken = params.get("access_token");
+    const expiresInRaw = params.get("expires_in");
+    const expiresIn = expiresInRaw ? parseInt(expiresInRaw, 10) : NaN;
     const error = params.get("error");
 
     if (error) {
@@ -21,7 +23,11 @@ export default function GoogleCalendarCallbackPage() {
     if (accessToken && window.opener) {
       try {
         window.opener.postMessage(
-          { type: "braindump-google-calendar-token", accessToken },
+          {
+            type: "braindump-google-calendar-token",
+            accessToken,
+            expiresIn: Number.isFinite(expiresIn) ? expiresIn : undefined,
+          },
           window.location.origin
         );
         setMessage("Connected. You can close this window.");

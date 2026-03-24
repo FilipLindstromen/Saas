@@ -13,7 +13,7 @@ const en: Msg = {
 
   "mode.work": "Work",
   "mode.personal": "Personal",
-  "mode.inbox": "Inbox",
+  "mode.inbox": "Uncategorized",
   "mode.all": "All",
 
   "topBar.settings": "Settings",
@@ -129,6 +129,8 @@ const en: Msg = {
   "items.loading": "Loading…",
   "items.emptyFilters": "No items match the current filters.",
   "items.emptySearch": "No entries match your search.",
+  "items.textViewSplitHint":
+    "Tip: A blank line between paragraphs creates a new entry. With entry titles on, the first line of each paragraph is the headline; the rest is the description.",
   "items.itemCount": "{n} item",
   "items.itemCountPlural": "{n} items",
   "items.allTypes": "All types",
@@ -168,6 +170,7 @@ const en: Msg = {
   "items.descPlaceholder": "What you said (description)",
   "items.progress": "Progress",
   "items.taskDueDate": "Due date",
+  "items.taskDeadline": "Deadline",
   "items.taskDueShort": "Due {date}",
   "items.shoppingDueShort": "Shop by {date}",
   "items.clearDueDate": "Clear due date",
@@ -248,21 +251,32 @@ const en: Msg = {
   "settings.soundEffectsHelp":
     "When on, checking off a task plays a crowd cheer from Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Stored in your browser only.",
 
-  "settings.googleCalendarSync": "Sync with Google Calendar",
+  "settings.googleCalendarSync": "Connect Google Calendar",
+  "settings.googleCalendarHelp":
+    "After you connect and pick a calendar, use “Import into BrainDump” to copy events into BrainDump’s Calendar view. Nothing is imported automatically.",
+  "settings.googleCalendarImportButton": "Import into BrainDump",
+  "settings.googleCalendarImporting": "Importing…",
+  "settings.googleCalendarImportDone": "Imported {count} events into BrainDump.",
+  "settings.googleCalendarImportError": "Import failed. Try connecting again if your Google session expired.",
+  "settings.googleCalendarNoToken": "Connect Google Calendar first (use the button above), then import.",
+  "settings.googleCalendarNoCalendar": "Choose which Google calendar to read from, then import.",
+  "settings.calendarImportTargetNote":
+    "Imports are saved as Personal › thoughts (calendar entries). You can move them afterward.",
   "settings.appleCalendarTitle": "Apple Calendar",
   "settings.appleCalendarIntro":
-    "Apple does not offer the same one-click web sign-in for iCloud Calendar as Google. To see BrainDump events in the Calendar app on iPhone, iPad, or Mac, use the steps below (Google Calendar as a bridge) or manage events in BrainDump’s Calendar view.",
-  "settings.appleCalendarToggleSteps": "Show how to connect with Apple Calendar",
-  "settings.appleCalendarToggleStepsHide": "Hide steps",
-  "settings.appleCalendarStep1":
-    "Turn on “Sync with Google Calendar” above, connect your Google account, and choose which Google calendar to use.",
-  "settings.appleCalendarStep2":
-    "On your iPhone or iPad: Settings → Calendar → Accounts → Add Account → Google, and sign in with the same Google account. On Mac: System Settings → Internet Accounts → Google.",
-  "settings.appleCalendarStep3":
-    "Make sure Calendars is enabled for that Google account. Events you sync from BrainDump to Google Calendar will then appear in Apple Calendar alongside your iCloud events.",
-  "settings.appleCalendarSupportLink": "Apple Support — Calendar accounts on iPhone",
+    "Bring Apple Calendar events into BrainDump with a single action—no Google account involved. Export a calendar or selection as an .ics file, then import it below.",
+  "settings.appleCalendarImportIcsButton": "Choose .ics file and import",
+  "settings.appleCalendarIcsHelp":
+    "On Mac: Calendar → select calendar or events → File → Export → Export…. On iPhone/iPad: use a share/export option from an app that produces an .ics file, or export from iCloud.com. Then choose the file here.",
+  "settings.appleCalendarToggleSteps": "Show export tips",
+  "settings.appleCalendarToggleStepsHide": "Hide export tips",
+  "settings.appleCalendarExportStepMac": "Mac: File → Export, or drag events to the Desktop to create .ics files.",
+  "settings.appleCalendarExportStepIos": "iPhone/iPad: sharing options vary by OS version; iCloud.com (Calendar) can export calendars on the web.",
+  "settings.appleCalendarImportDone": "Imported {count} events from the file into BrainDump.",
+  "settings.appleCalendarImportError": "Could not read that file. Check that it is a valid .ics calendar export.",
+  "settings.appleCalendarSupportLink": "Apple Support — Calendar on iPhone",
   "settings.appleCalendarIcloudNote":
-    "If you only use iCloud: BrainDump cannot sign in to iCloud Calendar directly in the browser (no Apple calendar OAuth for web apps). The Google bridge above is the reliable option; CalDAV with an app-specific password is possible in some desktop apps but is not built into BrainDump yet.",
+    "BrainDump cannot log in to iCloud Calendar directly in the browser. The .ics import path works with exports from Apple Calendar, iCloud, or other apps.",
 
   "menu.changeType": "Change type",
   "menu.edit": "Edit",
@@ -310,7 +324,7 @@ const sv: Msg = {
 
   "mode.work": "Arbete",
   "mode.personal": "Privat",
-  "mode.inbox": "Inkorg",
+  "mode.inbox": "Okategoriserat",
   "mode.all": "Allt",
 
   "topBar.settings": "Inställningar",
@@ -425,6 +439,8 @@ const sv: Msg = {
   "items.loading": "Laddar…",
   "items.emptyFilters": "Inga poster matchar filtren.",
   "items.emptySearch": "Inga poster matchar sökningen.",
+  "items.textViewSplitHint":
+    "Tips: En tom rad mellan stycken skapar en ny post. När posttitlar är på blir första raden i varje stycke rubrik; resten är beskrivning.",
   "items.itemCount": "{n} post",
   "items.itemCountPlural": "{n} poster",
   "items.allTypes": "Alla typer",
@@ -465,6 +481,7 @@ const sv: Msg = {
   "items.descPlaceholder": "Vad du sa (beskrivning)",
   "items.progress": "Framsteg",
   "items.taskDueDate": "Förfallodatum",
+  "items.taskDeadline": "Sista dag",
   "items.taskDueShort": "Senast {date}",
   "items.shoppingDueShort": "Handla {date}",
   "items.clearDueDate": "Ta bort datum",
@@ -545,21 +562,32 @@ const sv: Msg = {
   "settings.soundEffectsHelp":
     "När på: bockar du av en uppgift spelas en jubel-högtid från Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Sparas bara i din webbläsare.",
 
-  "settings.googleCalendarSync": "Synka med Google Kalender",
+  "settings.googleCalendarSync": "Koppla Google Kalender",
+  "settings.googleCalendarHelp":
+    "När du kopplat och valt kalender: använd ”Importera till BrainDump” för att kopiera händelser till BrainDumps kalendervy. Inget importeras automatiskt.",
+  "settings.googleCalendarImportButton": "Importera till BrainDump",
+  "settings.googleCalendarImporting": "Importerar…",
+  "settings.googleCalendarImportDone": "Importerade {count} händelser till BrainDump.",
+  "settings.googleCalendarImportError": "Import misslyckades. Koppla om Google Kalender om sessionen gått ut.",
+  "settings.googleCalendarNoToken": "Koppla Google Kalender först (knappen ovan), sedan importera.",
+  "settings.googleCalendarNoCalendar": "Välj vilken Google-kalender som ska läsas, sedan importera.",
+  "settings.calendarImportTargetNote":
+    "Importerade poster sparas som Personligt › thoughts (kalenderposter). Du kan flytta dem efteråt.",
   "settings.appleCalendarTitle": "Apple Kalender",
   "settings.appleCalendarIntro":
-    "Apple erbjuder inte samma ett-klicks-inloggning för iCloud-kalender i webben som Google. För att se BrainDump-händelser i Kalender på iPhone, iPad eller Mac: följ stegen nedan (Google Kalender som brygga) eller hantera händelser i BrainDumps kalendervy.",
-  "settings.appleCalendarToggleSteps": "Visa hur du kopplar Apple Kalender",
-  "settings.appleCalendarToggleStepsHide": "Dölj steg",
-  "settings.appleCalendarStep1":
-    "Slå på ”Synka med Google Kalender” ovan, koppla ditt Google-konto och välj vilken Google-kalender som ska användas.",
-  "settings.appleCalendarStep2":
-    "På iPhone eller iPad: Inställningar → Kalender → Konton → Lägg till konto → Google, och logga in med samma Google-konto. På Mac: Systeminställningar → Internetkonton → Google.",
-  "settings.appleCalendarStep3":
-    "Kontrollera att Kalender är påslaget för det Google-kontot. Händelser som synkas från BrainDump till Google Kalender visas då i Apple Kalender tillsammans med dina iCloud-händelser.",
-  "settings.appleCalendarSupportLink": "Apple-support — kalenderkonton på iPhone",
+    "För in händelser från Apple Kalender utan Google: exportera som .ics och importera med knappen nedan.",
+  "settings.appleCalendarImportIcsButton": "Välj .ics-fil och importera",
+  "settings.appleCalendarIcsHelp":
+    "Mac: Kalender → markera kalender eller händelser → Arkiv → Exportera → Exportera…. På iPhone/iPad: dela/exportera enligt app (ofta via .ics). Du kan också exportera från iCloud.com.",
+  "settings.appleCalendarToggleSteps": "Visa exporttips",
+  "settings.appleCalendarToggleStepsHide": "Dölj exporttips",
+  "settings.appleCalendarExportStepMac": "Mac: Arkiv → Exportera, eller dra händelser till skrivbordet för .ics-filer.",
+  "settings.appleCalendarExportStepIos": "iPhone/iPad: delning varierar; iCloud.com (Kalender) kan exportera kalendrar i webbläsaren.",
+  "settings.appleCalendarImportDone": "Importerade {count} händelser från filen till BrainDump.",
+  "settings.appleCalendarImportError": "Kunde inte läsa filen. Kontrollera att det är en giltig kalenderexport (.ics).",
+  "settings.appleCalendarSupportLink": "Apple-support — Kalender på iPhone",
   "settings.appleCalendarIcloudNote":
-    "Om du bara använder iCloud: BrainDump kan inte logga in direkt mot iCloud-kalender i webbläsaren (ingen Apple OAuth för webbappar). Bryggan via Google ovan är det stabila alternativet; CalDAV med appspecifikt lösenord finns i vissa skrivbordsappar men är inte inbyggt i BrainDump ännu.",
+    "BrainDump kan inte logga in mot iCloud-kalender direkt i webbläsaren. Import via .ics fungerar med export från Apple Kalender, iCloud eller andra appar.",
 
   "menu.changeType": "Byt typ",
   "menu.edit": "Redigera",

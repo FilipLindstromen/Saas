@@ -12,6 +12,12 @@ import {
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
 import { dateOnlyToStartOfDay, localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
 import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
+import {
+  deriveEntryTitle,
+  parseTextViewBlock,
+  resolveTextSplitScope,
+  splitTextViewBlocks,
+} from "@/lib/text-view-entry-split";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -105,6 +111,24 @@ function getPersonalAreasList(items: ViewItem[]): string[] {
   } catch {}
   const combined = [...new Set([...PERSONAL_AREA_DEFAULTS, ...fromItems, ...custom])];
   return combined.sort((a, b) => a.localeCompare(b));
+}
+
+function loadPersonalAreaIdSetForSplit(): Set<string> {
+  const s = new Set<string>([...PERSONAL_AREA_DEFAULTS]);
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_AREAS_KEY) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const c of parsed) {
+          if (typeof c === "string" && c.trim()) s.add(c.trim());
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return s;
 }
 
 function formatAreaLabel(value: string): string {
@@ -774,6 +798,105 @@ export function ItemsViewArea({
       .catch(() => {});
   }, []);
 
+  const commitTextViewContent = useCallback(
+    async (id: string, raw: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+
+      const blocks = splitTextViewBlocks(raw);
+      if (blocks.length === 0) {
+        const empty = raw.trim() === "" ? "" : raw.trim();
+        if (empty === (item.content ?? "").trim()) return;
+        fetch(`/api/organized-items/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: empty }),
+        })
+          .then((r) => {
+            if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, content: empty } : it)));
+          })
+          .catch(() => {});
+        return;
+      }
+
+      const parts = blocks.map((b) => parseTextViewBlock(b, showEntryTitles));
+      const scope = resolveTextSplitScope(mode, projectId, category, {
+        personalAreaIds: loadPersonalAreaIdSetForSplit(),
+      });
+
+      const patchFirst = async (): Promise<boolean> => {
+        const p0 = parts[0];
+        const nextTitle = showEntryTitles ? deriveEntryTitle(p0.title, p0.content) : item.title;
+        const nextContent = p0.content;
+        const body: { title?: string; content: string } = { content: nextContent };
+        if (showEntryTitles) body.title = nextTitle;
+        if (
+          parts.length === 1 &&
+          body.content === (item.content ?? "").trim() &&
+          (!showEntryTitles || body.title === item.title)
+        ) {
+          return true;
+        }
+        const r = await fetch(`/api/organized-items/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) return false;
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === id ? { ...it, ...body } : it
+          )
+        );
+        return true;
+      };
+
+      if (parts.length === 1) {
+        await patchFirst();
+        return;
+      }
+
+      const okFirst = await patchFirst();
+      if (!okFirst) return;
+
+      const resDump = await fetch("/api/dumps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: scope.dumpMode,
+          transcriptRaw: "",
+          transcriptEdited: "",
+          status: "organized",
+        }),
+      });
+      const dumpJson = (await resDump.json()) as { dump?: { id: string } };
+      const dumpId = dumpJson.dump?.id;
+      if (!dumpId) {
+        fetchItems();
+        return;
+      }
+
+      const batchItems = parts.slice(1).map((p) => ({
+        domain: scope.domain,
+        category: scope.category,
+        subcategory: "",
+        ...(scope.projectId ? { projectId: scope.projectId } : {}),
+        item_type: item.itemType,
+        title: deriveEntryTitle(p.title, p.content),
+        content: p.content,
+      }));
+
+      const batchRes = await fetch("/api/organized-items/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dumpId, items: batchItems }),
+      });
+      if (batchRes.ok) fetchItems();
+      else fetchItems();
+    },
+    [items, mode, projectId, category, showEntryTitles, fetchItems]
+  );
+
   const createEntry = useCallback(
     async (form: typeof addEntryForm) => {
       const title = form.title.trim();
@@ -823,6 +946,13 @@ export function ItemsViewArea({
         }
       }
       if (form.itemType === "shopping" && form.scheduledAt?.trim()) {
+        const d = dateOnlyToStartOfDay(form.scheduledAt.trim());
+        if (d) payload.scheduledAt = d.toISOString();
+      }
+      if (
+        (form.itemType === "task" || form.itemType === "task_completed") &&
+        form.scheduledAt?.trim()
+      ) {
         const d = dateOnlyToStartOfDay(form.scheduledAt.trim());
         if (d) payload.scheduledAt = d.toISOString();
       }
@@ -1363,7 +1493,13 @@ export function ItemsViewArea({
       ) : viewType === "list" ? (
         <ListView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
       ) : viewType === "text" ? (
-        <TextView showEntryTitles={showEntryTitles} items={filteredItems} onUpdate={updateEntryContent} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} />
+        <TextView
+          showEntryTitles={showEntryTitles}
+          items={filteredItems}
+          onUpdate={updateEntryContent}
+          onCommitTextContent={commitTextViewContent}
+          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+        />
       ) : viewType === "kanban" ? (
             <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
       ) : viewType === "calendar" ? (
@@ -1735,42 +1871,48 @@ export function ItemsViewArea({
                 boxSizing: "border-box",
               }}
             />
-            {items.find((i) => i.id === editingEntry.id)?.itemType === "shopping" && (
-              <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.taskDueDate")}</h4>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "0.5rem",
-                    flexDirection: isMobile ? "column" : "row",
-                    alignItems: isMobile ? "stretch" : "center",
-                  }}
-                >
-                  <input
-                    type="date"
-                    className="bd-input"
-                    value={editingEntry.scheduledAt ?? ""}
-                    onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
+            {(() => {
+              const ei = items.find((i) => i.id === editingEntry.id);
+              if (!ei || (ei.itemType !== "shopping" && !isTaskRow(ei))) return null;
+              return (
+                <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
+                  <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
+                    {isTaskRow(ei) ? t("items.taskDeadline") : t("items.taskDueDate")}
+                  </h4>
+                  <div
                     style={{
-                      padding: "0.35rem 0.5rem",
-                      fontSize: isMobile ? "max(1rem, 16px)" : "0.8125rem",
-                      width: isMobile ? "100%" : "auto",
-                      minWidth: 0,
-                      boxSizing: "border-box",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "center",
                     }}
-                  />
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    style={{ fontSize: "0.75rem" }}
-                    onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "" })}
                   >
-                    {t("items.clearDueDate")}
-                  </button>
+                    <input
+                      type="date"
+                      className="bd-input"
+                      value={editingEntry.scheduledAt ?? ""}
+                      onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
+                      style={{
+                        padding: "0.35rem 0.5rem",
+                        fontSize: isMobile ? "max(1rem, 16px)" : "0.8125rem",
+                        width: isMobile ? "100%" : "auto",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ fontSize: "0.75rem" }}
+                      onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "" })}
+                    >
+                      {t("items.clearDueDate")}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {items.find((i) => i.id === editingEntry.id)?.itemType === "calendar" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
                 <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Calendar</h4>
@@ -2003,7 +2145,10 @@ export function ItemsViewArea({
                           editingEntry.sendNotification && reminderAtIso ? rMin : null,
                       });
                     }
-                    if (currentItem?.itemType === "shopping") {
+                    if (
+                      currentItem &&
+                      (currentItem.itemType === "shopping" || isTaskRow(currentItem))
+                    ) {
                       const due = editingEntry.scheduledAt?.trim();
                       const dt = due ? dateOnlyToStartOfDay(due) : null;
                       updateSchedule(editingEntry.id, {
@@ -2168,9 +2313,13 @@ export function ItemsViewArea({
               placeholder="Description (optional)"
               style={{ width: "100%", minHeight: 80, marginBottom: "1rem" }}
             />
-            {addEntryForm.itemType === "shopping" && (
+            {(addEntryForm.itemType === "shopping" ||
+              addEntryForm.itemType === "task" ||
+              addEntryForm.itemType === "task_completed") && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>{t("items.taskDueDate")}</h4>
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
+                  {addEntryForm.itemType === "shopping" ? t("items.taskDueDate") : t("items.taskDeadline")}
+                </h4>
                 <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   <input
                     type="date"
@@ -2287,6 +2436,7 @@ function CalendarView({
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   isMobile?: boolean;
 }) {
+  const { t } = useI18n();
   const [month, setMonth] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -2440,6 +2590,7 @@ function CalendarView({
                 >
                   {dayItems.slice(0, maxEventChips).map((it) => {
                     const past = it.scheduledAt && new Date(String(it.scheduledAt).slice(0, 10)) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const taskDeadline = isTaskRow(it);
                     return (
                       <button
                         key={it.id}
@@ -2458,9 +2609,9 @@ function CalendarView({
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          boxShadow: "none",
+                          boxShadow: taskDeadline ? `inset 3px 0 0 ${TYPE_BAR_COLORS.task}` : "none",
                         }}
-                        title={`${it.title}${it.content?.trim() ? ` — ${it.content.trim().slice(0, 200)}` : ""}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}`}
+                        title={`${it.title}${it.content?.trim() ? ` — ${it.content.trim().slice(0, 200)}` : ""}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
                       >
                         {it.scheduledTime && <span style={{ marginRight: "0.25rem", opacity: 0.9 }}>{it.scheduledTime}</span>}
                         {entryPrimaryLine(it, showEntryTitles)}
@@ -3044,11 +3195,14 @@ function TextView({
   items,
   showEntryTitles = true,
   onUpdate,
+  onCommitTextContent,
   onItemContextMenu,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
+  /** Text view: blur commits full textarea; double line breaks split into new entries. */
+  onCommitTextContent?: (id: string, raw: string) => void | Promise<void>;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
 }) {
   const { t } = useI18n();
@@ -3073,6 +3227,23 @@ function TextView({
       else onUpdate(id, { content: trimmed });
     }
     setEditing(null);
+  };
+
+  const handleContentBlur = (id: string, value: string, current: string) => {
+    if (onCommitTextContent) {
+      void Promise.resolve(onCommitTextContent(id, value)).finally(() => setEditing(null));
+      return;
+    }
+    handleBlur(id, "content", value, current);
+  };
+
+  /** When titles are on, description editor includes headline (first line) + body for split/commit. */
+  const mergeTitleAndContent = (it: ViewItem) => {
+    const title = (it.title ?? "").trim();
+    const body = (it.content ?? "").trim();
+    if (!title) return body;
+    if (!body) return title;
+    return `${title}\n${body}`;
   };
 
   return (
@@ -3191,9 +3362,22 @@ function TextView({
             {isEditingContent ? (
               <textarea
                 ref={textareaRef}
-                value={editing?.value ?? it.content ?? ""}
+                value={
+                  editing?.id === it.id
+                    ? (editing.value ?? "")
+                    : showEntryTitles
+                      ? mergeTitleAndContent(it)
+                      : (it.content ?? "")
+                }
                 onChange={(e) => setEditing((prev) => prev ? { ...prev, value: e.target.value } : null)}
-                onBlur={() => editing && handleBlur(it.id, "content", editing.value, it.content ?? "")}
+                onBlur={() =>
+                  editing &&
+                  handleContentBlur(
+                    it.id,
+                    editing.value,
+                    showEntryTitles ? mergeTitleAndContent(it) : it.content ?? ""
+                  )
+                }
                 rows={4}
                 style={{
                   width: "100%",
@@ -3211,7 +3395,13 @@ function TextView({
               />
             ) : (
               <p
-                onClick={() => setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                onClick={() =>
+                  setEditing({
+                    id: it.id,
+                    field: "content",
+                    value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
+                  })
+                }
                 style={{
                   margin: 0,
                   fontSize: "0.875rem",
@@ -3231,6 +3421,18 @@ function TextView({
           </div>
         );
       })}
+      <p
+        style={{
+          fontSize: "0.72rem",
+          color: "var(--text-tertiary)",
+          margin: "0.35rem 0 0",
+          paddingLeft: "0.55rem",
+          lineHeight: 1.4,
+          maxWidth: 720,
+        }}
+      >
+        {t("items.textViewSplitHint")}
+      </p>
     </div>
   );
 }
@@ -3440,6 +3642,17 @@ function KanbanView({
               >
                 {it.content?.trim() || "—"}
               </div>
+              {isTaskRow(it) && it.scheduledAt && (
+                <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.35rem" }}>
+                  {t("items.taskDueShort", {
+                    date: new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    }),
+                  })}
+                </div>
+              )}
               <div
                 style={{
                   fontSize: "0.65rem",
@@ -3812,6 +4025,17 @@ function PostitsView({
                   <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {it.content?.trim() || "—"}
                   </div>
+                  {isTaskRow(it) && it.scheduledAt && (
+                    <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: "0.35rem" }}>
+                      {t("items.taskDueShort", {
+                        date: new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        }),
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

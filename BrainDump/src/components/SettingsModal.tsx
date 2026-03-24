@@ -1,11 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-settings";
 import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
 import { loadSoundEffectsEnabled, saveSoundEffectsEnabled } from "@/lib/sound-effects-settings";
 import { DeleteEntriesOverlay } from "@/components/DeleteEntriesOverlay";
+import {
+  fetchGoogleCalendarEvents,
+  importCalendarEventsToBrainDump,
+  parseIcsCalendarEvents,
+} from "@/lib/calendar-import-braindump";
+import {
+  clearGoogleCalendarAccessToken,
+  loadGoogleCalendarAccessToken,
+  saveGoogleCalendarAccessToken,
+} from "@/lib/google-calendar-token";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
@@ -166,6 +176,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [showDumpFace, setShowDumpFace] = useState(true);
   const [soundEffects, setSoundEffects] = useState(false);
   const [appleCalendarStepsOpen, setAppleCalendarStepsOpen] = useState(false);
+  const [calendarImportBusy, setCalendarImportBusy] = useState(false);
+  const [calendarImportMessage, setCalendarImportMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const icsFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     applyTextSizeOnLoad();
@@ -186,8 +199,60 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setCalendarListError(null);
       setDeleteOverlayOpen(false);
       setAppleCalendarStepsOpen(false);
+      setCalendarImportBusy(false);
+      setCalendarImportMessage(null);
     }
   }, [isOpen]);
+
+  const runGoogleImportIntoBrainDump = useCallback(async () => {
+    setCalendarImportMessage(null);
+    const { token, expired } = loadGoogleCalendarAccessToken();
+    const calId = selectedCalendarId ?? loadGoogleCalendarId();
+    if (!token || expired) {
+      setCalendarImportMessage({ tone: "err", text: t("settings.googleCalendarNoToken") });
+      return;
+    }
+    if (!calId) {
+      setCalendarImportMessage({ tone: "err", text: t("settings.googleCalendarNoCalendar") });
+      return;
+    }
+    setCalendarImportBusy(true);
+    try {
+      const events = await fetchGoogleCalendarEvents(token, calId);
+      const n = await importCalendarEventsToBrainDump({
+        domain: "personal",
+        category: "thoughts",
+        events,
+      });
+      setCalendarImportMessage({ tone: "ok", text: t("settings.googleCalendarImportDone", { count: n }) });
+    } catch {
+      setCalendarImportMessage({ tone: "err", text: t("settings.googleCalendarImportError") });
+    } finally {
+      setCalendarImportBusy(false);
+    }
+  }, [selectedCalendarId, t]);
+
+  const runIcsImportIntoBrainDump = useCallback(
+    async (file: File) => {
+      setCalendarImportMessage(null);
+      setCalendarImportBusy(true);
+      try {
+        const text = await file.text();
+        const events = parseIcsCalendarEvents(text);
+        const n = await importCalendarEventsToBrainDump({
+          domain: "personal",
+          category: "thoughts",
+          events,
+        });
+        setCalendarImportMessage({ tone: "ok", text: t("settings.appleCalendarImportDone", { count: n }) });
+      } catch {
+        setCalendarImportMessage({ tone: "err", text: t("settings.appleCalendarImportError") });
+      } finally {
+        setCalendarImportBusy(false);
+      }
+    },
+    [t]
+  );
 
   const handleSave = () => {
     saveOpenAIKey(openaiKey.trim());
@@ -234,6 +299,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (!isOpen) return;
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type === "braindump-google-calendar-token" && e.data?.accessToken) {
+        saveGoogleCalendarAccessToken(
+          e.data.accessToken as string,
+          typeof e.data.expiresIn === "number" ? e.data.expiresIn : undefined
+        );
         setCalendarListLoading(true);
         setCalendarListError(null);
         fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
@@ -397,12 +466,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 onChange={(e) => {
                   const on = e.target.checked;
                   setGoogleCalendarSync(on);
+                  if (!on) clearGoogleCalendarAccessToken();
                   if (on && !loadGoogleClientId()) setShowClientIdOverlay(true);
                 }}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }}
               />
               {t("settings.googleCalendarSync")}
             </label>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0.25rem 0 0 1.75rem", lineHeight: 1.45 }}>
+              {t("settings.googleCalendarHelp")}
+            </p>
             {googleCalendarSync && (
               <div style={{ marginTop: "0.75rem", marginLeft: "1.75rem" }}>
                 {!googleClientId.trim() ? (
@@ -458,6 +531,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </select>
                   </>
                 )}
+                {(selectedCalendarId || calendarList.length > 0) && (
+                  <div style={{ marginTop: "0.65rem" }}>
+                    <button
+                      type="button"
+                      className="bd-btn bd-btn-primary"
+                      disabled={calendarImportBusy || !googleClientId.trim()}
+                      onClick={() => void runGoogleImportIntoBrainDump()}
+                    >
+                      {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.googleCalendarImportButton")}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -481,6 +566,29 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
               {t("settings.appleCalendarIntro")}
             </p>
+            <input
+              ref={icsFileInputRef}
+              type="file"
+              accept=".ics,text/calendar,.ical"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void runIcsImportIntoBrainDump(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className="bd-btn bd-btn-primary"
+              disabled={calendarImportBusy}
+              onClick={() => icsFileInputRef.current?.click()}
+              style={{ marginBottom: "0.5rem" }}
+            >
+              {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.appleCalendarImportIcsButton")}
+            </button>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+              {t("settings.appleCalendarIcsHelp")}
+            </p>
             <button
               type="button"
               className="bd-btn"
@@ -492,7 +600,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </button>
             {appleCalendarStepsOpen && (
               <div style={{ marginTop: "0.35rem" }}>
-                <ol
+                <ul
                   style={{
                     fontSize: "0.8125rem",
                     color: "var(--text-secondary)",
@@ -501,10 +609,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     lineHeight: 1.55,
                   }}
                 >
-                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep1")}</li>
-                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep2")}</li>
-                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep3")}</li>
-                </ol>
+                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepMac")}</li>
+                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepIos")}</li>
+                </ul>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
                   {t("settings.appleCalendarIcloudNote")}
                 </p>
@@ -523,6 +630,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {t("settings.appleCalendarSupportLink")}
                 </a>
               </div>
+            )}
+            <p style={{ fontSize: "0.72rem", color: "var(--text-quaternary)", margin: "0.75rem 0 0", lineHeight: 1.45 }}>
+              {t("settings.calendarImportTargetNote")}
+            </p>
+            {calendarImportMessage && (
+              <p
+                style={{
+                  fontSize: "0.8125rem",
+                  margin: "0.45rem 0 0",
+                  color: calendarImportMessage.tone === "ok" ? "var(--text-secondary)" : "var(--accent)",
+                }}
+              >
+                {calendarImportMessage.text}
+              </p>
             )}
           </div>
           {showClientIdOverlay && (

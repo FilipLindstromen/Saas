@@ -46,7 +46,38 @@ export default function BrainDumpPage() {
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
+  const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+
+  const refreshUncategorizedAvailability = useCallback(async () => {
+    if (status !== "authenticated") return;
+    try {
+      const r = await fetch(
+        "/api/organized-items?domain=inbox&category=uncategorized&countOnly=true"
+      );
+      const d = (await r.json()) as { count?: number };
+      if (!r.ok) return;
+      setHasUncategorizedEntries((d.count ?? 0) > 0);
+    } catch {
+      setHasUncategorizedEntries(false);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    void refreshUncategorizedAvailability();
+  }, [refreshUncategorizedAvailability]);
+
+  useEffect(() => {
+    const onReload = () => void refreshUncategorizedAvailability();
+    window.addEventListener("braindump-reload-items", onReload);
+    return () => window.removeEventListener("braindump-reload-items", onReload);
+  }, [refreshUncategorizedAvailability]);
+
+  useEffect(() => {
+    if (!hasUncategorizedEntries && mode === "inbox") {
+      setMode("all");
+    }
+  }, [hasUncategorizedEntries, mode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -301,7 +332,12 @@ export default function BrainDumpPage() {
   return (
     <ErrorBoundary>
       <div className="bd-app-shell" style={{ background: "var(--bg-primary)" }}>
-        <TopBar mode={mode} onModeChange={setMode} onOpenSettings={() => setShowSettings(true)} />
+        <TopBar
+          mode={mode}
+          onModeChange={setMode}
+          onOpenSettings={() => setShowSettings(true)}
+          showUncategorizedWorkspace={hasUncategorizedEntries}
+        />
 
       <div
         className="bd-layout-main bd-main-scroll"

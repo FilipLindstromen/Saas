@@ -263,7 +263,7 @@ export interface ExportForDownloadOptions {
 }
 
 /** Preload all image overlays (data URL or URL) so they are ready for drawing during export. */
-/** Uses DOM img elements so animated GIFs work (HTMLImageElement doesn't animate). */
+/** Images must live in the document so animated GIF/WebP frames advance on canvas.drawImage (browser behavior). */
 function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTMLImageElement>> {
   const imageOverlays = overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl))
   if (imageOverlays.length === 0) return Promise.resolve(new Map())
@@ -273,8 +273,12 @@ function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTML
       new Promise<void>((resolve, reject) => {
         const img = document.createElement('img')
         img.crossOrigin = 'anonymous'
-        img.style.position = 'absolute'
+        img.style.position = 'fixed'
         img.style.left = '-9999px'
+        img.style.top = '0'
+        img.style.width = 'auto'
+        img.style.height = 'auto'
+        img.style.opacity = '0.01'
         img.style.pointerEvents = 'none'
         img.onload = () => {
           map.set(o.id, img)

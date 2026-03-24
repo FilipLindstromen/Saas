@@ -8,6 +8,22 @@ import styles from './RecordPreview.module.css'
 
 const CAPTION_SAMPLE_SEGMENT: CaptionSegment = { start: 0, end: 1, text: 'Sample caption text' }
 
+/**
+ * Animated GIF/WebP overlays only advance frames on canvas.drawImage when the backing
+ * <img> is attached to the document (browser quirk). Matches export preload behavior.
+ */
+function attachOverlayImageForCanvasAnimation(img: HTMLImageElement): void {
+  img.crossOrigin = 'anonymous'
+  img.style.position = 'fixed'
+  img.style.left = '-9999px'
+  img.style.top = '0'
+  img.style.width = 'auto'
+  img.style.height = 'auto'
+  img.style.opacity = '0.01'
+  img.style.pointerEvents = 'none'
+  if (!img.parentElement) document.body.appendChild(img)
+}
+
 /** Action safe (outer) and title safe (inner) as fraction of canvas size, centered */
 const SAFE_ZONE_PRESETS: Record<SafeZoneType, { action: number; title: number }> = {
   'youtube-9:16': { action: 0.95, title: 0.9 },
@@ -544,6 +560,8 @@ export function RecordPreview({
   const rafRef = useRef<number>(0)
   const overlayVideoRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const overlayImageRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  /** Last overlay image src per id (avoid data-* truncation breaking change detection for long data URLs). */
+  const overlayImageLastSrcRef = useRef<Map<string, string>>(new Map())
   const infographicElementImagesRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [dragState, setDragState] = useState<{
     overlayId: string
@@ -595,7 +613,7 @@ export function RecordPreview({
     if (!video) return
 
     if (!showRecordingInEdit || !playbackUrl) {
-      if (editPreviewSource === 'recording') {
+      if (editPreviewSource === 'recording' && !isRecording) {
         video.src = ''
         video.srcObject = null
       }
@@ -616,7 +634,7 @@ export function RecordPreview({
       video.removeEventListener('loadedmetadata', onLoaded)
       video.removeEventListener('ended', onPlaybackEnd || (() => { }))
     }
-  }, [playbackUrl, onPlaybackEnd, onDurationChange, showRecordingInEdit, editPreviewSource])
+  }, [playbackUrl, onPlaybackEnd, onDurationChange, showRecordingInEdit, editPreviewSource, isRecording])
 
   // Live mode: show camera stream (Record mode or Edit mode with webcam selected)
   useEffect(() => {
@@ -691,26 +709,50 @@ export function RecordPreview({
     }
   }, [overlays])
 
-  // Keep image elements for image overlays
+  // Keep image elements for image overlays (in-document so GIF animations advance on canvas)
   useEffect(() => {
     const map = overlayImageRef.current
+    const lastSrc = overlayImageLastSrcRef.current
     const imageOverlayIds = new Set(
       overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl)).map((o) => o.id)
     )
     for (const id of map.keys()) {
       if (!imageOverlayIds.has(id)) {
+        const el = map.get(id)
+        el?.remove()
         map.delete(id)
+        lastSrc.delete(id)
       }
     }
     for (const o of overlays) {
       if (o.type !== 'image' || (!o.imageDataUrl && !o.imageUrl)) continue
-      if (map.has(o.id)) continue
+      const src = o.imageDataUrl ?? o.imageUrl!
+      const existing = map.get(o.id)
+      if (existing) {
+        if (lastSrc.get(o.id) !== src) {
+          lastSrc.set(o.id, src)
+          existing.src = src
+        }
+        continue
+      }
       const el = new Image()
-      el.crossOrigin = 'anonymous'
-      el.src = o.imageDataUrl ?? o.imageUrl!
+      lastSrc.set(o.id, src)
+      el.src = src
+      attachOverlayImageForCanvasAnimation(el)
       map.set(o.id, el)
     }
   }, [overlays])
+
+  useEffect(() => {
+    return () => {
+      const map = overlayImageRef.current
+      for (const el of map.values()) {
+        el.remove()
+      }
+      map.clear()
+      overlayImageLastSrcRef.current.clear()
+    }
+  }, [])
 
   // Load infographic project data and preload element images (key = projectId:tabId)
   const infographicProjects = useMemo(() => {

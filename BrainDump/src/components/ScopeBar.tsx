@@ -484,6 +484,7 @@ export function ScopeBar({
               <>
                 <span className="bd-scope-label">{t("scope.project")}</span>
                 <div
+                  className="bd-scope-area-chips-scroll"
                   style={{
                     display: "flex",
                     gap: "0.35rem",
@@ -491,56 +492,38 @@ export function ScopeBar({
                     alignItems: "center",
                     flex: 1,
                     minWidth: 0,
+                    overflowX: "auto",
+                    overflowY: "visible",
+                    WebkitOverflowScrolling: "touch",
                     position: "relative",
                     zIndex: 2,
-                    overflow: "visible",
+                    paddingBottom: 2,
                   }}
                 >
-                  <select
-                    id="bd-work-project-select"
-                    className="bd-input"
-                    aria-label={t("scope.project")}
-                    value={selectedProjectId ?? ""}
-                    onChange={(e) => onProjectSelect(e.target.value || null)}
-                    style={{
-                      flex: 1,
-                      minWidth: 140,
-                      maxWidth: 420,
-                      padding: "0.4rem 0.65rem",
-                      fontSize: "0.8125rem",
-                      position: "relative",
-                      zIndex: 2,
-                    }}
-                  >
-                    <option value="">{t("scope.all")}</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedProjectId && (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      aria-label={t("scope.projectOptions")}
-                      title={t("scope.projectOptions")}
-                      onClick={(e) => {
-                        const p = projects.find((x) => x.id === selectedProjectId);
-                        if (p) setContextMenu({ x: e.clientX, y: e.clientY, project: p });
+                  <ScopeChip
+                    label={t("scope.all")}
+                    selected={!selectedProjectId}
+                    onClick={() => onProjectSelect(null)}
+                  />
+                  {projects.map((p) => (
+                    <ScopeChip
+                      key={p.id}
+                      label={p.name}
+                      selected={selectedProjectId === p.id}
+                      onClick={() => onProjectSelect(p.id)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({ x: e.clientX, y: e.clientY, project: p });
                       }}
-                      style={{ minWidth: 40, minHeight: 36, padding: "0.35rem 0.5rem", flexShrink: 0 }}
-                    >
-                      ⋮
-                    </button>
-                  )}
+                    />
+                  ))}
                   {showAddProject ? addProjectInline : (
                     <button
                       type="button"
                       className="bd-btn"
                       onClick={() => setShowAddProject(true)}
                       title={t("scope.addProject")}
-                      style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
+                      style={{ padding: "0.4rem 0.5rem", minWidth: 32, flexShrink: 0 }}
                     >
                       +
                     </button>

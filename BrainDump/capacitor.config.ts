@@ -8,13 +8,13 @@ loadEnv({ path: path.join(__dirname, "..", ".env.local") });
 
 /**
  * Remote URL mode: the iOS shell loads your deployed Next.js app (same as web).
- * Set CAPACITOR_SERVER_URL when running `npx cap sync ios` (e.g. in CI or before archive).
+ * Override with CAPACITOR_SERVER_URL when running `npx cap sync ios` (e.g. staging or localhost).
  * @see docs/ios/APPLE_SETUP.md
  */
 const serverUrl =
   process.env.CAPACITOR_SERVER_URL?.trim() ||
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-  "https://localhost:3001";
+  "https://saas-silk-tau.vercel.app";
 
 const config: CapacitorConfig = {
   appId: "com.braindump.app",

@@ -29,9 +29,16 @@ import { getStoredTheme, setStoredTheme, applyTheme, initThemeSync, type Theme }
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
+/** When media duration is unknown or invalid, timeline + trim use this instead of 0. */
+const FALLBACK_RECORDING_TIMELINE_SEC = 60
 
 function generateId() {
   return Math.random().toString(36).slice(2, 12)
+}
+
+function getVideoInputDeviceId(stream: MediaStream | null): string | undefined {
+  const track = stream?.getVideoTracks()[0]
+  return track?.getSettings?.()?.deviceId
 }
 
 export default function App() {
@@ -126,6 +133,7 @@ export default function App() {
   const [inspectorWidth, setInspectorWidth] = useState(() => initialState?.inspectorWidth ?? 280)
   const [inspectorResize, setInspectorResize] = useState<{ startX: number; startWidth: number } | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
+  const [recordArmBusy, setRecordArmBusy] = useState(false)
   const [isRestoring, setIsRestoring] = useState(true)
   const [projects] = useState([{ id: 'default', name: 'Untitled' }])
   const [tabs, setTabs] = useState([{ id: '1', name: 'Recording 1' }])
@@ -194,14 +202,24 @@ export default function App() {
   const displayTime = showLiveStream ? previewTime : currentTime
   const safeDisplayTime = Number.isFinite(displayTime) && displayTime >= 0 ? displayTime : 0
   const computedTimelineDuration = Math.max(60, ...overlays.map((o) => o.endTime), 1)
-  const sourceDuration = duration
-  const trimmedDuration = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
-  // When we have a trim, timeline shows only the trimmed region (0 to trimmedDuration) so the end is on the right
-  // Ensure we never show 0 - use at least 1s or source duration when available
-  const effectiveTrimmed = trimmedDuration > 0 ? trimmedDuration : Math.max(sourceDuration || 0, 1)
+  const sourceSec = Number.isFinite(duration) && duration > 0 ? duration : 0
+  const trimmedDuration = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceSec
+  const effectiveTrimmed =
+    trimmedDuration > 0 && Number.isFinite(trimmedDuration)
+      ? trimmedDuration
+      : Math.max(sourceSec, FALLBACK_RECORDING_TIMELINE_SEC)
+  const playbackTlFromMedia =
+    videoTrimEnd != null ? effectiveTrimmed : Math.max(sourceSec, FALLBACK_RECORDING_TIMELINE_SEC)
+  const validUserTimelineDuration =
+    userTimelineDuration != null &&
+    Number.isFinite(userTimelineDuration) &&
+    userTimelineDuration >= 1 &&
+    userTimelineDuration <= 600
+      ? userTimelineDuration
+      : null
   const timelineDuration = isPlayback
-    ? (userTimelineDuration ?? (videoTrimEnd != null ? effectiveTrimmed : Math.max(sourceDuration || 0, 1)))
-    : (userTimelineDuration ?? computedTimelineDuration)
+    ? (validUserTimelineDuration ?? playbackTlFromMedia)
+    : (validUserTimelineDuration ?? computedTimelineDuration)
 
   const handleTimelineDurationChange = useCallback((seconds: number) => {
     const n = Number(seconds)
@@ -297,19 +315,25 @@ export default function App() {
     return () => URL.revokeObjectURL(url)
   }, [recordedBlob, isRestoring])
 
-  // Fallback: when we have a recording but duration is still 0, try to get it from the blob
-  // If that fails, use persisted userTimelineDuration so the UI doesn't stay at 0
+  // Fallback: when we have a recording but duration is still unknown, probe the blob; else use 60s floor (not 0)
   useEffect(() => {
     if (!recordedBlob || (duration != null && duration > 0)) return
     let cancelled = false
     getVideoDurationFromBlob(recordedBlob)
       .then((d) => {
-        if (!cancelled && d > 0) setDuration(d)
+        if (cancelled) return
+        if (d > 0) setDuration(d)
+        else {
+          const u = userTimelineDuration
+          if (u != null && u >= 1 && u <= 600) setDuration(u)
+          else setDuration(FALLBACK_RECORDING_TIMELINE_SEC)
+        }
       })
       .catch(() => {
-        if (!cancelled && userTimelineDuration != null && userTimelineDuration >= 1 && userTimelineDuration <= 600) {
-          setDuration(userTimelineDuration)
-        }
+        if (cancelled) return
+        const u = userTimelineDuration
+        if (u != null && u >= 1 && u <= 600) setDuration(u)
+        else setDuration(FALLBACK_RECORDING_TIMELINE_SEC)
       })
     return () => { cancelled = true }
   }, [recordedBlob, duration, userTimelineDuration])
@@ -341,9 +365,13 @@ export default function App() {
             const fallback = persisted?.userTimelineDuration
             if (fallback != null && fallback >= 1 && fallback <= 600) {
               setDuration(fallback)
+            } else {
+              setDuration(FALLBACK_RECORDING_TIMELINE_SEC)
             }
             getVideoDurationFromBlob(saved.blob)
-              .then((d) => { if (d > 0) setDuration(d) })
+              .then((d) => {
+                if (d > 0) setDuration(d)
+              })
               .catch(() => {})
           }
         }
@@ -585,12 +613,12 @@ export default function App() {
     }
   }, [videoKind, videoDeviceId])
 
-  const connectMedia = useCallback(async () => {
+  const connectMedia = useCallback(async (): Promise<boolean> => {
     setVideoStreamError(null)
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setVideoStreamError('Camera not supported. Use HTTPS and a modern browser.')
-      return
+      return false
     }
 
     try {
@@ -644,7 +672,7 @@ export default function App() {
       setVideoStreamError(msg)
       setVideoStream(null)
       console.error(e)
-      return
+      return false
     }
 
     try {
@@ -667,16 +695,40 @@ export default function App() {
       console.error(e)
       setAudioStream(null)
     }
+    return true
   }, [videoKind, videoDeviceId, audioDeviceId, width, height, studioQuality, refreshDevices])
+
+  const prepareCameraForRecord = useCallback(async (): Promise<boolean> => {
+    setEditPreviewSource('webcam')
+    if (videoKind === 'screen') {
+      if (!videoStream) {
+        return await connectMedia()
+      }
+      return true
+    }
+    const currentId = getVideoInputDeviceId(videoStream)
+    const needsSelectedCamera =
+      !videoStream || (!!videoDeviceId && currentId !== videoDeviceId)
+    if (!needsSelectedCamera) return true
+    if (videoStream) {
+      videoStream.getVideoTracks().forEach((t) => t.stop())
+    }
+    return await connectMedia()
+  }, [videoKind, videoStream, videoDeviceId, connectMedia])
 
   // Auto-connect camera when app loads (no recording yet, camera mode)
   const hasAutoConnectedRef = useRef(false)
   useEffect(() => {
-    if (isRestoring || recordedBlob || videoStream || videoKind !== 'camera' || hasAutoConnectedRef.current) return
+    if (isRestoring || recordedBlob || videoStream || videoKind !== 'camera') return
+    if (videoDevices.length === 0) return
+    if (!videoDeviceId) return
+    if (hasAutoConnectedRef.current) return
     hasAutoConnectedRef.current = true
-    const t = setTimeout(() => connectMedia(), 400)
+    const t = setTimeout(() => {
+      void connectMedia()
+    }, 400)
     return () => clearTimeout(t)
-  }, [isRestoring, recordedBlob, videoStream, videoKind, connectMedia])
+  }, [isRestoring, recordedBlob, videoStream, videoKind, videoDeviceId, videoDevices.length, connectMedia])
 
   const handleAddOverlay = useCallback((type: 'text' | 'image' | 'video' | 'infographic', initialPatch?: Partial<OverlayItem>) => {
     const start = displayTime
@@ -711,7 +763,21 @@ export default function App() {
   }, [])
 
   const handleEditOverlay = useCallback((id: string, patch: Partial<OverlayItem>) => {
-    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
+    setOverlays((prev) =>
+      prev.map((o) => {
+        if (o.id !== id) return o
+        const next: OverlayItem = { ...o, ...patch }
+        if (o.type === 'image') {
+          if (patch.imageDataUrl != null && patch.imageDataUrl !== '') {
+            next.imageUrl = undefined
+          }
+          if (patch.imageUrl != null && patch.imageUrl !== '') {
+            next.imageDataUrl = undefined
+          }
+        }
+        return next
+      })
+    )
   }, [])
 
   const handleRemoveOverlay = useCallback((id: string) => {
@@ -1061,13 +1127,22 @@ export default function App() {
           <button
             type="button"
             className={countdown != null ? styles.recordStopToggleStop : isRecording ? styles.recordStopToggleStop : styles.recordStopToggleRecord}
-            disabled={!videoStream && !isRecording && countdown == null}
+            disabled={recordArmBusy || (!videoStream && !isRecording && countdown == null)}
             onClick={
               countdown != null
                 ? () => setCountdown(null)
                 : isRecording
                   ? stopRecording
-                  : () => setCountdown(3)
+                  : async () => {
+                      if (recordArmBusy) return
+                      setRecordArmBusy(true)
+                      try {
+                        const ok = await prepareCameraForRecord()
+                        if (ok) setCountdown(3)
+                      } finally {
+                        setRecordArmBusy(false)
+                      }
+                    }
             }
             title={countdown != null ? 'Cancel countdown' : isRecording ? 'Stop recording' : 'Start recording'}
             aria-label={countdown != null ? 'Cancel countdown' : isRecording ? 'Stop recording' : 'Start recording'}

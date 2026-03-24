@@ -37,6 +37,13 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status;
     if (dumpId) where.dumpId = dumpId;
 
+    const countOnly =
+      searchParams.get("countOnly") === "1" || searchParams.get("countOnly") === "true";
+    if (countOnly) {
+      const count = await prisma.organizedItem.count({ where });
+      return NextResponse.json({ count });
+    }
+
     const items = await prisma.organizedItem.findMany({
       where,
       orderBy: { createdAt: "desc" },

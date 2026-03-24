@@ -58,7 +58,7 @@ interface InspectorPanelProps {
   audioDeviceId?: string
   onAudioDeviceIdChange?: (id: string) => void
   videoError?: string | null
-  onConnectMedia?: () => void | Promise<void>
+  onConnectMedia?: () => void | Promise<void | boolean>
   hasVideoStream?: boolean
   aspectRatio?: AspectRatio
   onAspectRatioChange?: (a: AspectRatio) => void

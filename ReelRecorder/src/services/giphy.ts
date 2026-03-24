@@ -45,17 +45,29 @@ export async function searchGiphyStickers(
       images?: {
         fixed_height?: { url?: string; width?: string; height?: string }
         fixed_height_small?: { url?: string; width?: string; height?: string }
-        downsized?: { url?: string }
+        downsized?: { url?: string; width?: string; height?: string }
+        downsized_medium?: { url?: string; width?: string; height?: string }
+        downsized_small?: { url?: string; width?: string; height?: string }
       }
     }>
     pagination?: { total_count?: number; count?: number; offset?: number }
   }
   const data: GiphySticker[] = (json.data ?? []).map((item) => {
-    const img = item.images?.fixed_height ?? item.images?.fixed_height_small ?? item.images?.downsized
+    // Prefer full animated renditions (not stills). downsized_medium / downsized are reliable GIF URLs for canvas.
+    const anim =
+      item.images?.downsized_medium ??
+      item.images?.downsized ??
+      item.images?.fixed_height ??
+      item.images?.fixed_height_small
+    const img = anim
     const url = img?.url ?? ''
     const w = parseInt(img?.width ?? '200', 10) || 200
     const h = parseInt(img?.height ?? '200', 10) || 200
-    const preview = item.images?.fixed_height_small?.url ?? img?.url ?? ''
+    const preview =
+      item.images?.fixed_height_small?.url ??
+      item.images?.downsized_small?.url ??
+      item.images?.fixed_height?.url ??
+      url
     return {
       id: item.id,
       url,

@@ -357,6 +357,7 @@ export function OverlayEditor({ overlay, onUpdate, onClose, onRemove, onSaveToLi
                     img.onload = () => {
                       onUpdate({
                         imageDataUrl: dataUrl,
+                        imageUrl: undefined,
                         naturalWidth: img.naturalWidth,
                         naturalHeight: img.naturalHeight,
                         imageScale: 1,
