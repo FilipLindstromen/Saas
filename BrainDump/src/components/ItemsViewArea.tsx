@@ -10,6 +10,7 @@ import {
 } from "@/lib/item-types";
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
 import { dateOnlyToStartOfDay, localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
+import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -89,7 +90,6 @@ function isTaskCompleted(it: Pick<ViewItem, "itemType" | "progress" | "kanbanCol
   );
 }
 
-const PERSONAL_AREAS_DEFAULT = ["feeling", "thoughts", "hobbies", "goals", "health", "relationships", "shopping"];
 const CUSTOM_AREAS_KEY = "braindump_custom_areas";
 
 function getPersonalAreasList(items: ViewItem[]): string[] {
@@ -102,7 +102,7 @@ function getPersonalAreasList(items: ViewItem[]): string[] {
       custom = Array.isArray(parsed) ? parsed.filter((c: unknown) => typeof c === "string" && c.trim()) : [];
     }
   } catch {}
-  const combined = [...new Set([...PERSONAL_AREAS_DEFAULT, ...fromItems, ...custom])];
+  const combined = [...new Set([...PERSONAL_AREA_DEFAULTS, ...fromItems, ...custom])];
   return combined.sort((a, b) => a.localeCompare(b));
 }
 

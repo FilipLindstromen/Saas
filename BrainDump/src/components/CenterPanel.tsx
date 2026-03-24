@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { UnclearOverlay } from "./UnclearOverlay";
@@ -9,6 +17,7 @@ import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
 import { filterNewStandaloneProjectNames } from "@/lib/project-name-match";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
+import { PhotoCaptureTrigger } from "./PhotoCaptureTrigger";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
@@ -66,7 +75,7 @@ interface CenterPanelProps {
   onTranscriptReady: (text: string) => void;
   onOrganized: (items: OrganizedItemPreview[], transcript: string) => void;
   onAutoSave?: (items: OrganizedItemPreview[], transcript: string) => void | Promise<void>;
-  /** After a successful auto-save from the dump flow: e.g. switch to Work + New filter */
+  /** After a successful auto-save from the dump flow: e.g. All (work+personal), no project/area, New batch, clear search */
   onDumpFinished?: () => void;
   transcriptFromOrganize?: string;
   onOpenSettings?: () => void;
@@ -90,25 +99,32 @@ function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined
   return undefined;
 }
 
-export function CenterPanel({
-  mode,
-  onTranscriptReady,
-  onOrganized,
-  onAutoSave,
-  onDumpFinished,
-  transcriptFromOrganize,
-  onOpenSettings,
-  projectNames = [],
-  projectId = null,
-  category = null,
-  itemType = null,
-  onItemTypeSelect,
-  viewType,
-  onViewTypeChange,
-  searchFilter = "",
-  scopeSlot = null,
-  onWorkProjectsChanged,
-}: CenterPanelProps) {
+export type BrainDumpCenterHandle = {
+  processImageForOrganize: (file: File) => Promise<void>;
+};
+
+export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(function CenterPanel(
+  {
+    mode,
+    onTranscriptReady,
+    onOrganized,
+    onAutoSave,
+    onDumpFinished,
+    transcriptFromOrganize,
+    onOpenSettings,
+    projectNames = [],
+    projectId = null,
+    category = null,
+    itemType = null,
+    onItemTypeSelect,
+    viewType,
+    onViewTypeChange,
+    searchFilter = "",
+    scopeSlot = null,
+    onWorkProjectsChanged,
+  },
+  ref
+) {
   const { t, locale } = useI18n();
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [transcript, setTranscript] = useState("");
@@ -138,6 +154,7 @@ export function CenterPanel({
   /** False while overlay closed — aborts in-flight `startRecording` if user dismisses quickly */
   const showDumpOverlayRef = useRef(false);
   const [showDumpFace, setShowDumpFace] = useState(() => (typeof window !== "undefined" ? loadShowDumpFace() : true));
+  const [photoOrganizeFlow, setPhotoOrganizeFlow] = useState(false);
 
   useEffect(() => {
     const sync = () => setShowDumpFace(loadShowDumpFace());
@@ -576,6 +593,54 @@ export function CenterPanel({
     }
   }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t, onWorkProjectsChanged]);
 
+  const processImageForOrganize = useCallback(
+    async (file: File) => {
+      if (!file || file.size === 0) {
+        setError(t("error.emptyImage"));
+        return;
+      }
+      setError(null);
+      setPhotoOrganizeFlow(true);
+      setTranscribeLoading(true);
+      try {
+        const form = new FormData();
+        form.append("image", file);
+        const key = getStoredOpenAIKey();
+        if (key) form.append("apiKey", key);
+        form.append("locale", locale);
+        const res = await fetch("/api/transcribe-image", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) {
+          const msg = data.error || "Image transcription failed";
+          if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
+            onOpenSettings?.();
+          }
+          throw new Error(msg);
+        }
+        const text = (data.transcript || "").trim();
+        if (!text) {
+          throw new Error(t("error.noTextInImage"));
+        }
+        setTranscript((prev) => (prev ? prev + "\n\n" + text : text));
+        saveFormState({
+          transcriptRaw: text,
+          transcriptEdited: (transcript || "") + (transcript ? "\n\n" + text : text),
+        });
+        onTranscriptReady(text);
+        setTranscribeLoading(false);
+        await organize(text);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Photo processing failed");
+      } finally {
+        setTranscribeLoading(false);
+        setPhotoOrganizeFlow(false);
+      }
+    },
+    [locale, onOpenSettings, onTranscriptReady, organize, transcript, t]
+  );
+
+  useImperativeHandle(ref, () => ({ processImageForOrganize }), [processImageForOrganize]);
+
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();
     await new Promise((r) => setTimeout(r, 350));
@@ -607,6 +672,12 @@ export function CenterPanel({
 
   const isInbox = mode === "inbox";
   const isDumpProcessing = transcribeLoading || organizeLoading;
+  const processingTitle =
+    transcribeLoading && !organizeLoading
+      ? photoOrganizeFlow
+        ? t("center.readingPhoto")
+        : t("center.transcribing")
+      : t("center.organizingThoughts");
   const reflectionQuestions = Array.from({ length: 10 }, (_, i) => t(`help.q${i + 1}`));
 
   useEffect(() => {
@@ -748,20 +819,42 @@ export function CenterPanel({
           {t("center.dumpPromptInbox")}
         </p>
       )}
-      <button
-        id="bd-dump-fab"
-        className="bd-dump-fab"
-        type="button"
-        onClick={openDumpOverlay}
-        title={t("center.recordNewDump")}
-        aria-label={t("center.recordNewDump")}
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="22" />
-        </svg>
-      </button>
+      {!isMobile ? (
+        <div className="bd-dump-fab-row">
+          <PhotoCaptureTrigger onFile={(f) => void processImageForOrganize(f)} disabled={isDumpProcessing || photoOrganizeFlow} />
+          <button
+            id="bd-dump-fab"
+            className="bd-dump-fab"
+            type="button"
+            onClick={openDumpOverlay}
+            disabled={isDumpProcessing || photoOrganizeFlow}
+            title={t("center.recordNewDump")}
+            aria-label={t("center.recordNewDump")}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <button
+          id="bd-dump-fab"
+          className="bd-dump-fab"
+          type="button"
+          onClick={openDumpOverlay}
+          disabled={isDumpProcessing || photoOrganizeFlow}
+          title={t("center.recordNewDump")}
+          aria-label={t("center.recordNewDump")}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </button>
+      )}
       {showDumpOverlay && !isDumpProcessing && (
             <div
               className="bd-dump-overlay"
@@ -801,12 +894,12 @@ export function CenterPanel({
               </div>
             </div>
       )}
-      {showDumpOverlay && isDumpProcessing && (
+      {((showDumpOverlay && isDumpProcessing) || photoOrganizeFlow) && (
         <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
           <div className="bd-dump-processing-inner">
             {showDumpFace && <DumpListeningFace variant="overlay" />}
             <div className="bd-dump-spinner" aria-hidden />
-            <p className="bd-dump-processing-title">{t("center.organizingThoughts")}</p>
+            <p className="bd-dump-processing-title">{processingTitle}</p>
           </div>
         </div>
       )}
@@ -895,4 +988,6 @@ export function CenterPanel({
       )}
     </div>
   );
-}
+});
+
+CenterPanel.displayName = "CenterPanel";

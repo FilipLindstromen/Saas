@@ -101,9 +101,22 @@ const en: Msg = {
   "center.openSettings": "Open settings",
   "center.organizedSaved": "Organized and saved {n} item(s).",
   "center.organizedReview": "Organized into {n} item(s). Review and save on the right.",
-  "center.dumpPromptInbox": "Tap the microphone button to record a dump.",
+  "center.dumpPromptInbox": "Tap the microphone to record, or the camera button to capture text from a photo (next to the mic on desktop, bottom-left on mobile).",
+  "center.readingPhoto": "Reading text from your photo…",
+  "center.transcribing": "Transcribing audio…",
+  "center.webcamCapture": "Webcam",
+  "center.webcamCapturePhoto": "Capture photo",
+  "center.webcamCancel": "Cancel",
+
+  "bottom.photoDump": "Dump from photo (camera or file)",
+  "bottom.photoFromCamera": "Take photo",
+  "bottom.photoFromLibrary": "Choose from files",
+  "bottom.photoWebcam": "Use webcam",
+  "bottom.photoCaptureMenuAria": "Photo capture options",
 
   "error.openaiKey": "OpenAI API key is not configured",
+  "error.emptyImage": "Choose a non-empty image.",
+  "error.noTextInImage": "No readable text was found in the image. Try a clearer photo.",
   "error.recordFirst": "Record audio first, then click Transcribe.",
   "error.emptyRecording": "Recording is empty. Record again and wait a few seconds before stopping.",
   "error.micDenied": "Microphone access denied or unavailable.",
@@ -172,8 +185,9 @@ const en: Msg = {
 
   "settings.title": "Settings",
   "settings.deleteAllEntries": "Delete all entries",
+  "settings.deleteEntriesOpen": "Delete entries…",
   "settings.deleteAllIntro":
-    "Permanently remove organized entries. You can delete everything, or only Work or Personal.",
+    "Permanently remove organized entries. Open the list to choose what to delete (everything, Work, Personal, projects, areas, entry types, or only certain tasks).",
   "settings.deleteAllConfirm":
     "Permanently delete all your organized entries? This cannot be undone.",
   "settings.deleteAllDeleting": "Deleting…",
@@ -187,12 +201,65 @@ const en: Msg = {
     "Permanently delete all organized entries in Personal? This cannot be undone.",
   "settings.deleteWorkDone": "Work entries deleted.",
   "settings.deletePersonalDone": "Personal entries deleted.",
+  "settings.deleteEntriesTitle": "Delete entries",
+  "settings.deleteEntriesOverlayIntro":
+    "Pick exactly one option below. Only organized entries are removed — this does not delete your account or API keys.",
+  "settings.deleteEntriesTasksHint":
+    "These options affect task entries only (completed, active, or all tasks). Notes, calendar items, and other types are not included unless you choose a broader option.",
+  "settings.deleteEntriesLoading": "Loading…",
+  "settings.deleteEntriesEmpty": "You have no entries to delete.",
+  "settings.deleteEntriesClose": "Close",
+  "settings.deleteEntriesSelect": "Delete selected",
+  "settings.deleteEntriesSelectFirst": "Select an option in the list first.",
+  "settings.deleteEntriesConfirm":
+    "Permanently delete {count} entries?\n\n{label}\n\nThis cannot be undone.",
+  "settings.deleteEntriesDone": "Entries deleted.",
+  "settings.deleteSectionWorkspace": "Whole workspace",
+  "settings.deleteSectionTasks": "Tasks only",
+  "settings.deleteTasksSubgroupCompleted": "Completed tasks",
+  "settings.deleteTasksSubgroupActive": "Active (incomplete) tasks",
+  "settings.deleteTasksSubgroupAllStates": "All tasks (any status)",
+  "settings.deleteSectionByTypeWork": "By entry type — Work",
+  "settings.deleteSectionByTypePersonal": "By entry type — Personal",
+  "settings.deleteSectionWorkAreas": "Work areas",
+  "settings.deleteSectionPersonalAreas": "Personal areas",
+  "settings.deleteSectionProjects": "By project",
+  "settings.deleteRowEverything": "All entries (entire BrainDump)",
+  "settings.deleteRowAllInDomain": "All entries in {domain}",
+  "settings.deleteRowCompletedAll": "All completed tasks (Work + Personal)",
+  "settings.deleteRowCompletedInDomain": "Completed tasks in {domain}",
+  "settings.deleteRowActiveAll": "All active (incomplete) tasks",
+  "settings.deleteRowActiveInDomain": "Active tasks in {domain}",
+  "settings.deleteRowAllTasksAll": "All tasks, any state (Work + Personal)",
+  "settings.deleteRowAllTasksInDomain": "All tasks in {domain}, any state",
+  "settings.deleteRowItemType": "All “{type}” entries in {domain}",
+  "settings.deleteRowWorkArea": "All entries in Work area “{name}”",
+  "settings.deleteRowPersonalArea": "All entries in Personal area “{name}”",
+  "settings.deleteRowProject": "All entries in project “{name}”",
+  "settings.deleteProjectKeepsSidebar": "The project stays in the sidebar; only its entries are removed.",
+  "settings.deleteEntriesCountSuffix": "({count})",
   "settings.showEntryTitles": "Show entry titles in views",
   "settings.showEntryTitlesHelp":
     "When off, list, text, kanban, calendar, post-its, and mind map show description (or a snippet) instead of the title. Stored in your browser only.",
   "settings.showDumpFace": "Show listening face when dumping",
   "settings.showDumpFaceHelp":
     "Simple animated face above the dump panel while you record and organize. Turn off if you prefer a minimal UI. Stored in your browser only.",
+
+  "settings.googleCalendarSync": "Sync with Google Calendar",
+  "settings.appleCalendarTitle": "Apple Calendar",
+  "settings.appleCalendarIntro":
+    "Apple does not offer the same one-click web sign-in for iCloud Calendar as Google. To see BrainDump events in the Calendar app on iPhone, iPad, or Mac, use the steps below (Google Calendar as a bridge) or manage events in BrainDump’s Calendar view.",
+  "settings.appleCalendarToggleSteps": "Show how to connect with Apple Calendar",
+  "settings.appleCalendarToggleStepsHide": "Hide steps",
+  "settings.appleCalendarStep1":
+    "Turn on “Sync with Google Calendar” above, connect your Google account, and choose which Google calendar to use.",
+  "settings.appleCalendarStep2":
+    "On your iPhone or iPad: Settings → Calendar → Accounts → Add Account → Google, and sign in with the same Google account. On Mac: System Settings → Internet Accounts → Google.",
+  "settings.appleCalendarStep3":
+    "Make sure Calendars is enabled for that Google account. Events you sync from BrainDump to Google Calendar will then appear in Apple Calendar alongside your iCloud events.",
+  "settings.appleCalendarSupportLink": "Apple Support — Calendar accounts on iPhone",
+  "settings.appleCalendarIcloudNote":
+    "If you only use iCloud: BrainDump cannot sign in to iCloud Calendar directly in the browser (no Apple calendar OAuth for web apps). The Google bridge above is the reliable option; CalDAV with an app-specific password is possible in some desktop apps but is not built into BrainDump yet.",
 
   "menu.changeType": "Change type",
   "menu.edit": "Edit",
@@ -327,9 +394,22 @@ const sv: Msg = {
   "center.openSettings": "Öppna inställningar",
   "center.organizedSaved": "Organiserat och sparat {n} post(er).",
   "center.organizedReview": "Organiserat till {n} post(er). Granska och spara till höger.",
-  "center.dumpPromptInbox": "Tryck på mikrofonknappen för att spela in en dump.",
+  "center.dumpPromptInbox": "Tryck på mikrofonen för att spela in, eller kameraknappen för att läsa text från ett foto (bredvid mikrofonen på desktop, nere till vänster på mobil).",
+  "center.readingPhoto": "Läser text från din bild…",
+  "center.transcribing": "Transkriberar ljud…",
+  "center.webcamCapture": "Webbkamera",
+  "center.webcamCapturePhoto": "Ta foto",
+  "center.webcamCancel": "Avbryt",
+
+  "bottom.photoDump": "Dumpa från foto (kamera eller fil)",
+  "bottom.photoFromCamera": "Ta foto",
+  "bottom.photoFromLibrary": "Välj från filer",
+  "bottom.photoWebcam": "Använd webbkamera",
+  "bottom.photoCaptureMenuAria": "Alternativ för fotofångst",
 
   "error.openaiKey": "OpenAI API-nyckel är inte konfigurerad",
+  "error.emptyImage": "Välj en bild som inte är tom.",
+  "error.noTextInImage": "Ingen läsbar text hittades i bilden. Prova en tydligare bild.",
   "error.recordFirst": "Spela in ljud först, klicka sedan på Transkribera.",
   "error.emptyRecording": "Inspelningen är tom. Spela in igen och vänta några sekunder innan du stoppar.",
   "error.micDenied": "Mikrofon nekad eller otillgänglig.",
@@ -399,8 +479,9 @@ const sv: Msg = {
 
   "settings.title": "Inställningar",
   "settings.deleteAllEntries": "Ta bort alla poster",
+  "settings.deleteEntriesOpen": "Ta bort poster…",
   "settings.deleteAllIntro":
-    "Ta permanent bort organiserade poster. Du kan ta bort allt, eller bara Arbete eller Personligt.",
+    "Ta permanent bort organiserade poster. Öppna listan för att välja vad som tas bort (allt, Arbete, Privat, projekt, områden, posttyper eller bara vissa uppgifter).",
   "settings.deleteAllConfirm":
     "Ta permanent bort alla organiserade poster? Det går inte att ångra.",
   "settings.deleteAllDeleting": "Tar bort…",
@@ -414,12 +495,65 @@ const sv: Msg = {
     "Ta permanent bort alla organiserade poster under Personligt? Det går inte att ångra.",
   "settings.deleteWorkDone": "Arbetsposter har tagits bort.",
   "settings.deletePersonalDone": "Personliga poster har tagits bort.",
+  "settings.deleteEntriesTitle": "Ta bort poster",
+  "settings.deleteEntriesOverlayIntro":
+    "Välj ett alternativ nedan. Bara organiserade poster tas bort — detta raderar inte ditt konto eller API-nycklar.",
+  "settings.deleteEntriesTasksHint":
+    "Dessa alternativ gäller bara uppgiftsposter (klara, aktiva eller alla uppgifter). Anteckningar, kalenderposter och andra typer påverkas inte om du inte väljer ett bredare alternativ.",
+  "settings.deleteEntriesLoading": "Laddar…",
+  "settings.deleteEntriesEmpty": "Du har inga poster att ta bort.",
+  "settings.deleteEntriesClose": "Stäng",
+  "settings.deleteEntriesSelect": "Ta bort valt",
+  "settings.deleteEntriesSelectFirst": "Välj ett alternativ i listan först.",
+  "settings.deleteEntriesConfirm":
+    "Ta permanent bort {count} poster?\n\n{label}\n\nDet går inte att ångra.",
+  "settings.deleteEntriesDone": "Posterna har tagits bort.",
+  "settings.deleteSectionWorkspace": "Hela arbetsytan",
+  "settings.deleteSectionTasks": "Bara uppgifter",
+  "settings.deleteTasksSubgroupCompleted": "Klara uppgifter",
+  "settings.deleteTasksSubgroupActive": "Aktiva (ofullständiga) uppgifter",
+  "settings.deleteTasksSubgroupAllStates": "Alla uppgifter (oavsett status)",
+  "settings.deleteSectionByTypeWork": "Efter posttyp — Arbete",
+  "settings.deleteSectionByTypePersonal": "Efter posttyp — Privat",
+  "settings.deleteSectionWorkAreas": "Arbetsområden",
+  "settings.deleteSectionPersonalAreas": "Privata områden",
+  "settings.deleteSectionProjects": "Efter projekt",
+  "settings.deleteRowEverything": "Alla poster (hela BrainDump)",
+  "settings.deleteRowAllInDomain": "Alla poster i {domain}",
+  "settings.deleteRowCompletedAll": "Alla klara uppgifter (Arbete + Privat)",
+  "settings.deleteRowCompletedInDomain": "Klarmarkerade uppgifter i {domain}",
+  "settings.deleteRowActiveAll": "Alla aktiva (ofullständiga) uppgifter",
+  "settings.deleteRowActiveInDomain": "Aktiva uppgifter i {domain}",
+  "settings.deleteRowAllTasksAll": "Alla uppgifter oavsett status (Arbete + Privat)",
+  "settings.deleteRowAllTasksInDomain": "Alla uppgifter i {domain}, oavsett status",
+  "settings.deleteRowItemType": "Alla poster av typen ”{type}” i {domain}",
+  "settings.deleteRowWorkArea": "Alla poster i arbetsområdet ”{name}”",
+  "settings.deleteRowPersonalArea": "Alla poster i det privata området ”{name}”",
+  "settings.deleteRowProject": "Alla poster i projektet ”{name}”",
+  "settings.deleteProjectKeepsSidebar": "Projektet finns kvar i sidomenyn; bara posterna tas bort.",
+  "settings.deleteEntriesCountSuffix": "({count})",
   "settings.showEntryTitles": "Visa posttitlar i vyerna",
   "settings.showEntryTitlesHelp":
     "När av: visar list-, text-, kanban-, kalender-, post-it- och flödesdiagramvyer beskrivning (eller ett utdrag) i stället för titel. Sparas bara i din webbläsare.",
   "settings.showDumpFace": "Visa lyssnaransikte vid dumpning",
   "settings.showDumpFaceHelp":
     "Ett enkelt animerat ansikte ovanför dumppanelen när du spelar in och organiserar. Stäng av för minimalare gränssnitt. Sparas bara i din webbläsare.",
+
+  "settings.googleCalendarSync": "Synka med Google Kalender",
+  "settings.appleCalendarTitle": "Apple Kalender",
+  "settings.appleCalendarIntro":
+    "Apple erbjuder inte samma ett-klicks-inloggning för iCloud-kalender i webben som Google. För att se BrainDump-händelser i Kalender på iPhone, iPad eller Mac: följ stegen nedan (Google Kalender som brygga) eller hantera händelser i BrainDumps kalendervy.",
+  "settings.appleCalendarToggleSteps": "Visa hur du kopplar Apple Kalender",
+  "settings.appleCalendarToggleStepsHide": "Dölj steg",
+  "settings.appleCalendarStep1":
+    "Slå på ”Synka med Google Kalender” ovan, koppla ditt Google-konto och välj vilken Google-kalender som ska användas.",
+  "settings.appleCalendarStep2":
+    "På iPhone eller iPad: Inställningar → Kalender → Konton → Lägg till konto → Google, och logga in med samma Google-konto. På Mac: Systeminställningar → Internetkonton → Google.",
+  "settings.appleCalendarStep3":
+    "Kontrollera att Kalender är påslaget för det Google-kontot. Händelser som synkas från BrainDump till Google Kalender visas då i Apple Kalender tillsammans med dina iCloud-händelser.",
+  "settings.appleCalendarSupportLink": "Apple-support — kalenderkonton på iPhone",
+  "settings.appleCalendarIcloudNote":
+    "Om du bara använder iCloud: BrainDump kan inte logga in direkt mot iCloud-kalender i webbläsaren (ingen Apple OAuth för webbappar). Bryggan via Google ovan är det stabila alternativet; CalDAV med appspecifikt lösenord finns i vissa skrivbordsappar men är inte inbyggt i BrainDump ännu.",
 
   "menu.changeType": "Byt typ",
   "menu.edit": "Redigera",

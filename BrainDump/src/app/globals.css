@@ -857,6 +857,106 @@ select.bd-input::-ms-expand {
   filter: brightness(0.96);
 }
 
+/* Mic FAB + photo capture (desktop): single fixed cluster */
+.bd-dump-fab-row {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bd-dump-fab-row .bd-dump-fab {
+  position: static;
+  transform: none;
+}
+
+.bd-dump-fab-row .bd-dump-fab:hover {
+  transform: scale(1.06);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.06);
+  border-color: var(--bd-chrome-selected-border);
+}
+
+.bd-dump-fab-row .bd-dump-fab:active {
+  transform: scale(0.96);
+  filter: brightness(0.96);
+}
+
+.bd-dump-fab-row .bd-bottom-camera-btn {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  transition:
+    transform var(--bd-duration-normal) var(--bd-ease-soft),
+    box-shadow var(--bd-duration-normal) var(--bd-ease-in-out),
+    filter var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-dump-fab-row .bd-bottom-camera-btn:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.06);
+  border-color: var(--bd-chrome-selected-border);
+}
+
+.bd-dump-fab-row .bd-bottom-camera-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.bd-photo-capture-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  min-width: 11.5rem;
+  padding: 0.35rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+}
+
+.bd-photo-capture-menu-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.bd-photo-capture-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.bd-photo-input-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Generic modal (settings, unclear items, help, item dialogs) */
 .bd-modal-backdrop {
   position: fixed;
@@ -1471,6 +1571,17 @@ select.bd-input::-ms-expand {
     pointer-events: auto;
   }
 
+  .bd-bottom-bar-left-tools {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    pointer-events: auto;
+  }
+
   .bd-bottom-bar .bd-bottom-view-btn {
     flex: 0 0 auto !important;
     min-width: 44px !important;
@@ -1515,6 +1626,29 @@ select.bd-input::-ms-expand {
 
   .bd-bottom-bar .bd-bottom-dump-mic svg {
     flex-shrink: 0;
+  }
+
+  .bd-bottom-bar .bd-bottom-camera-btn {
+    flex: 0 0 auto !important;
+    min-width: 44px !important;
+    width: 44px !important;
+    max-width: 44px !important;
+    min-height: 44px;
+    padding: 0 !important;
+    border-radius: 12px;
+    font-size: 0;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bd-bottom-bar .bd-bottom-camera-btn:disabled {
+    opacity: 0.45;
+    pointer-events: none;
   }
 
   .bd-mobile-hide {

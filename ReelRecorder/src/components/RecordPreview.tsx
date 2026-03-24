@@ -42,7 +42,8 @@ function drawSafeZoneOverlay(
 const RESIZE_HANDLE_SIZE = 28
 const ROTATE_HANDLE_SIZE = 32
 const FLIP_ICON_SIZE = 26
-const HANDLE_HIT_PADDING = 6
+/** Extra radius around each resize grip so corners are easy to grab (canvas pixels). */
+const HANDLE_HIT_PADDING = 16
 const SELECTION_STROKE = 2
 const SNAP_THRESHOLD = 8
 const GUIDE_COLOR = '#f97316' // Orange, matches InfoGraphics accent
@@ -184,17 +185,69 @@ function getCenterAnchoredSize(
   return null
 }
 
-/** Bottom-right of the drawn quad in canvas space (matches canvasCapture transform order). */
-function getCenterAnchoredBrCornerCanvas(
+type BoxCorner = 'nw' | 'ne' | 'se' | 'sw'
+
+const BOX_CORNERS: BoxCorner[] = ['nw', 'ne', 'se', 'sw']
+
+function oppositeBoxCorner(c: BoxCorner): BoxCorner {
+  switch (c) {
+    case 'nw':
+      return 'se'
+    case 'se':
+      return 'nw'
+    case 'ne':
+      return 'sw'
+    case 'sw':
+      return 'ne'
+  }
+}
+
+function getAxisAlignedRectCorner(
+  rect: { x: number; y: number; w: number; h: number },
+  corner: BoxCorner
+): { x: number; y: number } {
+  switch (corner) {
+    case 'nw':
+      return { x: rect.x, y: rect.y }
+    case 'ne':
+      return { x: rect.x + rect.w, y: rect.y }
+    case 'se':
+      return { x: rect.x + rect.w, y: rect.y + rect.h }
+    case 'sw':
+      return { x: rect.x, y: rect.y + rect.h }
+  }
+}
+
+/** Corner of the drawn quad in canvas space (matches canvasCapture: translate center → rotate → flip X). */
+function getCenterAnchoredCornerCanvas(
   cx: number,
   cy: number,
   w: number,
   h: number,
   rotationDeg: number,
-  flipHorizontal: boolean
+  flipHorizontal: boolean,
+  corner: BoxCorner
 ): { x: number; y: number } {
-  let lx = w / 2
-  let ly = h / 2
+  let lx: number
+  let ly: number
+  switch (corner) {
+    case 'nw':
+      lx = -w / 2
+      ly = -h / 2
+      break
+    case 'ne':
+      lx = w / 2
+      ly = -h / 2
+      break
+    case 'se':
+      lx = w / 2
+      ly = h / 2
+      break
+    case 'sw':
+      lx = -w / 2
+      ly = h / 2
+      break
+  }
   if (flipHorizontal) lx = -lx
   const θ = (rotationDeg * Math.PI) / 180
   const cos = Math.cos(θ)
@@ -202,6 +255,36 @@ function getCenterAnchoredBrCornerCanvas(
   const wx = lx * cos - ly * sin
   const wy = lx * sin + ly * cos
   return { x: cx + wx, y: cy + wy }
+}
+
+/** Resize handle centers for hit-test and drawing (same order as BOX_CORNERS). */
+function getOverlayResizeCornerPoints(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  o: OverlayItem,
+  defaultFontFamily: string,
+  defaultBold: boolean
+): { corner: BoxCorner; x: number; y: number }[] | null {
+  const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily, defaultBold)
+  if (!rect) return null
+  if (o.type === 'image' || o.type === 'video' || o.type === 'infographic') {
+    const m = getCenterAnchoredSize(o, width, height)
+    if (m) {
+      const rot = o.rotation ?? 0
+      const flip = !!o.flipHorizontal
+      return BOX_CORNERS.map((corner) => ({
+        corner,
+        ...getCenterAnchoredCornerCanvas(m.cx, m.cy, m.w, m.h, rot, flip, corner),
+      }))
+    }
+  }
+  return [
+    { corner: 'nw', x: rect.x, y: rect.y },
+    { corner: 'ne', x: rect.x + rect.w, y: rect.y },
+    { corner: 'se', x: rect.x + rect.w, y: rect.y + rect.h },
+    { corner: 'sw', x: rect.x, y: rect.y + rect.h },
+  ]
 }
 
 /** Hit-test pointer inside rotated (and flipped) center-anchored rect; flip cancels out in this frame. */
@@ -284,17 +367,21 @@ function drawSelectionAndHandles(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   showRotateAndFlip: boolean,
-  /** When set (center-anchored overlays), place the resize grip on the visual BR corner */
-  resizeHandleCenter?: { x: number; y: number }
+  /** Centers of resize grips (one per corner); must match `getOverlayResizeCornerPoints` for hit-testing */
+  resizeHandleCenters: { x: number; y: number }[]
 ) {
   ctx.strokeStyle = '#5b8def'
   ctx.lineWidth = SELECTION_STROKE
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
   const half = RESIZE_HANDLE_SIZE / 2
-  const hcx = resizeHandleCenter?.x ?? rect.x + rect.w - half
-  const hcy = resizeHandleCenter?.y ?? rect.y + rect.h - half
+  const centers =
+    resizeHandleCenters.length > 0
+      ? resizeHandleCenters
+      : [getAxisAlignedRectCorner(rect, 'se')]
   ctx.fillStyle = '#5b8def'
-  ctx.fillRect(hcx - half, hcy - half, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
+  for (const c of centers) {
+    ctx.fillRect(c.x - half, c.y - half, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE)
+  }
   if (showRotateAndFlip) {
     const cx = rect.x + rect.w / 2
     const rotateY = rect.y - ROTATE_HANDLE_SIZE / 2 - 4
@@ -473,6 +560,10 @@ export function RecordPreview({
     centerX?: number
     centerY?: number
     startRadialDist?: number
+    /** Axis-aligned text: opposite corner + start distance for stable corner-drag scaling */
+    textAnchorX?: number
+    textAnchorY?: number
+    textStartDist?: number
   } | null>(null)
   const [rotateState, setRotateState] = useState<{
     overlayId: string
@@ -483,7 +574,9 @@ export function RecordPreview({
   } | null>(null)
   const [captionDrag, setCaptionDrag] = useState(false)
   const [snapGuides, setSnapGuides] = useState<{ type: 'x' | 'y'; pos: number }[]>([])
-  const [cursor, setCursor] = useState<'default' | 'grab' | 'grabbing' | 'nwse-resize' | 'pointer'>('default')
+  const [cursor, setCursor] = useState<
+    'default' | 'grab' | 'grabbing' | 'nwse-resize' | 'nesw-resize' | 'pointer'
+  >('default')
 
   // Effective "show recording": only when editPreviewSource is 'recording' (or no webcam when 'webcam')
   // When isRecording, always show webcam (we're recording it); don't show playback.
@@ -792,22 +885,13 @@ export function RecordPreview({
             const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
             if (rect) {
               const showRotateFlip = sel.type === 'image' || sel.type === 'video' || sel.type === 'infographic'
-              let resizeHandleCenter: { x: number; y: number } | undefined
-              if (showRotateFlip) {
-                const m = getCenterAnchoredSize(sel, width, height)
-                if (m) {
-                  const br = getCenterAnchoredBrCornerCanvas(
-                    m.cx,
-                    m.cy,
-                    m.w,
-                    m.h,
-                    sel.rotation ?? 0,
-                    !!sel.flipHorizontal
-                  )
-                  resizeHandleCenter = { x: br.x, y: br.y }
-                }
+              const resizeCorners =
+                getOverlayResizeCornerPoints(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)?.map(
+                  (p) => ({ x: p.x, y: p.y })
+                ) ?? []
+              if (resizeCorners.length > 0) {
+                drawSelectionAndHandles(ctx, rect, showRotateFlip, resizeCorners)
               }
-              drawSelectionAndHandles(ctx, rect, showRotateFlip, resizeHandleCenter)
             }
           }
         }
@@ -861,7 +945,7 @@ export function RecordPreview({
 
   type HitResult =
     | { type: 'overlay'; id: string; offsetX: number; offsetY: number }
-    | { type: 'resize'; id: string }
+    | { type: 'resize'; id: string; corner: BoxCorner }
     | { type: 'rotate'; id: string }
     | { type: 'flip'; id: string }
     | { type: 'caption' }
@@ -872,36 +956,22 @@ export function RecordPreview({
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return null
     const active = overlays.filter((o) => displayTime >= o.startTime && displayTime <= o.endTime)
-    // Check resize, rotate, flip handles for ALL overlays first (handles take priority over body)
-    if (onOverlayEdit) {
-      for (let i = active.length - 1; i >= 0; i--) {
-        const o = active[i]
+    // Resize / rotate / flip only for the selected overlay (matches on-canvas handles).
+    if (onOverlayEdit && selectedOverlayId) {
+      const o = active.find((ov) => ov.id === selectedOverlayId)
+      if (o) {
+        const cornerPts = getOverlayResizeCornerPoints(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+        if (cornerPts) {
+          const hitR = RESIZE_HANDLE_SIZE / 2 + HANDLE_HIT_PADDING
+          for (const { corner, x: hx, y: hy } of cornerPts) {
+            if (Math.hypot(canvasX - hx, canvasY - hy) <= hitR) {
+              return { type: 'resize', id: o.id, corner }
+            }
+          }
+        }
         const rect = getOverlayRect(ctx, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
         if (rect) {
           const pad = HANDLE_HIT_PADDING
-          const half = RESIZE_HANDLE_SIZE / 2 + pad
-          let hx: number
-          let hy: number
-          if (o.type === 'text' && o.text) {
-            hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
-            hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
-          } else if (o.type === 'image' || o.type === 'video' || o.type === 'infographic') {
-            const m = getCenterAnchoredSize(o, width, height)
-            if (!m) {
-              hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
-              hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
-            } else {
-              const br = getCenterAnchoredBrCornerCanvas(m.cx, m.cy, m.w, m.h, o.rotation ?? 0, !!o.flipHorizontal)
-              hx = br.x
-              hy = br.y
-            }
-          } else {
-            hx = rect.x + rect.w - RESIZE_HANDLE_SIZE / 2
-            hy = rect.y + rect.h - RESIZE_HANDLE_SIZE / 2
-          }
-          if (Math.abs(canvasX - hx) <= half && Math.abs(canvasY - hy) <= half) {
-            return { type: 'resize', id: o.id }
-          }
           const showRotateFlip = o.type === 'image' || o.type === 'video' || o.type === 'infographic'
           if (showRotateFlip) {
             const cx = rect.x + rect.w / 2
@@ -1060,6 +1130,20 @@ export function RecordPreview({
           }
         }
       }
+      let textAnchorX: number | undefined
+      let textAnchorY: number | undefined
+      let textStartDist: number | undefined
+      const ctxForText = canvasRef.current?.getContext('2d')
+      if (o.type === 'text' && ctxForText) {
+        const textRect = getOverlayRect(ctxForText, width, height, o, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+        if (textRect) {
+          const anchor = getAxisAlignedRectCorner(textRect, oppositeBoxCorner(hit.corner))
+          const d0 = Math.hypot(x - anchor.x, y - anchor.y)
+          textAnchorX = anchor.x
+          textAnchorY = anchor.y
+          textStartDist = Math.max(8, d0)
+        }
+      }
       setResizeState({
         overlayId: hit.id,
         startX: x,
@@ -1067,8 +1151,11 @@ export function RecordPreview({
         startValue,
         kind: o.type === 'text' ? 'fontSize' : 'scale',
         ...radial,
+        textAnchorX,
+        textAnchorY,
+        textStartDist,
       })
-      setCursor('nwse-resize')
+      setCursor(hit.corner === 'nw' || hit.corner === 'se' ? 'nwse-resize' : 'nesw-resize')
         ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
       return
     }
@@ -1108,6 +1195,14 @@ export function RecordPreview({
         const cur = Math.hypot(x - resizeState.centerX, y - resizeState.centerY)
         const k = cur / resizeState.startRadialDist
         newValue = resizeState.startValue * k
+      } else if (
+        resizeState.kind === 'fontSize' &&
+        resizeState.textAnchorX != null &&
+        resizeState.textAnchorY != null &&
+        resizeState.textStartDist != null
+      ) {
+        const cur = Math.hypot(x - resizeState.textAnchorX, y - resizeState.textAnchorY)
+        newValue = resizeState.startValue * (cur / resizeState.textStartDist)
       } else {
         const deltaX = x - resizeState.startX
         const deltaY = y - resizeState.startY
@@ -1179,7 +1274,9 @@ export function RecordPreview({
     }
     const hit = hitTest(x, y)
     if (hit?.type === 'caption' && onCaptionYChange) setCursor('grab')
-    else if (hit?.type === 'resize' && !isRecording && onOverlayEdit) setCursor('nwse-resize')
+    else if (hit?.type === 'resize' && !isRecording && onOverlayEdit) {
+      setCursor(hit.corner === 'nw' || hit.corner === 'se' ? 'nwse-resize' : 'nesw-resize')
+    }
     else if (hit?.type === 'rotate' && !isRecording && onOverlayEdit) setCursor('grab')
     else if (hit?.type === 'flip' && !isRecording && onOverlayEdit) setCursor('pointer')
     else if (hit?.type === 'overlay' && !isRecording && onOverlayMove) setCursor('grab')

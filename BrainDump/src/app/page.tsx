@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
-import { CenterPanel, type OrganizedItemPreview } from "@/components/CenterPanel";
+import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } from "@/components/CenterPanel";
+import { PhotoCaptureTrigger } from "@/components/PhotoCaptureTrigger";
 import { RightPanel } from "@/components/RightPanel";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -45,6 +46,7 @@ export default function BrainDumpPage() {
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
+  const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -200,8 +202,11 @@ export default function BrainDumpPage() {
   );
 
   const handleDumpFinished = useCallback(() => {
-    setMode("work");
+    setMode("all");
+    setSelectedProjectId(null);
+    setSelectedCategory(null);
     setSelectedItemType("new");
+    setSearchFilter("");
   }, []);
 
   const handleSaveComplete = useCallback((createdIds?: string[]) => {
@@ -378,6 +383,7 @@ export default function BrainDumpPage() {
           )}
           <div className="bd-page-content-padding">
             <CenterPanel
+              ref={centerPanelRef}
               mode={mode}
               onTranscriptReady={() => {}}
               onOrganized={handleOrganized}
@@ -425,7 +431,9 @@ export default function BrainDumpPage() {
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
-        <div className="bd-bottom-bar-spacer" aria-hidden />
+        <div className="bd-bottom-bar-left-tools">
+          <PhotoCaptureTrigger onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)} />
+        </div>
         <div className="bd-bottom-bar-center">
           <button
             type="button"

@@ -10,6 +10,7 @@ import {
   extractExplicitWorkProjectNames,
   filterRedundantProjectCreationNotes,
 } from "./project-name-match";
+import { PERSONAL_AREA_DEFAULTS } from "./personal-areas";
 
 export type Domain = "inbox" | "work" | "personal";
 
@@ -74,11 +75,19 @@ Rules:
      - recurrence: "none" unless the user clearly said daily/weekly/monthly recurrence; then "daily", "weekly", or "monthly".
      - send_notification: true if the user wants a reminder or notification for this event; false otherwise.
      - reminder_minutes_before: if send_notification is true, pick exactly one of: 60 (one hour before), 30 (half an hour before), 10 (ten minutes before), or 0 (notify at event time only, no advance ping). Match the user's wording when possible.
-6. Personal sections (category for domain=personal): feeling, thoughts, hobbies, goals, health, relationships, shopping.
-   - feeling: How the user feels, body state (tired, etc.), emotional state. Use item_type "reflection". Never attach to project_name.
-   - hobbies: Hobby projects, personal creative pursuits (e.g. painting, side projects for fun).
-   - thoughts: General personal thoughts that don't fit feeling/hobbies/goals/health/relationships/shopping.
-   - goals, health, relationships, shopping: Use when content clearly fits.
+6. Personal areas (category when domain=personal; use snake_case from the merged list at the end of this prompt when possible):
+   - feeling: Momentary mood, body sensations, tiredness, emotional snapshots. Use item_type "reflection". Never attach to project_name.
+   - wellbeing: Ongoing mental wellness, self-care, mindfulness, therapy homework, boundaries, sustainable habits (not a one-off mood — use feeling for that).
+   - relationships: Partner, family, friends, social connection, interpersonal conflict or support.
+   - health_fitness: Exercise, sport, nutrition, sleep as a goal, doctors, dentists, medical follow-ups, training plans.
+   - thoughts: General personal thoughts when no more specific area fits.
+   - hobbies: Creative leisure and fun side projects (not for income).
+   - goals: Personal aspirations and life milestones outside work.
+   - learning: Books, courses, languages, skills for personal growth (job training → work).
+   - finance: Personal money, budget, savings, bills, subscriptions.
+   - home: Household, living space, chores, repairs (things to buy → shopping).
+   - travel: Trips, vacations, transport plans.
+   - shopping: Things to buy (groceries, clothes, household goods).
 7. Work: Use category "projects" or "tasks" and set project_name when a work project is named (e.g. LumiRush). Work item_types: task, note, idea, calendar, shopping (only for clear work procurement).
    If the user names a project that is not in the "Existing projects" list, still set project_name to that name — the app will create the project automatically. Never omit project_name only because the project is new.
    When "Existing projects" is listed below, you MUST match the user's speech to one of those names whenever it is the same real project (see rule 10). Do not output a new spelling that differs only slightly.
@@ -127,11 +136,19 @@ Regler:
      - recurrence: "none" om inte användaren sagt daglig/veckovis/månadsvis upprepning.
      - send_notification: true om användaren vill ha påminnelse/notis.
      - reminder_minutes_before: om send_notification är true, exakt ett av: 60, 30, 10, eller 0 (endast vid starttid, ingen tidigare notis).
-6. Personliga sektioner (category för domain=personal): feeling, thoughts, hobbies, goals, health, relationships, shopping.
-   - feeling: Hur användaren mår, kropp, känsla. Använd item_type "reflection". Koppla aldrig till project_name.
-   - hobbies: Hobbyprojekt, personlig kreativitet (t.ex. målning, sidoprojekt för nöje).
-   - thoughts: Allmänna personliga tankar som inte passar feeling/hobbies/goals/health/relationships/shopping.
-   - goals, health, relationships, shopping: Använd när innehållet tydligt passar.
+6. Personliga områden (category när domain=personal; använd snake_case från den sammanslagna listan längst ned i prompten när det går):
+   - feeling: Stämningsläge, kroppskänsla, trötthet, känsla i stunden. Använd item_type "reflection". Koppla aldrig till project_name.
+   - wellbeing: Långsiktigt välmående, egenvård, mindfulness, terapi, gränser, hållbara vanor (inte enstaka humör → feeling).
+   - relationships: Partner, familj, vänner, socialt liv, konflikt eller stöd mellan människor.
+   - health_fitness: Träning, sport, kost, sömn som mål, läkare, tandläkare, medicinska uppföljningar.
+   - thoughts: Allmänna personliga tankar när inget mer specifikt område passar.
+   - hobbies: Kreativ fritid och roliga sidoprojekt (inte för inkomst).
+   - goals: Personliga mål och milstolpar utanför jobbet.
+   - learning: Böcker, kurser, språk, färdigheter för personlig utveckling (jobbutbildning → work).
+   - finance: Privatekonomi, budget, sparande, räkningar, prenumerationer.
+   - home: Hushåll, boende, sysslor, reparationer (inköp → shopping).
+   - travel: Resor, semester, transportplaner.
+   - shopping: Saker att köpa (mat, kläder, hemma).
 7. Work: Använd category "projects" eller "tasks" och sätt project_name när ett arbetsprojekt nämns. Work item_types: task, note, idea, calendar, shopping (endast vid tydliga jobbinköp).
    Om användaren nämner ett projekt som inte finns i listan "Befintliga projekt", sätt ändå project_name till det namnet — appen skapar projektet. Utelämna aldrig project_name bara för att projektet är nytt.
    När "Befintliga projekt" listas nedan MÅSTE du matcha användarens tal till ett av namnen om det är samma verkliga projekt (se regel 10). Skapa inte en ny stavning som bara skiljer lite.
@@ -177,9 +194,22 @@ export interface OrganizeOptions {
   referenceIso?: string;
 }
 
-const DEFAULT_CATEGORIES_WORK = "projects, tasks, notes, ideas, meetings, opportunities";
-const DEFAULT_CATEGORIES_PERSONAL = "feeling, thoughts, hobbies, goals, health, relationships, shopping";
-const DEFAULT_CATEGORIES_INBOX = "unprocessed, needs_review";
+const DEFAULT_CATEGORIES_WORK = ["projects", "tasks", "notes", "ideas", "meetings", "opportunities"];
+const DEFAULT_CATEGORIES_INBOX = ["unprocessed", "needs_review"];
+
+function mergeCategoryHintList(defaults: string[], existing?: string[], custom?: string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of [...defaults, ...(existing ?? []), ...(custom ?? [])]) {
+    const s = raw.trim();
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out.join(", ");
+}
 
 function buildSystemPrompt(options: OrganizeOptions): string {
   const sv = options.locale === "sv";
@@ -195,21 +225,17 @@ function buildSystemPrompt(options: OrganizeOptions): string {
       ? `\n\nStandardkontext för denna session: "${options.defaultDomain}". Vid tvekan om klassificering, föredra denna domain.`
       : `\n\nDefault context for this session: "${options.defaultDomain}". When classification is ambiguous, prefer this domain.`;
   }
-  const existing = options.existingCategories?.length
-    ? options.existingCategories.join(", ")
-    : options.defaultDomain === "work"
-      ? DEFAULT_CATEGORIES_WORK
+
+  const merged =
+    options.defaultDomain === "work"
+      ? mergeCategoryHintList(DEFAULT_CATEGORIES_WORK, options.existingCategories, options.customCategories)
       : options.defaultDomain === "personal"
-        ? DEFAULT_CATEGORIES_PERSONAL
-        : DEFAULT_CATEGORIES_INBOX;
+        ? mergeCategoryHintList([...PERSONAL_AREA_DEFAULTS], options.existingCategories, options.customCategories)
+        : mergeCategoryHintList(DEFAULT_CATEGORIES_INBOX, options.existingCategories, options.customCategories);
+
   extra += sv
-    ? `\n\nBefintliga kategorier (föredra när de passar): ${existing}.`
-    : `\n\nExisting categories (prefer these when they fit): ${existing}.`;
-  if (options.customCategories?.length) {
-    extra += sv
-      ? ` Användardefinierade områden att överväga: ${options.customCategories.join(", ")}.`
-      : ` User-added areas to consider: ${options.customCategories.join(", ")}.`;
-  }
+    ? `\n\nKategorier/områden att välja mellan (standard + från databas + användartillagda — föredra mest specifika som passar innehållet): ${merged}.`
+    : `\n\nCategories/areas to choose from (defaults + from database + user-added — prefer the most specific that fits the content): ${merged}.`;
   return base + extra;
 }
 
@@ -289,6 +315,7 @@ export async function organizeTranscript(
 
   function normalizeCategory(domain: string, category: string): string {
     if (domain === "personal" && (category === "feelings" || category === "emotions")) return "feeling";
+    if (domain === "personal" && (category === "health" || category === "fitness")) return "health_fitness";
     return category ?? "";
   }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-settings";
 import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
+import { DeleteEntriesOverlay } from "@/components/DeleteEntriesOverlay";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
@@ -159,10 +160,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [calendarList, setCalendarList] = useState<CalendarOption[]>([]);
   const [calendarListLoading, setCalendarListLoading] = useState(false);
   const [calendarListError, setCalendarListError] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState<null | "all" | "work" | "personal">(null);
-  const [deleteAllMessage, setDeleteAllMessage] = useState<string | null>(null);
+  const [deleteOverlayOpen, setDeleteOverlayOpen] = useState(false);
   const [showEntryTitles, setShowEntryTitles] = useState(true);
   const [showDumpFace, setShowDumpFace] = useState(true);
+  const [appleCalendarStepsOpen, setAppleCalendarStepsOpen] = useState(false);
 
   useEffect(() => {
     applyTextSizeOnLoad();
@@ -180,42 +181,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setSelectedCalendarSummary(loadGoogleCalendarSummary());
       setCalendarList([]);
       setCalendarListError(null);
-      setDeleteAllMessage(null);
+      setDeleteOverlayOpen(false);
+      setAppleCalendarStepsOpen(false);
     }
   }, [isOpen]);
-
-  const handleDeleteEntries = useCallback(
-    async (scope: "all" | "work" | "personal") => {
-      const confirmKey =
-        scope === "all"
-          ? "settings.deleteAllConfirm"
-          : scope === "work"
-            ? "settings.deleteWorkConfirm"
-            : "settings.deletePersonalConfirm";
-      if (!confirm(t(confirmKey))) return;
-      setDeleteBusy(scope);
-      setDeleteAllMessage(null);
-      try {
-        const url = scope === "all" ? "/api/organized-items" : `/api/organized-items?domain=${scope}`;
-        const res = await fetch(url, { method: "DELETE" });
-        const data = (await res.json()) as { error?: string; deleted?: number };
-        if (!res.ok) throw new Error(data.error || "Failed");
-        const doneKey =
-          scope === "all"
-            ? "settings.deleteAllDone"
-            : scope === "work"
-              ? "settings.deleteWorkDone"
-              : "settings.deletePersonalDone";
-        setDeleteAllMessage(t(doneKey));
-        window.dispatchEvent(new Event("braindump-reload-items"));
-      } catch {
-        setDeleteAllMessage(t("settings.deleteAllError"));
-      } finally {
-        setDeleteBusy(null);
-      }
-    },
-    [t]
-  );
 
   const handleSave = () => {
     saveOpenAIKey(openaiKey.trim());
@@ -297,6 +266,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen) return null;
 
   return (
+    <>
     <div
       role="dialog"
       aria-modal="true"
@@ -391,38 +361,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <span>{t("settings.showDumpFace")}</span>
           </label>
           <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <button
-                type="button"
-                className="bd-btn bd-btn-danger"
-                onClick={() => handleDeleteEntries("all")}
-                disabled={deleteBusy !== null}
-                style={{ width: "100%" }}
-              >
-                {deleteBusy === "all" ? t("settings.deleteAllDeleting") : t("settings.deleteAllEntries")}
-              </button>
-              <button
-                type="button"
-                className="bd-btn bd-btn-danger"
-                onClick={() => handleDeleteEntries("work")}
-                disabled={deleteBusy !== null}
-                style={{ width: "100%" }}
-              >
-                {deleteBusy === "work" ? t("settings.deleteAllDeleting") : t("settings.deleteWorkEntries")}
-              </button>
-              <button
-                type="button"
-                className="bd-btn bd-btn-danger"
-                onClick={() => handleDeleteEntries("personal")}
-                disabled={deleteBusy !== null}
-                style={{ width: "100%" }}
-              >
-                {deleteBusy === "personal" ? t("settings.deleteAllDeleting") : t("settings.deletePersonalEntries")}
-              </button>
-            </div>
-            {deleteAllMessage && (
-              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.5rem", marginBottom: 0 }}>{deleteAllMessage}</p>
-            )}
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 0, marginBottom: "0.65rem", lineHeight: 1.45 }}>
+              {t("settings.deleteAllIntro")}
+            </p>
+            <button
+              type="button"
+              className="bd-btn bd-btn-danger"
+              onClick={() => setDeleteOverlayOpen(true)}
+              style={{ width: "100%" }}
+            >
+              {t("settings.deleteEntriesOpen")}
+            </button>
           </div>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)" }}>
@@ -436,7 +385,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 }}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }}
               />
-              Sync with Google Calendar
+              {t("settings.googleCalendarSync")}
             </label>
             {googleCalendarSync && (
               <div style={{ marginTop: "0.75rem", marginLeft: "1.75rem" }}>
@@ -493,6 +442,70 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </select>
                   </>
                 )}
+              </div>
+            )}
+          </div>
+          <div
+            style={{
+              marginBottom: "1rem",
+              paddingTop: "0.75rem",
+              borderTop: "1px solid var(--border-subtle)",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 0.35rem",
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+              }}
+            >
+              {t("settings.appleCalendarTitle")}
+            </h3>
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+              {t("settings.appleCalendarIntro")}
+            </p>
+            <button
+              type="button"
+              className="bd-btn"
+              onClick={() => setAppleCalendarStepsOpen((o) => !o)}
+              aria-expanded={appleCalendarStepsOpen}
+              style={{ marginBottom: appleCalendarStepsOpen ? "0.5rem" : 0 }}
+            >
+              {appleCalendarStepsOpen ? t("settings.appleCalendarToggleStepsHide") : t("settings.appleCalendarToggleSteps")}
+            </button>
+            {appleCalendarStepsOpen && (
+              <div style={{ marginTop: "0.35rem" }}>
+                <ol
+                  style={{
+                    fontSize: "0.8125rem",
+                    color: "var(--text-secondary)",
+                    paddingLeft: "1.25rem",
+                    margin: "0 0 0.75rem",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep1")}</li>
+                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep2")}</li>
+                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarStep3")}</li>
+                </ol>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                  {t("settings.appleCalendarIcloudNote")}
+                </p>
+                <a
+                  href="https://support.apple.com/guide/iphone/iphc876bfcf3/ios"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bd-btn"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    fontSize: "0.8125rem",
+                    textDecoration: "none",
+                  }}
+                >
+                  {t("settings.appleCalendarSupportLink")}
+                </a>
               </div>
             )}
           </div>
@@ -572,5 +585,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
       </div>
     </div>
+    <DeleteEntriesOverlay isOpen={deleteOverlayOpen} onClose={() => setDeleteOverlayOpen(false)} />
+    </>
   );
 }

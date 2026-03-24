@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
+import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 
 interface Project {
   id: string;
@@ -976,7 +977,7 @@ export function ScopeBar({
   if (mode === "personal" || mode === "all") {
     const apiCategories = counts?.categoryCounts ? Object.keys(counts.categoryCounts).filter((k) => (counts!.categoryCounts![k] ?? 0) > 0) : [];
     const customAreas = (customAreasState.length ? customAreasState : loadCustomAreas()).filter((c) => !apiCategories.includes(c));
-    const allAreas = [...apiCategories, ...customAreas].sort((a, b) => a.localeCompare(b));
+    const allAreas = [...new Set([...PERSONAL_AREA_DEFAULTS, ...apiCategories, ...customAreas])].sort((a, b) => a.localeCompare(b));
 
     return (
       <>
