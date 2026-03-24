@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-settings";
 import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
+import { loadSoundEffectsEnabled, saveSoundEffectsEnabled } from "@/lib/sound-effects-settings";
 import { DeleteEntriesOverlay } from "@/components/DeleteEntriesOverlay";
 
 const TEXT_SIZE_KEY = "braindump_text_size";
@@ -163,6 +164,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [deleteOverlayOpen, setDeleteOverlayOpen] = useState(false);
   const [showEntryTitles, setShowEntryTitles] = useState(true);
   const [showDumpFace, setShowDumpFace] = useState(true);
+  const [soundEffects, setSoundEffects] = useState(false);
   const [appleCalendarStepsOpen, setAppleCalendarStepsOpen] = useState(false);
 
   useEffect(() => {
@@ -175,6 +177,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setTextSize(loadTextSize());
       setShowEntryTitles(loadShowEntryTitles());
       setShowDumpFace(loadShowDumpFace());
+      setSoundEffects(loadSoundEffectsEnabled());
       setGoogleCalendarSync(loadGoogleCalendarSync());
       setGoogleClientId(loadGoogleClientId());
       setSelectedCalendarId(loadGoogleCalendarId());
@@ -191,6 +194,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     saveTextSize(textSize);
     saveShowEntryTitles(showEntryTitles);
     saveShowDumpFace(showDumpFace);
+    saveSoundEffectsEnabled(soundEffects);
     saveGoogleCalendarSync(googleCalendarSync);
     saveGoogleClientId(googleClientId);
     if (selectedCalendarId && selectedCalendarSummary) {
@@ -360,6 +364,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             />
             <span>{t("settings.showDumpFace")}</span>
           </label>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+            <input
+              type="checkbox"
+              checked={soundEffects}
+              onChange={(e) => setSoundEffects(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
+            />
+            <span>{t("settings.soundEffects")}</span>
+          </label>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 1rem", lineHeight: 1.45, paddingLeft: "1.625rem" }}>
+            {t("settings.soundEffectsHelp")}
+          </p>
           <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
             <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 0, marginBottom: "0.65rem", lineHeight: 1.45 }}>
               {t("settings.deleteAllIntro")}

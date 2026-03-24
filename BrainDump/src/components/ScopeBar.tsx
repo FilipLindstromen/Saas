@@ -623,7 +623,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1095,
+              zIndex: 1200,
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -631,7 +631,7 @@ export function ScopeBar({
               alignItems: "flex-end",
               justifyContent: "center",
               padding: 0,
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+              paddingBottom: "var(--bd-bottom-bar-clearance)",
             }}
             onClick={() => setProjectPickerOpen(false)}
           >
@@ -1276,7 +1276,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1095,
+              zIndex: 1200,
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -1284,7 +1284,7 @@ export function ScopeBar({
               alignItems: "flex-end",
               justifyContent: "center",
               padding: 0,
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+              paddingBottom: "var(--bd-bottom-bar-clearance)",
             }}
             onClick={() => setAreaPickerOpen(false)}
           >

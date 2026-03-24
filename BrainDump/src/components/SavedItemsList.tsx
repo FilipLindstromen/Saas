@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
 
 interface SavedItem {
@@ -126,10 +127,12 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
       body: JSON.stringify({ itemType, progress, kanbanColumn }),
     })
       .then((r) => {
-        if (r.ok)
+        if (r.ok) {
           setItems((prev) =>
             prev.map((it) => (it.id === id ? { ...it, itemType, progress, kanbanColumn } : it))
           );
+          if (completed) playTaskCompleteCheer();
+        }
       })
       .catch(() => {});
   }, []);

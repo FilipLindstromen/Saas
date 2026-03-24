@@ -244,6 +244,9 @@ const en: Msg = {
   "settings.showDumpFace": "Show listening face when dumping",
   "settings.showDumpFaceHelp":
     "Simple animated face above the dump panel while you record and organize. Turn off if you prefer a minimal UI. Stored in your browser only.",
+  "settings.soundEffects": "Sound effects",
+  "settings.soundEffectsHelp":
+    "When on, checking off a task plays a crowd cheer from Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Stored in your browser only.",
 
   "settings.googleCalendarSync": "Sync with Google Calendar",
   "settings.appleCalendarTitle": "Apple Calendar",
@@ -538,6 +541,9 @@ const sv: Msg = {
   "settings.showDumpFace": "Visa lyssnaransikte vid dumpning",
   "settings.showDumpFaceHelp":
     "Ett enkelt animerat ansikte ovanför dumppanelen när du spelar in och organiserar. Stäng av för minimalare gränssnitt. Sparas bara i din webbläsare.",
+  "settings.soundEffects": "Ljudeffekter",
+  "settings.soundEffectsHelp":
+    "När på: bockar du av en uppgift spelas en jubel-högtid från Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Sparas bara i din webbläsare.",
 
   "settings.googleCalendarSync": "Synka med Google Kalender",
   "settings.appleCalendarTitle": "Apple Kalender",

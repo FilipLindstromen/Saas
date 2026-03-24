@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
+import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 import {
   BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
@@ -660,7 +661,11 @@ export function ItemsViewArea({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemType, progress, kanbanColumn }),
-    }).catch(() => {});
+    })
+      .then((r) => {
+        if (r.ok && completed) playTaskCompleteCheer();
+      })
+      .catch(() => {});
   }, []);
 
   const updatePosition = useCallback((id: string, x: number, y: number) => {
@@ -703,7 +708,7 @@ export function ItemsViewArea({
       body: JSON.stringify(patch),
     })
       .then((r) => {
-        if (r.ok)
+        if (r.ok) {
           setItems((prev) =>
             prev.map((it) => {
               if (it.id !== id) return it;
@@ -713,6 +718,8 @@ export function ItemsViewArea({
               return next;
             })
           );
+          if (newType === "task_completed") playTaskCompleteCheer();
+        }
       })
       .catch(() => {});
   }, []);
