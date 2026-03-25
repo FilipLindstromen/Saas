@@ -6,7 +6,6 @@ import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-se
 import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
 import { loadSoundEffectsEnabled, saveSoundEffectsEnabled } from "@/lib/sound-effects-settings";
 import { loadRevenueCatEnabled, saveRevenueCatEnabled } from "@/lib/revenuecat-settings";
-import { DeleteEntriesOverlay } from "@/components/DeleteEntriesOverlay";
 import {
   fetchGoogleCalendarEvents,
   importCalendarEventsToBrainDump,
@@ -345,7 +344,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen) return null;
 
   return (
-    <>
     <div
       role="dialog"
       aria-modal="true"
@@ -463,19 +461,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 1rem", lineHeight: 1.45, paddingLeft: "1.625rem" }}>
             {t("settings.revenueCatHelp")}
           </p>
-          <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
-            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 0, marginBottom: "0.65rem", lineHeight: 1.45 }}>
-              {t("settings.deleteAllIntro")}
-            </p>
-            <button
-              type="button"
-              className="bd-btn bd-btn-danger"
-              onClick={() => setDeleteOverlayOpen(true)}
-              style={{ width: "100%" }}
-            >
-              {t("settings.deleteEntriesOpen")}
-            </button>
-          </div>
           <div style={{ marginBottom: "1rem" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)" }}>
               <input
@@ -740,7 +725,5 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
       </div>
     </div>
-    <DeleteEntriesOverlay isOpen={deleteOverlayOpen} onClose={() => setDeleteOverlayOpen(false)} />
-    </>
   );
 }

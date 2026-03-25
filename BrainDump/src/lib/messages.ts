@@ -233,12 +233,20 @@ const en: Msg = {
     "These options affect task entries only (completed, active, or all tasks). Notes, calendar items, and other types are not included unless you choose a broader option.",
   "settings.deleteEntriesLoading": "Loading…",
   "settings.deleteEntriesEmpty": "You have no entries to delete.",
+  "settings.deleteEntriesNoEntriesButEmptyProjects":
+    "You have no organized entries. You can still remove empty projects (sidebar names with no items) below.",
   "settings.deleteEntriesClose": "Close",
   "settings.deleteEntriesSelect": "Delete selected",
   "settings.deleteEntriesSelectFirst": "Select an option in the list first.",
   "settings.deleteEntriesConfirm":
     "Permanently delete {count} entries?\n\n{label}\n\nThis cannot be undone.",
   "settings.deleteEntriesDone": "Entries deleted.",
+  "settings.deleteEmptyProjectsHint":
+    "You have {count} project(s) in the sidebar with no entries. Remove them if you no longer need those names.",
+  "settings.deleteEmptyProjectsButton": "Delete all projects without entries ({count})",
+  "settings.deleteEmptyProjectsConfirm":
+    "Permanently delete {count} project(s) that have no entries? They will disappear from the project list. This cannot be undone.",
+  "settings.deleteEmptyProjectsDone": "Empty projects removed.",
   "settings.deleteSectionWorkspace": "Whole workspace",
   "settings.deleteSectionTasks": "Tasks only",
   "settings.deleteTasksSubgroupCompleted": "Completed tasks",
@@ -570,12 +578,20 @@ const sv: Msg = {
     "Dessa alternativ gäller bara uppgiftsposter (klara, aktiva eller alla uppgifter). Anteckningar, kalenderposter och andra typer påverkas inte om du inte väljer ett bredare alternativ.",
   "settings.deleteEntriesLoading": "Laddar…",
   "settings.deleteEntriesEmpty": "Du har inga poster att ta bort.",
+  "settings.deleteEntriesNoEntriesButEmptyProjects":
+    "Du har inga organiserade poster. Du kan ändå ta bort tomma projekt (namn i sidomenyn utan poster) nedan.",
   "settings.deleteEntriesClose": "Stäng",
   "settings.deleteEntriesSelect": "Ta bort valt",
   "settings.deleteEntriesSelectFirst": "Välj ett alternativ i listan först.",
   "settings.deleteEntriesConfirm":
     "Ta permanent bort {count} poster?\n\n{label}\n\nDet går inte att ångra.",
   "settings.deleteEntriesDone": "Posterna har tagits bort.",
+  "settings.deleteEmptyProjectsHint":
+    "Du har {count} projekt i sidomenyn utan några poster. Ta bort dem om du inte behöver namnen längre.",
+  "settings.deleteEmptyProjectsButton": "Ta bort alla projekt utan poster ({count})",
+  "settings.deleteEmptyProjectsConfirm":
+    "Ta permanent bort {count} projekt som saknar poster? De försvinner från projektlistan. Det går inte att ångra.",
+  "settings.deleteEmptyProjectsDone": "Tomma projekt har tagits bort.",
   "settings.deleteSectionWorkspace": "Hela arbetsytan",
   "settings.deleteSectionTasks": "Bara uppgifter",
   "settings.deleteTasksSubgroupCompleted": "Klara uppgifter",

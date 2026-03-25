@@ -108,6 +108,13 @@ export default function BrainDumpPage() {
   }, [refreshWorkProjectNames]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onReloadProjects = () => refreshWorkProjectNames();
+    window.addEventListener("braindump-reload-projects", onReloadProjects);
+    return () => window.removeEventListener("braindump-reload-projects", onReloadProjects);
+  }, [refreshWorkProjectNames]);
+
+  useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     const check = async () => {
       if (Notification.permission === "default") await Notification.requestPermission();

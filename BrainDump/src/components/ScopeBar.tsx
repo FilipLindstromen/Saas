@@ -243,6 +243,12 @@ export function ScopeBar({
   }, [loadProjects]);
 
   useEffect(() => {
+    const onReloadProjects = () => loadProjects();
+    window.addEventListener("braindump-reload-projects", onReloadProjects);
+    return () => window.removeEventListener("braindump-reload-projects", onReloadProjects);
+  }, [loadProjects]);
+
+  useEffect(() => {
     setCounts(null);
     if (mode === "work" || mode === "personal") {
       fetchCounts(mode).then(setCounts);

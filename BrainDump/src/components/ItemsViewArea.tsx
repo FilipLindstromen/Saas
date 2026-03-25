@@ -590,6 +590,20 @@ export function ItemsViewArea({
   }, [fetchItems]);
 
   useEffect(() => {
+    const reloadProjects = () => {
+      if (mode !== "work") return;
+      fetch("/api/projects?domain=work")
+        .then((r) => r.json())
+        .then((d) =>
+          setProjectsList((d.projects ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+        )
+        .catch(() => setProjectsList([]));
+    };
+    window.addEventListener("braindump-reload-projects", reloadProjects);
+    return () => window.removeEventListener("braindump-reload-projects", reloadProjects);
+  }, [mode]);
+
+  useEffect(() => {
     const h = (e: Event) => {
       const detail = (e as CustomEvent<SuggestedItemTypeDetail[]>).detail;
       if (!Array.isArray(detail)) return;

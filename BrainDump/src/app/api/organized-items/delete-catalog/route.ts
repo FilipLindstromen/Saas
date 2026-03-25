@@ -118,11 +118,14 @@ export async function GET() {
       )
     );
 
+    const emptyProjectCount = projectCounts.filter((p) => p.count === 0).length;
+
     return NextResponse.json({
       totals: { all: totalAll, work: totalWork, personal: totalPersonal },
       completedTasks: { all: completedAll, work: completedWork, personal: completedPersonal },
       activeTasks: { all: activeAll, work: activeWork, personal: activePersonal },
       allTasks: { all: allTasksAll, work: allTasksWork, personal: allTasksPersonal },
+      emptyProjectCount,
       projects: projectCounts.filter((p) => p.count > 0),
       workCategories: workByCategory
         .filter((r) => r.category && String(r.category).trim())

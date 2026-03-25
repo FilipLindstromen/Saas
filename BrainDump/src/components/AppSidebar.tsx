@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { signOut, useSession } from "next-auth/react";
+import { DeleteEntriesOverlay } from "./DeleteEntriesOverlay";
 import { StreaksModal } from "./StreaksModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useI18n } from "@/lib/i18n";
@@ -102,6 +111,8 @@ export function AppSidebar({
   const [expanded, setExpanded] = useState(false);
   const [streakState, setStreakState] = useState<DumpStreakState>(() => getDumpStreakState());
   const [streaksOpen, setStreaksOpen] = useState(false);
+  const [deleteEntriesOpen, setDeleteEntriesOpen] = useState(false);
+  const [mobileDrawerExiting, setMobileDrawerExiting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileBtnRef = useRef<HTMLButtonElement>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
@@ -169,23 +180,45 @@ export function AppSidebar({
   }, [profileOpen, isMobile, expanded, updatePopoverPos]);
 
   useEffect(() => {
-    if (!isMobile || !mobileOpen) return;
+    if (!isMobile || (!mobileOpen && !mobileDrawerExiting)) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [isMobile, mobileOpen]);
+  }, [isMobile, mobileOpen, mobileDrawerExiting]);
+
+  useEffect(() => {
+    setMobileDrawerExiting(false);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    setMobileDrawerExiting(false);
+    if (mobileOpen) onMobileOpenChange(false);
+  }, [isMobile, mobileOpen, onMobileOpenChange]);
+
+  const closeMobileDrawerAnimated = useCallback(() => {
+    setMobileDrawerExiting(true);
+  }, []);
+
+  const handleMobileDrawerAnimationEnd = useCallback((e: AnimationEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const name = e.animationName || "";
+    if (!name.includes("bd-sidebar-drawer-slide-out")) return;
+    setMobileDrawerExiting(false);
+    onMobileOpenChange(false);
+  }, [onMobileOpenChange]);
 
   const pickMode = (m: Mode) => {
     onModeChange(m);
-    if (isMobile) onMobileOpenChange(false);
+    if (isMobile) closeMobileDrawerAnimated();
   };
 
   const openSettings = () => {
     setProfileOpen(false);
     onOpenSettings();
-    if (isMobile) onMobileOpenChange(false);
+    if (isMobile) closeMobileDrawerAnimated();
   };
 
   const user = session?.user;
@@ -299,7 +332,7 @@ export function AppSidebar({
           data-collapsed={!showLabels ? "true" : "false"}
           onClick={() => {
             setStreaksOpen(true);
-            if (isMobile) onMobileOpenChange(false);
+            if (isMobile) closeMobileDrawerAnimated();
           }}
           title={t("topBar.streaks")}
           aria-label={t("topBar.streaks")}
@@ -317,6 +350,28 @@ export function AppSidebar({
           <ThemeToggle className="bd-app-sidebar-theme-btn" />
           {showLabels ? <span className="bd-app-sidebar-tool-label">{t("theme.appearance")}</span> : null}
         </div>
+
+        <button
+          type="button"
+          className="bd-app-sidebar-nav-btn bd-app-sidebar-nav-btn--danger"
+          data-collapsed={!showLabels ? "true" : "false"}
+          onClick={() => {
+            setDeleteEntriesOpen(true);
+            if (isMobile) closeMobileDrawerAnimated();
+          }}
+          title={t("settings.deleteEntriesOpen")}
+          aria-label={t("settings.deleteEntriesOpen")}
+        >
+          <span className="bd-app-sidebar-nav-icon">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </span>
+          {showLabels ? <span className="bd-app-sidebar-nav-label">{t("settings.deleteEntriesOpen")}</span> : null}
+        </button>
 
         <button
           type="button"
@@ -381,13 +436,18 @@ export function AppSidebar({
   if (isMobile) {
     return (
       <>
-        {mobileOpen && (
-          <div className="bd-sidebar-drawer-backdrop" onClick={() => onMobileOpenChange(false)} role="presentation">
+        {(mobileOpen || mobileDrawerExiting) && (
+          <div
+            className={`bd-sidebar-drawer-backdrop${mobileDrawerExiting ? " bd-sidebar-drawer-backdrop--exit" : ""}`}
+            onClick={mobileDrawerExiting ? undefined : closeMobileDrawerAnimated}
+            role="presentation"
+          >
             <aside
-              className="bd-sidebar-drawer"
+              className={`bd-sidebar-drawer${mobileDrawerExiting ? " bd-sidebar-drawer--exit" : ""}`}
               onClick={(e) => e.stopPropagation()}
+              onAnimationEnd={handleMobileDrawerAnimationEnd}
               data-expanded="true"
-              aria-hidden={!mobileOpen}
+              aria-hidden={!(mobileOpen || mobileDrawerExiting)}
             >
               {sidebarBody}
             </aside>
@@ -395,6 +455,7 @@ export function AppSidebar({
         )}
         {profilePopover}
         {streaksModal}
+        {deleteEntriesOverlay}
       </>
     );
   }
@@ -410,6 +471,7 @@ export function AppSidebar({
       </aside>
       {profilePopover}
       {streaksModal}
+      {deleteEntriesOverlay}
     </>
   );
 }

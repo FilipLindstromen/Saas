@@ -8,6 +8,8 @@ type DeleteCatalog = {
   completedTasks: { all: number; work: number; personal: number };
   activeTasks: { all: number; work: number; personal: number };
   allTasks: { all: number; work: number; personal: number };
+  /** Projects (work/personal) with zero organized items — sidebar shells only. */
+  emptyProjectCount: number;
   projects: Array<{ id: string; name: string; domain: string; count: number }>;
   workCategories: Array<{ category: string; count: number }>;
   personalCategories: Array<{ category: string; count: number }>;
@@ -120,6 +122,7 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deletingEmptyProjects, setDeletingEmptyProjects] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,7 +136,10 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
       .then(async (res) => {
         const data = (await res.json()) as DeleteCatalog & { error?: string };
         if (!res.ok) throw new Error(data.error || "Failed");
-        setCatalog(data);
+        setCatalog({
+          ...data,
+          emptyProjectCount: typeof data.emptyProjectCount === "number" ? data.emptyProjectCount : 0,
+        });
       })
       .catch(() => {
         setLoadError(t("settings.deleteAllError"));
@@ -196,6 +202,37 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
       setDeleting(false);
     }
   }, [onClose, selectedKey, selectedLabel, t]);
+
+  const runDeleteEmptyProjects = useCallback(async () => {
+    const n = catalog?.emptyProjectCount ?? 0;
+    if (n <= 0) return;
+    const ok = confirm(t("settings.deleteEmptyProjectsConfirm", { count: n }));
+    if (!ok) return;
+    setDeletingEmptyProjects(true);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/projects/delete-empty", { method: "POST" });
+      const data = (await res.json()) as { deleted?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Failed");
+      window.dispatchEvent(new Event("braindump-reload-items"));
+      window.dispatchEvent(new Event("braindump-reload-projects"));
+      alert(t("settings.deleteEmptyProjectsDone"));
+      const refresh = await fetch("/api/organized-items/delete-catalog");
+      const refreshed = (await refresh.json()) as DeleteCatalog & { error?: string };
+      if (!refresh.ok) return;
+      setCatalog({
+        ...refreshed,
+        emptyProjectCount: typeof refreshed.emptyProjectCount === "number" ? refreshed.emptyProjectCount : 0,
+      });
+      if ((refreshed.totals?.all ?? 0) === 0 && (refreshed.emptyProjectCount ?? 0) === 0) {
+        onClose();
+      }
+    } catch {
+      setActionError(t("settings.deleteAllError"));
+    } finally {
+      setDeletingEmptyProjects(false);
+    }
+  }, [catalog, onClose, t]);
 
   if (!isOpen) return null;
 
@@ -261,7 +298,8 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
   );
 
   const c = catalog;
-  const empty = Boolean(c && c.totals.all === 0);
+  const emptyEntries = Boolean(c && c.totals.all === 0);
+  const emptyProjCount = c?.emptyProjectCount ?? 0;
 
   return (
     <div
@@ -318,11 +356,17 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
             <p style={{ marginTop: "1rem", color: "var(--accent)", fontSize: "0.875rem" }}>{loadError}</p>
           )}
 
-          {!loading && !loadError && empty && (
+          {!loading && !loadError && c && emptyEntries && emptyProjCount === 0 && (
             <p style={{ marginTop: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{t("settings.deleteEntriesEmpty")}</p>
           )}
 
-          {!loading && !loadError && c && !empty && (
+          {!loading && !loadError && c && emptyEntries && emptyProjCount > 0 && (
+            <p style={{ marginTop: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", lineHeight: 1.45 }}>
+              {t("settings.deleteEntriesNoEntriesButEmptyProjects")}
+            </p>
+          )}
+
+          {!loading && !loadError && c && !emptyEntries && (
             <div role="listbox" aria-label={t("settings.deleteEntriesTitle")} style={{ paddingBottom: "0.5rem" }}>
               <h3 style={firstSectionTitleStyle()}>{t("settings.deleteSectionWorkspace")}</h3>
               {c.totals.all > 0 && (
@@ -529,6 +573,29 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
               )}
             </div>
           )}
+
+          {!loading && !loadError && c && emptyProjCount > 0 && (
+            <div
+              style={{
+                marginTop: !emptyEntries ? "1.25rem" : "0.5rem",
+                paddingTop: "1rem",
+                borderTop: emptyEntries ? "none" : "1px solid var(--border-subtle)",
+              }}
+            >
+              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.75rem", lineHeight: 1.45 }}>
+                {t("settings.deleteEmptyProjectsHint", { count: emptyProjCount })}
+              </p>
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={() => void runDeleteEmptyProjects()}
+                disabled={deletingEmptyProjects || deleting || loading || !!loadError}
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                {deletingEmptyProjects ? t("settings.deleteAllDeleting") : t("settings.deleteEmptyProjectsButton", { count: emptyProjCount })}
+              </button>
+            </div>
+          )}
         </div>
 
         <div
@@ -545,14 +612,14 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
             <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--accent)" }}>{actionError}</p>
           )}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button type="button" className="bd-btn" onClick={onClose} disabled={deleting}>
+            <button type="button" className="bd-btn" onClick={onClose} disabled={deleting || deletingEmptyProjects}>
               {t("settings.deleteEntriesClose")}
             </button>
             <button
               type="button"
               className="bd-btn bd-btn-danger"
               onClick={() => void runDelete()}
-              disabled={deleting || !selectedKey || loading || !!loadError || empty}
+              disabled={deleting || deletingEmptyProjects || !selectedKey || loading || !!loadError || emptyEntries}
             >
               {deleting ? t("settings.deleteAllDeleting") : t("settings.deleteEntriesSelect")}
             </button>
