@@ -244,6 +244,12 @@ export interface ExportForDownloadOptions {
   trimStart?: number
   /** End time in source video (seconds); export runs until this */
   trimEnd?: number
+  /**
+   * Sub-range within [trimStart, trimEnd] (source seconds). When set, encoding runs from exportStart to exportEnd
+   * while overlays still use timeline time = currentTime - trimStart.
+   */
+  exportStart?: number
+  exportEnd?: number
   /** Preferred container format; MP4 is used only if the browser supports it */
   exportFormat?: ExportFormat
   overlays?: OverlayItem[]
@@ -383,6 +389,8 @@ export function exportVideoForDownload(
     sourceDuration: optSourceDuration,
     trimStart: optTrimStart,
     trimEnd: optTrimEnd,
+    exportStart: optExportStart,
+    exportEnd: optExportEnd,
     exportFormat: preferFormat = 'webm',
     overlays = [],
     overlayTextAnimation = 'none',
@@ -457,7 +465,15 @@ export function exportVideoForDownload(
         if (duration == null || duration <= 0) return false
         const trimStart = optTrimStart ?? 0
         const trimEnd = optTrimEnd ?? duration
-        video.currentTime = trimStart
+        const exportStart = Math.max(
+          trimStart,
+          Math.min(optExportStart ?? trimStart, trimEnd - 0.01)
+        )
+        const exportEnd = Math.max(
+          exportStart + 0.01,
+          Math.min(optExportEnd ?? trimEnd, trimEnd)
+        )
+        video.currentTime = exportStart
 
         const canvasStream = canvas.captureStream(30)
         const combinedStream = new MediaStream()
@@ -521,9 +537,10 @@ export function exportVideoForDownload(
         recorder.start(100)
 
         let rafId = 0
+        const encodeLen = exportEnd - exportStart
         const draw = () => {
           const srcTime = video.currentTime
-          if (srcTime >= trimEnd || video.ended) {
+          if (srcTime >= exportEnd || video.ended) {
             if (recorder && recorder.state === 'recording') recorder.stop()
             return
           }
@@ -536,9 +553,8 @@ export function exportVideoForDownload(
               ctx.drawImage(video, 0, 0, width, height)
             }
             const timelineTime = srcTime - trimStart
-            const duration = trimEnd - trimStart
-            if (duration > 0 && onProgress) {
-              const progress = Math.min(100, Math.max(0, (timelineTime / duration) * 100))
+            if (encodeLen > 0 && onProgress) {
+              const progress = Math.min(100, Math.max(0, ((srcTime - exportStart) / encodeLen) * 100))
               onProgress(progress)
             }
             if (hasOverlays) {

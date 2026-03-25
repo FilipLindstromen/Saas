@@ -8,16 +8,8 @@ import { OptionsBar } from './OptionsBar'
 import type { CaptionSegment } from '../services/captions'
 import { IconTrash, IconVideo, IconAudio, IconLayers, IconCursor, IconType, IconColor, IconSafeZone } from './Icons'
 import { CaptionBurnIn } from './CaptionBurnIn'
+import { OVERLAY_TEXT_ANIMATION_OPTIONS } from '../constants'
 import styles from './InspectorPanel.module.css'
-
-const TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'fade', label: 'Fade' },
-  { value: 'fade-slide-left', label: 'Fade + slide left' },
-  { value: 'fade-slide-right', label: 'Fade + slide right' },
-  { value: 'fade-slide-up', label: 'Fade + slide up' },
-  { value: 'fade-slide-down', label: 'Fade + slide down' },
-]
 
 export type InspectorTabId = 'video' | 'audio' | 'color' | 'overlays' | 'current' | 'captions' | 'safezones'
 
@@ -90,6 +82,8 @@ interface InspectorPanelProps {
   onCaptionFontSizePercentChange?: (percent: number) => void
   captionY?: number
   onCaptionYChange?: (y: number) => void
+  captionTextAnimation?: OverlayTextAnimation
+  onCaptionTextAnimationChange?: (anim: OverlayTextAnimation) => void
   captionSegments?: CaptionSegment[] | null
   onTranscriptionDone?: (segments: CaptionSegment[]) => void
   openaiApiKey?: string
@@ -171,6 +165,8 @@ export function InspectorPanel({
   onCaptionFontSizePercentChange = () => { },
   captionY,
   onCaptionYChange = () => { },
+  captionTextAnimation = 'fade',
+  onCaptionTextAnimationChange = () => { },
   captionSegments = null,
   onTranscriptionDone = () => { },
   openaiApiKey,
@@ -510,6 +506,8 @@ export function InspectorPanel({
               onCaptionStyleChange={onCaptionStyleChange}
               onCaptionFontSizePercentChange={onCaptionFontSizePercentChange}
               onCaptionYChange={onCaptionYChange}
+              captionTextAnimation={captionTextAnimation}
+              onCaptionTextAnimationChange={onCaptionTextAnimationChange}
               captionSegments={captionSegments ?? null}
               onTranscriptionDone={onTranscriptionDone}
             />
@@ -702,7 +700,7 @@ export function InspectorPanel({
               onChange={(e) => onOverlayTextAnimationChange(e.target.value as OverlayTextAnimation)}
               aria-label="Text animation style"
             >
-              {TEXT_ANIMATION_OPTIONS.map((opt) => (
+              {OVERLAY_TEXT_ANIMATION_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

@@ -38,6 +38,11 @@ interface ExportPanelProps {
   defaultBold?: boolean
   trimStart?: number
   trimEnd?: number
+  /** Source-time export window from program In/Out (optional). */
+  exportStart?: number
+  exportEnd?: number
+  /** When true, re-encode even if only the program region differs from full trim. */
+  programRegionExport?: boolean
   sourceDuration?: number
   colorAdjustmentsEnabled?: boolean
   colorBrightness?: number
@@ -101,7 +106,8 @@ export function ExportPanel({
     (colorBrightness !== 100 || colorContrast !== 100 || colorSaturation !== 100)
   const hasAudioAdjustments = musicBlob || videoVolume !== 100 || noiseRemovalEnabled
 
-  const needsExport = hasOverlaysToBurn || hasTrim || hasColor || hasAudioAdjustments || captionSegments
+  const needsExport =
+    hasOverlaysToBurn || hasTrim || programRegionExport || hasColor || hasAudioAdjustments || captionSegments
 
   const getExportBlob = async (): Promise<{ blob: Blob; extension: ExportFormat }> => {
     if (!videoBlob) throw new Error('No video')
@@ -127,6 +133,8 @@ export function ExportPanel({
         sourceDuration: resolvedDuration || 0,
         trimStart: trimStartProp,
         trimEnd: trimEndProp ?? resolvedDuration,
+        exportStart: exportStartProp,
+        exportEnd: exportEndProp,
         exportFormat,
         overlays,
         overlayTextAnimation,

@@ -42,6 +42,10 @@ interface TimelineProps {
   onSplitClip?: () => void
   /** Split video clip at playhead (when video clip is selected) */
   onVideoClipSplit?: () => void
+  /** Playback / export window on the timeline (seconds). Does not change overlay or video trim. */
+  programIn?: number
+  programOut?: number
+  onProgramRangeChange?: (range: { in: number; out: number }) => void
 }
 
 export function Timeline({
@@ -65,6 +69,9 @@ export function Timeline({
   onVideoClipTrimChange,
   onSplitClip,
   onVideoClipSplit,
+  programIn = 0,
+  programOut,
+  onProgramRangeChange,
 }: TimelineProps) {
   const safeDuration = Number.isFinite(duration) && duration >= 0 ? duration : 0
   const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? Math.min(currentTime, safeDuration) : 0
@@ -93,54 +100,56 @@ export function Timeline({
   const [durationEditing, setDurationEditing] = useState(false)
   const [durationInputValue, setDurationInputValue] = useState('')
   const durationInputRef = useRef<HTMLInputElement>(null)
-  const [inOutMarkerDrag, setInOutMarkerDrag] = useState<'in' | 'out' | null>(null)
-  const inOutMarkerDragRef = useRef<{ kind: 'in' | 'out'; rect: DOMRect } | null>(null)
-  const videoClipTrimRef = useRef(videoClipTrim)
-  videoClipTrimRef.current = videoClipTrim
+  const programMarkerDragRef = useRef<{ kind: 'in' | 'out'; rect: DOMRect; in: number; out: number } | null>(null)
 
-  const handleInOutMarkerPointerDown = useCallback(
+  const handleProgramMarkerPointerDown = useCallback(
     (e: React.PointerEvent, kind: 'in' | 'out') => {
-      if (!videoClipTrim || !onVideoClipTrimChange || !rulerRef.current) return
+      if (!onProgramRangeChange || programOut == null || !rulerRef.current) return
       e.preventDefault()
       e.stopPropagation()
-      setInOutMarkerDrag(kind)
-      inOutMarkerDragRef.current = { kind, rect: rulerRef.current.getBoundingClientRect() }
+      programMarkerDragRef.current = {
+        kind,
+        rect: rulerRef.current.getBoundingClientRect(),
+        in: programIn,
+        out: programOut,
+      }
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     },
-    [videoClipTrim, onVideoClipTrimChange]
+    [onProgramRangeChange, programIn, programOut]
   )
 
-  const handleInOutMarkerPointerMove = useCallback(
+  const handleProgramMarkerPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const state = inOutMarkerDragRef.current
-      const trim = videoClipTrimRef.current
-      if (!state || !trim || !onVideoClipTrimChange || !videoSourceDuration) return
-      const { rect } = state
+      const state = programMarkerDragRef.current
+      if (!state || !onProgramRangeChange) return
+      const { rect, kind } = state
       if (rect.width <= 0) return
       const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left))
-      // Timeline shows 0..safeDuration (trimmed region); map to source time trimStart..trimEnd
       const t = (x / rect.width) * safeDuration
-      const sourceTime = trim.trimStart + t
-      if (state.kind === 'in') {
-        const newStart = Math.max(0, Math.min(trim.trimEnd - MIN_CLIP_DURATION, sourceTime))
-        onVideoClipTrimChange(newStart, trim.trimEnd)
+      if (kind === 'in') {
+        const newIn = Math.max(0, Math.min(state.out - MIN_CLIP_DURATION, t))
+        programMarkerDragRef.current = { ...state, in: newIn }
+        onProgramRangeChange({ in: newIn, out: state.out })
       } else {
-        const newEnd = Math.max(trim.trimStart + MIN_CLIP_DURATION, Math.min(videoSourceDuration, sourceTime))
-        onVideoClipTrimChange(trim.trimStart, newEnd)
+        const newOut = Math.max(state.in + MIN_CLIP_DURATION, Math.min(safeDuration, t))
+        programMarkerDragRef.current = { ...state, out: newOut }
+        onProgramRangeChange({ in: state.in, out: newOut })
       }
     },
-    [onVideoClipTrimChange, videoSourceDuration, safeDuration]
+    [onProgramRangeChange, safeDuration]
   )
 
-  const handleInOutMarkerPointerUp = useCallback((e: React.PointerEvent) => {
-    if (inOutMarkerDragRef.current) {
+  const handleProgramMarkerPointerUp = useCallback((e: React.PointerEvent) => {
+    if (programMarkerDragRef.current) {
       try {
         ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
       } catch (_) { /* already released */ }
-      setInOutMarkerDrag(null)
-      inOutMarkerDragRef.current = null
+      programMarkerDragRef.current = null
     }
   }, [])
+
+  const effectiveProgramOut = programOut ?? safeDuration
+  const showProgramMarkers = !!onProgramRangeChange && programOut != null && safeDuration > 0
 
   const handleRulerClick = useCallback(
     (e: React.MouseEvent) => {
@@ -489,21 +498,21 @@ export function Timeline({
           <span className={styles.playheadTriangle} aria-hidden />
         </div>
 
-        {videoClipTrim && onVideoClipTrimChange && videoSourceDuration > 0 && (
+        {showProgramMarkers && (
           <>
             <div
               className={styles.inOutMarker}
               data-marker="in"
               style={{
-                left: `calc(72px + (100% - 72px) * 0)`,
+                left: `calc(72px + (100% - 72px) * ${programIn / Math.max(safeDuration, 0.001)})`,
               }}
-              onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'in')}
-              onPointerMove={handleInOutMarkerPointerMove}
-              onPointerUp={handleInOutMarkerPointerUp}
-              onPointerCancel={handleInOutMarkerPointerUp}
-              onPointerLeave={handleInOutMarkerPointerUp}
-              title="Export start (drag to adjust)"
-              aria-label="In point – export start"
+              onPointerDown={(e) => handleProgramMarkerPointerDown(e, 'in')}
+              onPointerMove={handleProgramMarkerPointerMove}
+              onPointerUp={handleProgramMarkerPointerUp}
+              onPointerCancel={handleProgramMarkerPointerUp}
+              onPointerLeave={handleProgramMarkerPointerUp}
+              title="Playback / export start (does not trim clips)"
+              aria-label="In point – playback and export start"
             >
               <span className={styles.inOutMarkerLine} aria-hidden />
               <span className={styles.inOutMarkerLabel}>In</span>
@@ -512,15 +521,15 @@ export function Timeline({
               className={styles.inOutMarker}
               data-marker="out"
               style={{
-                left: `calc(72px + (100% - 72px) * 1)`,
+                left: `calc(72px + (100% - 72px) * ${effectiveProgramOut / Math.max(safeDuration, 0.001)})`,
               }}
-              onPointerDown={(e) => handleInOutMarkerPointerDown(e, 'out')}
-              onPointerMove={handleInOutMarkerPointerMove}
-              onPointerUp={handleInOutMarkerPointerUp}
-              onPointerCancel={handleInOutMarkerPointerUp}
-              onPointerLeave={handleInOutMarkerPointerUp}
-              title="Export end (drag to adjust)"
-              aria-label="Out point – export end"
+              onPointerDown={(e) => handleProgramMarkerPointerDown(e, 'out')}
+              onPointerMove={handleProgramMarkerPointerMove}
+              onPointerUp={handleProgramMarkerPointerUp}
+              onPointerCancel={handleProgramMarkerPointerUp}
+              onPointerLeave={handleProgramMarkerPointerUp}
+              title="Playback / export end (does not trim clips)"
+              aria-label="Out point – playback and export end"
             >
               <span className={styles.inOutMarkerLine} aria-hidden />
               <span className={styles.inOutMarkerLabel}>Out</span>

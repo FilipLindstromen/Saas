@@ -31,6 +31,7 @@ import styles from './App.module.css'
 const OVERLAY_DURATION = 5
 /** When media duration is unknown or invalid, timeline + trim use this instead of 0. */
 const FALLBACK_RECORDING_TIMELINE_SEC = 60
+const PROGRAM_EXPORT_MIN_GAP = 0.5
 
 function generateId() {
   return Math.random().toString(36).slice(2, 12)
@@ -88,13 +89,21 @@ export default function App() {
   const [captionPreviewStyle, setCaptionPreviewStyle] = useState<CaptionStyle>(() => initialState?.captionPreviewStyle ?? 'lower-third')
   const [captionPreviewFontSizePercent, setCaptionPreviewFontSizePercent] = useState(() => initialState?.captionPreviewFontSizePercent ?? 2)
   const [captionPreviewCaptionY, setCaptionPreviewCaptionY] = useState(() => initialState?.captionPreviewCaptionY ?? 0.85)
+  const [captionTextAnimation, setCaptionTextAnimation] = useState<OverlayTextAnimation>(
+    () => initialState?.captionTextAnimation ?? 'fade'
+  )
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const isPreviewPlayingRef = useRef(isPreviewPlaying)
+  isPreviewPlayingRef.current = isPreviewPlaying
   const [captionSegments, setCaptionSegments] = useState<CaptionSegment[] | null>(null)
   /** Trim range of the recorded video (source seconds). Timeline shows trimEnd - trimStart. */
   const [videoTrimStart, setVideoTrimStart] = useState(0)
   const [videoTrimEnd, setVideoTrimEnd] = useState<number | null>(null)
   /** Video clip segments for split support. When null/empty, we use videoTrimStart/End. */
   const [videoClipSegments, setVideoClipSegments] = useState<{ trimStart: number; trimEnd: number }[] | null>(null)
+  /** Timeline seconds: In/Out for playback + export only (does not move or trim clips). */
+  const [programIn, setProgramIn] = useState(0)
+  const [programOut, setProgramOut] = useState(FALLBACK_RECORDING_TIMELINE_SEC)
   const [thumbnailPanelOpen, setThumbnailPanelOpen] = useState(false)
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null)
   const [thumbnailSeekTime, setThumbnailSeekTime] = useState(() => initialState?.thumbnailSeekTime ?? 0)
@@ -128,6 +137,7 @@ export default function App() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement | null>(null)
+  const prevRecordedBlobRef = useRef<Blob | null>(null)
   const userHasTrimmedVideoRef = useRef(false)
   const [timelineResize, setTimelineResize] = useState<{ startY: number; startHeight: number } | null>(null)
   const [inspectorWidth, setInspectorWidth] = useState(() => initialState?.inspectorWidth ?? 280)
@@ -220,6 +230,51 @@ export default function App() {
   const timelineDuration = isPlayback
     ? (validUserTimelineDuration ?? playbackTlFromMedia)
     : (validUserTimelineDuration ?? computedTimelineDuration)
+
+  const exportEncoderRange = useMemo(() => {
+    if (!recordedBlob) return null
+    const trimEnd = videoTrimEnd ?? duration
+    const trimLen = Math.max(0, trimEnd - videoTrimStart)
+    const pin = Math.max(0, Math.min(programIn, trimLen))
+    const pout = Math.max(pin + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, trimLen))
+    return {
+      exportStart: videoTrimStart + pin,
+      exportEnd: videoTrimStart + pout,
+      trimEnd,
+    }
+  }, [recordedBlob, duration, videoTrimStart, videoTrimEnd, programIn, programOut])
+
+  const needsProgramRegionExport =
+    exportEncoderRange != null &&
+    (exportEncoderRange.exportStart > videoTrimStart + 0.02 ||
+      exportEncoderRange.exportEnd < exportEncoderRange.trimEnd - 0.02)
+
+  const handleProgramRangeChange = useCallback(
+    (range: { in: number; out: number }) => {
+      const maxOut = timelineDuration
+      const pin = Math.max(0, Math.min(range.in, maxOut - PROGRAM_EXPORT_MIN_GAP))
+      const pout = Math.max(pin + PROGRAM_EXPORT_MIN_GAP, Math.min(range.out, maxOut))
+      setProgramIn(pin)
+      setProgramOut(pout)
+    },
+    [timelineDuration]
+  )
+
+  useEffect(() => {
+    if (!recordedBlob) {
+      prevRecordedBlobRef.current = null
+      return
+    }
+    const changed = recordedBlob !== prevRecordedBlobRef.current
+    prevRecordedBlobRef.current = recordedBlob
+    if (changed) {
+      setProgramIn(0)
+      setProgramOut(timelineDuration)
+      return
+    }
+    setProgramIn((i) => Math.max(0, Math.min(i, timelineDuration - PROGRAM_EXPORT_MIN_GAP)))
+    setProgramOut((o) => Math.max(PROGRAM_EXPORT_MIN_GAP, Math.min(o, timelineDuration)))
+  }, [recordedBlob, timelineDuration])
 
   const handleTimelineDurationChange = useCallback((seconds: number) => {
     const n = Number(seconds)
@@ -438,6 +493,7 @@ export default function App() {
       captionPreviewStyle,
       captionPreviewFontSizePercent,
       captionPreviewCaptionY,
+      captionTextAnimation,
       userTimelineDuration,
       timelineHeight,
       inspectorWidth,
@@ -463,7 +519,7 @@ export default function App() {
       noiseRemovalAmount,
       previewScale,
     })
-  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount, previewScale])
+  }, [videoKind, videoDeviceId, audioDeviceId, aspectRatio, resolutionIndex, quality, portraitFillHeight, studioQuality, overlays, overlayTextAnimation, captionPreviewStyle, captionPreviewFontSizePercent, captionPreviewCaptionY, captionTextAnimation, userTimelineDuration, timelineHeight, inspectorWidth, inspectorTab, safeZoneType, safeZoneVisible, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, thumbnailSeekTime, thumbnailTexts, thumbnailWebcamDataUrl, thumbnailGeneratedDataUrl, videoVolume, noiseRemovalEnabled, noiseRemovalAmount, previewScale])
 
   const handleThumbnailChange = useCallback((blob: Blob | null, dataUrl?: string | null) => {
     setThumbnailBlob(blob)
@@ -501,7 +557,7 @@ export default function App() {
     const hasColor =
       colorAdjustmentsEnabled &&
       (colorBrightness !== 100 || colorContrast !== 100 || colorSaturation !== 100)
-    const needsExport = hasOverlaysToBurn || hasTrim || hasColor
+    const needsExport = hasOverlaysToBurn || hasTrim || needsProgramRegionExport || hasColor
     if (needsExport) {
       setDownloadPreparing(true)
       try {
@@ -511,6 +567,8 @@ export default function App() {
           sourceDuration: duration ?? undefined,
           trimStart: videoTrimEnd != null ? videoTrimStart : undefined,
           trimEnd: videoTrimEnd ?? (duration ?? undefined),
+          exportStart: exportEncoderRange?.exportStart,
+          exportEnd: exportEncoderRange?.exportEnd,
           overlays,
           overlayTextAnimation,
           defaultFontFamily,
@@ -558,6 +616,8 @@ export default function App() {
     defaultFontFamily,
     defaultSecondaryFont,
     defaultBold,
+    exportEncoderRange,
+    needsProgramRegionExport,
   ])
 
   const handleInspectorResizeMove = useCallback(
@@ -908,6 +968,8 @@ export default function App() {
     setVideoClipSegments(null)
     userHasTrimmedVideoRef.current = false
     setUserTimelineDuration(null)
+    setProgramIn(0)
+    setProgramOut(FALLBACK_RECORDING_TIMELINE_SEC)
     setDuration(0)
     setCurrentTime(0)
     setSeekTime(null)
@@ -917,6 +979,7 @@ export default function App() {
     setThumbnailGeneratedDataUrl(null)
     setYoutubeCaption('')
     setYoutubeTitle('')
+    setCaptionTextAnimation('fade')
   }, [])
 
   const selectedOverlay = overlays.find((o) => o.id === selectedOverlayId) ?? null
@@ -986,11 +1049,22 @@ export default function App() {
             onCaptureStream={setCanvasStream}
             onDurationChange={setDuration}
             onTimeUpdate={(time) => {
-              if (videoTrimEnd != null) {
-                setCurrentTime(Math.max(0, Math.min(videoTrimEnd - videoTrimStart, time - videoTrimStart)))
-              } else {
-                setCurrentTime(time)
+              let ct =
+                videoTrimEnd != null
+                  ? Math.max(0, Math.min(videoTrimEnd - videoTrimStart, time - videoTrimStart))
+                  : time
+              const trimLen =
+                videoTrimEnd != null ? videoTrimEnd - videoTrimStart : Math.max(0.01, sourceSec)
+              const pIn = Math.max(0, Math.min(programIn, trimLen))
+              const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, trimLen))
+              if (recordedBlob && isPreviewPlayingRef.current && ct >= pOut - 0.05) {
+                setIsPreviewPlaying(false)
+                ct = pOut
+                const srcSeek = videoTrimEnd != null ? videoTrimStart + pOut : pOut
+                setSeekTime(srcSeek)
+                setTimeout(() => setSeekTime(null), 150)
               }
+              setCurrentTime(ct)
             }}
             videoTrimStart={recordedBlob && videoTrimEnd != null ? videoTrimStart : undefined}
             videoTrimEnd={recordedBlob && videoTrimEnd != null ? videoTrimEnd : undefined}
@@ -1004,6 +1078,7 @@ export default function App() {
             onOverlayEdit={handleEditOverlay}
             portraitFillHeight={portraitFillHeight}
             overlayTextAnimation={overlayTextAnimation}
+            captionTextAnimation={captionTextAnimation}
             videoVolume={videoVolume}
             defaultFontFamily={defaultFontFamily}
             defaultSecondaryFont={defaultSecondaryFont}
@@ -1231,6 +1306,9 @@ export default function App() {
           defaultBold={defaultBold}
           trimStart={videoTrimStart}
           trimEnd={videoTrimEnd ?? undefined}
+          exportStart={exportEncoderRange?.exportStart}
+          exportEnd={exportEncoderRange?.exportEnd}
+          programRegionExport={needsProgramRegionExport}
           sourceDuration={duration ?? undefined}
           colorAdjustmentsEnabled={colorAdjustmentsEnabled}
           colorBrightness={colorBrightness}
@@ -1391,6 +1469,18 @@ export default function App() {
                 onOverlayTextAnimationChange={setOverlayTextAnimation}
                 isPreviewPlaying={isPreviewPlaying}
                 onPreviewPlayToggle={() => {
+                  if (!isPreviewPlaying && recordedBlob && !showLiveStream) {
+                    const trimLen =
+                      videoTrimEnd != null ? videoTrimEnd - videoTrimStart : Math.max(0.01, sourceSec)
+                    const pIn = Math.max(0, Math.min(programIn, trimLen))
+                    const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, trimLen))
+                    if (currentTime < pIn - 0.02 || currentTime >= pOut - 0.02) {
+                      const srcSeek = videoTrimEnd != null ? videoTrimStart + pIn : pIn
+                      setSeekTime(srcSeek)
+                      setCurrentTime(pIn)
+                      setTimeout(() => setSeekTime(null), 150)
+                    }
+                  }
                   if (showLiveStream && !isPreviewPlaying && previewTime >= timelineDuration - 0.05) {
                     setPreviewTime(0)
                   }
@@ -1406,6 +1496,9 @@ export default function App() {
                 onVideoClipTrimChange={recordedBlob ? handleVideoClipTrimChange : undefined}
                 onVideoClipSplit={recordedBlob ? handleVideoClipSplit : undefined}
                 videoClipSegments={recordedBlob && videoClipSegments ? videoClipSegments : undefined}
+                programIn={recordedBlob ? programIn : undefined}
+                programOut={recordedBlob ? programOut : undefined}
+                onProgramRangeChange={recordedBlob ? handleProgramRangeChange : undefined}
               />
             </div>
           </div>
@@ -1487,6 +1580,8 @@ export default function App() {
             onCaptionFontSizePercentChange={setCaptionPreviewFontSizePercent}
             captionY={captionPreviewCaptionY}
             onCaptionYChange={setCaptionPreviewCaptionY}
+            captionTextAnimation={captionTextAnimation}
+            onCaptionTextAnimationChange={setCaptionTextAnimation}
             captionSegments={captionSegments}
             onTranscriptionDone={setCaptionSegments}
             openaiApiKey={openaiApiKey}

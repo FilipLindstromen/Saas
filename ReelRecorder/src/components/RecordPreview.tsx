@@ -470,6 +470,8 @@ interface RecordPreviewProps {
   /** When true and canvas is portrait (9:16) or square (1:1), scale video to fill height and crop sides */
   portraitFillHeight?: boolean
   overlayTextAnimation?: OverlayTextAnimation
+  /** In/out animation for burned-style captions (independent of overlay text animation) */
+  captionTextAnimation?: OverlayTextAnimation
   /** Global font settings for text overlays */
   defaultFontFamily?: string
   defaultSecondaryFont?: string
@@ -528,6 +530,7 @@ export function RecordPreview({
   onOverlayEdit,
   portraitFillHeight = false,
   overlayTextAnimation = 'none',
+  captionTextAnimation = 'fade',
   defaultFontFamily = 'Oswald',
   defaultSecondaryFont = 'Playfair Display',
   defaultBold = false,
@@ -916,7 +919,7 @@ export function RecordPreview({
           drawCaptionStyle(ctx, width, height, captionSegments, captionTime, captionPreview.style, {
             fontSizePercent: captionPreview.fontSizePercent,
             captionY: captionPreview.captionY,
-            textAnimation: overlayTextAnimation,
+            textAnimation: captionTextAnimation,
           })
         }
         // Draw selection border and resize handle when not recording
@@ -959,7 +962,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, captionTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {

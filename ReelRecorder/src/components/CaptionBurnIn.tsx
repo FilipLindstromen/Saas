@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import type { CaptionStyle } from '../types'
-import { CAPTION_STYLES } from '../constants'
+import type { CaptionStyle, OverlayTextAnimation } from '../types'
+import { CAPTION_STYLES, OVERLAY_TEXT_ANIMATION_OPTIONS } from '../constants'
 import { IconWand, IconRefresh } from './Icons'
 import { transcribeAudioFromVideo } from '../services/captions'
 import type { CaptionSegment } from '../services/captions'
@@ -24,6 +24,8 @@ interface CaptionBurnInProps {
   onCaptionStyleChange?: (style: CaptionStyle) => void
   onCaptionFontSizePercentChange?: (percent: number) => void
   onCaptionYChange?: (y: number) => void
+  captionTextAnimation?: OverlayTextAnimation
+  onCaptionTextAnimationChange?: (anim: OverlayTextAnimation) => void
   /** After transcription, segments are stored here; burn-in uses these (editable in left panel). */
   captionSegments: CaptionSegment[] | null
   onTranscriptionDone: (segments: CaptionSegment[]) => void
@@ -41,12 +43,15 @@ export function CaptionBurnIn({
   onCaptionStyleChange,
   onCaptionFontSizePercentChange,
   onCaptionYChange,
+  captionTextAnimation: controlledCaptionAnim,
+  onCaptionTextAnimationChange,
   captionSegments,
   onTranscriptionDone,
 }: CaptionBurnInProps) {
   const [internalStyle, setInternalStyle] = useState<CaptionStyle>('lower-third')
   const [internalFontSizePercent, setInternalFontSizePercent] = useState(2)
   const [internalCaptionY, setInternalCaptionY] = useState(0.85)
+  const [internalCaptionAnim, setInternalCaptionAnim] = useState<OverlayTextAnimation>('fade')
   const [status, setStatus] = useState<'idle' | 'transcribing' | 'burning' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const previewRef = useRef<HTMLCanvasElement>(null)
@@ -58,6 +63,8 @@ export function CaptionBurnIn({
   const setStyle = onCaptionStyleChange ?? setInternalStyle
   const setFontSizePercent = onCaptionFontSizePercentChange ?? setInternalFontSizePercent
   const setCaptionY = onCaptionYChange ?? setInternalCaptionY
+  const captionTextAnimation = controlledCaptionAnim ?? internalCaptionAnim
+  const setCaptionTextAnimation = onCaptionTextAnimationChange ?? setInternalCaptionAnim
 
   useEffect(() => {
     const canvas = previewRef.current
@@ -116,7 +123,11 @@ export function CaptionBurnIn({
     setError(null)
     setStatus('burning')
     try {
-      const blob = await burnCaptionsIntoVideo(videoBlob, captionSegments, style, width, height, { fontSizePercent, captionY })
+      const blob = await burnCaptionsIntoVideo(videoBlob, captionSegments, style, width, height, {
+        fontSizePercent,
+        captionY,
+        textAnimation: captionTextAnimation,
+      })
       onBurnedBlob(blob)
       setStatus('done')
     } catch (e) {
@@ -159,6 +170,19 @@ export function CaptionBurnIn({
         >
           {CAPTION_STYLES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className={styles.row}>
+        <label className={styles.label}>Caption animation</label>
+        <select
+          className={styles.select}
+          value={captionTextAnimation}
+          onChange={(e) => setCaptionTextAnimation(e.target.value as OverlayTextAnimation)}
+          aria-label="Caption in and out animation"
+        >
+          {OVERLAY_TEXT_ANIMATION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </div>
@@ -224,7 +248,7 @@ async function burnCaptionsIntoVideo(
   style: CaptionStyle,
   width: number,
   height: number,
-  options: { fontSizePercent: number; captionY: number }
+  options: { fontSizePercent: number; captionY: number; textAnimation?: OverlayTextAnimation }
 ): Promise<Blob> {
   const video = document.createElement('video')
   video.src = URL.createObjectURL(videoBlob)
@@ -266,7 +290,11 @@ async function burnCaptionsIntoVideo(
   const drawFrame = () => {
     if (video.ended || video.paused) return
     ctx.drawImage(video, 0, 0, width, height)
-    drawCaptionStyle(ctx, width, height, segments, video.currentTime, style, options)
+    drawCaptionStyle(ctx, width, height, segments, video.currentTime, style, {
+      fontSizePercent: options.fontSizePercent,
+      captionY: options.captionY,
+      textAnimation: options.textAnimation ?? 'fade',
+    })
     requestAnimationFrame(drawFrame)
   }
   drawFrame()

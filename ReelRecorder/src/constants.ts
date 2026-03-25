@@ -1,4 +1,14 @@
-import type { AspectRatio, ResolutionOption, QualityPreset, CaptionStyle } from './types'
+import type { AspectRatio, ResolutionOption, QualityPreset, CaptionStyle, OverlayTextAnimation } from './types'
+
+/** In/out animation (same choices as overlay text); also used for burn-in captions. */
+export const OVERLAY_TEXT_ANIMATION_OPTIONS: { value: OverlayTextAnimation; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'fade-slide-left', label: 'Fade + slide left' },
+  { value: 'fade-slide-right', label: 'Fade + slide right' },
+  { value: 'fade-slide-up', label: 'Fade + slide up' },
+  { value: 'fade-slide-down', label: 'Fade + slide down' },
+]
 
 export const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
   { value: '16:9', label: '16:9 (Landscape)' },

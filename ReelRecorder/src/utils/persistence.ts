@@ -24,6 +24,8 @@ export interface PersistedState {
   /** Caption font size as % of video width (e.g. 2 = 2%) */
   captionPreviewFontSizePercent: number
   captionPreviewCaptionY: number
+  /** Per-segment in/out animation for burned-in captions (preview + burn) */
+  captionTextAnimation: OverlayTextAnimation
   userTimelineDuration: number | null
   /** Timeline panel height in px (resizable by user) */
   timelineHeight: number
@@ -78,6 +80,7 @@ const defaults: PersistedState = {
   captionPreviewStyle: 'lower-third',
   captionPreviewFontSizePercent: 2,
   captionPreviewCaptionY: 0.85,
+  captionTextAnimation: 'fade',
   userTimelineDuration: null,
   timelineHeight: 220,
   inspectorWidth: 280,
@@ -226,6 +229,9 @@ function validateState(raw: unknown): PersistedState | null {
       typeof o.captionPreviewCaptionY === 'number' && Number.isFinite(o.captionPreviewCaptionY)
         ? Math.max(0, Math.min(1, o.captionPreviewCaptionY))
         : defaults.captionPreviewCaptionY,
+    captionTextAnimation: TEXT_ANIMATIONS.includes(o.captionTextAnimation as OverlayTextAnimation)
+      ? (o.captionTextAnimation as OverlayTextAnimation)
+      : defaults.captionTextAnimation,
     userTimelineDuration:
       o.userTimelineDuration != null && typeof o.userTimelineDuration === 'number' && Number.isFinite(o.userTimelineDuration) && o.userTimelineDuration >= 1 && o.userTimelineDuration <= 600
         ? o.userTimelineDuration
