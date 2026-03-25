@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
-export function ThemeToggle() {
+type ThemeToggleProps = {
+  className?: string;
+};
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
+  const { t } = useI18n();
   const [theme, setThemeState] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
@@ -39,13 +45,15 @@ export function ThemeToggle() {
     setThemeState(next);
   };
 
+  const label = theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark");
+
   return (
     <button
       type="button"
       onClick={toggle}
-      className="bd-btn bd-theme-toggle"
-      title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-      aria-label="Toggle theme"
+      className={className ? `bd-btn bd-theme-toggle ${className}` : "bd-btn bd-theme-toggle"}
+      title={label}
+      aria-label={label}
       style={{ padding: "0.5rem" }}
     >
       {theme === "dark" ? (

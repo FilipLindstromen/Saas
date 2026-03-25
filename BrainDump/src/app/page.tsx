@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { AppSidebar } from "@/components/AppSidebar";
 import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } from "@/components/CenterPanel";
@@ -41,6 +42,7 @@ export default function BrainDumpPage() {
   const [selectedItemType, setSelectedItemType] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [isMobile, setIsMobile] = useState(
@@ -335,8 +337,9 @@ export default function BrainDumpPage() {
         <TopBar
           mode={mode}
           onModeChange={setMode}
-          onOpenSettings={() => setShowSettings(true)}
           showUncategorizedWorkspace={hasUncategorizedEntries}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
+          workspaceSelectorMobileOnly
         />
 
       <div
@@ -348,60 +351,14 @@ export default function BrainDumpPage() {
           alignItems: "stretch",
         }}
       >
-        <aside
-          className="bd-mobile-hide bd-sidebar-rail"
-          style={{
-            width: 56,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            padding: "0.5rem 0",
-            gap: "0.35rem",
-          }}
-        >
-          <button
-            type="button"
-            className="bd-sidebar-rail-btn"
-            data-active={mode === "all"}
-            onClick={() => setMode("all")}
-            title={t("mode.all")}
-            aria-label={t("mode.all")}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="bd-sidebar-rail-btn"
-            data-active={mode === "work"}
-            onClick={() => setMode("work")}
-            title={t("mode.work")}
-            aria-label={t("mode.work")}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="bd-sidebar-rail-btn"
-            data-active={mode === "personal"}
-            onClick={() => setMode("personal")}
-            title={t("mode.personal")}
-            aria-label={t("mode.personal")}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
-        </aside>
+        <AppSidebar
+          mode={mode}
+          onModeChange={setMode}
+          showUncategorizedWorkspace={hasUncategorizedEntries}
+          onOpenSettings={() => setShowSettings(true)}
+          mobileOpen={mobileNavOpen}
+          onMobileOpenChange={setMobileNavOpen}
+        />
 
         <div className="bd-workspace-column" style={{ gap: "0" }}>
           {(mode === "work" || mode === "personal" || mode === "all") && !isMobile && (
