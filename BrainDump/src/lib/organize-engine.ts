@@ -1,8 +1,10 @@
 /**
  * Organization engine: takes a transcript and returns structured items via AI.
  * Keeps business logic separate from UI and API.
+ * Prompts and catalog labels live in organize-instructions.json (edit that file to tune behavior).
  */
 
+import organizeInstructions from "./organize-instructions.json";
 import { normalizeReminderMinutesBefore } from "./calendar-schedule";
 import {
   filterNewStandaloneProjectNames,
