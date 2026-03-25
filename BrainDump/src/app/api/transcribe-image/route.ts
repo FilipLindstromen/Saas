@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { auth } from "@/auth";
+import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -15,14 +17,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing image file" }, { status: 400 });
     }
 
-    const clientKey = (formData.get("apiKey") as string | null)?.trim() || "";
-    const apiKey = process.env.OPENAI_API_KEY || clientKey;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "OpenAI API key is not configured. Set OPENAI_API_KEY." },
-        { status: 500 }
-      );
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    const clientKey = (formData.get("apiKey") as string | null) ?? "";
+    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    if (!keyRes.ok) {
+      return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }
+    const apiKey = keyRes.apiKey;
 
     const buffer = Buffer.from(await file.arrayBuffer());
     if (buffer.length === 0) {

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
+import { fetchWithTimeout, postJsonWithTimeout } from "@/lib/safe-fetch-json";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
 import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
@@ -63,6 +64,12 @@ function getStoredOpenAIKey(): string {
 }
 
 const OPENAI_KEY_ERROR = "OpenAI API key is not configured";
+
+const TRANSCRIBE_TIMEOUT_MS = 120_000;
+const ORGANIZE_TIMEOUT_MS = 180_000;
+const TRANSCRIBE_IMAGE_TIMEOUT_MS = 120_000;
+/** Hard cap on continuous microphone recording (Whisper / UX / cost). */
+const MAX_RECORDING_SECONDS = 5 * 60;
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -155,6 +162,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const showDumpOverlayRef = useRef(false);
   const [showDumpFace, setShowDumpFace] = useState(() => (typeof window !== "undefined" ? loadShowDumpFace() : true));
   const [photoOrganizeFlow, setPhotoOrganizeFlow] = useState(false);
+  const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
 
   useEffect(() => {
     const sync = () => setShowDumpFace(loadShowDumpFace());
@@ -209,17 +217,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     if (window.matchMedia("(max-width: 768px)").matches) return;
     loadDevices(true);
   }, [showDumpOverlay, loadDevices]);
-
-  useEffect(() => {
-    if (recordState !== "recording") return;
-    setRecordingElapsed("0:00");
-    recordingStartRef.current = Date.now();
-    const interval = setInterval(() => {
-      const sec = Math.floor((Date.now() - recordingStartRef.current) / 1000);
-      setRecordingElapsed(formatElapsed(sec));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [recordState]);
 
   useEffect(() => {
     if (recordState !== "recording" || !canvasRef.current) return;
@@ -456,6 +453,26 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     }
   }, [t]);
 
+  const stopRecordingRef = useRef(stopRecording);
+  stopRecordingRef.current = stopRecording;
+
+  useEffect(() => {
+    if (recordState !== "recording") return;
+    setRecordingElapsed("0:00");
+    recordingStartRef.current = Date.now();
+    const interval = setInterval(() => {
+      const sec = Math.floor((Date.now() - recordingStartRef.current) / 1000);
+      setRecordingElapsed(formatElapsed(sec));
+      if (sec >= MAX_RECORDING_SECONDS) {
+        clearInterval(interval);
+        stopRecordingRef.current({ silent: true });
+        setOrganizeSuccess(t("center.recordingMaxLength"));
+        setTimeout(() => setOrganizeSuccess(null), 8000);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [recordState, t]);
+
   const transcribe = useCallback(async (): Promise<string | null> => {
     const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string };
     const blob = win.__lastAudioBlob;
@@ -477,8 +494,14 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       if (key) form.append("apiKey", key);
       /** Match Whisper to UI language (sv/en); API maps to ISO 639-1 for whisper-1 */
       form.append("language", locale);
-      const res = await fetch("/api/transcribe", { method: "POST", body: form });
-      const data = await res.json();
+      const res = await fetchWithTimeout("/api/transcribe", { method: "POST", body: form }, TRANSCRIBE_TIMEOUT_MS);
+      const raw = await res.text();
+      let data: { error?: string; transcript?: string };
+      try {
+        data = raw.trim() ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(!res.ok ? raw.trim().slice(0, 240) || `Transcription failed (${res.status})` : "Invalid response from server");
+      }
       if (!res.ok) {
         const msg = data.error || "Transcription failed";
         if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
@@ -528,6 +551,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     setError(null);
     setOrganizeLoading(true);
     setUnclearItems(null);
+    saveFormState({ organizeInProgress: true, organizeTranscriptSnapshot: text });
     try {
       const key = getStoredOpenAIKey();
       const defaultDomain = getDefaultDomainFromMode(mode);
@@ -539,23 +563,23 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           if (Array.isArray(parsed)) customCategories = parsed.filter((c: unknown) => typeof c === "string" && c.trim());
         }
       } catch {}
-      const res = await fetch("/api/organize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: text,
-          locale,
-          referenceIso: new Date().toISOString(),
-          ...(key ? { apiKey: key } : {}),
-          projectNames: projectNames.length > 0 ? projectNames : undefined,
-          ...(defaultDomain ? { defaultDomain } : {}),
-          ...(customCategories?.length ? { customCategories } : {}),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const msg = data.error || "Organization failed";
-        if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
+      const body = {
+        transcript: text,
+        locale,
+        referenceIso: new Date().toISOString(),
+        ...(key ? { apiKey: key } : {}),
+        projectNames: projectNames.length > 0 ? projectNames : undefined,
+        ...(defaultDomain ? { defaultDomain } : {}),
+        ...(customCategories?.length ? { customCategories } : {}),
+      };
+      const { ok, data } = await postJsonWithTimeout<{
+        error?: string;
+        items?: OrganizedItemPreview[];
+        standaloneProjectCreations?: unknown;
+      }>("/api/organize", body, ORGANIZE_TIMEOUT_MS);
+      if (!ok) {
+        const msg = typeof data.error === "string" && data.error ? data.error : "Organization failed";
+        if (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY")) {
           onOpenSettings?.();
         }
         throw new Error(msg);
@@ -577,6 +601,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
       const items: OrganizedItemPreview[] = Array.isArray(data.items) ? data.items : [];
       const unclear = items.filter((it) => (it.confidence_score ?? 0.8) < UNCLEAR_CONFIDENCE_THRESHOLD);
+      saveFormState({ organizeInProgress: false, organizeTranscriptSnapshot: undefined });
+      try {
+        sessionStorage.removeItem("braindump-resume-attempt");
+      } catch {
+        /* ignore */
+      }
       if (createdStandalone > 0) {
         setOrganizeSuccess(t("center.projectsCreatedOnly", { n: createdStandalone }));
         setTimeout(() => setOrganizeSuccess(null), 5000);
@@ -587,7 +617,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         await applyOrganizeResult(items, text);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Organization failed");
+      const msg = e instanceof Error ? e.message : "Organization failed";
+      setError(msg.toLowerCase().includes("timed out") ? t("center.organizeNetworkError") : msg);
     } finally {
       setOrganizeLoading(false);
     }
@@ -608,8 +639,14 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         const key = getStoredOpenAIKey();
         if (key) form.append("apiKey", key);
         form.append("locale", locale);
-        const res = await fetch("/api/transcribe-image", { method: "POST", body: form });
-        const data = await res.json();
+        const res = await fetchWithTimeout("/api/transcribe-image", { method: "POST", body: form }, TRANSCRIBE_IMAGE_TIMEOUT_MS);
+        const raw = await res.text();
+        let data: { error?: string; transcript?: string };
+        try {
+          data = raw.trim() ? JSON.parse(raw) : {};
+        } catch {
+          throw new Error(!res.ok ? raw.trim().slice(0, 240) || `Image transcription failed (${res.status})` : "Invalid response from server");
+        }
         if (!res.ok) {
           const msg = data.error || "Image transcription failed";
           if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
@@ -640,6 +677,27 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   );
 
   useImperativeHandle(ref, () => ({ processImageForOrganize }), [processImageForOrganize]);
+
+  useEffect(() => {
+    organizeRef.current = organize;
+  }, [organize]);
+
+  useEffect(() => {
+    const st = loadFormState();
+    if (!st.organizeInProgress || !st.organizeTranscriptSnapshot?.trim()) return;
+    try {
+      const last = Number(sessionStorage.getItem("braindump-resume-attempt") || "0");
+      if (Date.now() - last < 4000) return;
+      sessionStorage.setItem("braindump-resume-attempt", String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+    setOrganizeSuccess(t("center.resumingOrganize"));
+    const snap = st.organizeTranscriptSnapshot.trim();
+    queueMicrotask(() => {
+      void organizeRef.current(snap);
+    });
+  }, [t]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();
@@ -743,8 +801,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               </div>
               <div className="bd-dump-recording-actions">
                 <div className="bd-dump-timer-row">
-                  <span className="bd-dump-timer" aria-live="polite">
+                  <span className="bd-dump-timer" aria-live="polite" aria-atomic="true">
                     {recordingElapsed}
+                    <span style={{ opacity: 0.75, fontWeight: 400, marginLeft: "0.35rem" }}>{t("center.recordingMaxHint")}</span>
                   </span>
                 </div>
                 <div className="bd-dump-actions-row bd-dump-actions-row--split">

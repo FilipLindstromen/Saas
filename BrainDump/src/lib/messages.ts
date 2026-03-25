@@ -101,8 +101,12 @@ const en: Msg = {
   "center.openSettings": "Open settings",
   "center.organizedSaved": "Organized and saved {n} item(s).",
   "center.organizedReview": "Organized into {n} item(s). Review and save on the right.",
+  "center.resumingOrganize": "Resuming organization…",
+  "center.organizeNetworkError": "Organization failed. Your text is saved — tap Organize again to retry.",
   "center.dumpPromptInbox": "Tap the microphone to record, or the camera button to capture text from a photo (next to the mic on desktop, bottom-left on mobile).",
   "center.readingPhoto": "Reading text from your photo…",
+  "center.recordingMaxLength": "Maximum recording length (5 minutes) reached — recording stopped. You can transcribe or record again.",
+  "center.recordingMaxHint": "· max 5:00",
   "center.transcribing": "Transcribing audio…",
   "center.webcamCapture": "Webcam",
   "center.webcamCapturePhoto": "Capture photo",
@@ -250,6 +254,9 @@ const en: Msg = {
   "settings.soundEffects": "Sound effects",
   "settings.soundEffectsHelp":
     "When on, checking off a task plays a crowd cheer from Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Stored in your browser only.",
+  "settings.revenueCat": "Use RevenueCat (subscriptions & paywall)",
+  "settings.revenueCatHelp":
+    "When off, the app skips RevenueCat so you can use BrainDump locally without API keys. In production builds the default is on until you change it. Stored in your browser only.",
 
   "settings.googleCalendarSync": "Connect Google Calendar",
   "settings.googleCalendarHelp":
@@ -411,8 +418,13 @@ const sv: Msg = {
   "center.openSettings": "Öppna inställningar",
   "center.organizedSaved": "Organiserat och sparat {n} post(er).",
   "center.organizedReview": "Organiserat till {n} post(er). Granska och spara till höger.",
+  "center.resumingOrganize": "Återupptar organisering…",
+  "center.organizeNetworkError": "Organisering misslyckades. Texten är sparad — tryck Organisera igen för att försöka.",
   "center.dumpPromptInbox": "Tryck på mikrofonen för att spela in, eller kameraknappen för att läsa text från ett foto (bredvid mikrofonen på desktop, nere till vänster på mobil).",
   "center.readingPhoto": "Läser text från din bild…",
+  "center.recordingMaxLength":
+    "Maximal inspelningslängd (5 minuter) nådd — inspelningen stoppades. Du kan transkribera eller spela in igen.",
+  "center.recordingMaxHint": "· max 5:00",
   "center.transcribing": "Transkriberar ljud…",
   "center.webcamCapture": "Webbkamera",
   "center.webcamCapturePhoto": "Ta foto",
@@ -561,6 +573,9 @@ const sv: Msg = {
   "settings.soundEffects": "Ljudeffekter",
   "settings.soundEffectsHelp":
     "När på: bockar du av en uppgift spelas en jubel-högtid från Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Sparas bara i din webbläsare.",
+  "settings.revenueCat": "Använd RevenueCat (prenumerationer & paywall)",
+  "settings.revenueCatHelp":
+    "När av: hoppar appen över RevenueCat så du kan utveckla utan API-nycklar. I produktionsbyggen är standard på tills du ändrar det. Sparas bara i din webbläsare.",
 
   "settings.googleCalendarSync": "Koppla Google Kalender",
   "settings.googleCalendarHelp":

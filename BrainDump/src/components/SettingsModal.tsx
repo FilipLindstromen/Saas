@@ -5,6 +5,7 @@ import { useI18n, type Locale } from "@/lib/i18n";
 import { loadShowEntryTitles, saveShowEntryTitles } from "@/lib/entry-display-settings";
 import { loadShowDumpFace, saveShowDumpFace } from "@/lib/dump-face-settings";
 import { loadSoundEffectsEnabled, saveSoundEffectsEnabled } from "@/lib/sound-effects-settings";
+import { loadRevenueCatEnabled, saveRevenueCatEnabled } from "@/lib/revenuecat-settings";
 import { DeleteEntriesOverlay } from "@/components/DeleteEntriesOverlay";
 import {
   fetchGoogleCalendarEvents,
@@ -175,6 +176,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [showEntryTitles, setShowEntryTitles] = useState(true);
   const [showDumpFace, setShowDumpFace] = useState(true);
   const [soundEffects, setSoundEffects] = useState(false);
+  const [revenueCatEnabled, setRevenueCatEnabled] = useState(() =>
+    typeof window !== "undefined" ? loadRevenueCatEnabled() : true
+  );
   const [appleCalendarStepsOpen, setAppleCalendarStepsOpen] = useState(false);
   const [calendarImportBusy, setCalendarImportBusy] = useState(false);
   const [calendarImportMessage, setCalendarImportMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
@@ -191,6 +195,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setShowEntryTitles(loadShowEntryTitles());
       setShowDumpFace(loadShowDumpFace());
       setSoundEffects(loadSoundEffectsEnabled());
+      setRevenueCatEnabled(loadRevenueCatEnabled());
       setGoogleCalendarSync(loadGoogleCalendarSync());
       setGoogleClientId(loadGoogleClientId());
       setSelectedCalendarId(loadGoogleCalendarId());
@@ -260,6 +265,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     saveShowEntryTitles(showEntryTitles);
     saveShowDumpFace(showDumpFace);
     saveSoundEffectsEnabled(soundEffects);
+    saveRevenueCatEnabled(revenueCatEnabled);
     saveGoogleCalendarSync(googleCalendarSync);
     saveGoogleClientId(googleClientId);
     if (selectedCalendarId && selectedCalendarSummary) {
@@ -444,6 +450,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </label>
           <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 1rem", lineHeight: 1.45, paddingLeft: "1.625rem" }}>
             {t("settings.soundEffectsHelp")}
+          </p>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+            <input
+              type="checkbox"
+              checked={revenueCatEnabled}
+              onChange={(e) => setRevenueCatEnabled(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
+            />
+            <span>{t("settings.revenueCat")}</span>
+          </label>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 1rem", lineHeight: 1.45, paddingLeft: "1.625rem" }}>
+            {t("settings.revenueCatHelp")}
           </p>
           <div style={{ marginBottom: "1rem", paddingTop: "0.25rem", borderTop: "1px solid var(--border-subtle)" }}>
             <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: 0, marginBottom: "0.65rem", lineHeight: 1.45 }}>

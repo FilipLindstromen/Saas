@@ -12,9 +12,8 @@ const nextConfig = {
   // When served under a subpath (e.g. from SaaS hub at /BrainDump/), set NEXT_PUBLIC_BASE_PATH=/BrainDump
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || "",
-  // Expose root .env keys to client (so shared/apiKeys can use them)
+  // Never expose OPENAI_API_KEY to the browser (session + server or BYOK in Settings only).
   env: {
-    NEXT_PUBLIC_OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
     NEXT_PUBLIC_UNSPLASH_ACCESS_KEY: process.env.UNSPLASH_ACCESS_KEY || "",
     NEXT_PUBLIC_PEXELS_API_KEY: process.env.PEXELS_API_KEY || "",
     NEXT_PUBLIC_GIPHY_API_KEY: process.env.GIPHY_API_KEY || "",

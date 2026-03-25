@@ -1,25 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { organizeTranscript } from "@/lib/organize-engine";
+import { organizeTranscriptResilient } from "@/lib/organize-engine";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
+import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 
-export const maxDuration = 30;
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const transcript = typeof body.transcript === "string" ? body.transcript : "";
-    const clientKey = (body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "").trim();
-    const apiKey = process.env.OPENAI_API_KEY || clientKey;
-    if (!apiKey) {
+    const MAX_INBOUND = 450_000;
+    if (transcript.length > MAX_INBOUND) {
       return NextResponse.json(
-        { error: "OpenAI API key is not configured. Set OPENAI_API_KEY." },
-        { status: 500 }
+        { error: `Transcript too long (max ${MAX_INBOUND.toLocaleString()} characters).` },
+        { status: 413 }
       );
     }
+    const clientKey = body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "";
 
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
+
+    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    if (!keyRes.ok) {
+      return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
+    }
+    const apiKey = keyRes.apiKey;
 
     let mergedProjectNames: string[] = [];
     if (userId) {
@@ -45,10 +52,10 @@ export async function POST(request: NextRequest) {
     const referenceIso = typeof body.referenceIso === "string" ? body.referenceIso.trim() : undefined;
 
     let existingCategories: string[] | undefined;
-    if (defaultDomain === "work" || defaultDomain === "personal") {
+    if (userId && (defaultDomain === "work" || defaultDomain === "personal")) {
       const rows = await prisma.organizedItem.groupBy({
         by: ["category"],
-        where: { domain: defaultDomain },
+        where: { domain: defaultDomain, userId },
       });
       existingCategories = rows.map((r) => r.category).filter(Boolean);
     }
@@ -62,11 +69,12 @@ export async function POST(request: NextRequest) {
       ...(referenceIso ? { referenceIso } : {}),
     };
 
-    const result = await organizeTranscript(transcript, apiKey, options);
-    return NextResponse.json({
-      items: result.items,
-      standaloneProjectCreations: result.standaloneProjectCreations,
-    });
+    const result = await organizeTranscriptResilient(transcript, apiKey, options);
+    const items = Array.isArray(result.items) ? result.items : [];
+    const standaloneProjectCreations = Array.isArray(result.standaloneProjectCreations)
+      ? result.standaloneProjectCreations
+      : [];
+    return NextResponse.json({ items, standaloneProjectCreations });
   } catch (e) {
     console.error("Organize error:", e);
     const message = e instanceof Error ? e.message : "Organization failed";

@@ -1,38 +1,36 @@
-/* Shared Saas theme — BrainDump: premium dark dashboard (near-black, outline-first, minimal shadow) */
+/* BrainDump — bento dashboard (soft grey canvas, elevated cards, high radius; light & dark) */
 :root[data-theme="dark"],
 :root {
-  /* Canvas → chrome — subtle steps, not “blue slate” */
-  --bg-primary: #050506;
-  --bg-secondary: #0a0a0c;
-  --bg-tertiary: #111113;
-  --bg-elevated: #0e0e11;
-  --bg-hover: #18181c;
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text-primary: #f4f4f5;
-  --text-secondary: rgba(244, 244, 245, 0.88);
-  --text-tertiary: rgba(244, 244, 245, 0.5);
-  --text-quaternary: rgba(244, 244, 245, 0.32);
-  /* Accent — reserved for strong CTAs / recording; UI chrome uses --bd-chrome-* */
-  --accent: #e8e8ea;
-  --accent-hover: #f4f4f5;
-  --accent-soft: rgba(255, 255, 255, 0.08);
-  --accent-muted: rgba(255, 255, 255, 0.06);
-  /* Monochrome outline selection (chips, toggles, sidebar) — slightly lifted vs canvas */
-  --bd-chrome-selected-bg: rgba(255, 255, 255, 0.12);
-  --bd-chrome-selected-border: rgba(255, 255, 255, 0.72);
-  --bd-chrome-selected-text: #fafafa;
+  --bg-primary: #0c0c0e;
+  --bg-secondary: #141416;
+  --bg-tertiary: #1c1c20;
+  --bg-elevated: #222226;
+  --bg-hover: #2c2c31;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --text-primary: #fafafa;
+  --text-secondary: rgba(250, 250, 250, 0.88);
+  --text-tertiary: rgba(250, 250, 250, 0.52);
+  --text-quaternary: rgba(250, 250, 250, 0.34);
+  --accent: #f4f4f5;
+  --accent-hover: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.1);
+  --accent-muted: rgba(255, 255, 255, 0.07);
+  /* Selected chip = light surface on dark canvas (matches reference dark “white” CTAs) */
+  --bd-chrome-selected-bg: #f4f4f5;
+  --bd-chrome-selected-border: #f4f4f5;
+  --bd-chrome-selected-text: #0a0a0a;
   --bd-chrome-muted-bg: transparent;
   --bd-btn-primary-fg: #0a0a0a;
-  /* Hairline elevation — reference UI is “in the surface”, not floating cards */
-  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.04);
-  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
   --shadow-up: 0 -1px 0 rgba(255, 255, 255, 0.06);
-  --bd-shadow-panel: none;
-  --card-radius: 12px;
+  --bd-shadow-panel: 0 4px 28px rgba(0, 0, 0, 0.38);
+  --card-radius: 22px;
   --button-radius: 999px;
+  --bd-input-radius: 14px;
   --btn-bg: transparent;
   --btn-border: var(--border-default);
   --btn-shadow: none;
@@ -52,8 +50,8 @@
   --bd-success-border: color-mix(in srgb, var(--bd-success) 26%, transparent);
   --bd-success-text: #c8f7d4;
   /* Regions — “what belongs where” */
-  --bd-surface-scope: color-mix(in srgb, #fff 4%, var(--bg-primary));
-  --bd-chrome-edge: rgba(255, 255, 255, 0.08);
+  --bd-surface-scope: color-mix(in srgb, #fff 5%, var(--bg-primary));
+  --bd-chrome-edge: rgba(255, 255, 255, 0.09);
   /* Mobile bottom dump mic — warm red-orange */
   --bd-dump-mic-bg: linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%);
   --bd-dump-mic-fg: #ffffff;
@@ -62,34 +60,35 @@
 }
 
 :root[data-theme="light"] {
-  --bg-primary: #f4f4f5;
+  --bg-primary: #e8e8ec;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #ececee;
-  --bg-elevated: #fafafa;
-  --bg-hover: #f0f0f2;
-  --border-subtle: rgba(15, 23, 42, 0.06);
-  --border-default: rgba(15, 23, 42, 0.12);
-  --border-strong: rgba(15, 23, 42, 0.2);
-  --text-primary: #0f172a;
-  --text-secondary: rgba(15, 23, 42, 0.88);
-  --text-tertiary: rgba(15, 23, 42, 0.52);
-  --text-quaternary: rgba(15, 23, 42, 0.36);
-  --accent: #171717;
-  --accent-hover: #262626;
-  --accent-soft: rgba(15, 23, 42, 0.08);
-  --accent-muted: rgba(15, 23, 42, 0.05);
-  /* Selected chips / toggles: bright surface on gray canvas */
-  --bd-chrome-selected-bg: #ffffff;
-  --bd-chrome-selected-border: rgba(15, 23, 42, 0.78);
-  --bd-chrome-selected-text: #0f172a;
+  --bg-tertiary: #e0e0e5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f3f3f5;
+  --border-subtle: rgba(15, 23, 42, 0.07);
+  --border-default: rgba(15, 23, 42, 0.11);
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --text-primary: #0a0a0b;
+  --text-secondary: rgba(10, 10, 11, 0.86);
+  --text-tertiary: rgba(10, 10, 11, 0.5);
+  --text-quaternary: rgba(10, 10, 11, 0.34);
+  --accent: #0a0a0a;
+  --accent-hover: #171717;
+  --accent-soft: rgba(10, 10, 11, 0.08);
+  --accent-muted: rgba(10, 10, 11, 0.05);
+  /* Selected chip = solid dark on light canvas (reference “Work” pill) */
+  --bd-chrome-selected-bg: #0a0a0a;
+  --bd-chrome-selected-border: #0a0a0a;
+  --bd-chrome-selected-text: #fafafa;
   --bd-chrome-muted-bg: transparent;
   --bd-btn-primary-fg: #fafafa;
-  --shadow-sm: 0 1px 0 rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 20px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 14px 44px rgba(15, 23, 42, 0.12);
   --shadow-up: 0 -1px 0 rgba(15, 23, 42, 0.06);
-  --bd-shadow-panel: none;
+  --bd-shadow-panel: 0 2px 16px rgba(15, 23, 42, 0.07), 0 1px 3px rgba(15, 23, 42, 0.04);
   --button-radius: 999px;
+  --bd-input-radius: 14px;
   --btn-bg: transparent;
   --btn-border: var(--border-default);
   --btn-shadow: none;
@@ -185,12 +184,12 @@ body {
   overflow: hidden;
 }
 
-/* Serif display — hero titles, app name (reference: “Morning Viktor”) */
+/* App title — bento reference: bold geometric sans */
 .bd-display-heading {
-  font-family: var(--font-display), Georgia, "Times New Roman", serif;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.12;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
 }
 
 /* Slim icon rail — outline icons, no filled “accent blob” */
@@ -260,7 +259,7 @@ textarea {
   border-radius: var(--card-radius);
   overflow: hidden;
   box-shadow: var(--bd-shadow-panel);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Inline status banners — consistent success / danger */
@@ -364,7 +363,7 @@ textarea {
 .bd-textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border-radius: var(--button-radius);
+  border-radius: var(--bd-input-radius, 14px);
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -1082,7 +1081,7 @@ select.bd-input::-ms-expand {
   padding-bottom: 0;
 }
 
-/* Flush with top bar: same chrome surface, no card radius (web + mobile) */
+/* Scope strip — bento card on desktop; full-bleed on small screens */
 .bd-scope-outer-wrap {
   flex-shrink: 0;
   position: relative;
@@ -1094,6 +1093,19 @@ select.bd-input::-ms-expand {
   border-bottom: 1px solid var(--bd-chrome-edge);
   background: var(--bg-primary);
   box-shadow: none;
+}
+
+@media (min-width: 769px) {
+  .bd-scope-outer-wrap {
+    margin: var(--bd-space-2) var(--bd-space-3) 0;
+    padding: var(--bd-space-4) max(var(--bd-space-4), env(safe-area-inset-left)) var(--bd-space-4)
+      max(var(--bd-space-4), env(safe-area-inset-right));
+    border-radius: var(--card-radius);
+    border: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    box-shadow: var(--bd-shadow-panel);
+  }
 }
 
 .bd-page-content-padding {
@@ -1108,7 +1120,7 @@ select.bd-input::-ms-expand {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Items list: toolbar + content */
+/* Items list: toolbar + content — main bento card */
 .bd-items-view-root {
   display: flex;
   flex-direction: column;
@@ -1121,6 +1133,10 @@ select.bd-input::-ms-expand {
   overflow-x: hidden;
   padding: var(--bd-space-4);
   gap: var(--bd-space-4);
+  background: var(--bg-elevated);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--bd-shadow-panel);
 }
 
 /* Toolbar: filters + views — flush on page (no card frame; spacing from .bd-items-view-root) */
@@ -1248,7 +1264,7 @@ select.bd-input::-ms-expand {
 
 .bd-bottom-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--bd-btn-primary-fg);
   border: 1px solid var(--accent);
   box-shadow: none;
 }
@@ -1257,7 +1273,7 @@ select.bd-input::-ms-expand {
   border-radius: 12px;
 }
 
-/* Sticky app header — same chrome family as bottom bar */
+/* Sticky app header — floats on canvas */
 .bd-topbar {
   position: sticky;
   top: 0;
@@ -1269,12 +1285,16 @@ select.bd-input::-ms-expand {
   padding-right: max(var(--bd-space-4), env(safe-area-inset-right));
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bd-chrome-edge);
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
   animation: bd-topbar-enter var(--bd-duration-slow) var(--bd-ease-soft) both;
 }
 
 :root[data-theme="light"] .bd-topbar {
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="dark"] .bd-topbar {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Workspace dropdown: don’t stretch full width (bd-input is width:100% by default) */
@@ -1299,10 +1319,10 @@ select.bd-input::-ms-expand {
   top: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  font-family: var(--font-display), Georgia, "Times New Roman", serif;
-  font-weight: 600;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 700;
   font-size: 1.125rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-primary);
   z-index: 0;
 }
@@ -1475,6 +1495,11 @@ select.bd-input::-ms-expand {
     margin: 0;
     padding: var(--bd-space-2) max(0.65rem, env(safe-area-inset-left)) var(--bd-space-2)
       max(0.65rem, env(safe-area-inset-right));
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--bd-chrome-edge);
+    background: var(--bg-primary);
+    box-shadow: none;
   }
 
   .bd-page-content-padding {

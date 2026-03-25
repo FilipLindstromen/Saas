@@ -9,6 +9,10 @@ export interface BrainDumpFormState {
   transcriptEdited: string;
   currentDumpId: string | null;
   lastMode: string;
+  /** Organization was in flight (user closed app / network drop) — resume on next load. */
+  organizeInProgress?: boolean;
+  /** Transcript snapshot for resume (must match what was being organized). */
+  organizeTranscriptSnapshot?: string;
 }
 
 const DEFAULT: BrainDumpFormState = {

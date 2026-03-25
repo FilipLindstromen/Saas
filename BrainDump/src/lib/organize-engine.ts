@@ -1,11 +1,11 @@
 /**
  * Organization engine: takes a transcript and returns structured items via AI.
  * Keeps business logic separate from UI and API.
- * Prompts and catalog labels live in organize-instructions.json (edit that file to tune behavior).
+ * Long transcripts are split and merged server-side (see organizeTranscriptResilient).
  */
 
-import organizeInstructions from "./organize-instructions.json";
 import { normalizeReminderMinutesBefore } from "./calendar-schedule";
+import { splitTranscriptIntoChunks } from "./transcript-chunks";
 import {
   filterNewStandaloneProjectNames,
   resolveProjectNameToCanonical,
@@ -194,6 +194,30 @@ export interface OrganizeOptions {
   locale?: "en" | "sv";
   /** Client "now" (ISO string) so the model can resolve "today" / "tomorrow" for calendar fields. */
   referenceIso?: string;
+  /** When organizing a transcript in multiple API passes (long text). */
+  chunkPart?: { index: number; total: number };
+}
+
+const TRANSCRIPT_MAX_CHARS = 400_000;
+const CHUNK_TRIGGER_LENGTH = 7_000;
+const CHUNK_TARGET_CHARS = 8_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts: number, label: string): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (i < attempts - 1) await sleep(450 * (i + 1));
+    }
+  }
+  const msg = last instanceof Error ? last.message : String(last);
+  throw new Error(`${label} failed after ${attempts} attempts: ${msg}`);
 }
 
 const DEFAULT_CATEGORIES_WORK = ["projects", "tasks", "notes", "ideas", "meetings", "opportunities"];
@@ -277,10 +301,21 @@ export async function organizeTranscript(
       ? `\n\nReferensdatum/tid (användarens "nu" för att tolka idag/imorgon): ${ref}`
       : `\n\nReference date/time (user's "now" for interpreting today/tomorrow): ${ref}`;
 
-  const userContent =
+  let userContent =
     locale === "sv"
       ? `Transkript:\n\n${transcript}${refLine}\n\nSkriv title och content på svenska för varje post (om transkriptet är på svenska).`
       : `Transcript:\n\n${transcript}${refLine}`;
+
+  const cp = options.chunkPart;
+  if (cp && cp.total > 1) {
+    userContent +=
+      locale === "sv"
+        ? `\n\n(Ovan är del ${cp.index} av ${cp.total} av samma brain dump — extrahera bara poster från denna text. Ignorera dubbletter av poster som redan fanns i en tidigare del om du skulle råka upprepa.)`
+        : `\n\n(Above is part ${cp.index} of ${cp.total} of the same brain dump — extract items only from this segment. Avoid duplicating items that would have appeared in an earlier part.)`;
+  }
+
+  const maxOut =
+    options.chunkPart && options.chunkPart.total > 1 ? 4096 : 2000;
 
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -289,7 +324,7 @@ export async function organizeTranscript(
       { role: "user", content: userContent },
     ],
     temperature: 0.4,
-    max_tokens: 2000,
+    max_tokens: maxOut,
     response_format: { type: "json_object" },
   });
 
@@ -473,4 +508,54 @@ export async function organizeTranscript(
   } catch {
     return { items: [], standaloneProjectCreations: [] };
   }
+}
+
+/**
+ * Chunk long transcripts, retry each OpenAI call, merge items and standalone project creations.
+ */
+export async function organizeTranscriptResilient(
+  transcript: string,
+  openaiApiKey: string,
+  options: OrganizeOptions = {}
+): Promise<OrganizeTranscriptResult> {
+  const t = transcript.trim();
+  if (!t) return { items: [], standaloneProjectCreations: [] };
+  if (t.length > TRANSCRIPT_MAX_CHARS) {
+    throw new Error(
+      `Transcript is too long (max ${TRANSCRIPT_MAX_CHARS.toLocaleString()} characters). Shorten or split into multiple dumps.`
+    );
+  }
+
+  const chunks =
+    t.length <= CHUNK_TRIGGER_LENGTH ? [t] : splitTranscriptIntoChunks(t, CHUNK_TARGET_CHARS);
+  if (chunks.length === 1) {
+    return withRetry(() => organizeTranscript(t, openaiApiKey, options), 3, "Organization");
+  }
+
+  const allItems: OrganizedItemInput[] = [];
+  const standaloneSeen = new Set<string>();
+  const standaloneOut: string[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkOpts: OrganizeOptions = {
+      ...options,
+      chunkPart: { index: i + 1, total: chunks.length },
+    };
+    const part = chunks[i];
+    const result = await withRetry(
+      () => organizeTranscript(part, openaiApiKey, chunkOpts),
+      3,
+      `Organization part ${i + 1}/${chunks.length}`
+    );
+    allItems.push(...result.items);
+    for (const s of result.standaloneProjectCreations) {
+      const k = s.trim().toLowerCase();
+      if (!k || standaloneSeen.has(k)) continue;
+      standaloneSeen.add(k);
+      standaloneOut.push(s.trim());
+    }
+    if (i < chunks.length - 1) await sleep(400);
+  }
+
+  return { items: allItems, standaloneProjectCreations: standaloneOut };
 }

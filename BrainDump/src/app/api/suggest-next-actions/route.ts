@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 
 interface SuggestItem {
   title: string;
@@ -18,15 +20,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
     const items = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
-    const clientKey = (body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "").trim();
-    const apiKey = process.env.OPENAI_API_KEY || clientKey;
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "OpenAI API key is not configured. Set OPENAI_API_KEY or provide apiKey in request body." },
-        { status: 500 }
-      );
+    const session = await auth();
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    const clientKey = body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "";
+    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    if (!keyRes.ok) {
+      return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }
+    const apiKey = keyRes.apiKey;
 
     if (items.length === 0) {
       return NextResponse.json({ suggestions: [] });

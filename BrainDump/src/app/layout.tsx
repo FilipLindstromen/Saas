@@ -2,18 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { I18nProvider } from "@/lib/i18n";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 
 const fontSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
-  display: "swap",
-});
-
-const fontDisplay = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
   display: "swap",
 });
 
@@ -40,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${fontSans.variable} ${fontDisplay.variable}`}>
+    <html lang="en" suppressHydrationWarning className={fontSans.variable}>
       <head>
         <script
           dangerouslySetInnerHTML={{
