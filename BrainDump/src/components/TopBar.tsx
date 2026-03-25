@@ -25,7 +25,12 @@ const MODE_KEY: Record<Mode, string> = {
 
 const WORKSPACE_MODES: Mode[] = ["all", "work", "personal", "inbox"];
 
-export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
+export function TopBar({
+  mode,
+  onModeChange,
+  onOpenSettings,
+  showUncategorizedWorkspace = true,
+}: TopBarProps) {
   const { t } = useI18n();
   const [streakState, setStreakState] = useState<DumpStreakState>(() => getDumpStreakState());
   const [streaksOpen, setStreaksOpen] = useState(false);
@@ -42,8 +47,8 @@ export function TopBar({ mode, onModeChange, onOpenSettings }: TopBarProps) {
   }, []);
 
   const workspaceModes = showUncategorizedWorkspace
-    ? [...BASE_WORKSPACE_MODES, INBOX_MODE]
-    : BASE_WORKSPACE_MODES;
+    ? WORKSPACE_MODES
+    : WORKSPACE_MODES.filter((m) => m !== "inbox");
 
   return (
     <>
