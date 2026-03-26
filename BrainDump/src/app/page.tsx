@@ -45,9 +45,6 @@ export default function BrainDumpPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
-  );
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
 
@@ -80,15 +77,6 @@ export default function BrainDumpPage() {
       setMode("all");
     }
   }, [hasUncategorizedEntries, mode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 768px)");
-    const sync = () => setIsMobile(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
 
   useEffect(() => {
     try {
@@ -346,7 +334,19 @@ export default function BrainDumpPage() {
           onModeChange={setMode}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
-          workspaceSelectorMobileOnly
+          scopeSlot={
+            mode === "work" || mode === "personal" || mode === "all" ? (
+              <ScopeBar
+                mode={mode}
+                selectedProjectId={selectedProjectId}
+                selectedCategory={selectedCategory}
+                onProjectSelect={setSelectedProjectId}
+                onCategorySelect={setSelectedCategory}
+                searchFilter={searchFilter}
+                onSearchFilterChange={setSearchFilter}
+              />
+            ) : null
+          }
         />
 
       <div
@@ -358,29 +358,7 @@ export default function BrainDumpPage() {
           alignItems: "stretch",
         }}
       >
-        <AppSidebar
-          mode={mode}
-          onModeChange={setMode}
-          showUncategorizedWorkspace={hasUncategorizedEntries}
-          onOpenSettings={() => setShowSettings(true)}
-          mobileOpen={mobileNavOpen}
-          onMobileOpenChange={setMobileNavOpen}
-        />
-
         <div className="bd-workspace-column" style={{ gap: "0" }}>
-          {(mode === "work" || mode === "personal" || mode === "all") && !isMobile && (
-            <div className="bd-scope-outer-wrap" style={{ flexShrink: 0 }}>
-              <ScopeBar
-                mode={mode}
-                selectedProjectId={selectedProjectId}
-                selectedCategory={selectedCategory}
-                onProjectSelect={setSelectedProjectId}
-                onCategorySelect={setSelectedCategory}
-                searchFilter={searchFilter}
-                onSearchFilterChange={setSearchFilter}
-              />
-            </div>
-          )}
           <div className="bd-page-content-padding">
             <CenterPanel
               ref={centerPanelRef}
@@ -399,19 +377,6 @@ export default function BrainDumpPage() {
               viewType={viewType}
               onViewTypeChange={setViewType}
               searchFilter={searchFilter}
-              scopeSlot={
-                isMobile && (mode === "work" || mode === "personal" || mode === "all") ? (
-                  <ScopeBar
-                    mode={mode}
-                    selectedProjectId={selectedProjectId}
-                    selectedCategory={selectedCategory}
-                    onProjectSelect={setSelectedProjectId}
-                    onCategorySelect={setSelectedCategory}
-                    searchFilter={searchFilter}
-                    onSearchFilterChange={setSearchFilter}
-                  />
-                ) : null
-              }
             />
           </div>
           {mode === "inbox" && (
@@ -428,6 +393,15 @@ export default function BrainDumpPage() {
             </div>
           )}
         </div>
+
+        <AppSidebar
+          mode={mode}
+          onModeChange={setMode}
+          showUncategorizedWorkspace={hasUncategorizedEntries}
+          onOpenSettings={() => setShowSettings(true)}
+          mobileOpen={mobileNavOpen}
+          onMobileOpenChange={setMobileNavOpen}
+        />
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
@@ -435,25 +409,39 @@ export default function BrainDumpPage() {
           <PhotoCaptureTrigger onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)} />
         </div>
         <div className="bd-bottom-bar-center">
-          <button
-            type="button"
-            className="bd-bottom-dump-mic"
-            onClick={() => {
-              if (typeof document === "undefined") return;
-              const fab = document.getElementById("bd-dump-fab");
-              if (fab && "click" in fab) {
-                (fab as HTMLButtonElement).click();
-              }
-            }}
-            title={t("center.recordNewDump")}
-            aria-label={t("center.recordNewDump")}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
-          </button>
+          <div className="bd-bottom-bar-center-cluster">
+            <button
+              type="button"
+              className="bd-bottom-dump-mic"
+              onClick={() => {
+                if (typeof document === "undefined") return;
+                const fab = document.getElementById("bd-dump-fab");
+                if (fab && "click" in fab) {
+                  (fab as HTMLButtonElement).click();
+                }
+              }}
+              title={t("center.recordNewDump")}
+              aria-label={t("center.recordNewDump")}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="bd-btn bd-bottom-type-dump-btn"
+              onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
+              title={t("center.typeDump")}
+              aria-label={t("center.typeDump")}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 6h16M4 12h16M4 18h10" />
+                <path d="M16 16h2v2h-2z" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div id="bd-bottom-view-slot" className="bd-bottom-bar-view-slot" />
       </div>

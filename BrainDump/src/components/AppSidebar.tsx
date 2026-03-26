@@ -157,9 +157,10 @@ export function AppSidebar({
     const r = el.getBoundingClientRect();
     const gap = 8;
     if (expanded || isMobile) {
-      setPopoverPos({ top: r.bottom + gap, left: Math.min(r.left, window.innerWidth - 260) });
+      setPopoverPos({ top: r.bottom + gap, left: Math.max(12, Math.min(r.left, window.innerWidth - 268)) });
     } else {
-      setPopoverPos({ top: r.top, left: r.right + gap });
+      /* Sidebar rail on the right: open popover to the left of the avatar */
+      setPopoverPos({ top: r.top, left: Math.max(12, r.left - 268) });
     }
   }, [expanded, isMobile]);
 
@@ -466,7 +467,7 @@ export function AppSidebar({
   return (
     <>
       <aside
-        className="bd-app-sidebar bd-sidebar-rail"
+        className="bd-app-sidebar bd-sidebar-rail bd-app-sidebar--trailing"
         data-expanded={expanded ? "true" : "false"}
         aria-label={t("sidebar.navAria")}
       >

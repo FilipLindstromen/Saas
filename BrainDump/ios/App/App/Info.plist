@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>BrainDump can import your calendar events into your workspace when you choose to.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>BrainDump reads events from your calendars only when you tap import, to copy them into BrainDump.</string>
 </dict>
 </plist>

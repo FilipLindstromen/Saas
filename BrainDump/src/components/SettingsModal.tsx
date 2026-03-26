@@ -12,6 +12,11 @@ import {
   parseIcsCalendarEvents,
 } from "@/lib/calendar-import-braindump";
 import {
+  AppleCalendarPermissionError,
+  fetchAppleCalendarEventsForImport,
+  isIosNativeCalendarImportAvailable,
+} from "@/lib/apple-calendar-native";
+import {
   clearGoogleCalendarAccessToken,
   loadGoogleCalendarAccessToken,
   saveGoogleCalendarAccessToken,
@@ -179,6 +184,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     typeof window !== "undefined" ? loadRevenueCatEnabled() : true
   );
   const [appleCalendarStepsOpen, setAppleCalendarStepsOpen] = useState(false);
+  const [appleIcsAdvancedOpen, setAppleIcsAdvancedOpen] = useState(false);
   const [calendarImportBusy, setCalendarImportBusy] = useState(false);
   const [calendarImportMessage, setCalendarImportMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const icsFileInputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +209,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setCalendarListError(null);
       setDeleteOverlayOpen(false);
       setAppleCalendarStepsOpen(false);
+      setAppleIcsAdvancedOpen(false);
       setCalendarImportBusy(false);
       setCalendarImportMessage(null);
     }
@@ -257,6 +264,28 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     },
     [t]
   );
+
+  const runAppleNativeImport = useCallback(async () => {
+    setCalendarImportMessage(null);
+    setCalendarImportBusy(true);
+    try {
+      const events = await fetchAppleCalendarEventsForImport();
+      const n = await importCalendarEventsToBrainDump({
+        domain: "personal",
+        category: "thoughts",
+        events,
+      });
+      setCalendarImportMessage({ tone: "ok", text: t("settings.appleCalendarImportNativeDone", { count: n }) });
+    } catch (e) {
+      if (e instanceof AppleCalendarPermissionError) {
+        setCalendarImportMessage({ tone: "err", text: t("settings.appleCalendarPermissionDenied") });
+      } else {
+        setCalendarImportMessage({ tone: "err", text: t("settings.appleCalendarImportNativeError") });
+      }
+    } finally {
+      setCalendarImportBusy(false);
+    }
+  }, [t]);
 
   const handleSave = () => {
     saveOpenAIKey(openaiKey.trim());
@@ -566,9 +595,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             >
               {t("settings.appleCalendarTitle")}
             </h3>
-            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
-              {t("settings.appleCalendarIntro")}
-            </p>
             <input
               ref={icsFileInputRef}
               type="file"
@@ -580,59 +606,148 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 e.target.value = "";
               }}
             />
-            <button
-              type="button"
-              className="bd-btn bd-btn-primary"
-              disabled={calendarImportBusy}
-              onClick={() => icsFileInputRef.current?.click()}
-              style={{ marginBottom: "0.5rem" }}
-            >
-              {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.appleCalendarImportIcsButton")}
-            </button>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
-              {t("settings.appleCalendarIcsHelp")}
-            </p>
-            <button
-              type="button"
-              className="bd-btn"
-              onClick={() => setAppleCalendarStepsOpen((o) => !o)}
-              aria-expanded={appleCalendarStepsOpen}
-              style={{ marginBottom: appleCalendarStepsOpen ? "0.5rem" : 0 }}
-            >
-              {appleCalendarStepsOpen ? t("settings.appleCalendarToggleStepsHide") : t("settings.appleCalendarToggleSteps")}
-            </button>
-            {appleCalendarStepsOpen && (
-              <div style={{ marginTop: "0.35rem" }}>
-                <ul
-                  style={{
-                    fontSize: "0.8125rem",
-                    color: "var(--text-secondary)",
-                    paddingLeft: "1.25rem",
-                    margin: "0 0 0.75rem",
-                    lineHeight: 1.55,
-                  }}
-                >
-                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepMac")}</li>
-                  <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepIos")}</li>
-                </ul>
-                <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
-                  {t("settings.appleCalendarIcloudNote")}
+            {isIosNativeCalendarImportAvailable() ? (
+              <>
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                  {t("settings.appleCalendarIntroIosNative")}
                 </p>
-                <a
-                  href="https://support.apple.com/guide/iphone/iphc876bfcf3/ios"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bd-btn"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    fontSize: "0.8125rem",
-                    textDecoration: "none",
-                  }}
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-primary"
+                  disabled={calendarImportBusy}
+                  onClick={() => void runAppleNativeImport()}
+                  style={{ marginBottom: "0.5rem" }}
                 >
-                  {t("settings.appleCalendarSupportLink")}
-                </a>
-              </div>
+                  {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.appleCalendarImportFromDevice")}
+                </button>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setAppleIcsAdvancedOpen((o) => !o)}
+                  aria-expanded={appleIcsAdvancedOpen}
+                  style={{ marginBottom: appleIcsAdvancedOpen ? "0.5rem" : 0 }}
+                >
+                  {appleIcsAdvancedOpen ? t("settings.appleCalendarAdvancedIcsHide") : t("settings.appleCalendarAdvancedIcs")}
+                </button>
+                {appleIcsAdvancedOpen && (
+                  <div style={{ marginTop: "0.35rem" }}>
+                    <button
+                      type="button"
+                      className="bd-btn bd-btn-primary"
+                      disabled={calendarImportBusy}
+                      onClick={() => icsFileInputRef.current?.click()}
+                      style={{ marginBottom: "0.5rem" }}
+                    >
+                      {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.appleCalendarImportIcsButton")}
+                    </button>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                      {t("settings.appleCalendarIcsHelp")}
+                    </p>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => setAppleCalendarStepsOpen((o) => !o)}
+                      aria-expanded={appleCalendarStepsOpen}
+                      style={{ marginBottom: appleCalendarStepsOpen ? "0.5rem" : 0 }}
+                    >
+                      {appleCalendarStepsOpen ? t("settings.appleCalendarToggleStepsHide") : t("settings.appleCalendarToggleSteps")}
+                    </button>
+                    {appleCalendarStepsOpen && (
+                      <div style={{ marginTop: "0.35rem" }}>
+                        <ul
+                          style={{
+                            fontSize: "0.8125rem",
+                            color: "var(--text-secondary)",
+                            paddingLeft: "1.25rem",
+                            margin: "0 0 0.75rem",
+                            lineHeight: 1.55,
+                          }}
+                        >
+                          <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepMac")}</li>
+                          <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepIos")}</li>
+                        </ul>
+                        <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                          {t("settings.appleCalendarIcloudNote")}
+                        </p>
+                        <a
+                          href="https://support.apple.com/guide/iphone/iphc876bfcf3/ios"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bd-btn"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            fontSize: "0.8125rem",
+                            textDecoration: "none",
+                          }}
+                        >
+                          {t("settings.appleCalendarSupportLink")}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                  {t("settings.appleCalendarIntro")}
+                </p>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-primary"
+                  disabled={calendarImportBusy}
+                  onClick={() => icsFileInputRef.current?.click()}
+                  style={{ marginBottom: "0.5rem" }}
+                >
+                  {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.appleCalendarImportIcsButton")}
+                </button>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                  {t("settings.appleCalendarIcsHelp")}
+                </p>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setAppleCalendarStepsOpen((o) => !o)}
+                  aria-expanded={appleCalendarStepsOpen}
+                  style={{ marginBottom: appleCalendarStepsOpen ? "0.5rem" : 0 }}
+                >
+                  {appleCalendarStepsOpen ? t("settings.appleCalendarToggleStepsHide") : t("settings.appleCalendarToggleSteps")}
+                </button>
+                {appleCalendarStepsOpen && (
+                  <div style={{ marginTop: "0.35rem" }}>
+                    <ul
+                      style={{
+                        fontSize: "0.8125rem",
+                        color: "var(--text-secondary)",
+                        paddingLeft: "1.25rem",
+                        margin: "0 0 0.75rem",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepMac")}</li>
+                      <li style={{ marginBottom: "0.35rem" }}>{t("settings.appleCalendarExportStepIos")}</li>
+                    </ul>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 0.65rem", lineHeight: 1.5 }}>
+                      {t("settings.appleCalendarIcloudNote")}
+                    </p>
+                    <a
+                      href="https://support.apple.com/guide/iphone/iphc876bfcf3/ios"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bd-btn"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontSize: "0.8125rem",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {t("settings.appleCalendarSupportLink")}
+                    </a>
+                  </div>
+                )}
+              </>
             )}
             <p style={{ fontSize: "0.72rem", color: "var(--text-quaternary)", margin: "0.75rem 0 0", lineHeight: 1.45 }}>
               {t("settings.calendarImportTargetNote")}

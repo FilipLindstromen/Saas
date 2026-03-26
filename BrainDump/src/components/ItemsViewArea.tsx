@@ -1616,7 +1616,15 @@ export function ItemsViewArea({
       ) : filteredItems.length === 0 ? (
         <p className="bd-empty">{t("items.emptySearch")}</p>
       ) : viewType === "list" ? (
-        <ListView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} />
+        <ListView
+          showEntryTitles={showEntryTitles}
+          items={filteredItems}
+          onSetTaskCompleted={setTaskCompleted}
+          onDelete={deleteItem}
+          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+          onEdit={(it) => setEditingEntry(toEditEntry(it))}
+          onUpdate={updateEntryContent}
+        />
       ) : viewType === "text" ? (
         <TextView
           showEntryTitles={showEntryTitles}
@@ -3197,6 +3205,7 @@ function ListView({
   onDelete,
   onItemContextMenu,
   onEdit,
+  onUpdate,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -3204,8 +3213,38 @@ function ListView({
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
+  onUpdate?: (id: string, updates: { title?: string; content?: string }) => void;
 }) {
   const { t } = useI18n();
+  const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    if (editing.field === "title") inputRef.current?.focus();
+    else textareaRef.current?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!showEntryTitles && editing?.field === "title") setEditing(null);
+  }, [showEntryTitles, editing?.field]);
+
+  const handleFieldBlur = (id: string, field: "title" | "content", value: string, it: ViewItem) => {
+    if (!onUpdate) {
+      setEditing(null);
+      return;
+    }
+    const trimmed = value.trim();
+    const currentTitle = it.title ?? "";
+    const currentContent = (it.content ?? "").trim();
+    if (field === "title") {
+      if (trimmed !== currentTitle) onUpdate(id, { title: trimmed || currentTitle });
+    } else if (trimmed !== currentContent) {
+      onUpdate(id, { content: trimmed });
+    }
+    setEditing(null);
+  };
   const byType = new Map<string, ViewItem[]>();
   for (const it of items) {
     const ty = it.itemType || "note";
@@ -3241,7 +3280,8 @@ function ListView({
           border: "1px solid var(--border-default)",
           borderRadius: "20px",
           background: "var(--bg-elevated)",
-          cursor: onEdit ? "pointer" : undefined,
+          cursor:
+            onEdit && (!editing || editing.id !== it.id) ? "pointer" : undefined,
           boxShadow: "var(--shadow-sm)",
           overflow: "hidden",
         }}
@@ -3300,12 +3340,106 @@ function ListView({
               </button>
             )}
           </div>
-          {showEntryTitles && (
-            <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: "var(--text-primary)", wordBreak: "break-word", overflowWrap: "anywhere" }}>{it.title}</div>
+          {showEntryTitles &&
+            (onUpdate && editing?.id === it.id && editing.field === "title" ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={editing.value}
+                onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+                onBlur={() => handleFieldBlur(it.id, "title", editing.value, it)}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setEditing(null);
+                  }
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                aria-label={t("menu.edit")}
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.9375rem",
+                  color: "var(--text-primary)",
+                  width: "100%",
+                  margin: 0,
+                  padding: "0.1rem 0",
+                  border: "none",
+                  borderRadius: 4,
+                  background: "var(--bg-secondary)",
+                  outline: "1px solid var(--bd-chrome-selected-border)",
+                  wordBreak: "break-word",
+                }}
+              />
+            ) : (
+              <div
+                onClick={() => onUpdate && setEditing({ id: it.id, field: "title", value: it.title ?? "" })}
+                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.9375rem",
+                  color: "var(--text-primary)",
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  cursor: onUpdate ? "text" : undefined,
+                }}
+              >
+                {it.title?.trim() ? it.title : "—"}
+              </div>
+            ))}
+          {onUpdate && editing?.id === it.id && editing.field === "content" ? (
+            <textarea
+              ref={textareaRef}
+              value={editing.value}
+              onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+              onBlur={() => handleFieldBlur(it.id, "content", editing.value, it)}
+              onDoubleClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setEditing(null);
+                }
+              }}
+              aria-label={t("menu.edit")}
+              rows={4}
+              style={{
+                fontSize: "0.8125rem",
+                color: "var(--text-secondary)",
+                lineHeight: 1.4,
+                width: "100%",
+                margin: 0,
+                padding: "0.35rem 0.4rem",
+                resize: "vertical",
+                minHeight: 72,
+                border: "none",
+                borderRadius: 4,
+                background: "var(--bg-secondary)",
+                outline: "1px solid var(--bd-chrome-selected-border)",
+                fontFamily: "inherit",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
+              }}
+            />
+          ) : (
+            <div
+              onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+              onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+              style={{
+                fontSize: "0.8125rem",
+                color: "var(--text-secondary)",
+                lineHeight: 1.4,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
+                cursor: onUpdate ? "text" : undefined,
+              }}
+            >
+              {it.content?.trim() || "—"}
+            </div>
           )}
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-            {it.content?.trim() || "—"}
-          </div>
           {scheduleLabel && (
             <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
               {scheduleLabel}

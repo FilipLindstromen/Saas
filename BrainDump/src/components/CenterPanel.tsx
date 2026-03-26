@@ -108,6 +108,8 @@ function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined
 
 export type BrainDumpCenterHandle = {
   processImageForOrganize: (file: File) => Promise<void>;
+  /** Opens the typed-dump sheet (mobile bar or programmatic). */
+  openTypedDumpSheet: () => void;
 };
 
 export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(function CenterPanel(
@@ -162,6 +164,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const showDumpOverlayRef = useRef(false);
   const [showDumpFace, setShowDumpFace] = useState(() => (typeof window !== "undefined" ? loadShowDumpFace() : true));
   const [photoOrganizeFlow, setPhotoOrganizeFlow] = useState(false);
+  const [showTypedDumpSheet, setShowTypedDumpSheet] = useState(false);
+  const [typedDumpText, setTypedDumpText] = useState("");
   const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
 
   useEffect(() => {
@@ -624,6 +628,25 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     }
   }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t, onWorkProjectsChanged]);
 
+  const organizeFromTypedText = useCallback(
+    async (raw: string) => {
+      const text = raw.trim();
+      if (!text) {
+        setError(t("error.enterTranscript"));
+        return;
+      }
+      setError(null);
+      setTranscript((prev) => {
+        const edited = prev ? `${prev}\n\n${text}` : text;
+        saveFormState({ transcriptRaw: text, transcriptEdited: edited });
+        return edited;
+      });
+      onTranscriptReady(text);
+      await organize(text);
+    },
+    [organize, onTranscriptReady, t]
+  );
+
   const processImageForOrganize = useCallback(
     async (file: File) => {
       if (!file || file.size === 0) {
@@ -676,7 +699,21 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     [locale, onOpenSettings, onTranscriptReady, organize, transcript, t]
   );
 
-  useImperativeHandle(ref, () => ({ processImageForOrganize }), [processImageForOrganize]);
+  const openTypedDumpSheet = useCallback(() => {
+    setTypedDumpText("");
+    setShowTypedDumpSheet(true);
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({ processImageForOrganize, openTypedDumpSheet }),
+    [processImageForOrganize, openTypedDumpSheet]
+  );
+
+  const closeTypedDumpSheet = useCallback(() => {
+    setShowTypedDumpSheet(false);
+    setTypedDumpText("");
+  }, []);
 
   useEffect(() => {
     organizeRef.current = organize;
@@ -730,6 +767,23 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
   const isInbox = mode === "inbox";
   const isDumpProcessing = transcribeLoading || organizeLoading;
+
+  const handleTypedDumpOrganize = useCallback(async () => {
+    const text = typedDumpText.trim();
+    if (!text || isDumpProcessing) return;
+    closeTypedDumpSheet();
+    await organizeFromTypedText(text);
+  }, [typedDumpText, isDumpProcessing, closeTypedDumpSheet, organizeFromTypedText]);
+
+  useEffect(() => {
+    if (!showTypedDumpSheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeTypedDumpSheet();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showTypedDumpSheet, closeTypedDumpSheet]);
+
   const processingTitle =
     transcribeLoading && !organizeLoading
       ? photoOrganizeFlow
@@ -882,6 +936,19 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         <div className="bd-dump-fab-row">
           <PhotoCaptureTrigger onFile={(f) => void processImageForOrganize(f)} disabled={isDumpProcessing || photoOrganizeFlow} />
           <button
+            type="button"
+            className="bd-btn bd-bottom-camera-btn bd-typed-dump-open-btn"
+            onClick={openTypedDumpSheet}
+            disabled={isDumpProcessing || photoOrganizeFlow}
+            title={t("center.typeDump")}
+            aria-label={t("center.typeDump")}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 6h16M4 12h16M4 18h10" />
+              <path d="M16 16h2v2h-2z" />
+            </svg>
+          </button>
+          <button
             id="bd-dump-fab"
             className="bd-dump-fab"
             type="button"
@@ -953,7 +1020,80 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               </div>
             </div>
       )}
-      {((showDumpOverlay && isDumpProcessing) || photoOrganizeFlow) && (
+      {showTypedDumpSheet && (
+        <div
+          className="bd-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bd-typed-dump-title"
+          onClick={closeTypedDumpSheet}
+        >
+          <div
+            className="bd-panel bd-modal-panel bd-typed-dump-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "min(90dvh, 90vh)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+              padding: "1.25rem",
+              overflow: "hidden",
+              boxSizing: "border-box",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexShrink: 0 }}>
+              <h2 id="bd-typed-dump-title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                {t("center.typeDumpTitle")}
+              </h2>
+              <button
+                type="button"
+                className="bd-btn"
+                onClick={closeTypedDumpSheet}
+                aria-label={t("center.close")}
+                style={{ minHeight: 40, paddingInline: "0.65rem", flexShrink: 0 }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <textarea
+              className="bd-input"
+              value={typedDumpText}
+              onChange={(e) => setTypedDumpText(e.target.value)}
+              placeholder={t("center.transcriptPlaceholder")}
+              autoFocus
+              aria-label={t("center.transcript")}
+              rows={14}
+              style={{
+                flex: "1 1 auto",
+                minHeight: 200,
+                resize: "vertical",
+                width: "100%",
+                fontSize: "16px",
+                lineHeight: 1.45,
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", flexWrap: "wrap", flexShrink: 0 }}>
+              <button type="button" className="bd-btn" onClick={closeTypedDumpSheet}>
+                {t("center.cancelDump")}
+              </button>
+              <button
+                type="button"
+                className="bd-btn bd-btn-primary"
+                onClick={() => void handleTypedDumpOrganize()}
+                disabled={!typedDumpText.trim() || isDumpProcessing}
+              >
+                {t("center.typeDumpOrganize")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {(isDumpProcessing || photoOrganizeFlow) && (
         <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
           <div className="bd-dump-processing-inner">
             {showDumpFace && <DumpListeningFace variant="overlay" />}
