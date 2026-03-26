@@ -432,6 +432,9 @@ export function AppSidebar({
       : null;
 
   const streaksModal = <StreaksModal isOpen={streaksOpen} onClose={() => setStreaksOpen(false)} state={streakState} />;
+  const deleteEntriesOverlay = (
+    <DeleteEntriesOverlay isOpen={deleteEntriesOpen} onClose={() => setDeleteEntriesOpen(false)} />
+  );
 
   if (isMobile) {
     return (
