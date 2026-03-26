@@ -1301,6 +1301,16 @@ export function ItemsViewArea({
     setBottomViewSlotEl(document.getElementById("bd-bottom-view-slot"));
   }, []);
 
+  const editSheetScopeLabel = useMemo(() => {
+    if (mode === "work") {
+      return !projectId ? t("scope.all") : projectsList.find((p) => p.id === projectId)?.name ?? t("scope.all");
+    }
+    if (mode === "personal" || mode === "all") {
+      return category ? formatAreaLabel(category) : t("scope.all");
+    }
+    return t("scope.all");
+  }, [mode, projectId, category, projectsList, t]);
+
   if (loading) {
     return (
       <div style={{ padding: "1.5rem" }}>
@@ -1311,16 +1321,6 @@ export function ItemsViewArea({
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
   const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
-
-  const editSheetScopeLabel = useMemo(() => {
-    if (mode === "work") {
-      return !projectId ? t("scope.all") : projectsList.find((p) => p.id === projectId)?.name ?? t("scope.all");
-    }
-    if (mode === "personal" || mode === "all") {
-      return category ? formatAreaLabel(category) : t("scope.all");
-    }
-    return t("scope.all");
-  }, [mode, projectId, category, projectsList, t]);
 
   const mobileViewPickerButton = (
     <button
