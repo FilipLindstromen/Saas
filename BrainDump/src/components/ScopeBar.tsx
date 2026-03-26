@@ -233,6 +233,16 @@ export function ScopeBar({
   }, [isMobile]);
 
   useEffect(() => {
+    const openScopePicker = () => {
+      if (mode === "inbox") return;
+      if (mode === "work") setProjectPickerOpen(true);
+      else setAreaPickerOpen(true);
+    };
+    window.addEventListener("braindump-open-scope-picker", openScopePicker);
+    return () => window.removeEventListener("braindump-open-scope-picker", openScopePicker);
+  }, [mode]);
+
+  useEffect(() => {
     if (!isMobile) setScopeFilterOpen(false);
   }, [isMobile]);
 
@@ -419,7 +429,6 @@ export function ScopeBar({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
                   <button
                     type="button"
-                    className="bd-btn"
                     aria-haspopup="listbox"
                     aria-expanded={projectPickerOpen}
                     aria-label={t("scope.openProjectMenu")}
@@ -429,27 +438,30 @@ export function ScopeBar({
                       minWidth: 0,
                       width: "auto",
                       maxWidth: "none",
-                      minHeight: 44,
+                      minHeight: 48,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "0.5rem",
-                      padding: "0.45rem 0.75rem",
-                      borderRadius: "var(--button-radius)",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      background: !selectedProjectId ? "var(--bd-chrome-selected-bg)" : "transparent",
-                      color: !selectedProjectId ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
-                      borderColor: !selectedProjectId ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                      boxShadow: "none",
+                      justifyContent: "flex-start",
+                      gap: "0.35rem",
+                      padding: "0.35rem 0",
+                      border: "none",
+                      background: "none",
+                      borderRadius: 0,
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      lineHeight: 1.15,
+                      letterSpacing: "-0.02em",
+                      color: "var(--text-primary)",
+                      cursor: "pointer",
+                      WebkitTapHighlightColor: "transparent",
                     }}
                   >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", flex: 1, minWidth: 0 }}>
                       {selectedProjectLabel}
                     </span>
                     <svg
-                      width="18"
-                      height="18"
+                      width="22"
+                      height="22"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -457,7 +469,7 @@ export function ScopeBar({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.92 }}
+                      style={{ flexShrink: 0, opacity: 0.85, marginTop: 2 }}
                     >
                       <path d="m6 9 6 6 6-6" />
                     </svg>
@@ -1004,7 +1016,6 @@ export function ScopeBar({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
                   <button
                     type="button"
-                    className="bd-btn"
                     aria-haspopup="listbox"
                     aria-expanded={areaPickerOpen}
                     aria-label={t("scope.openAreaMenu")}
@@ -1014,27 +1025,30 @@ export function ScopeBar({
                       minWidth: 0,
                       width: "auto",
                       maxWidth: "none",
-                      minHeight: 44,
+                      minHeight: 48,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "0.5rem",
-                      padding: "0.45rem 0.75rem",
-                      borderRadius: "var(--button-radius)",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      background: !selectedCategory ? "var(--bd-chrome-selected-bg)" : "transparent",
-                      color: !selectedCategory ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
-                      borderColor: !selectedCategory ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                      boxShadow: "none",
+                      justifyContent: "flex-start",
+                      gap: "0.35rem",
+                      padding: "0.35rem 0",
+                      border: "none",
+                      background: "none",
+                      borderRadius: 0,
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      lineHeight: 1.15,
+                      letterSpacing: "-0.02em",
+                      color: "var(--text-primary)",
+                      cursor: "pointer",
+                      WebkitTapHighlightColor: "transparent",
                     }}
                   >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", flex: 1, minWidth: 0 }}>
                       {selectedCategory ? formatCategoryLabel(selectedCategory) : t("scope.all")}
                     </span>
                     <svg
-                      width="18"
-                      height="18"
+                      width="22"
+                      height="22"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -1042,7 +1056,7 @@ export function ScopeBar({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.92 }}
+                      style={{ flexShrink: 0, opacity: 0.85, marginTop: 2 }}
                     >
                       <path d="m6 9 6 6 6-6" />
                     </svg>

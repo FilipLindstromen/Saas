@@ -82,9 +82,9 @@ function useIsMobile() {
 }
 
 export function AppSidebar({
-  mode: _mode,
-  onModeChange: _onModeChange,
-  showUncategorizedWorkspace: _showUncategorizedWorkspace,
+  mode,
+  onModeChange,
+  showUncategorizedWorkspace,
   onOpenSettings,
   mobileOpen,
   onMobileOpenChange,

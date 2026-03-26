@@ -83,6 +83,7 @@ export interface ViewItem {
   reminderEarlyNotifiedAt?: string | null;
   project?: { id: string; name: string } | null;
   tags?: { tag: { name: string } }[];
+  priority?: number | null;
 }
 
 interface ItemsViewAreaProps {
@@ -395,6 +396,33 @@ function formatCalendarScheduleLabel(it: { scheduledAt?: string | null; schedule
   return null;
 }
 
+/** Mobile edit sheet: "Today, 26 Mar, 14:00" style line (accent). */
+function formatMobileEditScheduleLine(
+  scheduledAt: string,
+  scheduledTime: string | undefined,
+  locale: string,
+  t: (key: string) => string
+): string | null {
+  const dateStr = scheduledAt?.trim();
+  if (!dateStr) return null;
+  const key = dateStr.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const target = new Date(`${key}T12:00:00`);
+  if (!Number.isFinite(target.getTime())) return null;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayStart = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const diffDays = Math.round((dayStart - todayStart) / 86400000);
+  const dateShort = target.toLocaleDateString(locale || undefined, { day: "numeric", month: "short" });
+  const timePart = (scheduledTime ?? "").trim();
+  if (diffDays === 0) {
+    return timePart ? `${t("scope.dateFilterToday")}, ${dateShort}, ${timePart}` : `${t("scope.dateFilterToday")}, ${dateShort}`;
+  }
+  if (diffDays === 1) {
+    return timePart ? `${t("scope.dateFilterTomorrow")}, ${dateShort}, ${timePart}` : `${t("scope.dateFilterTomorrow")}, ${dateShort}`;
+  }
+  return timePart ? `${dateShort}, ${timePart}` : dateShort;
+}
 
 function filterItemsBySearch(items: ViewItem[], searchFilter: string): ViewItem[] {
   const q = searchFilter.trim().toLowerCase();
@@ -472,7 +500,11 @@ export function ItemsViewArea({
     sendNotification?: boolean;
     /** Minutes before event for advance notification (0, 10, 30, 60) */
     reminderMinutesBefore?: number;
+    priority?: number | null;
   } | null>(null);
+  const [editEntryMoreOpen, setEditEntryMoreOpen] = useState(false);
+  const [editEntryScheduleOpen, setEditEntryScheduleOpen] = useState(false);
+  const editEntryContentRef = useRef<HTMLTextAreaElement | null>(null);
   const [reminderEntry, setReminderEntry] = useState<{
     id: string;
     title: string;
@@ -505,6 +537,7 @@ export function ItemsViewArea({
     recurrence: it.recurrence ?? "none",
     sendNotification: it.sendNotification ?? false,
     reminderMinutesBefore: normalizeReminderMinutesBefore(it.reminderMinutesBefore ?? 30),
+    priority: it.priority ?? null,
   }), []);
   const [lineToolActive, setLineToolActive] = useState(false);
   const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
@@ -1180,6 +1213,76 @@ export function ItemsViewArea({
     []
   );
 
+  type EditingEntryState = NonNullable<typeof editingEntry>;
+
+  const flushEditingEntry = useCallback(
+    (ed: EditingEntryState) => {
+      fetch(`/api/organized-items/${ed.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: ed.title,
+          content: ed.content,
+          priority: ed.priority ?? null,
+        }),
+      })
+        .then((r) => {
+          if (r.ok)
+            setItems((prev) =>
+              prev.map((it) =>
+                it.id === ed.id ? { ...it, title: ed.title, content: ed.content, priority: ed.priority ?? null } : it
+              )
+            );
+        })
+        .catch(() => {});
+
+      const currentItem = items.find((i) => i.id === ed.id);
+      if (currentItem?.itemType === "calendar") {
+        const rMin = normalizeReminderMinutesBefore(ed.reminderMinutesBefore ?? 0);
+        const dateStr = ed.scheduledAt?.trim();
+        const timeStr = ed.scheduledTime?.trim() || "09:00";
+        let reminderAtIso: string | null = null;
+        if (ed.sendNotification && dateStr) {
+          const dt = localDateTimeToDate(dateStr, timeStr);
+          reminderAtIso = dt ? dt.toISOString() : null;
+        }
+        updateSchedule(ed.id, {
+          scheduledAt: ed.scheduledAt || null,
+          scheduledTime: ed.scheduledTime || null,
+          recurrence: (ed.recurrence === "none" ? null : ed.recurrence) || null,
+          sendNotification: ed.sendNotification ?? false,
+          reminderAt: ed.sendNotification && reminderAtIso ? reminderAtIso : null,
+          reminderMinutesBefore: ed.sendNotification && reminderAtIso ? rMin : null,
+        });
+      }
+      if (currentItem && (currentItem.itemType === "shopping" || isTaskRow(currentItem))) {
+        const due = ed.scheduledAt?.trim();
+        const dt = due ? dateOnlyToStartOfDay(due) : null;
+        updateSchedule(ed.id, {
+          scheduledAt: dt ? dt.toISOString() : null,
+          scheduledTime: ed.scheduledTime?.trim() ? ed.scheduledTime.trim() : null,
+        });
+      }
+    },
+    [items, updateSchedule]
+  );
+
+  useEffect(() => {
+    if (!editingEntry) {
+      setEditEntryMoreOpen(false);
+      setEditEntryScheduleOpen(false);
+    }
+  }, [editingEntry]);
+
+  useEffect(() => {
+    if (!editingEntry || !isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [editingEntry, isMobile]);
+
   const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
@@ -1208,6 +1311,16 @@ export function ItemsViewArea({
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
   const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
+
+  const editSheetScopeLabel = useMemo(() => {
+    if (mode === "work") {
+      return !projectId ? t("scope.all") : projectsList.find((p) => p.id === projectId)?.name ?? t("scope.all");
+    }
+    if (mode === "personal" || mode === "all") {
+      return category ? formatAreaLabel(category) : t("scope.all");
+    }
+    return t("scope.all");
+  }, [mode, projectId, category, projectsList, t]);
 
   const mobileViewPickerButton = (
     <button
@@ -2014,7 +2127,339 @@ export function ItemsViewArea({
         );
       })()}
 
-      {editingEntry && (
+      {editingEntry ? (
+        isMobile ? (
+        <div className="bd-edit-entry-mobile">
+          <header className="bd-edit-entry-mobile-top">
+            <button
+              type="button"
+              className="bd-edit-entry-icon-btn"
+              onClick={() => {
+                flushEditingEntry(editingEntry);
+                setEditingEntry(null);
+              }}
+              aria-label={t("items.editCloseSave")}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="bd-edit-entry-mobile-scope"
+              onClick={() => {
+                if (mode === "inbox") return;
+                window.dispatchEvent(new Event("braindump-open-scope-picker"));
+              }}
+              aria-label={t("scope.openProjectMenu")}
+              disabled={mode === "inbox"}
+            >
+              <span className="bd-edit-entry-mobile-scope-label">{editSheetScopeLabel}</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div className="bd-edit-entry-mobile-top-actions">
+              <button
+                type="button"
+                className="bd-edit-entry-icon-btn"
+                aria-pressed={Boolean(editingEntry.priority)}
+                aria-label={t("items.editFlag")}
+                onClick={() =>
+                  setEditingEntry((p) => (p ? { ...p, priority: p.priority ? null : 1 } : null))
+                }
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill={editingEntry.priority ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                  <line x1="4" y1="22" x2="4" y2="15" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="bd-edit-entry-icon-btn"
+                aria-label={t("items.editMore")}
+                onClick={() => setEditEntryMoreOpen(true)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <circle cx="12" cy="6" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="18" r="1.5" />
+                </svg>
+              </button>
+            </div>
+          </header>
+          <div className="bd-edit-entry-mobile-scroll">
+            {(() => {
+              const ei = items.find((i) => i.id === editingEntry.id);
+              const scheduleLine =
+                ei?.itemType === "calendar"
+                  ? formatCalendarScheduleLabel({
+                      scheduledAt: editingEntry.scheduledAt,
+                      scheduledTime: editingEntry.scheduledTime,
+                      recurrence: editingEntry.recurrence,
+                    })
+                  : formatMobileEditScheduleLine(
+                      editingEntry.scheduledAt ?? "",
+                      editingEntry.scheduledTime,
+                      locale,
+                      t
+                    );
+              const showScheduleRow =
+                ei &&
+                (ei.itemType === "calendar" || ei.itemType === "shopping" || isTaskRow(ei));
+              const taskDone = ei ? isTaskCompleted(ei) : false;
+              return (
+                <>
+                  {showScheduleRow ? (
+                    <div className="bd-edit-entry-mobile-schedule-row">
+                      {ei && isTaskRow(ei) ? (
+                        <label className="bd-todo-checkbox-wrap">
+                          <input
+                            type="checkbox"
+                            className="bd-todo-checkbox"
+                            checked={taskDone}
+                            onChange={(e) => {
+                              setTaskCompleted(editingEntry.id, e.target.checked);
+                            }}
+                            aria-label={taskDone ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                          />
+                        </label>
+                      ) : (
+                        <span className="bd-edit-entry-schedule-spacer" aria-hidden />
+                      )}
+                      <button
+                        type="button"
+                        className="bd-edit-entry-schedule-accent"
+                        onClick={() => {
+                          if (!editingEntry.scheduledAt?.trim()) {
+                            const n = new Date();
+                            const y = n.getFullYear();
+                            const mo = String(n.getMonth() + 1).padStart(2, "0");
+                            const da = String(n.getDate()).padStart(2, "0");
+                            setEditingEntry((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    scheduledAt: `${y}-${mo}-${da}`,
+                                    scheduledTime: prev.scheduledTime?.trim() || "14:00",
+                                  }
+                                : null
+                            );
+                          }
+                          setEditEntryScheduleOpen((o) => !o);
+                        }}
+                      >
+                        <span className="bd-edit-entry-schedule-accent-inner">
+                          {scheduleLine || t("items.editTapToSchedule")}
+                          {scheduleLine ? (
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              aria-hidden
+                              className="bd-edit-entry-schedule-alarm"
+                            >
+                              <circle cx="12" cy="13" r="7" />
+                              <path d="M12 9v4l2 2M5 3 2 3M22 3h-3M2 3h3" />
+                            </svg>
+                          ) : null}
+                        </span>
+                      </button>
+                    </div>
+                  ) : null}
+                  {editEntryScheduleOpen && ei && (ei.itemType === "shopping" || isTaskRow(ei)) ? (
+                    <div className="bd-edit-entry-mobile-schedule-fields">
+                      <input
+                        type="date"
+                        className="bd-input"
+                        value={editingEntry.scheduledAt ?? ""}
+                        onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
+                      />
+                      <input
+                        type="time"
+                        className="bd-input"
+                        value={editingEntry.scheduledTime ?? ""}
+                        onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledTime: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "", scheduledTime: "" })}
+                      >
+                        {t("items.clearDueDate")}
+                      </button>
+                    </div>
+                  ) : null}
+                  {editEntryScheduleOpen && ei?.itemType === "calendar" ? (
+                    <div className="bd-edit-entry-mobile-schedule-fields bd-edit-entry-mobile-calendar-fields">
+                      <label className="bd-edit-entry-field-label">
+                        Date
+                        <input
+                          type="date"
+                          className="bd-input"
+                          value={editingEntry.scheduledAt ?? ""}
+                          onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledAt: e.target.value })}
+                        />
+                      </label>
+                      <label className="bd-edit-entry-field-label">
+                        Time
+                        <input
+                          type="time"
+                          className="bd-input"
+                          value={editingEntry.scheduledTime ?? ""}
+                          onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledTime: e.target.value })}
+                        />
+                      </label>
+                      <label className="bd-edit-entry-field-label">
+                        Repeats
+                        <select
+                          className="bd-input"
+                          value={editingEntry.recurrence ?? "none"}
+                          onChange={(e) => setEditingEntry((prev) => prev && { ...prev, recurrence: e.target.value })}
+                        >
+                          <option value="none">None</option>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <label className="bd-edit-entry-inline-check">
+                        <input
+                          type="checkbox"
+                          checked={editingEntry.sendNotification ?? false}
+                          onChange={(e) => setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })}
+                        />
+                        Send notification
+                      </label>
+                      {editingEntry.sendNotification ? (
+                        <label className="bd-edit-entry-field-label">
+                          Notify before event
+                          <select
+                            className="bd-input"
+                            value={editingEntry.reminderMinutesBefore ?? 30}
+                            onChange={(e) =>
+                              setEditingEntry((prev) =>
+                                prev ? { ...prev, reminderMinutesBefore: Number(e.target.value) } : null
+                              )
+                            }
+                          >
+                            {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                              <option key={m} value={m}>
+                                {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <input
+                    className="bd-edit-entry-mobile-title"
+                    value={editingEntry.title}
+                    onChange={(e) => setEditingEntry((prev) => prev && { ...prev, title: e.target.value })}
+                    placeholder={t("items.titlePlaceholder")}
+                    enterKeyHint="next"
+                    autoFocus
+                  />
+                  <textarea
+                    ref={editEntryContentRef}
+                    className="bd-edit-entry-mobile-desc"
+                    value={editingEntry.content}
+                    onChange={(e) => setEditingEntry((prev) => prev && { ...prev, content: e.target.value })}
+                    placeholder={t("items.description")}
+                    rows={6}
+                  />
+                </>
+              );
+            })()}
+          </div>
+          <div className="bd-edit-entry-mobile-accessory">
+            <div className="bd-edit-entry-accessory-pill">
+              <button
+                type="button"
+                className="bd-edit-entry-accessory-icon"
+                aria-label={t("items.editTag")}
+                disabled
+                style={{ opacity: 0.45 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                  <path d="M7 7h.01" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="bd-edit-entry-accessory-icon"
+                aria-label={t("items.editInsertList")}
+                onClick={() => {
+                  const el = editEntryContentRef.current;
+                  const start = el?.selectionStart ?? editingEntry.content.length;
+                  const ins = "\n• ";
+                  const v = editingEntry.content;
+                  const next = v.slice(0, start) + ins + v.slice(start);
+                  setEditingEntry((p) => (p ? { ...p, content: next } : null));
+                  requestAnimationFrame(() => {
+                    if (!el) return;
+                    el.focus();
+                    const pos = start + ins.length;
+                    el.selectionStart = el.selectionEnd = pos;
+                  });
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <button
+              type="button"
+              className="bd-edit-entry-icon-btn"
+              aria-label={t("items.editDismissKeyboard")}
+              onClick={() => (document.activeElement as HTMLElement | null)?.blur?.()}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+          {editEntryMoreOpen ? (
+            <div
+              className="bd-edit-entry-more-backdrop"
+              onClick={() => setEditEntryMoreOpen(false)}
+              role="presentation"
+            >
+              <div className="bd-panel bd-edit-entry-more-sheet" onClick={(e) => e.stopPropagation()}>
+                <h3 className="bd-edit-entry-more-title">{t("items.editMore")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-danger"
+                  style={{ width: "100%", justifyContent: "center" }}
+                  onClick={() => {
+                    if (!confirm(t("items.confirmDeleteEntry"))) return;
+                    deleteItem(editingEntry.id, true);
+                    setEditingEntry(null);
+                    setEditEntryMoreOpen(false);
+                  }}
+                >
+                  {t("menu.delete")}
+                </button>
+                <button type="button" className="bd-btn" style={{ width: "100%", marginTop: "0.5rem" }} onClick={() => setEditEntryMoreOpen(false)}>
+                  {t("scope.cancel")}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+        ) : (
         <div
           className="bd-modal-backdrop bd-edit-entry-backdrop"
           onClick={() => setEditingEntry(null)}
@@ -2022,8 +2467,8 @@ export function ItemsViewArea({
           <div
             className="bd-panel bd-modal-panel bd-edit-entry-panel"
             style={{
-              padding: isMobile ? "1rem 1rem 1.1rem" : "1.25rem",
-              maxWidth: isMobile ? "100%" : 480,
+              padding: "1.25rem",
+              maxWidth: 480,
               width: "100%",
               boxSizing: "border-box",
             }}
@@ -2306,37 +2751,7 @@ export function ItemsViewArea({
                   type="button"
                   className="bd-btn bd-btn-primary"
                   onClick={() => {
-                    updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
-                    const currentItem = items.find((i) => i.id === editingEntry.id);
-                    if (currentItem?.itemType === "calendar") {
-                      const rMin = normalizeReminderMinutesBefore(editingEntry.reminderMinutesBefore ?? 0);
-                      const dateStr = editingEntry.scheduledAt?.trim();
-                      const timeStr = editingEntry.scheduledTime?.trim() || "09:00";
-                      let reminderAtIso: string | null = null;
-                      if (editingEntry.sendNotification && dateStr) {
-                        const dt = localDateTimeToDate(dateStr, timeStr);
-                        reminderAtIso = dt ? dt.toISOString() : null;
-                      }
-                      updateSchedule(editingEntry.id, {
-                        scheduledAt: editingEntry.scheduledAt || null,
-                        scheduledTime: editingEntry.scheduledTime || null,
-                        recurrence: (editingEntry.recurrence === "none" ? null : editingEntry.recurrence) || null,
-                        sendNotification: editingEntry.sendNotification ?? false,
-                        reminderAt: editingEntry.sendNotification && reminderAtIso ? reminderAtIso : null,
-                        reminderMinutesBefore:
-                          editingEntry.sendNotification && reminderAtIso ? rMin : null,
-                      });
-                    }
-                    if (
-                      currentItem &&
-                      (currentItem.itemType === "shopping" || isTaskRow(currentItem))
-                    ) {
-                      const due = editingEntry.scheduledAt?.trim();
-                      const dt = due ? dateOnlyToStartOfDay(due) : null;
-                      updateSchedule(editingEntry.id, {
-                        scheduledAt: dt ? dt.toISOString() : null,
-                      });
-                    }
+                    flushEditingEntry(editingEntry);
                     setEditingEntry(null);
                   }}
                   aria-label={t("items.ariaSaveEntry")}
@@ -2351,7 +2766,8 @@ export function ItemsViewArea({
             </div>
           </div>
         </div>
-      )}
+        )
+      ) : null}
 
       {reminderEntry && (
         <div
@@ -2661,12 +3077,51 @@ export function ItemsViewArea({
   );
 }
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function calendarDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** Week strip starts Sunday (S M T W T F S) to match common mobile calendar patterns. */
+function startOfWeekSunday(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = x.getDay();
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
+function getScheduledItemsForCalendarDay(cellDate: Date, scheduledItems: ViewItem[]): ViewItem[] {
+  const y = cellDate.getFullYear();
+  const m = cellDate.getMonth();
+  const day = cellDate.getDate();
+  const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const cellTime = new Date(y, m, day).getTime();
+  return scheduledItems.filter((it) => {
+    const at = it.scheduledAt ? String(it.scheduledAt).slice(0, 10) : null;
+    const startDate = at ? new Date(at + "T00:00:00") : null;
+    if (it.recurrence === "daily" && startDate) {
+      return cellTime >= startDate.getTime();
+    }
+    if (it.recurrence === "weekly" && at) {
+      const start = new Date(at + "T00:00:00");
+      const diffDays = Math.floor((cellTime - start.getTime()) / 86400000);
+      return diffDays >= 0 && diffDays % 7 === 0;
+    }
+    if (it.recurrence === "monthly" && at) {
+      const d0 = new Date(at + "T00:00:00");
+      return cellTime >= d0.getTime() && day === new Date(at).getDate();
+    }
+    return at === dateStr;
+  });
+}
 
 function CalendarView({
   items,
   showEntryTitles = true,
-  onSchedule,
+  onSchedule: _onSchedule,
   onEdit,
   onItemContextMenu,
   isMobile = false,
@@ -2679,203 +3134,246 @@ function CalendarView({
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
-  const [hoveredCell, setHoveredCell] = useState<number | null>(null);
-  const today = new Date();
-  const scheduledItems = items.filter((it) => it.scheduledAt || (it.recurrence && it.recurrence !== "none"));
-  const firstDay = new Date(month.year, month.month, 1).getDay();
-  const startPad = firstDay === 0 ? 6 : firstDay - 1;
-  const daysInMonth = new Date(month.year, month.month + 1, 0).getDate();
-  const totalCells = Math.ceil((startPad + daysInMonth) / 7) * 7;
-  const leadingEmpty = startPad;
-  const trailingEmpty = totalCells - leadingEmpty - daysInMonth;
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
-  const getItemsForDay = (day: number) => {
-    if (day < 1 || day > daysInMonth) return [];
-    const dateStr = `${month.year}-${String(month.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const cellDate = new Date(month.year, month.month, day);
-    return scheduledItems.filter((it) => {
-      const at = it.scheduledAt ? String(it.scheduledAt).slice(0, 10) : null;
-      const startDate = at ? new Date(at + "T00:00:00") : null;
-      if (it.recurrence === "daily" && startDate) {
-        return cellDate.getTime() >= startDate.getTime();
-      }
-      if (it.recurrence === "weekly" && at) {
-        const start = new Date(at + "T00:00:00");
-        const diffDays = Math.floor((cellDate.getTime() - start.getTime()) / 86400000);
-        return diffDays >= 0 && diffDays % 7 === 0;
-      }
-      if (it.recurrence === "monthly" && at) {
-        const d = new Date(at + "T00:00:00");
-        return cellDate.getTime() >= d.getTime() && new Date(month.year, month.month, day).getDate() === new Date(at).getDate();
-      }
-      return at === dateStr;
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  });
+
+  const todayNorm = (() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  })();
+
+  const scheduledItems = useMemo(
+    () => items.filter((it) => it.scheduledAt || (it.recurrence && it.recurrence !== "none")),
+    [items]
+  );
+
+  const weekStart = useMemo(() => startOfWeekSunday(selectedDate), [selectedDate]);
+
+  const weekDays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        return d;
+      }),
+    [weekStart]
+  );
+
+  const dayItems = useMemo(
+    () => getScheduledItemsForCalendarDay(selectedDate, scheduledItems),
+    [selectedDate, scheduledItems]
+  );
+
+  const shiftWeek = useCallback((dir: number) => {
+    setSelectedDate((d) => {
+      const n = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      n.setDate(n.getDate() + dir * 7);
+      return n;
     });
-  };
+  }, []);
 
-  const isToday = (day: number) =>
-    month.year === today.getFullYear() && month.month === today.getMonth() && day === today.getDate();
+  const goToday = useCallback(() => {
+    const n = new Date();
+    setSelectedDate(new Date(n.getFullYear(), n.getMonth(), n.getDate()));
+  }, []);
 
-  const prevMonth = () => setMonth((m) => (m.month === 0 ? { year: m.year - 1, month: 11 } : { year: m.year, month: m.month - 1 }));
-  const nextMonth = () => setMonth((m) => (m.month === 11 ? { year: m.year + 1, month: 0 } : { year: m.year, month: m.month + 1 }));
-  const goToday = () => setMonth({ year: today.getFullYear(), month: today.getMonth() });
-  const monthLabel = new Date(month.year, month.month).toLocaleString("default", { month: "long", year: "numeric" });
-  const headerDateLabel = new Date(month.year, month.month, 1).toLocaleString("default", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
+  const SWIPE_MIN_PX = 48;
+  const onWeekTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+  const onWeekTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartX.current == null || touchStartY.current == null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = e.changedTouches[0].clientY - touchStartY.current;
+      touchStartX.current = null;
+      touchStartY.current = null;
+      if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy)) return;
+      if (dx > 0) shiftWeek(-1);
+      else shiftWeek(1);
+    },
+    [shiftWeek]
+  );
 
-  /* Keep every day cell at a fixed height (calendar look, no variable row growth). */
-  const cellH = isMobile ? 72 : 116;
-  const maxEventChips = isMobile ? 1 : 3;
-  const gridRadius = 0;
-  const unscheduledRadius = 0;
+  const headerMonthLine = selectedDate.toLocaleDateString(undefined, { month: "long" });
+  const headerMainLine = isSameCalendarDay(selectedDate, todayNorm)
+    ? t("scope.dateFilterToday")
+    : selectedDate.toLocaleDateString(undefined, { weekday: "long" });
+
+  const gap = isMobile ? "0.5rem" : "0.85rem";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.5rem" : "1rem", flex: 1, minHeight: 0 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "0.45rem" : "0.75rem" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
-          <div>
-            <h2 style={{ fontSize: isMobile ? "1.05rem" : "1.25rem", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
-              {headerDateLabel}
-            </h2>
-            <p style={{ fontSize: isMobile ? "0.8125rem" : "0.875rem", color: "var(--text-tertiary)", margin: "0.25rem 0 0" }}>{monthLabel}</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-            <button type="button" className="bd-btn" onClick={goToday} style={{ padding: "0.4rem 0.65rem", fontSize: "0.8125rem" }}>
-              Today
-            </button>
-            <button type="button" className="bd-btn" onClick={prevMonth} style={{ padding: "0.4rem 0.5rem" }} aria-label="Previous month">
-              ‹
-            </button>
-            <button type="button" className="bd-btn" onClick={nextMonth} style={{ padding: "0.4rem 0.5rem" }} aria-label="Next month">
-              ›
-            </button>
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", gap, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.65rem" }}>
+        <div>
+          <p
+            style={{
+              fontSize: isMobile ? "0.75rem" : "0.8125rem",
+              fontWeight: 500,
+              color: "var(--text-tertiary)",
+              margin: 0,
+              letterSpacing: "0.02em",
+            }}
+          >
+            {headerMonthLine}
+          </p>
+          <h2
+            style={{
+              fontSize: isMobile ? "1.25rem" : "1.35rem",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              margin: "0.12rem 0 0",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {headerMainLine}
+          </h2>
         </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "1px",
-            background: "var(--border-subtle)",
-            borderRadius: gridRadius,
-            overflow: "hidden",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          {WEEKDAYS.map((d) => (
-            <div
-              key={d}
-              style={{
-                fontSize: isMobile ? "0.62rem" : "0.7rem",
-                fontWeight: 600,
-                color: "var(--text-tertiary)",
-                padding: isMobile ? "0.3rem 0.2rem" : "0.5rem 0.35rem",
-                textAlign: "center",
-                background: "var(--bg-secondary)",
-              }}
-            >
-              {d}
-            </div>
-          ))}
-          {Array.from({ length: totalCells }, (_, i) => {
-            const day = i - startPad + 1;
-            const isCurrentMonth = day >= 1 && day <= daysInMonth;
-            const dayItems = isCurrentMonth ? getItemsForDay(day) : [];
-            const cellDateNum = isCurrentMonth ? day : (i < startPad ? new Date(month.year, month.month, 0).getDate() - startPad + i + 1 : i - startPad - daysInMonth + 1);
-            const isHovered = hoveredCell === i;
-            const isTodayCell = isCurrentMonth && isToday(day);
-            return (
-              <div
-                key={i}
-                onMouseEnter={() => setHoveredCell(i)}
-                onMouseLeave={() => setHoveredCell(null)}
-                style={{
-                  height: cellH,
-                  padding: isMobile ? "0.2rem" : "0.4rem",
-                  background: isCurrentMonth ? (isHovered ? "var(--bg-hover)" : "var(--bg-primary)") : "var(--bg-secondary)",
-                  boxShadow: isTodayCell && isHovered && isCurrentMonth ? "0 0 0 1px var(--bd-chrome-selected-border), var(--shadow-sm)" : isTodayCell ? "0 0 0 1px var(--bd-chrome-selected-border)" : isHovered && isCurrentMonth ? "var(--shadow-sm)" : "none",
-                  overflow: "hidden",
-                  transition:
-                    "background var(--bd-duration-fast) var(--bd-ease-soft), box-shadow var(--bd-duration-fast) var(--bd-ease-soft)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: isCurrentMonth ? (isMobile ? "0.8rem" : "0.9375rem") : isMobile ? "0.65rem" : "0.75rem",
-                    fontWeight: isTodayCell ? 700 : 500,
-                    color: isCurrentMonth ? "var(--text-primary)" : "var(--text-quaternary)",
-                    marginBottom: isMobile ? "0.15rem" : "0.3rem",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {isCurrentMonth ? day : cellDateNum}
-                </div>
-                {dayItems.length > 0 && !isMobile && (
-                  <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>
-                    {dayItems.length} {dayItems.length === 1 ? "item" : "items"}
-                  </div>
-                )}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: isMobile ? "0.15rem" : "0.25rem",
-                    overflow: "hidden",
-                  }}
-                >
-                  {dayItems.slice(0, maxEventChips).map((it) => {
-                    const past = it.scheduledAt && new Date(String(it.scheduledAt).slice(0, 10)) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    const taskDeadline = isTaskRow(it);
-                    return (
-                      <button
-                        key={it.id}
-                        type="button"
-                        onClick={() => onEdit(it)}
-                        onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
-                        style={{
-                          textAlign: "left",
-                          fontSize: isMobile ? "0.6rem" : "0.7rem",
-                          padding: isMobile ? "0.15rem 0.3rem" : "0.3rem 0.45rem",
-                          background: past ? "var(--bg-tertiary)" : "var(--bd-chrome-selected-bg)",
-                          color: past ? "var(--text-tertiary)" : "var(--bd-chrome-selected-text)",
-                          border: past ? "none" : "1px solid var(--border-default)",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          boxShadow: taskDeadline ? `inset 3px 0 0 ${TYPE_BAR_COLORS.task}` : "none",
-                        }}
-                        title={`${it.title}${
-                          it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content)
-                            ? ` — ${it.content.trim().slice(0, 200)}`
-                            : ""
-                        }${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
-                      >
-                        {it.scheduledTime && <span style={{ marginRight: "0.25rem", opacity: 0.9 }}>{it.scheduledTime}</span>}
-                        {entryPrimaryLine(it, showEntryTitles)}
-                      </button>
-                    );
-                  })}
-                  {dayItems.length > maxEventChips && (
-                    <span style={{ fontSize: isMobile ? "0.58rem" : "0.65rem", color: "var(--text-tertiary)" }}>
-                      +{dayItems.length - maxEventChips} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <button type="button" className="bd-btn" onClick={goToday} style={{ padding: "0.4rem 0.65rem", fontSize: "0.8125rem" }}>
+            {t("scope.dateFilterToday")}
+          </button>
+          <button type="button" className="bd-btn" onClick={() => shiftWeek(-1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekPrev")}>
+            ‹
+          </button>
+          <button type="button" className="bd-btn" onClick={() => shiftWeek(1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekNext")}>
+            ›
+          </button>
         </div>
       </div>
 
+      <div
+        className="bd-calendar-week-strip"
+        role="group"
+        aria-label={t("items.viewCalendar")}
+        onTouchStart={onWeekTouchStart}
+        onTouchEnd={onWeekTouchEnd}
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "stretch",
+          touchAction: "pan-y",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          padding: isMobile ? "0.15rem 0" : "0.25rem 0",
+        }}
+      >
+        {weekDays.map((d) => {
+          const sel = isSameCalendarDay(d, selectedDate);
+          const letter = d.toLocaleDateString(undefined, { weekday: "narrow" });
+          return (
+            <button
+              key={calendarDateKey(d)}
+              type="button"
+              onClick={() => setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.2rem",
+                padding: "0.35rem 0.1rem",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                borderRadius: 8,
+              }}
+            >
+              <span style={{ fontSize: isMobile ? "0.68rem" : "0.72rem", fontWeight: 500, color: "var(--text-tertiary)", lineHeight: 1 }}>
+                {letter}
+              </span>
+              <span
+                style={{
+                  width: isMobile ? 38 : 40,
+                  height: isMobile ? 38 : 40,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: isMobile ? "0.9rem" : "0.95rem",
+                  lineHeight: 1,
+                  ...(sel
+                    ? {
+                        background: "var(--accent)",
+                        color: "var(--bd-dump-mic-fg, #ffffff)",
+                        boxShadow: "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)",
+                      }
+                    : { color: "var(--text-primary)", background: "transparent" }),
+                }}
+              >
+                {d.getDate()}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {isMobile ? (
+        <p style={{ fontSize: "0.68rem", color: "var(--text-quaternary)", margin: "-0.05rem 0 0", textAlign: "center", lineHeight: 1.35 }}>
+          {t("items.calendarSwipeHint")}
+        </p>
+      ) : null}
+
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          WebkitOverflowScrolling: "touch",
+          display: "flex",
+          flexDirection: "column",
+          gap: isMobile ? "0.45rem" : "0.55rem",
+          paddingTop: "0.35rem",
+        }}
+      >
+        {dayItems.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2.25rem 1rem 1.5rem" }}>
+            <p style={{ margin: 0, fontSize: isMobile ? "1rem" : "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("items.calendarFreeDayTitle")}</p>
+            <p style={{ margin: "0.45rem 0 0", fontSize: "0.875rem", color: "var(--text-tertiary)" }}>{t("items.calendarFreeDayHint")}</p>
+          </div>
+        ) : (
+          dayItems.map((it) => {
+            const past =
+              it.scheduledAt &&
+              new Date(String(it.scheduledAt).slice(0, 10)) < new Date(todayNorm.getFullYear(), todayNorm.getMonth(), todayNorm.getDate());
+            const taskDeadline = isTaskRow(it);
+            return (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => onEdit(it)}
+                onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+                style={{
+                  textAlign: "left",
+                  fontSize: isMobile ? "0.875rem" : "0.9rem",
+                  padding: isMobile ? "0.65rem 0.75rem" : "0.7rem 0.85rem",
+                  background: past ? "var(--bg-tertiary)" : "var(--bd-chrome-selected-bg)",
+                  color: past ? "var(--text-tertiary)" : "var(--bd-chrome-selected-text)",
+                  border: past ? "1px solid var(--border-subtle)" : "1px solid var(--border-default)",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  boxShadow: taskDeadline ? `inset 4px 0 0 ${TYPE_BAR_COLORS.task}` : "none",
+                }}
+                title={`${it.title}${
+                  it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content) ? ` — ${it.content.trim().slice(0, 200)}` : ""
+                }${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
+              >
+                {it.scheduledTime && <span style={{ marginRight: "0.35rem", opacity: 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>}
+                {entryPrimaryLine(it, showEntryTitles)}
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -3305,10 +3803,11 @@ function ListView({
     byType.get(ty)!.push(it);
   }
   const typesInUse = [...LIST_VIEW_TYPE_ORDER.filter((ty) => byType.has(ty)), ...Array.from(byType.keys()).filter((ty) => !LIST_VIEW_TYPE_ORDER.includes(ty))];
+  const flatItems = typesInUse.flatMap((ty) => byType.get(ty) ?? []);
 
   const renderEntry = (it: ViewItem, index: number) => {
     const ep = enterStaggerProps(index);
-    const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
+    const taskCompleted = isTaskRow(it) && isTaskCompleted(it);
     let scheduleLabel: string | null = null;
     if (it.itemType === "shopping" && it.scheduledAt) {
       const d = new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`);
@@ -3322,83 +3821,59 @@ function ListView({
     }
     const hideRedundantBody =
       showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
+    const bodySnippet = hideRedundantBody ? "" : (it.content ?? "").trim();
+    const showNotesGlyph = !hideRedundantBody && !!(it.content ?? "").trim();
+    const isTask = isTaskRow(it);
+
+    const primaryTitleStyle: CSSProperties = {
+      fontWeight: 600,
+      fontSize: "1rem",
+      color: "var(--text-primary)",
+      wordBreak: "break-word",
+      overflowWrap: "anywhere",
+      cursor: onUpdate ? "text" : undefined,
+      textDecoration: taskCompleted ? "line-through" : undefined,
+      opacity: taskCompleted ? 0.52 : 1,
+    };
+
     return (
       <div
         key={it.id}
-        className={ep.className}
+        className={`bd-todo-row ${ep.className}`}
         onDoubleClick={() => onEdit?.(it)}
         onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
         style={{
           ...ep.style,
-          display: "flex",
-          alignItems: "stretch",
-          minHeight: 72,
-          minWidth: 0,
-          border: "1px solid var(--border-default)",
-          borderRadius: "20px",
-          background: "var(--bg-elevated)",
-          cursor:
-            onEdit && (!editing || editing.id !== it.id) ? "pointer" : undefined,
-          boxShadow: "var(--shadow-sm)",
-          overflow: "hidden",
+          cursor: onEdit && (!editing || editing.id !== it.id) ? "pointer" : undefined,
         }}
       >
-        <div style={{ width: 4, flexShrink: 0, background: barColor }} />
-        {isTaskRow(it) && (
-          <label
-            style={{
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              paddingLeft: "0.5rem",
-              paddingRight: "0.25rem",
-              cursor: "pointer",
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <input
-              type="checkbox"
-              checked={isTaskCompleted(it)}
-              onChange={(e) => {
-                e.stopPropagation();
-                onSetTaskCompleted(it.id, e.target.checked);
-              }}
-              aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
-              style={{ width: 18, height: 18, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
-            />
-          </label>
-        )}
-        <div style={{ flex: 1, minWidth: 0, padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <EntryTypeIcon type={it.itemType} size={14} />
-              {entryTypeMetaLine(it, t)}
-            </span>
-            {onItemContextMenu && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); }}
-                style={{
-                  padding: "0.2rem",
-                  border: "none",
-                  background: "none",
-                  color: "var(--text-tertiary)",
-                  cursor: "pointer",
-                  borderRadius: 4,
+        <div className="bd-todo-row-lead">
+          {isTask ? (
+            <label
+              className="bd-todo-checkbox-wrap"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                className="bd-todo-checkbox"
+                checked={isTaskCompleted(it)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onSetTaskCompleted(it.id, e.target.checked);
                 }}
-                aria-label="More actions"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="6" r="1.5" />
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="12" cy="18" r="1.5" />
-                </svg>
-              </button>
-            )}
-          </div>
-          {showEntryTitles &&
-            (onUpdate && editing?.id === it.id && editing.field === "title" ? (
+                aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+              />
+            </label>
+          ) : (
+            <span className="bd-todo-row-type-lead" title={formatTypeLabel(it.itemType || "note", t)}>
+              <EntryTypeIcon type={it.itemType} size={20} />
+            </span>
+          )}
+        </div>
+        <div className="bd-todo-row-body">
+          {showEntryTitles ? (
+            onUpdate && editing?.id === it.id && editing.field === "title" ? (
               <input
                 ref={inputRef}
                 type="text"
@@ -3415,35 +3890,36 @@ function ListView({
                 }}
                 aria-label={t("menu.edit")}
                 style={{
-                  fontWeight: 600,
-                  fontSize: "0.9375rem",
-                  color: "var(--text-primary)",
+                  ...primaryTitleStyle,
                   width: "100%",
                   margin: 0,
-                  padding: "0.1rem 0",
+                  padding: "0.15rem 0.35rem",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: 6,
                   background: "var(--bg-secondary)",
                   outline: "1px solid var(--bd-chrome-selected-border)",
-                  wordBreak: "break-word",
                 }}
               />
             ) : (
               <div
                 onClick={() => onUpdate && setEditing({ id: it.id, field: "title", value: it.title ?? "" })}
                 onDoubleClick={(e) => onUpdate && e.stopPropagation()}
-                style={{
-                  fontWeight: 600,
-                  fontSize: "0.9375rem",
-                  color: "var(--text-primary)",
-                  wordBreak: "break-word",
-                  overflowWrap: "anywhere",
-                  cursor: onUpdate ? "text" : undefined,
-                }}
+                style={primaryTitleStyle}
               >
                 {it.title?.trim() ? it.title : "—"}
               </div>
-            ))}
+            )
+          ) : (
+            onUpdate && editing?.id === it.id && editing.field === "content" ? null : (
+              <div
+                onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                style={primaryTitleStyle}
+              >
+                {entryPrimaryLine(it, false)}
+              </div>
+            )
+          )}
           {(!hideRedundantBody || (onUpdate && editing?.id === it.id && editing.field === "content")) &&
             (onUpdate && editing?.id === it.id && editing.field === "content" ? (
               <textarea
@@ -3461,16 +3937,16 @@ function ListView({
                 aria-label={t("menu.edit")}
                 rows={4}
                 style={{
-                  fontSize: "0.8125rem",
+                  fontSize: "0.875rem",
                   color: "var(--text-secondary)",
-                  lineHeight: 1.4,
+                  lineHeight: 1.45,
                   width: "100%",
                   margin: 0,
                   padding: "0.35rem 0.4rem",
                   resize: "vertical",
                   minHeight: 72,
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: 6,
                   background: "var(--bg-secondary)",
                   outline: "1px solid var(--bd-chrome-selected-border)",
                   fontFamily: "inherit",
@@ -3479,9 +3955,33 @@ function ListView({
                 }}
               />
             ) : (
+              showEntryTitles &&
+              bodySnippet && (
+                <div
+                  onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                  onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                  style={{
+                    fontSize: "0.8125rem",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.4,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                    cursor: onUpdate ? "text" : undefined,
+                  }}
+                >
+                  {bodySnippet}
+                </div>
+              )
+            ))}
+          {!showEntryTitles &&
+            !(onUpdate && editing?.id === it.id && editing.field === "content") &&
+            (it.content ?? "").trim().split("\n").length > 1 && (
               <div
                 onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
-                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
                 style={{
                   fontSize: "0.8125rem",
                   color: "var(--text-secondary)",
@@ -3490,80 +3990,50 @@ function ListView({
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
                   overflow: "hidden",
-                  wordBreak: "break-word",
-                  overflowWrap: "anywhere",
                   cursor: onUpdate ? "text" : undefined,
                 }}
               >
-                {it.content?.trim() || "—"}
+                {(it.content ?? "").trim().split("\n").slice(1).join("\n").trim()}
               </div>
-            ))}
+            )}
           {scheduleLabel && (
-            <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
-              {scheduleLabel}
-            </div>
+            <div style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>{scheduleLabel}</div>
           )}
         </div>
+        {showNotesGlyph ? (
+          <div className="bd-todo-row-trail" title={t("items.description")}>
+            <span className="bd-todo-notes-glyph" aria-hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+            </span>
+          </div>
+        ) : null}
       </div>
     );
   };
 
   return (
     <div
-      className="bd-list-view"
+      className="bd-list-view bd-list-view--stacked"
       style={{
         display: "flex",
-        flexDirection: "row",
+        flexDirection: "column",
         gap: "1rem",
         overflow: "auto",
-        alignContent: "start",
-        alignItems: "flex-start",
+        alignItems: "stretch",
         width: "100%",
         maxWidth: "100%",
         minWidth: 0,
         boxSizing: "border-box",
       }}
     >
-      {typesInUse.map((type) => {
-        const typeItems = byType.get(type) ?? [];
-        const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
-        return (
-          <div
-            key={type}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.5rem",
-              minWidth: 280,
-              maxWidth: 360,
-              flex: "0 0 auto",
-            }}
-          >
-            <div
-              style={{
-                padding: "0.5rem 0.75rem",
-                borderRadius: "var(--card-radius)",
-                background: "var(--bg-elevated)",
-                border: `1.5px solid ${typeColor}`,
-                color: typeColor,
-                fontSize: "0.8125rem",
-                fontWeight: 600,
-                textAlign: "center",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <EntryTypeIcon type={type} size={14} />
-              {formatTypeLabel(type, t)} ({typeItems.length})
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {typeItems.map((it, idx) => renderEntry(it, idx))}
-            </div>
-          </div>
-        );
-      })}
+      <div className="bd-todo-list-card">{flatItems.map((it, idx) => renderEntry(it, idx))}</div>
     </div>
   );
 }

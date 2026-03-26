@@ -134,6 +134,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     onViewTypeChange,
     searchFilter = "",
     scopeSlot = null,
+    onMobileTopBarBeforeMenuSlot,
     onWorkProjectsChanged,
     onDumpRecordingChange,
   },
