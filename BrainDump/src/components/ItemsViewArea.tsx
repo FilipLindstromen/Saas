@@ -18,6 +18,7 @@ import {
   resolveTextSplitScope,
   splitTextViewBlocks,
 } from "@/lib/text-view-entry-split";
+import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -96,6 +97,8 @@ interface ItemsViewAreaProps {
   reloadKey?: number;
   /** Mobile: render ScopeBar in one row with type / view / filter (passed from page when scope is shown). */
   scopeSlot?: ReactNode;
+  /** Mobile: register content immediately left of the top-bar menu (e.g. AI next-actions). */
+  onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
 }
 
 function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
@@ -332,6 +335,37 @@ function entryContextLabel(it: ViewItem): string {
   return domain.charAt(0).toUpperCase() + domain.slice(1);
 }
 
+/** Compact due for the type meta line: "Today", "Tomorrow", or locale short date (e.g. 11/4). */
+function taskDueCompactForTypeLine(
+  it: ViewItem,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): string | null {
+  if (!isTaskRow(it) || !it.scheduledAt) return null;
+  const key = String(it.scheduledAt).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const target = new Date(`${key}T12:00:00`);
+  if (!Number.isFinite(target.getTime())) return null;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayStart = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const diffDays = Math.round((dayStart - todayStart) / 86400000);
+  if (diffDays === 0) return t("scope.dateFilterToday");
+  if (diffDays === 1) return t("scope.dateFilterTomorrow");
+  return target.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+}
+
+/** First context line, e.g. `Project: Task` or `Project: Task: Today` when the task has a deadline. */
+function entryTypeMetaLine(
+  it: ViewItem,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): string {
+  const left = entryContextLabel(it) || entryTypeLabel(it.itemType, t);
+  const typePart = entryTypeLabel(it.itemType, t);
+  const due = taskDueCompactForTypeLine(it, t);
+  if (due) return `${left}: ${typePart}: ${due}`;
+  return `${left}: ${typePart}`;
+}
+
 const NEW_ENTRY_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 function isNewEntry(it: ViewItem): boolean {
@@ -396,6 +430,7 @@ export function ItemsViewArea({
   searchFilter = "",
   reloadKey = 0,
   scopeSlot,
+  onMobileTopBarBeforeMenuSlot,
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
@@ -523,6 +558,47 @@ export function ItemsViewArea({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  const showMobileAiInTopBar =
+    isMobile && (mode === "work" || mode === "personal" || mode === "all");
+
+  useEffect(() => {
+    if (!onMobileTopBarBeforeMenuSlot) return;
+    if (!showMobileAiInTopBar) {
+      onMobileTopBarBeforeMenuSlot(null);
+      return;
+    }
+    onMobileTopBarBeforeMenuSlot(
+      <button
+        key="bd-topbar-ai-next"
+        type="button"
+        className="bd-btn bd-topbar-ai-suggest-btn"
+        disabled={items.length === 0 || aiSuggestLoading || loading}
+        onClick={() => void runAiSuggest()}
+        title={t("items.aiNextThree")}
+        aria-label={t("items.aiNextThree")}
+        style={{ opacity: items.length === 0 ? 0.45 : 1 }}
+      >
+        {aiSuggestLoading ? (
+          <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>{t("items.aiNextThreeBusy")}</span>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+            <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+          </svg>
+        )}
+      </button>
+    );
+    return () => onMobileTopBarBeforeMenuSlot(null);
+  }, [
+    onMobileTopBarBeforeMenuSlot,
+    showMobileAiInTopBar,
+    items.length,
+    aiSuggestLoading,
+    loading,
+    runAiSuggest,
+    t,
+  ]);
 
   useEffect(() => {
     if (!isMobile) setViewPickerOpen(false);
@@ -1197,33 +1273,6 @@ export function ItemsViewArea({
           </svg>
         </button>
       )}
-      <button
-        type="button"
-        className="bd-btn"
-        disabled={items.length === 0 || aiSuggestLoading || loading}
-        onClick={() => void runAiSuggest()}
-        title={t("items.aiNextThree")}
-        aria-label={t("items.aiNextThree")}
-        style={{
-          flexShrink: 0,
-          minWidth: 44,
-          minHeight: 44,
-          padding: "0.4rem",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: items.length === 0 ? 0.45 : 1,
-        }}
-      >
-        {aiSuggestLoading ? (
-          <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>{t("items.aiNextThreeBusy")}</span>
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-            <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
-          </svg>
-        )}
-      </button>
       {viewType === "postits" && (
         <button
           type="button"
@@ -2804,7 +2853,11 @@ function CalendarView({
                           whiteSpace: "nowrap",
                           boxShadow: taskDeadline ? `inset 3px 0 0 ${TYPE_BAR_COLORS.task}` : "none",
                         }}
-                        title={`${it.title}${it.content?.trim() ? ` — ${it.content.trim().slice(0, 200)}` : ""}${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
+                        title={`${it.title}${
+                          it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content)
+                            ? ` — ${it.content.trim().slice(0, 200)}`
+                            : ""
+                        }${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
                       >
                         {it.scheduledTime && <span style={{ marginRight: "0.25rem", opacity: 0.9 }}>{it.scheduledTime}</span>}
                         {entryPrimaryLine(it, showEntryTitles)}
@@ -3075,7 +3128,7 @@ function MindmapView({
           </span>
           <span className="bd-mindmap-entry-text">
             {entryPrimaryLine(it, showEntryTitles)}
-            {showEntryTitles && it.content?.trim() && (
+            {showEntryTitles && it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content) && (
               <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
                 {it.content.slice(0, 48)}
                 {it.content.length > 48 ? "…" : ""}
@@ -3257,14 +3310,18 @@ function ListView({
     const ep = enterStaggerProps(index);
     const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
     let scheduleLabel: string | null = null;
-    if ((isTaskRow(it) || it.itemType === "shopping") && it.scheduledAt) {
+    if (it.itemType === "shopping" && it.scheduledAt) {
       const d = new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`);
       const ds = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-      scheduleLabel =
-        it.itemType === "shopping" ? t("items.shoppingDueShort", { date: ds }) : t("items.taskDueShort", { date: ds });
-    } else if (it.itemType === "calendar" || it.scheduledAt || (it.recurrence && it.recurrence !== "none")) {
+      scheduleLabel = t("items.shoppingDueShort", { date: ds });
+    } else if (
+      it.itemType === "calendar" ||
+      ((!isTaskRow(it) && it.scheduledAt) || (it.recurrence && it.recurrence !== "none"))
+    ) {
       scheduleLabel = formatCalendarScheduleLabel(it);
     }
+    const hideRedundantBody =
+      showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
     return (
       <div
         key={it.id}
@@ -3316,7 +3373,7 @@ function ListView({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
             <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <EntryTypeIcon type={it.itemType} size={14} />
-              {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
+              {entryTypeMetaLine(it, t)}
             </span>
             {onItemContextMenu && (
               <button
@@ -3387,59 +3444,60 @@ function ListView({
                 {it.title?.trim() ? it.title : "—"}
               </div>
             ))}
-          {onUpdate && editing?.id === it.id && editing.field === "content" ? (
-            <textarea
-              ref={textareaRef}
-              value={editing.value}
-              onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
-              onBlur={() => handleFieldBlur(it.id, "content", editing.value, it)}
-              onDoubleClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setEditing(null);
-                }
-              }}
-              aria-label={t("menu.edit")}
-              rows={4}
-              style={{
-                fontSize: "0.8125rem",
-                color: "var(--text-secondary)",
-                lineHeight: 1.4,
-                width: "100%",
-                margin: 0,
-                padding: "0.35rem 0.4rem",
-                resize: "vertical",
-                minHeight: 72,
-                border: "none",
-                borderRadius: 4,
-                background: "var(--bg-secondary)",
-                outline: "1px solid var(--bd-chrome-selected-border)",
-                fontFamily: "inherit",
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
-              }}
-            />
-          ) : (
-            <div
-              onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
-              onDoubleClick={(e) => onUpdate && e.stopPropagation()}
-              style={{
-                fontSize: "0.8125rem",
-                color: "var(--text-secondary)",
-                lineHeight: 1.4,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
-                cursor: onUpdate ? "text" : undefined,
-              }}
-            >
-              {it.content?.trim() || "—"}
-            </div>
-          )}
+          {(!hideRedundantBody || (onUpdate && editing?.id === it.id && editing.field === "content")) &&
+            (onUpdate && editing?.id === it.id && editing.field === "content" ? (
+              <textarea
+                ref={textareaRef}
+                value={editing.value}
+                onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
+                onBlur={() => handleFieldBlur(it.id, "content", editing.value, it)}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setEditing(null);
+                  }
+                }}
+                aria-label={t("menu.edit")}
+                rows={4}
+                style={{
+                  fontSize: "0.8125rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.4,
+                  width: "100%",
+                  margin: 0,
+                  padding: "0.35rem 0.4rem",
+                  resize: "vertical",
+                  minHeight: 72,
+                  border: "none",
+                  borderRadius: 4,
+                  background: "var(--bg-secondary)",
+                  outline: "1px solid var(--bd-chrome-selected-border)",
+                  fontFamily: "inherit",
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                }}
+              />
+            ) : (
+              <div
+                onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                style={{
+                  fontSize: "0.8125rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.4,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  cursor: onUpdate ? "text" : undefined,
+                }}
+              >
+                {it.content?.trim() || "—"}
+              </div>
+            ))}
           {scheduleLabel && (
             <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
               {scheduleLabel}
@@ -3632,7 +3690,7 @@ function TextView({
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem" }}>
               <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", lineHeight: 1.2 }}>
-                {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
+                {entryTypeMetaLine(it, t)}
               </span>
               {showEntryTitles &&
                 (isEditingTitle ? (
@@ -3712,7 +3770,7 @@ function TextView({
                   outline: "none",
                 }}
               />
-            ) : (
+            ) : showEntryTitles && isContentRedundantWithTitle(it.title, it.content) && (it.content ?? "").trim() ? null : (
               <p
                 onClick={() =>
                   setEditing({
@@ -3925,6 +3983,8 @@ function KanbanView({
           </h4>
           {col.items.map((it, idx) => {
             const ep = enterStaggerProps(idx);
+            const hideRedundantBody =
+              showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
             return (
             <div
               key={it.id}
@@ -3947,6 +4007,7 @@ function KanbanView({
               }}
             >
               {showEntryTitles && <div style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.35 }}>{it.title}</div>}
+              {!hideRedundantBody && (
               <div
                 style={{
                   fontSize: "0.75rem",
@@ -3961,16 +4022,6 @@ function KanbanView({
               >
                 {it.content?.trim() || "—"}
               </div>
-              {isTaskRow(it) && it.scheduledAt && (
-                <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: "0.35rem" }}>
-                  {t("items.taskDueShort", {
-                    date: new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    }),
-                  })}
-                </div>
               )}
               <div
                 style={{
@@ -3983,7 +4034,7 @@ function KanbanView({
                 }}
               >
                 <EntryTypeIcon type={it.itemType} size={12} />
-                {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
+                {entryTypeMetaLine(it, t)}
               </div>
             </div>
             );
@@ -4267,6 +4318,8 @@ function PostitsView({
           const x = drag ? drag.x : base.x;
           const y = drag ? drag.y : base.y;
           const barColor = POSTIT_COLORS[it.itemType] ?? POSTIT_COLORS.default;
+          const hideRedundantBody =
+            showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
           return (
             <div
               key={it.id}
@@ -4317,7 +4370,7 @@ function PostitsView({
                       />
                     )}
                     <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)", minWidth: 0 }}>
-                      {`${entryContextLabel(it) || entryTypeLabel(it.itemType, t)}: ${entryTypeLabel(it.itemType, t)}`}
+                      {entryTypeMetaLine(it, t)}
                     </span>
                   </div>
                   {onItemContextMenu && (
@@ -4341,19 +4394,10 @@ function PostitsView({
                       {it.title}
                     </div>
                   )}
+                  {!hideRedundantBody && (
                   <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {it.content?.trim() || "—"}
                   </div>
-                  {isTaskRow(it) && it.scheduledAt && (
-                    <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: "0.35rem" }}>
-                      {t("items.taskDueShort", {
-                        date: new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        }),
-                      })}
-                    </div>
                   )}
                 </div>
               </div>

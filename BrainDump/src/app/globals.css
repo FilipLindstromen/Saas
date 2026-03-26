@@ -760,10 +760,10 @@ textarea {
   box-shadow: none;
   border: none;
   overflow: visible;
-  padding: var(--bd-space-4);
+  padding: var(--bd-space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--bd-space-5);
+  gap: var(--bd-space-3);
 }
 .bd-btn {
   display: inline-flex;
@@ -1319,6 +1319,34 @@ select.bd-input::-ms-expand {
   filter: brightness(0.96);
 }
 
+@keyframes bd-dump-fab-recording-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+/* Recording: stop icon, accent tint, above dump overlay so same control stops capture */
+.bd-dump-fab.bd-dump-fab--recording {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-tertiary));
+  color: var(--accent);
+  animation: bd-dump-fab-recording-pulse 1.25s var(--bd-ease-in-out) infinite;
+  z-index: 1010;
+}
+
+.bd-dump-fab.bd-dump-fab--recording:hover {
+  filter: brightness(1.06);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border-strong));
+}
+
+.bd-dump-fab.bd-dump-fab--recording:active {
+  filter: brightness(0.98);
+}
+
 /* Mic FAB + photo capture (desktop): single fixed cluster */
 .bd-dump-fab-row {
   position: fixed;
@@ -1346,6 +1374,19 @@ select.bd-input::-ms-expand {
 .bd-dump-fab-row .bd-dump-fab:active {
   transform: scale(0.96);
   filter: brightness(0.96);
+}
+
+.bd-dump-fab-row .bd-dump-fab.bd-dump-fab--recording {
+  position: relative;
+  z-index: 1010;
+}
+
+.bd-dump-fab-row .bd-dump-fab.bd-dump-fab--recording:hover {
+  transform: scale(1.06);
+}
+
+.bd-dump-fab-row .bd-dump-fab.bd-dump-fab--recording:active {
+  transform: scale(0.96);
 }
 
 .bd-dump-fab-row .bd-bottom-camera-btn {
@@ -1544,31 +1585,18 @@ select.bd-input::-ms-expand {
   padding-bottom: 0;
 }
 
-/* Scope strip — bento card on desktop; full-bleed on small screens */
+/* Scope strip — flat on workspace background (no inset card) */
 .bd-scope-outer-wrap {
   flex-shrink: 0;
   position: relative;
   margin: 0;
-  padding: var(--bd-space-3) max(var(--bd-space-4), env(safe-area-inset-left)) var(--bd-space-3)
-    max(var(--bd-space-4), env(safe-area-inset-right));
+  padding: var(--bd-space-3) max(var(--bd-space-3), env(safe-area-inset-left)) var(--bd-space-3)
+    max(var(--bd-space-3), env(safe-area-inset-right));
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--bd-chrome-edge);
   background: var(--bg-primary);
   box-shadow: none;
-}
-
-@media (min-width: 769px) {
-  .bd-scope-outer-wrap {
-    margin: var(--bd-space-2) var(--bd-space-3) 0;
-    padding: var(--bd-space-4) max(var(--bd-space-4), env(safe-area-inset-left)) var(--bd-space-4)
-      max(var(--bd-space-4), env(safe-area-inset-right));
-    border-radius: var(--card-radius);
-    border: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
-    box-shadow: var(--bd-shadow-panel);
-  }
 }
 
 .bd-page-content-padding {
@@ -1577,13 +1605,13 @@ select.bd-input::-ms-expand {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--bd-space-3);
-  padding: var(--bd-space-4);
+  gap: var(--bd-space-2);
+  padding: var(--bd-space-3);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Items list: toolbar + content — main bento card */
+/* Items list: toolbar + content — flush with workspace background (no inset card) */
 .bd-items-view-root {
   display: flex;
   flex-direction: column;
@@ -1594,22 +1622,22 @@ select.bd-input::-ms-expand {
   max-width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
-  padding: var(--bd-space-4);
-  gap: var(--bd-space-4);
-  background: var(--bg-elevated);
-  border-radius: var(--card-radius);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--bd-shadow-panel);
+  padding: var(--bd-space-2) 0;
+  gap: var(--bd-space-2);
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
-/* Toolbar: filters + views — flush on page (no card frame; spacing from .bd-items-view-root) */
+/* Toolbar: filters + views — spacing only */
 .bd-items-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--bd-space-3) var(--bd-space-5);
+  gap: var(--bd-space-2) var(--bd-space-4);
   align-items: start;
   width: 100%;
-  padding: var(--bd-space-3) 0;
+  padding: var(--bd-space-2) 0;
   border-radius: 0;
   border: none;
   background: transparent;
@@ -1619,7 +1647,7 @@ select.bd-input::-ms-expand {
 .bd-items-toolbar-left {
   display: flex;
   flex-direction: column;
-  gap: var(--bd-space-3);
+  gap: var(--bd-space-2);
   min-width: 0;
 }
 
@@ -1818,6 +1846,24 @@ select.bd-input::-ms-expand {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 0.35rem;
+}
+
+/* Mobile top bar: AI next-actions trigger (44px target, matches menu button rhythm) */
+.bd-topbar-ai-suggest-btn {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 769px) {
+  .bd-topbar-ai-suggest-btn {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1828,6 +1874,77 @@ select.bd-input::-ms-expand {
     padding-right: 1.75rem;
     font-size: 0.8125rem;
   }
+}
+
+/* Project / area opener in top bar — match workspace select (.bd-input) */
+.bd-topbar-scope-trigger {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--bd-input-radius, 14px);
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.25;
+  cursor: pointer;
+  box-shadow: none;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color var(--bd-duration-fast) var(--bd-ease-soft),
+    background var(--bd-duration-fast) var(--bd-ease-soft),
+    box-shadow var(--bd-duration-normal) var(--bd-ease-soft);
+}
+
+.bd-topbar-scope-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 0 3px var(--accent-soft);
+}
+
+.bd-topbar-scope-trigger:focus:not(:focus-visible) {
+  border-color: var(--border-default);
+  box-shadow: none;
+}
+
+.bd-topbar-scope-trigger:focus-visible {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 0 3px var(--accent-soft);
+}
+
+@media (min-width: 769px) {
+  .bd-topbar-scope-trigger {
+    font-size: 0.875rem;
+  }
+}
+
+/* Portaled full-screen; above .bd-topbar (transform traps fixed children) + item sheets (1200) */
+.bd-scope-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1350;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  padding-bottom: var(--bd-bottom-bar-clearance);
 }
 
 .bd-mobile-mode-pill {
@@ -1976,8 +2093,8 @@ select.bd-input::-ms-expand {
 
 @media (max-width: 768px) {
   :root {
-    /* Mic (~56px) + bar vertical padding; safe-area folded into max() so home indicator not double-counted */
-    --bd-bottom-bar-clearance: calc(56px + 0.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)));
+    /* Mic (~64px) + bar vertical padding; safe-area folded into max() so home indicator not double-counted */
+    --bd-bottom-bar-clearance: calc(64px + 0.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)));
   }
 
   .bd-scope-outer-wrap {
@@ -1992,32 +2109,32 @@ select.bd-input::-ms-expand {
   }
 
   .bd-page-content-padding {
-    padding: var(--bd-space-3);
-    padding-left: max(0.65rem, env(safe-area-inset-left));
-    padding-right: max(0.65rem, env(safe-area-inset-right));
+    padding: var(--bd-space-2);
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
     max-width: 100%;
     min-width: 0;
     overflow-x: hidden;
     box-sizing: border-box;
-    gap: var(--bd-space-3);
+    gap: var(--bd-space-2);
   }
 
   .bd-center-panel {
-    padding: var(--bd-space-3);
-    gap: var(--bd-space-4);
+    padding: var(--bd-space-2);
+    gap: var(--bd-space-3);
   }
 
   /* Items list area: no horizontal spill on small screens */
   .bd-items-view-root {
     max-width: 100%;
     min-width: 0;
-    padding: var(--bd-space-3);
-    gap: var(--bd-space-3);
+    padding: var(--bd-space-1) 0;
+    gap: var(--bd-space-2);
   }
 
   .bd-items-toolbar {
     grid-template-columns: 1fr;
-    gap: var(--bd-space-3);
+    gap: var(--bd-space-2);
   }
 
   .bd-items-toolbar-right {
@@ -2049,10 +2166,9 @@ select.bd-input::-ms-expand {
   }
 
   .bd-bottom-bar {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
     gap: 0.5rem;
     padding-left: max(0.65rem, env(safe-area-inset-left));
     padding-right: max(0.65rem, env(safe-area-inset-right));
@@ -2063,48 +2179,55 @@ select.bd-input::-ms-expand {
     -webkit-backdrop-filter: none;
   }
 
-  /* Center mic in bar; left spacer + right view slot balance the row (parent is position:fixed) */
-  .bd-bottom-bar-center {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+  .bd-app-shell--dump-recording .bd-bottom-bar {
+    z-index: 1015;
+  }
+
+  @keyframes bd-bottom-dump-mic-pulse {
+    0%,
+    100% {
+      filter: brightness(1.05);
+      box-shadow: var(--bd-dump-mic-shadow);
+    }
+    50% {
+      filter: brightness(1.16);
+      box-shadow:
+        0 0 0 5px color-mix(in srgb, var(--bd-dump-mic-fg) 28%, transparent),
+        0 8px 26px rgba(232, 93, 45, 0.42);
+    }
+  }
+
+  /* Camera · mic · type-a-dump — visual center column */
+  .bd-bottom-bar-controls {
+    grid-column: 2;
+    justify-self: center;
     display: flex;
-    justify-content: center;
+    flex-direction: row;
     align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
     min-width: 0;
-    z-index: 1;
   }
 
-  .bd-bottom-bar-center-cluster {
+  .bd-bottom-bar-controls .bd-photo-capture-wrap {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
   }
 
-  .bd-bottom-bar-spacer {
-    width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-    pointer-events: none;
+  .bd-bottom-bar .bd-bottom-bar-controls > button,
+  .bd-bottom-bar .bd-bottom-bar-controls .bd-bottom-camera-btn {
+    flex: 0 0 auto !important;
   }
 
   .bd-bottom-bar-view-slot {
-    flex: 0 0 44px;
-    width: 44px;
-    min-width: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-    pointer-events: auto;
-  }
-
-  .bd-bottom-bar-left-tools {
-    flex: 0 0 44px;
-    width: 44px;
-    min-width: 44px;
+    grid-column: 3;
+    justify-self: end;
+    align-self: center;
+    position: relative;
+    width: 48px;
+    min-width: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2114,22 +2237,24 @@ select.bd-input::-ms-expand {
 
   .bd-bottom-bar .bd-bottom-view-btn {
     flex: 0 0 auto !important;
-    min-width: 44px !important;
-    width: 44px !important;
-    max-width: 44px !important;
-    min-height: 44px;
+    min-width: 48px !important;
+    width: 48px !important;
+    max-width: 48px !important;
+    min-height: 48px;
+    max-height: 48px;
     padding: 0 !important;
-    border-radius: 12px;
+    border-radius: 50% !important;
     font-size: 0;
   }
 
-  /* Round mic FAB — centered in bottom bar */
+  /* Primary mic — larger circle, centered between camera and type */
   .bd-bottom-bar .bd-bottom-dump-mic {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    min-height: 56px;
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    min-height: 64px;
     max-width: none;
+    max-height: none;
     padding: 0;
     border-radius: 50%;
     aspect-ratio: 1;
@@ -2154,18 +2279,30 @@ select.bd-input::-ms-expand {
     box-shadow: 0 8px 28px rgba(232, 93, 45, 0.45);
   }
 
+  .bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording {
+    animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
+  }
+
+  .bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording:hover {
+    animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
+    filter: brightness(1.08);
+  }
+
   .bd-bottom-bar .bd-bottom-dump-mic svg {
     flex-shrink: 0;
+    width: 28px;
+    height: 28px;
   }
 
   .bd-bottom-bar .bd-bottom-camera-btn {
     flex: 0 0 auto !important;
-    min-width: 44px !important;
-    width: 44px !important;
-    max-width: 44px !important;
-    min-height: 44px;
+    min-width: 48px !important;
+    width: 48px !important;
+    max-width: 48px !important;
+    min-height: 48px;
+    max-height: 48px;
     padding: 0 !important;
-    border-radius: 12px;
+    border-radius: 50%;
     font-size: 0;
     background: var(--bg-tertiary);
     color: var(--text-primary);
@@ -2183,12 +2320,13 @@ select.bd-input::-ms-expand {
 
   .bd-bottom-bar .bd-bottom-type-dump-btn {
     flex: 0 0 auto !important;
-    min-width: 44px !important;
-    width: 44px !important;
-    max-width: 44px !important;
-    min-height: 44px;
+    min-width: 48px !important;
+    width: 48px !important;
+    max-width: 48px !important;
+    min-height: 48px;
+    max-height: 48px;
     padding: 0 !important;
-    border-radius: 12px;
+    border-radius: 50%;
     font-size: 0;
     background: var(--bg-tertiary);
     color: var(--text-primary);
@@ -2318,7 +2456,9 @@ select.bd-input::-ms-expand {
   .bd-items-sheet-backdrop,
   .bd-items-sheet-panel,
   .bd-topbar,
-  .bd-dump-fab {
+  .bd-dump-fab,
+  .bd-dump-fab--recording,
+  .bd-bottom-dump-mic--recording {
     animation: none !important;
   }
   .bd-dump-sheet-inner {

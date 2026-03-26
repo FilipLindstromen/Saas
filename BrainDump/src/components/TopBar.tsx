@@ -12,6 +12,8 @@ interface TopBarProps {
   showUncategorizedWorkspace?: boolean;
   /** Opens the slide-out nav on small screens (sidebar lives in AppSidebar). */
   onOpenMobileNav?: () => void;
+  /** Placed just left of the hamburger on small screens (e.g. AI next-actions). */
+  beforeMenuSlot?: ReactNode;
   /** Project / area scope controls (ScopeBar); omit in inbox mode. */
   scopeSlot?: ReactNode;
 }
@@ -30,6 +32,7 @@ export function TopBar({
   onModeChange,
   showUncategorizedWorkspace = true,
   onOpenMobileNav,
+  beforeMenuSlot = null,
   scopeSlot = null,
 }: TopBarProps) {
   const { t } = useI18n();
@@ -62,6 +65,7 @@ export function TopBar({
         {scopeSlot ? <div className="bd-topbar-scope-slot">{scopeSlot}</div> : <div className="bd-topbar-grow" aria-hidden />}
         {onOpenMobileNav ? (
           <div className="bd-topbar-end">
+            {beforeMenuSlot}
             <button
               type="button"
               className="bd-btn bd-topbar-menu-btn"

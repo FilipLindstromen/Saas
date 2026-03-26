@@ -96,8 +96,12 @@ interface CenterPanelProps {
   searchFilter?: string;
   /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
   scopeSlot?: ReactNode;
+  /** Mobile: items view registers controls left of the top-bar menu (see TopBar.beforeMenuSlot). */
+  onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
   /** After organizing creates new work projects — refetch project list for ScopeBar / prompts. */
   onWorkProjectsChanged?: () => void;
+  /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
+  onDumpRecordingChange?: (active: boolean) => void;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -131,6 +135,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     searchFilter = "",
     scopeSlot = null,
     onWorkProjectsChanged,
+    onDumpRecordingChange,
   },
   ref
 ) {
@@ -796,6 +801,10 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     if (isDumpProcessing) setShowHelpOverlay(false);
   }, [isDumpProcessing]);
 
+  useEffect(() => {
+    onDumpRecordingChange?.(recordState === "recording");
+  }, [recordState, onDumpRecordingChange]);
+
   const openDumpOverlay = useCallback(() => {
     setError(null);
     showDumpOverlayRef.current = true;
@@ -811,6 +820,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     setShowDumpOverlay(false);
     if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
   }, [isDumpProcessing, stopRecording, mode]);
+
+  const onDumpFabClick = useCallback(() => {
+    if (isDumpProcessing || photoOrganizeFlow) return;
+    if (recordState === "recording") {
+      void handleStopAndProcess();
+      return;
+    }
+    if (showDumpOverlay) return;
+    openDumpOverlay();
+  }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay]);
 
   const dumpPanelContent = (
     <>
@@ -950,35 +969,47 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           </button>
           <button
             id="bd-dump-fab"
-            className="bd-dump-fab"
+            className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
             type="button"
-            onClick={openDumpOverlay}
+            onClick={onDumpFabClick}
             disabled={isDumpProcessing || photoOrganizeFlow}
-            title={t("center.recordNewDump")}
-            aria-label={t("center.recordNewDump")}
+            title={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
+            aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
+            {recordState === "recording" ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            )}
           </button>
         </div>
       ) : (
         <button
           id="bd-dump-fab"
-          className="bd-dump-fab"
+          className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
           type="button"
-          onClick={openDumpOverlay}
+          onClick={onDumpFabClick}
           disabled={isDumpProcessing || photoOrganizeFlow}
-          title={t("center.recordNewDump")}
-          aria-label={t("center.recordNewDump")}
+          title={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
+          aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
+          {recordState === "recording" ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          )}
         </button>
       )}
       {showDumpOverlay && !isDumpProcessing && (
@@ -1163,6 +1194,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           searchFilter={searchFilter}
           reloadKey={itemsReloadKey}
           scopeSlot={scopeSlot}
+          onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
         />
       )}
       {isInbox && unclearItems && (

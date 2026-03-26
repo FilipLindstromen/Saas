@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -46,6 +46,8 @@ export default function BrainDumpPage() {
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
+  const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
+  const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
 
   const refreshUncategorizedAvailability = useCallback(async () => {
@@ -334,6 +336,7 @@ export default function BrainDumpPage() {
           onModeChange={setMode}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
+          beforeMenuSlot={mobileTopBarBeforeMenu}
           scopeSlot={
             mode === "work" || mode === "personal" || mode === "all" ? (
               <ScopeBar
@@ -377,6 +380,8 @@ export default function BrainDumpPage() {
               viewType={viewType}
               onViewTypeChange={setViewType}
               searchFilter={searchFilter}
+              onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
+              onDumpRecordingChange={setDumpRecordingActive}
             />
           </div>
           {mode === "inbox" && (
@@ -405,43 +410,45 @@ export default function BrainDumpPage() {
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
-        <div className="bd-bottom-bar-left-tools">
+        <div className="bd-bottom-bar-controls">
           <PhotoCaptureTrigger onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)} />
-        </div>
-        <div className="bd-bottom-bar-center">
-          <div className="bd-bottom-bar-center-cluster">
-            <button
-              type="button"
-              className="bd-bottom-dump-mic"
-              onClick={() => {
-                if (typeof document === "undefined") return;
-                const fab = document.getElementById("bd-dump-fab");
-                if (fab && "click" in fab) {
-                  (fab as HTMLButtonElement).click();
-                }
-              }}
-              title={t("center.recordNewDump")}
-              aria-label={t("center.recordNewDump")}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <button
+            type="button"
+            className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}
+            onClick={() => {
+              if (typeof document === "undefined") return;
+              const fab = document.getElementById("bd-dump-fab");
+              if (fab && "click" in fab) {
+                (fab as HTMLButtonElement).click();
+              }
+            }}
+            title={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
+            aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
+          >
+            {dumpRecordingActive ? (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            ) : (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="22" />
               </svg>
-            </button>
-            <button
-              type="button"
-              className="bd-btn bd-bottom-type-dump-btn"
-              onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
-              title={t("center.typeDump")}
-              aria-label={t("center.typeDump")}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 6h16M4 12h16M4 18h10" />
-                <path d="M16 16h2v2h-2z" />
-              </svg>
-            </button>
-          </div>
+            )}
+          </button>
+          <button
+            type="button"
+            className="bd-btn bd-bottom-type-dump-btn"
+            onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
+            title={t("center.typeDump")}
+            aria-label={t("center.typeDump")}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 6h16M4 12h16M4 18h10" />
+              <path d="M16 16h2v2h-2z" />
+            </svg>
+          </button>
         </div>
         <div id="bd-bottom-view-slot" className="bd-bottom-bar-view-slot" />
       </div>

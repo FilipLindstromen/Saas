@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
@@ -202,6 +203,11 @@ export function ScopeBar({
   const [isMobile, setIsMobile] = useState(false);
   const [scopeFilterOpen, setScopeFilterOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [scopeSheetMount, setScopeSheetMount] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setScopeSheetMount(document.body);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

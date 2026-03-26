@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
+import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
 
 interface SavedItem {
   id: string;
@@ -276,6 +277,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{it.title}</div>
+                {!(it.content?.trim() && isContentRedundantWithTitle(it.title, it.content)) && (
                 <div
                   style={{
                     fontSize: "0.8125rem",
@@ -290,6 +292,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 >
                   {it.content?.trim() ? (it.content.length > 160 ? `${it.content.slice(0, 160)}…` : it.content) : "—"}
                 </div>
+                )}
                 <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.25rem" }}>
                   {entryTypeLabel(it.itemType, t)}
                   {it.category && ` · ${it.category}`}
