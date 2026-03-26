@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type AnimationEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { signOut, useSession } from "next-auth/react";
@@ -19,6 +20,44 @@ import { getDumpStreakState, STREAK_RECORDED_EVENT, type DumpStreakState } from 
 const SIDEBAR_EXPANDED_KEY = "braindump-sidebar-expanded";
 
 type Mode = "inbox" | "work" | "personal" | "all";
+
+const MODE_KEY: Record<Mode, string> = {
+  all: "mode.all",
+  work: "mode.work",
+  personal: "mode.personal",
+  inbox: "mode.inbox",
+};
+
+const WORKSPACE_MODES: Mode[] = ["all", "work", "personal", "inbox"];
+
+const modeIcons: Record<Mode, () => ReactNode> = {
+  all: () => (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  work: () => (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </svg>
+  ),
+  personal: () => (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  inbox: () => (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  ),
+};
 
 type AppSidebarProps = {
   mode: Mode;
@@ -155,6 +194,14 @@ export function AppSidebar({
     setMobileDrawerExiting(false);
     onMobileOpenChange(false);
   }, [onMobileOpenChange]);
+
+  const pickMode = useCallback(
+    (m: Mode) => {
+      onModeChange(m);
+      if (isMobile) closeMobileDrawerAnimated();
+    },
+    [onModeChange, isMobile, closeMobileDrawerAnimated]
+  );
 
   const openSettings = () => {
     setProfileOpen(false);
