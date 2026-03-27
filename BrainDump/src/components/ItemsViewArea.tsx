@@ -615,9 +615,9 @@ export function ItemsViewArea({
         {aiSuggestLoading ? (
           <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>{t("items.aiNextThreeBusy")}</span>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-            <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M12 3v4M12 17v4M5 12h4M15 12h4" />
+            <path d="M19 4v3.5M17.25 5.75h3.5" strokeWidth="1.65" />
           </svg>
         )}
       </button>
@@ -1357,7 +1357,7 @@ export function ItemsViewArea({
       {onItemTypeSelect && (
         <button
           type="button"
-          className="bd-btn"
+          className={isMobile ? "bd-btn bd-mobile-type-chip-pill" : "bd-btn"}
           aria-haspopup="listbox"
           aria-expanded={typePickerOpen}
           aria-label={t("items.openTypeMenu")}
@@ -1374,10 +1374,14 @@ export function ItemsViewArea({
             padding: "0.4rem 0.65rem",
             fontSize: "0.8125rem",
             fontWeight: 600,
-            background: "var(--bd-chrome-selected-bg)",
-            borderColor: "var(--bd-chrome-selected-border)",
-            color: "var(--bd-chrome-selected-text)",
-            boxShadow: "none",
+            ...(isMobile
+              ? {}
+              : {
+                  background: "var(--bd-chrome-selected-bg)",
+                  borderColor: "var(--bd-chrome-selected-border)",
+                  color: "var(--bd-chrome-selected-text)",
+                  boxShadow: "none",
+                }),
           }}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>

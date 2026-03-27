@@ -429,6 +429,7 @@ export function ScopeBar({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
                   <button
                     type="button"
+                    className="bd-scope-mobile-head"
                     aria-haspopup="listbox"
                     aria-expanded={projectPickerOpen}
                     aria-label={t("scope.openProjectMenu")}
@@ -477,7 +478,7 @@ export function ScopeBar({
                   {onSearchFilterChange && (
                     <button
                       type="button"
-                      className="bd-btn"
+                      className={isMobile ? "bd-btn bd-scope-filter-circle" : "bd-btn"}
                       onClick={() => setScopeFilterOpen((o) => !o)}
                       aria-pressed={scopeFilterOpen}
                       aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
@@ -491,9 +492,13 @@ export function ScopeBar({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
-                        borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                        color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
+                        ...(isMobile
+                          ? {}
+                          : {
+                              background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
+                              borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                              color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
+                            }),
                       }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -1016,6 +1021,7 @@ export function ScopeBar({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", flexWrap: "nowrap" }}>
                   <button
                     type="button"
+                    className="bd-scope-mobile-head"
                     aria-haspopup="listbox"
                     aria-expanded={areaPickerOpen}
                     aria-label={t("scope.openAreaMenu")}
@@ -1064,7 +1070,7 @@ export function ScopeBar({
                   {onSearchFilterChange && (
                     <button
                       type="button"
-                      className="bd-btn"
+                      className={isMobile ? "bd-btn bd-scope-filter-circle" : "bd-btn"}
                       onClick={() => setScopeFilterOpen((o) => !o)}
                       aria-pressed={scopeFilterOpen}
                       aria-label={scopeFilterOpen ? t("scope.hideFilter") : t("scope.showFilter")}
@@ -1078,9 +1084,13 @@ export function ScopeBar({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
-                        borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                        color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
+                        ...(isMobile
+                          ? {}
+                          : {
+                              background: scopeFilterOpen ? "var(--bd-chrome-selected-bg)" : "transparent",
+                              borderColor: scopeFilterOpen ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+                              color: scopeFilterOpen ? "var(--bd-chrome-selected-text)" : "var(--text-tertiary)",
+                            }),
                       }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

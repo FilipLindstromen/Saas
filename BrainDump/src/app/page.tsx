@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -48,7 +48,36 @@ export default function BrainDumpPage() {
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
   const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+  );
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => setIsMobileLayout(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const scopeBarSlot = useMemo(
+    () =>
+      mode === "work" || mode === "personal" || mode === "all" ? (
+        <ScopeBar
+          key="bd-scope-main"
+          mode={mode}
+          selectedProjectId={selectedProjectId}
+          selectedCategory={selectedCategory}
+          onProjectSelect={setSelectedProjectId}
+          onCategorySelect={setSelectedCategory}
+          searchFilter={searchFilter}
+          onSearchFilterChange={setSearchFilter}
+        />
+      ) : null,
+    [mode, selectedProjectId, selectedCategory, searchFilter]
+  );
 
   const refreshUncategorizedAvailability = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -337,19 +366,7 @@ export default function BrainDumpPage() {
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
           beforeMenuSlot={mobileTopBarBeforeMenu}
-          scopeSlot={
-            mode === "work" || mode === "personal" || mode === "all" ? (
-              <ScopeBar
-                mode={mode}
-                selectedProjectId={selectedProjectId}
-                selectedCategory={selectedCategory}
-                onProjectSelect={setSelectedProjectId}
-                onCategorySelect={setSelectedCategory}
-                searchFilter={searchFilter}
-                onSearchFilterChange={setSearchFilter}
-              />
-            ) : null
-          }
+          scopeSlot={isMobileLayout ? null : scopeBarSlot}
         />
 
       <div
@@ -380,6 +397,7 @@ export default function BrainDumpPage() {
               viewType={viewType}
               onViewTypeChange={setViewType}
               searchFilter={searchFilter}
+              scopeSlot={isMobileLayout ? scopeBarSlot : null}
               onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
               onDumpRecordingChange={setDumpRecordingActive}
             />
