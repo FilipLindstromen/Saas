@@ -155,6 +155,9 @@ const en: Msg = {
   "items.dragToReorder": "Drag to reorder",
   "items.textViewSplitHint":
     "Tip: A blank line between paragraphs creates a new entry. With entry titles on, the first line of each paragraph is the headline; the rest is the description.",
+  "items.textViewTapMoreDetails":
+    "Tap to add or edit details (blank line starts a new entry)",
+  "items.clickToAddDescription": "Click to add description…",
   "items.itemCount": "{n} item",
   "items.itemCountPlural": "{n} items",
   "items.allTypes": "All types",
@@ -537,6 +540,9 @@ const sv: Msg = {
   "items.dragToReorder": "Dra för att ändra ordning",
   "items.textViewSplitHint":
     "Tips: En tom rad mellan stycken skapar en ny post. När posttitlar är på blir första raden i varje stycke rubrik; resten är beskrivning.",
+  "items.textViewTapMoreDetails":
+    "Tryck för att lägga till eller redigera detaljer (tom rad startar ny post)",
+  "items.clickToAddDescription": "Tryck för att lägga till en beskrivning…",
   "items.itemCount": "{n} post",
   "items.itemCountPlural": "{n} poster",
   "items.allTypes": "Alla typer",

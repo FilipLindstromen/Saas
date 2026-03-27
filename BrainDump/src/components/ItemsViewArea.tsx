@@ -4338,20 +4338,31 @@ function TextView({
     setEditing(null);
   };
 
+  const scheduleSplitFocus = useCallback((focus: TextViewCommitFocus) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setEditing({
+          id: focus.focusEntryId,
+          field: focus.focusField,
+          value: focus.focusValue,
+        });
+        window.setTimeout(() => {
+          if (focus.focusField === "title") {
+            inputRef.current?.focus();
+          } else {
+            textareaRef.current?.focus();
+          }
+        }, 0);
+      });
+    });
+  }, []);
+
   const handleContentBlur = (id: string, value: string, current: string) => {
     if (onCommitTextContent) {
       if (textSplitCommitLockRef.current) return;
       void Promise.resolve(onCommitTextContent(id, value)).then((focus) => {
         if (focus?.focusEntryId) {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setEditing({
-                id: focus.focusEntryId,
-                field: focus.focusField,
-                value: focus.focusValue,
-              });
-            });
-          });
+          scheduleSplitFocus(focus);
         } else {
           setEditing(null);
         }
@@ -4568,15 +4579,7 @@ function TextView({
                   void Promise.resolve(onCommitTextContent(it.id, next))
                     .then((focus) => {
                       if (focus?.focusEntryId) {
-                        requestAnimationFrame(() => {
-                          requestAnimationFrame(() => {
-                            setEditing({
-                              id: focus.focusEntryId,
-                              field: focus.focusField,
-                              value: focus.focusValue,
-                            });
-                          });
-                        });
+                        scheduleSplitFocus(focus);
                       } else {
                         setEditing({ id: it.id, field: "content", value: next });
                       }
@@ -4585,11 +4588,10 @@ function TextView({
                       textSplitCommitLockRef.current = false;
                     });
                 }}
-                onBlur={() =>
-                  editing &&
+                onBlur={(e) =>
                   handleContentBlur(
                     it.id,
-                    editing.value,
+                    e.currentTarget.value,
                     showEntryTitles ? mergeTitleAndContent(it) : it.content ?? ""
                   )
                 }
@@ -4608,7 +4610,7 @@ function TextView({
                   outline: "none",
                 }}
               />
-            ) : showEntryTitles && isContentRedundantWithTitle(it.title, it.content) && (it.content ?? "").trim() ? null : (
+            ) : (
               <p
                 onClick={() =>
                   setEditing({
@@ -4629,7 +4631,18 @@ function TextView({
                   wordBreak: "break-word",
                 }}
               >
-                {it.content?.trim() || "Click to add description…"}
+                {(() => {
+                  const body = (it.content ?? "").trim();
+                  if (!body) return t("items.clickToAddDescription");
+                  if (
+                    showEntryTitles &&
+                    isContentRedundantWithTitle(it.title, it.content) &&
+                    body
+                  ) {
+                    return t("items.textViewTapMoreDetails");
+                  }
+                  return body;
+                })()}
               </p>
             )}
           </article>
@@ -4701,7 +4714,7 @@ function KanbanView({
   );
 
   useEffect(() => {
-    const onWindowDrop = (e: DragEvent) => {
+    const onWindowDrop = (e: globalThis.DragEvent) => {
       const id = draggedIdRef.current;
       const column = dragOverColumnRef.current;
       if (!id || !column) return;
