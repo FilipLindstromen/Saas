@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 export async function GET(
   _request: NextRequest,
@@ -10,6 +11,8 @@ export async function GET(
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const { id } = await params;
     const item = await prisma.organizedItem.findUnique({
@@ -32,6 +35,8 @@ export async function PATCH(
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const { id } = await params;
     const body = await request.json();
@@ -109,6 +114,8 @@ export async function DELETE(
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const { id } = await params;
     await prisma.organizedItem.delete({ where: { id, userId } });

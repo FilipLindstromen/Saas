@@ -1697,68 +1697,75 @@ export function ItemsViewArea({
           </div>
         )}
 
-      {items.length === 0 ? (
-        <p className="bd-empty">{t("items.emptyFilters")}</p>
-      ) : filteredItems.length === 0 ? (
+      {items.length > 0 && filteredItems.length === 0 ? (
         <p className="bd-empty">{t("items.emptySearch")}</p>
-      ) : viewType === "list" ? (
-        <ListView
-          showEntryTitles={showEntryTitles}
-          items={filteredItems}
-          onSetTaskCompleted={setTaskCompleted}
-          onDelete={deleteItem}
-          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-          onEdit={(it) => setEditingEntry(toEditEntry(it))}
-          onUpdate={updateEntryContent}
-          reorderEnabled={canReorderEntries}
-          onReorder={reorderEntriesPersist}
-        />
-      ) : viewType === "text" ? (
-        <TextView
-          showEntryTitles={showEntryTitles}
-          items={filteredItems}
-          onUpdate={updateEntryContent}
-          onCommitTextContent={commitTextViewContent}
-          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-          reorderEnabled={canReorderEntries}
-          onReorder={reorderEntriesPersist}
-        />
-      ) : viewType === "kanban" ? (
-            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
-      ) : viewType === "calendar" ? (
-        <CalendarView
-          showEntryTitles={showEntryTitles}
-          items={filteredItems}
-          onSchedule={updateSchedule}
-          onEdit={(it) => setEditingEntry(toEditEntry(it))}
-          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-          isMobile={isMobile}
-        />
-      ) : viewType === "flowchart" ? (
-        <MindmapView
-          showEntryTitles={showEntryTitles}
-          items={filteredItems}
-          onSetTaskCompleted={setTaskCompleted}
-          onEdit={(it) => setEditingEntry(toEditEntry(it))}
-          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-          isMobile={isMobile}
-        />
       ) : (
-        <PostitsView
-          showEntryTitles={showEntryTitles}
-          items={filteredItems}
-          onSetTaskCompleted={setTaskCompleted}
-          onDelete={deleteItem}
-          onPosition={updatePosition}
-          postitPositions={postitPositions}
-          setPostitPositions={setPostitPositions}
-          onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-          onEdit={(it) => setEditingEntry(toEditEntry(it))}
-          lineToolActive={lineToolActive}
-          links={postitLinks}
-          onAddLink={(fromId, toId) => setPostitLinks((prev) => (prev.some((l) => l.fromId === fromId && l.toId === toId) ? prev : [...prev, { fromId, toId }]))}
-          onRemoveLink={(fromId, toId) => setPostitLinks((prev) => prev.filter((l) => !(l.fromId === fromId && l.toId === toId)))}
-        />
+        <>
+          {items.length === 0 ? (
+            <p className="bd-empty" style={{ margin: "0 0 0.75rem" }}>
+              {t("items.emptyFilters")}
+            </p>
+          ) : null}
+          {viewType === "list" ? (
+            <ListView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onSetTaskCompleted={setTaskCompleted}
+              onDelete={deleteItem}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
+              onUpdate={updateEntryContent}
+              reorderEnabled={canReorderEntries}
+              onReorder={reorderEntriesPersist}
+            />
+          ) : viewType === "text" ? (
+            <TextView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onUpdate={updateEntryContent}
+              onCommitTextContent={commitTextViewContent}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              reorderEnabled={canReorderEntries}
+              onReorder={reorderEntriesPersist}
+            />
+          ) : viewType === "kanban" ? (
+            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
+          ) : viewType === "calendar" ? (
+            <CalendarView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onSchedule={updateSchedule}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              isMobile={isMobile}
+            />
+          ) : viewType === "flowchart" ? (
+            <MindmapView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onSetTaskCompleted={setTaskCompleted}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              isMobile={isMobile}
+            />
+          ) : (
+            <PostitsView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onSetTaskCompleted={setTaskCompleted}
+              onDelete={deleteItem}
+              onPosition={updatePosition}
+              postitPositions={postitPositions}
+              setPostitPositions={setPostitPositions}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
+              lineToolActive={lineToolActive}
+              links={postitLinks}
+              onAddLink={(fromId, toId) => setPostitLinks((prev) => (prev.some((l) => l.fromId === fromId && l.toId === toId) ? prev : [...prev, { fromId, toId }]))}
+              onRemoveLink={(fromId, toId) => setPostitLinks((prev) => prev.filter((l) => !(l.fromId === fromId && l.toId === toId)))}
+            />
+          )}
+        </>
       )}
 
       {itemContextMenu && (() => {

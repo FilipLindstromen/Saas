@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
 import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,6 +102,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const body = await request.json();
     const {

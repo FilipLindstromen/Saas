@@ -8,6 +8,7 @@ import {
   localDateTimeToDate,
   normalizeReminderMinutesBefore,
 } from "@/lib/calendar-schedule";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 /**
  * POST /api/organized-items/batch
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const created: Array<{ id: string; title: string }> = [];
 
