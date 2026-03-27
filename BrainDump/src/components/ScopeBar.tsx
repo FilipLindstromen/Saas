@@ -169,7 +169,6 @@ function DueDateFilterMenuButton({
         title={t("scope.dateFilterMenuAria")}
         onClick={(e) => {
           e.stopPropagation();
-          e.preventDefault();
           setOpen((o) => !o);
         }}
         style={{

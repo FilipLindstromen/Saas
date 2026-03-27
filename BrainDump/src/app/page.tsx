@@ -41,6 +41,7 @@ export default function BrainDumpPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItemType, setSelectedItemType] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilterPreset>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
@@ -75,10 +76,12 @@ export default function BrainDumpPage() {
           onCategorySelect={setSelectedCategory}
           searchFilter={searchFilter}
           onSearchFilterChange={setSearchFilter}
+          dueDateFilter={dueDateFilter}
+          onDueDateFilterChange={setDueDateFilter}
           beforeFilterSlot={desktopScopeBeforeFilter}
         />
       ) : null,
-    [mode, selectedProjectId, selectedCategory, searchFilter, desktopScopeBeforeFilter]
+    [mode, selectedProjectId, selectedCategory, searchFilter, dueDateFilter, desktopScopeBeforeFilter]
   );
 
   const refreshUncategorizedAvailability = useCallback(async () => {
