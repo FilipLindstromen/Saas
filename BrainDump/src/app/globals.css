@@ -2122,6 +2122,37 @@ select.bd-input::-ms-expand {
   padding-bottom: var(--bd-bottom-bar-clearance);
 }
 
+/* Rendered via portal on document.body — above items sheets (≤1300), edit chrome (1400), top bar (300) */
+.bd-topbar-workspace-backdrop {
+  z-index: 2000;
+}
+
+/* Desktop: native <select> was painted under scroll/stacking contexts; menu uses the same sheet as mobile. */
+.bd-topbar-workspace-desktop-trigger {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bd-topbar-workspace-desktop-trigger__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.bd-topbar-workspace-desktop-trigger__chev {
+  flex-shrink: 0;
+  opacity: 0.75;
+  color: var(--text-tertiary);
+}
+
 .bd-mobile-mode-pill {
   display: none;
   flex-shrink: 0;

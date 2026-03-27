@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 
 type Mode = "inbox" | "work" | "personal" | "all";
@@ -75,6 +76,11 @@ export function TopBar({
   const { t } = useI18n();
   const [isMobile, setIsMobile] = useState(false);
   const [workspaceSheetOpen, setWorkspaceSheetOpen] = useState(false);
+  const [sheetMount, setSheetMount] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setSheetMount(document.body);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,8 +92,22 @@ export function TopBar({
   }, []);
 
   useEffect(() => {
-    if (!isMobile) setWorkspaceSheetOpen(false);
-  }, [isMobile]);
+    if (!workspaceSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setWorkspaceSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [workspaceSheetOpen]);
+
+  useEffect(() => {
+    if (!workspaceSheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [workspaceSheetOpen]);
 
   const workspaceModes = showUncategorizedWorkspace
     ? WORKSPACE_MODES
@@ -98,7 +118,77 @@ export function TopBar({
     setWorkspaceSheetOpen(false);
   };
 
+  const workspaceSheet =
+    workspaceSheetOpen && sheetMount
+      ? createPortal(
+          <div
+            className="bd-scope-picker-backdrop bd-topbar-workspace-backdrop"
+            role="presentation"
+            onClick={() => setWorkspaceSheetOpen(false)}
+          >
+            <div
+              className="bd-panel bd-topbar-workspace-sheet"
+              role="listbox"
+              aria-label={t("topBar.workspace")}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bd-topbar-workspace-sheet__grab" aria-hidden />
+              <div className="bd-topbar-workspace-sheet__head">
+                <h3 className="bd-topbar-workspace-sheet__title">{t("topBar.workspace")}</h3>
+                <button
+                  type="button"
+                  className="bd-btn"
+                  onClick={() => setWorkspaceSheetOpen(false)}
+                  aria-label={t("scope.cancel")}
+                  style={{
+                    minWidth: 44,
+                    minHeight: 44,
+                    padding: "0.45rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="bd-topbar-workspace-sheet__list">
+                {workspaceModes.map((m) => {
+                  const sel = mode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      className="bd-btn bd-topbar-workspace-sheet__option"
+                      role="option"
+                      aria-selected={sel}
+                      onClick={() => pickMode(m)}
+                    >
+                      <span className="bd-topbar-workspace-sheet__option-glyph" aria-hidden>
+                        <ModeGlyph mode={m} />
+                      </span>
+                      <span className="bd-topbar-workspace-sheet__option-label">{t(MODE_KEY[m])}</span>
+                      {sel ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 18 }} aria-hidden />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          sheetMount
+        )
+      : null;
+
   return (
+    <>
     <header className="bd-topbar">
       <div className="bd-topbar-row">
         <div className="bd-topbar-pinned">
@@ -120,19 +210,31 @@ export function TopBar({
               </span>
             </button>
           ) : (
-            <select
+            <button
               id="bd-topbar-workspace"
-              className="bd-input bd-topbar-workspace-select"
+              type="button"
+              className="bd-input bd-topbar-workspace-select bd-topbar-workspace-desktop-trigger"
               aria-label={t("topBar.workspace")}
-              value={mode}
-              onChange={(e) => onModeChange(e.target.value as Mode)}
+              aria-expanded={workspaceSheetOpen}
+              aria-haspopup="listbox"
+              onClick={() => setWorkspaceSheetOpen(true)}
             >
-              {workspaceModes.map((m) => (
-                <option key={m} value={m}>
-                  {t(MODE_KEY[m])}
-                </option>
-              ))}
-            </select>
+              <span className="bd-topbar-workspace-desktop-trigger__label">{t(MODE_KEY[mode])}</span>
+              <svg
+                className="bd-topbar-workspace-desktop-trigger__chev"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
           )}
         </div>
         {scopeSlot && !isMobile ? (
@@ -159,64 +261,8 @@ export function TopBar({
           </div>
         ) : null}
       </div>
-
-      {isMobile && workspaceSheetOpen && (
-        <div
-          className="bd-scope-picker-backdrop"
-          role="presentation"
-          onClick={() => setWorkspaceSheetOpen(false)}
-        >
-          <div
-            className="bd-panel bd-topbar-workspace-sheet"
-            role="listbox"
-            aria-label={t("topBar.workspace")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bd-topbar-workspace-sheet__grab" aria-hidden />
-            <div className="bd-topbar-workspace-sheet__head">
-              <h3 className="bd-topbar-workspace-sheet__title">{t("topBar.workspace")}</h3>
-              <button
-                type="button"
-                className="bd-btn"
-                onClick={() => setWorkspaceSheetOpen(false)}
-                aria-label={t("scope.cancel")}
-                style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="bd-topbar-workspace-sheet__list">
-              {workspaceModes.map((m) => {
-                const sel = mode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    className="bd-btn bd-topbar-workspace-sheet__option"
-                    role="option"
-                    aria-selected={sel}
-                    onClick={() => pickMode(m)}
-                  >
-                    <span className="bd-topbar-workspace-sheet__option-glyph" aria-hidden>
-                      <ModeGlyph mode={m} />
-                    </span>
-                    <span className="bd-topbar-workspace-sheet__option-label">{t(MODE_KEY[m])}</span>
-                    {sel ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <span style={{ width: 18 }} aria-hidden />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </header>
+    {workspaceSheet}
+    </>
   );
 }
