@@ -13,6 +13,7 @@
     "lint": "npx next lint",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate deploy",
     "db:seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {

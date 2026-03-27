@@ -140,11 +140,12 @@ export async function POST(request: NextRequest) {
       typeof project_name === "string" && project_name.trim() ? project_name.trim() : "";
 
     const item = await prisma.$transaction(async (tx) => {
-      const minAgg = await tx.organizedItem.aggregate({
+      const minRow = await tx.organizedItem.findFirst({
         where: { userId },
-        _min: { listOrder: true },
+        orderBy: { listOrder: "asc" },
+        select: { listOrder: true },
       });
-      const nextListOrder = (minAgg._min.listOrder ?? 0) - 1000;
+      const nextListOrder = (minRow?.listOrder ?? 0) - 1000;
 
       let resolvedProjectId: string | null = projectId ?? null;
       if (pname) {

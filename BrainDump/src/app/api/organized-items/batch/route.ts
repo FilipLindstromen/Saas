@@ -70,12 +70,13 @@ export async function POST(request: NextRequest) {
     const created: Array<{ id: string; title: string }> = [];
 
     await prisma.$transaction(async (tx) => {
-      let nextListOrder = (
-        await tx.organizedItem.aggregate({
-          where: { userId },
-          _min: { listOrder: true },
-        })
-      )._min.listOrder ?? 0;
+      // findFirst avoids aggregate + driver edge cases; same as min(listOrder) for this user
+      const minRow = await tx.organizedItem.findFirst({
+        where: { userId },
+        orderBy: { listOrder: "asc" },
+        select: { listOrder: true },
+      });
+      let nextListOrder = minRow?.listOrder ?? 0;
 
       for (const it of items) {
         const name =
