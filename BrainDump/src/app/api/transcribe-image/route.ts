@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const locale = (formData.get("locale") as string | null)?.trim().toLowerCase() ?? "en";
     const langNote =
       locale === "sv"
-        ? "Om texten är på svenska, transkribera den på svenska och behåll svensk stavning."
+        ? "Om texten är på svenska, transkribera den på svenska och behåll svensk stavning. Föredra siffror för tal (7) framför ord (sju) vid antal och mängder."
         : "If the text is in a non-English language, transcribe it in that language faithfully.";
 
     const base64 = buffer.toString("base64");
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
 Rules:
 - Output ONLY the transcribed text. No preamble, no "Here is...", no markdown fences unless the original clearly uses code blocks.
 - Preserve line breaks, bullet points, and numbered lists when visible.
+- Prefer Arabic digits for quantities and counts (e.g. 7) rather than spelling numbers in words (e.g. seven), unless the source text clearly uses words.
 - ${langNote}
 - If there is no readable text, reply exactly: (no text detected)`,
         },

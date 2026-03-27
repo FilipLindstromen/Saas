@@ -45,10 +45,18 @@ export async function POST(request: NextRequest) {
     /** ISO 639-1; Whisper supports forcing language for more reliable output in that language */
     const language = langRaw === "sv" ? "sv" : langRaw === "en" ? "en" : undefined;
 
+    const numberStylePrompt =
+      language === "sv"
+        ? "Skriv tal med siffror när det handlar om antal eller mängder: 7, inte sju."
+        : language === "en"
+          ? "Write numbers as digits for counts and amounts: 7, not seven."
+          : "Prefer digits for numbers in the transcript (e.g. 7) instead of spelling them out (seven) when stating quantities or counts.";
+
     const transcription = await openai.audio.transcriptions.create({
       file: apiFile,
       model: "whisper-1",
       ...(language ? { language } : {}),
+      prompt: numberStylePrompt,
     });
 
     const text = (transcription as { text?: string }).text?.trim() ?? "";

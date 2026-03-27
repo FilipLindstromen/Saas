@@ -118,6 +118,7 @@ Rules:
    - Put ONLY the new project name(s) in "standalone_project_creations" (array of strings).
    - Set "items" to [] (empty array). Do NOT create a note, idea, or task that only repeats the project-creation request or echoes the project name without other work content.
    If the same utterance ALSO contains real tasks, meeting notes, or ideas unrelated to the shell project, put those in "items" as usual AND still add standalone_project_creations for any brand-new project shell(s) that have no items yet.
+12. Numerals: In **title** and **content**, prefer **Arabic digits** for quantities, counts, and amounts the user states as numbers (e.g. 7, 14, 3 items, €50) rather than spelling them out in words (seven, fourteen, three items, fifty euros). Keep words only when the user clearly used fixed phrases or titles that are conventionally written out, or for small grammar words (e.g. "first", "once").
 
 Categories and sections are dynamic. Prefer existing ones when they fit; you MAY create new category names (lowercase, snake_case) when content clearly belongs elsewhere.
 When existing_categories are provided below, prefer those.
@@ -192,6 +193,7 @@ Regler:
    - Lägg ENDAST nya namn i "standalone_project_creations".
    - Sätt "items" till []. Skapa INTE note, idea eller task som bara upprepar skapa-projekt-meningen eller ekar projektnamnet utan annat innehåll.
    Om samma uttalande OCKSÅ innehåller riktiga uppgifter eller idéer, lägg dem i "items" som vanligt och lägg ändå in standalone_project_creations för helt nya projekt utan poster.
+12. Siffror: I **title** och **content**, föredra **siffror** (7, 14, 3 st, 50 kr) framför utskrivna tal (sju, fjorton, tre stycken, femtio kronor) när användaren uttrycker mängder eller antal som tal. Behåll ord bara i fasta uttryck, titlar eller grammatik (t.ex. "första", "en gång").
 
 Fältnamn domain, category, item_type osv ska vara på engelska som i schemat nedan. Värden i title och content ska vara på svenska när användaren pratat svenska.
 

@@ -653,12 +653,13 @@ export function ScopeBar({
           )}
         </div>
 
-        {isMobile && projectPickerOpen && (
+        {isMobile && projectPickerOpen && scopeSheetMount
+          ? createPortal(
           <div
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: "var(--bd-z-dropdown)",
+              zIndex: "var(--bd-z-scope-sheet)",
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -816,70 +817,112 @@ export function ScopeBar({
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          </div>,
+          scopeSheetMount
+        )
+        : null}
 
-        {contextMenu && (
-          <div
-            style={isMobile ? {
-              position: "fixed",
-              inset: 0,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "rgba(0,0,0,0.35)",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              padding: "0.75rem",
-            } : undefined}
-            onClick={isMobile ? () => setContextMenu(null) : undefined}
-          >
-          <div
-            ref={menuRef}
-            style={{
-              position: isMobile ? "relative" : "fixed",
-              left: isMobile ? undefined : contextMenu.x,
-              top: isMobile ? undefined : contextMenu.y,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              borderRadius: isMobile ? "16px" : "var(--button-radius)",
-              boxShadow: "var(--shadow-md)",
-              padding: "0.25rem 0",
-              minWidth: "120px",
-              width: isMobile ? "min(100%, 420px)" : undefined,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start" }}
-              onClick={() => {
-                setRenameProject(contextMenu.project);
-                setRenameValue(contextMenu.project.name);
-                setContextMenu(null);
-              }}
-            >
-              {t("scope.rename")}
-            </button>
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-              onClick={() => handleDeleteProject(contextMenu.project)}
-            >
-              {t("scope.deleteProject")}
-            </button>
-            {isMobile && (
-              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setContextMenu(null)}>
-                {t("scope.cancel")}
-              </button>
-            )}
-          </div>
-          </div>
-        )}
+        {contextMenu && scopeSheetMount
+          ? createPortal(
+              isMobile ? (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: "var(--bd-z-scope-sheet)",
+                    background: "rgba(0,0,0,0.35)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    padding: "0.75rem",
+                  }}
+                  onClick={() => setContextMenu(null)}
+                >
+                  <div
+                    ref={menuRef}
+                    style={{
+                      position: "relative",
+                      zIndex: "var(--bd-z-scope-sheet)",
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-default)",
+                      borderRadius: "16px",
+                      boxShadow: "var(--shadow-md)",
+                      padding: "0.25rem 0",
+                      minWidth: "120px",
+                      width: "min(100%, 420px)",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      onClick={() => {
+                        setRenameProject(contextMenu.project);
+                        setRenameValue(contextMenu.project.name);
+                        setContextMenu(null);
+                      }}
+                    >
+                      {t("scope.rename")}
+                    </button>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
+                      onClick={() => handleDeleteProject(contextMenu.project)}
+                    >
+                      {t("scope.deleteProject")}
+                    </button>
+                    <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setContextMenu(null)}>
+                      {t("scope.cancel")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  ref={menuRef}
+                  style={{
+                    position: "fixed",
+                    left: contextMenu.x,
+                    top: contextMenu.y,
+                    zIndex: "var(--bd-z-scope-sheet)",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--button-radius)",
+                    boxShadow: "var(--shadow-md)",
+                    padding: "0.25rem 0",
+                    minWidth: "120px",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    onClick={() => {
+                      setRenameProject(contextMenu.project);
+                      setRenameValue(contextMenu.project.name);
+                      setContextMenu(null);
+                    }}
+                  >
+                    {t("scope.rename")}
+                  </button>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
+                    onClick={() => handleDeleteProject(contextMenu.project)}
+                  >
+                    {t("scope.deleteProject")}
+                  </button>
+                </div>
+              ),
+              scopeSheetMount
+            )
+          : null}
 
-        {renameProject && (
+        {renameProject && scopeSheetMount
+          ? createPortal(
           <div
             style={{
               position: "fixed",
@@ -963,48 +1006,57 @@ export function ScopeBar({
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          </div>,
+          scopeSheetMount
+        )
+        : null}
 
-        {confirmProject && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: "var(--bd-z-modal)",
-              background: "rgba(0,0,0,0.4)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "1rem",
-            }}
-            onClick={() => setConfirmProject(null)}
-          >
-            <div
-              className="bd-panel"
-              style={{ padding: "1.25rem", maxWidth: 360 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("scope.deleteProjectConfirm")}</h3>
-              <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                &ldquo;{confirmProject.name}&rdquo; {t("scope.deleteProjectBody")}
-              </p>
-              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                <button type="button" className="bd-btn" onClick={() => setConfirmProject(null)}>
-                  {t("scope.no")}
-                </button>
-                <button
-                  type="button"
-                  className="bd-btn"
-                  style={{ background: "var(--text-danger, #c53030)", color: "#fff", borderColor: "var(--text-danger, #c53030)" }}
-                  onClick={confirmDeleteProject}
+        {confirmProject && scopeSheetMount
+          ? createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: "var(--bd-z-modal)",
+                  background: "rgba(0,0,0,0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "1rem",
+                }}
+                onClick={() => setConfirmProject(null)}
+              >
+                <div
+                  className="bd-panel"
+                  style={{ padding: "1.25rem", maxWidth: 360 }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {t("scope.yesDelete")}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                  <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("scope.deleteProjectConfirm")}</h3>
+                  <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                    &ldquo;{confirmProject.name}&rdquo; {t("scope.deleteProjectBody")}
+                  </p>
+                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                    <button type="button" className="bd-btn" onClick={() => setConfirmProject(null)}>
+                      {t("scope.no")}
+                    </button>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{
+                        background: "var(--text-danger, #c53030)",
+                        color: "#fff",
+                        borderColor: "var(--text-danger, #c53030)",
+                      }}
+                      onClick={confirmDeleteProject}
+                    >
+                      {t("scope.yesDelete")}
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              scopeSheetMount
+            )
+          : null}
       </>
     );
   }
@@ -1334,12 +1386,13 @@ export function ScopeBar({
           </div>
         )}
         </div>
-        {isMobile && areaPickerOpen && (
+        {isMobile && areaPickerOpen && scopeSheetMount
+          ? createPortal(
           <div
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: "var(--bd-z-dropdown)",
+              zIndex: "var(--bd-z-scope-sheet)",
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -1504,60 +1557,94 @@ export function ScopeBar({
                 </button>
               </div>
             </div>
-          </div>
-        )}
-        {areaContextMenu?.isCustom && (
-          <div
-            style={isMobile ? {
-              position: "fixed",
-              inset: 0,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "rgba(0,0,0,0.35)",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              padding: "0.75rem",
-            } : undefined}
-            onClick={isMobile ? () => setAreaContextMenu(null) : undefined}
-          >
-          <div
-            style={{
-              position: isMobile ? "relative" : "fixed",
-              left: isMobile ? undefined : areaContextMenu.x,
-              top: isMobile ? undefined : areaContextMenu.y,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              borderRadius: isMobile ? "16px" : "var(--button-radius)",
-              boxShadow: "var(--shadow-md)",
-              padding: "0.25rem 0",
-              minWidth: "120px",
-              width: isMobile ? "min(100%, 420px)" : undefined,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-              onClick={() => {
-                const next = loadCustomAreas().filter((c) => c !== areaContextMenu.value);
-                saveCustomAreas(next);
-                setCustomAreasState(next);
-                if (selectedCategory === areaContextMenu.value) onCategorySelect(null);
-                setAreaContextMenu(null);
-              }}
-            >
-              {t("scope.removeArea")}
-            </button>
-            {isMobile && (
-              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setAreaContextMenu(null)}>
-                {t("scope.cancel")}
-              </button>
-            )}
-          </div>
-          </div>
-        )}
+          </div>,
+          scopeSheetMount
+        )
+        : null}
+        {areaContextMenu?.isCustom && scopeSheetMount
+          ? createPortal(
+              isMobile ? (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: "var(--bd-z-scope-sheet)",
+                    background: "rgba(0,0,0,0.35)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    padding: "0.75rem",
+                  }}
+                  onClick={() => setAreaContextMenu(null)}
+                >
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: "var(--bd-z-scope-sheet)",
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-default)",
+                      borderRadius: "16px",
+                      boxShadow: "var(--shadow-md)",
+                      padding: "0.25rem 0",
+                      minWidth: "120px",
+                      width: "min(100%, 420px)",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
+                      onClick={() => {
+                        const next = loadCustomAreas().filter((c) => c !== areaContextMenu.value);
+                        saveCustomAreas(next);
+                        setCustomAreasState(next);
+                        if (selectedCategory === areaContextMenu.value) onCategorySelect(null);
+                        setAreaContextMenu(null);
+                      }}
+                    >
+                      {t("scope.removeArea")}
+                    </button>
+                    <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={() => setAreaContextMenu(null)}>
+                      {t("scope.cancel")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    position: "fixed",
+                    left: areaContextMenu.x,
+                    top: areaContextMenu.y,
+                    zIndex: "var(--bd-z-scope-sheet)",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--button-radius)",
+                    boxShadow: "var(--shadow-md)",
+                    padding: "0.25rem 0",
+                    minWidth: "120px",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
+                    onClick={() => {
+                      const next = loadCustomAreas().filter((c) => c !== areaContextMenu.value);
+                      saveCustomAreas(next);
+                      setCustomAreasState(next);
+                      if (selectedCategory === areaContextMenu.value) onCategorySelect(null);
+                      setAreaContextMenu(null);
+                    }}
+                  >
+                    {t("scope.removeArea")}
+                  </button>
+                </div>
+              ),
+              scopeSheetMount
+            )
+          : null}
       </>
     );
   }

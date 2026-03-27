@@ -60,6 +60,8 @@
   /* Stacking: menus/sheets above chrome; modals above menus; processing on top */
   --bd-z-bottom-bar: 350;
   --bd-z-dropdown: 5000;
+  /* Area/project pickers & scope menus — above item sheets (.bd-z-dropdown), below dialogs */
+  --bd-z-scope-sheet: 5500;
   --bd-z-modal: 6000;
   --bd-z-blocking: 7000;
 }
