@@ -1924,13 +1924,20 @@ select.bd-input::-ms-expand {
   min-width: 0;
   display: flex;
   align-items: center;
-  overflow-x: auto;
+  /* ScopeBar scrolls chips internally; don’t scroll the whole row (keeps filter + menu on the right). */
+  overflow-x: visible;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 .bd-topbar-scope-slot::-webkit-scrollbar {
   display: none;
+}
+
+/* First fragment child is the scope toolbar row; modals may follow as siblings. */
+.bd-topbar-scope-slot > :first-child {
+  flex: 1 1 0%;
+  min-width: 0;
 }
 
 .bd-topbar-end {

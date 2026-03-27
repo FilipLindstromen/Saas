@@ -264,7 +264,7 @@ export function ScopeBar({
     return () => window.removeEventListener("braindump-reload-projects", onReloadProjects);
   }, [loadProjects]);
 
-  useEffect(() => {
+  const reloadCounts = useCallback(() => {
     setCounts(null);
     if (mode === "work" || mode === "personal") {
       fetchCounts(mode).then(setCounts);
@@ -299,6 +299,16 @@ export function ScopeBar({
         .catch(() => setCounts(null));
     }
   }, [mode]);
+
+  useEffect(() => {
+    reloadCounts();
+  }, [reloadCounts]);
+
+  useEffect(() => {
+    const onItemsChanged = () => reloadCounts();
+    window.addEventListener("braindump-reload-items", onItemsChanged);
+    return () => window.removeEventListener("braindump-reload-items", onItemsChanged);
+  }, [reloadCounts]);
 
   useEffect(() => {
     if (mode === "personal" || mode === "all") setCustomAreasState(loadCustomAreas());
@@ -348,6 +358,12 @@ export function ScopeBar({
   if (mode === "inbox") return null;
 
   if (mode === "work") {
+    const countsLoaded = counts != null;
+    const projectItemCount = (id: string) => counts?.projectCounts?.[id] ?? 0;
+    const visibleProjects = countsLoaded
+      ? projects.filter((p) => projectItemCount(p.id) > 0 || selectedProjectId === p.id)
+      : projects;
+
     const selectedProjectLabel =
       !selectedProjectId
         ? t("scope.all")
@@ -410,6 +426,7 @@ export function ScopeBar({
             background: "transparent",
             /* visible so native <select> dropdown is not clipped */
             overflowX: "visible",
+            ...(!isMobile ? { width: "100%", minWidth: 0 } : {}),
           }}
         >
           <div
@@ -420,8 +437,8 @@ export function ScopeBar({
               gap: "0.5rem",
               overflowX: "visible",
               minWidth: 0,
-              flex: isMobile ? 1 : undefined,
-              width: isMobile ? "auto" : "100%",
+              flex: 1,
+              width: isMobile ? "auto" : undefined,
             }}
           >
             {isMobile ? (
@@ -534,7 +551,7 @@ export function ScopeBar({
                     selected={!selectedProjectId}
                     onClick={() => onProjectSelect(null)}
                   />
-                  {projects.map((p) => (
+                  {visibleProjects.map((p) => (
                     <ScopeChip
                       key={p.id}
                       label={p.name}
@@ -567,7 +584,6 @@ export function ScopeBar({
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.5rem",
-                marginLeft: isMobile ? 0 : "auto",
                 flexShrink: 0,
                 width: isMobile ? "100%" : "auto",
                 maxWidth: isMobile ? "100%" : 420,
@@ -718,7 +734,7 @@ export function ScopeBar({
                     <span style={{ width: 18 }} aria-hidden />
                   )}
                 </button>
-                {projects.map((p) => {
+                {visibleProjects.map((p) => {
                   const sel = selectedProjectId === p.id;
                   return (
                     <div key={p.id} style={{ display: "flex", alignItems: "stretch", gap: "0.35rem" }}>
@@ -987,9 +1003,25 @@ export function ScopeBar({
   }
 
   if (mode === "personal" || mode === "all") {
-    const apiCategories = counts?.categoryCounts ? Object.keys(counts.categoryCounts).filter((k) => (counts!.categoryCounts![k] ?? 0) > 0) : [];
-    const customAreas = (customAreasState.length ? customAreasState : loadCustomAreas()).filter((c) => !apiCategories.includes(c));
-    const allAreas = [...new Set([...PERSONAL_AREA_DEFAULTS, ...apiCategories, ...customAreas])].sort((a, b) => a.localeCompare(b));
+    const countsLoaded = counts != null;
+    const categoryItemCount = (key: string) => counts?.categoryCounts?.[key] ?? 0;
+    const storedCustomAreas = customAreasState.length ? customAreasState : loadCustomAreas();
+
+    const apiCategories = counts?.categoryCounts
+      ? Object.keys(counts.categoryCounts).filter((k) => categoryItemCount(k) > 0)
+      : [];
+
+    const defaultAreasVisible = countsLoaded
+      ? PERSONAL_AREA_DEFAULTS.filter((a) => categoryItemCount(a) > 0 || selectedCategory === a)
+      : [...PERSONAL_AREA_DEFAULTS];
+
+    const customAreasVisible = countsLoaded
+      ? storedCustomAreas.filter((c) => categoryItemCount(c) > 0 || selectedCategory === c)
+      : storedCustomAreas;
+
+    const allAreas = [...new Set([...defaultAreasVisible, ...apiCategories, ...customAreasVisible])].sort((a, b) =>
+      a.localeCompare(b)
+    );
 
     return (
       <>
@@ -1002,6 +1034,7 @@ export function ScopeBar({
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
             overflowX: "visible",
+            ...(!isMobile ? { width: "100%", minWidth: 0 } : {}),
           }}
         >
           <div
@@ -1012,8 +1045,8 @@ export function ScopeBar({
               gap: "0.5rem",
               overflowX: "visible",
               minWidth: 0,
-              flex: isMobile ? 1 : undefined,
-              width: isMobile ? "auto" : "100%",
+              flex: 1,
+              width: isMobile ? "auto" : undefined,
             }}
           >
             {isMobile ? (
@@ -1173,11 +1206,11 @@ export function ScopeBar({
                           value,
                           x: e.clientX,
                           y: e.clientY,
-                          isCustom: customAreas.includes(value),
+                          isCustom: storedCustomAreas.includes(value),
                         });
                       }}
                       onMore={
-                        isMobile && customAreas.includes(value)
+                        isMobile && storedCustomAreas.includes(value)
                           ? () =>
                               setAreaContextMenu({
                                 value,
@@ -1243,7 +1276,6 @@ export function ScopeBar({
               display: "flex",
               alignItems: "center",
               gap: "0.5rem",
-              marginLeft: isMobile ? 0 : "auto",
               flexShrink: 0,
               width: isMobile ? "100%" : undefined,
             }}
@@ -1415,7 +1447,7 @@ export function ScopeBar({
                           <span style={{ width: 18 }} aria-hidden />
                         )}
                       </button>
-                      {customAreas.includes(value) && (
+                      {storedCustomAreas.includes(value) && (
                         <button
                           type="button"
                           className="bd-btn"
