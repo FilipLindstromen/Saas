@@ -1809,6 +1809,7 @@ select.bd-input::-ms-expand {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  pointer-events: auto;
   /* Above .bd-topbar (300); below modal/menu tokens (see --bd-z-*) */
   z-index: var(--bd-z-bottom-bar);
   transform: translateZ(0);
@@ -2872,8 +2873,6 @@ input.bd-todo-checkbox:checked {
   }
 
   .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
-    position: relative;
-    z-index: 2;
     flex: 1 1 0;
     min-width: 0;
     display: flex;
@@ -2917,12 +2916,12 @@ input.bd-todo-checkbox:checked {
     flex: 0 0 auto;
     width: 72px;
     position: relative;
-    z-index: 1;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     height: 26px;
-    pointer-events: none;
+    /* Must not use pointer-events: none — taps would fall through to content under the bar */
+    pointer-events: auto;
   }
 
   .bd-bottom-bar-pill-mic-wrap .bd-bottom-dump-mic {

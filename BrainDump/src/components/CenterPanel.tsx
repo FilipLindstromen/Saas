@@ -100,6 +100,8 @@ export type BrainDumpCenterHandle = {
   processImageForOrganize: (file: File) => Promise<void>;
   /** Opens the typed-dump sheet (mobile bar or programmatic). */
   openTypedDumpSheet: () => void;
+  /** Same as the main record/stop control (mobile bottom bar calls this; desktop uses #bd-dump-fab). */
+  toggleDumpRecording: () => void;
 };
 
 export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(function CenterPanel(

@@ -486,13 +486,7 @@ export default function BrainDumpPage() {
               <button
                 type="button"
                 className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}
-                onClick={() => {
-                  if (typeof document === "undefined") return;
-                  const fab = document.getElementById("bd-dump-fab");
-                  if (fab && "click" in fab) {
-                    (fab as HTMLButtonElement).click();
-                  }
-                }}
+                onClick={() => centerPanelRef.current?.toggleDumpRecording()}
                 title={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
                 aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
               >
