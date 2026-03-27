@@ -3136,6 +3136,9 @@ function CalendarView({
   const { t } = useI18n();
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  /** Increment + direction drives slide-in animation when changing weeks. */
+  const [weekStripSlideKey, setWeekStripSlideKey] = useState(0);
+  const [weekStripSlideDir, setWeekStripSlideDir] = useState<"prev" | "next" | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(() => {
     const n = new Date();
@@ -3169,7 +3172,12 @@ function CalendarView({
     [selectedDate, scheduledItems]
   );
 
-  const shiftWeek = useCallback((dir: number) => {
+  const shiftWeek = useCallback((dir: number, options?: { animate?: boolean }) => {
+    const animate = options?.animate !== false;
+    if (animate) {
+      setWeekStripSlideDir(dir > 0 ? "next" : "prev");
+      setWeekStripSlideKey((k) => k + 1);
+    }
     setSelectedDate((d) => {
       const n = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       n.setDate(n.getDate() + dir * 7);
@@ -3179,7 +3187,16 @@ function CalendarView({
 
   const goToday = useCallback(() => {
     const n = new Date();
-    setSelectedDate(new Date(n.getFullYear(), n.getMonth(), n.getDate()));
+    const target = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    setSelectedDate((prev) => {
+      const wPrev = startOfWeekSunday(prev).getTime();
+      const wNext = startOfWeekSunday(target).getTime();
+      if (wPrev !== wNext) {
+        setWeekStripSlideDir(wNext > wPrev ? "next" : "prev");
+        setWeekStripSlideKey((k) => k + 1);
+      }
+      return target;
+    });
   }, []);
 
   const SWIPE_MIN_PX = 48;
@@ -3249,72 +3266,85 @@ function CalendarView({
       </div>
 
       <div
-        className="bd-calendar-week-strip"
+        className="bd-calendar-week-strip-viewport"
         role="group"
         aria-label={t("items.viewCalendar")}
         onTouchStart={onWeekTouchStart}
         onTouchEnd={onWeekTouchEnd}
         style={{
-          display: "flex",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "stretch",
           touchAction: "pan-y",
           userSelect: "none",
           WebkitUserSelect: "none",
           padding: isMobile ? "0.15rem 0" : "0.25rem 0",
         }}
       >
-        {weekDays.map((d) => {
-          const sel = isSameCalendarDay(d, selectedDate);
-          const letter = d.toLocaleDateString(undefined, { weekday: "narrow" });
-          return (
-            <button
-              key={calendarDateKey(d)}
-              type="button"
-              onClick={() => setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.2rem",
-                padding: "0.35rem 0.1rem",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                borderRadius: 8,
-              }}
-            >
-              <span style={{ fontSize: isMobile ? "0.68rem" : "0.72rem", fontWeight: 500, color: "var(--text-tertiary)", lineHeight: 1 }}>
-                {letter}
-              </span>
-              <span
+        <div
+          key={weekStripSlideKey}
+          className={
+            weekStripSlideKey > 0 && weekStripSlideDir
+              ? weekStripSlideDir === "next"
+                ? "bd-calendar-week-strip-inner bd-calendar-week-strip-inner--in-next"
+                : "bd-calendar-week-strip-inner bd-calendar-week-strip-inner--in-prev"
+              : "bd-calendar-week-strip-inner"
+          }
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "stretch",
+          }}
+        >
+          {weekDays.map((d) => {
+            const sel = isSameCalendarDay(d, selectedDate);
+            const letter = d.toLocaleDateString(undefined, { weekday: "narrow" });
+            return (
+              <button
+                key={calendarDateKey(d)}
+                type="button"
+                onClick={() => setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}
                 style={{
-                  width: isMobile ? 38 : 40,
-                  height: isMobile ? 38 : 40,
-                  borderRadius: "50%",
+                  flex: 1,
+                  minWidth: 0,
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 700,
-                  fontSize: isMobile ? "0.9rem" : "0.95rem",
-                  lineHeight: 1,
-                  ...(sel
-                    ? {
-                        background: "var(--accent)",
-                        color: "var(--bd-dump-mic-fg, #ffffff)",
-                        boxShadow: "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)",
-                      }
-                    : { color: "var(--text-primary)", background: "transparent" }),
+                  gap: "0.2rem",
+                  padding: "0.35rem 0.1rem",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  borderRadius: 8,
                 }}
               >
-                {d.getDate()}
-              </span>
-            </button>
-          );
-        })}
+                <span style={{ fontSize: isMobile ? "0.68rem" : "0.72rem", fontWeight: 500, color: "var(--text-tertiary)", lineHeight: 1 }}>
+                  {letter}
+                </span>
+                <span
+                  style={{
+                    width: isMobile ? 38 : 40,
+                    height: isMobile ? 38 : 40,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: isMobile ? "0.9rem" : "0.95rem",
+                    lineHeight: 1,
+                    ...(sel
+                      ? {
+                          background: "var(--accent)",
+                          color: "var(--bd-dump-mic-fg, #ffffff)",
+                          boxShadow: "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)",
+                        }
+                      : { color: "var(--text-primary)", background: "transparent" }),
+                  }}
+                >
+                  {d.getDate()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isMobile ? (
