@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
@@ -16,6 +25,7 @@ import {
   parseTextViewBlock,
   resolveTextSplitScope,
   splitTextViewBlocks,
+  type TextViewCommitFocus,
 } from "@/lib/text-view-entry-split";
 import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
 
@@ -704,10 +714,10 @@ export function ItemsViewArea({
       });
   }, []);
 
-  const fetchItems = useCallback(() => {
+  const fetchItems = useCallback((): Promise<void> => {
     if (mode === "all") {
       setLoading(true);
-      Promise.all([
+      return Promise.all([
         fetchWithTimeout("/api/organized-items?domain=work").then((d) => d.items || []),
         fetchWithTimeout("/api/organized-items?domain=personal").then((d) => d.items || []),
       ])
@@ -720,14 +730,13 @@ export function ItemsViewArea({
         })
         .catch(() => setItems([]))
         .finally(() => setLoading(false));
-      return;
     }
     const params = new URLSearchParams();
     params.set("domain", mode);
     if (projectId) params.set("projectId", projectId);
     if (category) params.set("category", category);
     setLoading(true);
-    fetchWithTimeout(`/api/organized-items?${params}`)
+    return fetchWithTimeout(`/api/organized-items?${params}`)
       .then((d) => setItems(d.items || []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
@@ -1045,7 +1054,7 @@ export function ItemsViewArea({
   }, []);
 
   const commitTextViewContent = useCallback(
-    async (id: string, raw: string) => {
+    async (id: string, raw: string): Promise<TextViewCommitFocus | void> => {
       const item = items.find((i) => i.id === id);
       if (!item) return;
 
@@ -1105,6 +1114,8 @@ export function ItemsViewArea({
       const okFirst = await patchFirst();
       if (!okFirst) return;
 
+      const secondPart = parts[1];
+
       const resDump = await fetch("/api/dumps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1118,7 +1129,7 @@ export function ItemsViewArea({
       const dumpJson = (await resDump.json()) as { dump?: { id: string } };
       const dumpId = dumpJson.dump?.id;
       if (!dumpId) {
-        fetchItems();
+        await fetchItems();
         return;
       }
 
@@ -1137,8 +1148,23 @@ export function ItemsViewArea({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dumpId, items: batchItems }),
       });
-      if (batchRes.ok) fetchItems();
-      else fetchItems();
+      const batchJson = (await batchRes.json()) as { created?: Array<{ id: string; title: string }> };
+      await fetchItems();
+      if (!batchRes.ok) return;
+      const firstNew = batchJson.created?.[0];
+      if (!firstNew) return;
+      if (showEntryTitles) {
+        return {
+          focusEntryId: firstNew.id,
+          focusField: "title",
+          focusValue: secondPart.title,
+        };
+      }
+      return {
+        focusEntryId: firstNew.id,
+        focusField: "content",
+        focusValue: secondPart.content,
+      };
     },
     [items, mode, projectId, category, showEntryTitles, fetchItems]
   );
@@ -3855,6 +3881,57 @@ function MindmapView({
   );
 }
 
+type ReorderDragPreview = { draggedId: string; overId: string; place: "before" | "after" };
+
+function applyReorderPreview(items: ViewItem[], preview: ReorderDragPreview | null): ViewItem[] {
+  if (!preview) return items;
+  const { draggedId, overId, place } = preview;
+  if (draggedId === overId) return items;
+  const ids = items.map((i) => i.id);
+  const from = ids.indexOf(draggedId);
+  const overIdx = ids.indexOf(overId);
+  if (from < 0 || overIdx < 0) return items;
+  const next = [...ids];
+  next.splice(from, 1);
+  let insertAt = next.indexOf(overId);
+  if (place === "after") insertAt += 1;
+  next.splice(insertAt, 0, draggedId);
+  return next.map((id) => items.find((i) => i.id === id)).filter(Boolean) as ViewItem[];
+}
+
+function mergeDragPlace(e: DragEvent, rowEl: HTMLElement): "before" | "after" {
+  const r = rowEl.getBoundingClientRect();
+  return e.clientY < r.top + r.height / 2 ? "before" : "after";
+}
+
+/** Custom drag snapshot so the row content follows the cursor clearly. */
+function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
+  const row = handleEl.closest("[data-bd-entry-id]") as HTMLElement | null;
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  const clone = row.cloneNode(true) as HTMLElement;
+  const cs = window.getComputedStyle(row);
+  clone.style.cssText = [
+    "position:fixed",
+    "left:-9999px",
+    "top:0",
+    `width:${rect.width}px`,
+    `box-sizing:${cs.boxSizing || "border-box"}`,
+    "opacity:0.96",
+    "pointer-events:none",
+    "z-index:99999",
+    "box-shadow:0 14px 40px rgba(0,0,0,0.2)",
+    "border-radius:12px",
+    "background:var(--bg-elevated)",
+    "color:var(--text-primary)",
+  ].join(";");
+  document.body.appendChild(clone);
+  const ox = Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left));
+  const oy = Math.min(rect.height - 4, Math.max(4, e.clientY - rect.top));
+  e.dataTransfer.setDragImage(clone, ox, oy);
+  window.setTimeout(() => clone.remove(), 0);
+}
+
 function ListView({
   items,
   showEntryTitles = true,
@@ -3878,8 +3955,14 @@ function ListView({
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
+  const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const listItemsOrdered = useMemo(
+    () => (reorderEnabled && reorderPreview ? applyReorderPreview(items, reorderPreview) : items),
+    [items, reorderEnabled, reorderPreview]
+  );
 
   useEffect(() => {
     if (!editing) return;
@@ -3906,19 +3989,17 @@ function ListView({
     }
     setEditing(null);
   };
-  const onDropOnRow = (e: React.DragEvent, targetId: string) => {
+
+  const commitReorderDrop = (e: DragEvent, targetId: string) => {
     e.preventDefault();
     if (!onReorder) return;
     const fromId = e.dataTransfer.getData("text/plain");
-    if (!fromId || fromId === targetId) return;
-    const ids = items.map((i) => i.id);
-    const from = ids.indexOf(fromId);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    const next = [...ids];
-    next.splice(from, 1);
-    next.splice(to, 0, fromId);
-    onReorder(next);
+    if (!fromId) return;
+    const el = e.currentTarget as HTMLElement;
+    const place = mergeDragPlace(e, el);
+    const ordered = applyReorderPreview(items, { draggedId: fromId, overId: targetId, place });
+    onReorder(ordered.map((i) => i.id));
+    setReorderPreview(null);
   };
 
   const renderEntry = (it: ViewItem, index: number) => {
@@ -3952,10 +4033,20 @@ function ListView({
       opacity: taskCompleted ? 0.52 : 1,
     };
 
+    const isDraggingRow = reorderPreview?.draggedId === it.id;
+    const dropHint =
+      reorderPreview &&
+      reorderPreview.draggedId !== it.id &&
+      reorderPreview.overId === it.id &&
+      (reorderPreview.place === "before"
+        ? { boxShadow: "inset 0 3px 0 0 var(--accent)" }
+        : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
+
     return (
       <div
         key={it.id}
         className={`bd-todo-row ${ep.className}`}
+        data-bd-entry-id={it.id}
         onDoubleClick={() => onEdit?.(it)}
         onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
         onDragOver={
@@ -3963,13 +4054,22 @@ function ListView({
             ? (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = "move";
+                setReorderPreview((prev) => {
+                  if (!prev) return prev;
+                  if (prev.draggedId === it.id) return prev;
+                  const place = mergeDragPlace(e, e.currentTarget as HTMLElement);
+                  if (prev.overId === it.id && prev.place === place) return prev;
+                  return { ...prev, overId: it.id, place };
+                });
               }
             : undefined
         }
-        onDrop={reorderEnabled && onReorder ? (e) => onDropOnRow(e, it.id) : undefined}
+        onDrop={reorderEnabled && onReorder ? (e) => commitReorderDrop(e, it.id) : undefined}
         style={{
           ...ep.style,
           cursor: onEdit && (!editing || editing.id !== it.id) ? "pointer" : undefined,
+          opacity: isDraggingRow ? 0.38 : 1,
+          ...dropHint,
         }}
       >
         <div className="bd-todo-row-lead">
@@ -3980,7 +4080,10 @@ function ListView({
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/plain", it.id);
                 e.dataTransfer.effectAllowed = "move";
+                setReorderPreview({ draggedId: it.id, overId: it.id, place: "before" });
+                attachRowDragImage(e, e.currentTarget as HTMLElement);
               }}
+              onDragEnd={() => setReorderPreview(null)}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               title={t("items.dragToReorder")}
@@ -4181,7 +4284,7 @@ function ListView({
         boxSizing: "border-box",
       }}
     >
-      <div className="bd-todo-list-card">{items.map((it, idx) => renderEntry(it, idx))}</div>
+      <div className="bd-todo-list-card">{listItemsOrdered.map((it, idx) => renderEntry(it, idx))}</div>
     </div>
   );
 }
@@ -4198,16 +4301,23 @@ function TextView({
   items: ViewItem[];
   showEntryTitles?: boolean;
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
-  /** Text view: blur commits full textarea; double line breaks split into new entries. */
-  onCommitTextContent?: (id: string, raw: string) => void | Promise<void>;
+  /** Text view: blur commits full textarea; double line breaks split into new entries (also on input). */
+  onCommitTextContent?: (id: string, raw: string) => void | Promise<TextViewCommitFocus | void>;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   reorderEnabled?: boolean;
   onReorder?: (orderedIds: string[]) => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
+  const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textSplitCommitLockRef = useRef(false);
+
+  const textItemsOrdered = useMemo(
+    () => (reorderEnabled && reorderPreview ? applyReorderPreview(items, reorderPreview) : items),
+    [items, reorderEnabled, reorderPreview]
+  );
 
   useEffect(() => {
     if (!editing) return;
@@ -4230,7 +4340,22 @@ function TextView({
 
   const handleContentBlur = (id: string, value: string, current: string) => {
     if (onCommitTextContent) {
-      void Promise.resolve(onCommitTextContent(id, value)).finally(() => setEditing(null));
+      if (textSplitCommitLockRef.current) return;
+      void Promise.resolve(onCommitTextContent(id, value)).then((focus) => {
+        if (focus?.focusEntryId) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setEditing({
+                id: focus.focusEntryId,
+                field: focus.focusField,
+                value: focus.focusValue,
+              });
+            });
+          });
+        } else {
+          setEditing(null);
+        }
+      });
       return;
     }
     handleBlur(id, "content", value, current);
@@ -4245,19 +4370,16 @@ function TextView({
     return `${title}\n${body}`;
   };
 
-  const onDropOnRow = (e: React.DragEvent, targetId: string) => {
+  const commitTextReorderDrop = (e: DragEvent, targetId: string) => {
     e.preventDefault();
     if (!onReorder) return;
     const fromId = e.dataTransfer.getData("text/plain");
-    if (!fromId || fromId === targetId) return;
-    const ids = items.map((i) => i.id);
-    const from = ids.indexOf(fromId);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    const next = [...ids];
-    next.splice(from, 1);
-    next.splice(to, 0, fromId);
-    onReorder(next);
+    if (!fromId) return;
+    const el = e.currentTarget as HTMLElement;
+    const place = mergeDragPlace(e, el);
+    const ordered = applyReorderPreview(items, { draggedId: fromId, overId: targetId, place });
+    onReorder(ordered.map((i) => i.id));
+    setReorderPreview(null);
   };
 
   return (
@@ -4275,16 +4397,25 @@ function TextView({
         boxSizing: "border-box",
       }}
     >
-      {items.map((it, i) => {
+      {textItemsOrdered.map((it, i) => {
         const ep = enterStaggerProps(i);
         const isEditingTitle = editing?.id === it.id && editing?.field === "title";
         const isEditingContent = editing?.id === it.id && editing?.field === "content";
         const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
         const isNew = isNewEntry(it);
+        const isDraggingRow = reorderPreview?.draggedId === it.id;
+        const dropHint =
+          reorderPreview &&
+          reorderPreview.draggedId !== it.id &&
+          reorderPreview.overId === it.id &&
+          (reorderPreview.place === "before"
+            ? { boxShadow: "inset 0 3px 0 0 var(--accent)" }
+            : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
         return (
           <div
             key={it.id}
             className={ep.className}
+            data-bd-entry-id={it.id}
             style={{
               ...ep.style,
               display: "flex",
@@ -4292,16 +4423,25 @@ function TextView({
               background: "transparent",
               gap: "0.45rem",
               alignItems: "stretch",
+              opacity: isDraggingRow ? 0.38 : 1,
+              ...dropHint,
             }}
             onDragOver={
               reorderEnabled && onReorder
                 ? (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
+                    setReorderPreview((prev) => {
+                      if (!prev) return prev;
+                      if (prev.draggedId === it.id) return prev;
+                      const place = mergeDragPlace(e, e.currentTarget as HTMLElement);
+                      if (prev.overId === it.id && prev.place === place) return prev;
+                      return { ...prev, overId: it.id, place };
+                    });
                   }
                 : undefined
             }
-            onDrop={reorderEnabled && onReorder ? (e) => onDropOnRow(e, it.id) : undefined}
+            onDrop={reorderEnabled && onReorder ? (e) => commitTextReorderDrop(e, it.id) : undefined}
           >
             {reorderEnabled && onReorder ? (
               <span
@@ -4310,7 +4450,10 @@ function TextView({
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", it.id);
                   e.dataTransfer.effectAllowed = "move";
+                  setReorderPreview({ draggedId: it.id, overId: it.id, place: "before" });
+                  attachRowDragImage(e, e.currentTarget as HTMLElement);
                 }}
+                onDragEnd={() => setReorderPreview(null)}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 title={t("items.dragToReorder")}
@@ -4416,7 +4559,32 @@ function TextView({
                       ? mergeTitleAndContent(it)
                       : (it.content ?? "")
                 }
-                onChange={(e) => setEditing((prev) => prev ? { ...prev, value: e.target.value } : null)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setEditing((prev) => (prev ? { ...prev, value: next } : null));
+                  if (!onCommitTextContent) return;
+                  if (splitTextViewBlocks(next).length < 2) return;
+                  textSplitCommitLockRef.current = true;
+                  void Promise.resolve(onCommitTextContent(it.id, next))
+                    .then((focus) => {
+                      if (focus?.focusEntryId) {
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            setEditing({
+                              id: focus.focusEntryId,
+                              field: focus.focusField,
+                              value: focus.focusValue,
+                            });
+                          });
+                        });
+                      } else {
+                        setEditing({ id: it.id, field: "content", value: next });
+                      }
+                    })
+                    .finally(() => {
+                      textSplitCommitLockRef.current = false;
+                    });
+                }}
                 onBlur={() =>
                   editing &&
                   handleContentBlur(

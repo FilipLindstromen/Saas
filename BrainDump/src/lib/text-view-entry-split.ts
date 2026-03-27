@@ -2,14 +2,20 @@ import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 
 export type TextViewEntryPart = { title: string; content: string };
 
+/** Returned after text-view commit splits the textarea into a new entry; drives focus to the new row. */
+export type TextViewCommitFocus = {
+  focusEntryId: string;
+  focusField: "title" | "content";
+  focusValue: string;
+};
+
 const PERSONAL_AREA_SET = new Set(PERSONAL_AREA_DEFAULTS);
 
-/** Split on blank lines (double line break). */
+/** Split on blank lines (double line break). Keeps empty trailing segments so Enter twice can start a new blank entry. */
 export function splitTextViewBlocks(raw: string): string[] {
-  return raw
-    .split(/\n\s*\n/)
-    .map((b) => b.trim())
-    .filter((b) => b.length > 0);
+  const parts = raw.split(/\n\s*\n/).map((b) => b.trim());
+  if (parts.length >= 2) return parts;
+  return parts.filter((b) => b.length > 0);
 }
 
 /**
