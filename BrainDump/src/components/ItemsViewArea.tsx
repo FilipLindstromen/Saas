@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
@@ -33,18 +32,6 @@ function toolbarChipProps(i: number): { className: string; style: CSSProperties 
     className: "bd-btn bd-toolbar-chip",
     style: { ["--bd-i" as string]: Math.min(Math.max(i, 0), 14) },
   };
-}
-
-function getStoredOpenAIKey(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    if (!raw) return "";
-    const parsed = JSON.parse(raw);
-    return (parsed.openai ?? "").trim();
-  } catch {
-    return "";
-  }
 }
 
 function viewChipProps(i: number): { className: string; style: CSSProperties } {
@@ -84,6 +71,7 @@ export interface ViewItem {
   project?: { id: string; name: string } | null;
   tags?: { tag: { name: string } }[];
   priority?: number | null;
+  listOrder?: number | null;
 }
 
 interface ItemsViewAreaProps {
@@ -447,6 +435,15 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
   return items.filter((it) => it.itemType === itemType);
 }
 
+function sortItemsByListOrder(list: ViewItem[]): ViewItem[] {
+  return [...list].sort((a, b) => {
+    const ao = a.listOrder ?? 0;
+    const bo = b.listOrder ?? 0;
+    if (ao !== bo) return ao - bo;
+    return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+  });
+}
+
 export function ItemsViewArea({
   mode,
   projectId,
@@ -476,15 +473,17 @@ export function ItemsViewArea({
     };
   }, []);
   const filteredItems = useMemo(
-    () => filterItemsBySearch(filterItemsByType(items, itemType), searchFilter),
+    () =>
+      sortItemsByListOrder(filterItemsBySearch(filterItemsByType(items, itemType), searchFilter)),
     [items, itemType, searchFilter, newBatchTick]
   );
+
+  const canReorderEntries = !searchFilter.trim();
 
   const [suggestedItemTypesFromDump, setSuggestedItemTypesFromDump] = useState<SuggestedItemTypeDetail[]>([]);
   const [internalViewType, setInternalViewType] = useState<ItemsViewType>(loadViewPreference);
   const viewType = controlledViewType ?? internalViewType;
   const setViewType = onViewTypeChange ?? setInternalViewType;
-  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [postitPositions, setPostitPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
   const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
@@ -514,7 +513,6 @@ export function ItemsViewArea({
   } | null>(null);
   const [addEntryOpen, setAddEntryOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [viewPickerOpen, setViewPickerOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [addEntryForm, setAddEntryForm] = useState({
     itemType: "note",
@@ -569,7 +567,6 @@ export function ItemsViewArea({
         body: JSON.stringify({
           locale,
           items: payloadItems,
-          apiKey: getStoredOpenAIKey(),
         }),
       });
       const data = (await res.json()) as { suggestions?: { title: string; reason: string }[]; error?: string };
@@ -634,10 +631,6 @@ export function ItemsViewArea({
   ]);
 
   useEffect(() => {
-    if (!isMobile) setViewPickerOpen(false);
-  }, [isMobile]);
-
-  useEffect(() => {
     if (!isMobile) setTypePickerOpen(false);
   }, [isMobile]);
 
@@ -670,8 +663,7 @@ export function ItemsViewArea({
           if (category) {
             merged = merged.filter((it) => it.category === category);
           }
-          merged.sort((a, b) => new Date((b as { createdAt?: string }).createdAt ?? 0).getTime() - new Date((a as { createdAt?: string }).createdAt ?? 0).getTime());
-          setItems(merged);
+          setItems(sortItemsByListOrder(merged as ViewItem[]));
         })
         .catch(() => setItems([]))
         .finally(() => setLoading(false));
@@ -691,6 +683,29 @@ export function ItemsViewArea({
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  const reorderEntriesPersist = useCallback(
+    (visibleOrderedIds: string[]) => {
+      if (!visibleOrderedIds.length) return;
+      const byId = new Map(items.map((i) => [i.id, i]));
+      if (visibleOrderedIds.some((id) => !byId.has(id))) return;
+      const visibleSet = new Set(visibleOrderedIds);
+      const tail = sortItemsByListOrder(items.filter((i) => !visibleSet.has(i.id)));
+      const head = visibleOrderedIds.map((id) => byId.get(id)!);
+      const merged = [...head, ...tail];
+      const gap = 1000;
+      const withOrder = merged.map((it, i) => ({ ...it, listOrder: i * gap }));
+      setItems(withOrder);
+      void fetch("/api/organized-items/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: withOrder.map((i) => i.id) }),
+      }).then((r) => {
+        if (!r.ok) fetchItems();
+      });
+    },
+    [items, fetchItems]
+  );
 
   useEffect(() => {
     const onReload = () => fetchItems();
@@ -1126,6 +1141,16 @@ export function ItemsViewArea({
       if (form.itemType === "shopping" && form.scheduledAt?.trim()) {
         const d = dateOnlyToStartOfDay(form.scheduledAt.trim());
         if (d) payload.scheduledAt = d.toISOString();
+        payload.scheduledTime = form.scheduledTime?.trim() || null;
+        payload.sendNotification = form.sendNotification;
+        const rMin = normalizeReminderMinutesBefore(form.reminderMinutesBefore ?? 0);
+        if (form.sendNotification) {
+          const at = localDateTimeToDate(form.scheduledAt.trim(), form.scheduledTime || undefined);
+          if (at) {
+            payload.reminderAt = at.toISOString();
+            payload.reminderMinutesBefore = rMin;
+          }
+        }
       }
       if (
         (form.itemType === "task" || form.itemType === "task_completed") &&
@@ -1133,6 +1158,16 @@ export function ItemsViewArea({
       ) {
         const d = dateOnlyToStartOfDay(form.scheduledAt.trim());
         if (d) payload.scheduledAt = d.toISOString();
+        payload.scheduledTime = form.scheduledTime?.trim() || null;
+        payload.sendNotification = form.sendNotification;
+        const rMin = normalizeReminderMinutesBefore(form.reminderMinutesBefore ?? 0);
+        if (form.sendNotification) {
+          const at = localDateTimeToDate(form.scheduledAt.trim(), form.scheduledTime || undefined);
+          if (at) {
+            payload.reminderAt = at.toISOString();
+            payload.reminderMinutesBefore = rMin;
+          }
+        }
       }
       const resItem = await fetch("/api/organized-items", {
         method: "POST",
@@ -1173,8 +1208,8 @@ export function ItemsViewArea({
       .catch(() => {});
   }, []);
 
-  /** Advance notification for calendar (matches server / organize). */
-  const CALENDAR_NOTIFY_BEFORE_OPTIONS = [60, 30, 10, 0] as const;
+  /** Notify-before options for calendar and deadline (matches server: 0, 10, 30, 60). */
+  const NOTIFY_BEFORE_EVENT_OPTIONS = [10, 30, 60, 0] as const;
   const REMINDER_MINUTES_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
   const updateReminder = useCallback(
     (id: string, reminderDate: string, reminderTime: string, reminderMinutesBefore: number) => {
@@ -1258,9 +1293,19 @@ export function ItemsViewArea({
       if (currentItem && (currentItem.itemType === "shopping" || isTaskRow(currentItem))) {
         const due = ed.scheduledAt?.trim();
         const dt = due ? dateOnlyToStartOfDay(due) : null;
+        const timeStr = ed.scheduledTime?.trim() || "";
+        const rMin = normalizeReminderMinutesBefore(ed.reminderMinutesBefore ?? 0);
+        let reminderAtIso: string | null = null;
+        if (due && ed.sendNotification) {
+          const eventDt = localDateTimeToDate(due, timeStr || undefined);
+          reminderAtIso = eventDt ? eventDt.toISOString() : null;
+        }
         updateSchedule(ed.id, {
           scheduledAt: dt ? dt.toISOString() : null,
-          scheduledTime: ed.scheduledTime?.trim() ? ed.scheduledTime.trim() : null,
+          scheduledTime: timeStr || null,
+          sendNotification: due ? (ed.sendNotification ?? false) : false,
+          reminderAt: due && ed.sendNotification && reminderAtIso ? reminderAtIso : null,
+          reminderMinutesBefore: due && ed.sendNotification && reminderAtIso ? rMin : null,
         });
       }
     },
@@ -1295,12 +1340,6 @@ export function ItemsViewArea({
     [t]
   );
 
-  const [bottomViewSlotEl, setBottomViewSlotEl] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (typeof document === "undefined") return;
-    setBottomViewSlotEl(document.getElementById("bd-bottom-view-slot"));
-  }, []);
-
   const editSheetScopeLabel = useMemo(() => {
     if (mode === "work") {
       return !projectId ? t("scope.all") : projectsList.find((p) => p.id === projectId)?.name ?? t("scope.all");
@@ -1321,36 +1360,6 @@ export function ItemsViewArea({
 
   const mobileModesToolbar = mode === "work" || mode === "personal" || mode === "all";
   const showUnifiedMobileChrome = Boolean(isMobile && mobileModesToolbar && scopeSlot);
-
-  const mobileViewPickerButton = (
-    <button
-      type="button"
-      className="bd-btn bd-bottom-view-btn"
-      aria-haspopup="listbox"
-      aria-expanded={viewPickerOpen}
-      aria-label={t("items.openViewMenu")}
-      title={viewButtons.find((b) => b.value === viewType)?.label}
-      onClick={() => setViewPickerOpen(true)}
-      style={{
-        flexShrink: 0,
-        minWidth: 44,
-        minHeight: 44,
-        width: 44,
-        padding: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bd-chrome-selected-bg)",
-        borderColor: "var(--bd-chrome-selected-border)",
-        color: "var(--bd-chrome-selected-text)",
-        boxShadow: "none",
-      }}
-    >
-      <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-        {viewButtons.find((b) => b.value === viewType)?.icon}
-      </span>
-    </button>
-  );
 
   const mobileToolbarCompactInner = (
     <>
@@ -1417,7 +1426,6 @@ export function ItemsViewArea({
 
   return (
     <div className="bd-items-view-root">
-      {isMobile && bottomViewSlotEl && createPortal(mobileViewPickerButton, bottomViewSlotEl)}
       {showUnifiedMobileChrome && (
         <div className="bd-mobile-unified-chrome">
           <div className="bd-mobile-unified-chrome__scope">{scopeSlot}</div>
@@ -1603,94 +1611,6 @@ export function ItemsViewArea({
         )}
       </div>
       )}
-        {isMobile && viewPickerOpen && (
-          <div
-            className="bd-items-sheet-backdrop"
-            onClick={() => setViewPickerOpen(false)}
-          >
-            <div
-              className="bd-panel bd-items-sheet-panel"
-              onClick={(e) => e.stopPropagation()}
-              role="listbox"
-              aria-label={t("items.chooseView")}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 5,
-                  borderRadius: 999,
-                  background: "var(--border-strong)",
-                  margin: "0 auto 0.85rem",
-                  opacity: 0.85,
-                }}
-                aria-hidden
-              />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.75rem" }}>
-                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("items.chooseView")}</h3>
-                <button
-                  type="button"
-                  className="bd-btn"
-                  onClick={() => setViewPickerOpen(false)}
-                  aria-label={t("scope.cancel")}
-                  style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {viewButtons.map(({ value, label, icon }, i) => {
-                  const sel = viewType === value;
-                  const vc = viewChipProps(i);
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`bd-btn ${vc.className}`.trim()}
-                      role="option"
-                      aria-selected={sel}
-                      title={label}
-                      onClick={() => {
-                        setViewType(value);
-                        setViewPickerOpen(false);
-                      }}
-                      style={{
-                        ...vc.style,
-                        minHeight: 52,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "0.75rem",
-                        padding: "0.5rem 0.75rem",
-                        background: sel ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
-                        color: sel ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
-                        borderColor: sel ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0, flex: 1 }}>
-                        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-hidden>
-                          {icon}
-                        </span>
-                        <span style={{ fontSize: "0.9375rem", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {label}
-                        </span>
-                      </span>
-                      {sel ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <span style={{ width: 18 }} aria-hidden />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
         {isMobile && typePickerOpen && onItemTypeSelect && mobileModesToolbar && (
           <div
             className="bd-items-sheet-backdrop"
@@ -1790,6 +1710,8 @@ export function ItemsViewArea({
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
           onEdit={(it) => setEditingEntry(toEditEntry(it))}
           onUpdate={updateEntryContent}
+          reorderEnabled={canReorderEntries}
+          onReorder={reorderEntriesPersist}
         />
       ) : viewType === "text" ? (
         <TextView
@@ -1798,6 +1720,8 @@ export function ItemsViewArea({
           onUpdate={updateEntryContent}
           onCommitTextContent={commitTextViewContent}
           onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+          reorderEnabled={canReorderEntries}
+          onReorder={reorderEntriesPersist}
         />
       ) : viewType === "kanban" ? (
             <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
@@ -1856,7 +1780,7 @@ export function ItemsViewArea({
               position: isMobile ? "relative" : "fixed",
               left: isMobile ? undefined : itemContextMenu.x,
               top: isMobile ? undefined : itemContextMenu.y,
-              zIndex: 1000,
+              zIndex: "var(--bd-z-dropdown)",
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
               borderRadius: isMobile ? "16px" : "var(--button-radius)",
@@ -1952,7 +1876,7 @@ export function ItemsViewArea({
                   position: "fixed",
                   left: itemContextMenu.x + 148,
                   top: itemContextMenu.y,
-                  zIndex: 1001,
+                  zIndex: "calc(var(--bd-z-dropdown) + 1)",
                   background: "var(--bg-elevated)",
                   border: "1px solid var(--border-default)",
                   borderRadius: "var(--button-radius)",
@@ -2016,7 +1940,7 @@ export function ItemsViewArea({
                     position: "fixed",
                     left: itemContextMenu.x + 148,
                     top: itemContextMenu.y,
-                    zIndex: 1001,
+                    zIndex: "calc(var(--bd-z-dropdown) + 1)",
                     background: "var(--bg-elevated)",
                     border: "1px solid var(--border-default)",
                     borderRadius: "var(--button-radius)",
@@ -2292,16 +2216,58 @@ export function ItemsViewArea({
                       <button
                         type="button"
                         className="bd-btn"
-                        onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "", scheduledTime: "" })}
+                        onClick={() =>
+                          setEditingEntry((prev) =>
+                            prev && { ...prev, scheduledAt: "", scheduledTime: "", sendNotification: false }
+                          )
+                        }
                       >
                         {t("items.clearDueDate")}
                       </button>
+                      {editingEntry.scheduledAt?.trim() ? (
+                        <>
+                          <label className="bd-edit-entry-inline-check">
+                            <input
+                              type="checkbox"
+                              checked={editingEntry.sendNotification ?? false}
+                              onChange={(e) =>
+                                setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })
+                              }
+                            />
+                            {t("items.editSendNotification")}
+                          </label>
+                          {editingEntry.sendNotification ? (
+                            <label className="bd-edit-entry-field-label">
+                              {t("items.editNotifyBefore")}
+                              <select
+                                className="bd-input"
+                                value={editingEntry.reminderMinutesBefore ?? 30}
+                                onChange={(e) =>
+                                  setEditingEntry((prev) =>
+                                    prev ? { ...prev, reminderMinutesBefore: Number(e.target.value) } : null
+                                  )
+                                }
+                              >
+                                {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
+                                  <option key={m} value={m}>
+                                    {m === 0
+                                      ? t("items.notifyAtDeadlineOrEvent")
+                                      : m === 60
+                                        ? t("items.notifyOneHourBefore")
+                                        : t("items.minutesBefore", { n: m })}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   {editEntryScheduleOpen && ei?.itemType === "calendar" ? (
                     <div className="bd-edit-entry-mobile-schedule-fields bd-edit-entry-mobile-calendar-fields">
                       <label className="bd-edit-entry-field-label">
-                        Date
+                        {t("items.editCalendarDate")}
                         <input
                           type="date"
                           className="bd-input"
@@ -2310,7 +2276,7 @@ export function ItemsViewArea({
                         />
                       </label>
                       <label className="bd-edit-entry-field-label">
-                        Time
+                        {t("items.editCalendarTime")}
                         <input
                           type="time"
                           className="bd-input"
@@ -2319,16 +2285,16 @@ export function ItemsViewArea({
                         />
                       </label>
                       <label className="bd-edit-entry-field-label">
-                        Repeats
+                        {t("items.editCalendarRepeats")}
                         <select
                           className="bd-input"
                           value={editingEntry.recurrence ?? "none"}
                           onChange={(e) => setEditingEntry((prev) => prev && { ...prev, recurrence: e.target.value })}
                         >
-                          <option value="none">None</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="monthly">Monthly</option>
+                          <option value="none">{t("items.recurrenceNone")}</option>
+                          <option value="daily">{t("items.recurrenceDaily")}</option>
+                          <option value="weekly">{t("items.recurrenceWeekly")}</option>
+                          <option value="monthly">{t("items.recurrenceMonthly")}</option>
                         </select>
                       </label>
                       <label className="bd-edit-entry-inline-check">
@@ -2337,11 +2303,11 @@ export function ItemsViewArea({
                           checked={editingEntry.sendNotification ?? false}
                           onChange={(e) => setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })}
                         />
-                        Send notification
+                        {t("items.editSendNotification")}
                       </label>
                       {editingEntry.sendNotification ? (
                         <label className="bd-edit-entry-field-label">
-                          Notify before event
+                          {t("items.editNotifyBefore")}
                           <select
                             className="bd-input"
                             value={editingEntry.reminderMinutesBefore ?? 30}
@@ -2351,9 +2317,13 @@ export function ItemsViewArea({
                               )
                             }
                           >
-                            {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                            {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
                               <option key={m} value={m}>
-                                {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                                {m === 0
+                                  ? t("items.notifyAtDeadlineOrEvent")
+                                  : m === 60
+                                    ? t("items.notifyOneHourBefore")
+                                    : t("items.minutesBefore", { n: m })}
                               </option>
                             ))}
                           </select>
@@ -2380,60 +2350,6 @@ export function ItemsViewArea({
                 </>
               );
             })()}
-          </div>
-          <div className="bd-edit-entry-mobile-accessory">
-            <div className="bd-edit-entry-accessory-pill">
-              <button
-                type="button"
-                className="bd-edit-entry-accessory-icon"
-                aria-label={t("items.editTag")}
-                disabled
-                style={{ opacity: 0.45 }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-                  <path d="M7 7h.01" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="bd-edit-entry-accessory-icon"
-                aria-label={t("items.editInsertList")}
-                onClick={() => {
-                  const el = editEntryContentRef.current;
-                  const start = el?.selectionStart ?? editingEntry.content.length;
-                  const ins = "\n• ";
-                  const v = editingEntry.content;
-                  const next = v.slice(0, start) + ins + v.slice(start);
-                  setEditingEntry((p) => (p ? { ...p, content: next } : null));
-                  requestAnimationFrame(() => {
-                    if (!el) return;
-                    el.focus();
-                    const pos = start + ins.length;
-                    el.selectionStart = el.selectionEnd = pos;
-                  });
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <line x1="8" y1="6" x2="21" y2="6" />
-                  <line x1="8" y1="12" x2="21" y2="12" />
-                  <line x1="8" y1="18" x2="21" y2="18" />
-                  <line x1="3" y1="6" x2="3.01" y2="6" />
-                  <line x1="3" y1="12" x2="3.01" y2="12" />
-                  <line x1="3" y1="18" x2="3.01" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <button
-              type="button"
-              className="bd-edit-entry-icon-btn"
-              aria-label={t("items.editDismissKeyboard")}
-              onClick={() => (document.activeElement as HTMLElement | null)?.blur?.()}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
           </div>
           {editEntryMoreOpen ? (
             <div
@@ -2532,21 +2448,96 @@ export function ItemsViewArea({
                         boxSizing: "border-box",
                       }}
                     />
+                    <input
+                      type="time"
+                      className="bd-input"
+                      value={editingEntry.scheduledTime ?? ""}
+                      onChange={(e) => setEditingEntry((prev) => prev && { ...prev, scheduledTime: e.target.value })}
+                      style={{
+                        padding: "0.35rem 0.5rem",
+                        fontSize: isMobile ? "max(1rem, 16px)" : "0.8125rem",
+                        width: isMobile ? "100%" : "auto",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                      }}
+                    />
                     <button
                       type="button"
                       className="bd-btn"
                       style={{ fontSize: "0.75rem" }}
-                      onClick={() => setEditingEntry((prev) => prev && { ...prev, scheduledAt: "" })}
+                      onClick={() =>
+                        setEditingEntry((prev) =>
+                          prev && { ...prev, scheduledAt: "", scheduledTime: "", sendNotification: false }
+                        )
+                      }
                     >
                       {t("items.clearDueDate")}
                     </button>
                   </div>
+                  {editingEntry.scheduledAt?.trim() ? (
+                    <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          fontSize: "0.75rem",
+                          color: "var(--text-tertiary)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingEntry.sendNotification ?? false}
+                          onChange={(e) =>
+                            setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })
+                          }
+                        />
+                        {t("items.editSendNotification")}
+                      </label>
+                      {editingEntry.sendNotification ? (
+                        <label
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--text-tertiary)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.25rem",
+                            maxWidth: "16rem",
+                          }}
+                        >
+                          {t("items.editNotifyBefore")}
+                          <select
+                            className="bd-input"
+                            value={editingEntry.reminderMinutesBefore ?? 30}
+                            onChange={(e) =>
+                              setEditingEntry((prev) =>
+                                prev ? { ...prev, reminderMinutesBefore: Number(e.target.value) } : null
+                              )
+                            }
+                            style={{ padding: "0.25rem 0.5rem" }}
+                          >
+                            {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
+                              <option key={m} value={m}>
+                                {m === 0
+                                  ? t("items.notifyAtDeadlineOrEvent")
+                                  : m === 60
+                                    ? t("items.notifyOneHourBefore")
+                                    : t("items.minutesBefore", { n: m })}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               );
             })()}
             {items.find((i) => i.id === editingEntry.id)?.itemType === "calendar" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Calendar</h4>
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
+                  {t("items.viewCalendar")}
+                </h4>
                 <div
                   style={{
                     display: "flex",
@@ -2567,7 +2558,7 @@ export function ItemsViewArea({
                       width: isMobile ? "100%" : "auto",
                     }}
                   >
-                    Date
+                    {t("items.editCalendarDate")}
                     <input
                       type="date"
                       className="bd-input"
@@ -2593,7 +2584,7 @@ export function ItemsViewArea({
                       width: isMobile ? "100%" : "auto",
                     }}
                   >
-                    Time
+                    {t("items.editCalendarTime")}
                     <input
                       type="time"
                       className="bd-input"
@@ -2619,7 +2610,7 @@ export function ItemsViewArea({
                       width: isMobile ? "100%" : "auto",
                     }}
                   >
-                    Repeats
+                    {t("items.editCalendarRepeats")}
                     <select
                       className="bd-input"
                       value={editingEntry.recurrence ?? "none"}
@@ -2632,10 +2623,10 @@ export function ItemsViewArea({
                         boxSizing: "border-box",
                       }}
                     >
-                      <option value="none">None</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
+                      <option value="none">{t("items.recurrenceNone")}</option>
+                      <option value="daily">{t("items.recurrenceDaily")}</option>
+                      <option value="weekly">{t("items.recurrenceWeekly")}</option>
+                      <option value="monthly">{t("items.recurrenceMonthly")}</option>
                     </select>
                   </label>
                   <label
@@ -2655,7 +2646,7 @@ export function ItemsViewArea({
                       onChange={(e) => setEditingEntry((prev) => prev && { ...prev, sendNotification: e.target.checked })}
                       style={{ width: isMobile ? 22 : undefined, height: isMobile ? 22 : undefined }}
                     />
-                    Send notification
+                    {t("items.editSendNotification")}
                   </label>
                   {editingEntry.sendNotification && (
                     <label
@@ -2669,7 +2660,7 @@ export function ItemsViewArea({
                         width: isMobile ? "100%" : "auto",
                       }}
                     >
-                      Notify before event
+                      {t("items.editNotifyBefore")}
                       <select
                         className="bd-input"
                         value={editingEntry.reminderMinutesBefore ?? 30}
@@ -2680,9 +2671,13 @@ export function ItemsViewArea({
                         }
                         style={{ padding: "0.25rem 0.5rem", width: isMobile ? "100%" : "auto", boxSizing: "border-box" }}
                       >
-                        {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                        {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
                           <option key={m} value={m}>
-                            {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                            {m === 0
+                              ? t("items.notifyAtDeadlineOrEvent")
+                              : m === 60
+                                ? t("items.notifyOneHourBefore")
+                                : t("items.minutesBefore", { n: m })}
                           </option>
                         ))}
                       </select>
@@ -2922,7 +2917,7 @@ export function ItemsViewArea({
                 <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
                   {addEntryForm.itemType === "shopping" ? t("items.taskDueDate") : t("items.taskDeadline")}
                 </h4>
-                <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
                   <input
                     type="date"
                     className="bd-input"
@@ -2930,15 +2925,59 @@ export function ItemsViewArea({
                     onChange={(e) => setAddEntryForm((f) => ({ ...f, scheduledAt: e.target.value }))}
                     style={{ padding: "0.35rem 0.5rem", maxWidth: "12rem" }}
                   />
-                </label>
+                  <input
+                    type="time"
+                    className="bd-input"
+                    value={addEntryForm.scheduledTime}
+                    onChange={(e) => setAddEntryForm((f) => ({ ...f, scheduledTime: e.target.value }))}
+                    style={{ padding: "0.35rem 0.5rem" }}
+                  />
+                </div>
+                {addEntryForm.scheduledAt?.trim() ? (
+                  <div style={{ marginTop: "0.65rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+                      <input
+                        type="checkbox"
+                        checked={addEntryForm.sendNotification}
+                        onChange={(e) => setAddEntryForm((f) => ({ ...f, sendNotification: e.target.checked }))}
+                      />
+                      {t("items.editSendNotification")}
+                    </label>
+                    {addEntryForm.sendNotification ? (
+                      <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.25rem", maxWidth: "16rem" }}>
+                        {t("items.editNotifyBefore")}
+                        <select
+                          className="bd-input"
+                          value={addEntryForm.reminderMinutesBefore}
+                          onChange={(e) =>
+                            setAddEntryForm((f) => ({ ...f, reminderMinutesBefore: Number(e.target.value) }))
+                          }
+                          style={{ padding: "0.25rem 0.5rem" }}
+                        >
+                          {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
+                            <option key={m} value={m}>
+                              {m === 0
+                                ? t("items.notifyAtDeadlineOrEvent")
+                                : m === 60
+                                  ? t("items.notifyOneHourBefore")
+                                  : t("items.minutesBefore", { n: m })}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             )}
             {addEntryForm.itemType === "calendar" && (
               <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "0.75rem", marginBottom: "1rem" }}>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>Calendar</h4>
+                <h4 style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 0.5rem" }}>
+                  {t("items.viewCalendar")}
+                </h4>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", alignItems: "center" }}>
                   <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
-                    Date
+                    {t("items.editCalendarDate")}
                     <input
                       type="date"
                       className="bd-input"
@@ -2948,7 +2987,7 @@ export function ItemsViewArea({
                     />
                   </label>
                   <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
-                    Time
+                    {t("items.editCalendarTime")}
                     <input
                       type="time"
                       className="bd-input"
@@ -2958,17 +2997,17 @@ export function ItemsViewArea({
                     />
                   </label>
                   <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
-                    Repeats
+                    {t("items.editCalendarRepeats")}
                     <select
                       className="bd-input"
                       value={addEntryForm.recurrence}
                       onChange={(e) => setAddEntryForm((f) => ({ ...f, recurrence: e.target.value }))}
                       style={{ marginLeft: "0.35rem", padding: "0.25rem 0.5rem" }}
                     >
-                      <option value="none">None</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
+                      <option value="none">{t("items.recurrenceNone")}</option>
+                      <option value="daily">{t("items.recurrenceDaily")}</option>
+                      <option value="weekly">{t("items.recurrenceWeekly")}</option>
+                      <option value="monthly">{t("items.recurrenceMonthly")}</option>
                     </select>
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
@@ -2977,11 +3016,11 @@ export function ItemsViewArea({
                       checked={addEntryForm.sendNotification}
                       onChange={(e) => setAddEntryForm((f) => ({ ...f, sendNotification: e.target.checked }))}
                     />
-                    Send notification
+                    {t("items.editSendNotification")}
                   </label>
                   {addEntryForm.sendNotification && (
                     <label style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", gap: "0.25rem", minWidth: "12rem" }}>
-                      Notify before event
+                      {t("items.editNotifyBefore")}
                       <select
                         className="bd-input"
                         value={addEntryForm.reminderMinutesBefore}
@@ -2990,9 +3029,13 @@ export function ItemsViewArea({
                         }
                         style={{ padding: "0.25rem 0.5rem" }}
                       >
-                        {CALENDAR_NOTIFY_BEFORE_OPTIONS.map((m) => (
+                        {NOTIFY_BEFORE_EVENT_OPTIONS.map((m) => (
                           <option key={m} value={m}>
-                            {m === 0 ? "At event time only" : m === 60 ? "1 hour before" : `${m} minutes before`}
+                            {m === 0
+                              ? t("items.notifyAtDeadlineOrEvent")
+                              : m === 60
+                                ? t("items.notifyOneHourBefore")
+                                : t("items.minutesBefore", { n: m })}
                           </option>
                         ))}
                       </select>
@@ -3781,8 +3824,6 @@ function MindmapView({
   );
 }
 
-const LIST_VIEW_TYPE_ORDER = ["task", "task_completed", "shopping", "note", "idea", "calendar", "reflection", "emotion"];
-
 function ListView({
   items,
   showEntryTitles = true,
@@ -3791,6 +3832,8 @@ function ListView({
   onItemContextMenu,
   onEdit,
   onUpdate,
+  reorderEnabled = false,
+  onReorder,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -3799,6 +3842,8 @@ function ListView({
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   onEdit?: (item: ViewItem) => void;
   onUpdate?: (id: string, updates: { title?: string; content?: string }) => void;
+  reorderEnabled?: boolean;
+  onReorder?: (orderedIds: string[]) => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
@@ -3830,14 +3875,20 @@ function ListView({
     }
     setEditing(null);
   };
-  const byType = new Map<string, ViewItem[]>();
-  for (const it of items) {
-    const ty = it.itemType || "note";
-    if (!byType.has(ty)) byType.set(ty, []);
-    byType.get(ty)!.push(it);
-  }
-  const typesInUse = [...LIST_VIEW_TYPE_ORDER.filter((ty) => byType.has(ty)), ...Array.from(byType.keys()).filter((ty) => !LIST_VIEW_TYPE_ORDER.includes(ty))];
-  const flatItems = typesInUse.flatMap((ty) => byType.get(ty) ?? []);
+  const onDropOnRow = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!onReorder) return;
+    const fromId = e.dataTransfer.getData("text/plain");
+    if (!fromId || fromId === targetId) return;
+    const ids = items.map((i) => i.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, fromId);
+    onReorder(next);
+  };
 
   const renderEntry = (it: ViewItem, index: number) => {
     const ep = enterStaggerProps(index);
@@ -3876,12 +3927,44 @@ function ListView({
         className={`bd-todo-row ${ep.className}`}
         onDoubleClick={() => onEdit?.(it)}
         onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+        onDragOver={
+          reorderEnabled && onReorder
+            ? (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }
+            : undefined
+        }
+        onDrop={reorderEnabled && onReorder ? (e) => onDropOnRow(e, it.id) : undefined}
         style={{
           ...ep.style,
           cursor: onEdit && (!editing || editing.id !== it.id) ? "pointer" : undefined,
         }}
       >
         <div className="bd-todo-row-lead">
+          {reorderEnabled && onReorder ? (
+            <span
+              className="bd-entry-drag-handle"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/plain", it.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              title={t("items.dragToReorder")}
+              aria-label={t("items.dragToReorder")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+                <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+          ) : null}
           {isTask ? (
             <label
               className="bd-todo-checkbox-wrap"
@@ -4067,7 +4150,7 @@ function ListView({
         boxSizing: "border-box",
       }}
     >
-      <div className="bd-todo-list-card">{flatItems.map((it, idx) => renderEntry(it, idx))}</div>
+      <div className="bd-todo-list-card">{items.map((it, idx) => renderEntry(it, idx))}</div>
     </div>
   );
 }
@@ -4078,6 +4161,8 @@ function TextView({
   onUpdate,
   onCommitTextContent,
   onItemContextMenu,
+  reorderEnabled = false,
+  onReorder,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -4085,6 +4170,8 @@ function TextView({
   /** Text view: blur commits full textarea; double line breaks split into new entries. */
   onCommitTextContent?: (id: string, raw: string) => void | Promise<void>;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
+  reorderEnabled?: boolean;
+  onReorder?: (orderedIds: string[]) => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
@@ -4127,6 +4214,21 @@ function TextView({
     return `${title}\n${body}`;
   };
 
+  const onDropOnRow = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!onReorder) return;
+    const fromId = e.dataTransfer.getData("text/plain");
+    if (!fromId || fromId === targetId) return;
+    const ids = items.map((i) => i.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, fromId);
+    onReorder(next);
+  };
+
   return (
     <div
       className="bd-text-view"
@@ -4158,8 +4260,41 @@ function TextView({
               flexDirection: "row",
               background: "transparent",
               gap: "0.45rem",
+              alignItems: "stretch",
             }}
+            onDragOver={
+              reorderEnabled && onReorder
+                ? (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }
+                : undefined
+            }
+            onDrop={reorderEnabled && onReorder ? (e) => onDropOnRow(e, it.id) : undefined}
           >
+            {reorderEnabled && onReorder ? (
+              <span
+                className="bd-entry-drag-handle bd-entry-drag-handle--text"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", it.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                title={t("items.dragToReorder")}
+                aria-label={t("items.dragToReorder")}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
+                </svg>
+              </span>
+            ) : null}
             <div style={{ width: 4, borderRadius: 999, background: barColor, flexShrink: 0 }} />
             <article
               onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}

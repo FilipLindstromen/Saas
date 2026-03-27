@@ -115,6 +115,11 @@ export default function BrainDumpPage() {
     } catch {}
   }, [viewType]);
 
+  useEffect(() => {
+    if (!isMobileLayout) return;
+    setViewType((v) => (v === "kanban" || v === "postits" ? "list" : v));
+  }, [isMobileLayout]);
+
   const refreshWorkProjectNames = useCallback(() => {
     fetch("/api/projects?domain=work")
       .then((r) => r.json())
@@ -225,7 +230,10 @@ export default function BrainDumpPage() {
             : {}),
           ...((it.item_type === "task" || it.item_type === "task_completed" || it.item_type === "shopping") &&
           it.scheduled_date
-            ? { scheduled_date: it.scheduled_date }
+            ? {
+                scheduled_date: it.scheduled_date,
+                ...(it.scheduled_time ? { scheduled_time: it.scheduled_time } : {}),
+              }
             : {}),
         }));
         const resBatch = await fetch("/api/organized-items/batch", {
@@ -428,47 +436,137 @@ export default function BrainDumpPage() {
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
-        <div className="bd-bottom-bar-controls">
-          <PhotoCaptureTrigger onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)} />
-          <button
-            type="button"
-            className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}
-            onClick={() => {
-              if (typeof document === "undefined") return;
-              const fab = document.getElementById("bd-dump-fab");
-              if (fab && "click" in fab) {
-                (fab as HTMLButtonElement).click();
-              }
-            }}
-            title={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
-            aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
-          >
-            {dumpRecordingActive ? (
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <rect x="6" y="6" width="12" height="12" rx="2" />
+        <div className="bd-bottom-bar-mobile-col">
+          <nav className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
+            <button
+              type="button"
+              className={`bd-bottom-bar-pill-item${viewType === "list" ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setViewType("list")}
+              title={t("items.viewList")}
+              aria-label={t("items.viewList")}
+              aria-current={viewType === "list" ? "page" : undefined}
+            >
+              {viewType === "list" ? (
+                <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+                  <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--accent)" stroke="none" />
+                  <path
+                    d="M8.5 12.5 11 15l4.5-5.5"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.96)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
+                  <path
+                    d="M8.5 12.5 11 15l4.5-5.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`bd-bottom-bar-pill-item${viewType === "text" ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setViewType("text")}
+              title={t("items.viewText")}
+              aria-label={t("items.viewText")}
+              aria-current={viewType === "text" ? "page" : undefined}
+            >
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 6h16M4 12h16M4 18h11" />
               </svg>
-            ) : (
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
+            </button>
+            <div className="bd-bottom-bar-pill-mic-wrap">
+              <button
+                type="button"
+                className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}
+                onClick={() => {
+                  if (typeof document === "undefined") return;
+                  const fab = document.getElementById("bd-dump-fab");
+                  if (fab && "click" in fab) {
+                    (fab as HTMLButtonElement).click();
+                  }
+                }}
+                title={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
+                aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
+              >
+                {dumpRecordingActive ? (
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`bd-bottom-bar-pill-item${viewType === "calendar" ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setViewType("calendar")}
+              title={t("items.viewCalendar")}
+              aria-label={t("items.viewCalendar")}
+              aria-current={viewType === "calendar" ? "page" : undefined}
+            >
+              <svg className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+                <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <text
+                  x="12"
+                  y="17.5"
+                  textAnchor="middle"
+                  fontSize="9"
+                  fontWeight="600"
+                  fill="currentColor"
+                  className="bd-bottom-bar-cal-day"
+                >
+                  {new Date().getDate()}
+                </text>
               </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="bd-btn bd-bottom-type-dump-btn"
-            onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
-            title={t("center.typeDump")}
-            aria-label={t("center.typeDump")}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M4 6h16M4 12h16M4 18h10" />
-              <path d="M16 16h2v2h-2z" />
-            </svg>
-          </button>
+            </button>
+            <button
+              type="button"
+              className={`bd-bottom-bar-pill-item${viewType === "flowchart" ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setViewType("flowchart")}
+              title={t("items.viewFlowchart")}
+              aria-label={t("items.viewFlowchart")}
+              aria-current={viewType === "flowchart" ? "page" : undefined}
+            >
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="2.25" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
+              </svg>
+            </button>
+          </nav>
+          <div className="bd-bottom-bar-quick-tools">
+            <PhotoCaptureTrigger
+              onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)}
+              buttonClassName="bd-bottom-bar-quick-tool"
+            />
+            <button
+              type="button"
+              className="bd-btn bd-bottom-bar-quick-tool bd-bottom-type-dump-btn"
+              onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
+              title={t("center.typeDump")}
+              aria-label={t("center.typeDump")}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 6h16M4 12h16M4 18h10" />
+                <path d="M16 16h2v2h-2z" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div id="bd-bottom-view-slot" className="bd-bottom-bar-view-slot" />
       </div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />

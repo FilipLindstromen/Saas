@@ -57,6 +57,11 @@
   --bd-dump-mic-fg: #ffffff;
   --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #c2410c);
   --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.38);
+  /* Stacking: menus/sheets above chrome; modals above menus; processing on top */
+  --bd-z-bottom-bar: 350;
+  --bd-z-dropdown: 5000;
+  --bd-z-modal: 6000;
+  --bd-z-blocking: 7000;
 }
 
 :root[data-theme="light"] {
@@ -407,7 +412,7 @@ body {
 }
 
 .bd-app-sidebar-profile-popover {
-  z-index: 1300;
+  z-index: var(--bd-z-dropdown);
   min-width: 220px;
   max-width: min(280px, calc(100vw - 24px));
   padding: 0.65rem 0.55rem;
@@ -554,7 +559,7 @@ body {
 .bd-sidebar-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1100;
+  z-index: var(--bd-z-modal);
   background: var(--bd-overlay-modal);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -977,7 +982,7 @@ select.bd-input::-ms-expand {
 .bd-dump-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--bd-z-modal);
   background: var(--bd-overlay-dump);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1431,7 +1436,7 @@ select.bd-input::-ms-expand {
   border: 1px solid var(--border-default);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-md);
-  z-index: 1000;
+  z-index: var(--bd-z-dropdown);
 }
 
 .bd-photo-capture-menu-item {
@@ -1469,7 +1474,7 @@ select.bd-input::-ms-expand {
 .bd-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: var(--bd-z-modal);
   background: var(--bd-overlay-modal);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1548,7 +1553,7 @@ select.bd-input::-ms-expand {
 .bd-items-sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: var(--bd-z-dropdown);
   background: var(--bd-overlay-sheet);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1663,7 +1668,6 @@ select.bd-input::-ms-expand {
 /* Mobile: large scope row + filter + type (second header row under TopBar) */
 .bd-mobile-unified-chrome {
   position: relative;
-  z-index: 25;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1768,8 +1772,8 @@ select.bd-input::-ms-expand {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  /* Below modal/sheet layer (1200); sibling after .bd-layout-main so it still paints over main scroll */
-  z-index: 100;
+  /* Above .bd-topbar (300); below modal/menu tokens (see --bd-z-*) */
+  z-index: var(--bd-z-bottom-bar);
   transform: translateZ(0);
   backface-visibility: hidden;
 }
@@ -2111,7 +2115,7 @@ select.bd-input::-ms-expand {
 .bd-scope-picker-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1350;
+  z-index: var(--bd-z-dropdown);
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -2120,11 +2124,6 @@ select.bd-input::-ms-expand {
   justify-content: center;
   padding: 0;
   padding-bottom: var(--bd-bottom-bar-clearance);
-}
-
-/* Rendered via portal on document.body — above items sheets (≤1300), edit chrome (1400), top bar (300) */
-.bd-topbar-workspace-backdrop {
-  z-index: 2000;
 }
 
 /* Desktop: native <select> was painted under scroll/stacking contexts; menu uses the same sheet as mobile. */
@@ -2238,7 +2237,7 @@ select.bd-input::-ms-expand {
 .bd-dump-processing-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1002;
+  z-index: var(--bd-z-blocking);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2328,6 +2327,34 @@ select.bd-input::-ms-expand {
   border-bottom: none;
 }
 
+/* List / text view: drag handle (HTML5 DnD) */
+.bd-entry-drag-handle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 0.2rem 0.15rem;
+  margin-right: 0.1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.bd-entry-drag-handle:active {
+  cursor: grabbing;
+}
+
+.bd-entry-drag-handle--text {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+}
+
 .bd-todo-row-lead {
   flex-shrink: 0;
   width: 28px;
@@ -2405,7 +2432,7 @@ input.bd-todo-checkbox:checked {
 .bd-edit-entry-mobile {
   position: fixed;
   inset: 0;
-  z-index: 1300;
+  z-index: var(--bd-z-modal);
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -2577,51 +2604,10 @@ input.bd-todo-checkbox:checked {
   color: var(--text-tertiary);
 }
 
-.bd-edit-entry-mobile-accessory {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.45rem max(0.85rem, env(safe-area-inset-left))
-    max(0.5rem, calc(env(safe-area-inset-bottom, 0px) + 4px)) max(0.85rem, env(safe-area-inset-right));
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
-}
-
-.bd-edit-entry-accessory-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.1rem;
-  padding: 0.2rem 0.3rem;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-}
-
-.bd-edit-entry-accessory-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.bd-edit-entry-accessory-icon:disabled {
-  cursor: default;
-}
-
 .bd-edit-entry-more-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  z-index: var(--bd-z-modal);
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -2704,8 +2690,8 @@ input.bd-todo-checkbox:checked {
 
 @media (max-width: 768px) {
   :root {
-    /* Mic (~64px) + bar vertical padding; safe-area folded into max() so home indicator not double-counted */
-    --bd-bottom-bar-clearance: calc(64px + 0.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)));
+    /* Pill bar + raised mic + quick tools row + safe area */
+    --bd-bottom-bar-clearance: calc(118px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
   }
 
   .bd-scope-outer-wrap {
@@ -2777,12 +2763,11 @@ input.bd-todo-checkbox:checked {
   }
 
   .bd-bottom-bar {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 0.5rem;
-    padding-left: max(0.65rem, env(safe-area-inset-left));
-    padding-right: max(0.65rem, env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0.35rem 0 0;
     background: none;
     background-color: transparent;
     background-image: none;
@@ -2790,8 +2775,22 @@ input.bd-todo-checkbox:checked {
     -webkit-backdrop-filter: none;
   }
 
+  .bd-bottom-bar-mobile-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+
   .bd-app-shell--dump-recording .bd-bottom-bar {
-    z-index: 1015;
+    z-index: calc(var(--bd-z-bottom-bar) + 50);
   }
 
   @keyframes bd-bottom-dump-mic-pulse {
@@ -2808,57 +2807,94 @@ input.bd-todo-checkbox:checked {
     }
   }
 
-  /* Camera · mic · type-a-dump — visual center column */
-  .bd-bottom-bar-controls {
-    grid-column: 2;
-    justify-self: center;
+  .bd-bottom-bar-pill {
     display: flex;
     flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 0.85rem;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.1rem;
+    width: 100%;
+    min-height: 52px;
+    padding: 0.42rem 0.5rem 0.48rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-elevated) 94%, #0a0a0a);
+    box-shadow:
+      0 6px 28px rgba(0, 0, 0, 0.38),
+      0 1px 0 rgba(255, 255, 255, 0.05);
+    border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :root[data-theme="light"] .bd-bottom-bar-pill {
+    background: color-mix(in srgb, var(--bg-elevated) 88%, #f3f3f3);
+    box-shadow:
+      0 6px 22px rgba(15, 23, 42, 0.12),
+      0 1px 0 rgba(255, 255, 255, 0.9);
+    border-color: var(--border-subtle);
+  }
+
+  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
+    flex: 1 1 0;
     min-width: 0;
-  }
-
-  .bd-bottom-bar-controls .bd-photo-capture-wrap {
-    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .bd-bottom-bar .bd-bottom-bar-controls > button,
-  .bd-bottom-bar .bd-bottom-bar-controls .bd-bottom-camera-btn {
-    flex: 0 0 auto !important;
-  }
-
-  .bd-bottom-bar-view-slot {
-    grid-column: 3;
-    justify-self: end;
-    align-self: center;
-    position: relative;
-    width: 48px;
-    min-width: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-    pointer-events: auto;
-  }
-
-  .bd-bottom-bar .bd-bottom-view-btn {
-    flex: 0 0 auto !important;
-    min-width: 48px !important;
-    width: 48px !important;
-    max-width: 48px !important;
-    min-height: 48px;
-    max-height: 48px;
-    padding: 0 !important;
-    border-radius: 50% !important;
+    min-height: 44px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.2rem;
     font-size: 0;
+    transition:
+      background var(--bd-duration-fast) var(--bd-ease-soft),
+      color var(--bd-duration-fast) var(--bd-ease-soft);
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* Primary mic — larger circle, centered between camera and type */
+  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item:active {
+    transform: scale(0.95);
+  }
+
+  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--active {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  }
+
+  .bd-bottom-bar-pill-icon {
+    display: block;
+    flex-shrink: 0;
+    opacity: 0.95;
+  }
+
+  .bd-bottom-bar-pill-icon--calendar .bd-bottom-bar-cal-day {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    dominant-baseline: middle;
+  }
+
+  .bd-bottom-bar-pill-mic-wrap {
+    flex: 0 0 auto;
+    width: 68px;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 26px;
+    pointer-events: none;
+  }
+
+  .bd-bottom-bar-pill-mic-wrap .bd-bottom-dump-mic {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    margin-left: -32px;
+    transform: translateY(-16px);
+  }
+
+  /* Raised primary mic inside pill */
   .bd-bottom-bar .bd-bottom-dump-mic {
     width: 64px;
     height: 64px;
@@ -2905,13 +2941,33 @@ input.bd-todo-checkbox:checked {
     height: 28px;
   }
 
-  .bd-bottom-bar .bd-bottom-camera-btn {
+  .bd-bottom-bar-quick-tools {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+  }
+
+  .bd-bottom-bar-quick-tools .bd-photo-capture-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bd-bottom-bar .bd-bottom-bar-quick-tools .bd-btn,
+  .bd-bottom-bar .bd-bottom-bar-quick-tools .bd-bottom-camera-btn {
     flex: 0 0 auto !important;
-    min-width: 48px !important;
-    width: 48px !important;
-    max-width: 48px !important;
-    min-height: 48px;
-    max-height: 48px;
+  }
+
+  .bd-bottom-bar .bd-bottom-bar-quick-tool.bd-bottom-camera-btn,
+  .bd-bottom-bar .bd-bottom-bar-quick-tool.bd-bottom-type-dump-btn {
+    flex: 0 0 auto !important;
+    min-width: 42px !important;
+    width: 42px !important;
+    max-width: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
     padding: 0 !important;
     border-radius: 50%;
     font-size: 0;
@@ -2924,31 +2980,12 @@ input.bd-todo-checkbox:checked {
     justify-content: center;
   }
 
-  .bd-bottom-bar .bd-bottom-camera-btn:disabled {
+  .bd-bottom-bar .bd-bottom-bar-quick-tool.bd-bottom-camera-btn:disabled {
     opacity: 0.45;
     pointer-events: none;
   }
 
-  .bd-bottom-bar .bd-bottom-type-dump-btn {
-    flex: 0 0 auto !important;
-    min-width: 48px !important;
-    width: 48px !important;
-    max-width: 48px !important;
-    min-height: 48px;
-    max-height: 48px;
-    padding: 0 !important;
-    border-radius: 50%;
-    font-size: 0;
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-default);
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .bd-bottom-bar .bd-bottom-type-dump-btn:active {
+  .bd-bottom-bar .bd-bottom-bar-quick-tool.bd-bottom-type-dump-btn:active {
     transform: scale(0.96);
   }
 

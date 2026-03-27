@@ -38,7 +38,7 @@ const labelStyle: React.CSSProperties = {
 const overlayBackdrop: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000,
+  zIndex: "var(--bd-z-modal)",
   background: "rgba(0, 0, 0, 0.45)",
   display: "flex",
   alignItems: "center",

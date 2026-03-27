@@ -635,7 +635,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1200,
+              zIndex: "var(--bd-z-dropdown)",
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -801,7 +801,7 @@ export function ScopeBar({
             style={isMobile ? {
               position: "fixed",
               inset: 0,
-              zIndex: 1090,
+              zIndex: "var(--bd-z-dropdown)",
               background: "rgba(0,0,0,0.35)",
               display: "flex",
               alignItems: "flex-end",
@@ -816,7 +816,7 @@ export function ScopeBar({
               position: isMobile ? "relative" : "fixed",
               left: isMobile ? undefined : contextMenu.x,
               top: isMobile ? undefined : contextMenu.y,
-              zIndex: 1000,
+              zIndex: "var(--bd-z-dropdown)",
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
               borderRadius: isMobile ? "16px" : "var(--button-radius)",
@@ -861,7 +861,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1100,
+              zIndex: "var(--bd-z-modal)",
               background: "rgba(0,0,0,0.4)",
               display: "flex",
               alignItems: "center",
@@ -948,7 +948,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1100,
+              zIndex: "var(--bd-z-modal)",
               background: "rgba(0,0,0,0.4)",
               display: "flex",
               alignItems: "center",
@@ -1295,7 +1295,7 @@ export function ScopeBar({
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1200,
+              zIndex: "var(--bd-z-dropdown)",
               background: "rgba(0,0,0,0.45)",
               backdropFilter: "blur(6px)",
               WebkitBackdropFilter: "blur(6px)",
@@ -1467,7 +1467,7 @@ export function ScopeBar({
             style={isMobile ? {
               position: "fixed",
               inset: 0,
-              zIndex: 1090,
+              zIndex: "var(--bd-z-dropdown)",
               background: "rgba(0,0,0,0.35)",
               display: "flex",
               alignItems: "flex-end",
@@ -1481,7 +1481,7 @@ export function ScopeBar({
               position: isMobile ? "relative" : "fixed",
               left: isMobile ? undefined : areaContextMenu.x,
               top: isMobile ? undefined : areaContextMenu.y,
-              zIndex: 1000,
+              zIndex: "var(--bd-z-dropdown)",
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
               borderRadius: isMobile ? "16px" : "var(--button-radius)",

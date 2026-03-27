@@ -307,7 +307,6 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
       aria-modal="true"
       aria-labelledby="bd-delete-entries-title"
       className="bd-modal-backdrop"
-      style={{ zIndex: 1200 }}
       onClick={onClose}
     >
       <div

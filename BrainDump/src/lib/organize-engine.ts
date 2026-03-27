@@ -75,12 +75,15 @@ Rules:
    - personal: Hobby projects, creative pursuits the user does for themselves ("personal thing", "not work-related"), how they feel (tired, body feelings, emotional state), reflections about life or wellbeing, personal goals, health, relationships, shopping. If the user says something is a "personal" thing or a "hobby project", it is always personal.
    - work: Work projects, work tasks, professional courses, business/marketing tasks, deliverables for a job or business. If a project name is clearly work (e.g. LumiRush as a product/tool), tasks for that project are work. "Set up a sales page" or "create one video each day for marketing" are work when tied to a work project.
    - If a task does not mention a specific work project and has no clear work context, classify it as personal (e.g. home errands like changing windshield wipers).
+   - Errands and appointments with only a clock time and no calendar day (e.g. "at 2pm", "kl 14", "this afternoon at three") MUST use the **reference date below as "today"** for the date fields: set scheduled_date or task_due_date to that calendar day, and scheduled_time to the time they said. Do not leave the date empty just because they omitted "today".
+   - Picking up, dropping off, or meeting a **person** (e.g. "pick up Mio", "get the kids", "meet Anna at five") is **not** shopping. Use **item_type calendar** (timed appointment) **or** **task** with **task_due_date** and **scheduled_time** — pick **calendar** when it is a **fixed clock time** (default for these — shows in Calendar); use **task** with due date + time only when it sounds like a checklist reminder ("don't forget to…") without a time-block. **domain = personal**, no project_name, unless the user clearly ties it to work. Category **relationships** (family/partner/kids/friends) or **tasks** (other social). Example: "I need to pick up Mio at 2pm" with no work project → personal, **calendar** (preferred) or task, title e.g. "Pick up Mio", scheduled_date (or task_due_date) = **user's local calendar today** from the reference below, scheduled_time = 14:00.
+   - **Timed personal people & logistics (disambiguation):** Verbs like pick up / drop off / collect / meet / school run / drive someone (Swedish: hämta, lämna, träffa, skjutsa, köra … hem) with a **person or kids** as the object are **never shopping** — even if they say "pick up". **Shopping** is for **goods**: groceries, milk, store orders, retail packages, dry cleaning as items. **Work-session override:** If the default context is **work** but the line has **no work project**, **no work keywords**, and matches this people-logistics pattern, still output **domain personal**.
 5. item_type is critical:
-   - Use "task" for concrete to-dos: explicit "task/todo" language AND practical "I need to / I have to / I should [do something]" when it is a real action (not buying goods → shopping, not scheduling a timed event → calendar, not emotional reflection → reflection). Example: "Tomorrow I need to change graphics in project X" → task with cleaned title "Change graphics", not the whole sentence as content.
+   - Use "task" for concrete to-dos: explicit "task/todo" language AND practical "I need to / I have to / I should [do something]" when it is a real action (not buying goods → shopping, not a **timed appointment-style** slot you would put on a calendar → then prefer calendar, not emotional reflection → reflection). If the user gives **only a time** with no date ("at 2pm"), use **today** from the reference date for task_due_date (and include **scheduled_time**). Example: "Tomorrow I need to change graphics in project X" → task with cleaned title "Change graphics", not the whole sentence as content.
    - Use "idea" for ideas, concepts, creative/hobby possibilities WITHOUT a clear do-by action or calendar time. A hobby the user "might start someday" is an idea; "I need to finish the demo by Friday" is a task.
    - Use "reflection" for how the user feels, body state, tiredness, emotional state, or brief reflections not tied to a project — always use category "feeling" and domain "personal" for these. Do NOT attach these to projects or hobbies.
    - Use "note" for general notes, facts, decisions, updates. When in doubt, use "note".
-   - Use "shopping" for things to buy or get from a store: groceries, clothes, household items, phrases like "I need to shop", "buy socks", "pick up milk", "get from the store". Prefer "shopping" over "task" when the action is purchasing goods (e.g. "I need to shop socks tomorrow" → item_type "shopping", not "task"). Use domain "personal" and category "shopping" unless it is clearly work-related procurement (office supplies for work → domain "work", category "shopping"). When the user says when to shop (e.g. "tomorrow", "today", "next Saturday"), you MUST set shopping_due_date (YYYY-MM-DD) using the reference date/time below — the app stores this as the shopping list due day. Omit only if no day was implied at all.
+   - Use "shopping" for things to buy or get from a store: groceries, clothes, household items, phrases like "I need to shop", "buy socks", "pick up milk", "get from the store". Prefer "shopping" over "task" when the action is purchasing goods (e.g. "I need to shop socks tomorrow" → item_type "shopping", not "task"). **Do not** use shopping for "pick up [person's name]" or childcare/school run — those are calendar or task (see domain rule above). Use domain "personal" and category "shopping" unless it is clearly work-related procurement (office supplies for work → domain "work", category "shopping"). When the user says when to shop (e.g. "tomorrow", "today", "next Saturday"), you MUST set shopping_due_date (YYYY-MM-DD) using the reference date/time below — the app stores this as the shopping list due day. Omit only if no day was implied at all.
    - Use "calendar" for time-bound or recurring items (e.g. "every day", "every Monday", "remind me next week", events with a date/time). These appear only in the Calendar view.
    - For EVERY item with item_type "calendar", you MUST extract scheduling from the transcript:
      - scheduled_date: YYYY-MM-DD using the reference date/time below to interpret "today", "tomorrow", "next Friday", "March 20", etc.
@@ -122,7 +125,7 @@ When existing_categories are provided below, prefer those.
 Respond with a single JSON object:
 { "items": [ ... ], "standalone_project_creations"?: string[] }
 Each "items" element: { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "shopping_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" }
-For tasks with a due day, include task_due_date (YYYY-MM-DD). For shopping items with a planned day, include shopping_due_date (YYYY-MM-DD). For calendar items, include scheduled_date and related fields as in the rules above.
+For tasks with a due day, include task_due_date (YYYY-MM-DD) and **scheduled_time** (HH:mm) when the user gave a time of day. For shopping items with a planned day, include shopping_due_date (YYYY-MM-DD). For calendar items, include scheduled_date and related fields as in the rules above.
 standalone_project_creations: array of strings (work project names to create as empty projects), per rule 11. Omit the key or use [] if none.
 Use only the fields listed. No extra commentary.`;
 
@@ -146,12 +149,15 @@ Regler:
    - personal: Hobbyprojekt, kreativa sysslor för sig själv ("privat", "inte jobbrelaterat"), hur man mår (trött, kropp, känsla), reflektioner om liv eller välmående, personliga mål, hälsa, relationer, shopping. Om användaren säger att något är "privat" eller hobby, ska det alltid vara personal.
    - work: Arbetsprojekt, arbetsuppgifter, yrkeskurser, affärs-/marknadsföringsuppgifter, leveranser för jobb eller företag. Om ett projektnamn tydligt är arbete, är uppgifter för det projektet work. "Sätt upp en säljlanding" eller "gör en video om dagen för marknadsföring" är work när det kopplas till ett arbetsprojekt.
    - Om en uppgift inte nämner ett specifikt arbetsprojekt och saknar tydlig arbetskontext, klassificera den som personal (t.ex. hemmaärenden som att byta vindrutetorkare).
+   - Ärenden och tider med bara klockslag utan kalenderdag (t.ex. "klockan 14", "kl två") MÅSTE använda **referensdatum nedan som "idag"** för datumfälten: sätt scheduled_date eller task_due_date till den dagen och scheduled_time till tiden. Lämna inte datum tomt bara för att användaren inte sa "idag".
+   - Hämta/lämna eller träffa en **person** (t.ex. "hämta Mio", "hämta barnen") är **inte** shopping. Använd **calendar** eller **task** med **task_due_date** och **scheduled_time** — föredra **calendar** vid **konkret klockslag** (syns i kalendern); **task** om det låter som en checklistepåminnelse utan tidsblock. **domain = personal**, inget project_name om det inte tydligt är jobb. Category **relationships** (familj/partner/barn/vänner) eller **tasks** (övrigt socialt). Exempel: "Jag måste hämta Mio klockan två" utan arbetsprojekt → personal, **calendar** (föredras) eller task, title t.ex. "Hämta Mio", scheduled_date eller task_due_date = **användarens lokala kalenderdatum idag** enligt referensen nedan, scheduled_time = 14:00.
+   - **Privat logistik med människor:** Hämta/lämna/träffa/skjutsa/köra (person eller barn) är **aldrig shopping** — även om de säger "hämta". **Shopping** gäller **varor**: mat, butik, paket från återförsäljare, kemtvätt som **sak**. **Åsidosätt work-kontext:** Om standardläget är **work** men meningen saknar **arbetsprojekt**, saknar **arbetsnyckelord** och matchar detta mönster → **domain personal** i alla fall.
 5. item_type är avgörande:
-   - Använd "task" för konkreta göromål: uttrycklig "uppgift/todo" OCH praktiska "jag måste / jag behöver / jag ska [göra något]" när det är en verklig handling (inte inköp → shopping, inte tidsbunden händelse → calendar, inte känsloreflektion → reflection). Exempel: "Imorgon behöver jag byta grafik i projekt X" → task med städad title "Byta grafik", inte hela meningen i content.
+   - Använd "task" för konkreta göromål: uttrycklig "uppgift/todo" OCH praktiska "jag måste / jag behöver / jag ska [göra något]" när det är en verklig handling (inte inköp → shopping, inte en **tidsbokning** du hellre lägger i kalendern → då calendar, inte känsloreflektion → reflection). Om användaren bara ger **tid** utan datum ("klockan 14"), använd **idag** enligt referensdatum för task_due_date och sätt **scheduled_time**. Exempel: "Imorgon behöver jag byta grafik i projekt X" → task med städad title "Byta grafik", inte hela meningen i content.
    - Använd "idea" för idéer och möjligheter utan tydlig deadline eller direkt göra-nu-handling. Hobby "någon gång" = idea; "jag måste bli klar till fredag" = task.
    - Använd "reflection" för hur användaren mår, kroppstillstånd, trötthet, känsloläge, eller korta reflektioner utan projekt — använd alltid category "feeling" och domain "personal". Koppla INTE dessa till projekt eller hobbies.
    - Använd "note" för allmänna anteckningar, fakta, beslut, uppdateringar. Vid tvekan, använd "note".
-   - Använd "shopping" för saker att köpa: mat, kläder, "jag måste handla", "köpa strumpor", "handla imorgon". Föredra "shopping" framför "task" när det handlar om att köpa varor (t.ex. "handla strumpor imorgon" → shopping). Använd domain "personal" och category "shopping" om det inte tydligt är inköp för jobbet. När användaren säger när handla (t.ex. "imorgon", "idag"), MÅSTE du sätta shopping_due_date (YYYY-MM-DD) med referensdatum nedan — appen använder det som datum för inköpsraden. Utelämna bara om ingen dag alls antyds.
+   - Använd "shopping" för saker att köpa: mat, kläder, "jag måste handla", "köpa strumpor", "handla imorgon". Föredra "shopping" framför "task" när det handlar om att köpa varor (t.ex. "handla strumpor imorgon" → shopping). **Inte** shopping för "hämta [personnamn]" eller barnlämning — då calendar eller task (se regel ovan). Använd domain "personal" och category "shopping" om det inte tydligt är inköp för jobbet. När användaren säger när handla (t.ex. "imorgon", "idag"), MÅSTE du sätta shopping_due_date (YYYY-MM-DD) med referensdatum nedan — appen använder det som datum för inköpsraden. Utelämna bara om ingen dag alls antyds.
    - Använd "calendar" för tidsbundna eller återkommande saker (t.ex. "varje dag", "varje måndag", "påminn mig nästa vecka", händelser med datum/tid).
    - För varje post med item_type "calendar": extrahera schemaläggning från transkriptet:
      - scheduled_date: YYYY-MM-DD med referensdatum/tid nedan för "idag", "imorgon", "nästa fredag", osv.
@@ -195,7 +201,7 @@ När befintliga kategorier listas nedan, föredra dem.
 Svara med ett enda JSON-objekt:
 { "items": [ ... ], "standalone_project_creations"?: string[] }
 Varje element i "items": { "domain", "category", "subcategory", "project_name?", "item_type", "title", "content", "tags?", "emotion_label?", "recommended_view", "confidence_score", "task_due_date?", "shopping_due_date?", "scheduled_date?", "scheduled_time?", "recurrence?", "send_notification?", "reminder_minutes_before?" }
-För shopping med planerad dag: shopping_due_date (YYYY-MM-DD). För calendar-poster: scheduled_date och scheduled_time när användaren gett datum eller tid.
+För shopping med planerad dag: shopping_due_date (YYYY-MM-DD). För task med dag och klockslag: task_due_date och **scheduled_time** (HH:mm). För calendar-poster: scheduled_date och scheduled_time när användaren gett datum eller tid.
 standalone_project_creations: strängarray enligt regel 11; utelämna eller []. Använd bara listade fält. Ingen extra kommentar.`;
 
 export interface OrganizeTranscriptResult {
@@ -215,6 +221,8 @@ export interface OrganizeOptions {
   locale?: "en" | "sv";
   /** Client "now" (ISO string) so the model can resolve "today" / "tomorrow" for calendar fields. */
   referenceIso?: string;
+  /** User's local calendar date YYYY-MM-DD (avoids UTC midnight shifting "today" for reminders). */
+  referenceLocalDate?: string;
   /** When organizing a transcript in multiple API passes (long text). */
   chunkPart?: { index: number; total: number };
 }
@@ -303,6 +311,112 @@ function parseStandaloneFromResponse(parsed: Record<string, unknown>): string[] 
   return out;
 }
 
+function getReferenceLocalDateForGuardrails(options: OrganizeOptions): string | undefined {
+  const loc = options.referenceLocalDate?.trim();
+  if (loc && /^\d{4}-\d{2}-\d{2}$/.test(loc)) return loc;
+  const iso = options.referenceIso?.trim();
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
+/** Heuristic: picking up / meeting people vs groceries or store pickups (EN/SV). */
+function textSuggestsPersonLogisticsNotGroceries(text: string): boolean {
+  const s = text.replace(/\s+/g, " ").trim();
+  if (!s) return false;
+  const low = s.toLowerCase();
+
+  if (/\b(pick\s*up|pickup)\s+(my\s+)?(groceries|milk|eggs|bread|wine|beer|flowers|cake)\b/i.test(s)) return false;
+  if (/\b(pick\s*up|pickup)\s+the\s+(groceries|milk|stuff\s+from|order\s+from)\b/i.test(low)) return false;
+  if (/\b(pick\s*up|pickup)\s+(a\s+)?package\s+(from|at)\b/i.test(low)) return false;
+  if (/\bhämta\s+(mat|mjölk|paket|beställning|grejerna|varorna)\b/.test(low)) return false;
+
+  if (/\b(pick\s*up|pickup|drop\s*-?off|drop\s+off)\s+my\s+(son|daughter|kid|kids|child|children)\b/i.test(low))
+    return true;
+  if (/\b(pick\s*up|pickup|drop\s*-?off|drop\s+off)\s+([A-ZÅÄÖ][a-zåäö]{1,}|[A-ZÅÄÖ]{2,})\b/.test(s)) return true;
+  if (/\b(get|collect)\s+(the\s+)?(kids|children|child)\b/i.test(low)) return true;
+  if (/\bmeet\s+([A-ZÅÄÖ][a-zåäö]+)\b/.test(s)) return true;
+  if (/\bhämta\s+([A-ZÅÄÖ][a-zåäö]{1,}|barnen|kidsen|ungarna)\b/.test(s)) return true;
+  if (/\blämna(\s+av)?\s+([A-ZÅÄÖ][a-zåäö]{1,}|barnen)\b/i.test(s)) return true;
+  if (/\b(skjutsa|kör)\s+([A-ZÅÄÖ][a-zåäö]{1,}|barnen)\b/i.test(low)) return true;
+
+  return false;
+}
+
+function blobLooksLikeWorkContext(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    /\b(work|job|office|client|deadline|meeting|boss|team|company|business|deploy|repo|ticket)\b/.test(t) ||
+    /\b(arbete|jobb|kontor|kund|möte|deadline|chef|team|företag)\b/.test(t)
+  );
+}
+
+function padHHmm(time: string): string {
+  if (!/^\d{1,2}:\d{2}$/.test(time)) return time;
+  const [h, m] = time.split(":");
+  return `${h!.padStart(2, "0")}:${m!}`;
+}
+
+/** Shopping→calendar fixes, work→personal for family logistics, infer today's date when only a clock time is set. */
+function applyPersonalLogisticsGuardrails(item: OrganizedItemInput, options: OrganizeOptions): OrganizedItemInput {
+  const refLocal = getReferenceLocalDateForGuardrails(options);
+  let out: OrganizedItemInput = { ...item };
+
+  const blob = `${out.title ?? ""} ${out.content ?? ""}`.trim();
+
+  if (
+    out.domain === "work" &&
+    !(out.project_name && String(out.project_name).trim()) &&
+    textSuggestsPersonLogisticsNotGroceries(blob) &&
+    !blobLooksLikeWorkContext(blob)
+  ) {
+    out = {
+      ...out,
+      domain: "personal",
+      project_name: undefined,
+      category:
+        out.category === "shopping" || !out.category || out.category === "tasks" || out.category === "projects"
+          ? "relationships"
+          : out.category,
+    };
+  }
+
+  if (out.item_type === "shopping" && textSuggestsPersonLogisticsNotGroceries(blob)) {
+    out = {
+      ...out,
+      item_type: "calendar",
+      domain: "personal",
+      project_name: undefined,
+      category: "relationships",
+      recommended_view:
+        out.recommended_view === "reflection_cards" || out.recommended_view === "task_list"
+          ? "note_cards"
+          : (out.recommended_view ?? "note_cards"),
+    };
+  }
+
+  const t = out.scheduled_time?.trim();
+  const hasValidTime = Boolean(t && /^\d{1,2}:\d{2}$/.test(t));
+  const d = out.scheduled_date?.trim();
+  const hasValidDate = Boolean(d && /^\d{4}-\d{2}-\d{2}$/.test(d));
+
+  if (
+    refLocal &&
+    hasValidTime &&
+    !hasValidDate &&
+    (out.item_type === "calendar" || out.item_type === "task" || out.item_type === "task_completed")
+  ) {
+    out = { ...out, scheduled_date: refLocal };
+  }
+
+  if (out.scheduled_time && /^\d{1,2}:\d{2}$/.test(out.scheduled_time)) {
+    out = { ...out, scheduled_time: padHHmm(out.scheduled_time) };
+  }
+
+  return out;
+}
+
 export async function organizeTranscript(
   transcript: string,
   openaiApiKey: string,
@@ -317,10 +431,19 @@ export async function organizeTranscript(
   const ref =
     options.referenceIso?.trim() ||
     new Date().toISOString();
+  const refLocal = options.referenceLocalDate?.trim();
   const refLine =
     locale === "sv"
-      ? `\n\nReferensdatum/tid (användarens "nu" för att tolka idag/imorgon): ${ref}`
-      : `\n\nReference date/time (user's "now" for interpreting today/tomorrow): ${ref}`;
+      ? `\n\nReferensdatum/tid (användarens "nu" för att tolka idag/imorgon): ${ref}${
+          refLocal && /^\d{4}-\d{2}-\d{2}$/.test(refLocal)
+            ? `\nAnvändarens **lokala kalenderdatum idag** (använd för "idag" när bara klockslag anges): ${refLocal}`
+            : ""
+        }`
+      : `\n\nReference date/time (user's "now" for interpreting today/tomorrow): ${ref}${
+          refLocal && /^\d{4}-\d{2}-\d{2}$/.test(refLocal)
+            ? `\nUser's **local calendar date today** (use for "today" when only a clock time is given): ${refLocal}`
+            : ""
+        }`;
 
   let userContent =
     locale === "sv"
@@ -510,6 +633,11 @@ export async function organizeTranscript(
         if (due) {
           base.scheduled_date = due;
         }
+        const timeRaw = pickStr(raw, "scheduled_time", "scheduledTime");
+        if (timeRaw && /^\d{1,2}:\d{2}$/.test(timeRaw)) {
+          const [h, m] = timeRaw.split(":");
+          base.scheduled_time = `${h!.padStart(2, "0")}:${m!}`;
+        }
       }
 
       if (item_type === "shopping") {
@@ -520,9 +648,14 @@ export async function organizeTranscript(
         if (due) {
           base.scheduled_date = due;
         }
+        const shopTimeRaw = pickStr(raw, "scheduled_time", "scheduledTime");
+        if (shopTimeRaw && /^\d{1,2}:\d{2}$/.test(shopTimeRaw)) {
+          const [h, m] = shopTimeRaw.split(":");
+          base.scheduled_time = `${h!.padStart(2, "0")}:${m!}`;
+        }
       }
 
-      return base;
+      return applyPersonalLogisticsGuardrails(base, options);
     });
     const filteredItems = filterRedundantProjectCreationNotes(mappedItems, transcript, namesForEchoFilter);
     return { items: filteredItems, standaloneProjectCreations };

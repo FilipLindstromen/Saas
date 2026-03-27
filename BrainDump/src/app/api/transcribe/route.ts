@@ -18,8 +18,7 @@ export async function POST(request: NextRequest) {
 
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
-    const clientKey = (formData.get("apiKey") as string | null) ?? "";
-    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    const keyRes = resolveOpenAiApiKey(userId);
     if (!keyRes.ok) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }

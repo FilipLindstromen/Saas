@@ -83,8 +83,14 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
                 : {}),
             }
           : {}),
-        ...((it.item_type === "task" || it.item_type === "shopping") && it.scheduled_date
-          ? { scheduled_date: it.scheduled_date }
+        ...((it.item_type === "task" ||
+          it.item_type === "task_completed" ||
+          it.item_type === "shopping") &&
+        it.scheduled_date
+          ? {
+              scheduled_date: it.scheduled_date,
+              ...(it.scheduled_time ? { scheduled_time: it.scheduled_time } : {}),
+            }
           : {}),
       }));
 

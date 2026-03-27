@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
         tags?: string[];
         scheduled_date?: string;
         scheduled_time?: string;
+        task_due_date?: string;
+        shopping_due_date?: string;
         recurrence?: string;
         send_notification?: boolean;
         reminder_minutes_before?: number;
@@ -68,6 +70,13 @@ export async function POST(request: NextRequest) {
     const created: Array<{ id: string; title: string }> = [];
 
     await prisma.$transaction(async (tx) => {
+      let nextListOrder = (
+        await tx.organizedItem.aggregate({
+          where: { userId },
+          _min: { listOrder: true },
+        })
+      )._min.listOrder ?? 0;
+
       for (const it of items) {
         const name =
           (typeof it.project_name === "string" && it.project_name.trim()) ||
@@ -116,13 +125,28 @@ export async function POST(request: NextRequest) {
         const reminderAtVal =
           isCalendar && sendNotif && eventStart ? eventStart : null;
 
-        const taskDueDate =
+        const taskDueFromScheduled =
           isTaskLike && scheduledAtDate != null ? scheduledAtDate : null;
-        const taskProgress = itemTypeStr === "task_completed" ? "completed" : "todo";
-        const taskKanbanCol = itemTypeStr === "task_completed" ? "completed" : "todo";
-        const shoppingDueDate =
+        const shoppingDueFromScheduled =
           isShopping && scheduledAtDate != null ? scheduledAtDate : null;
 
+        const taskDueRaw =
+          typeof it.task_due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.task_due_date.trim())
+            ? it.task_due_date.trim()
+            : undefined;
+        const shoppingDueRaw =
+          typeof it.shopping_due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.shopping_due_date.trim())
+            ? it.shopping_due_date.trim()
+            : undefined;
+        const taskDueFromField = taskDueRaw ? dateOnlyToStartOfDay(taskDueRaw) : null;
+        const shoppingDueFromField = shoppingDueRaw ? dateOnlyToStartOfDay(shoppingDueRaw) : null;
+
+        const effectiveTaskDue = isTaskLike ? taskDueFromScheduled ?? taskDueFromField : null;
+        const effectiveShoppingDue = isShopping ? shoppingDueFromScheduled ?? shoppingDueFromField : null;
+        const taskProgress = itemTypeStr === "task_completed" ? "completed" : "todo";
+        const taskKanbanCol = itemTypeStr === "task_completed" ? "completed" : "todo";
+
+        nextListOrder -= 1000;
         const item = await tx.organizedItem.create({
           data: {
             dumpId: dumpIdStr,
@@ -134,16 +158,19 @@ export async function POST(request: NextRequest) {
             itemType: itemTypeStr,
             title: String(it.title ?? ""),
             content: String(it.content ?? ""),
+            listOrder: nextListOrder,
             emotionLabel: it.emotion_label != null && it.emotion_label !== "" ? String(it.emotion_label) : null,
             status: "draft",
             progress: taskProgress,
             recommendedView: String(it.recommended_view ?? "note_cards"),
             confidenceScore: typeof it.confidence_score === "number" ? it.confidence_score : 0.8,
             ...(isCalendar && scheduledAtDate != null && { scheduledAt: scheduledAtDate }),
-            ...(isTaskLike && taskDueDate != null && { scheduledAt: taskDueDate }),
+            ...(isTaskLike && effectiveTaskDue != null && { scheduledAt: effectiveTaskDue }),
             ...(isTaskLike && { kanbanColumn: taskKanbanCol }),
-            ...(isShopping && shoppingDueDate != null && { scheduledAt: shoppingDueDate }),
+            ...(isShopping && effectiveShoppingDue != null && { scheduledAt: effectiveShoppingDue }),
             ...(isCalendar && scheduledTimeRaw && { scheduledTime: scheduledTimeRaw }),
+            ...(isTaskLike && scheduledTimeRaw && { scheduledTime: scheduledTimeRaw }),
+            ...(isShopping && scheduledTimeRaw && { scheduledTime: scheduledTimeRaw }),
             ...(isCalendar && recurrenceVal && { recurrence: recurrenceVal }),
             ...(isCalendar && { sendNotification: sendNotif }),
             ...(isCalendar && sendNotif && reminderAtVal

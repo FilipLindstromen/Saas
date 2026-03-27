@@ -59,6 +59,7 @@ export async function PATCH(
       reminderMinutesBefore,
       reminderNotifiedAt,
       reminderEarlyNotifiedAt,
+      listOrder,
     } = body;
 
     const item = await prisma.organizedItem.update({
@@ -87,6 +88,9 @@ export async function PATCH(
         ...(reminderMinutesBefore !== undefined && { reminderMinutesBefore }),
         ...(reminderNotifiedAt !== undefined && { reminderNotifiedAt: reminderNotifiedAt === null ? null : new Date(reminderNotifiedAt) }),
         ...(reminderEarlyNotifiedAt !== undefined && { reminderEarlyNotifiedAt: reminderEarlyNotifiedAt === null ? null : new Date(reminderEarlyNotifiedAt) }),
+        ...(listOrder !== undefined &&
+          typeof listOrder === "number" &&
+          Number.isFinite(listOrder) && { listOrder }),
       },
       include: { project: true, tags: { include: { tag: true } } },
     });

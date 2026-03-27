@@ -57,6 +57,8 @@ model OrganizedItem {
   reminderMinutesBefore  Int?     // also notify this many minutes before (0 = no early notification)
   reminderNotifiedAt     DateTime? // set when main reminder was sent
   reminderEarlyNotifiedAt DateTime? // set when early (X min before) reminder was sent
+  /// Manual order for list/text views (ascending: smaller = higher in UI). Tie-break: createdAt desc when equal.
+  listOrder        Float     @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

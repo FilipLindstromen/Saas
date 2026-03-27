@@ -32,6 +32,7 @@ export type OrganizedItemAvgAggregateOutputType = {
   positionX: number | null
   positionY: number | null
   reminderMinutesBefore: number | null
+  listOrder: number | null
 }
 
 export type OrganizedItemSumAggregateOutputType = {
@@ -40,6 +41,7 @@ export type OrganizedItemSumAggregateOutputType = {
   positionX: number | null
   positionY: number | null
   reminderMinutesBefore: number | null
+  listOrder: number | null
 }
 
 export type OrganizedItemMinAggregateOutputType = {
@@ -70,6 +72,7 @@ export type OrganizedItemMinAggregateOutputType = {
   reminderMinutesBefore: number | null
   reminderNotifiedAt: Date | null
   reminderEarlyNotifiedAt: Date | null
+  listOrder: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -102,6 +105,7 @@ export type OrganizedItemMaxAggregateOutputType = {
   reminderMinutesBefore: number | null
   reminderNotifiedAt: Date | null
   reminderEarlyNotifiedAt: Date | null
+  listOrder: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -134,6 +138,7 @@ export type OrganizedItemCountAggregateOutputType = {
   reminderMinutesBefore: number
   reminderNotifiedAt: number
   reminderEarlyNotifiedAt: number
+  listOrder: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -146,6 +151,7 @@ export type OrganizedItemAvgAggregateInputType = {
   positionX?: true
   positionY?: true
   reminderMinutesBefore?: true
+  listOrder?: true
 }
 
 export type OrganizedItemSumAggregateInputType = {
@@ -154,6 +160,7 @@ export type OrganizedItemSumAggregateInputType = {
   positionX?: true
   positionY?: true
   reminderMinutesBefore?: true
+  listOrder?: true
 }
 
 export type OrganizedItemMinAggregateInputType = {
@@ -184,6 +191,7 @@ export type OrganizedItemMinAggregateInputType = {
   reminderMinutesBefore?: true
   reminderNotifiedAt?: true
   reminderEarlyNotifiedAt?: true
+  listOrder?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -216,6 +224,7 @@ export type OrganizedItemMaxAggregateInputType = {
   reminderMinutesBefore?: true
   reminderNotifiedAt?: true
   reminderEarlyNotifiedAt?: true
+  listOrder?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -248,6 +257,7 @@ export type OrganizedItemCountAggregateInputType = {
   reminderMinutesBefore?: true
   reminderNotifiedAt?: true
   reminderEarlyNotifiedAt?: true
+  listOrder?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -367,6 +377,7 @@ export type OrganizedItemGroupByOutputType = {
   reminderMinutesBefore: number | null
   reminderNotifiedAt: Date | null
   reminderEarlyNotifiedAt: Date | null
+  listOrder: number
   createdAt: Date
   updatedAt: Date
   _count: OrganizedItemCountAggregateOutputType | null
@@ -422,6 +433,7 @@ export type OrganizedItemWhereInput = {
   reminderMinutesBefore?: Prisma.IntNullableFilter<"OrganizedItem"> | number | null
   reminderNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
+  listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
@@ -458,6 +470,7 @@ export type OrganizedItemOrderByWithRelationInput = {
   reminderMinutesBefore?: Prisma.SortOrderInput | Prisma.SortOrder
   reminderNotifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   reminderEarlyNotifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   dump?: Prisma.DumpOrderByWithRelationInput
@@ -497,6 +510,7 @@ export type OrganizedItemWhereUniqueInput = Prisma.AtLeast<{
   reminderMinutesBefore?: Prisma.IntNullableFilter<"OrganizedItem"> | number | null
   reminderNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
+  listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
@@ -533,6 +547,7 @@ export type OrganizedItemOrderByWithAggregationInput = {
   reminderMinutesBefore?: Prisma.SortOrderInput | Prisma.SortOrder
   reminderNotifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   reminderEarlyNotifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OrganizedItemCountOrderByAggregateInput
@@ -573,6 +588,7 @@ export type OrganizedItemScalarWhereWithAggregatesInput = {
   reminderMinutesBefore?: Prisma.IntNullableWithAggregatesFilter<"OrganizedItem"> | number | null
   reminderNotifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OrganizedItem"> | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OrganizedItem"> | Date | string | null
+  listOrder?: Prisma.FloatWithAggregatesFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"OrganizedItem"> | Date | string
 }
@@ -602,6 +618,7 @@ export type OrganizedItemCreateInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
@@ -638,6 +655,7 @@ export type OrganizedItemUncheckedCreateInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
@@ -668,6 +686,7 @@ export type OrganizedItemUpdateInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
@@ -704,6 +723,7 @@ export type OrganizedItemUncheckedUpdateInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
@@ -737,6 +757,7 @@ export type OrganizedItemCreateManyInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -766,6 +787,7 @@ export type OrganizedItemUpdateManyMutationInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -798,6 +820,7 @@ export type OrganizedItemUncheckedUpdateManyInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -840,6 +863,7 @@ export type OrganizedItemCountOrderByAggregateInput = {
   reminderMinutesBefore?: Prisma.SortOrder
   reminderNotifiedAt?: Prisma.SortOrder
   reminderEarlyNotifiedAt?: Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -850,6 +874,7 @@ export type OrganizedItemAvgOrderByAggregateInput = {
   positionX?: Prisma.SortOrder
   positionY?: Prisma.SortOrder
   reminderMinutesBefore?: Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
 }
 
 export type OrganizedItemMaxOrderByAggregateInput = {
@@ -880,6 +905,7 @@ export type OrganizedItemMaxOrderByAggregateInput = {
   reminderMinutesBefore?: Prisma.SortOrder
   reminderNotifiedAt?: Prisma.SortOrder
   reminderEarlyNotifiedAt?: Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -912,6 +938,7 @@ export type OrganizedItemMinOrderByAggregateInput = {
   reminderMinutesBefore?: Prisma.SortOrder
   reminderNotifiedAt?: Prisma.SortOrder
   reminderEarlyNotifiedAt?: Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -922,6 +949,7 @@ export type OrganizedItemSumOrderByAggregateInput = {
   positionX?: Prisma.SortOrder
   positionY?: Prisma.SortOrder
   reminderMinutesBefore?: Prisma.SortOrder
+  listOrder?: Prisma.SortOrder
 }
 
 export type OrganizedItemScalarRelationFilter = {
@@ -1122,6 +1150,7 @@ export type OrganizedItemCreateWithoutDumpInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutItemsInput
@@ -1156,6 +1185,7 @@ export type OrganizedItemUncheckedCreateWithoutDumpInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
@@ -1218,6 +1248,7 @@ export type OrganizedItemScalarWhereInput = {
   reminderMinutesBefore?: Prisma.IntNullableFilter<"OrganizedItem"> | number | null
   reminderNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
+  listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
 }
@@ -1247,6 +1278,7 @@ export type OrganizedItemCreateWithoutProjectInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
@@ -1281,6 +1313,7 @@ export type OrganizedItemUncheckedCreateWithoutProjectInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
@@ -1337,6 +1370,7 @@ export type OrganizedItemCreateWithoutTagsInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
@@ -1372,6 +1406,7 @@ export type OrganizedItemUncheckedCreateWithoutTagsInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1417,6 +1452,7 @@ export type OrganizedItemUpdateWithoutTagsInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
@@ -1452,6 +1488,7 @@ export type OrganizedItemUncheckedUpdateWithoutTagsInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1481,6 +1518,7 @@ export type OrganizedItemCreateWithoutUserInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
@@ -1515,6 +1553,7 @@ export type OrganizedItemUncheckedCreateWithoutUserInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
@@ -1573,6 +1612,7 @@ export type OrganizedItemCreateManyDumpInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1602,6 +1642,7 @@ export type OrganizedItemUpdateWithoutDumpInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
@@ -1636,6 +1677,7 @@ export type OrganizedItemUncheckedUpdateWithoutDumpInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
@@ -1668,6 +1710,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutDumpInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1699,6 +1742,7 @@ export type OrganizedItemCreateManyProjectInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1728,6 +1772,7 @@ export type OrganizedItemUpdateWithoutProjectInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
@@ -1762,6 +1807,7 @@ export type OrganizedItemUncheckedUpdateWithoutProjectInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
@@ -1794,6 +1840,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutProjectInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1825,6 +1872,7 @@ export type OrganizedItemCreateManyUserInput = {
   reminderMinutesBefore?: number | null
   reminderNotifiedAt?: Date | string | null
   reminderEarlyNotifiedAt?: Date | string | null
+  listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1854,6 +1902,7 @@ export type OrganizedItemUpdateWithoutUserInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
@@ -1888,6 +1937,7 @@ export type OrganizedItemUncheckedUpdateWithoutUserInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
@@ -1920,6 +1970,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutUserInput = {
   reminderMinutesBefore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   reminderNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reminderEarlyNotifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1983,6 +2034,7 @@ export type OrganizedItemSelect<ExtArgs extends runtime.Types.Extensions.Interna
   reminderMinutesBefore?: boolean
   reminderNotifiedAt?: boolean
   reminderEarlyNotifiedAt?: boolean
+  listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
@@ -2020,6 +2072,7 @@ export type OrganizedItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   reminderMinutesBefore?: boolean
   reminderNotifiedAt?: boolean
   reminderEarlyNotifiedAt?: boolean
+  listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
@@ -2055,6 +2108,7 @@ export type OrganizedItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   reminderMinutesBefore?: boolean
   reminderNotifiedAt?: boolean
   reminderEarlyNotifiedAt?: boolean
+  listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
@@ -2090,11 +2144,12 @@ export type OrganizedItemSelectScalar = {
   reminderMinutesBefore?: boolean
   reminderNotifiedAt?: boolean
   reminderEarlyNotifiedAt?: boolean
+  listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "userId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["organizedItem"]>
+export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "userId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "listOrder" | "createdAt" | "updatedAt", ExtArgs["result"]["organizedItem"]>
 export type OrganizedItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -2149,6 +2204,10 @@ export type $OrganizedItemPayload<ExtArgs extends runtime.Types.Extensions.Inter
     reminderMinutesBefore: number | null
     reminderNotifiedAt: Date | null
     reminderEarlyNotifiedAt: Date | null
+    /**
+     * Manual order for list/text views (ascending: smaller = higher in UI). Tie-break: createdAt desc when equal.
+     */
+    listOrder: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["organizedItem"]>
@@ -2605,6 +2664,7 @@ export interface OrganizedItemFieldRefs {
   readonly reminderMinutesBefore: Prisma.FieldRef<"OrganizedItem", 'Int'>
   readonly reminderNotifiedAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
   readonly reminderEarlyNotifiedAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
+  readonly listOrder: Prisma.FieldRef<"OrganizedItem", 'Float'>
   readonly createdAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
 }

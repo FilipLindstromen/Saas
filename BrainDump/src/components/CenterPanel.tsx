@@ -51,20 +51,6 @@ export interface OrganizedItemPreview {
   reminder_minutes_before?: number;
 }
 
-function getStoredOpenAIKey(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    if (!raw) return "";
-    const parsed = JSON.parse(raw);
-    return (parsed.openai ?? "").trim();
-  } catch {
-    return "";
-  }
-}
-
-const OPENAI_KEY_ERROR = "OpenAI API key is not configured";
-
 const TRANSCRIBE_TIMEOUT_MS = 120_000;
 const ORGANIZE_TIMEOUT_MS = 180_000;
 const TRANSCRIBE_IMAGE_TIMEOUT_MS = 120_000;
@@ -500,8 +486,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     try {
       const form = new FormData();
       form.append("file", blob, fileName);
-      const key = getStoredOpenAIKey();
-      if (key) form.append("apiKey", key);
       /** Match Whisper to UI language (sv/en); API maps to ISO 639-1 for whisper-1 */
       form.append("language", locale);
       const res = await fetchWithTimeout("/api/transcribe", { method: "POST", body: form }, TRANSCRIBE_TIMEOUT_MS);
@@ -514,9 +498,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       }
       if (!res.ok) {
         const msg = data.error || "Transcription failed";
-        if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
-          onOpenSettings?.();
-        }
         throw new Error(msg);
       }
       const text = (data.transcript || "").trim();
@@ -530,7 +511,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     } finally {
       setTranscribeLoading(false);
     }
-  }, [transcript, onTranscriptReady, onOpenSettings, locale, t]);
+  }, [transcript, onTranscriptReady, locale, t]);
 
   const applyOrganizeResult = useCallback(
     async (items: OrganizedItemPreview[], text: string) => {
@@ -563,7 +544,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     setUnclearItems(null);
     saveFormState({ organizeInProgress: true, organizeTranscriptSnapshot: text });
     try {
-      const key = getStoredOpenAIKey();
       const defaultDomain = getDefaultDomainFromMode(mode);
       let customCategories: string[] | undefined;
       try {
@@ -573,11 +553,13 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           if (Array.isArray(parsed)) customCategories = parsed.filter((c: unknown) => typeof c === "string" && c.trim());
         }
       } catch {}
+      const now = new Date();
+      const referenceLocalDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const body = {
         transcript: text,
         locale,
-        referenceIso: new Date().toISOString(),
-        ...(key ? { apiKey: key } : {}),
+        referenceIso: now.toISOString(),
+        referenceLocalDate,
         projectNames: projectNames.length > 0 ? projectNames : undefined,
         ...(defaultDomain ? { defaultDomain } : {}),
         ...(customCategories?.length ? { customCategories } : {}),
@@ -589,9 +571,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       }>("/api/organize", body, ORGANIZE_TIMEOUT_MS);
       if (!ok) {
         const msg = typeof data.error === "string" && data.error ? data.error : "Organization failed";
-        if (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY")) {
-          onOpenSettings?.();
-        }
         throw new Error(msg);
       }
       const standaloneRaw: string[] = Array.isArray(data.standaloneProjectCreations)
@@ -632,7 +611,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     } finally {
       setOrganizeLoading(false);
     }
-  }, [transcript, projectNames, onOpenSettings, onAutoSave, applyOrganizeResult, mode, locale, t, onWorkProjectsChanged]);
+  }, [transcript, projectNames, onAutoSave, applyOrganizeResult, mode, locale, t, onWorkProjectsChanged]);
 
   const organizeFromTypedText = useCallback(
     async (raw: string) => {
@@ -665,8 +644,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       try {
         const form = new FormData();
         form.append("image", file);
-        const key = getStoredOpenAIKey();
-        if (key) form.append("apiKey", key);
         form.append("locale", locale);
         const res = await fetchWithTimeout("/api/transcribe-image", { method: "POST", body: form }, TRANSCRIBE_IMAGE_TIMEOUT_MS);
         const raw = await res.text();
@@ -678,9 +655,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         }
         if (!res.ok) {
           const msg = data.error || "Image transcription failed";
-          if (typeof msg === "string" && (msg.includes(OPENAI_KEY_ERROR) || msg.includes("OPENAI_API_KEY"))) {
-            onOpenSettings?.();
-          }
           throw new Error(msg);
         }
         const text = (data.transcript || "").trim();
@@ -702,7 +676,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         setPhotoOrganizeFlow(false);
       }
     },
-    [locale, onOpenSettings, onTranscriptReady, organize, transcript, t]
+    [locale, onTranscriptReady, organize, transcript, t]
   );
 
   const openTypedDumpSheet = useCallback(() => {
@@ -935,11 +909,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       {error && (
         <div className="bd-banner-error">
           <span>{error}</span>
-          {typeof error === "string" && (error.includes(OPENAI_KEY_ERROR) || error.includes("OPENAI_API_KEY")) && onOpenSettings && (
-            <button type="button" className="bd-btn bd-btn-primary" onClick={onOpenSettings} style={{ flexShrink: 0 }}>
-              {t("center.openSettings")}
-            </button>
-          )}
         </div>
       )}
     </>

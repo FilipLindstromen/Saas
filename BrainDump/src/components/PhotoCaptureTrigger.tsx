@@ -148,7 +148,7 @@ export function PhotoCaptureTrigger({
       </div>
 
       {webcamOpen && (
-        <div className="bd-modal-backdrop" style={{ zIndex: 1200 }} role="presentation" onClick={stopWebcam}>
+        <div className="bd-modal-backdrop" role="presentation" onClick={stopWebcam}>
           <div
             className="bd-panel bd-modal-panel"
             style={{ width: "min(100%, 420px)", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}

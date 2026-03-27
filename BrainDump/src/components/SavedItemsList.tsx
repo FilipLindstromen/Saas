@@ -339,7 +339,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             style={isMobile ? {
               position: "fixed",
               inset: 0,
-              zIndex: 1100,
+              zIndex: "var(--bd-z-dropdown)",
               background: "rgba(0,0,0,0.35)",
               display: "flex",
               alignItems: "flex-end",
@@ -353,7 +353,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
               position: isMobile ? "relative" : "fixed",
               left: isMobile ? undefined : itemContextMenu.x,
               top: isMobile ? undefined : itemContextMenu.y,
-              zIndex: 1000,
+              zIndex: "var(--bd-z-dropdown)",
               background: "var(--bg-elevated)",
               border: "1px solid var(--border-default)",
               borderRadius: isMobile ? "16px" : "var(--button-radius)",
@@ -569,7 +569,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
           style={{
             position: "fixed",
             inset: 0,
-            zIndex: 1100,
+            zIndex: "var(--bd-z-modal)",
             background: "rgba(0,0,0,0.35)",
             display: "flex",
             alignItems: "center",

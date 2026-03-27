@@ -35,30 +35,6 @@ const TEXT_SIZE_OPTIONS = [
   { value: "xlarge", label: "Extra large", scale: 1.25 },
 ] as const;
 
-function loadOpenAIKey(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    if (!raw) return "";
-    const parsed = JSON.parse(raw);
-    return parsed.openai ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveOpenAIKey(key: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    const current = raw ? JSON.parse(raw) : {};
-    const next = { ...current, openai: key };
-    localStorage.setItem("saasApiKeys", JSON.stringify(next));
-  } catch (e) {
-    console.warn("Failed to save API key", e);
-  }
-}
-
 function loadTextSize(): string {
   if (typeof window === "undefined") return "medium";
   try {
@@ -166,7 +142,6 @@ interface CalendarOption {
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { t, locale, setLocale } = useI18n();
-  const [openaiKey, setOpenaiKey] = useState("");
   const [textSize, setTextSize] = useState("medium");
   const [googleCalendarSync, setGoogleCalendarSync] = useState(false);
   const [googleClientId, setGoogleClientId] = useState("");
@@ -195,7 +170,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   useEffect(() => {
     if (isOpen) {
-      setOpenaiKey(loadOpenAIKey());
       setTextSize(loadTextSize());
       setShowEntryTitles(loadShowEntryTitles());
       setShowDumpFace(loadShowDumpFace());
@@ -288,7 +262,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }, [t]);
 
   const handleSave = () => {
-    saveOpenAIKey(openaiKey.trim());
     saveTextSize(textSize);
     saveShowEntryTitles(showEntryTitles);
     saveShowDumpFace(showDumpFace);
@@ -419,19 +392,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <option value="en">{t("lang.english")}</option>
             <option value="sv">{t("lang.swedish")}</option>
           </select>
-          <label htmlFor="bd-openai-key" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-            OpenAI API key
-          </label>
-          <input
-            id="bd-openai-key"
-            type="password"
-            className="bd-input"
-            value={openaiKey}
-            onChange={(e) => setOpenaiKey(e.target.value)}
-            placeholder="sk-..."
-            style={{ marginBottom: "1rem" }}
-            autoComplete="off"
-          />
           <label htmlFor="bd-text-size" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
             Text size
           </label>

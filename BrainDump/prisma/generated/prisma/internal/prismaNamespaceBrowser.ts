@@ -57,6 +57,7 @@ export const ModelName = {
   Tag: 'Tag',
   OrganizedItemTag: 'OrganizedItemTag',
   User: 'User',
+  PasswordResetToken: 'PasswordResetToken',
   Account: 'Account',
   Session: 'Session',
   VerificationToken: 'VerificationToken'
@@ -122,6 +123,7 @@ export const OrganizedItemScalarFieldEnum = {
   reminderMinutesBefore: 'reminderMinutesBefore',
   reminderNotifiedAt: 'reminderNotifiedAt',
   reminderEarlyNotifiedAt: 'reminderEarlyNotifiedAt',
+  listOrder: 'listOrder',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -165,10 +167,21 @@ export const UserScalarFieldEnum = {
   name: 'name',
   email: 'email',
   emailVerified: 'emailVerified',
-  image: 'image'
+  image: 'image',
+  passwordHash: 'passwordHash'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const PasswordResetTokenScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  token: 'token',
+  expiresAt: 'expiresAt'
+} as const
+
+export type PasswordResetTokenScalarFieldEnum = (typeof PasswordResetTokenScalarFieldEnum)[keyof typeof PasswordResetTokenScalarFieldEnum]
 
 
 export const AccountScalarFieldEnum = {

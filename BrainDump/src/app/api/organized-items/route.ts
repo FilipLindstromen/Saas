@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const items = await prisma.organizedItem.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ listOrder: "asc" }, { createdAt: "desc" }],
       take: 200,
       include: {
         dump: { select: { id: true, mode: true, createdAt: true } },
@@ -140,6 +140,12 @@ export async function POST(request: NextRequest) {
       typeof project_name === "string" && project_name.trim() ? project_name.trim() : "";
 
     const item = await prisma.$transaction(async (tx) => {
+      const minAgg = await tx.organizedItem.aggregate({
+        where: { userId },
+        _min: { listOrder: true },
+      });
+      const nextListOrder = (minAgg._min.listOrder ?? 0) - 1000;
+
       let resolvedProjectId: string | null = projectId ?? null;
       if (pname) {
         resolvedProjectId = await resolveOrCreateProjectByName(
@@ -167,6 +173,7 @@ export async function POST(request: NextRequest) {
           itemType,
           title,
           content: content ?? "",
+          listOrder: nextListOrder,
           emotionLabel: emotionLabel ?? null,
           status: status ?? "draft",
           priority: priority ?? null,

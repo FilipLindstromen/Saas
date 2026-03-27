@@ -17,12 +17,10 @@ export async function POST(request: NextRequest) {
         { status: 413 }
       );
     }
-    const clientKey = body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "";
-
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
 
-    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    const keyRes = resolveOpenAiApiKey(userId);
     if (!keyRes.ok) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }
@@ -50,6 +48,8 @@ export async function POST(request: NextRequest) {
     const customCategories = Array.isArray(body.customCategories) ? body.customCategories.filter((c: unknown) => typeof c === "string" && c.trim()) : undefined;
     const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
     const referenceIso = typeof body.referenceIso === "string" ? body.referenceIso.trim() : undefined;
+    const referenceLocalDateRaw = typeof body.referenceLocalDate === "string" ? body.referenceLocalDate.trim() : "";
+    const referenceLocalDate = /^\d{4}-\d{2}-\d{2}$/.test(referenceLocalDateRaw) ? referenceLocalDateRaw : undefined;
 
     let existingCategories: string[] | undefined;
     if (userId && (defaultDomain === "work" || defaultDomain === "personal")) {
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       customCategories,
       locale,
       ...(referenceIso ? { referenceIso } : {}),
+      ...(referenceLocalDate ? { referenceLocalDate } : {}),
     };
 
     const result = await organizeTranscriptResilient(transcript, apiKey, options);

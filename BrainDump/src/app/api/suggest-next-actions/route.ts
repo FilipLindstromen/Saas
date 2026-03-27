@@ -22,8 +22,7 @@ export async function POST(request: NextRequest) {
     const items = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
-    const clientKey = body.apiKey && typeof body.apiKey === "string" ? body.apiKey : "";
-    const keyRes = resolveOpenAiApiKey(clientKey, userId);
+    const keyRes = resolveOpenAiApiKey(userId);
     if (!keyRes.ok) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }

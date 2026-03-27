@@ -68,9 +68,14 @@ export type Tag = Prisma.TagModel
 export type OrganizedItemTag = Prisma.OrganizedItemTagModel
 /**
  * Model User
- * Auth.js / NextAuth user model
+ * Auth.js / NextAuth user model (credentials: passwordHash set; OAuth: accounts used)
  */
 export type User = Prisma.UserModel
+/**
+ * Model PasswordResetToken
+ * One-time token for email/password reset flow
+ */
+export type PasswordResetToken = Prisma.PasswordResetTokenModel
 /**
  * Model Account
  * Auth.js / NextAuth account model
