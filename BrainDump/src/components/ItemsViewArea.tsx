@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type Dispatch,
   type DragEvent,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
@@ -28,6 +30,7 @@ import {
   type TextViewCommitFocus,
 } from "@/lib/text-view-entry-split";
 import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
+import { filterItemsByDueDatePreset, type DueDateFilterPreset } from "@/lib/due-date-filter";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -93,6 +96,7 @@ interface ItemsViewAreaProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  dueDateFilter?: DueDateFilterPreset;
   reloadKey?: number;
   /** Mobile: render ScopeBar in one row with type / view / filter (passed from page when scope is shown). */
   scopeSlot?: ReactNode;
@@ -465,6 +469,7 @@ export function ItemsViewArea({
   viewType: controlledViewType,
   onViewTypeChange,
   searchFilter = "",
+  dueDateFilter = "all",
   reloadKey = 0,
   scopeSlot,
   onMobileTopBarBeforeMenuSlot,
@@ -487,11 +492,16 @@ export function ItemsViewArea({
   }, []);
   const filteredItems = useMemo(
     () =>
-      sortItemsByListOrder(filterItemsBySearch(filterItemsByType(items, itemType), searchFilter)),
-    [items, itemType, searchFilter, newBatchTick]
+      sortItemsByListOrder(
+        filterItemsBySearch(
+          filterItemsByDueDatePreset(filterItemsByType(items, itemType), dueDateFilter),
+          searchFilter
+        )
+      ),
+    [items, itemType, searchFilter, dueDateFilter, newBatchTick]
   );
 
-  const canReorderEntries = !searchFilter.trim();
+  const canReorderEntries = !searchFilter.trim() && dueDateFilter === "all";
 
   const [suggestedItemTypesFromDump, setSuggestedItemTypesFromDump] = useState<SuggestedItemTypeDetail[]>([]);
   const [internalViewType, setInternalViewType] = useState<ItemsViewType>(loadViewPreference);
@@ -517,6 +527,8 @@ export function ItemsViewArea({
   const [editEntryMoreOpen, setEditEntryMoreOpen] = useState(false);
   const [editEntryScheduleOpen, setEditEntryScheduleOpen] = useState(false);
   const editEntryContentRef = useRef<HTMLTextAreaElement | null>(null);
+  const editingEntryRef = useRef(editingEntry);
+  editingEntryRef.current = editingEntry;
   const [reminderEntry, setReminderEntry] = useState<{
     id: string;
     title: string;
@@ -1407,6 +1419,23 @@ export function ItemsViewArea({
     };
   }, [editingEntry, isMobile]);
 
+  useEffect(() => {
+    if (!editingEntry) return;
+    const onChromePointerDown = (e: PointerEvent) => {
+      const node = e.target;
+      if (!(node instanceof Node)) return;
+      const top = document.querySelector(".bd-topbar");
+      const bottom = document.querySelector(".bd-bottom-bar");
+      if (!(top?.contains(node) || bottom?.contains(node))) return;
+      const ed = editingEntryRef.current;
+      if (!ed) return;
+      flushEditingEntry(ed);
+      setEditingEntry(null);
+    };
+    document.addEventListener("pointerdown", onChromePointerDown, true);
+    return () => document.removeEventListener("pointerdown", onChromePointerDown, true);
+  }, [editingEntry, flushEditingEntry]);
+
   const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
@@ -1774,6 +1803,7 @@ export function ItemsViewArea({
               items={filteredItems}
               onUpdate={updateEntryContent}
               onCommitTextContent={commitTextViewContent}
+              onDelete={deleteItem}
               onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
               reorderEnabled={canReorderEntries}
               onReorder={reorderEntriesPersist}
@@ -2171,6 +2201,20 @@ export function ItemsViewArea({
                   <circle cx="12" cy="18" r="1.5" />
                 </svg>
               </button>
+              <button
+                type="button"
+                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
+                aria-label={t("items.ariaSaveEntry")}
+                title={t("items.ariaSaveEntry")}
+                onClick={() => {
+                  flushEditingEntry(editingEntry);
+                  setEditingEntry(null);
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
             </div>
           </header>
           <div className="bd-edit-entry-mobile-scroll">
@@ -2451,7 +2495,23 @@ export function ItemsViewArea({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
+            <div className="bd-edit-entry-panel-title-row">
+              <h3>{t("items.editEntry")}</h3>
+              <button
+                type="button"
+                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
+                aria-label={t("items.ariaSaveEntry")}
+                title={t("items.ariaSaveEntry")}
+                onClick={() => {
+                  flushEditingEntry(editingEntry);
+                  setEditingEntry(null);
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </div>
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
             <input
               className="bd-input"
@@ -3467,6 +3527,7 @@ function CalendarView({
           flexDirection: "column",
           gap: isMobile ? "0.45rem" : "0.55rem",
           paddingTop: "0.35rem",
+          paddingBottom: "var(--bd-view-bottom-pad)",
         }}
       >
         {dayItems.length === 0 ? (
@@ -3862,7 +3923,15 @@ function MindmapView({
   const rootColor = "var(--accent)";
 
   return (
-    <div className="bd-mindmap" style={{ padding: isMobile ? "0.65rem" : "1.25rem 1.5rem 1.75rem" }}>
+    <div
+      className="bd-mindmap"
+      style={{
+        padding: isMobile ? "0.65rem" : "1.25rem 1.5rem 0",
+        paddingBottom: isMobile
+          ? "calc(0.65rem + var(--bd-view-bottom-pad))"
+          : "calc(1.75rem + var(--bd-view-bottom-pad))",
+      }}
+    >
       {items.length === 0 ? (
         <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>{t("items.flowchartEmpty")}</p>
       ) : (
@@ -3932,6 +4001,161 @@ function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
   window.setTimeout(() => clone.remove(), 0);
 }
 
+const SWIPE_DELETE_WIDTH_PX = 80;
+
+type SwipeDeleteRowProps = {
+  entryId: string;
+  swipeOpenId: string | null;
+  setSwipeOpenId: Dispatch<SetStateAction<string | null>>;
+  onDelete: () => void;
+  disabled?: boolean;
+  /** Sliding panel background so content covers the delete strip when closed */
+  slideSurface: "elevated" | "canvas";
+  children: ReactNode;
+};
+
+function SwipeDeleteRow({
+  entryId,
+  swipeOpenId,
+  setSwipeOpenId,
+  onDelete,
+  disabled,
+  slideSurface,
+  children,
+}: SwipeDeleteRowProps) {
+  const { t } = useI18n();
+  const [offset, setOffset] = useState(0);
+  const [transitioning, setTransitioning] = useState(true);
+  const offsetRef = useRef(0);
+  offsetRef.current = offset;
+  const drag = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startOffset: number;
+    lock: "none" | "h" | "v";
+  } | null>(null);
+
+  useEffect(() => {
+    if (swipeOpenId !== entryId) {
+      setOffset((o) => (o > 0 ? 0 : o));
+    }
+  }, [swipeOpenId, entryId]);
+
+  const slideClass =
+    slideSurface === "elevated"
+      ? "bd-swipe-delete-slide bd-swipe-delete-slide--elevated"
+      : "bd-swipe-delete-slide bd-swipe-delete-slide--canvas";
+
+  const finishPointer = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (d.lock === "h") {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      const final = offsetRef.current;
+      drag.current = null;
+      setTransitioning(true);
+      if (final > SWIPE_DELETE_WIDTH_PX / 2) {
+        offsetRef.current = SWIPE_DELETE_WIDTH_PX;
+        setOffset(SWIPE_DELETE_WIDTH_PX);
+        setSwipeOpenId(entryId);
+      } else {
+        offsetRef.current = 0;
+        setOffset(0);
+        setSwipeOpenId((prev) => (prev === entryId ? null : prev));
+      }
+    } else {
+      drag.current = null;
+      setTransitioning(true);
+    }
+  };
+
+  return (
+    <div
+      className="bd-swipe-delete-wrap"
+      style={{ ["--bd-swipe-delete-w" as string]: `${SWIPE_DELETE_WIDTH_PX}px` }}
+    >
+      <div className="bd-swipe-delete-actions" aria-hidden={offset === 0}>
+        <button
+          type="button"
+          className="bd-swipe-delete-btn"
+          data-bd-no-swipe
+          aria-label={t("items.ariaDeleteEntry")}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+            setSwipeOpenId((prev) => (prev === entryId ? null : prev));
+            offsetRef.current = 0;
+            setOffset(0);
+          }}
+        >
+          {t("menu.delete")}
+        </button>
+      </div>
+      <div
+        className={slideClass}
+        style={{
+          transform: `translateX(${-offset}px)`,
+          transition: transitioning ? "transform 0.22s var(--bd-ease-soft)" : "none",
+        }}
+        onPointerDown={(e) => {
+          if (disabled) return;
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          const el = e.target as HTMLElement;
+          if (el.closest("[data-bd-no-swipe]")) return;
+          setTransitioning(false);
+          drag.current = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            startOffset: offsetRef.current,
+            lock: "none",
+          };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d || d.pointerId !== e.pointerId) return;
+          const dx = e.clientX - d.startX;
+          const dy = e.clientY - d.startY;
+          if (d.lock === "none") {
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            if (Math.abs(dy) > Math.abs(dx)) {
+              d.lock = "v";
+              drag.current = null;
+              setTransitioning(true);
+              return;
+            }
+            d.lock = "h";
+            try {
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            } catch {
+              /* ignore */
+            }
+          }
+          if (d.lock !== "h") return;
+          e.preventDefault();
+          const next = Math.min(SWIPE_DELETE_WIDTH_PX, Math.max(0, d.startOffset - dx));
+          offsetRef.current = next;
+          setOffset(next);
+        }}
+        onPointerUp={finishPointer}
+        onPointerCancel={finishPointer}
+        onLostPointerCapture={() => {
+          drag.current = null;
+          setTransitioning(true);
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ListView({
   items,
   showEntryTitles = true,
@@ -3956,6 +4180,7 @@ function ListView({
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
   const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -4043,8 +4268,16 @@ function ListView({
         : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
 
     return (
-      <div
+      <SwipeDeleteRow
         key={it.id}
+        entryId={it.id}
+        swipeOpenId={swipeOpenId}
+        setSwipeOpenId={setSwipeOpenId}
+        onDelete={() => onDelete(it.id, true)}
+        disabled={!!(editing && editing.id === it.id)}
+        slideSurface="elevated"
+      >
+      <div
         className={`bd-todo-row ${ep.className}`}
         data-bd-entry-id={it.id}
         onDoubleClick={() => onEdit?.(it)}
@@ -4076,6 +4309,7 @@ function ListView({
           {reorderEnabled && onReorder ? (
             <span
               className="bd-entry-drag-handle"
+              data-bd-no-swipe
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/plain", it.id);
@@ -4102,12 +4336,14 @@ function ListView({
           {isTask ? (
             <label
               className="bd-todo-checkbox-wrap"
+              data-bd-no-swipe
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
               <input
                 type="checkbox"
                 className="bd-todo-checkbox"
+                data-bd-no-swipe
                 checked={isTaskCompleted(it)}
                 onChange={(e) => {
                   e.stopPropagation();
@@ -4128,6 +4364,7 @@ function ListView({
               <input
                 ref={inputRef}
                 type="text"
+                data-bd-no-swipe
                 value={editing.value}
                 onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                 onBlur={() => handleFieldBlur(it.id, "title", editing.value, it)}
@@ -4175,6 +4412,7 @@ function ListView({
             (onUpdate && editing?.id === it.id && editing.field === "content" ? (
               <textarea
                 ref={textareaRef}
+                data-bd-no-swipe
                 value={editing.value}
                 onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                 onBlur={() => handleFieldBlur(it.id, "content", editing.value, it)}
@@ -4266,6 +4504,7 @@ function ListView({
           </div>
         ) : null}
       </div>
+      </SwipeDeleteRow>
     );
   };
 
@@ -4294,6 +4533,7 @@ function TextView({
   showEntryTitles = true,
   onUpdate,
   onCommitTextContent,
+  onDelete,
   onItemContextMenu,
   reorderEnabled = false,
   onReorder,
@@ -4303,6 +4543,7 @@ function TextView({
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
   /** Text view: blur commits full textarea; double line breaks split into new entries (also on input). */
   onCommitTextContent?: (id: string, raw: string) => void | Promise<TextViewCommitFocus | void>;
+  onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
   reorderEnabled?: boolean;
   onReorder?: (orderedIds: string[]) => void;
@@ -4310,6 +4551,7 @@ function TextView({
   const { t } = useI18n();
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
   const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const textSplitCommitLockRef = useRef(false);
@@ -4423,8 +4665,16 @@ function TextView({
             ? { boxShadow: "inset 0 3px 0 0 var(--accent)" }
             : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
         return (
-          <div
+          <SwipeDeleteRow
             key={it.id}
+            entryId={it.id}
+            swipeOpenId={swipeOpenId}
+            setSwipeOpenId={setSwipeOpenId}
+            onDelete={() => onDelete(it.id, true)}
+            disabled={isEditingTitle || isEditingContent}
+            slideSurface="canvas"
+          >
+          <div
             className={ep.className}
             data-bd-entry-id={it.id}
             style={{
@@ -4457,6 +4707,7 @@ function TextView({
             {reorderEnabled && onReorder ? (
               <span
                 className="bd-entry-drag-handle bd-entry-drag-handle--text"
+                data-bd-no-swipe
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", it.id);
@@ -4521,6 +4772,7 @@ function TextView({
                   <input
                     ref={inputRef}
                     type="text"
+                    data-bd-no-swipe
                     value={editing?.value ?? it.title}
                     onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                     onBlur={() => editing && handleBlur(it.id, "title", editing.value, it.title)}
@@ -4563,6 +4815,7 @@ function TextView({
             {isEditingContent ? (
               <textarea
                 ref={textareaRef}
+                data-bd-no-swipe
                 value={
                   editing?.id === it.id
                     ? (editing.value ?? "")
@@ -4647,6 +4900,7 @@ function TextView({
             )}
           </article>
           </div>
+          </SwipeDeleteRow>
         );
       })}
       <p
@@ -4795,6 +5049,7 @@ function KanbanView({
           maxWidth: "100%",
           minWidth: 0,
           boxSizing: "border-box",
+          ...(isMobile ? {} : { paddingBottom: "var(--bd-view-bottom-pad)" }),
         }}
       >
       {byColumn.map((col) => (
@@ -5104,6 +5359,7 @@ function PostitsView({
         overflow: "auto",
         background: "var(--bg-primary)",
         borderRadius: 0,
+        paddingBottom: "var(--bd-view-bottom-pad)",
       }}
       onMouseLeave={() => {
         if (dragState) setDragState(null);

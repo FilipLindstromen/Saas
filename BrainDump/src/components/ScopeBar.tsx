@@ -124,54 +124,284 @@ function fetchCounts(domain: string): Promise<CountsResponse> {
     .catch(() => ({}));
 }
 
-const DUE_DATE_PRESETS: DueDateFilterPreset[] = ["all", "today", "tomorrow", "this_week", "no_date"];
+const DUE_DATE_LABEL_KEY: Record<DueDateFilterPreset, string> = {
+  all: "scope.dateFilterAll",
+  today: "scope.dateFilterToday",
+  tomorrow: "scope.dateFilterTomorrow",
+  this_week: "scope.dateFilterThisWeek",
+  no_date: "scope.dateFilterNoDate",
+};
 
-function DueDateFilterChips({
+function DueDateFilterMenuButton({
   value,
   onChange,
+  isMobile,
   t,
 }: {
   value: DueDateFilterPreset;
   onChange: (preset: DueDateFilterPreset) => void;
+  isMobile: boolean;
   t: (key: string) => string;
 }) {
-  const labelKey: Record<DueDateFilterPreset, string> = {
-    all: "scope.dateFilterAll",
-    today: "scope.dateFilterToday",
-    tomorrow: "scope.dateFilterTomorrow",
-    this_week: "scope.dateFilterThisWeek",
-    no_date: "scope.dateFilterNoDate",
-  };
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("click", onDoc, true);
+    return () => document.removeEventListener("click", onDoc, true);
+  }, [open]);
+
+  const selected = value !== "all";
+
+  return (
+    <div ref={rootRef} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        type="button"
+        className={isMobile ? "bd-btn bd-scope-filter-circle" : "bd-btn"}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={t("scope.dateFilterMenuAria")}
+        title={t("scope.dateFilterMenuAria")}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setOpen((o) => !o);
+        }}
+        style={{
+          minWidth: isMobile ? 44 : 40,
+          minHeight: isMobile ? 44 : 36,
+          padding: isMobile ? "0.4rem" : "0.35rem 0.5rem",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "0.35rem",
+          fontSize: "0.75rem",
+          fontWeight: 600,
+          ...(selected
+            ? {
+                background: "var(--bd-chrome-selected-bg)",
+                borderColor: "var(--bd-chrome-selected-border)",
+                color: "var(--bd-chrome-selected-text)",
+              }
+            : {}),
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        {!isMobile && selected ? (
+          <span
+            style={{
+              maxWidth: "5.5rem",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t(DUE_DATE_LABEL_KEY[value])}
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label={t("scope.dateFilterMenuAria")}
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "calc(100% + 4px)",
+            minWidth: "12rem",
+            zIndex: "var(--bd-z-dropdown)",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: 12,
+            boxShadow: "var(--shadow-md)",
+            padding: "0.35rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.15rem",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(["today", "tomorrow", "this_week"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="option"
+              aria-selected={value === p}
+              className="bd-btn"
+              onClick={() => {
+                onChange(p);
+                setOpen(false);
+              }}
+              style={{
+                justifyContent: "flex-start",
+                minHeight: 40,
+                fontWeight: 600,
+                fontSize: "0.8125rem",
+                background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
+                color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
+              }}
+            >
+              {t(DUE_DATE_LABEL_KEY[p])}
+            </button>
+          ))}
+          <div style={{ height: 1, background: "var(--border-subtle)", margin: "0.2rem 0" }} aria-hidden />
+          {(["all", "no_date"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="option"
+              aria-selected={value === p}
+              className="bd-btn"
+              onClick={() => {
+                onChange(p);
+                setOpen(false);
+              }}
+              style={{
+                justifyContent: "flex-start",
+                minHeight: 40,
+                fontWeight: 500,
+                fontSize: "0.8125rem",
+                background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
+                color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-secondary)",
+                borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
+              }}
+            >
+              {t(DUE_DATE_LABEL_KEY[p])}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ScopeFilterSearchBlock({
+  isMobile,
+  searchFilter,
+  onSearchFilterChange,
+  beforeFilterSlot,
+  dueDateFilter,
+  onDueDateFilterChange,
+  t,
+}: {
+  isMobile: boolean;
+  searchFilter: string;
+  onSearchFilterChange: (v: string) => void;
+  beforeFilterSlot?: ReactNode;
+  dueDateFilter: DueDateFilterPreset;
+  onDueDateFilterChange?: (preset: DueDateFilterPreset) => void;
+  t: (key: string) => string;
+}) {
   return (
     <div
-      className="bd-scope-date-filters"
       style={{
         display: "flex",
-        flexWrap: "wrap",
-        gap: "0.35rem",
-        alignItems: "center",
-        width: "100%",
+        flexDirection: "column",
+        gap: "0.5rem",
+        flexShrink: 0,
+        width: isMobile ? "100%" : "auto",
+        maxWidth: isMobile ? "100%" : 520,
+        alignItems: isMobile ? "stretch" : "flex-end",
+        minWidth: 0,
       }}
     >
-      {DUE_DATE_PRESETS.map((p) => (
-        <button
-          key={p}
-          type="button"
-          className="bd-btn"
-          aria-pressed={value === p}
-          onClick={() => onChange(p)}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          width: "100%",
+          justifyContent: isMobile ? "stretch" : "flex-end",
+          flexWrap: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {!isMobile && beforeFilterSlot ? (
+          <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
+        ) : null}
+        {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
+        <div
           style={{
-            padding: "0.35rem 0.65rem",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            background: value === p ? "var(--bd-chrome-selected-bg)" : "var(--bg-secondary)",
-            borderColor: value === p ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-            color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flex: isMobile ? 1 : undefined,
+            minWidth: 0,
+            width: isMobile ? "100%" : "auto",
           }}
         >
-          {t(labelKey[p])}
-        </button>
-      ))}
+          <div
+            style={{
+              position: "relative",
+              flex: 1,
+              minWidth: 0,
+              width: isMobile ? undefined : 200,
+              maxWidth: isMobile ? "none" : 280,
+            }}
+          >
+            <input
+              type="search"
+              enterKeyHint="search"
+              className="bd-input"
+              value={searchFilter}
+              onChange={(e) => onSearchFilterChange(e.target.value)}
+              placeholder={t("scope.searchPlaceholder")}
+              style={{
+                width: "100%",
+                padding: "0.45rem 1.9rem 0.45rem 0.65rem",
+                fontSize: isMobile ? "16px" : "0.8125rem",
+                minHeight: isMobile ? 44 : undefined,
+              }}
+            />
+            {searchFilter ? (
+              <button
+                type="button"
+                aria-label={t("scope.clearFilter")}
+                onClick={() => onSearchFilterChange("")}
+                style={{
+                  position: "absolute",
+                  right: 6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--text-tertiary)",
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          {onDueDateFilterChange ? (
+            <DueDateFilterMenuButton
+              value={dueDateFilter}
+              onChange={onDueDateFilterChange}
+              isMobile={isMobile}
+              t={t}
+            />
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -582,74 +812,15 @@ export function ScopeBar({
             )}
           </div>
           {onSearchFilterChange && showScopeFilterInput && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                flexShrink: 0,
-                width: isMobile ? "100%" : "auto",
-                maxWidth: isMobile ? "100%" : 420,
-                alignItems: isMobile ? "stretch" : "flex-end",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  width: "100%",
-                  justifyContent: isMobile ? "stretch" : "flex-end",
-                  flexWrap: isMobile ? "wrap" : "nowrap",
-                }}
-              >
-                {!isMobile && beforeFilterSlot ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
-                ) : null}
-                {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
-                <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
-                  <input
-                    type="search"
-                    enterKeyHint="search"
-                    className="bd-input"
-                    value={searchFilter}
-                    onChange={(e) => onSearchFilterChange(e.target.value)}
-                    placeholder={t("scope.searchPlaceholder")}
-                    style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
-                  />
-                  {searchFilter && (
-                    <button
-                      type="button"
-                      aria-label={t("scope.clearFilter")}
-                      onClick={() => onSearchFilterChange("")}
-                      style={{
-                        position: "absolute",
-                        right: 6,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        width: 28,
-                        height: 28,
-                        borderRadius: "999px",
-                        border: "none",
-                        background: "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--text-tertiary)",
-                        cursor: "pointer",
-                        fontSize: "0.875rem",
-                        padding: 0,
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              </div>
-              {onDueDateFilterChange && (
-                <DueDateFilterChips value={dueDateFilter} onChange={onDueDateFilterChange} t={t} />
-              )}
-            </div>
+            <ScopeFilterSearchBlock
+              isMobile={isMobile}
+              searchFilter={searchFilter}
+              onSearchFilterChange={onSearchFilterChange}
+              beforeFilterSlot={beforeFilterSlot}
+              dueDateFilter={dueDateFilter}
+              onDueDateFilterChange={onDueDateFilterChange}
+              t={t}
+            />
           )}
         </div>
 
@@ -1330,60 +1501,15 @@ export function ScopeBar({
             )}
           </div>
         {onSearchFilterChange && showScopeFilterInput && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flexShrink: 0,
-              width: isMobile ? "100%" : undefined,
-              flexWrap: isMobile ? "wrap" : "nowrap",
-              justifyContent: isMobile ? "stretch" : "flex-end",
-            }}
-          >
-            {!isMobile && beforeFilterSlot ? (
-              <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
-            ) : null}
-            {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
-            <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
-              <input
-                type="search"
-                enterKeyHint="search"
-                className="bd-input"
-                value={searchFilter}
-                onChange={(e) => onSearchFilterChange(e.target.value)}
-                placeholder={t("scope.searchPlaceholder")}
-                style={{ width: "100%", padding: "0.45rem 1.9rem 0.45rem 0.65rem", fontSize: isMobile ? "16px" : "0.8125rem", minHeight: isMobile ? 44 : undefined }}
-              />
-              {searchFilter && (
-                <button
-                  type="button"
-                  aria-label={t("scope.clearFilter")}
-                  onClick={() => onSearchFilterChange("")}
-                  style={{
-                    position: "absolute",
-                    right: 6,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: 28,
-                    height: 28,
-                    borderRadius: "999px",
-                    border: "none",
-                    background: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--text-tertiary)",
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                    padding: 0,
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
+          <ScopeFilterSearchBlock
+            isMobile={isMobile}
+            searchFilter={searchFilter}
+            onSearchFilterChange={onSearchFilterChange}
+            beforeFilterSlot={beforeFilterSlot}
+            dueDateFilter={dueDateFilter}
+            onDueDateFilterChange={onDueDateFilterChange}
+            t={t}
+          />
         )}
         </div>
         {isMobile && areaPickerOpen && scopeSheetMount

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
@@ -209,6 +209,8 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
 
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
   const [editingEntry, setEditingEntry] = useState<{ id: string; title: string; content: string } | null>(null);
+  const editingEntryRef = useRef(editingEntry);
+  editingEntryRef.current = editingEntry;
   const [reminderEntry, setReminderEntry] = useState<{
     id: string;
     title: string;
@@ -223,6 +225,23 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+
+  useEffect(() => {
+    if (!editingEntry) return;
+    const onChromePointerDown = (e: PointerEvent) => {
+      const node = e.target;
+      if (!(node instanceof Node)) return;
+      const top = document.querySelector(".bd-topbar");
+      const bottom = document.querySelector(".bd-bottom-bar");
+      if (!(top?.contains(node) || bottom?.contains(node))) return;
+      const ed = editingEntryRef.current;
+      if (!ed) return;
+      updateEntryContent(ed.id, { title: ed.title, content: ed.content });
+      setEditingEntry(null);
+    };
+    document.addEventListener("pointerdown", onChromePointerDown, true);
+    return () => document.removeEventListener("pointerdown", onChromePointerDown, true);
+  }, [editingEntry, updateEntryContent]);
 
   useEffect(() => {
     if (!itemContextMenu) return;
@@ -459,7 +478,24 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>{t("items.editEntry")}</h3>
+            <div className="bd-edit-entry-panel-title-row">
+              <h3>{t("items.editEntry")}</h3>
+              <button
+                type="button"
+                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
+                aria-label={t("items.ariaSaveEntry")}
+                title={t("items.ariaSaveEntry")}
+                onClick={() => {
+                  if (!editingEntry) return;
+                  updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
+                  setEditingEntry(null);
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </div>
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
             <input
               className="bd-input"

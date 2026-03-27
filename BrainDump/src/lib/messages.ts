@@ -88,6 +88,7 @@ const en: Msg = {
   "scope.dateFilterTomorrow": "Tomorrow",
   "scope.dateFilterThisWeek": "This week",
   "scope.dateFilterNoDate": "No date",
+  "scope.dateFilterMenuAria": "Filter by due date",
 
   "center.record": "Record",
   "center.microphone": "Microphone",
@@ -472,6 +473,7 @@ const sv: Msg = {
   "scope.dateFilterTomorrow": "Imorgon",
   "scope.dateFilterThisWeek": "Denna vecka",
   "scope.dateFilterNoDate": "Utan datum",
+  "scope.dateFilterMenuAria": "Filtrera efter datum",
 
   "center.record": "Spela in",
   "center.microphone": "Mikrofon",

@@ -80,6 +80,7 @@ interface CenterPanelProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  dueDateFilter?: import("@/lib/due-date-filter").DueDateFilterPreset;
   /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
   scopeSlot?: ReactNode;
   /** Mobile: items view registers controls left of the top-bar menu (see TopBar.beforeMenuSlot). */
@@ -123,6 +124,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     viewType,
     onViewTypeChange,
     searchFilter = "",
+    dueDateFilter = "all",
     scopeSlot = null,
     onMobileTopBarBeforeMenuSlot,
     onDesktopScopeBeforeFilterSlot,
@@ -1198,6 +1200,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           viewType={viewType}
           onViewTypeChange={onViewTypeChange}
           searchFilter={searchFilter}
+          dueDateFilter={dueDateFilter}
           reloadKey={itemsReloadKey}
           scopeSlot={scopeSlot}
           onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}

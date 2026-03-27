@@ -11,6 +11,7 @@ import { RightPanel } from "@/components/RightPanel";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
+import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
 import { recordOrganizedDump } from "@/lib/dump-streak";
@@ -414,6 +415,7 @@ export default function BrainDumpPage() {
               viewType={viewType}
               onViewTypeChange={setViewType}
               searchFilter={searchFilter}
+              dueDateFilter={dueDateFilter}
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
               onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
               onDesktopScopeBeforeFilterSlot={setDesktopScopeBeforeFilter}

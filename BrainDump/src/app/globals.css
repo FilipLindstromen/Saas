@@ -126,6 +126,8 @@
 
 /* Spacing scale (8px base) — use for toolbar, panels, gaps */
 :root {
+  /* Extra scroll room above fixed mobile bottom bar (list/calendar/board scroll roots) */
+  --bd-view-bottom-pad: 200px;
   --bd-space-1: 0.25rem;
   --bd-space-2: 0.5rem;
   --bd-space-3: 0.75rem;
@@ -1644,6 +1646,7 @@ select.bd-input::-ms-expand {
   flex-direction: column;
   gap: var(--bd-space-2);
   padding: var(--bd-space-3);
+  padding-bottom: calc(var(--bd-space-3) + var(--bd-view-bottom-pad));
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -1702,7 +1705,7 @@ select.bd-input::-ms-expand {
   position: relative;
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   width: calc(100% + 2 * var(--bd-space-3));
   max-width: none;
@@ -2336,6 +2339,69 @@ select.bd-input::-ms-expand {
   display: none;
 }
 
+/* Swipe-to-delete row (list + text views) */
+.bd-swipe-delete-wrap {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.bd-swipe-delete-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--bd-swipe-delete-w, 5rem);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 0;
+}
+
+.bd-swipe-delete-btn {
+  flex: 1;
+  min-height: 100%;
+  margin: 0;
+  padding: 0 0.35rem;
+  border: none;
+  border-radius: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: #fff;
+  background: var(--bd-danger);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    filter var(--bd-duration-fast) var(--bd-ease-soft),
+    background var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-swipe-delete-btn:hover {
+  filter: brightness(1.06);
+}
+
+.bd-swipe-delete-btn:active {
+  filter: brightness(0.94);
+}
+
+.bd-swipe-delete-slide {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.bd-swipe-delete-slide--elevated {
+  background: var(--bg-elevated);
+}
+
+.bd-swipe-delete-slide--canvas {
+  background: var(--bg-primary);
+}
+
 /* List view — single stacked “todo” card */
 .bd-list-view.bd-list-view--stacked {
   flex-direction: column;
@@ -2502,6 +2568,30 @@ input.bd-todo-checkbox:checked {
   flex-shrink: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+}
+
+.bd-edit-entry-save-btn {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bd-btn-primary-fg);
+}
+
+.bd-edit-entry-save-btn:hover {
+  filter: brightness(1.06);
+}
+
+.bd-edit-entry-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0 0 0.75rem;
+}
+
+.bd-edit-entry-panel-title-row h3 {
+  margin: 0;
+  font-size: 1rem;
+  min-width: 0;
 }
 
 .bd-edit-entry-mobile-scope {
@@ -2749,6 +2839,7 @@ input.bd-todo-checkbox:checked {
     padding: var(--bd-space-2);
     padding-left: max(0.5rem, env(safe-area-inset-left));
     padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-bottom: calc(var(--bd-space-2) + var(--bd-view-bottom-pad));
     max-width: 100%;
     min-width: 0;
     overflow-x: hidden;
