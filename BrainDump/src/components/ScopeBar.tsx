@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
@@ -25,6 +25,8 @@ interface ScopeBarProps {
   /** Filter entries by due date (tasks, calendar) — shown with search when filter is open. */
   dueDateFilter?: DueDateFilterPreset;
   onDueDateFilterChange?: (preset: DueDateFilterPreset) => void;
+  /** Desktop: content immediately left of the filter field (e.g. “Next 3 — AI”). */
+  beforeFilterSlot?: ReactNode;
 }
 
 const CUSTOM_AREAS_KEY = "braindump_custom_areas";
@@ -184,6 +186,7 @@ export function ScopeBar({
   onSearchFilterChange,
   dueDateFilter = "all",
   onDueDateFilterChange,
+  beforeFilterSlot = null,
 }: ScopeBarProps) {
   const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -597,8 +600,12 @@ export function ScopeBar({
                   gap: "0.5rem",
                   width: "100%",
                   justifyContent: isMobile ? "stretch" : "flex-end",
+                  flexWrap: isMobile ? "wrap" : "nowrap",
                 }}
               >
+                {!isMobile && beforeFilterSlot ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
+                ) : null}
                 {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
                 <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
                   <input
@@ -1278,8 +1285,13 @@ export function ScopeBar({
               gap: "0.5rem",
               flexShrink: 0,
               width: isMobile ? "100%" : undefined,
+              flexWrap: isMobile ? "wrap" : "nowrap",
+              justifyContent: isMobile ? "stretch" : "flex-end",
             }}
           >
+            {!isMobile && beforeFilterSlot ? (
+              <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
+            ) : null}
             {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
             <div style={{ position: "relative", width: isMobile ? "100%" : 180, flexShrink: 0, flex: isMobile ? 1 : undefined, minWidth: 0 }}>
               <input

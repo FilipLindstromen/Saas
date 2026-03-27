@@ -46,6 +46,7 @@ export default function BrainDumpPage() {
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
   const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
+  const [desktopScopeBeforeFilter, setDesktopScopeBeforeFilter] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
@@ -73,9 +74,10 @@ export default function BrainDumpPage() {
           onCategorySelect={setSelectedCategory}
           searchFilter={searchFilter}
           onSearchFilterChange={setSearchFilter}
+          beforeFilterSlot={desktopScopeBeforeFilter}
         />
       ) : null,
-    [mode, selectedProjectId, selectedCategory, searchFilter]
+    [mode, selectedProjectId, selectedCategory, searchFilter, desktopScopeBeforeFilter]
   );
 
   const refreshUncategorizedAvailability = useCallback(async () => {
@@ -385,6 +387,14 @@ export default function BrainDumpPage() {
           alignItems: "stretch",
         }}
       >
+        <AppSidebar
+          mode={mode}
+          onModeChange={setMode}
+          showUncategorizedWorkspace={hasUncategorizedEntries}
+          onOpenSettings={() => setShowSettings(true)}
+          mobileOpen={mobileNavOpen}
+          onMobileOpenChange={setMobileNavOpen}
+        />
         <div className="bd-workspace-column" style={{ gap: "0" }}>
           <div className="bd-page-content-padding">
             <CenterPanel
@@ -406,6 +416,7 @@ export default function BrainDumpPage() {
               searchFilter={searchFilter}
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
               onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
+              onDesktopScopeBeforeFilterSlot={setDesktopScopeBeforeFilter}
               onDumpRecordingChange={setDumpRecordingActive}
             />
           </div>
@@ -423,15 +434,6 @@ export default function BrainDumpPage() {
             </div>
           )}
         </div>
-
-        <AppSidebar
-          mode={mode}
-          onModeChange={setMode}
-          showUncategorizedWorkspace={hasUncategorizedEntries}
-          onOpenSettings={() => setShowSettings(true)}
-          mobileOpen={mobileNavOpen}
-          onMobileOpenChange={setMobileNavOpen}
-        />
       </div>
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>

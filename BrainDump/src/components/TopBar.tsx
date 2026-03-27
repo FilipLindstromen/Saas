@@ -242,7 +242,7 @@ export function TopBar({
         ) : (
           <div className="bd-topbar-grow" aria-hidden />
         )}
-        {onOpenMobileNav ? (
+        {onOpenMobileNav && isMobile ? (
           <div className="bd-topbar-end">
             {beforeMenuSlot}
             <button

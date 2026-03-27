@@ -84,6 +84,8 @@ interface CenterPanelProps {
   scopeSlot?: ReactNode;
   /** Mobile: items view registers controls left of the top-bar menu (see TopBar.beforeMenuSlot). */
   onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
+  /** Desktop: items view registers controls left of the scope filter field (see ScopeBar.beforeFilterSlot). */
+  onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
   /** After organizing creates new work projects — refetch project list for ScopeBar / prompts. */
   onWorkProjectsChanged?: () => void;
   /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
@@ -123,6 +125,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     searchFilter = "",
     scopeSlot = null,
     onMobileTopBarBeforeMenuSlot,
+    onDesktopScopeBeforeFilterSlot,
     onWorkProjectsChanged,
     onDumpRecordingChange,
   },
@@ -1198,6 +1201,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           reloadKey={itemsReloadKey}
           scopeSlot={scopeSlot}
           onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
+          onDesktopScopeBeforeFilterSlot={onDesktopScopeBeforeFilterSlot}
         />
       )}
       {isInbox && unclearItems && (

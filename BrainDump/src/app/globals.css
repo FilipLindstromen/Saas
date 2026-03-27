@@ -197,10 +197,10 @@ body {
   line-height: 1.08;
 }
 
-/* Slim icon rail — outline icons, no filled “accent blob” (divider on inner / leading edge when rail is on the right) */
+/* Slim icon rail — divider on the right (sidebar docked left, next to main content) */
 .bd-sidebar-rail {
-  border-right: none;
-  border-left: 1px solid var(--border-subtle);
+  border-left: none;
+  border-right: 1px solid var(--border-subtle);
   background: var(--bg-primary);
 }
 
@@ -280,13 +280,6 @@ body {
 .bd-app-sidebar[data-expanded="true"] .bd-app-sidebar-fold {
   justify-content: flex-end;
   padding-right: 0.45rem;
-}
-
-/* Rail docked to the right: collapse control on the inner (left) edge */
-.bd-app-sidebar--trailing[data-expanded="true"] .bd-app-sidebar-fold {
-  justify-content: flex-start;
-  padding-right: 0;
-  padding-left: 0.45rem;
 }
 
 .bd-app-sidebar-profile-wrap {

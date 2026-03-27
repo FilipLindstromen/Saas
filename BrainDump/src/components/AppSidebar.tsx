@@ -143,8 +143,11 @@ export function AppSidebar({
     if (expanded || isMobile) {
       setPopoverPos({ top: r.bottom + gap, left: Math.max(12, Math.min(r.left, window.innerWidth - 268)) });
     } else {
-      /* Sidebar rail on the right: open popover to the left of the avatar */
-      setPopoverPos({ top: r.top, left: Math.max(12, r.left - 268) });
+      /* Collapsed rail on the left: open popover to the right of the avatar */
+      setPopoverPos({
+        top: r.top,
+        left: Math.min(r.right + gap, window.innerWidth - 268 - 12),
+      });
     }
   }, [expanded, isMobile]);
 
@@ -454,7 +457,7 @@ export function AppSidebar({
   return (
     <>
       <aside
-        className="bd-app-sidebar bd-sidebar-rail bd-app-sidebar--trailing"
+        className="bd-app-sidebar bd-sidebar-rail"
         data-expanded={expanded ? "true" : "false"}
         aria-label={t("sidebar.navAria")}
       >

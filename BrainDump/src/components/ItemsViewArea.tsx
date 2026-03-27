@@ -88,6 +88,8 @@ interface ItemsViewAreaProps {
   scopeSlot?: ReactNode;
   /** Mobile: register content immediately left of the top-bar menu (e.g. AI next-actions). */
   onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
+  /** Desktop: register content immediately left of the scope search filter (e.g. AI next-actions). */
+  onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
 }
 
 function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
@@ -456,6 +458,7 @@ export function ItemsViewArea({
   reloadKey = 0,
   scopeSlot,
   onMobileTopBarBeforeMenuSlot,
+  onDesktopScopeBeforeFilterSlot,
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
@@ -623,6 +626,56 @@ export function ItemsViewArea({
   }, [
     onMobileTopBarBeforeMenuSlot,
     showMobileAiInTopBar,
+    items.length,
+    aiSuggestLoading,
+    loading,
+    runAiSuggest,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (!onDesktopScopeBeforeFilterSlot) return;
+    const showDesktopAi =
+      !isMobile && (mode === "work" || mode === "personal" || mode === "all");
+    if (!showDesktopAi) {
+      onDesktopScopeBeforeFilterSlot(null);
+      return;
+    }
+    onDesktopScopeBeforeFilterSlot(
+      <button
+        type="button"
+        className="bd-btn bd-toolbar-chip"
+        disabled={items.length === 0 || aiSuggestLoading || loading}
+        onClick={() => void runAiSuggest()}
+        title={t("items.aiNextThree")}
+        aria-label={t("items.aiNextThree")}
+        style={{
+          padding: "0.4rem 0.7rem",
+          fontSize: "0.8125rem",
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.4rem",
+        }}
+      >
+        {aiSuggestLoading ? (
+          <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem" }}>{t("items.aiNextThreeBusy")}</span>
+        ) : (
+          <>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+              <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+            </svg>
+            <span className="bd-mobile-hide">{t("items.aiNextThree")}</span>
+          </>
+        )}
+      </button>
+    );
+    return () => onDesktopScopeBeforeFilterSlot(null);
+  }, [
+    onDesktopScopeBeforeFilterSlot,
+    isMobile,
+    mode,
     items.length,
     aiSuggestLoading,
     loading,
@@ -1531,35 +1584,6 @@ export function ItemsViewArea({
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className="bd-btn bd-toolbar-chip"
-                    disabled={items.length === 0 || aiSuggestLoading || loading}
-                    onClick={() => void runAiSuggest()}
-                    title={t("items.aiNextThree")}
-                    aria-label={t("items.aiNextThree")}
-                    style={{
-                      padding: "0.4rem 0.7rem",
-                      fontSize: "0.8125rem",
-                      flexShrink: 0,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.4rem",
-                      marginRight: "0.15rem",
-                    }}
-                  >
-                    {aiSuggestLoading ? (
-                      <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem" }}>{t("items.aiNextThreeBusy")}</span>
-                    ) : (
-                      <>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-                          <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
-                        </svg>
-                        <span className="bd-mobile-hide">{t("items.aiNextThree")}</span>
-                      </>
-                    )}
-                  </button>
                   {viewButtons.map(({ value, label, icon }, i) => {
                     const vc = viewChipProps(i);
                     return (
