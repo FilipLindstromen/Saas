@@ -18,7 +18,7 @@ import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
 import { filterNewStandaloneProjectNames } from "@/lib/project-name-match";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
-import { PhotoCaptureTrigger } from "./PhotoCaptureTrigger";
+import { PhotoCaptureTrigger, type PhotoCaptureTriggerHandle } from "./PhotoCaptureTrigger";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
@@ -159,6 +159,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [showTypedDumpSheet, setShowTypedDumpSheet] = useState(false);
   const [typedDumpText, setTypedDumpText] = useState("");
   const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
+  const photoAnchorRef = useRef<PhotoCaptureTriggerHandle | null>(null);
 
   useEffect(() => {
     const sync = () => setShowDumpFace(loadShowDumpFace());
@@ -684,12 +685,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     setShowTypedDumpSheet(true);
   }, []);
 
-  useImperativeHandle(
-    ref,
-    () => ({ processImageForOrganize, openTypedDumpSheet }),
-    [processImageForOrganize, openTypedDumpSheet]
-  );
-
   const closeTypedDumpSheet = useCallback(() => {
     setShowTypedDumpSheet(false);
     setTypedDumpText("");
@@ -806,6 +801,39 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     openDumpOverlay();
   }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      processImageForOrganize,
+      openTypedDumpSheet,
+      toggleDumpRecording: () => {
+        onDumpFabClick();
+      },
+    }),
+    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick]
+  );
+
+  const switchFromRecordingToTypedDump = useCallback(() => {
+    if (isDumpProcessing) return;
+    showDumpOverlayRef.current = false;
+    stopRecording({ silent: true });
+    setError(null);
+    setShowDumpOverlay(false);
+    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+    setTypedDumpText("");
+    setShowTypedDumpSheet(true);
+  }, [isDumpProcessing, stopRecording, mode]);
+
+  const switchFromRecordingToPhoto = useCallback(() => {
+    if (isDumpProcessing) return;
+    showDumpOverlayRef.current = false;
+    stopRecording({ silent: true });
+    setError(null);
+    setShowDumpOverlay(false);
+    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+    requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
+  }, [isDumpProcessing, stopRecording, mode]);
+
   const dumpPanelContent = (
     <>
       <section className="bd-dump-overlay-body">
@@ -848,6 +876,39 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 />
               </div>
               <div className="bd-dump-recording-actions">
+                <div className="bd-dump-alternate-input-row">
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    onClick={switchFromRecordingToPhoto}
+                    disabled={transcribeLoading || organizeLoading}
+                    title={t("center.dumpUsePhoto")}
+                    aria-label={t("center.dumpUsePhoto")}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                        <circle cx="12" cy="13" r="3" />
+                      </svg>
+                      {t("center.dumpUsePhoto")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    onClick={switchFromRecordingToTypedDump}
+                    disabled={transcribeLoading || organizeLoading}
+                    title={t("center.dumpUseText")}
+                    aria-label={t("center.dumpUseText")}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M4 6h16M4 12h16M4 18h11" />
+                      </svg>
+                      {t("center.dumpUseText")}
+                    </span>
+                  </button>
+                </div>
                 <div className="bd-dump-timer-row">
                   <span className="bd-dump-timer" aria-live="polite" aria-atomic="true">
                     {recordingElapsed}
@@ -921,22 +982,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           {t("center.dumpPromptInbox")}
         </p>
       )}
-      {!isMobile ? (
+      {!isMobile && (
         <div className="bd-dump-fab-row">
-          <PhotoCaptureTrigger onFile={(f) => void processImageForOrganize(f)} disabled={isDumpProcessing || photoOrganizeFlow} />
-          <button
-            type="button"
-            className="bd-btn bd-bottom-camera-btn bd-typed-dump-open-btn"
-            onClick={openTypedDumpSheet}
-            disabled={isDumpProcessing || photoOrganizeFlow}
-            title={t("center.typeDump")}
-            aria-label={t("center.typeDump")}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M4 6h16M4 12h16M4 18h10" />
-              <path d="M16 16h2v2h-2z" />
-            </svg>
-          </button>
           <button
             id="bd-dump-fab"
             className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
@@ -959,29 +1006,13 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             )}
           </button>
         </div>
-      ) : (
-        <button
-          id="bd-dump-fab"
-          className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
-          type="button"
-          onClick={onDumpFabClick}
-          disabled={isDumpProcessing || photoOrganizeFlow}
-          title={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
-          aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
-        >
-          {recordState === "recording" ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
-          )}
-        </button>
       )}
+      <PhotoCaptureTrigger
+        ref={photoAnchorRef}
+        anchorOnly
+        onFile={(f) => void processImageForOrganize(f)}
+        disabled={isDumpProcessing || photoOrganizeFlow}
+      />
       {showDumpOverlay && !isDumpProcessing && (
             <div
               className="bd-dump-overlay"

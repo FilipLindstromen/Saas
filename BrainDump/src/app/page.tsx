@@ -7,7 +7,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } from "@/components/CenterPanel";
-import { PhotoCaptureTrigger } from "@/components/PhotoCaptureTrigger";
 import { RightPanel } from "@/components/RightPanel";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -548,24 +547,6 @@ export default function BrainDumpPage() {
               </svg>
             </button>
           </nav>
-          <div className="bd-bottom-bar-quick-tools">
-            <PhotoCaptureTrigger
-              onFile={(f) => void centerPanelRef.current?.processImageForOrganize(f)}
-              buttonClassName="bd-bottom-bar-quick-tool"
-            />
-            <button
-              type="button"
-              className="bd-btn bd-bottom-bar-quick-tool bd-bottom-type-dump-btn"
-              onClick={() => centerPanelRef.current?.openTypedDumpSheet()}
-              title={t("center.typeDump")}
-              aria-label={t("center.typeDump")}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 6h16M4 12h16M4 18h10" />
-                <path d="M16 16h2v2h-2z" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
 

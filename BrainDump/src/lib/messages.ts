@@ -111,6 +111,8 @@ const en: Msg = {
   "center.gotIt": "Got it",
   "center.closeHelp": "Close",
   "center.recordNewDump": "Record a new dump",
+  "center.dumpUsePhoto": "Use photo instead",
+  "center.dumpUseText": "Type text instead",
   "center.typeDump": "Type a dump",
   "center.typeDumpTitle": "Type a brain dump",
   "center.typeDumpOrganize": "Organize",
@@ -120,7 +122,7 @@ const en: Msg = {
   "center.resumingOrganize": "Resuming organization…",
   "center.organizeNetworkError": "Organization failed. Your text is saved — tap Organize again to retry.",
   "center.dumpPromptInbox":
-    "Tap the microphone to record, the text button to type a long dump and organize it, or the camera to capture text from a photo (desktop: next to the mic; mobile: bottom bar).",
+    "Start a recording, then use Stop to transcribe, or choose type or photo in the dump window to switch input.",
   "center.readingPhoto": "Reading text from your photo…",
   "center.recordingMaxLength": "Maximum recording length (5 minutes) reached — recording stopped. You can transcribe or record again.",
   "center.recordingMaxHint": "· max 5:00",
@@ -490,6 +492,8 @@ const sv: Msg = {
   "center.gotIt": "Okej",
   "center.closeHelp": "Stäng",
   "center.recordNewDump": "Spela in en ny dump",
+  "center.dumpUsePhoto": "Använd foto i stället",
+  "center.dumpUseText": "Skriv text i stället",
   "center.typeDump": "Skriv en dump",
   "center.typeDumpTitle": "Skriv en brain dump",
   "center.typeDumpOrganize": "Organisera",
@@ -499,7 +503,7 @@ const sv: Msg = {
   "center.resumingOrganize": "Återupptar organisering…",
   "center.organizeNetworkError": "Organisering misslyckades. Texten är sparad — tryck Organisera igen för att försöka.",
   "center.dumpPromptInbox":
-    "Tryck på mikrofonen för att spela in, textknappen för att skriva en längre dump och organisera, eller kameran för text från foto (desktop bredvid mikrofonen; mobil i nedersta raden).",
+    "Starta en inspelning — stoppa för att transkribera, eller välj text eller foto i dump-fönstret för att byta inmatning.",
   "center.readingPhoto": "Läser text från din bild…",
   "center.recordingMaxLength":
     "Maximal inspelningslängd (5 minuter) nådd — inspelningen stoppades. Du kan transkribera eller spela in igen.",

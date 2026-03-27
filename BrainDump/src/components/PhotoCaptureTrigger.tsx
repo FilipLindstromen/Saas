@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+
+export type PhotoCaptureTriggerHandle = {
+  /** Opens the camera / library / webcam menu (positions near bottom when anchor is hidden). */
+  openMenu: () => void;
+};
 
 type PhotoCaptureTriggerProps = {
   onFile: (file: File) => void | Promise<void>;
@@ -9,22 +14,37 @@ type PhotoCaptureTriggerProps = {
   className?: string;
   buttonClassName?: string;
   disabled?: boolean;
+  /** Hide the visible button — use only with openMenu() (e.g. programmatic anchor). */
+  anchorOnly?: boolean;
 };
 
-export function PhotoCaptureTrigger({
-  onFile,
-  className = "",
-  buttonClassName = "",
-  disabled = false,
-}: PhotoCaptureTriggerProps) {
+export const PhotoCaptureTrigger = forwardRef<PhotoCaptureTriggerHandle, PhotoCaptureTriggerProps>(function PhotoCaptureTrigger(
+  { onFile, className = "", buttonClassName = "", disabled = false, anchorOnly = false },
+  ref
+) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuFixed, setMenuFixed] = useState(false);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openMenu: () => {
+        if (disabledRef.current) return;
+        setMenuFixed(true);
+        setMenuOpen(true);
+      },
+    }),
+    []
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -33,6 +53,10 @@ export function PhotoCaptureTrigger({
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) setMenuFixed(false);
   }, [menuOpen]);
 
   const stopWebcam = useCallback(() => {
@@ -99,24 +123,37 @@ export function PhotoCaptureTrigger({
 
   return (
     <>
-      <div ref={wrapRef} className={`bd-photo-capture-wrap ${className}`.trim()} style={{ position: "relative" }}>
-        <button
-          type="button"
-          className={`bd-bottom-camera-btn ${buttonClassName}`.trim()}
-          disabled={disabled}
-          onClick={() => setMenuOpen((o) => !o)}
-          title={t("bottom.photoDump")}
-          aria-label={t("bottom.photoDump")}
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-            <circle cx="12" cy="13" r="3" />
-          </svg>
-        </button>
+      <div
+        ref={wrapRef}
+        className={`bd-photo-capture-wrap${anchorOnly ? " bd-photo-capture-wrap--anchor-only" : ""} ${className}`.trim()}
+        style={{ position: "relative" }}
+      >
+        {!anchorOnly && (
+          <button
+            type="button"
+            className={`bd-bottom-camera-btn ${buttonClassName}`.trim()}
+            disabled={disabled}
+            onClick={() => {
+              setMenuFixed(false);
+              setMenuOpen((o) => !o);
+            }}
+            title={t("bottom.photoDump")}
+            aria-label={t("bottom.photoDump")}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+          </button>
+        )}
         {menuOpen && (
-          <div className="bd-photo-capture-menu" role="menu" aria-label={t("bottom.photoCaptureMenuAria")}>
+          <div
+            className={`bd-photo-capture-menu${menuFixed ? " bd-photo-capture-menu--fixed" : ""}`}
+            role="menu"
+            aria-label={t("bottom.photoCaptureMenuAria")}
+          >
             <button type="button" role="menuitem" className="bd-photo-capture-menu-item" onClick={() => cameraInputRef.current?.click()}>
               {t("bottom.photoFromCamera")}
             </button>
@@ -169,4 +206,6 @@ export function PhotoCaptureTrigger({
       )}
     </>
   );
-}
+});
+
+PhotoCaptureTrigger.displayName = "PhotoCaptureTrigger";

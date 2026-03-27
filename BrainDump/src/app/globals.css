@@ -1439,6 +1439,43 @@ select.bd-input::-ms-expand {
   z-index: var(--bd-z-dropdown);
 }
 
+/* Programmatic open (e.g. from dump flow) — menu near bottom, above chrome */
+.bd-photo-capture-menu--fixed {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: calc(96px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
+  transform: translateX(-50%);
+}
+
+.bd-photo-capture-wrap--anchor-only {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bd-photo-capture-wrap--anchor-only .bd-photo-capture-menu {
+  pointer-events: auto;
+}
+
+.bd-dump-alternate-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+}
+
+.bd-dump-alternate-input-row .bd-btn {
+  min-height: 44px;
+}
+
 .bd-photo-capture-menu-item {
   display: block;
   width: 100%;
@@ -2691,7 +2728,7 @@ input.bd-todo-checkbox:checked {
 @media (max-width: 768px) {
   :root {
     /* Pill bar + raised mic + quick tools row + safe area */
-    --bd-bottom-bar-clearance: calc(118px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
+    --bd-bottom-bar-clearance: calc(88px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
   }
 
   .bd-scope-outer-wrap {
@@ -2812,7 +2849,7 @@ input.bd-todo-checkbox:checked {
     flex-direction: row;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 0.1rem;
+    gap: 0.35rem;
     width: 100%;
     min-height: 52px;
     padding: 0.42rem 0.5rem 0.48rem;
@@ -2835,6 +2872,8 @@ input.bd-todo-checkbox:checked {
   }
 
   .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
+    position: relative;
+    z-index: 2;
     flex: 1 1 0;
     min-width: 0;
     display: flex;
@@ -2876,8 +2915,9 @@ input.bd-todo-checkbox:checked {
 
   .bd-bottom-bar-pill-mic-wrap {
     flex: 0 0 auto;
-    width: 68px;
+    width: 72px;
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -2890,16 +2930,16 @@ input.bd-todo-checkbox:checked {
     position: absolute;
     bottom: 0;
     left: 50%;
-    margin-left: -32px;
-    transform: translateY(-16px);
+    margin-left: -28px;
+    transform: translateY(-12px);
   }
 
   /* Raised primary mic inside pill */
   .bd-bottom-bar .bd-bottom-dump-mic {
-    width: 64px;
-    height: 64px;
-    min-width: 64px;
-    min-height: 64px;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
     max-width: none;
     max-height: none;
     padding: 0;
