@@ -16,6 +16,7 @@ import { StreaksModal } from "./StreaksModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useI18n } from "@/lib/i18n";
 import { getDumpStreakState, STREAK_RECORDED_EVENT, type DumpStreakState } from "@/lib/dump-streak";
+import { useSaasTheme } from "@/lib/saas-theme-client";
 
 const SIDEBAR_EXPANDED_KEY = "braindump-sidebar-expanded";
 
@@ -27,8 +28,6 @@ const MODE_KEY: Record<Mode, string> = {
   personal: "mode.personal",
   inbox: "mode.inbox",
 };
-
-const WORKSPACE_MODES: Mode[] = ["all", "work", "personal", "inbox"];
 
 const modeIcons: Record<Mode, () => ReactNode> = {
   all: () => (
@@ -90,6 +89,8 @@ export function AppSidebar({
   onMobileOpenChange,
 }: AppSidebarProps) {
   const { t } = useI18n();
+  const saasTheme = useSaasTheme();
+  const themeToggleLabel = saasTheme === "dark" ? t("theme.darkMode") : t("theme.lightMode");
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
@@ -131,7 +132,8 @@ export function AppSidebar({
     }
   }, []);
 
-  const workspaceModes = showUncategorizedWorkspace ? WORKSPACE_MODES : WORKSPACE_MODES.filter((m) => m !== "inbox");
+  /** All / Work / Personal live in the main scope UI; sidebar only exposes Inbox when available. */
+  const sidebarWorkspaceModes: Mode[] = showUncategorizedWorkspace ? ["inbox"] : [];
 
   const showLabels = isMobile || expanded;
 
@@ -295,24 +297,26 @@ export function AppSidebar({
         )}
       </div>
 
-      <nav className="bd-app-sidebar-nav" aria-label={t("sidebar.navAria")}>
-        {workspaceModes.map((m) => (
-          <button
-            key={m}
-            type="button"
-            className="bd-app-sidebar-nav-btn"
-            data-active={mode === m ? "true" : "false"}
-            data-collapsed={!showLabels ? "true" : "false"}
-            onClick={() => pickMode(m)}
-            title={t(MODE_KEY[m])}
-            aria-label={t(MODE_KEY[m])}
-            aria-current={mode === m ? "page" : undefined}
-          >
-            <span className="bd-app-sidebar-nav-icon">{modeIcons[m]()}</span>
-            {showLabels ? <span className="bd-app-sidebar-nav-label">{t(MODE_KEY[m])}</span> : null}
-          </button>
-        ))}
-      </nav>
+      {sidebarWorkspaceModes.length > 0 ? (
+        <nav className="bd-app-sidebar-nav" aria-label={t("sidebar.navAria")}>
+          {sidebarWorkspaceModes.map((m) => (
+            <button
+              key={m}
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-active={mode === m ? "true" : "false"}
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => pickMode(m)}
+              title={t(MODE_KEY[m])}
+              aria-label={t(MODE_KEY[m])}
+              aria-current={mode === m ? "page" : undefined}
+            >
+              <span className="bd-app-sidebar-nav-icon">{modeIcons[m]()}</span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t(MODE_KEY[m])}</span> : null}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
       <div className="bd-app-sidebar-spacer" />
 
@@ -339,7 +343,7 @@ export function AppSidebar({
 
         <div className="bd-app-sidebar-tool-row" data-collapsed={!showLabels ? "true" : "false"}>
           <ThemeToggle className="bd-app-sidebar-theme-btn" />
-          {showLabels ? <span className="bd-app-sidebar-tool-label">{t("theme.appearance")}</span> : null}
+          {showLabels ? <span className="bd-app-sidebar-tool-label">{themeToggleLabel}</span> : null}
         </div>
 
         <button

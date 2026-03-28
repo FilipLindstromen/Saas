@@ -34,6 +34,8 @@ const en: Msg = {
 
   "theme.switchToLight": "Switch to light mode",
   "theme.switchToDark": "Switch to dark mode",
+  "theme.lightMode": "Light mode",
+  "theme.darkMode": "Dark mode",
   "theme.appearance": "Appearance",
 
   "streaks.title": "Dump streaks",
@@ -358,7 +360,10 @@ const en: Msg = {
     "BrainDump cannot log in to iCloud Calendar directly in the browser. The .ics import path works with exports from Apple Calendar, iCloud, or other apps.",
 
   "menu.changeType": "Change type",
+  "menu.changeWorkPrivate": "Change work / personal",
+  "menu.changeAreaProject": "Change area / project",
   "menu.edit": "Edit",
+  "menu.back": "Back",
   "menu.setReminder": "Set reminder",
   "menu.moveToProject": "Move to project",
   "menu.moveToArea": "Move to area",
@@ -424,6 +429,8 @@ const sv: Msg = {
 
   "theme.switchToLight": "Byt till ljust läge",
   "theme.switchToDark": "Byt till mörkt läge",
+  "theme.lightMode": "Ljust läge",
+  "theme.darkMode": "Mörkt läge",
   "theme.appearance": "Utseende",
 
   "streaks.title": "Dump-streaks",
@@ -749,7 +756,10 @@ const sv: Msg = {
     "BrainDump kan inte logga in mot iCloud-kalender direkt i webbläsaren. Import via .ics fungerar med export från Apple Kalender, iCloud eller andra appar.",
 
   "menu.changeType": "Byt typ",
+  "menu.changeWorkPrivate": "Byt arbete / privat",
+  "menu.changeAreaProject": "Byt område / projekt",
   "menu.edit": "Redigera",
+  "menu.back": "Tillbaka",
   "menu.setReminder": "Sätt påminnelse",
   "menu.moveToProject": "Flytta till projekt",
   "menu.moveToArea": "Flytta till område",

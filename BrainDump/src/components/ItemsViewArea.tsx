@@ -9,6 +9,8 @@ import {
   type CSSProperties,
   type Dispatch,
   type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type SetStateAction,
 } from "react";
@@ -27,7 +29,12 @@ import {
   localDateTimeToDate,
   normalizeReminderMinutesBefore,
 } from "@/lib/calendar-schedule";
-import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
+import {
+  CUSTOM_AREAS_KEY,
+  formatAreaLabel,
+  getPersonalAreasList,
+  PERSONAL_AREA_DEFAULTS,
+} from "@/lib/personal-areas";
 import {
   deriveEntryTitle,
   parseTextViewBlock,
@@ -63,6 +70,8 @@ function viewChipProps(i: number): { className: string; style: CSSProperties } {
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
 export type ItemsViewType = "kanban" | "list" | "postits" | "calendar" | "flowchart" | "text";
+
+export type ItemContextSubmenu = "workPrivate" | "areaProject" | "type";
 
 export interface ViewItem {
   id: string;
@@ -123,22 +132,6 @@ function isTaskCompleted(it: Pick<ViewItem, "itemType" | "progress" | "kanbanCol
   );
 }
 
-const CUSTOM_AREAS_KEY = "braindump_custom_areas";
-
-function getPersonalAreasList(items: ViewItem[]): string[] {
-  const fromItems = [...new Set(items.filter((it) => it.domain === "personal").map((it) => it.category).filter(Boolean))];
-  let custom: string[] = [];
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_AREAS_KEY) : null;
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      custom = Array.isArray(parsed) ? parsed.filter((c: unknown) => typeof c === "string" && c.trim()) : [];
-    }
-  } catch {}
-  const combined = [...new Set([...PERSONAL_AREA_DEFAULTS, ...fromItems, ...custom])];
-  return combined.sort((a, b) => a.localeCompare(b));
-}
-
 function loadPersonalAreaIdSetForSplit(): Set<string> {
   const s = new Set<string>([...PERSONAL_AREA_DEFAULTS]);
   try {
@@ -155,10 +148,6 @@ function loadPersonalAreaIdSetForSplit(): Set<string> {
     /* ignore */
   }
   return s;
-}
-
-function formatAreaLabel(value: string): string {
-  return value.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 }
 
 const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
@@ -203,16 +192,16 @@ const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> 
 };
 
 /** Base entry types + dynamic types from items / dump suggestions (add entry & context menu). */
-function mergeEntryTypesForDomain(
+export function mergeEntryTypesForDomain(
   domain: string,
-  items: ViewItem[],
+  items: { domain: string; itemType?: string }[],
   suggested: SuggestedItemTypeDetail[],
   t?: (key: string) => string
 ): { value: string; label: string }[] {
   const base = ENTRY_TYPES_BY_DOMAIN[domain] ?? ENTRY_TYPES_BY_DOMAIN.work;
   const seen = new Set(base.map((b) => b.value));
   const out = base.map(({ value }) => ({ value, label: formatTypeLabel(value, t) }));
-  const itemMatchesDomain = (it: ViewItem) =>
+  const itemMatchesDomain = (it: { domain: string }) =>
     domain === "all" ? it.domain === "work" || it.domain === "personal" : it.domain === domain;
   for (const it of items) {
     if (!itemMatchesDomain(it) || !it.itemType || it.itemType === "reminder" || seen.has(it.itemType)) continue;
@@ -515,9 +504,8 @@ export function ItemsViewArea({
   const setViewType = onViewTypeChange ?? setInternalViewType;
   const [postitPositions, setPostitPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
+  const [itemContextSubmenu, setItemContextSubmenu] = useState<ItemContextSubmenu | null>(null);
   const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
-  const [moveToProjectForId, setMoveToProjectForId] = useState<string | null>(null);
-  const [moveToAreaForId, setMoveToAreaForId] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<{
     id: string;
     title: string;
@@ -801,19 +789,23 @@ export function ItemsViewArea({
     return () => window.removeEventListener("braindump-reload-items", onReload);
   }, [fetchItems]);
 
+  const loadWorkProjects = useCallback(() => {
+    fetch("/api/projects?domain=work")
+      .then((r) => r.json())
+      .then((d) =>
+        setProjectsList((d.projects ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+      )
+      .catch(() => setProjectsList([]));
+  }, []);
+
   useEffect(() => {
-    const reloadProjects = () => {
-      if (mode !== "work") return;
-      fetch("/api/projects?domain=work")
-        .then((r) => r.json())
-        .then((d) =>
-          setProjectsList((d.projects ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
-        )
-        .catch(() => setProjectsList([]));
-    };
-    window.addEventListener("braindump-reload-projects", reloadProjects);
-    return () => window.removeEventListener("braindump-reload-projects", reloadProjects);
-  }, [mode]);
+    loadWorkProjects();
+  }, [loadWorkProjects]);
+
+  useEffect(() => {
+    window.addEventListener("braindump-reload-projects", loadWorkProjects);
+    return () => window.removeEventListener("braindump-reload-projects", loadWorkProjects);
+  }, [loadWorkProjects]);
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -941,11 +933,15 @@ export function ItemsViewArea({
 
   useEffect(() => {
     if (!itemContextMenu) return;
+    setItemContextSubmenu(null);
+  }, [itemContextMenu?.id]);
+
+  useEffect(() => {
+    if (!itemContextMenu) return;
     if (isMobile) return;
     const close = () => {
       setItemContextMenu(null);
-      setMoveToProjectForId(null);
-      setMoveToAreaForId(null);
+      setItemContextSubmenu(null);
     };
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
@@ -1056,13 +1052,32 @@ export function ItemsViewArea({
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (mode !== "work") return;
-    fetch("/api/projects?domain=work")
-      .then((r) => r.json())
-      .then((d) => setProjectsList((d.projects ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))))
-      .catch(() => setProjectsList([]));
-  }, [mode]);
+  const updateItemDomain = useCallback(
+    (id: string, newDomain: "work" | "personal") => {
+      const it = items.find((i) => i.id === id);
+      if (!it || (it.domain !== "work" && it.domain !== "personal")) return;
+      if (it.domain === newDomain) return;
+      const body =
+        newDomain === "work"
+          ? { domain: "work", category: "tasks", subcategory: "", projectId: null as string | null }
+          : {
+              domain: "personal",
+              category: PERSONAL_AREA_DEFAULTS[0] ?? "thoughts",
+              subcategory: "",
+              projectId: null as string | null,
+            };
+      fetch(`/api/organized-items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then((r) => {
+          if (r.ok) void fetchItems();
+        })
+        .catch(() => {});
+    },
+    [items, fetchItems]
+  );
 
   const updateEntryContent = useCallback((id: string, updates: { title?: string; content?: string }) => {
     fetch(`/api/organized-items/${id}`, {
@@ -1169,21 +1184,39 @@ export function ItemsViewArea({
         content: p.content,
       }));
 
+      const orderedForSplit = sortItemsByListOrder(items);
+      const splitIdx = orderedForSplit.findIndex((i) => i.id === id);
+      const insertBeforeItemId =
+        splitIdx >= 0 && splitIdx + 1 < orderedForSplit.length ? orderedForSplit[splitIdx + 1]!.id : null;
+
       const batchRes = await fetch("/api/organized-items/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dumpId, items: batchItems }),
+        body: JSON.stringify({
+          dumpId,
+          items: batchItems,
+          insertAfterItemId: id,
+          insertBeforeItemId,
+        }),
       });
-      const batchJson = (await batchRes.json()) as { created?: Array<{ id: string; title: string }> };
-      await fetchItems();
-      if (!batchRes.ok) return;
-      const firstNew = batchJson.created?.[0];
+      const batchJson = (await batchRes.json()) as {
+        created?: Array<{ id: string; title: string }>;
+        createdItems?: ViewItem[];
+      };
+      if (!batchRes.ok || !batchJson.createdItems?.length) {
+        await fetchItems();
+        return;
+      }
+      const newRows = batchJson.createdItems;
+      setItems((prev) => sortItemsByListOrder([...prev, ...newRows]));
+      const firstNew = newRows[0];
       if (!firstNew) return;
       if (showEntryTitles) {
+        const headline = (firstNew.title ?? "").trim() || secondPart.title;
         return {
           focusEntryId: firstNew.id,
           focusField: "title",
-          focusValue: secondPart.title,
+          focusValue: headline,
         };
       }
       return {
@@ -1803,6 +1836,7 @@ export function ItemsViewArea({
             <ListView
               showEntryTitles={showEntryTitles}
               items={filteredItems}
+              isMobile={isMobile}
               onSetTaskCompleted={setTaskCompleted}
               onDelete={deleteItem}
               onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
@@ -1815,6 +1849,7 @@ export function ItemsViewArea({
             <TextView
               showEntryTitles={showEntryTitles}
               items={filteredItems}
+              isMobile={isMobile}
               onUpdate={updateEntryContent}
               onCommitTextContent={commitTextViewContent}
               onDelete={deleteItem}
@@ -1857,46 +1892,143 @@ export function ItemsViewArea({
               links={postitLinks}
               onAddLink={(fromId, toId) => setPostitLinks((prev) => (prev.some((l) => l.fromId === fromId && l.toId === toId) ? prev : [...prev, { fromId, toId }]))}
               onRemoveLink={(fromId, toId) => setPostitLinks((prev) => prev.filter((l) => !(l.fromId === fromId && l.toId === toId)))}
+              isMobile={isMobile}
             />
           )}
         </>
       )}
 
       {itemContextMenu && (() => {
-        const types = mergeEntryTypesForDomain(itemContextMenu.domain, items, suggestedItemTypesFromDump, t);
         const selectedItem = items.find((i) => i.id === itemContextMenu.id);
+        const domainKey = selectedItem?.domain ?? itemContextMenu.domain;
+        const types = mergeEntryTypesForDomain(domainKey, items, suggestedItemTypesFromDump, t);
         const personalAreas = getPersonalAreasList(items);
         const closeMenu = () => {
           setItemContextMenu(null);
-          setMoveToProjectForId(null);
-          setMoveToAreaForId(null);
+          setItemContextSubmenu(null);
         };
-        return (
-          <div
-            className={isMobile ? "bd-items-sheet-backdrop bd-items-context-menu-backdrop" : undefined}
-            onClick={isMobile ? closeMenu : undefined}
-          >
+        const placementIsWork = domainKey === "work";
+        const placementIsPersonal = domainKey === "personal";
+        const showDomainAndPlacement = placementIsWork || placementIsPersonal;
+
+        const subFlyoutStyle: CSSProperties = {
+          position: "fixed",
+          left: itemContextMenu.x + 168,
+          top: itemContextMenu.y,
+          zIndex: "calc(var(--bd-z-dropdown) + 1)",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "12px",
+          boxShadow: "var(--shadow-md)",
+          padding: "0.25rem 0",
+          minWidth: "188px",
+          maxHeight: "min(320px, 70dvh)",
+          overflow: "auto",
+        };
+
+        const submenuHeader = (label: string) => (
           <div
             style={{
-              position: isMobile ? "relative" : "fixed",
-              left: isMobile ? undefined : itemContextMenu.x,
-              top: isMobile ? undefined : itemContextMenu.y,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              borderRadius: isMobile ? "16px" : "var(--button-radius)",
-              boxShadow: "var(--shadow-md)",
-              padding: "0.25rem 0",
-              minWidth: "140px",
-              width: isMobile ? "min(100%, 560px)" : undefined,
-              maxHeight: isMobile ? "80dvh" : undefined,
-              overflow: "auto",
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              color: "var(--text-tertiary)",
+              borderBottom: "1px solid var(--border-default)",
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-              {isMobile ? t("menu.actions") : t("menu.changeType")}
-            </div>
+            {label}
+          </div>
+        );
+
+        const workPrivateOptions = () => (
+          <>
+            <button
+              type="button"
+              className="bd-btn"
+              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "work" ? 600 : 400 }}
+              onClick={() => {
+                updateItemDomain(itemContextMenu.id, "work");
+                closeMenu();
+              }}
+            >
+              {t("mode.work")}
+              {domainKey === "work" ? " ✓" : ""}
+            </button>
+            <button
+              type="button"
+              className="bd-btn"
+              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "personal" ? 600 : 400 }}
+              onClick={() => {
+                updateItemDomain(itemContextMenu.id, "personal");
+                closeMenu();
+              }}
+            >
+              {t("mode.personal")}
+              {domainKey === "personal" ? " ✓" : ""}
+            </button>
+          </>
+        );
+
+        const projectPickList = () => {
+          const currentProjectId = selectedItem?.project?.id ?? null;
+          return (
+            <>
+              <button
+                type="button"
+                className="bd-btn"
+                style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === null ? 600 : 400 }}
+                onClick={() => {
+                  updateProject(itemContextMenu.id, null);
+                  closeMenu();
+                }}
+              >
+                {t("menu.noProject")}
+                {currentProjectId === null ? " ✓" : ""}
+              </button>
+              {projectsList.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="bd-btn"
+                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === p.id ? 600 : 400 }}
+                  onClick={() => {
+                    updateProject(itemContextMenu.id, p.id);
+                    closeMenu();
+                  }}
+                >
+                  {p.name}
+                  {currentProjectId === p.id ? " ✓" : ""}
+                </button>
+              ))}
+            </>
+          );
+        };
+
+        const areaPickList = () => {
+          const currentCategory = selectedItem?.category ?? "";
+          return (
+            <>
+              {personalAreas.map((areaKey) => (
+                <button
+                  key={areaKey}
+                  type="button"
+                  className="bd-btn"
+                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentCategory === areaKey ? 600 : 400 }}
+                  onClick={() => {
+                    updateCategory(itemContextMenu.id, areaKey);
+                    closeMenu();
+                  }}
+                >
+                  {formatAreaLabel(areaKey)}
+                  {currentCategory === areaKey ? " ✓" : ""}
+                </button>
+              ))}
+            </>
+          );
+        };
+
+        const typeOptionList = () => (
+          <>
             {types.map(({ value, label }) => (
               <button
                 key={value}
@@ -1916,242 +2048,164 @@ export function ItemsViewArea({
                 {itemContextMenu.currentType === value ? " ✓" : ""}
               </button>
             ))}
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start" }}
-              onClick={() => {
-                const it = items.find((i) => i.id === itemContextMenu.id);
-                if (it) setEditingEntry(toEditEntry(it));
-                closeMenu();
+          </>
+        );
+
+        const mobileSubTitle =
+          itemContextSubmenu === "workPrivate"
+            ? t("menu.changeWorkPrivate")
+            : itemContextSubmenu === "areaProject"
+              ? placementIsWork
+                ? t("menu.selectProject")
+                : t("menu.selectArea")
+              : itemContextSubmenu === "type"
+                ? t("menu.changeType")
+                : "";
+
+        return (
+          <div
+            className={isMobile ? "bd-items-sheet-backdrop bd-items-context-menu-backdrop" : undefined}
+            onClick={isMobile ? closeMenu : undefined}
+          >
+            <div
+              style={{
+                position: isMobile ? "relative" : "fixed",
+                left: isMobile ? undefined : itemContextMenu.x,
+                top: isMobile ? undefined : itemContextMenu.y,
+                zIndex: "var(--bd-z-dropdown)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-default)",
+                borderRadius: isMobile ? "16px" : "12px",
+                boxShadow: "var(--shadow-md)",
+                padding: "0.25rem 0",
+                minWidth: "168px",
+                width: isMobile ? "min(100%, 560px)" : undefined,
+                maxHeight: isMobile ? "80dvh" : undefined,
+                overflow: "auto",
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {t("menu.edit")}
-            </button>
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start" }}
-              onClick={() => {
-                const it = items.find((i) => i.id === itemContextMenu.id);
-                if (it) {
-                  const at = it.reminderAt ? String(it.reminderAt) : "";
-                  const datePart = at ? at.slice(0, 10) : "";
-                  const timePart = at && at.length >= 16 ? at.slice(11, 16) : "09:00";
-                  setReminderEntry({
-                    id: it.id,
-                    title: it.title,
-                    reminderDate: datePart,
-                    reminderTime: timePart,
-                    reminderMinutesBefore: it.reminderMinutesBefore ?? 0,
-                  });
-                }
-                closeMenu();
-              }}
-            >
-              {t("menu.setReminder")}
-            </button>
-            {mode === "work" && (
-              <button
-                type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start" }}
-                onClick={() => setMoveToProjectForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
-              >
-                {t("menu.moveToProject")}
-              </button>
-            )}
-            {itemContextMenu.domain === "personal" && (
-              <button
-                type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start" }}
-                onClick={() => setMoveToAreaForId((prev) => (prev === itemContextMenu.id ? null : itemContextMenu.id))}
-              >
-                {t("menu.moveToArea")}
-              </button>
-            )}
-            {mode === "work" && moveToProjectForId === itemContextMenu.id && !isMobile && (
-              <div
-                style={{
-                  position: "fixed",
-                  left: itemContextMenu.x + 148,
-                  top: itemContextMenu.y,
-                  zIndex: "calc(var(--bd-z-dropdown) + 1)",
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-default)",
-                  borderRadius: "var(--button-radius)",
-                  boxShadow: "var(--shadow-md)",
-                  padding: "0.25rem 0",
-                  minWidth: "160px",
-                  maxHeight: "280px",
-                  overflow: "auto",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-                  {t("menu.selectProject")}
-                </div>
-                {(() => {
-                  const it = items.find((i) => i.id === itemContextMenu.id);
-                  const currentProjectId = it?.project?.id ?? null;
-                  return (
-                    <>
-                      <button
-                        type="button"
-                        className="bd-btn"
-                        style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === null ? 600 : 400 }}
-                        onClick={() => {
-                          updateProject(itemContextMenu.id, null);
-                          setMoveToProjectForId(null);
-                          setItemContextMenu(null);
-                        }}
-                      >
-                        {t("menu.noProject")}
-                        {currentProjectId === null ? " ✓" : ""}
-                      </button>
-                      {projectsList.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          className="bd-btn"
-                          style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === p.id ? 600 : 400 }}
-                          onClick={() => {
-                            updateProject(itemContextMenu.id, p.id);
-                            setMoveToProjectForId(null);
-                            setItemContextMenu(null);
-                          }}
-                        >
-                          {p.name}
-                          {currentProjectId === p.id ? " ✓" : ""}
-                        </button>
-                      ))}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-            {itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && !isMobile && (() => {
-              const areas = getPersonalAreasList(items);
-              const it = items.find((i) => i.id === itemContextMenu.id);
-              const currentCategory = it?.category ?? "";
-              return (
-                <div
-                  style={{
-                    position: "fixed",
-                    left: itemContextMenu.x + 148,
-                    top: itemContextMenu.y,
-                    zIndex: "calc(var(--bd-z-dropdown) + 1)",
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: "var(--button-radius)",
-                    boxShadow: "var(--shadow-md)",
-                    padding: "0.25rem 0",
-                    minWidth: "160px",
-                    maxHeight: "280px",
-                    overflow: "auto",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+              {isMobile && itemContextSubmenu ? (
+                <>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: 600 }}
+                    onClick={() => setItemContextSubmenu(null)}
+                  >
+                    {t("menu.back")}
+                  </button>
                   <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-                    {t("menu.selectArea")}
+                    {mobileSubTitle}
                   </div>
-                  {areas.map((areaKey) => (
+                  {itemContextSubmenu === "workPrivate" ? workPrivateOptions() : null}
+                  {itemContextSubmenu === "areaProject"
+                    ? placementIsWork
+                      ? projectPickList()
+                      : placementIsPersonal
+                        ? areaPickList()
+                        : null
+                    : null}
+                  {itemContextSubmenu === "type" ? typeOptionList() : null}
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      color: "var(--text-tertiary)",
+                      borderBottom: "1px solid var(--border-default)",
+                    }}
+                  >
+                    {t("menu.actions")}
+                  </div>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    onClick={() => {
+                      const it = items.find((i) => i.id === itemContextMenu.id);
+                      if (it) setEditingEntry(toEditEntry(it));
+                      closeMenu();
+                    }}
+                  >
+                    {t("menu.edit")}
+                  </button>
+                  {showDomainAndPlacement ? (
                     <button
-                      key={areaKey}
                       type="button"
                       className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentCategory === areaKey ? 600 : 400 }}
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      onClick={() => setItemContextSubmenu("workPrivate")}
+                    >
+                      {t("menu.changeWorkPrivate")}
+                    </button>
+                  ) : null}
+                  {showDomainAndPlacement ? (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      onClick={() => setItemContextSubmenu("areaProject")}
+                    >
+                      {t("menu.changeAreaProject")}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    onClick={() => setItemContextSubmenu("type")}
+                  >
+                    {t("menu.changeType")}
+                  </button>
+                  <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
                       onClick={() => {
-                        updateCategory(itemContextMenu.id, areaKey);
-                        setMoveToAreaForId(null);
-                        setItemContextMenu(null);
+                        deleteItem(itemContextMenu.id, true);
+                        closeMenu();
                       }}
                     >
-                      {formatAreaLabel(areaKey)}
-                      {currentCategory === areaKey ? " ✓" : ""}
+                      {t("menu.delete")}
                     </button>
-                  ))}
-                </div>
-              );
-            })()}
-            {isMobile && mode === "work" && moveToProjectForId === itemContextMenu.id && (
-              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
-                  {t("menu.selectProject")}
-                </div>
-                <button
-                  type="button"
-                  className="bd-btn"
-                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.project?.id == null ? 600 : 400 }}
-                  onClick={() => {
-                    updateProject(itemContextMenu.id, null);
-                    closeMenu();
-                  }}
-                >
-                  {t("menu.noProject")}
-                  {selectedItem?.project?.id == null ? " ✓" : ""}
-                </button>
-                {projectsList.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.project?.id === p.id ? 600 : 400 }}
-                    onClick={() => {
-                      updateProject(itemContextMenu.id, p.id);
-                      closeMenu();
-                    }}
-                  >
-                    {p.name}
-                    {selectedItem?.project?.id === p.id ? " ✓" : ""}
-                  </button>
-                ))}
-              </div>
-            )}
-            {isMobile && itemContextMenu.domain === "personal" && moveToAreaForId === itemContextMenu.id && (
-              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)" }}>
-                  {t("menu.selectArea")}
-                </div>
-                {personalAreas.map((areaKey) => (
-                  <button
-                    key={areaKey}
-                    type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: selectedItem?.category === areaKey ? 600 : 400 }}
-                    onClick={() => {
-                      updateCategory(itemContextMenu.id, areaKey);
-                      closeMenu();
-                    }}
-                  >
-                    {formatAreaLabel(areaKey)}
-                    {selectedItem?.category === areaKey ? " ✓" : ""}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-              <button
-                type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-                onClick={() => {
-                  deleteItem(itemContextMenu.id, true);
-                  closeMenu();
-                }}
-              >
-                {t("menu.delete")}
-              </button>
+                  </div>
+                  {isMobile ? (
+                    <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                      <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                        {t("menu.cancel")}
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
-            {isMobile && (
-              <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
-                  {t("menu.cancel")}
-                </button>
+            {!isMobile && itemContextSubmenu ? (
+              <div style={subFlyoutStyle} onClick={(e) => e.stopPropagation()}>
+                {itemContextSubmenu === "workPrivate" ? (
+                  <>
+                    {submenuHeader(t("menu.changeWorkPrivate"))}
+                    {workPrivateOptions()}
+                  </>
+                ) : null}
+                {itemContextSubmenu === "areaProject" ? (
+                  <>
+                    {submenuHeader(placementIsWork ? t("menu.selectProject") : t("menu.selectArea"))}
+                    {placementIsWork ? projectPickList() : placementIsPersonal ? areaPickList() : null}
+                  </>
+                ) : null}
+                {itemContextSubmenu === "type" ? (
+                  <>
+                    {submenuHeader(t("menu.changeType"))}
+                    {typeOptionList()}
+                  </>
+                ) : null}
               </div>
-            )}
-          </div>
+            ) : null}
           </div>
         );
       })()}
@@ -3309,6 +3363,7 @@ function CalendarView({
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   /** Increment + direction drives slide-in animation when changing weeks. */
@@ -3556,8 +3611,16 @@ function CalendarView({
               <button
                 key={it.id}
                 type="button"
-                onClick={() => onEdit(it)}
-                onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+                onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
+                {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
+                onContextMenu={
+                  onItemContextMenu && !isMobile
+                    ? (e) => {
+                        e.preventDefault();
+                        onItemContextMenu(e, it.id, it.domain, it.itemType);
+                      }
+                    : undefined
+                }
                 style={{
                   textAlign: "left",
                   fontSize: isMobile ? "0.875rem" : "0.9rem",
@@ -3675,6 +3738,7 @@ function MindmapView({
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
@@ -3809,8 +3873,16 @@ function MindmapView({
             borderLeft: `3px solid ${barColor}`,
             position: "relative",
           }}
-          onClick={() => onEdit(it)}
-          onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+          onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
+          {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
+          onContextMenu={
+            onItemContextMenu && !isMobile
+              ? (e) => {
+                  e.preventDefault();
+                  onItemContextMenu(e, it.id, it.domain, it.itemType);
+                }
+              : undefined
+          }
         >
           {isNew && (
             <span
@@ -4012,6 +4084,108 @@ function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
   window.setTimeout(() => clone.remove(), 0);
 }
 
+const MOBILE_LONG_PRESS_MS = 520;
+const MOBILE_TAP_MAX_MS = 420;
+const MOBILE_MOVE_CANCEL_PX = 14;
+
+function syntheticContextMenuEvent(clientX: number, clientY: number): ReactMouseEvent {
+  return {
+    clientX,
+    clientY,
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  } as ReactMouseEvent;
+}
+
+type MobileFieldSlot = {
+  pointerId: number;
+  x0: number;
+  y0: number;
+  t0: number;
+  /** Browser timer id (`window.setTimeout`); avoid `NodeJS.Timeout` from merged typings. */
+  timer: number | null;
+  longFired: boolean;
+  onShortTap?: () => void;
+};
+
+/** Touch: long-press opens the entry context menu; short tap release starts inline edit (when onShortTap is set). */
+function useMobileEntryFieldGestures(
+  isMobile: boolean,
+  onItemContextMenu?: (e: ReactMouseEvent, id: string, domain: string, currentType: string) => void
+) {
+  const slotRef = useRef<MobileFieldSlot | null>(null);
+
+  const clearSlot = useCallback(() => {
+    const s = slotRef.current;
+    if (s?.timer) window.clearTimeout(s.timer);
+    slotRef.current = null;
+  }, []);
+
+  const bindField = useCallback(
+    (it: ViewItem, onShortTap?: () => void) => {
+      if (!isMobile) return {};
+      const allowMenu = Boolean(onItemContextMenu);
+      const allowTap = Boolean(onShortTap);
+      if (!allowMenu && !allowTap) return {};
+
+      return {
+        onPointerDown: (e: ReactPointerEvent) => {
+          if (e.pointerType !== "touch") return;
+          e.stopPropagation();
+          clearSlot();
+          const { pointerId, clientX, clientY } = e;
+          const t0 = Date.now();
+          const timer: number | null = allowMenu
+            ? (window.setTimeout(() => {
+                const cur = slotRef.current;
+                if (!cur || cur.pointerId !== pointerId || !onItemContextMenu) return;
+                cur.longFired = true;
+                cur.timer = null;
+                onItemContextMenu(syntheticContextMenuEvent(clientX, clientY), it.id, it.domain, it.itemType);
+              }, MOBILE_LONG_PRESS_MS) as unknown as number)
+            : null;
+          slotRef.current = {
+            pointerId,
+            x0: clientX,
+            y0: clientY,
+            t0,
+            timer,
+            longFired: false,
+            onShortTap,
+          };
+        },
+        onPointerMove: (e: ReactPointerEvent) => {
+          const s = slotRef.current;
+          if (!s || s.pointerId !== e.pointerId) return;
+          const dx = e.clientX - s.x0;
+          const dy = e.clientY - s.y0;
+          if (dx * dx + dy * dy > MOBILE_MOVE_CANCEL_PX * MOBILE_MOVE_CANCEL_PX) clearSlot();
+        },
+        onPointerUp: (e: ReactPointerEvent) => {
+          const s = slotRef.current;
+          if (!s || s.pointerId !== e.pointerId) return;
+          if (s.timer) window.clearTimeout(s.timer);
+          const longFired = s.longFired;
+          const elapsed = Date.now() - s.t0;
+          const dx = e.clientX - s.x0;
+          const dy = e.clientY - s.y0;
+          const movedFar = dx * dx + dy * dy > MOBILE_MOVE_CANCEL_PX * MOBILE_MOVE_CANCEL_PX;
+          const shortTap = s.onShortTap;
+          clearSlot();
+          if (longFired || movedFar) return;
+          if (elapsed <= MOBILE_TAP_MAX_MS && shortTap) shortTap();
+        },
+        onPointerCancel: (e: ReactPointerEvent) => {
+          if (slotRef.current?.pointerId === e.pointerId) clearSlot();
+        },
+      };
+    },
+    [isMobile, onItemContextMenu, clearSlot]
+  );
+
+  return bindField;
+}
+
 /** Reveal width behind the row (icon-only delete control). */
 const SWIPE_DELETE_WIDTH_PX = 56;
 /** Map finger movement to slide: >1 opens fully with less horizontal travel (fewer “multi-swipe” feels). */
@@ -4209,6 +4383,7 @@ function SwipeDeleteRow({
 function ListView({
   items,
   showEntryTitles = true,
+  isMobile = false,
   onSetTaskCompleted,
   onDelete,
   onItemContextMenu,
@@ -4219,6 +4394,7 @@ function ListView({
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
+  isMobile?: boolean;
   onSetTaskCompleted: (id: string, completed: boolean) => void;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
@@ -4228,6 +4404,7 @@ function ListView({
   onReorder?: (orderedIds: string[]) => void;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
   const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
@@ -4331,7 +4508,9 @@ function ListView({
         className={`bd-todo-row ${ep.className}`}
         data-bd-entry-id={it.id}
         onDoubleClick={() => onEdit?.(it)}
-        onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+        onContextMenu={
+          onItemContextMenu && !isMobile ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined
+        }
         onDragOver={
           reorderEnabled && onReorder
             ? (e) => {
@@ -4419,6 +4598,7 @@ function ListView({
                 onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                 onBlur={() => handleFieldBlur(it.id, "title", editing.value, it)}
                 onDoubleClick={(e) => e.stopPropagation()}
+                {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     e.preventDefault();
@@ -4440,7 +4620,10 @@ function ListView({
               />
             ) : (
               <div
-                onClick={() => onUpdate && setEditing({ id: it.id, field: "title", value: it.title ?? "" })}
+                onClick={
+                  !isMobile && onUpdate ? () => setEditing({ id: it.id, field: "title", value: it.title ?? "" }) : undefined
+                }
+                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title ?? "" })) : {})}
                 onDoubleClick={(e) => onUpdate && e.stopPropagation()}
                 style={primaryTitleStyle}
               >
@@ -4450,7 +4633,12 @@ function ListView({
           ) : (
             onUpdate && editing?.id === it.id && editing.field === "content" ? null : (
               <div
-                onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                onClick={
+                  !isMobile && onUpdate
+                    ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
+                    : undefined
+                }
+                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
                 onDoubleClick={(e) => onUpdate && e.stopPropagation()}
                 style={primaryTitleStyle}
               >
@@ -4467,6 +4655,7 @@ function ListView({
                 onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                 onBlur={() => handleFieldBlur(it.id, "content", editing.value, it)}
                 onDoubleClick={(e) => e.stopPropagation()}
+                {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     e.preventDefault();
@@ -4497,7 +4686,12 @@ function ListView({
               showEntryTitles &&
               bodySnippet && (
                 <div
-                  onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                  onClick={
+                    !isMobile && onUpdate
+                      ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
+                      : undefined
+                  }
+                  {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
                   onDoubleClick={(e) => onUpdate && e.stopPropagation()}
                   style={{
                     fontSize: "0.8125rem",
@@ -4520,7 +4714,12 @@ function ListView({
             !(onUpdate && editing?.id === it.id && editing.field === "content") &&
             (it.content ?? "").trim().split("\n").length > 1 && (
               <div
-                onClick={() => onUpdate && setEditing({ id: it.id, field: "content", value: it.content ?? "" })}
+                onClick={
+                  !isMobile && onUpdate
+                    ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
+                    : undefined
+                }
+                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
                 style={{
                   fontSize: "0.8125rem",
                   color: "var(--text-secondary)",
@@ -4581,6 +4780,7 @@ function ListView({
 function TextView({
   items,
   showEntryTitles = true,
+  isMobile = false,
   onUpdate,
   onCommitTextContent,
   onDelete,
@@ -4590,6 +4790,7 @@ function TextView({
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
+  isMobile?: boolean;
   onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
   /** Text view: blur commits full textarea; double line breaks split into new entries (also on input). */
   onCommitTextContent?: (id: string, raw: string) => void | Promise<TextViewCommitFocus | void>;
@@ -4599,6 +4800,7 @@ function TextView({
   onReorder?: (orderedIds: string[]) => void;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
   const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
@@ -4640,9 +4842,19 @@ function TextView({
         });
         window.setTimeout(() => {
           if (focus.focusField === "title") {
-            inputRef.current?.focus();
+            const el = inputRef.current;
+            el?.focus();
+            if (el) {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }
           } else {
-            textareaRef.current?.focus();
+            const el = textareaRef.current;
+            el?.focus();
+            if (el) {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }
           }
         }, 0);
       });
@@ -4783,7 +4995,14 @@ function TextView({
             ) : null}
             <div style={{ width: 4, borderRadius: 999, background: barColor, flexShrink: 0 }} />
             <article
-              onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+              onContextMenu={
+                onItemContextMenu && !isMobile
+                  ? (e) => {
+                      e.preventDefault();
+                      onItemContextMenu(e, it.id, it.domain, it.itemType);
+                    }
+                  : undefined
+              }
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -4826,6 +5045,7 @@ function TextView({
                     value={editing?.value ?? it.title}
                     onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
                     onBlur={() => editing && handleBlur(it.id, "title", editing.value, it.title)}
+                    {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     }}
@@ -4845,7 +5065,8 @@ function TextView({
                   />
                 ) : (
                   <h2
-                    onClick={() => setEditing({ id: it.id, field: "title", value: it.title })}
+                    onClick={!isMobile ? () => setEditing({ id: it.id, field: "title", value: it.title }) : undefined}
+                    {...(isMobile ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title })) : {})}
                     style={{
                       flex: 1,
                       margin: 0,
@@ -4898,6 +5119,7 @@ function TextView({
                     showEntryTitles ? mergeTitleAndContent(it) : it.content ?? ""
                   )
                 }
+                {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
                 rows={4}
                 style={{
                   width: "100%",
@@ -4915,13 +5137,25 @@ function TextView({
               />
             ) : (
               <p
-                onClick={() =>
-                  setEditing({
-                    id: it.id,
-                    field: "content",
-                    value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
-                  })
+                onClick={
+                  !isMobile
+                    ? () =>
+                        setEditing({
+                          id: it.id,
+                          field: "content",
+                          value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
+                        })
+                    : undefined
                 }
+                {...(isMobile
+                  ? bindMobileField(it, () =>
+                      setEditing({
+                        id: it.id,
+                        field: "content",
+                        value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
+                      })
+                    )
+                  : {})}
                 style={{
                   margin: 0,
                   fontSize: "0.875rem",
@@ -4986,6 +5220,7 @@ function KanbanView({
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
@@ -5151,7 +5386,15 @@ function KanbanView({
               onDragOver={(e) => handleDragOver(e, col.key)}
               onDrop={(e) => handleDrop(e, col.key)}
               onDoubleClick={() => onEdit?.(it)}
-              onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+              onContextMenu={
+                onItemContextMenu && !isMobile
+                  ? (e) => {
+                      e.preventDefault();
+                      onItemContextMenu(e, it.id, it.domain, it.itemType);
+                    }
+                  : undefined
+              }
+              {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
               style={{
                 ...ep.style,
                 padding: "0.65rem 0.85rem",
@@ -5232,6 +5475,7 @@ function PostitsView({
   links,
   onAddLink,
   onRemoveLink,
+  isMobile = false,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -5246,8 +5490,10 @@ function PostitsView({
   links: { fromId: string; toId: string }[];
   onAddLink: (fromId: string, toId: string) => void;
   onRemoveLink: (fromId: string, toId: string) => void;
+  isMobile?: boolean;
 }) {
   const { t } = useI18n();
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [dragState, setDragState] = useState<{ id: string; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
@@ -5484,7 +5730,15 @@ function PostitsView({
               className={ep.className}
               onMouseDown={(e) => handleMouseDown(e, it.id)}
               onDoubleClick={() => onEdit?.(it)}
-              onContextMenu={onItemContextMenu ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined}
+              onContextMenu={
+                onItemContextMenu && !isMobile
+                  ? (e) => {
+                      e.preventDefault();
+                      onItemContextMenu(e, it.id, it.domain, it.itemType);
+                    }
+                  : undefined
+              }
+              {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
               style={{
                 ...ep.style,
                 position: "absolute",

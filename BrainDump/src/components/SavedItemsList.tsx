@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
 import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
+import {
+  getPersonalAreasList,
+  PERSONAL_AREA_DEFAULTS,
+  formatAreaLabel,
+} from "@/lib/personal-areas";
+import { mergeEntryTypesForDomain, type ItemContextSubmenu } from "@/components/ItemsViewArea";
 
 interface SavedItem {
   id: string;
@@ -47,33 +53,6 @@ function entryTypeLabel(itemType: string, t?: (key: string) => string): string {
   if (itemType === "task_completed") return t ? t("items.typeTaskCompleted") : "Task: Completed";
   return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-
-const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
-  work: [
-    { value: "task", label: "Task" },
-    { value: "task_completed", label: "Task: Completed" },
-    { value: "note", label: "Note" },
-    { value: "idea", label: "Idea" },
-    { value: "calendar", label: "Calendar" },
-  ],
-  personal: [
-    { value: "task", label: "Task" },
-    { value: "note", label: "Note" },
-    { value: "idea", label: "Idea" },
-    { value: "emotion", label: "Emotion" },
-    { value: "reflection", label: "Reflection" },
-    { value: "calendar", label: "Calendar" },
-  ],
-  inbox: [
-    { value: "task", label: "Task" },
-    { value: "task_completed", label: "Task: Completed" },
-    { value: "note", label: "Note" },
-    { value: "idea", label: "Idea" },
-    { value: "emotion", label: "Emotion" },
-    { value: "reflection", label: "Reflection" },
-    { value: "calendar", label: "Calendar" },
-  ],
-};
 
 export function SavedItemsList({ mode, projectId, category, itemType }: SavedItemsListProps) {
   const { t } = useI18n();
@@ -149,16 +128,110 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   }, []);
 
   const updateItemType = useCallback((id: string, newType: string) => {
+    const patch: Record<string, unknown> = { itemType: newType };
+    if (newType === "task_completed") {
+      patch.progress = "completed";
+      patch.kanbanColumn = "completed";
+    } else if (newType === "task") {
+      patch.progress = "todo";
+      patch.kanbanColumn = "todo";
+    }
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemType: newType }),
+      body: JSON.stringify(patch),
     })
       .then((r) => {
-        if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, itemType: newType } : it)));
+        if (r.ok) {
+          setItems((prev) =>
+            prev.map((it) => {
+              if (it.id !== id) return it;
+              const next = { ...it, itemType: newType };
+              if (newType === "task_completed") return { ...next, progress: "completed", kanbanColumn: "completed" };
+              if (newType === "task") return { ...next, progress: "todo", kanbanColumn: "todo" };
+              return next;
+            })
+          );
+          if (newType === "task_completed") playTaskCompleteCheer();
+        }
       })
       .catch(() => {});
   }, []);
+
+  const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
+
+  const loadWorkProjects = useCallback(() => {
+    fetch("/api/projects?domain=work")
+      .then((r) => r.json())
+      .then((d) =>
+        setProjectsList((d.projects ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+      )
+      .catch(() => setProjectsList([]));
+  }, []);
+
+  useEffect(() => {
+    loadWorkProjects();
+  }, [loadWorkProjects]);
+
+  useEffect(() => {
+    window.addEventListener("braindump-reload-projects", loadWorkProjects);
+    return () => window.removeEventListener("braindump-reload-projects", loadWorkProjects);
+  }, [loadWorkProjects]);
+
+  const updateProject = useCallback((id: string, projectIdVal: string | null) => {
+    fetch(`/api/organized-items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: projectIdVal }),
+    })
+      .then((r) => {
+        if (r.ok) {
+          const project = projectIdVal ? projectsList.find((p) => p.id === projectIdVal) ?? null : null;
+          setItems((prev) =>
+            prev.map((it) => (it.id === id ? { ...it, project: project ? { id: project.id, name: project.name } : null } : it))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [projectsList]);
+
+  const updateCategory = useCallback((id: string, cat: string) => {
+    fetch(`/api/organized-items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: cat, subcategory: "" }),
+    })
+      .then((r) => {
+        if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, category: cat, subcategory: "" } : it)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateItemDomain = useCallback(
+    (id: string, newDomain: "work" | "personal") => {
+      const it = items.find((i) => i.id === id);
+      if (!it || (it.domain !== "work" && it.domain !== "personal") || it.domain === newDomain) return;
+      const body =
+        newDomain === "work"
+          ? { domain: "work", category: "tasks", subcategory: "", projectId: null as string | null }
+          : {
+              domain: "personal",
+              category: PERSONAL_AREA_DEFAULTS[0] ?? "thoughts",
+              subcategory: "",
+              projectId: null as string | null,
+            };
+      fetch(`/api/organized-items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then((r) => {
+          if (r.ok) void fetchItems();
+        })
+        .catch(() => {});
+    },
+    [items, fetchItems]
+  );
 
   const updateEntryContent = useCallback((id: string, updates: { title?: string; content?: string }) => {
     fetch(`/api/organized-items/${id}`, {
@@ -209,6 +282,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   );
 
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
+  const [itemContextSubmenu, setItemContextSubmenu] = useState<ItemContextSubmenu | null>(null);
   const [editingEntry, setEditingEntry] = useState<{ id: string; title: string; content: string } | null>(null);
   const editingEntryRef = useRef(editingEntry);
   editingEntryRef.current = editingEntry;
@@ -251,8 +325,16 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
 
   useEffect(() => {
     if (!itemContextMenu) return;
+    setItemContextSubmenu(null);
+  }, [itemContextMenu?.id]);
+
+  useEffect(() => {
+    if (!itemContextMenu) return;
     if (isMobile) return;
-    const close = () => setItemContextMenu(null);
+    const close = () => {
+      setItemContextMenu(null);
+      setItemContextSubmenu(null);
+    };
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
     return () => {
@@ -357,41 +439,136 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
       </div>
 
       {itemContextMenu && (() => {
-        const types = ENTRY_TYPES_BY_DOMAIN[itemContextMenu.domain] ?? ENTRY_TYPES_BY_DOMAIN.inbox;
-        const closeMenu = () => setItemContextMenu(null);
-        return (
-          <div
-            style={isMobile ? {
-              position: "fixed",
-              inset: 0,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "rgba(0,0,0,0.35)",
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              padding: "0.75rem",
-            } : undefined}
-            onClick={isMobile ? closeMenu : undefined}
-          >
+        const selectedItem = items.find((i) => i.id === itemContextMenu.id);
+        const domainKey = selectedItem?.domain ?? itemContextMenu.domain;
+        const types = mergeEntryTypesForDomain(domainKey, items, [], t);
+        const personalAreas = getPersonalAreasList(items);
+        const closeMenu = () => {
+          setItemContextMenu(null);
+          setItemContextSubmenu(null);
+        };
+        const placementIsWork = domainKey === "work";
+        const placementIsPersonal = domainKey === "personal";
+        const showDomainAndPlacement = placementIsWork || placementIsPersonal;
+
+        const subFlyoutStyle: CSSProperties = {
+          position: "fixed",
+          left: itemContextMenu.x + 168,
+          top: itemContextMenu.y,
+          zIndex: "calc(var(--bd-z-dropdown) + 1)",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "12px",
+          boxShadow: "var(--shadow-md)",
+          padding: "0.25rem 0",
+          minWidth: "188px",
+          maxHeight: "min(320px, 70dvh)",
+          overflow: "auto",
+        };
+
+        const submenuHeader = (label: string) => (
           <div
             style={{
-              position: isMobile ? "relative" : "fixed",
-              left: isMobile ? undefined : itemContextMenu.x,
-              top: isMobile ? undefined : itemContextMenu.y,
-              zIndex: "var(--bd-z-dropdown)",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              borderRadius: isMobile ? "16px" : "var(--button-radius)",
-              boxShadow: "var(--shadow-md)",
-              padding: "0.25rem 0",
-              minWidth: "140px",
-              width: isMobile ? "min(100%, 420px)" : undefined,
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              color: "var(--text-tertiary)",
+              borderBottom: "1px solid var(--border-default)",
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-              {t("menu.changeType")}
-            </div>
+            {label}
+          </div>
+        );
+
+        const workPrivateOptions = () => (
+          <>
+            <button
+              type="button"
+              className="bd-btn"
+              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "work" ? 600 : 400 }}
+              onClick={() => {
+                updateItemDomain(itemContextMenu.id, "work");
+                closeMenu();
+              }}
+            >
+              {t("mode.work")}
+              {domainKey === "work" ? " ✓" : ""}
+            </button>
+            <button
+              type="button"
+              className="bd-btn"
+              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "personal" ? 600 : 400 }}
+              onClick={() => {
+                updateItemDomain(itemContextMenu.id, "personal");
+                closeMenu();
+              }}
+            >
+              {t("mode.personal")}
+              {domainKey === "personal" ? " ✓" : ""}
+            </button>
+          </>
+        );
+
+        const projectPickList = () => {
+          const currentProjectId = selectedItem?.project?.id ?? null;
+          return (
+            <>
+              <button
+                type="button"
+                className="bd-btn"
+                style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === null ? 600 : 400 }}
+                onClick={() => {
+                  updateProject(itemContextMenu.id, null);
+                  closeMenu();
+                }}
+              >
+                {t("menu.noProject")}
+                {currentProjectId === null ? " ✓" : ""}
+              </button>
+              {projectsList.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="bd-btn"
+                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === p.id ? 600 : 400 }}
+                  onClick={() => {
+                    updateProject(itemContextMenu.id, p.id);
+                    closeMenu();
+                  }}
+                >
+                  {p.name}
+                  {currentProjectId === p.id ? " ✓" : ""}
+                </button>
+              ))}
+            </>
+          );
+        };
+
+        const areaPickList = () => {
+          const currentCategory = selectedItem?.category ?? "";
+          return (
+            <>
+              {personalAreas.map((areaKey) => (
+                <button
+                  key={areaKey}
+                  type="button"
+                  className="bd-btn"
+                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentCategory === areaKey ? 600 : 400 }}
+                  onClick={() => {
+                    updateCategory(itemContextMenu.id, areaKey);
+                    closeMenu();
+                  }}
+                >
+                  {formatAreaLabel(areaKey)}
+                  {currentCategory === areaKey ? " ✓" : ""}
+                </button>
+              ))}
+            </>
+          );
+        };
+
+        const typeOptionList = () => (
+          <>
             {types.map(({ value, label }) => (
               <button
                 key={value}
@@ -411,60 +588,185 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                 {itemContextMenu.currentType === value ? " ✓" : ""}
               </button>
             ))}
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start" }}
-              onClick={() => {
-                const it = items.find((i) => i.id === itemContextMenu.id);
-                if (it) setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" });
-                closeMenu();
+          </>
+        );
+
+        const mobileSubTitle =
+          itemContextSubmenu === "workPrivate"
+            ? t("menu.changeWorkPrivate")
+            : itemContextSubmenu === "areaProject"
+              ? placementIsWork
+                ? t("menu.selectProject")
+                : t("menu.selectArea")
+              : itemContextSubmenu === "type"
+                ? t("menu.changeType")
+                : "";
+
+        return (
+          <div
+            style={
+              isMobile
+                ? {
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: "var(--bd-z-dropdown)",
+                    background: "rgba(0,0,0,0.35)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    padding: "0.75rem",
+                  }
+                : undefined
+            }
+            onClick={isMobile ? closeMenu : undefined}
+          >
+            <div
+              style={{
+                position: isMobile ? "relative" : "fixed",
+                left: isMobile ? undefined : itemContextMenu.x,
+                top: isMobile ? undefined : itemContextMenu.y,
+                zIndex: "var(--bd-z-dropdown)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-default)",
+                borderRadius: isMobile ? "16px" : "12px",
+                boxShadow: "var(--shadow-md)",
+                padding: "0.25rem 0",
+                minWidth: "168px",
+                width: isMobile ? "min(100%, 420px)" : undefined,
+                maxHeight: isMobile ? "80dvh" : undefined,
+                overflow: "auto",
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {t("menu.edit")}
-            </button>
-            <button
-              type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start" }}
-              onClick={() => {
-                const it = items.find((i) => i.id === itemContextMenu.id);
-                if (it) {
-                  const at = it.reminderAt ? String(it.reminderAt) : "";
-                  const datePart = at ? at.slice(0, 10) : "";
-                  const timePart = at && at.length >= 16 ? at.slice(11, 16) : "09:00";
-                  setReminderEntry({
-                    id: it.id,
-                    title: it.title,
-                    reminderDate: datePart,
-                    reminderTime: timePart,
-                    reminderMinutesBefore: it.reminderMinutesBefore ?? 0,
-                  });
-                }
-                closeMenu();
-              }}
-            >
-              {t("menu.setReminder")}
-            </button>
-            <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-              <button
-                type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-                onClick={() => {
-                  deleteItem(itemContextMenu.id, true);
-                  closeMenu();
-                }}
-              >
-                {t("menu.delete")}
-              </button>
+              {isMobile && itemContextSubmenu ? (
+                <>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: 600 }}
+                    onClick={() => setItemContextSubmenu(null)}
+                  >
+                    {t("menu.back")}
+                  </button>
+                  <div
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      color: "var(--text-tertiary)",
+                      borderBottom: "1px solid var(--border-default)",
+                    }}
+                  >
+                    {mobileSubTitle}
+                  </div>
+                  {itemContextSubmenu === "workPrivate" ? workPrivateOptions() : null}
+                  {itemContextSubmenu === "areaProject"
+                    ? placementIsWork
+                      ? projectPickList()
+                      : placementIsPersonal
+                        ? areaPickList()
+                        : null
+                    : null}
+                  {itemContextSubmenu === "type" ? typeOptionList() : null}
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      color: "var(--text-tertiary)",
+                      borderBottom: "1px solid var(--border-default)",
+                    }}
+                  >
+                    {t("menu.actions")}
+                  </div>
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    onClick={() => {
+                      const it = items.find((i) => i.id === itemContextMenu.id);
+                      if (it) setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" });
+                      closeMenu();
+                    }}
+                  >
+                    {t("menu.edit")}
+                  </button>
+                  {showDomainAndPlacement ? (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      onClick={() => setItemContextSubmenu("workPrivate")}
+                    >
+                      {t("menu.changeWorkPrivate")}
+                    </button>
+                  ) : null}
+                  {showDomainAndPlacement ? (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      onClick={() => setItemContextSubmenu("areaProject")}
+                    >
+                      {t("menu.changeAreaProject")}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="bd-btn"
+                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    onClick={() => setItemContextSubmenu("type")}
+                  >
+                    {t("menu.changeType")}
+                  </button>
+                  <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
+                      onClick={() => {
+                        deleteItem(itemContextMenu.id, true);
+                        closeMenu();
+                      }}
+                    >
+                      {t("menu.delete")}
+                    </button>
+                  </div>
+                  {isMobile ? (
+                    <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
+                      <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                        {t("menu.cancel")}
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
-            {isMobile && (
-              <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
-                {t("menu.cancel")}
-              </button>
-            )}
-          </div>
+            {!isMobile && itemContextSubmenu ? (
+              <div style={subFlyoutStyle} onClick={(e) => e.stopPropagation()}>
+                {itemContextSubmenu === "workPrivate" ? (
+                  <>
+                    {submenuHeader(t("menu.changeWorkPrivate"))}
+                    {workPrivateOptions()}
+                  </>
+                ) : null}
+                {itemContextSubmenu === "areaProject" ? (
+                  <>
+                    {submenuHeader(placementIsWork ? t("menu.selectProject") : t("menu.selectArea"))}
+                    {placementIsWork ? projectPickList() : placementIsPersonal ? areaPickList() : null}
+                  </>
+                ) : null}
+                {itemContextSubmenu === "type" ? (
+                  <>
+                    {submenuHeader(t("menu.changeType"))}
+                    {typeOptionList()}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         );
       })()}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
-import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
+import { CUSTOM_AREAS_KEY, PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 
 interface Project {
   id: string;
@@ -28,8 +28,6 @@ interface ScopeBarProps {
   /** Desktop: content immediately left of the filter field (e.g. “Next 3 — AI”). */
   beforeFilterSlot?: ReactNode;
 }
-
-const CUSTOM_AREAS_KEY = "braindump_custom_areas";
 
 function formatCategoryLabel(value: string): string {
   return value
@@ -1152,7 +1150,7 @@ export function ScopeBar({
                     zIndex: "var(--bd-z-scope-sheet)",
                     background: "var(--bg-elevated)",
                     border: "1px solid var(--border-default)",
-                    borderRadius: "var(--button-radius)",
+                    borderRadius: "12px",
                     boxShadow: "var(--shadow-md)",
                     padding: "0.25rem 0",
                     minWidth: "120px",
@@ -1841,7 +1839,7 @@ export function ScopeBar({
                     zIndex: "var(--bd-z-scope-sheet)",
                     background: "var(--bg-elevated)",
                     border: "1px solid var(--border-default)",
-                    borderRadius: "var(--button-radius)",
+                    borderRadius: "12px",
                     boxShadow: "var(--shadow-md)",
                     padding: "0.25rem 0",
                     minWidth: "120px",

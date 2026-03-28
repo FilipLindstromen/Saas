@@ -24,8 +24,16 @@ export async function POST(request: NextRequest) {
     const userId = (session.user as { id?: string }).id!;
 
     const body = await request.json();
-    const { dumpId, items } = body as {
+    const {
+      dumpId,
+      items,
+      insertAfterItemId: insertAfterRaw,
+      insertBeforeItemId: insertBeforeRaw,
+    } = body as {
       dumpId: string;
+      /** When splitting text view, new rows are ordered between this item and `insertBeforeItemId` (listOrder). */
+      insertAfterItemId?: string | null;
+      insertBeforeItemId?: string | null;
       items: Array<{
         domain: string;
         category: string;
@@ -70,7 +78,12 @@ export async function POST(request: NextRequest) {
 
     await ensureOrganizedItemListOrderColumn(prisma);
 
-    const created: Array<{ id: string; title: string }> = [];
+    const insertAfterItemId =
+      typeof insertAfterRaw === "string" && insertAfterRaw.trim() ? insertAfterRaw.trim() : null;
+    const insertBeforeItemId =
+      typeof insertBeforeRaw === "string" && insertBeforeRaw.trim() ? insertBeforeRaw.trim() : null;
+
+    const createdIds: string[] = [];
 
     await prisma.$transaction(async (tx) => {
       // findFirst avoids aggregate + driver edge cases; same as min(listOrder) for this user
@@ -81,7 +94,51 @@ export async function POST(request: NextRequest) {
       });
       let nextListOrder = minRow?.listOrder ?? 0;
 
-      for (const it of items) {
+      const n = items.length;
+      let insertListOrders: number[] | null = null;
+
+      if (insertAfterItemId && n > 0) {
+        const anchor = await tx.organizedItem.findFirst({
+          where: { id: insertAfterItemId, userId },
+          select: { listOrder: true, createdAt: true },
+        });
+        if (anchor) {
+          let placed = false;
+          if (
+            insertBeforeItemId &&
+            insertBeforeItemId !== insertAfterItemId
+          ) {
+            const beforeRow = await tx.organizedItem.findFirst({
+              where: { id: insertBeforeItemId, userId },
+              select: { listOrder: true, createdAt: true },
+            });
+            if (beforeRow) {
+              const aLo = anchor.listOrder;
+              const bLo = beforeRow.listOrder;
+              const aT = anchor.createdAt.getTime();
+              const bT = beforeRow.createdAt.getTime();
+              const beforeIsAfterAnchor = bLo > aLo || (bLo === aLo && bT < aT);
+              if (beforeIsAfterAnchor) {
+                if (bLo > aLo) {
+                  insertListOrders = Array.from(
+                    { length: n },
+                    (_, i) => aLo + ((bLo - aLo) * (i + 1)) / (n + 1)
+                  );
+                } else {
+                  insertListOrders = Array.from({ length: n }, (_, i) => aLo + (i + 1) * 1e-6);
+                }
+                placed = true;
+              }
+            }
+          }
+          if (!placed) {
+            insertListOrders = Array.from({ length: n }, (_, i) => anchor.listOrder + 1000 * (i + 1));
+          }
+        }
+      }
+
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx];
         const name =
           (typeof it.project_name === "string" && it.project_name.trim()) ||
           (typeof it.project === "string" && it.project.trim()) ||
@@ -150,7 +207,9 @@ export async function POST(request: NextRequest) {
         const taskProgress = itemTypeStr === "task_completed" ? "completed" : "todo";
         const taskKanbanCol = itemTypeStr === "task_completed" ? "completed" : "todo";
 
-        nextListOrder -= 1000;
+        const listOrderForRow =
+          insertListOrders != null ? insertListOrders[idx]! : (() => ((nextListOrder -= 1000), nextListOrder))();
+
         const item = await tx.organizedItem.create({
           data: {
             dumpId: dumpIdStr,
@@ -162,7 +221,7 @@ export async function POST(request: NextRequest) {
             itemType: itemTypeStr,
             title: String(it.title ?? ""),
             content: String(it.content ?? ""),
-            listOrder: nextListOrder,
+            listOrder: listOrderForRow,
             emotionLabel: it.emotion_label != null && it.emotion_label !== "" ? String(it.emotion_label) : null,
             status: "draft",
             progress: taskProgress,
@@ -182,7 +241,7 @@ export async function POST(request: NextRequest) {
               : {}),
           },
         });
-        created.push({ id: item.id, title: item.title });
+        createdIds.push(item.id);
 
         if (Array.isArray(it.tags) && it.tags.length > 0) {
           for (const tagName of it.tags) {
@@ -200,7 +259,23 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    return NextResponse.json({ created, count: created.length });
+    const createdItems =
+      createdIds.length === 0
+        ? []
+        : await prisma.organizedItem.findMany({
+            where: { id: { in: createdIds } },
+            include: {
+              dump: { select: { id: true, mode: true, createdAt: true } },
+              project: true,
+              tags: { include: { tag: true } },
+            },
+          });
+    const orderIndex = new Map(createdIds.map((id, i) => [id, i]));
+    createdItems.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+
+    const created = createdItems.map((row) => ({ id: row.id, title: row.title }));
+
+    return NextResponse.json({ created, createdItems, count: created.length });
   } catch (e) {
     console.error("Batch create organized items error:", e);
     const message = getDbErrorMessage(e) || "Failed to create items";

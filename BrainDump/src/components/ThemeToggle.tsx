@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useSaasTheme } from "@/lib/saas-theme-client";
 
 type ThemeToggleProps = {
   className?: string;
@@ -9,31 +9,7 @@ type ThemeToggleProps = {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { t } = useI18n();
-  const [theme, setThemeState] = useState<"light" | "dark">("dark");
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("saas-apps-theme");
-      if (stored === "light" || stored === "dark") setThemeState(stored);
-      else if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) setThemeState("dark");
-      else setThemeState("light");
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
-      try {
-        const t = localStorage.getItem("saas-apps-theme");
-        if (t === "light" || t === "dark") setThemeState(t);
-      } catch {}
-    };
-    window.addEventListener("storage", handler);
-    window.addEventListener("saas-theme-change", handler as EventListener);
-    return () => {
-      window.removeEventListener("storage", handler);
-      window.removeEventListener("saas-theme-change", handler as EventListener);
-    };
-  }, []);
+  const theme = useSaasTheme();
 
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
@@ -41,8 +17,9 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     try {
       localStorage.setItem("saas-apps-theme", next);
       window.dispatchEvent(new CustomEvent("saas-theme-change", { detail: next }));
-    } catch {}
-    setThemeState(next);
+    } catch {
+      /* ignore */
+    }
   };
 
   const label = theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark");
