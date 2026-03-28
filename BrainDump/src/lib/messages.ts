@@ -29,6 +29,8 @@ const en: Msg = {
   "sidebar.signOut": "Sign out",
   "sidebar.closeMenu": "Close menu",
   "sidebar.menu": "Menu",
+  "sidebar.capturePhoto": "Photo dump",
+  "sidebar.captureText": "Write dump",
 
   "theme.switchToLight": "Switch to light mode",
   "theme.switchToDark": "Switch to dark mode",
@@ -89,6 +91,8 @@ const en: Msg = {
   "scope.dateFilterThisWeek": "This week",
   "scope.dateFilterNoDate": "No date",
   "scope.dateFilterMenuAria": "Filter by due date",
+  "scope.dateFilterQuickAria": "Quick due date: today, tomorrow, this week",
+  "scope.dateFilterMoreAria": "More date filters (any date, no date)",
 
   "center.record": "Record",
   "center.microphone": "Microphone",
@@ -415,6 +419,8 @@ const sv: Msg = {
   "sidebar.signOut": "Logga ut",
   "sidebar.closeMenu": "Stäng meny",
   "sidebar.menu": "Meny",
+  "sidebar.capturePhoto": "Fotodump",
+  "sidebar.captureText": "Skriv dump",
 
   "theme.switchToLight": "Byt till ljust läge",
   "theme.switchToDark": "Byt till mörkt läge",
@@ -474,6 +480,8 @@ const sv: Msg = {
   "scope.dateFilterThisWeek": "Denna vecka",
   "scope.dateFilterNoDate": "Utan datum",
   "scope.dateFilterMenuAria": "Filtrera efter datum",
+  "scope.dateFilterQuickAria": "Snabbval: idag, imorgon, denna vecka",
+  "scope.dateFilterMoreAria": "Fler datumfilter (alla datum, utan datum)",
 
   "center.record": "Spela in",
   "center.microphone": "Mikrofon",

@@ -103,6 +103,8 @@ export type BrainDumpCenterHandle = {
   processImageForOrganize: (file: File) => Promise<void>;
   /** Opens the typed-dump sheet (mobile bar or programmatic). */
   openTypedDumpSheet: () => void;
+  /** Opens camera / library / webcam menu (sidebar photo action). */
+  openPhotoCaptureMenu: () => void;
   /** Same as the main record/stop control (mobile bottom bar calls this; desktop uses #bd-dump-fab). */
   toggleDumpRecording: () => void;
 };
@@ -167,6 +169,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [typedDumpText, setTypedDumpText] = useState("");
   const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
   const photoAnchorRef = useRef<PhotoCaptureTriggerHandle | null>(null);
+  const isDumpProcessing = transcribeLoading || organizeLoading;
 
   useEffect(() => {
     const sync = () => setShowDumpFace(loadShowDumpFace());
@@ -688,9 +691,10 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   );
 
   const openTypedDumpSheet = useCallback(() => {
+    if (isDumpProcessing || photoOrganizeFlow) return;
     setTypedDumpText("");
     setShowTypedDumpSheet(true);
-  }, []);
+  }, [isDumpProcessing, photoOrganizeFlow]);
 
   const closeTypedDumpSheet = useCallback(() => {
     setShowTypedDumpSheet(false);
@@ -748,7 +752,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   );
 
   const isInbox = mode === "inbox";
-  const isDumpProcessing = transcribeLoading || organizeLoading;
 
   const handleTypedDumpOrganize = useCallback(async () => {
     const text = typedDumpText.trim();
@@ -798,6 +801,15 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
   }, [isDumpProcessing, stopRecording, mode]);
 
+  useEffect(() => {
+    if (!showDumpOverlay || showHelpOverlay) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDumpOverlay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showDumpOverlay, showHelpOverlay, closeDumpOverlay]);
+
   const onDumpFabClick = useCallback(() => {
     if (isDumpProcessing || photoOrganizeFlow) return;
     if (recordState === "recording") {
@@ -813,6 +825,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     () => ({
       processImageForOrganize,
       openTypedDumpSheet,
+      openPhotoCaptureMenu: () => {
+        requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
+      },
       toggleDumpRecording: () => {
         onDumpFabClick();
       },
@@ -919,7 +934,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 <div className="bd-dump-timer-row">
                   <span className="bd-dump-timer" aria-live="polite" aria-atomic="true">
                     {recordingElapsed}
-                    <span style={{ opacity: 0.75, fontWeight: 400, marginLeft: "0.35rem" }}>{t("center.recordingMaxHint")}</span>
+                    <span className="bd-dump-timer-hint">{t("center.recordingMaxHint")}</span>
                   </span>
                 </div>
                 <div className="bd-dump-actions-row bd-dump-actions-row--split">
@@ -1021,43 +1036,42 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         disabled={isDumpProcessing || photoOrganizeFlow}
       />
       {showDumpOverlay && !isDumpProcessing && (
-            <div
-              className="bd-dump-overlay"
-              role="presentation"
-              onClick={closeDumpOverlay}
-            >
-              <div
-                className="bd-panel bd-dump-sheet-inner"
-                onClick={(e) => e.stopPropagation()}
+        <div
+          className="bd-modal-backdrop bd-dump-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bd-voice-dump-title"
+          onClick={closeDumpOverlay}
+        >
+          <div
+            className="bd-panel bd-modal-panel bd-dump-sheet-inner"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="bd-dump-sheet-header">
+              <button
+                type="button"
+                className="bd-btn bd-dump-sheet-header-btn"
+                onClick={closeDumpOverlay}
+                disabled={isDumpProcessing}
+                aria-label={t("center.close")}
               >
-                <div className="bd-dump-sheet-handle" aria-hidden />
-                <div className="bd-dump-sheet-header">
-                  <button
-                    type="button"
-                    className="bd-dump-sheet-corner-btn"
-                    onClick={closeDumpOverlay}
-                    disabled={isDumpProcessing}
-                    aria-label={t("center.close")}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <h2 className="bd-dump-sheet-title">{t("center.newDump")}</h2>
-                  <button
-                    type="button"
-                    className="bd-dump-sheet-corner-btn bd-dump-sheet-help-btn"
-                    onClick={() => setShowHelpOverlay(true)}
-                  >
-                    {t("center.help")}
-                  </button>
-                </div>
-                <div className="bd-dump-sheet-content">
-                  {showDumpFace && <DumpListeningFace variant="sheet" />}
-                  {dumpPanelContent}
-                </div>
-              </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
+                {t("center.newDump")}
+              </h2>
+              <button type="button" className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-help-btn" onClick={() => setShowHelpOverlay(true)}>
+                {t("center.help")}
+              </button>
+            </header>
+            <div className="bd-dump-sheet-content">
+              {showDumpFace && <DumpListeningFace variant="sheet" />}
+              {dumpPanelContent}
             </div>
+          </div>
+        </div>
       )}
       {showTypedDumpSheet && (
         <div
