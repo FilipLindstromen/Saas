@@ -64,6 +64,9 @@ type AppSidebarProps = {
   onOpenSettings: () => void;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
+  onCapturePhoto?: () => void;
+  onCaptureText?: () => void;
+  onOpenCoach?: () => void;
 };
 
 function useIsMobile() {
@@ -86,6 +89,9 @@ export function AppSidebar({
   onOpenSettings,
   mobileOpen,
   onMobileOpenChange,
+  onCapturePhoto,
+  onCaptureText,
+  onOpenCoach,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { data: session } = useSession();
@@ -312,6 +318,73 @@ export function AppSidebar({
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t(MODE_KEY[m])}</span> : null}
             </button>
           ))}
+        </nav>
+      ) : null}
+
+      {onCapturePhoto || onCaptureText || onOpenCoach ? (
+        <nav className="bd-app-sidebar-nav" aria-label={t("sidebar.dumpInputsAria")}>
+          {onCapturePhoto ? (
+            <button
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => {
+                onCapturePhoto();
+                if (isMobile) closeMobileDrawerAnimated();
+              }}
+              title={t("sidebar.capturePhoto")}
+              aria-label={t("sidebar.capturePhoto")}
+            >
+              <span className="bd-app-sidebar-nav-icon">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+              </span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.capturePhoto")}</span> : null}
+            </button>
+          ) : null}
+          {onCaptureText ? (
+            <button
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => {
+                onCaptureText();
+                if (isMobile) closeMobileDrawerAnimated();
+              }}
+              title={t("sidebar.captureText")}
+              aria-label={t("sidebar.captureText")}
+            >
+              <span className="bd-app-sidebar-nav-icon">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 6h16M4 12h16M4 18h11" />
+                </svg>
+              </span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.captureText")}</span> : null}
+            </button>
+          ) : null}
+          {onOpenCoach ? (
+            <button
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => {
+                onOpenCoach();
+                if (isMobile) closeMobileDrawerAnimated();
+              }}
+              title={t("coach.title")}
+              aria-label={t("coach.title")}
+            >
+              <span className="bd-app-sidebar-nav-icon">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M21 15a4 4 0 0 1-4 4H8l-4 4V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z" />
+                  <path d="M8 10h.01M12 10h.01M16 10h.01" />
+                </svg>
+              </span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("coach.title")}</span> : null}
+            </button>
+          ) : null}
         </nav>
       ) : null}
 

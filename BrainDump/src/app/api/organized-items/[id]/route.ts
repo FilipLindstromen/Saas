@@ -67,6 +67,27 @@ export async function PATCH(
       listOrder,
     } = body;
 
+    const existing = await prisma.organizedItem.findFirst({
+      where: { id, userId },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    const nextProgress = progress !== undefined ? progress : existing.progress;
+    const nextKanban = kanbanColumn !== undefined ? kanbanColumn : existing.kanbanColumn;
+    const nextItemTypeRaw = itemType !== undefined ? itemType : existing.itemType;
+
+    let resolvedItemType: string | undefined;
+    if (itemType !== undefined && itemType !== "task" && itemType !== "task_completed") {
+      resolvedItemType = itemType;
+    } else if (nextItemTypeRaw === "task" || nextItemTypeRaw === "task_completed") {
+      const completed = nextProgress === "completed" || nextKanban === "completed";
+      resolvedItemType = completed ? "task_completed" : "task";
+    }
+
+    const shouldWriteItemType = resolvedItemType !== undefined && resolvedItemType !== existing.itemType;
+
     const item = await prisma.organizedItem.update({
       where: { id, userId },
       data: {
@@ -74,7 +95,7 @@ export async function PATCH(
         ...(category !== undefined && { category }),
         ...(subcategory !== undefined && { subcategory }),
         ...(projectId !== undefined && { projectId }),
-        ...(itemType !== undefined && { itemType }),
+        ...(shouldWriteItemType && resolvedItemType !== undefined && { itemType: resolvedItemType }),
         ...(title !== undefined && { title }),
         ...(content !== undefined && { content }),
         ...(emotionLabel !== undefined && { emotionLabel }),

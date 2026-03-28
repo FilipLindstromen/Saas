@@ -132,6 +132,15 @@ function isTaskCompleted(it: Pick<ViewItem, "itemType" | "progress" | "kanbanCol
   );
 }
 
+/** Type filter chip / count bucket: incomplete tasks → "task", completed → "task_completed". */
+function itemTypeFilterKey(it: Pick<ViewItem, "itemType" | "progress" | "kanbanColumn">): string | null {
+  if (!it.itemType || it.itemType === "reminder") return null;
+  if (it.itemType === "task") {
+    return isTaskCompleted(it) ? "task_completed" : "task";
+  }
+  return it.itemType;
+}
+
 function loadPersonalAreaIdSetForSplit(): Set<string> {
   const s = new Set<string>([...PERSONAL_AREA_DEFAULTS]);
   try {
@@ -441,7 +450,10 @@ function filterItemsByType(items: ViewItem[], itemType: string | null): ViewItem
     return items.filter((it) => ids.has(it.id));
   }
   if (itemType === "task") {
-    return items.filter((it) => it.itemType === "task" || it.itemType === "task_completed");
+    return items.filter((it) => it.itemType === "task" && !isTaskCompleted(it));
+  }
+  if (itemType === "task_completed") {
+    return items.filter(isTaskCompleted);
   }
   return items.filter((it) => it.itemType === itemType);
 }
@@ -840,8 +852,8 @@ export function ItemsViewArea({
   const typesWithEntries = useMemo(() => {
     const m = new Map<string, number>();
     for (const it of items) {
-      if (!it.itemType || it.itemType === "reminder") continue;
-      const key = it.itemType === "task_completed" ? "task" : it.itemType;
+      const key = itemTypeFilterKey(it);
+      if (key === null) continue;
       m.set(key, (m.get(key) ?? 0) + 1);
     }
     return m;
@@ -1854,6 +1866,7 @@ export function ItemsViewArea({
               onCommitTextContent={commitTextViewContent}
               onDelete={deleteItem}
               onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
               reorderEnabled={canReorderEntries}
               onReorder={reorderEntriesPersist}
             />
@@ -3607,12 +3620,14 @@ function CalendarView({
               it.scheduledAt &&
               new Date(String(it.scheduledAt).slice(0, 10)) < new Date(todayNorm.getFullYear(), todayNorm.getMonth(), todayNorm.getDate());
             const taskDeadline = isTaskRow(it);
+            const typeColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
             return (
               <button
                 key={it.id}
                 type="button"
                 onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
                 {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
+                onDoubleClick={() => onEdit(it)}
                 onContextMenu={
                   onItemContextMenu && !isMobile
                     ? (e) => {
@@ -3630,14 +3645,30 @@ function CalendarView({
                   border: past ? "1px solid var(--border-subtle)" : "1px solid var(--border-default)",
                   borderRadius: 12,
                   cursor: "pointer",
-                  boxShadow: taskDeadline ? `inset 4px 0 0 ${TYPE_BAR_COLORS.task}` : "none",
                 }}
-                title={`${it.title}${
+                title={`${entryTypeLabel(it.itemType || "note", t)} · ${it.title}${
                   it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content) ? ` — ${it.content.trim().slice(0, 200)}` : ""
                 }${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
               >
-                {it.scheduledTime && <span style={{ marginRight: "0.35rem", opacity: 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>}
-                {entryPrimaryLine(it, showEntryTitles)}
+                <span style={{ display: "flex", alignItems: "flex-start", gap: isMobile ? "0.5rem" : "0.55rem" }}>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      color: past ? "var(--text-quaternary)" : typeColor,
+                      display: "flex",
+                      alignItems: "center",
+                      marginTop: "0.08em",
+                    }}
+                    title={entryTypeLabel(it.itemType || "note", t)}
+                    aria-hidden
+                  >
+                    <EntryTypeIcon type={it.itemType || "note"} size={isMobile ? 18 : 20} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+                    {it.scheduledTime && <span style={{ marginRight: "0.35rem", opacity: 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>}
+                    {entryPrimaryLine(it, showEntryTitles)}
+                  </span>
+                </span>
               </button>
             );
           })
@@ -3875,6 +3906,7 @@ function MindmapView({
           }}
           onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
           {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
+          onDoubleClick={() => onEdit(it)}
           onContextMenu={
             onItemContextMenu && !isMobile
               ? (e) => {
@@ -4087,6 +4119,8 @@ function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
 const MOBILE_LONG_PRESS_MS = 520;
 const MOBILE_TAP_MAX_MS = 420;
 const MOBILE_MOVE_CANCEL_PX = 14;
+/** Max gap between two taps for double-tap; delayed single-tap waits this long so double can cancel it */
+const MOBILE_DOUBLE_TAP_WINDOW_MS = 300;
 
 function syntheticContextMenuEvent(clientX: number, clientY: number): ReactMouseEvent {
   return {
@@ -4105,15 +4139,24 @@ type MobileFieldSlot = {
   /** Browser timer id (`window.setTimeout`); avoid `NodeJS.Timeout` from merged typings. */
   timer: number | null;
   longFired: boolean;
-  onShortTap?: () => void;
 };
 
-/** Touch: long-press opens the entry context menu; short tap release starts inline edit (when onShortTap is set). */
-function useMobileEntryFieldGestures(
+type PendingDeferredSingleTap = { itemId: string; timer: number };
+
+/** Touch: long-press opens context menu; short tap = inline edit or delayed when double-tap also requested; double-tap opens full editor. */
+export function useMobileEntryFieldGestures(
   isMobile: boolean,
   onItemContextMenu?: (e: ReactMouseEvent, id: string, domain: string, currentType: string) => void
 ) {
   const slotRef = useRef<MobileFieldSlot | null>(null);
+  const pendingDeferredSingleRef = useRef<PendingDeferredSingleTap | null>(null);
+  const doubleTapFirstRef = useRef<{ itemId: string; t: number } | null>(null);
+
+  const clearDeferredSingle = useCallback(() => {
+    const p = pendingDeferredSingleRef.current;
+    if (p) window.clearTimeout(p.timer);
+    pendingDeferredSingleRef.current = null;
+  }, []);
 
   const clearSlot = useCallback(() => {
     const s = slotRef.current;
@@ -4122,17 +4165,22 @@ function useMobileEntryFieldGestures(
   }, []);
 
   const bindField = useCallback(
-    (it: ViewItem, onShortTap?: () => void) => {
+    (it: ViewItem, onShortTap?: () => void, onDoubleTap?: () => void) => {
       if (!isMobile) return {};
       const allowMenu = Boolean(onItemContextMenu);
-      const allowTap = Boolean(onShortTap);
-      if (!allowMenu && !allowTap) return {};
+      const hasShort = Boolean(onShortTap);
+      const hasDouble = Boolean(onDoubleTap);
+      if (!allowMenu && !hasShort && !hasDouble) return {};
 
       return {
         onPointerDown: (e: ReactPointerEvent) => {
           if (e.pointerType !== "touch") return;
           e.stopPropagation();
           clearSlot();
+          clearDeferredSingle();
+          if (doubleTapFirstRef.current && doubleTapFirstRef.current.itemId !== it.id) {
+            doubleTapFirstRef.current = null;
+          }
           const { pointerId, clientX, clientY } = e;
           const t0 = Date.now();
           const timer: number | null = allowMenu
@@ -4151,7 +4199,6 @@ function useMobileEntryFieldGestures(
             t0,
             timer,
             longFired: false,
-            onShortTap,
           };
         },
         onPointerMove: (e: ReactPointerEvent) => {
@@ -4170,32 +4217,73 @@ function useMobileEntryFieldGestures(
           const dx = e.clientX - s.x0;
           const dy = e.clientY - s.y0;
           const movedFar = dx * dx + dy * dy > MOBILE_MOVE_CANCEL_PX * MOBILE_MOVE_CANCEL_PX;
-          const shortTap = s.onShortTap;
           clearSlot();
           if (longFired || movedFar) return;
-          if (elapsed <= MOBILE_TAP_MAX_MS && shortTap) shortTap();
+          if (elapsed > MOBILE_TAP_MAX_MS) return;
+
+          if (hasShort && hasDouble) {
+            const pending = pendingDeferredSingleRef.current;
+            if (pending && pending.itemId === it.id) {
+              clearDeferredSingle();
+              onDoubleTap!();
+              return;
+            }
+            clearDeferredSingle();
+            pendingDeferredSingleRef.current = {
+              itemId: it.id,
+              timer: window.setTimeout(() => {
+                pendingDeferredSingleRef.current = null;
+                onShortTap!();
+              }, MOBILE_DOUBLE_TAP_WINDOW_MS) as unknown as number,
+            };
+            return;
+          }
+
+          if (hasDouble && !hasShort) {
+            const first = doubleTapFirstRef.current;
+            const now = Date.now();
+            if (first && first.itemId === it.id && now - first.t < MOBILE_DOUBLE_TAP_WINDOW_MS) {
+              doubleTapFirstRef.current = null;
+              onDoubleTap!();
+            } else {
+              doubleTapFirstRef.current = { itemId: it.id, t: now };
+            }
+            return;
+          }
+
+          if (hasShort) onShortTap!();
         },
         onPointerCancel: (e: ReactPointerEvent) => {
           if (slotRef.current?.pointerId === e.pointerId) clearSlot();
         },
       };
     },
-    [isMobile, onItemContextMenu, clearSlot]
+    [isMobile, onItemContextMenu, clearSlot, clearDeferredSingle]
   );
+
+  useEffect(() => {
+    const onEnd = (ev: Event) => {
+      const pid = (ev as CustomEvent<{ pointerId: number }>).detail?.pointerId;
+      if (pid === undefined) return;
+      if (slotRef.current?.pointerId === pid) clearSlot();
+    };
+    window.addEventListener("bd-mobile-field-gesture-end", onEnd);
+    return () => window.removeEventListener("bd-mobile-field-gesture-end", onEnd);
+  }, [clearSlot]);
 
   return bindField;
 }
 
 /** Reveal width behind the row (icon-only delete control). */
 const SWIPE_DELETE_WIDTH_PX = 56;
-/** Map finger movement to slide: >1 opens fully with less horizontal travel (fewer “multi-swipe” feels). */
-const SWIPE_DRAG_GAIN = 1.45;
-const SWIPE_LOCK_THRESHOLD_PX = 8;
+/** Map finger movement to slide: >1 opens fully with less horizontal travel. */
+const SWIPE_DRAG_GAIN = 2.05;
+const SWIPE_LOCK_THRESHOLD_PX = 4;
 /** Release: open if past this fraction of width (or fling left). */
-const SWIPE_OPEN_COMMIT_RATIO = 0.33;
+const SWIPE_OPEN_COMMIT_RATIO = 0.2;
 /** Pointer velocity (px/s): negative x = moving left / opening. */
-const SWIPE_FLING_OPEN_VX = -420;
-const SWIPE_FLING_CLOSE_VX = 380;
+const SWIPE_FLING_OPEN_VX = -280;
+const SWIPE_FLING_CLOSE_VX = 420;
 
 type SwipeDeleteRowProps = {
   entryId: string;
@@ -4269,9 +4357,10 @@ function SwipeDeleteRow({
       else if (vx > SWIPE_FLING_CLOSE_VX) snapOpen = false;
       else snapOpen = final >= commitLine;
       if (snapOpen) {
-        offsetRef.current = SWIPE_DELETE_WIDTH_PX;
-        setOffset(SWIPE_DELETE_WIDTH_PX);
+        const full = SWIPE_DELETE_WIDTH_PX;
+        offsetRef.current = full;
         setSwipeOpenId(entryId);
+        setOffset(full);
       } else {
         offsetRef.current = 0;
         setOffset(0);
@@ -4281,6 +4370,9 @@ function SwipeDeleteRow({
       drag.current = null;
       setTransitioning(true);
     }
+    window.dispatchEvent(
+      new CustomEvent("bd-mobile-field-gesture-end", { detail: { pointerId: e.pointerId } })
+    );
   };
 
   return (
@@ -4315,10 +4407,10 @@ function SwipeDeleteRow({
       <div
         className={slideClass}
         style={{
-          transform: `translateX(${-offset}px)`,
-          transition: transitioning ? "transform 0.28s var(--bd-ease-out)" : "none",
+          transform: `translate3d(${-offset}px, 0, 0)`,
+          transition: transitioning ? "transform 0.22s var(--bd-ease-out)" : "none",
         }}
-        onPointerDown={(e) => {
+        onPointerDownCapture={(e) => {
           if (disabled) return;
           if (e.pointerType === "mouse" && e.button !== 0) return;
           const el = e.target as HTMLElement;
@@ -4340,7 +4432,8 @@ function SwipeDeleteRow({
           const dy = e.clientY - d.startY;
           if (d.lock === "none") {
             if (Math.abs(dx) < SWIPE_LOCK_THRESHOLD_PX && Math.abs(dy) < SWIPE_LOCK_THRESHOLD_PX) return;
-            if (Math.abs(dy) > Math.abs(dx)) {
+            // Bias horizontal: only treat as vertical scroll when clearly more vertical than horizontal.
+            if (Math.abs(dy) > Math.abs(dx) * 1.18) {
               d.lock = "v";
               drag.current = null;
               swipeVelSamplesRef.current = [];
@@ -4623,8 +4716,13 @@ function ListView({
                 onClick={
                   !isMobile && onUpdate ? () => setEditing({ id: it.id, field: "title", value: it.title ?? "" }) : undefined
                 }
-                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title ?? "" })) : {})}
-                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                {...(isMobile && onUpdate
+                  ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title ?? "" }), () => onEdit?.(it))
+                  : {})}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(it);
+                }}
                 style={primaryTitleStyle}
               >
                 {it.title?.trim() ? it.title : "—"}
@@ -4638,8 +4736,15 @@ function ListView({
                     ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
                     : undefined
                 }
-                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
-                onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                {...(isMobile && onUpdate
+                  ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" }), () =>
+                      onEdit?.(it)
+                    )
+                  : {})}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(it);
+                }}
                 style={primaryTitleStyle}
               >
                 {entryPrimaryLine(it, false)}
@@ -4691,8 +4796,15 @@ function ListView({
                       ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
                       : undefined
                   }
-                  {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
-                  onDoubleClick={(e) => onUpdate && e.stopPropagation()}
+                  {...(isMobile && onUpdate
+                    ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" }), () =>
+                        onEdit?.(it)
+                      )
+                    : {})}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(it);
+                  }}
                   style={{
                     fontSize: "0.8125rem",
                     color: "var(--text-secondary)",
@@ -4719,7 +4831,15 @@ function ListView({
                     ? () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })
                     : undefined
                 }
-                {...(isMobile && onUpdate ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" })) : {})}
+                {...(isMobile && onUpdate
+                  ? bindMobileField(it, () => setEditing({ id: it.id, field: "content", value: it.content ?? "" }), () =>
+                      onEdit?.(it)
+                    )
+                  : {})}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(it);
+                }}
                 style={{
                   fontSize: "0.8125rem",
                   color: "var(--text-secondary)",
@@ -4785,6 +4905,7 @@ function TextView({
   onCommitTextContent,
   onDelete,
   onItemContextMenu,
+  onEdit,
   reorderEnabled = false,
   onReorder,
 }: {
@@ -4796,6 +4917,7 @@ function TextView({
   onCommitTextContent?: (id: string, raw: string) => void | Promise<TextViewCommitFocus | void>;
   onDelete: (id: string, skipConfirm?: boolean) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
+  onEdit?: (item: ViewItem) => void;
   reorderEnabled?: boolean;
   onReorder?: (orderedIds: string[]) => void;
 }) {
@@ -5066,7 +5188,13 @@ function TextView({
                 ) : (
                   <h2
                     onClick={!isMobile ? () => setEditing({ id: it.id, field: "title", value: it.title }) : undefined}
-                    {...(isMobile ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title })) : {})}
+                    {...(isMobile
+                      ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title }), () => onEdit?.(it))
+                      : {})}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      onEdit?.(it);
+                    }}
                     style={{
                       flex: 1,
                       margin: 0,
@@ -5148,14 +5276,21 @@ function TextView({
                     : undefined
                 }
                 {...(isMobile
-                  ? bindMobileField(it, () =>
-                      setEditing({
-                        id: it.id,
-                        field: "content",
-                        value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
-                      })
+                  ? bindMobileField(
+                      it,
+                      () =>
+                        setEditing({
+                          id: it.id,
+                          field: "content",
+                          value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
+                        }),
+                      () => onEdit?.(it)
                     )
                   : {})}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(it);
+                }}
                 style={{
                   margin: 0,
                   fontSize: "0.875rem",
@@ -5394,7 +5529,7 @@ function KanbanView({
                     }
                   : undefined
               }
-              {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
+              {...(isMobile ? bindMobileField(it, undefined, () => onEdit?.(it)) : {})}
               style={{
                 ...ep.style,
                 padding: "0.65rem 0.85rem",
@@ -5738,7 +5873,7 @@ function PostitsView({
                     }
                   : undefined
               }
-              {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
+              {...(isMobile ? bindMobileField(it, undefined, () => onEdit?.(it)) : {})}
               style={{
                 ...ep.style,
                 position: "absolute",

@@ -8,6 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } from "@/components/CenterPanel";
 import { RightPanel } from "@/components/RightPanel";
+import { CoachChatOverlay } from "@/components/CoachChatOverlay";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
@@ -44,6 +45,7 @@ export default function BrainDumpPage() {
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilterPreset>("all");
   const [showSettings, setShowSettings] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
@@ -54,6 +56,14 @@ export default function BrainDumpPage() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+
+  const onSidebarCapturePhoto = useCallback(() => {
+    centerPanelRef.current?.openPhotoCaptureMenu();
+  }, []);
+
+  const onSidebarCaptureText = useCallback(() => {
+    centerPanelRef.current?.openTypedDumpSheet();
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -398,6 +408,9 @@ export default function BrainDumpPage() {
           onOpenSettings={() => setShowSettings(true)}
           mobileOpen={mobileNavOpen}
           onMobileOpenChange={setMobileNavOpen}
+          onCapturePhoto={onSidebarCapturePhoto}
+          onCaptureText={onSidebarCaptureText}
+          onOpenCoach={() => setCoachChatOpen(true)}
         />
         <div className="bd-workspace-column" style={{ gap: "0" }}>
           <div className="bd-page-content-padding">
@@ -522,20 +535,22 @@ export default function BrainDumpPage() {
             </button>
             <button
               type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "flowchart" ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setViewType("flowchart")}
-              title={t("items.viewFlowchart")}
-              aria-label={t("items.viewFlowchart")}
-              aria-current={viewType === "flowchart" ? "page" : undefined}
+              className="bd-bottom-bar-pill-item bd-bottom-bar-pill-item--coach"
+              onClick={() => setCoachChatOpen(true)}
+              title={t("coach.title")}
+              aria-label={t("bottom.coachNav")}
+              aria-haspopup="dialog"
             >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle cx="12" cy="12" r="2.25" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                <path d="M21 15a4 4 0 0 1-4 4H8l-4 4V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z" />
+                <path d="M8 10h.01M12 10h.01M16 10h.01" />
               </svg>
             </button>
           </nav>
         </div>
       </div>
+
+      <CoachChatOverlay open={coachChatOpen} onClose={() => setCoachChatOpen(false)} />
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>

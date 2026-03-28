@@ -11,7 +11,12 @@ import {
   PERSONAL_AREA_DEFAULTS,
   formatAreaLabel,
 } from "@/lib/personal-areas";
-import { mergeEntryTypesForDomain, type ItemContextSubmenu } from "@/components/ItemsViewArea";
+import {
+  mergeEntryTypesForDomain,
+  type ItemContextSubmenu,
+  type ViewItem,
+  useMobileEntryFieldGestures,
+} from "@/components/ItemsViewArea";
 
 interface SavedItem {
   id: string;
@@ -52,6 +57,16 @@ function isTaskCompleted(it: Pick<SavedItem, "itemType" | "progress" | "kanbanCo
 function entryTypeLabel(itemType: string, t?: (key: string) => string): string {
   if (itemType === "task_completed") return t ? t("items.typeTaskCompleted") : "Task: Completed";
   return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function savedItemToViewItem(it: SavedItem): ViewItem {
+  return {
+    ...it,
+    subcategory: it.subcategory ?? "",
+    progress: it.progress ?? "todo",
+    status: it.status || "saved",
+    recommendedView: it.recommendedView || "note_cards",
+  };
 }
 
 export function SavedItemsList({ mode, projectId, category, itemType }: SavedItemsListProps) {
@@ -284,6 +299,9 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
   const [itemContextSubmenu, setItemContextSubmenu] = useState<ItemContextSubmenu | null>(null);
   const [editingEntry, setEditingEntry] = useState<{ id: string; title: string; content: string } | null>(null);
+  const bindSavedCardTouch = useMobileEntryFieldGestures(isMobile, (e, id, domain, currentType) =>
+    setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })
+  );
   const editingEntryRef = useRef(editingEntry);
   editingEntryRef.current = editingEntry;
   const [reminderEntry, setReminderEntry] = useState<{
@@ -369,6 +387,11 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
           <div
             key={it.id}
             onDoubleClick={() => setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" })}
+            {...(isMobile
+              ? bindSavedCardTouch(savedItemToViewItem(it), undefined, () =>
+                  setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" })
+                )
+              : {})}
             onContextMenu={(e) => {
               e.preventDefault();
               setItemContextMenu({ id: it.id, x: e.clientX, y: e.clientY, domain: it.domain, currentType: it.itemType });

@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState } from "@/lib/form-storage";
 import { fetchWithTimeout, postJsonWithTimeout } from "@/lib/safe-fetch-json";
@@ -690,11 +691,22 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     [locale, onTranscriptReady, organize, transcript, t]
   );
 
+  const leaveVoiceDumpSessionForOtherInput = useCallback(() => {
+    if (isDumpProcessing) return;
+    if (!showDumpOverlay && recordState !== "recording") return;
+    showDumpOverlayRef.current = false;
+    stopRecording({ silent: true });
+    setError(null);
+    setShowDumpOverlay(false);
+    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+  }, [isDumpProcessing, showDumpOverlay, recordState, stopRecording, mode]);
+
   const openTypedDumpSheet = useCallback(() => {
     if (isDumpProcessing || photoOrganizeFlow) return;
+    leaveVoiceDumpSessionForOtherInput();
     setTypedDumpText("");
     setShowTypedDumpSheet(true);
-  }, [isDumpProcessing, photoOrganizeFlow]);
+  }, [isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput]);
 
   const closeTypedDumpSheet = useCallback(() => {
     setShowTypedDumpSheet(false);
@@ -826,35 +838,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       processImageForOrganize,
       openTypedDumpSheet,
       openPhotoCaptureMenu: () => {
+        if (isDumpProcessing || photoOrganizeFlow) return;
+        leaveVoiceDumpSessionForOtherInput();
         requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
       },
       toggleDumpRecording: () => {
         onDumpFabClick();
       },
     }),
-    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick]
+    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick, isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput]
   );
-
-  const switchFromRecordingToTypedDump = useCallback(() => {
-    if (isDumpProcessing) return;
-    showDumpOverlayRef.current = false;
-    stopRecording({ silent: true });
-    setError(null);
-    setShowDumpOverlay(false);
-    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-    setTypedDumpText("");
-    setShowTypedDumpSheet(true);
-  }, [isDumpProcessing, stopRecording, mode]);
-
-  const switchFromRecordingToPhoto = useCallback(() => {
-    if (isDumpProcessing) return;
-    showDumpOverlayRef.current = false;
-    stopRecording({ silent: true });
-    setError(null);
-    setShowDumpOverlay(false);
-    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-    requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
-  }, [isDumpProcessing, stopRecording, mode]);
 
   const dumpPanelContent = (
     <>
@@ -898,39 +891,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 />
               </div>
               <div className="bd-dump-recording-actions">
-                <div className="bd-dump-alternate-input-row">
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    onClick={switchFromRecordingToPhoto}
-                    disabled={transcribeLoading || organizeLoading}
-                    title={t("center.dumpUsePhoto")}
-                    aria-label={t("center.dumpUsePhoto")}
-                  >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                        <circle cx="12" cy="13" r="3" />
-                      </svg>
-                      {t("center.dumpUsePhoto")}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    onClick={switchFromRecordingToTypedDump}
-                    disabled={transcribeLoading || organizeLoading}
-                    title={t("center.dumpUseText")}
-                    aria-label={t("center.dumpUseText")}
-                  >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M4 6h16M4 12h16M4 18h11" />
-                      </svg>
-                      {t("center.dumpUseText")}
-                    </span>
-                  </button>
-                </div>
                 <div className="bd-dump-timer-row">
                   <span className="bd-dump-timer" aria-live="polite" aria-atomic="true">
                     {recordingElapsed}
@@ -1146,15 +1106,18 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           </div>
         </div>
       )}
-      {(isDumpProcessing || photoOrganizeFlow) && (
-        <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
-          <div className="bd-dump-processing-inner">
-            {showDumpFace && <DumpListeningFace variant="overlay" />}
-            <div className="bd-dump-spinner" aria-hidden />
-            <p className="bd-dump-processing-title">{processingTitle}</p>
-          </div>
-        </div>
-      )}
+      {(isDumpProcessing || photoOrganizeFlow) &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="bd-dump-processing-overlay" role="status" aria-live="polite" aria-busy="true">
+            <div className="bd-dump-processing-inner">
+              {showDumpFace && <DumpListeningFace variant="overlay" />}
+              <div className="bd-dump-spinner" aria-hidden />
+              <p className="bd-dump-processing-title">{processingTitle}</p>
+            </div>
+          </div>,
+          document.body
+        )}
       {showDumpOverlay && showHelpOverlay && (
         <div
           className="bd-modal-backdrop bd-help-overlay-mobile"

@@ -2203,7 +2203,8 @@ select.bd-input::-ms-expand {
   display: none;
 }
 
-/* Full-screen state while transcribing + organizing + saving after a dump */
+/* Full-screen while transcribing / organizing. Rendered via createPortal(document.body) in CenterPanel
+   so z-index competes with fixed .bd-bottom-bar (sibling of main), not only inside .bd-layout-main. */
 .bd-dump-processing-overlay {
   position: fixed;
   inset: 0;
@@ -2316,6 +2317,19 @@ select.bd-input::-ms-expand {
   width: 100%;
   touch-action: pan-y;
   will-change: transform;
+}
+
+/*
+ * Children default to touch-action: auto, which lets the browser steal horizontal moves.
+ * pan-y keeps vertical scrolling but lets our pointer handlers own horizontal swipe-to-delete.
+ * Exceptions: inputs / no-swipe controls need normal behavior for editing.
+ */
+.bd-swipe-delete-slide *:not([data-bd-no-swipe]) {
+  touch-action: pan-y;
+}
+
+.bd-swipe-delete-slide [data-bd-no-swipe] {
+  touch-action: auto;
 }
 
 .bd-swipe-delete-slide--elevated {
@@ -2467,6 +2481,214 @@ input.bd-todo-checkbox:checked {
   flex-direction: column;
   background: var(--bg-primary);
   padding-top: env(safe-area-inset-top);
+}
+
+/* Coach chat — opened from mobile bottom bar; portal to body */
+.bd-coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--bd-z-modal);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  pointer-events: none;
+}
+
+.bd-coach-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: var(--bd-overlay-modal);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.bd-coach-panel {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: min(88dvh, 100dvh - env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: calc(var(--card-radius) + 4px) calc(var(--card-radius) + 4px) 0 0;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  animation: bd-coach-rise var(--bd-duration-normal) var(--bd-ease-soft) both;
+}
+
+@keyframes bd-coach-rise {
+  from {
+    transform: translate3d(0, 12px, 0);
+    opacity: 0.92;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+.bd-coach-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.65rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bd-coach-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bd-coach-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.bd-coach-close {
+  flex-shrink: 0;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.bd-coach-messages {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.bd-coach-hint {
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.bd-coach-bubble {
+  max-width: 92%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bd-coach-bubble--user {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-tertiary));
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+}
+
+.bd-coach-bubble--assistant {
+  align-self: flex-start;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.bd-coach-typing {
+  opacity: 0.85;
+  font-style: italic;
+}
+
+.bd-coach-error {
+  margin: 0 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bd-danger-bg);
+  border: 1px solid var(--bd-danger-border);
+  color: var(--bd-danger-text);
+  font-size: 0.85rem;
+}
+
+.bd-coach-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  padding: 0.65rem 1rem 0.85rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-primary) 35%, var(--bg-elevated));
+}
+
+.bd-coach-voice {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bd-coach-voice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bd-coach-voice--active {
+  background: color-mix(in srgb, var(--bd-danger) 22%, var(--bg-tertiary));
+  border-color: var(--bd-danger-border);
+  color: var(--bd-danger);
+  animation: bd-coach-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes bd-coach-pulse {
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.bd-coach-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  max-height: 120px;
+  resize: none;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.bd-coach-send {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bd-edit-entry-mobile-top {
@@ -3171,6 +3393,12 @@ input.bd-todo-checkbox:checked {
     filter: none;
   }
   .bd-help-sheet-inner {
+    animation: none !important;
+  }
+  .bd-coach-panel {
+    animation: none !important;
+  }
+  .bd-coach-voice--active {
     animation: none !important;
   }
   .bd-enter,

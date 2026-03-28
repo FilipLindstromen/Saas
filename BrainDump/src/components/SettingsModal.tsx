@@ -29,8 +29,8 @@ const GOOGLE_CALENDAR_SUMMARY_KEY = "braindump_google_calendar_summary";
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
 const TEXT_SIZE_OPTIONS = [
-  { value: "small", label: "Small", scale: 0.875 },
-  { value: "medium", label: "Medium", scale: 1 },
+  { value: "small", label: "Small", scale: 0.8 },
+  { value: "medium", label: "Medium", scale: 0.875 },
   { value: "large", label: "Large", scale: 1.125 },
   { value: "xlarge", label: "Extra large", scale: 1.25 },
 ] as const;

@@ -30,7 +30,8 @@ const en: Msg = {
   "sidebar.closeMenu": "Close menu",
   "sidebar.menu": "Menu",
   "sidebar.capturePhoto": "Photo dump",
-  "sidebar.captureText": "Write dump",
+  "sidebar.captureText": "Text dump",
+  "sidebar.dumpInputsAria": "Photo, text dumps, and coach",
 
   "theme.switchToLight": "Switch to light mode",
   "theme.switchToDark": "Switch to dark mode",
@@ -52,6 +53,24 @@ const en: Msg = {
 
   "bottom.all": "All",
   "bottom.navAria": "Primary navigation",
+  "bottom.coachNav": "Open coach chat",
+
+  "coach.title": "Coach",
+  "coach.subtitle": "Your tasks, notes, and reflections are in context — ask anything or use voice.",
+  "coach.emptyHint":
+    "Ask for help prioritizing, reflecting, or planning. Tap the mic to speak; your message is transcribed before sending.",
+  "coach.placeholder": "Message your coach…",
+  "coach.inputAria": "Coach message",
+  "coach.send": "Send",
+  "coach.close": "Close coach",
+  "coach.thinking": "Thinking…",
+  "coach.startRecording": "Record voice message",
+  "coach.stopRecording": "Stop recording",
+  "coach.micDenied": "Microphone access was denied.",
+  "coach.voiceUnsupported": "Voice input is not supported in this browser.",
+  "coach.transcribeFailed": "Could not transcribe audio. Try again.",
+  "coach.sendFailed": "Could not reach the coach. Try again.",
+  "coach.emptyReply": "No reply from coach.",
   "bottom.work": "Work",
   "bottom.dump": "Dump",
   "bottom.personal": "Personal",
@@ -129,7 +148,7 @@ const en: Msg = {
   "center.resumingOrganize": "Resuming organization…",
   "center.organizeNetworkError": "Organization failed. Your text is saved — tap Organize again to retry.",
   "center.dumpPromptInbox":
-    "Start a recording, then use Stop to transcribe, or choose type or photo in the dump window to switch input.",
+    "Start a recording, then use Stop to transcribe. For a photo or text dump, use the sidebar menu.",
   "center.readingPhoto": "Reading text from your photo…",
   "center.recordingMaxLength": "Maximum recording length (5 minutes) reached — recording stopped. You can transcribe or record again.",
   "center.recordingMaxHint": "· max 5:00",
@@ -403,7 +422,8 @@ const sv: Msg = {
   "sidebar.closeMenu": "Stäng meny",
   "sidebar.menu": "Meny",
   "sidebar.capturePhoto": "Fotodump",
-  "sidebar.captureText": "Skriv dump",
+  "sidebar.captureText": "Textdump",
+  "sidebar.dumpInputsAria": "Foto-, textdumpar och coach",
 
   "theme.switchToLight": "Byt till ljust läge",
   "theme.switchToDark": "Byt till mörkt läge",
@@ -426,6 +446,24 @@ const sv: Msg = {
 
   "bottom.all": "Allt",
   "bottom.navAria": "Huvudnavigering",
+  "bottom.coachNav": "Öppna coach-chatt",
+
+  "coach.title": "Coach",
+  "coach.subtitle": "Dina uppgifter, anteckningar och reflektioner ingår i kontexten — fråga eller använd röst.",
+  "coach.emptyHint":
+    "Be om hjälp att prioritera, reflektera eller planera. Tryck på mikrofonen för att prata; meddelandet transkriberas innan det skickas.",
+  "coach.placeholder": "Skriv till coachen…",
+  "coach.inputAria": "Meddelande till coachen",
+  "coach.send": "Skicka",
+  "coach.close": "Stäng coach",
+  "coach.thinking": "Tänker…",
+  "coach.startRecording": "Spela in röstmeddelande",
+  "coach.stopRecording": "Stoppa inspelning",
+  "coach.micDenied": "Mikrofontillåtelse nekades.",
+  "coach.voiceUnsupported": "Röststöd saknas i den här webbläsaren.",
+  "coach.transcribeFailed": "Kunde inte transkribera ljudet. Försök igen.",
+  "coach.sendFailed": "Kunde inte nå coachen. Försök igen.",
+  "coach.emptyReply": "Inget svar från coachen.",
   "bottom.work": "Arbete",
   "bottom.dump": "Dumpa",
   "bottom.personal": "Privat",
@@ -501,7 +539,7 @@ const sv: Msg = {
   "center.resumingOrganize": "Återupptar organisering…",
   "center.organizeNetworkError": "Organisering misslyckades. Texten är sparad — tryck Organisera igen för att försöka.",
   "center.dumpPromptInbox":
-    "Starta en inspelning — stoppa för att transkribera, eller välj text eller foto i dump-fönstret för att byta inmatning.",
+    "Starta en inspelning och stoppa för att transkribera. För foto- eller textdump, använd sidomenyn.",
   "center.readingPhoto": "Läser text från din bild…",
   "center.recordingMaxLength":
     "Maximal inspelningslängd (5 minuter) nådd — inspelningen stoppades. Du kan transkribera eller spela in igen.",

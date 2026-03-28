@@ -4,6 +4,7 @@ import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
 import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
+import type { Prisma } from "../../../../prisma/generated/prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,19 +22,27 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const dumpId = searchParams.get("dumpId");
 
-    const where: {
-      userId: string;
-      domain?: string;
-      category?: string;
-      itemType?: string | { in: string[] };
-      projectId?: string | null;
-      status?: string;
-      dumpId?: string;
-    } = { userId };
+    const where: Prisma.OrganizedItemWhereInput = { userId };
     if (domain) where.domain = domain;
     if (category) where.category = category;
-    if (itemType === "task") where.itemType = { in: ["task", "task_completed"] };
-    else if (itemType) where.itemType = itemType;
+    if (itemType === "task") {
+      where.itemType = "task";
+      where.NOT = {
+        OR: [{ progress: "completed" }, { kanbanColumn: "completed" }],
+      };
+    } else if (itemType === "task_completed") {
+      where.OR = [
+        { itemType: "task_completed" },
+        {
+          AND: [
+            { itemType: "task" },
+            { OR: [{ progress: "completed" }, { kanbanColumn: "completed" }] },
+          ],
+        },
+      ];
+    } else if (itemType) {
+      where.itemType = itemType;
+    }
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
     if (dumpId) where.dumpId = dumpId;
