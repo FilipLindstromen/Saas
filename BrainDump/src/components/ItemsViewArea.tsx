@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
@@ -20,7 +21,12 @@ import {
   type SuggestedItemTypeDetail,
 } from "@/lib/item-types";
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
-import { dateOnlyToStartOfDay, localDateTimeToDate, normalizeReminderMinutesBefore } from "@/lib/calendar-schedule";
+import {
+  dateOnlyToStartOfDay,
+  isPastScheduledForAiSuggestions,
+  localDateTimeToDate,
+  normalizeReminderMinutesBefore,
+} from "@/lib/calendar-schedule";
 import { PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 import {
   deriveEntryTitle,
@@ -538,6 +544,7 @@ export function ItemsViewArea({
   } | null>(null);
   const [addEntryOpen, setAddEntryOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [editEntryPortalEl, setEditEntryPortalEl] = useState<HTMLElement | null>(null);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [addEntryForm, setAddEntryForm] = useState({
     itemType: "note",
@@ -571,16 +578,19 @@ export function ItemsViewArea({
 
   const runAiSuggest = useCallback(async () => {
     if (items.length === 0) return;
-    const payloadItems = items.slice(0, 45).map((it) => ({
-      title: it.title,
-      content: it.content,
-      itemType: it.itemType,
-      progress: it.progress,
-      scheduledAt: it.scheduledAt ?? undefined,
-      scheduledTime: it.scheduledTime ?? undefined,
-      recurrence: it.recurrence ?? undefined,
-      project: it.project,
-    }));
+    const payloadItems = items
+      .filter((it) => !isPastScheduledForAiSuggestions(it))
+      .slice(0, 45)
+      .map((it) => ({
+        title: it.title,
+        content: it.content,
+        itemType: it.itemType,
+        progress: it.progress,
+        scheduledAt: it.scheduledAt ?? undefined,
+        scheduledTime: it.scheduledTime ?? undefined,
+        recurrence: it.recurrence ?? undefined,
+        project: it.project,
+      }));
     setAiSuggestLoading(true);
     setAiSuggestError(null);
     setAiSuggestList([]);
@@ -612,6 +622,10 @@ export function ItemsViewArea({
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    setEditEntryPortalEl(typeof document !== "undefined" ? document.body : null);
   }, []);
 
   const showMobileAiInTopBar =
@@ -2142,9 +2156,10 @@ export function ItemsViewArea({
         );
       })()}
 
-      {editingEntry ? (
-        isMobile ? (
-        <div className="bd-edit-entry-mobile">
+      {editingEntry && editEntryPortalEl
+        ? createPortal(
+            isMobile ? (
+            <div className="bd-edit-entry-mobile">
           <header className="bd-edit-entry-mobile-top">
             <button
               type="button"
@@ -2203,7 +2218,7 @@ export function ItemsViewArea({
               </button>
               <button
                 type="button"
-                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
+                className="bd-btn bd-btn-primary bd-edit-entry-save-header-btn"
                 aria-label={t("items.ariaSaveEntry")}
                 title={t("items.ariaSaveEntry")}
                 onClick={() => {
@@ -2211,9 +2226,7 @@ export function ItemsViewArea({
                   setEditingEntry(null);
                 }}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                {t("scope.save")}
               </button>
             </div>
           </header>
@@ -2486,10 +2499,10 @@ export function ItemsViewArea({
           onClick={() => setEditingEntry(null)}
         >
           <div
-            className="bd-panel bd-modal-panel bd-edit-entry-panel"
+            className="bd-panel bd-modal-panel bd-edit-entry-panel bd-edit-entry-panel--tall"
             style={{
               padding: "1.25rem",
-              maxWidth: 480,
+              maxWidth: 560,
               width: "100%",
               boxSizing: "border-box",
             }}
@@ -2499,7 +2512,7 @@ export function ItemsViewArea({
               <h3>{t("items.editEntry")}</h3>
               <button
                 type="button"
-                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
+                className="bd-btn bd-btn-primary bd-edit-entry-save-header-btn"
                 aria-label={t("items.ariaSaveEntry")}
                 title={t("items.ariaSaveEntry")}
                 onClick={() => {
@@ -2507,9 +2520,7 @@ export function ItemsViewArea({
                   setEditingEntry(null);
                 }}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                {t("scope.save")}
               </button>
             </div>
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
@@ -2872,18 +2883,18 @@ export function ItemsViewArea({
                   }}
                   aria-label={t("items.ariaSaveEntry")}
                   title={t("items.ariaSaveEntry")}
-                  style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                  style={{ minHeight: 44, padding: "0.55rem 1rem", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+                  {t("scope.save")}
                 </button>
               </div>
             </div>
           </div>
         </div>
         )
-      ) : null}
+      , editEntryPortalEl
+      )
+        : null}
 
       {reminderEntry && (
         <div
@@ -3497,7 +3508,7 @@ function CalendarView({
                     ...(sel
                       ? {
                           background: "var(--accent)",
-                          color: "var(--bd-dump-mic-fg, #ffffff)",
+                          color: "var(--bd-btn-primary-fg)",
                           boxShadow: "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)",
                         }
                       : { color: "var(--text-primary)", background: "transparent" }),
@@ -4001,7 +4012,16 @@ function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
   window.setTimeout(() => clone.remove(), 0);
 }
 
-const SWIPE_DELETE_WIDTH_PX = 80;
+/** Reveal width behind the row (icon-only delete control). */
+const SWIPE_DELETE_WIDTH_PX = 56;
+/** Map finger movement to slide: >1 opens fully with less horizontal travel (fewer “multi-swipe” feels). */
+const SWIPE_DRAG_GAIN = 1.45;
+const SWIPE_LOCK_THRESHOLD_PX = 8;
+/** Release: open if past this fraction of width (or fling left). */
+const SWIPE_OPEN_COMMIT_RATIO = 0.33;
+/** Pointer velocity (px/s): negative x = moving left / opening. */
+const SWIPE_FLING_OPEN_VX = -420;
+const SWIPE_FLING_CLOSE_VX = 380;
 
 type SwipeDeleteRowProps = {
   entryId: string;
@@ -4035,6 +4055,7 @@ function SwipeDeleteRow({
     startOffset: number;
     lock: "none" | "h" | "v";
   } | null>(null);
+  const swipeVelSamplesRef = useRef<{ x: number; t: number }[]>([]);
 
   useEffect(() => {
     if (swipeOpenId !== entryId) {
@@ -4059,7 +4080,21 @@ function SwipeDeleteRow({
       const final = offsetRef.current;
       drag.current = null;
       setTransitioning(true);
-      if (final > SWIPE_DELETE_WIDTH_PX / 2) {
+      const samples = swipeVelSamplesRef.current;
+      let vx = 0;
+      if (samples.length >= 2) {
+        const last = samples[samples.length - 1];
+        const first = samples[0];
+        const dt = (last.t - first.t) / 1000;
+        if (dt > 0.012) vx = (last.x - first.x) / dt;
+      }
+      swipeVelSamplesRef.current = [];
+      const commitLine = SWIPE_DELETE_WIDTH_PX * SWIPE_OPEN_COMMIT_RATIO;
+      let snapOpen: boolean;
+      if (vx < SWIPE_FLING_OPEN_VX) snapOpen = true;
+      else if (vx > SWIPE_FLING_CLOSE_VX) snapOpen = false;
+      else snapOpen = final >= commitLine;
+      if (snapOpen) {
         offsetRef.current = SWIPE_DELETE_WIDTH_PX;
         setOffset(SWIPE_DELETE_WIDTH_PX);
         setSwipeOpenId(entryId);
@@ -4094,20 +4129,27 @@ function SwipeDeleteRow({
             setOffset(0);
           }}
         >
-          {t("menu.delete")}
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 6h18" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
         </button>
       </div>
       <div
         className={slideClass}
         style={{
           transform: `translateX(${-offset}px)`,
-          transition: transitioning ? "transform 0.22s var(--bd-ease-soft)" : "none",
+          transition: transitioning ? "transform 0.28s var(--bd-ease-out)" : "none",
         }}
         onPointerDown={(e) => {
           if (disabled) return;
           if (e.pointerType === "mouse" && e.button !== 0) return;
           const el = e.target as HTMLElement;
           if (el.closest("[data-bd-no-swipe]")) return;
+          swipeVelSamplesRef.current = [{ x: e.clientX, t: performance.now() }];
           setTransitioning(false);
           drag.current = {
             pointerId: e.pointerId,
@@ -4123,10 +4165,11 @@ function SwipeDeleteRow({
           const dx = e.clientX - d.startX;
           const dy = e.clientY - d.startY;
           if (d.lock === "none") {
-            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            if (Math.abs(dx) < SWIPE_LOCK_THRESHOLD_PX && Math.abs(dy) < SWIPE_LOCK_THRESHOLD_PX) return;
             if (Math.abs(dy) > Math.abs(dx)) {
               d.lock = "v";
               drag.current = null;
+              swipeVelSamplesRef.current = [];
               setTransitioning(true);
               return;
             }
@@ -4139,7 +4182,14 @@ function SwipeDeleteRow({
           }
           if (d.lock !== "h") return;
           e.preventDefault();
-          const next = Math.min(SWIPE_DELETE_WIDTH_PX, Math.max(0, d.startOffset - dx));
+          const now = performance.now();
+          const arr = swipeVelSamplesRef.current;
+          arr.push({ x: e.clientX, t: now });
+          while (arr.length > 1 && now - arr[0].t > 140) arr.shift();
+          const next = Math.min(
+            SWIPE_DELETE_WIDTH_PX,
+            Math.max(0, d.startOffset - dx * SWIPE_DRAG_GAIN)
+          );
           offsetRef.current = next;
           setOffset(next);
         }}

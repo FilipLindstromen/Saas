@@ -37,3 +37,53 @@ export function dateOnlyToStartOfDay(dateYYYYMMDD: string): Date | null {
   const dt = new Date(`${d}T00:00:00`);
   return Number.isNaN(dt.getTime()) ? null : dt;
 }
+
+function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * True if scheduled date/time is strictly before "now" in the user's local timezone.
+ * Used to omit past meetings / deadlines from AI "next actions" input.
+ * Items without a schedule return false (not past).
+ */
+export function isPastScheduledForAiSuggestions(it: {
+  scheduledAt?: string | null;
+  scheduledTime?: string | null;
+}): boolean {
+  const raw = it.scheduledAt;
+  if (raw == null || String(raw).trim() === "") return false;
+
+  const nowMs = Date.now();
+  const s = String(raw).trim();
+  const timeRaw = String(it.scheduledTime ?? "").trim();
+
+  if (timeRaw) {
+    let datePart: string | null = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      datePart = s;
+    } else {
+      const parsed = new Date(s);
+      if (Number.isNaN(parsed.getTime())) return false;
+      datePart = localDateKey(parsed);
+    }
+    const at = localDateTimeToDate(datePart, timeRaw);
+    if (!at) return false;
+    return at.getTime() < nowMs;
+  }
+
+  let datePart: string | null = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    datePart = s;
+  } else {
+    const parsed = new Date(s);
+    if (Number.isNaN(parsed.getTime())) return false;
+    datePart = localDateKey(parsed);
+  }
+  const endOfDay = new Date(`${datePart}T23:59:59.999`);
+  if (Number.isNaN(endOfDay.getTime())) return false;
+  return endOfDay.getTime() < nowMs;
+}

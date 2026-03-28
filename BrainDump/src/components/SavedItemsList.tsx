@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
@@ -224,6 +225,11 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const [editEntryPortalEl, setEditEntryPortalEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setEditEntryPortalEl(typeof document !== "undefined" ? document.body : null);
   }, []);
 
   useEffect(() => {
@@ -463,39 +469,38 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
         );
       })()}
 
-      {editingEntry && (
-        <div
-          className="bd-modal-backdrop bd-edit-entry-backdrop"
-          onClick={() => setEditingEntry(null)}
-        >
-          <div
-            className="bd-panel bd-modal-panel bd-edit-entry-panel"
-            style={{
-              padding: isMobile ? "1rem 1rem 1.1rem" : "1.25rem",
-              maxWidth: isMobile ? "100%" : 480,
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bd-edit-entry-panel-title-row">
-              <h3>{t("items.editEntry")}</h3>
-              <button
-                type="button"
-                className="bd-edit-entry-icon-btn bd-edit-entry-save-btn"
-                aria-label={t("items.ariaSaveEntry")}
-                title={t("items.ariaSaveEntry")}
-                onClick={() => {
-                  if (!editingEntry) return;
-                  updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
-                  setEditingEntry(null);
+      {editingEntry && editEntryPortalEl
+        ? createPortal(
+            <div
+              className="bd-modal-backdrop bd-edit-entry-backdrop"
+              onClick={() => setEditingEntry(null)}
+            >
+              <div
+                className={`bd-panel bd-modal-panel bd-edit-entry-panel${isMobile ? "" : " bd-edit-entry-panel--tall"}`}
+                style={{
+                  padding: isMobile ? "1rem 1rem 1.1rem" : "1.25rem",
+                  maxWidth: isMobile ? "100%" : 560,
+                  width: "100%",
+                  boxSizing: "border-box",
                 }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </button>
-            </div>
+                <div className="bd-edit-entry-panel-title-row">
+                  <h3>{t("items.editEntry")}</h3>
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn-primary bd-edit-entry-save-header-btn"
+                    aria-label={t("items.ariaSaveEntry")}
+                    title={t("items.ariaSaveEntry")}
+                    onClick={() => {
+                      if (!editingEntry) return;
+                      updateEntryContent(editingEntry.id, { title: editingEntry.title, content: editingEntry.content });
+                      setEditingEntry(null);
+                    }}
+                  >
+                    {t("scope.save")}
+                  </button>
+                </div>
             <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>{t("items.headline")}</label>
             <input
               className="bd-input"
@@ -588,17 +593,17 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
                   }}
                   aria-label={t("items.ariaSaveEntry")}
                   title={t("items.ariaSaveEntry")}
-                  style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                  style={{ minHeight: 44, padding: "0.55rem 1rem", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+                  {t("scope.save")}
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+            editEntryPortalEl,
+          )
+        : null}
 
       {reminderEntry && (
         <div

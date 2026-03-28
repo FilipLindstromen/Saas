@@ -36,7 +36,6 @@
   --btn-shadow: none;
   --btn-shadow-inset: none;
   /* Overlays — slate-tinted scrims (match UI, not pure black) */
-  --bd-overlay-dump: rgba(6, 10, 18, 0.72);
   --bd-overlay-modal: rgba(5, 9, 16, 0.78);
   --bd-overlay-sheet: rgba(8, 12, 20, 0.62);
   --bd-overlay-processing: rgba(4, 8, 14, 0.8);
@@ -100,7 +99,6 @@
   --btn-border: var(--border-default);
   --btn-shadow: none;
   --btn-shadow-inset: none;
-  --bd-overlay-dump: rgba(15, 23, 42, 0.44);
   --bd-overlay-modal: rgba(15, 23, 42, 0.5);
   --bd-overlay-sheet: rgba(15, 23, 42, 0.38);
   --bd-overlay-processing: rgba(15, 23, 42, 0.52);
@@ -975,106 +973,56 @@ select.bd-input::-ms-expand {
   animation-delay: calc(min(var(--bd-i, 0), 8) * 28ms);
 }
 
-/* Dump overlay: backdrop + sheet (desktop centers; mobile overrides in @media) */
-.bd-dump-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--bd-z-modal);
-  background: var(--bd-overlay-dump);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
-    max(1rem, env(safe-area-inset-left));
+/* Voice dump: same scrim + panel language as bd-modal-backdrop / bd-modal-panel */
+.bd-modal-backdrop.bd-dump-overlay {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  animation: bd-backdrop-fade-in var(--bd-duration-normal) var(--bd-ease-in-out) both;
 }
 
 .bd-dump-sheet-inner {
-  animation: bd-desktop-sheet-in var(--bd-duration-normal) var(--bd-ease-soft) both;
-  transform-origin: 50% 60%;
-  padding: 1.25rem;
-  max-width: 520px;
+  padding: var(--bd-space-5);
+  max-width: 560px;
   width: 100%;
-  max-height: min(90vh, 90dvh);
+  max-height: min(90dvh, calc(100dvh - max(2rem, env(safe-area-inset-top) + env(safe-area-inset-bottom))));
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border-default));
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .bd-dump-sheet-header {
-  position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: center;
-  min-height: 2.5rem;
-  margin-bottom: 1rem;
+  gap: var(--bd-space-3);
+  margin-bottom: var(--bd-space-4);
   flex-shrink: 0;
+  min-height: 2.75rem;
+}
+
+.bd-dump-sheet-header-btn {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0.5rem 0.65rem;
+  flex-shrink: 0;
+}
+
+.bd-dump-sheet-help-btn {
+  font-size: 0.875rem;
+  font-weight: 500;
+  min-width: max-content;
 }
 
 .bd-dump-sheet-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: var(--text-primary);
   text-align: center;
-  padding-inline: 3rem;
-  line-height: 1.3;
-}
-
-.bd-dump-sheet-corner-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--button-radius);
-  border: 1px solid var(--border-default);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background var(--bd-duration-fast) var(--bd-ease-soft),
-    opacity var(--bd-duration-fast) var(--bd-ease-in-out),
-    border-color var(--bd-duration-fast) var(--bd-ease-soft);
-}
-
-.bd-dump-sheet-corner-btn:first-child {
-  left: 0;
-}
-
-.bd-dump-sheet-help-btn {
-  right: 0;
-  width: auto;
-  min-height: 36px;
-  padding: 0 0.65rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-default));
-  background: var(--accent-muted);
-}
-
-.bd-dump-sheet-help-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-default));
-}
-
-.bd-dump-sheet-corner-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  line-height: 1.35;
+  min-width: 0;
 }
 
 .bd-dump-sheet-content {
@@ -1083,6 +1031,8 @@ select.bd-input::-ms-expand {
   align-items: center;
   gap: 0;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Listening face above dump controls */
@@ -1211,9 +1161,9 @@ select.bd-input::-ms-expand {
   max-width: min(100%, 360px);
   height: auto;
   aspect-ratio: 320 / 64;
-  border-radius: var(--button-radius);
-  background: var(--bg-tertiary);
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--border-default));
+  border-radius: var(--bd-input-radius);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 .bd-dump-actions-row {
@@ -1250,12 +1200,19 @@ select.bd-input::-ms-expand {
 }
 
 .bd-dump-timer {
-  font-size: 1.5rem;
+  font-size: 1.375rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
   min-width: 3.5ch;
-  text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.bd-dump-timer-hint {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  margin-left: 0.35rem;
 }
 
 .bd-dump-btn-main {
@@ -2334,17 +2291,13 @@ select.bd-input::-ms-expand {
   }
 }
 
-/* Dump modal: drag handle only on small screens (shown in @media below) */
-.bd-dump-sheet-handle {
-  display: none;
-}
-
 /* Swipe-to-delete row (list + text views) */
 .bd-swipe-delete-wrap {
   position: relative;
   overflow: hidden;
   width: 100%;
   flex-shrink: 0;
+  overscroll-behavior-x: contain;
 }
 
 .bd-swipe-delete-actions {
@@ -2361,13 +2314,14 @@ select.bd-input::-ms-expand {
 
 .bd-swipe-delete-btn {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 100%;
   margin: 0;
-  padding: 0 0.35rem;
+  padding: 0;
   border: none;
   border-radius: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   color: #fff;
@@ -2592,6 +2546,24 @@ input.bd-todo-checkbox:checked {
   margin: 0;
   font-size: 1rem;
   min-width: 0;
+}
+
+.bd-edit-entry-save-header-btn {
+  flex-shrink: 0;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+@media (min-width: 769px) {
+  .bd-edit-entry-panel--tall.bd-panel.bd-modal-panel {
+    max-height: min(92dvh, calc(100dvh - max(2rem, env(safe-area-inset-top) + env(safe-area-inset-bottom))));
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
 }
 
 .bd-edit-entry-mobile-scope {
@@ -2994,6 +2966,11 @@ input.bd-todo-checkbox:checked {
     background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   }
 
+  /* Tasks tab: selection is background only; icon stays same tone as other inactive tabs */
+  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--tasks.bd-bottom-bar-pill-item--active {
+    color: var(--text-secondary);
+  }
+
   .bd-bottom-bar-pill-icon {
     display: block;
     flex-shrink: 0;
@@ -3156,30 +3133,22 @@ input.bd-todo-checkbox:checked {
     padding-inline: 0.85rem;
   }
 
-  /* Dump overlay: centered sheet so stop/cancel stay above home indicator + bottom bar */
-  .bd-dump-overlay {
+  /* Voice dump modal: tighter safe-area padding on small screens */
+  .bd-modal-backdrop.bd-dump-overlay {
     align-items: center !important;
     justify-content: center !important;
     padding: max(0.5rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom))
       max(0.65rem, env(safe-area-inset-left)) !important;
-    overflow: auto !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 
   .bd-dump-sheet-inner {
-    border-radius: var(--card-radius) !important;
     max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1.25rem)) !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 1rem 1rem 1.15rem !important;
-    animation: bd-desktop-sheet-in var(--bd-duration-normal) var(--bd-ease-soft) both !important;
-    box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-subtle) !important;
+    padding: var(--bd-space-4) var(--bd-space-4) var(--bd-space-5) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
   }
 
   .bd-dump-sheet-content {
@@ -3187,17 +3156,6 @@ input.bd-todo-checkbox:checked {
     min-height: 0 !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-  }
-
-  .bd-dump-sheet-handle {
-    display: none;
-    width: 40px;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--border-strong);
-    margin: 0 auto 0.85rem;
-    flex-shrink: 0;
-    opacity: 0.85;
   }
 
   .bd-help-overlay-mobile {
@@ -3227,7 +3185,7 @@ input.bd-todo-checkbox:checked {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bd-dump-overlay,
+  .bd-modal-backdrop.bd-dump-overlay,
   .bd-dump-sheet-inner,
   .bd-dump-processing-overlay,
   .bd-dump-processing-inner,
@@ -3239,9 +3197,6 @@ input.bd-todo-checkbox:checked {
   .bd-dump-fab,
   .bd-dump-fab--recording,
   .bd-bottom-dump-mic--recording {
-    animation: none !important;
-  }
-  .bd-dump-sheet-inner {
     animation: none !important;
   }
   .bd-btn:active:not(:disabled) {

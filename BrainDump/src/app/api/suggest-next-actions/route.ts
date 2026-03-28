@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { isPastScheduledForAiSuggestions } from "@/lib/calendar-schedule";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 
 interface SuggestItem {
@@ -19,7 +20,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
-    const items = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
+    const rawItems = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
+    const items = rawItems.filter((it) => !isPastScheduledForAiSuggestions(it));
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
     const keyRes = resolveOpenAiApiKey(userId);
@@ -82,6 +84,7 @@ Regler:
 - Var specifik; undvik flummiga råd.
 - "title": 3–10 ord. "reason": en tydlig mening.
 - Prioritera tidsbundna poster och arbete som driver projekt när det passar; blanda in 0–1 reflektionsfrågor när känslor, beslut eller öppna loopar talar för det.
+- Föreslå inte möten eller deadlines vars schemalagda tid redan har passerat.
 - Om allt är klart eller inget är värdefullt att föreslå: returnera en tom lista.
 
 Returnera ENDAST JSON med formen:

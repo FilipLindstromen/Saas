@@ -446,36 +446,22 @@ export default function BrainDumpPage() {
           <nav className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
             <button
               type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "list" ? " bd-bottom-bar-pill-item--active" : ""}`}
+              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" ? " bd-bottom-bar-pill-item--active" : ""}`}
               onClick={() => setViewType("list")}
               title={t("items.viewList")}
               aria-label={t("items.viewList")}
               aria-current={viewType === "list" ? "page" : undefined}
             >
-              {viewType === "list" ? (
-                <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-                  <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--accent)" stroke="none" />
-                  <path
-                    d="M8.5 12.5 11 15l4.5-5.5"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.96)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              ) : (
-                <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
-                  <path
-                    d="M8.5 12.5 11 15l4.5-5.5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
+                <path
+                  d="M8.5 12.5 11 15l4.5-5.5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
             <button
               type="button"
