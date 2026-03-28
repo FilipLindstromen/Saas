@@ -525,32 +525,6 @@ body {
   border-top: 1px solid var(--border-subtle);
 }
 
-.bd-app-sidebar-tool-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 44px;
-  padding: 0 0.35rem;
-}
-
-.bd-app-sidebar-tool-row[data-collapsed="true"] {
-  justify-content: center;
-  padding: 0 0.25rem;
-}
-
-.bd-app-sidebar-theme-btn {
-  flex-shrink: 0;
-}
-
-.bd-app-sidebar-tool-label {
-  flex: 1;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .bd-sidebar-drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -1804,10 +1778,6 @@ select.bd-input::-ms-expand {
   color: var(--bd-btn-primary-fg);
   border: 1px solid var(--accent);
   box-shadow: none;
-}
-
-.bd-theme-toggle {
-  border-radius: 12px;
 }
 
 /* Sticky app header — floats on canvas */
@@ -3112,16 +3082,6 @@ input.bd-todo-checkbox:checked {
 
   .bd-topbar-lang {
     min-height: 44px;
-  }
-
-  .bd-theme-toggle {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0.65rem !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px !important;
   }
 
   .bd-dump-fab {

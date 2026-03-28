@@ -16,7 +16,6 @@ import { StreaksModal } from "./StreaksModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useI18n } from "@/lib/i18n";
 import { getDumpStreakState, STREAK_RECORDED_EVENT, type DumpStreakState } from "@/lib/dump-streak";
-import { useSaasTheme } from "@/lib/saas-theme-client";
 
 const SIDEBAR_EXPANDED_KEY = "braindump-sidebar-expanded";
 
@@ -89,8 +88,6 @@ export function AppSidebar({
   onMobileOpenChange,
 }: AppSidebarProps) {
   const { t } = useI18n();
-  const saasTheme = useSaasTheme();
-  const themeToggleLabel = saasTheme === "dark" ? t("theme.darkMode") : t("theme.lightMode");
   const { data: session } = useSession();
   const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
@@ -341,10 +338,7 @@ export function AppSidebar({
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("topBar.streaks")}</span> : null}
         </button>
 
-        <div className="bd-app-sidebar-tool-row" data-collapsed={!showLabels ? "true" : "false"}>
-          <ThemeToggle className="bd-app-sidebar-theme-btn" />
-          {showLabels ? <span className="bd-app-sidebar-tool-label">{themeToggleLabel}</span> : null}
-        </div>
+        <ThemeToggle showLabels={showLabels} />
 
         <button
           type="button"
