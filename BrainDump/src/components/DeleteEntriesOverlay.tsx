@@ -4,113 +4,22 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useI18n } from "@/lib/i18n";
 
 type DeleteCatalog = {
-  totals: { all: number; work: number; personal: number };
-  completedTasks: { all: number; work: number; personal: number };
-  activeTasks: { all: number; work: number; personal: number };
-  allTasks: { all: number; work: number; personal: number };
-  /** Projects (work/personal) with zero organized items — sidebar shells only. */
+  completedTasks: number;
+  reflections: number;
+  shopping: number;
   emptyProjectCount: number;
-  projects: Array<{ id: string; name: string; domain: string; count: number }>;
-  workCategories: Array<{ category: string; count: number }>;
-  personalCategories: Array<{ category: string; count: number }>;
-  itemTypesWork: Record<string, number>;
-  itemTypesPersonal: Record<string, number>;
 };
 
-function formatCategoryLabel(value: string): string {
-  return value
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function itemTypeDisplay(itemType: string, t: (key: string) => string): string {
-  if (itemType === "task_completed") return t("items.typeTaskCompleted");
-  return (itemType || "note").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** Maps UI selection key → POST body `scope` for /api/organized-items/delete-scoped */
 function deleteSelectionKeyToScope(key: string): object | null {
-  if (key === "everything") return { type: "everything" };
-  const parts = key.split("|");
-  const h = parts[0];
-  if (h === "domain" && (parts[1] === "work" || parts[1] === "personal")) {
-    return { type: "domain", domain: parts[1] };
-  }
-  if (h === "completed") {
-    if (parts[1] === "all") return { type: "completed_tasks" };
-    if (parts[1] === "work" || parts[1] === "personal") {
-      return { type: "completed_tasks", domain: parts[1] };
-    }
-  }
-  if (h === "active") {
-    if (parts[1] === "all") return { type: "active_tasks" };
-    if (parts[1] === "work" || parts[1] === "personal") {
-      return { type: "active_tasks", domain: parts[1] };
-    }
-  }
-  if (h === "alltasks") {
-    if (parts[1] === "all") return { type: "all_tasks" };
-    if (parts[1] === "work" || parts[1] === "personal") {
-      return { type: "all_tasks", domain: parts[1] };
-    }
-  }
-  if (h === "itype" && parts.length >= 3) {
-    const domain = parts[1];
-    const itemType = parts.slice(2).join("|");
-    if ((domain === "work" || domain === "personal") && itemType) {
-      return { type: "item_type", itemType, domain };
-    }
-  }
-  if (h === "wcat" && parts[1]) {
-    try {
-      const category = decodeURIComponent(parts[1]);
-      if (category) return { type: "work_category", category };
-    } catch {
-      return null;
-    }
-  }
-  if (h === "pcat" && parts[1]) {
-    try {
-      const category = decodeURIComponent(parts[1]);
-      if (category) return { type: "personal_category", category };
-    } catch {
-      return null;
-    }
-  }
-  if (h === "project" && parts[1]) {
-    return { type: "project", projectId: parts[1] };
-  }
+  if (key === "completed_tasks") return { type: "completed_tasks" };
+  if (key === "reflection") return { type: "item_type", itemType: "reflection" };
+  if (key === "shopping") return { type: "item_type", itemType: "shopping" };
   return null;
 }
 
 interface DeleteEntriesOverlayProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-function sectionTitleStyle(): React.CSSProperties {
-  return {
-    fontSize: "0.6875rem",
-    fontWeight: 700,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "var(--text-tertiary)",
-    margin: "1.25rem 0 0.5rem",
-    paddingTop: "0.25rem",
-    borderTop: "1px solid var(--border-subtle)",
-  };
-}
-
-function firstSectionTitleStyle(): CSSProperties {
-  return {
-    fontSize: "0.6875rem",
-    fontWeight: 700,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "var(--text-tertiary)",
-    margin: "0 0 0.5rem",
-  };
 }
 
 export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayProps) {
@@ -137,7 +46,9 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
         const data = (await res.json()) as DeleteCatalog & { error?: string };
         if (!res.ok) throw new Error(data.error || "Failed");
         setCatalog({
-          ...data,
+          completedTasks: typeof data.completedTasks === "number" ? data.completedTasks : 0,
+          reflections: typeof data.reflections === "number" ? data.reflections : 0,
+          shopping: typeof data.shopping === "number" ? data.shopping : 0,
           emptyProjectCount: typeof data.emptyProjectCount === "number" ? data.emptyProjectCount : 0,
         });
       })
@@ -221,10 +132,14 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
       const refreshed = (await refresh.json()) as DeleteCatalog & { error?: string };
       if (!refresh.ok) return;
       setCatalog({
-        ...refreshed,
+        completedTasks: typeof refreshed.completedTasks === "number" ? refreshed.completedTasks : 0,
+        reflections: typeof refreshed.reflections === "number" ? refreshed.reflections : 0,
+        shopping: typeof refreshed.shopping === "number" ? refreshed.shopping : 0,
         emptyProjectCount: typeof refreshed.emptyProjectCount === "number" ? refreshed.emptyProjectCount : 0,
       });
-      if ((refreshed.totals?.all ?? 0) === 0 && (refreshed.emptyProjectCount ?? 0) === 0) {
+      const bulkTotal =
+        (refreshed.completedTasks ?? 0) + (refreshed.reflections ?? 0) + (refreshed.shopping ?? 0);
+      if (bulkTotal === 0 && (refreshed.emptyProjectCount ?? 0) === 0) {
         onClose();
       }
     } catch {
@@ -235,16 +150,6 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
   }, [catalog, onClose, t]);
 
   if (!isOpen) return null;
-
-  const workLabel = t("mode.work");
-  const personalLabel = t("mode.personal");
-
-  const subgroupLabelStyle: CSSProperties = {
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    color: "var(--text-secondary)",
-    margin: "0.65rem 0 0.35rem",
-  };
 
   const rowStyle = (selected: boolean): CSSProperties => ({
     display: "block",
@@ -266,27 +171,17 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
     k,
     label,
     count,
-    danger,
   }: {
     k: string;
     label: string;
     count: number;
-    danger?: boolean;
   }) => (
     <button
       type="button"
       role="option"
       aria-selected={selectedKey === k}
       onClick={() => select(k, label)}
-      style={{
-        ...rowStyle(selectedKey === k),
-        ...(danger
-          ? {
-              borderColor:
-                selectedKey === k ? "var(--accent)" : "color-mix(in srgb, var(--accent) 35%, var(--border-default))",
-            }
-          : {}),
-      }}
+      style={rowStyle(selectedKey === k)}
     >
       <span style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "baseline" }}>
         <span>{label}</span>
@@ -298,8 +193,12 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
   );
 
   const c = catalog;
-  const emptyEntries = Boolean(c && c.totals.all === 0);
+  const completed = c?.completedTasks ?? 0;
+  const refl = c?.reflections ?? 0;
+  const shop = c?.shopping ?? 0;
+  const hasBulkRows = completed > 0 || refl > 0 || shop > 0;
   const emptyProjCount = c?.emptyProjectCount ?? 0;
+  const noBulkAndNoEmptyProjects = !hasBulkRows && emptyProjCount === 0;
 
   return (
     <div
@@ -355,230 +254,32 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
             <p style={{ marginTop: "1rem", color: "var(--accent)", fontSize: "0.875rem" }}>{loadError}</p>
           )}
 
-          {!loading && !loadError && c && emptyEntries && emptyProjCount === 0 && (
+          {!loading && !loadError && c && noBulkAndNoEmptyProjects && (
             <p style={{ marginTop: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{t("settings.deleteEntriesEmpty")}</p>
           )}
 
-          {!loading && !loadError && c && emptyEntries && emptyProjCount > 0 && (
+          {!loading && !loadError && c && !hasBulkRows && emptyProjCount > 0 && (
             <p style={{ marginTop: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", lineHeight: 1.45 }}>
               {t("settings.deleteEntriesNoEntriesButEmptyProjects")}
             </p>
           )}
 
-          {!loading && !loadError && c && !emptyEntries && (
-            <div role="listbox" aria-label={t("settings.deleteEntriesTitle")} style={{ paddingBottom: "0.5rem" }}>
-              <h3 style={firstSectionTitleStyle()}>{t("settings.deleteSectionWorkspace")}</h3>
-              {c.totals.all > 0 && (
-                <OptionRow
-                  k="everything"
-                  label={t("settings.deleteRowEverything")}
-                  count={c.totals.all}
-                  danger
-                />
+          {!loading && !loadError && c && hasBulkRows && (
+            <div role="listbox" aria-label={t("settings.deleteEntriesTitle")} style={{ marginTop: "0.75rem", paddingBottom: "0.5rem" }}>
+              {completed > 0 && (
+                <OptionRow k="completed_tasks" label={t("settings.deleteRowCompletedTasks")} count={completed} />
               )}
-              {c.totals.work > 0 && (
-                <OptionRow
-                  k="domain|work"
-                  label={t("settings.deleteRowAllInDomain", { domain: workLabel })}
-                  count={c.totals.work}
-                  danger
-                />
-              )}
-              {c.totals.personal > 0 && (
-                <OptionRow
-                  k="domain|personal"
-                  label={t("settings.deleteRowAllInDomain", { domain: personalLabel })}
-                  count={c.totals.personal}
-                  danger
-                />
-              )}
-
-              {(c.completedTasks.all > 0 ||
-                c.completedTasks.work > 0 ||
-                c.completedTasks.personal > 0 ||
-                c.activeTasks.all > 0 ||
-                c.activeTasks.work > 0 ||
-                c.activeTasks.personal > 0 ||
-                c.allTasks.all > 0 ||
-                c.allTasks.work > 0 ||
-                c.allTasks.personal > 0) && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionTasks")}</h3>
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "-0.25rem 0 0.5rem", lineHeight: 1.4 }}>
-                    {t("settings.deleteEntriesTasksHint")}
-                  </p>
-                  {(c.completedTasks.all > 0 || c.completedTasks.work > 0 || c.completedTasks.personal > 0) && (
-                    <>
-                      <div style={subgroupLabelStyle}>{t("settings.deleteTasksSubgroupCompleted")}</div>
-                      {c.completedTasks.all > 0 && (
-                        <OptionRow
-                          k="completed|all"
-                          label={t("settings.deleteRowCompletedAll")}
-                          count={c.completedTasks.all}
-                        />
-                      )}
-                      {c.completedTasks.work > 0 && (
-                        <OptionRow
-                          k="completed|work"
-                          label={t("settings.deleteRowCompletedInDomain", { domain: workLabel })}
-                          count={c.completedTasks.work}
-                        />
-                      )}
-                      {c.completedTasks.personal > 0 && (
-                        <OptionRow
-                          k="completed|personal"
-                          label={t("settings.deleteRowCompletedInDomain", { domain: personalLabel })}
-                          count={c.completedTasks.personal}
-                        />
-                      )}
-                    </>
-                  )}
-                  {(c.activeTasks.all > 0 || c.activeTasks.work > 0 || c.activeTasks.personal > 0) && (
-                    <>
-                      <div style={subgroupLabelStyle}>{t("settings.deleteTasksSubgroupActive")}</div>
-                      {c.activeTasks.all > 0 && (
-                        <OptionRow k="active|all" label={t("settings.deleteRowActiveAll")} count={c.activeTasks.all} />
-                      )}
-                      {c.activeTasks.work > 0 && (
-                        <OptionRow
-                          k="active|work"
-                          label={t("settings.deleteRowActiveInDomain", { domain: workLabel })}
-                          count={c.activeTasks.work}
-                        />
-                      )}
-                      {c.activeTasks.personal > 0 && (
-                        <OptionRow
-                          k="active|personal"
-                          label={t("settings.deleteRowActiveInDomain", { domain: personalLabel })}
-                          count={c.activeTasks.personal}
-                        />
-                      )}
-                    </>
-                  )}
-                  {(c.allTasks.all > 0 || c.allTasks.work > 0 || c.allTasks.personal > 0) && (
-                    <>
-                      <div style={subgroupLabelStyle}>{t("settings.deleteTasksSubgroupAllStates")}</div>
-                      {c.allTasks.all > 0 && (
-                        <OptionRow k="alltasks|all" label={t("settings.deleteRowAllTasksAll")} count={c.allTasks.all} />
-                      )}
-                      {c.allTasks.work > 0 && (
-                        <OptionRow
-                          k="alltasks|work"
-                          label={t("settings.deleteRowAllTasksInDomain", { domain: workLabel })}
-                          count={c.allTasks.work}
-                        />
-                      )}
-                      {c.allTasks.personal > 0 && (
-                        <OptionRow
-                          k="alltasks|personal"
-                          label={t("settings.deleteRowAllTasksInDomain", { domain: personalLabel })}
-                          count={c.allTasks.personal}
-                        />
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-
-              {Object.entries(c.itemTypesWork).filter(([, n]) => n > 0).length > 0 && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionByTypeWork")}</h3>
-                  {Object.entries(c.itemTypesWork)
-                    .filter(([, n]) => n > 0)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([itemType, count]) => (
-                      <OptionRow
-                        key={`iw-${itemType}`}
-                        k={`itype|work|${itemType}`}
-                        label={t("settings.deleteRowItemType", {
-                          type: itemTypeDisplay(itemType, t),
-                          domain: workLabel,
-                        })}
-                        count={count}
-                      />
-                    ))}
-                </>
-              )}
-
-              {Object.entries(c.itemTypesPersonal).filter(([, n]) => n > 0).length > 0 && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionByTypePersonal")}</h3>
-                  {Object.entries(c.itemTypesPersonal)
-                    .filter(([, n]) => n > 0)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([itemType, count]) => (
-                      <OptionRow
-                        key={`ip-${itemType}`}
-                        k={`itype|personal|${itemType}`}
-                        label={t("settings.deleteRowItemType", {
-                          type: itemTypeDisplay(itemType, t),
-                          domain: personalLabel,
-                        })}
-                        count={count}
-                      />
-                    ))}
-                </>
-              )}
-
-              {c.workCategories.filter((x) => x.count > 0).length > 0 && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionWorkAreas")}</h3>
-                  {c.workCategories
-                    .filter((x) => x.count > 0)
-                    .sort((a, b) => a.category.localeCompare(b.category))
-                    .map(({ category, count }) => (
-                      <OptionRow
-                        key={`w-${category}`}
-                        k={`wcat|${encodeURIComponent(category)}`}
-                        label={t("settings.deleteRowWorkArea", { name: formatCategoryLabel(category) })}
-                        count={count}
-                      />
-                    ))}
-                </>
-              )}
-
-              {c.personalCategories.filter((x) => x.count > 0).length > 0 && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionPersonalAreas")}</h3>
-                  {c.personalCategories
-                    .filter((x) => x.count > 0)
-                    .sort((a, b) => a.category.localeCompare(b.category))
-                    .map(({ category, count }) => (
-                      <OptionRow
-                        key={`p-${category}`}
-                        k={`pcat|${encodeURIComponent(category)}`}
-                        label={t("settings.deleteRowPersonalArea", { name: formatCategoryLabel(category) })}
-                        count={count}
-                      />
-                    ))}
-                </>
-              )}
-
-              {c.projects.length > 0 && (
-                <>
-                  <h3 style={sectionTitleStyle()}>{t("settings.deleteSectionProjects")}</h3>
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "-0.25rem 0 0.5rem", lineHeight: 1.4 }}>
-                    {t("settings.deleteProjectKeepsSidebar")}
-                  </p>
-                  {c.projects.map((p) => (
-                    <OptionRow
-                      key={p.id}
-                      k={`project|${p.id}`}
-                      label={t("settings.deleteRowProject", { name: p.name })}
-                      count={p.count}
-                    />
-                  ))}
-                </>
-              )}
+              {refl > 0 && <OptionRow k="reflection" label={t("settings.deleteRowReflections")} count={refl} />}
+              {shop > 0 && <OptionRow k="shopping" label={t("settings.deleteRowShopping")} count={shop} />}
             </div>
           )}
 
           {!loading && !loadError && c && emptyProjCount > 0 && (
             <div
               style={{
-                marginTop: !emptyEntries ? "1.25rem" : "0.5rem",
+                marginTop: hasBulkRows ? "1.25rem" : "0.5rem",
                 paddingTop: "1rem",
-                borderTop: emptyEntries ? "none" : "1px solid var(--border-subtle)",
+                borderTop: hasBulkRows ? "1px solid var(--border-subtle)" : "none",
               }}
             >
               <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.75rem", lineHeight: 1.45 }}>
@@ -618,7 +319,7 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
               type="button"
               className="bd-btn bd-btn-danger"
               onClick={() => void runDelete()}
-              disabled={deleting || deletingEmptyProjects || !selectedKey || loading || !!loadError || emptyEntries}
+              disabled={deleting || deletingEmptyProjects || !selectedKey || loading || !!loadError || !hasBulkRows}
             >
               {deleting ? t("settings.deleteAllDeleting") : t("settings.deleteEntriesSelect")}
             </button>
