@@ -82,6 +82,21 @@ function roundRect(
   ctx.quadraticCurveTo(x, y, x + r, y)
 }
 
+/**
+ * Pixel size for laying out / drawing a stock video overlay. Must match selection hit-test
+ * fallbacks (e.g. RecordPreview getOverlayRect uses 1920×1080 when metadata is missing).
+ * Avoids 0×0 draws when `naturalWidth` is absent and `video.videoWidth` is still 0.
+ */
+function overlayVideoIntrinsicSize(o: OverlayItem, video: HTMLVideoElement): { w: number; h: number } {
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  const nw = o.naturalWidth
+  const nh = o.naturalHeight
+  const w = nw != null && nw > 0 ? nw : vw > 0 ? vw : 1920
+  const h = nh != null && nh > 0 ? nh : vh > 0 ? vh : 1080
+  return { w, h }
+}
+
 export interface DrawOverlaysOptions {
   textAnimation?: OverlayTextAnimation
   /** Global font settings; used for all text overlays */
@@ -232,8 +247,9 @@ export function drawOverlays(
       const video = options.preloadedVideos?.get(o.id)
       if (video && video.readyState >= 2) {
         const scale = o.imageScale ?? 1
-        const w = (o.naturalWidth ?? video.videoWidth) * scale
-        const h = (o.naturalHeight ?? video.videoHeight) * scale
+        const { w: iw, h: ih } = overlayVideoIntrinsicSize(o, video)
+        const w = iw * scale
+        const h = ih * scale
         const x = ((o.x ?? 0.5) * width) - w / 2
         const y = ((o.y ?? 0.5) * height) - h / 2
         const cx = x + w / 2

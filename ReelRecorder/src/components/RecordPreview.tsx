@@ -54,6 +54,34 @@ const MIN_IMAGE_SCALE = 0.1
 /** 10 = 1000% in inspector / slider */
 const MAX_IMAGE_SCALE = 10
 
+/**
+ * Map viewport client coordinates to canvas bitmap space (`width` × `height`).
+ * The preview `<canvas>` uses `width:100%; height:100%; object-fit:contain`, so the bitmap is
+ * uniformly scaled and centered inside the element box; `getBoundingClientRect` is the full box,
+ * not the painted bitmap — mapping must subtract letterbox offsets and use the contain scale.
+ */
+function clientToCanvasBitmap(
+  clientX: number,
+  clientY: number,
+  canvasEl: HTMLCanvasElement,
+  bitmapW: number,
+  bitmapH: number
+): { x: number; y: number } {
+  const rect = canvasEl.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 }
+  const containScale = Math.min(rect.width / bitmapW, rect.height / bitmapH)
+  const drawW = bitmapW * containScale
+  const drawH = bitmapH * containScale
+  const offX = (rect.width - drawW) / 2
+  const offY = (rect.height - drawH) / 2
+  const lx = clientX - rect.left
+  const ly = clientY - rect.top
+  return {
+    x: (lx - offX) / containScale,
+    y: (ly - offY) / containScale,
+  }
+}
+
 /** Compute AABB of a rotated rectangle (center cx,cy; half-size hw,hh; angle in radians). */
 function getRotatedRectAABB(
   cx: number,
@@ -694,7 +722,8 @@ export function RecordPreview({
         const el = document.createElement('video')
         el.muted = true
         el.playsInline = true
-        el.preload = 'metadata'
+        // `metadata` often never reaches HAVE_CURRENT_DATA; canvas needs decoded frames.
+        el.preload = 'auto'
         el.crossOrigin = 'anonymous'
         el.src = o.videoUrl
         el.load()
@@ -892,8 +921,30 @@ export function RecordPreview({
           drawSafeZoneOverlay(ctx, width, height, safeZone.type)
         }
 
-        // Draw overlays, texts, and captions – always on top of video (displayTime is timeline position)
+        // Stock overlay videos: keep timeline time in sync and ensure frames decode (paused seek).
         const timeForOverlays = displayTime
+        const ovVideos = overlayVideoRef.current
+        for (const o of overlays) {
+          if (o.type !== 'video' || !o.videoUrl) continue
+          if (timeForOverlays < o.startTime || timeForOverlays > o.endTime) continue
+          const v = ovVideos.get(o.id)
+          if (!v) continue
+          const local = Math.max(0, timeForOverlays - o.startTime)
+          if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            v.play().catch(() => {})
+            continue
+          }
+          v.pause()
+          if (Math.abs(v.currentTime - local) > 0.06) {
+            try {
+              v.currentTime = local
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+
+        // Draw overlays, texts, and captions – always on top of webcam / program video
         drawOverlays(ctx, width, height, overlays, timeForOverlays, {
           textAnimation: overlayTextAnimation,
           defaultFontFamily,
@@ -944,9 +995,9 @@ export function RecordPreview({
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText('Select video source and start', width / 2, height / 2)
-      }
-      if (!isRecording && safeZone?.visible) {
-        drawSafeZoneOverlay(ctx, width, height, safeZone.type)
+        if (!isRecording && safeZone?.visible && safeZone.type) {
+          drawSafeZoneOverlay(ctx, width, height, safeZone.type)
+        }
       }
       rafRef.current = requestAnimationFrame(draw)
     }
@@ -971,13 +1022,7 @@ export function RecordPreview({
   const getCanvasCoords = (e: React.PointerEvent | PointerEvent) => {
     const canvas = canvasRef.current
     if (!canvas) return { x: 0, y: 0 }
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = width / rect.width
-    const scaleY = height / rect.height
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    }
+    return clientToCanvasBitmap(e.clientX, e.clientY, canvas, width, height)
   }
 
   type HitResult =
@@ -1389,12 +1434,8 @@ export function RecordPreview({
     let radial: { centerX: number; centerY: number; startRadialDist: number } | undefined
     if (overlay.type === 'image' || overlay.type === 'video' || overlay.type === 'infographic') {
       const m = getCenterAnchoredSize(overlay, width, height)
-      if (m) {
-        const rect = canvasRef.current?.getBoundingClientRect()
-        const scaleX = rect && rect.width > 0 ? width / rect.width : 1
-        const scaleY = rect && rect.height > 0 ? height / rect.height : 1
-        const cx = (e.clientX - (rect?.left ?? 0)) * scaleX
-        const cy = (e.clientY - (rect?.top ?? 0)) * scaleY
+      if (m && canvasRef.current) {
+        const { x: cx, y: cy } = clientToCanvasBitmap(e.clientX, e.clientY, canvasRef.current, width, height)
         const d0 = Math.hypot(cx - m.cx, cy - m.cy)
         radial = { centerX: m.cx, centerY: m.cy, startRadialDist: Math.max(12, d0) }
       }
@@ -1435,11 +1476,13 @@ export function RecordPreview({
         resizeState.startRadialDist != null &&
         canvasRef.current
       ) {
-        const rect = canvasRef.current.getBoundingClientRect()
-        const scaleX = rect.width > 0 ? width / rect.width : 1
-        const scaleY = rect.height > 0 ? height / rect.height : 1
-        const cx = (e.clientX - rect.left) * scaleX
-        const cy = (e.clientY - rect.top) * scaleY
+        const { x: cx, y: cy } = clientToCanvasBitmap(
+          e.clientX,
+          e.clientY,
+          canvasRef.current,
+          width,
+          height
+        )
         const cur = Math.hypot(cx - resizeState.centerX, cy - resizeState.centerY)
         newVal = resizeState.startValue * (cur / resizeState.startRadialDist)
       } else {
