@@ -46,6 +46,12 @@ interface TimelineProps {
   programIn?: number
   programOut?: number
   onProgramRangeChange?: (range: { in: number; out: number }) => void
+  /** Undo: before first onEditOverlay during a clip drag on the timeline. */
+  onOverlayClipGestureStart?: () => void
+  onOverlayClipGestureEnd?: () => void
+  /** Undo: before trim changes during main video clip drag. */
+  onVideoTrimGestureStart?: () => void
+  onVideoTrimGestureEnd?: () => void
 }
 
 export function Timeline({
@@ -72,6 +78,10 @@ export function Timeline({
   programIn = 0,
   programOut,
   onProgramRangeChange,
+  onOverlayClipGestureStart,
+  onOverlayClipGestureEnd,
+  onVideoTrimGestureStart,
+  onVideoTrimGestureEnd,
 }: TimelineProps) {
   const safeDuration = Number.isFinite(duration) && duration >= 0 ? duration : 0
   const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? Math.min(currentTime, safeDuration) : 0
@@ -268,6 +278,7 @@ export function Timeline({
         const xInClip = e.clientX - stripRect.left - clipLeftPx
         mode = getClipDragMode(xInClip, clipWidthPx)
       }
+      onOverlayClipGestureStart?.()
       setClipDrag({
         id: o.id,
         mode,
@@ -278,7 +289,7 @@ export function Timeline({
       })
         ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
-    [safeDuration, getClipDragMode]
+    [safeDuration, getClipDragMode, onOverlayClipGestureStart]
   )
 
   const handleClipPointerMove = useCallback(
@@ -319,9 +330,10 @@ export function Timeline({
       if (clipDrag) {
         ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setClipDrag(null)
+        onOverlayClipGestureEnd?.()
       }
     },
-    [clipDrag]
+    [clipDrag, onOverlayClipGestureEnd]
   )
 
   const videoSegments = videoClipSegments ?? (videoClipTrim ? [videoClipTrim] : [])
@@ -333,6 +345,7 @@ export function Timeline({
       const strip = videoStripRef.current
       if (!strip || !onVideoClipTrimChange) return
       const stripRect = strip.getBoundingClientRect()
+      onVideoTrimGestureStart?.()
       setVideoClipDrag({
         mode,
         startX: e.clientX,
@@ -343,7 +356,7 @@ export function Timeline({
       })
         ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     },
-    [onVideoClipTrimChange]
+    [onVideoClipTrimChange, onVideoTrimGestureStart]
   )
 
   const handleVideoClipPointerMove = useCallback(
@@ -389,9 +402,10 @@ export function Timeline({
       if (videoClipDrag) {
         ; (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
         setVideoClipDrag(null)
+        onVideoTrimGestureEnd?.()
       }
     },
-    [videoClipDrag]
+    [videoClipDrag, onVideoTrimGestureEnd]
   )
 
   const textOverlays = overlays.filter((o) => o.type === 'text')

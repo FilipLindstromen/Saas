@@ -5,24 +5,9 @@ import { loadInfographicProjectData } from '../utils/infographicLoader'
 import type { InfographicProjectData } from '../utils/infographicLoader'
 import type { CaptionSegment } from '../services/captions'
 import styles from './RecordPreview.module.css'
+import { attachImageForAnimatedCanvasDraw } from '../utils/animatedImageForCanvas'
 
 const CAPTION_SAMPLE_SEGMENT: CaptionSegment = { start: 0, end: 1, text: 'Sample caption text' }
-
-/**
- * Animated GIF/WebP overlays only advance frames on canvas.drawImage when the backing
- * <img> is attached to the document (browser quirk). Matches export preload behavior.
- */
-function attachOverlayImageForCanvasAnimation(img: HTMLImageElement): void {
-  img.crossOrigin = 'anonymous'
-  img.style.position = 'fixed'
-  img.style.left = '-9999px'
-  img.style.top = '0'
-  img.style.width = 'auto'
-  img.style.height = 'auto'
-  img.style.opacity = '0.01'
-  img.style.pointerEvents = 'none'
-  if (!img.parentElement) document.body.appendChild(img)
-}
 
 /** Action safe (outer) and title safe (inner) as fraction of canvas size, centered */
 const SAFE_ZONE_PRESETS: Record<SafeZoneType, { action: number; title: number }> = {
@@ -506,6 +491,10 @@ interface RecordPreviewProps {
   playbackUrl?: string | null
   /** In edit mode: show recording (playback) or live webcam. When 'webcam', preview uses videoStream. */
   editPreviewSource?: 'recording' | 'webcam'
+  /** Undo: called once when user starts dragging / resizing / rotating an overlay on the canvas (before edits). */
+  onCanvasOverlayGestureStart?: () => void
+  /** Undo: called when that canvas gesture ends. */
+  onCanvasOverlayGestureEnd?: () => void
 }
 
 export function RecordPreview({
@@ -550,6 +539,8 @@ export function RecordPreview({
   videoVolume = 100,
   playbackUrl,
   editPreviewSource = 'recording',
+  onCanvasOverlayGestureStart,
+  onCanvasOverlayGestureEnd,
 }: RecordPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
@@ -734,14 +725,15 @@ export function RecordPreview({
       if (existing) {
         if (lastSrc.get(o.id) !== src) {
           lastSrc.set(o.id, src)
+          existing.crossOrigin = 'anonymous'
           existing.src = src
         }
         continue
       }
       const el = new Image()
       lastSrc.set(o.id, src)
+      attachImageForAnimatedCanvasDraw(el)
       el.src = src
-      attachOverlayImageForCanvasAnimation(el)
       map.set(o.id, el)
     }
   }, [overlays])
@@ -1143,6 +1135,7 @@ export function RecordPreview({
       const centerX = (o.x ?? 0.5) * width
       const centerY = (o.y ?? 0.5) * height
       const startAngle = Math.atan2(y - centerY, x - centerX)
+      onCanvasOverlayGestureStart?.()
       setRotateState({
         overlayId: hit.id,
         startAngle,
@@ -1189,6 +1182,7 @@ export function RecordPreview({
           textStartDist = Math.max(8, d0)
         }
       }
+      onCanvasOverlayGestureStart?.()
       setResizeState({
         overlayId: hit.id,
         startX: x,
@@ -1207,6 +1201,7 @@ export function RecordPreview({
     if (hit?.type === 'overlay' && !isRecording) {
       e.preventDefault()
       onOverlaySelect?.(hit.id)
+      onCanvasOverlayGestureStart?.()
       setDragState({ overlayId: hit.id, offsetX: hit.offsetX, offsetY: hit.offsetY })
       setCursor('grabbing')
       ; (e.target as HTMLCanvasElement).setPointerCapture?.(e.pointerId)
@@ -1330,6 +1325,7 @@ export function RecordPreview({
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (captionDrag || dragState || resizeState || rotateState) {
+      const endedOverlayGesture = !!(dragState || resizeState || rotateState)
       ; (e.target as HTMLCanvasElement).releasePointerCapture?.(e.pointerId)
       setCaptionDrag(false)
       setDragState(null)
@@ -1337,16 +1333,19 @@ export function RecordPreview({
       setRotateState(null)
       setSnapGuides([])
       setCursor('default')
+      if (endedOverlayGesture) onCanvasOverlayGestureEnd?.()
     }
   }
 
   const handlePointerLeave = () => {
     if (captionDrag || dragState || resizeState || rotateState) {
+      const endedOverlayGesture = !!(dragState || resizeState || rotateState)
       setCaptionDrag(false)
       setDragState(null)
       setResizeState(null)
       setRotateState(null)
       setSnapGuides([])
+      if (endedOverlayGesture) onCanvasOverlayGestureEnd?.()
     }
     setCursor('default')
   }

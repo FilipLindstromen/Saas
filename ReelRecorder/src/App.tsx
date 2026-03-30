@@ -32,6 +32,14 @@ const OVERLAY_DURATION = 5
 /** When media duration is unknown or invalid, timeline + trim use this instead of 0. */
 const FALLBACK_RECORDING_TIMELINE_SEC = 60
 const PROGRAM_EXPORT_MIN_GAP = 0.5
+const MAX_EDITOR_UNDO = 50
+
+type EditorUndoSnapshot = {
+  overlays: OverlayItem[]
+  videoTrimStart: number
+  videoTrimEnd: number | null
+  videoClipSegments: { trimStart: number; trimEnd: number }[] | null
+}
 
 function generateId() {
   return Math.random().toString(36).slice(2, 12)
@@ -161,6 +169,95 @@ export default function App() {
   const skipUserTimelineDurationResetRef = useRef(false)
   const studioDisconnectRef = useRef<(() => void) | null>(null)
 
+  const undoStackRef = useRef<EditorUndoSnapshot[]>([])
+  const undoableRef = useRef<EditorUndoSnapshot>({
+    overlays,
+    videoTrimStart,
+    videoTrimEnd,
+    videoClipSegments,
+  })
+  const inCanvasOverlayGestureRef = useRef(false)
+  const inTimelineClipGestureRef = useRef(false)
+  const inVideoTrimGestureRef = useRef(false)
+  const inInspectorRangeGestureRef = useRef(false)
+
+  useEffect(() => {
+    undoableRef.current = { overlays, videoTrimStart, videoTrimEnd, videoClipSegments }
+  }, [overlays, videoTrimStart, videoTrimEnd, videoClipSegments])
+
+  const pushEditorUndo = useCallback(() => {
+    const u = undoableRef.current
+    const snap: EditorUndoSnapshot = {
+      overlays: structuredClone(u.overlays),
+      videoTrimStart: u.videoTrimStart,
+      videoTrimEnd: u.videoTrimEnd,
+      videoClipSegments: u.videoClipSegments ? structuredClone(u.videoClipSegments) : null,
+    }
+    undoStackRef.current = [...undoStackRef.current.slice(-(MAX_EDITOR_UNDO - 1)), snap]
+  }, [])
+
+  const performEditorUndo = useCallback(() => {
+    const stack = undoStackRef.current
+    if (stack.length === 0) return
+    const prev = stack.pop()!
+    setOverlays(structuredClone(prev.overlays))
+    setVideoTrimStart(prev.videoTrimStart)
+    setVideoTrimEnd(prev.videoTrimEnd)
+    setVideoClipSegments(prev.videoClipSegments ? structuredClone(prev.videoClipSegments) : null)
+    setSelectedOverlayId((sel) => {
+      if (sel == null || sel === 'background') return sel
+      return prev.overlays.some((o) => o.id === sel) ? sel : null
+    })
+  }, [])
+
+  const onCanvasOverlayGestureStart = useCallback(() => {
+    pushEditorUndo()
+    inCanvasOverlayGestureRef.current = true
+  }, [pushEditorUndo])
+
+  const onCanvasOverlayGestureEnd = useCallback(() => {
+    inCanvasOverlayGestureRef.current = false
+  }, [])
+
+  const onOverlayClipGestureStart = useCallback(() => {
+    pushEditorUndo()
+    inTimelineClipGestureRef.current = true
+  }, [pushEditorUndo])
+
+  const onOverlayClipGestureEnd = useCallback(() => {
+    inTimelineClipGestureRef.current = false
+  }, [])
+
+  const onVideoTrimGestureStart = useCallback(() => {
+    pushEditorUndo()
+    inVideoTrimGestureRef.current = true
+  }, [pushEditorUndo])
+
+  const onVideoTrimGestureEnd = useCallback(() => {
+    inVideoTrimGestureRef.current = false
+  }, [])
+
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null
+      if (!t?.closest('[data-reel-overlay-inspector]')) return
+      if (!t.closest('input[type="range"]')) return
+      inInspectorRangeGestureRef.current = true
+      pushEditorUndo()
+    }
+    const onUp = () => {
+      inInspectorRangeGestureRef.current = false
+    }
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onUp, true)
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onUp, true)
+    }
+  }, [pushEditorUndo])
+
   const allResolutions = useMemo(() => getResolutionsForAspect(aspectRatio), [aspectRatio])
   const resolutions = useMemo(() => {
     const filtered =
@@ -183,6 +280,37 @@ export default function App() {
     audioStream,
     videoBitrate,
   })
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isUndo =
+        (e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey) && !e.shiftKey
+      if (!isUndo) return
+      if (isRecording) return
+      const target = e.target as HTMLElement | null
+      if (target?.tagName === 'TEXTAREA') return
+      if (target?.tagName === 'SELECT') return
+      if (target?.isContentEditable) return
+      if (target?.tagName === 'INPUT') {
+        const type = (target as HTMLInputElement).type
+        if (
+          type === 'text' ||
+          type === 'search' ||
+          type === 'email' ||
+          type === 'password' ||
+          type === 'url' ||
+          type === 'tel' ||
+          !type
+        ) {
+          return
+        }
+      }
+      e.preventDefault()
+      performEditorUndo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [performEditorUndo, isRecording])
 
   const recordStartTimeRef = useRef<number>(0)
   const [recordElapsedSeconds, setRecordElapsedSeconds] = useState(0)
@@ -801,9 +929,10 @@ export default function App() {
       ...(type === 'infographic' ? { infographicProjectId: '', infographicTabId: '', infographicProjectName: '', imageScale: 1, x: 0.5, y: 0.5 } : {}),
       ...initialPatch,
     }
+    pushEditorUndo()
     setOverlays((prev) => [...prev, item])
     setSelectedOverlayId(item.id)
-  }, [displayTime, timelineDuration, defaultFontFamily, defaultSecondaryFont])
+  }, [displayTime, timelineDuration, defaultFontFamily, defaultSecondaryFont, pushEditorUndo])
 
   const handleAddOverlayFromLibrary = useCallback((clip: LibraryClip) => {
     const start = displayTime
@@ -813,9 +942,10 @@ export default function App() {
       startTime: start,
       endTime: Math.min(start + OVERLAY_DURATION, timelineDuration),
     }
+    pushEditorUndo()
     setOverlays((prev) => [...prev, item])
     setSelectedOverlayId(item.id)
-  }, [displayTime, timelineDuration])
+  }, [displayTime, timelineDuration, pushEditorUndo])
 
   const handleRemoveFromClipLibrary = useCallback((libraryId: string) => {
     removeClipFromLibrary(libraryId)
@@ -823,6 +953,14 @@ export default function App() {
   }, [])
 
   const handleEditOverlay = useCallback((id: string, patch: Partial<OverlayItem>) => {
+    if (
+      !inCanvasOverlayGestureRef.current &&
+      !inTimelineClipGestureRef.current &&
+      !inVideoTrimGestureRef.current &&
+      !inInspectorRangeGestureRef.current
+    ) {
+      pushEditorUndo()
+    }
     setOverlays((prev) =>
       prev.map((o) => {
         if (o.id !== id) return o
@@ -838,12 +976,13 @@ export default function App() {
         return next
       })
     )
-  }, [])
+  }, [pushEditorUndo])
 
   const handleRemoveOverlay = useCallback((id: string) => {
+    pushEditorUndo()
     setOverlays((prev) => prev.filter((o) => o.id !== id))
     if (selectedOverlayId === id) setSelectedOverlayId(null)
-  }, [selectedOverlayId])
+  }, [selectedOverlayId, pushEditorUndo])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -873,6 +1012,7 @@ export default function App() {
     const minLen = 0.5
     if (t <= overlay.startTime + minLen || t >= overlay.endTime - minLen) return
     const newId = generateId()
+    pushEditorUndo()
     setOverlays((prev) =>
       prev.flatMap((o) => {
         if (o.id !== selectedOverlayId) return [o]
@@ -883,7 +1023,7 @@ export default function App() {
       })
     )
     setSelectedOverlayId(newId)
-  }, [selectedOverlayId, overlays, recordedBlob, currentTime, previewTime])
+  }, [selectedOverlayId, overlays, recordedBlob, currentTime, previewTime, pushEditorUndo])
 
   const handleVideoClipSplit = useCallback(() => {
     if (!recordedBlob || videoTrimEnd == null) return
@@ -894,6 +1034,7 @@ export default function App() {
     const seg = segments[idx]
     const minLen = 0.5
     if (sourceTime <= seg.trimStart + minLen || sourceTime >= seg.trimEnd - minLen) return
+    pushEditorUndo()
     const next = [
       ...segments.slice(0, idx),
       { trimStart: seg.trimStart, trimEnd: sourceTime },
@@ -902,7 +1043,7 @@ export default function App() {
     ]
     setVideoClipSegments(next)
     setSelectedOverlayId('background')
-  }, [recordedBlob, videoTrimStart, videoTrimEnd, currentTime, videoClipSegments])
+  }, [recordedBlob, videoTrimStart, videoTrimEnd, currentTime, videoClipSegments, pushEditorUndo])
 
   const handleVideoClipTrimChange = useCallback((trimStart: number, trimEnd: number, segmentIndex?: number) => {
     userHasTrimmedVideoRef.current = true
@@ -958,6 +1099,7 @@ export default function App() {
   const handleClearProject = useCallback(() => {
     if (!window.confirm('Are you sure you want to clear the entire project? This will remove all recordings and overlays.')) return
 
+    undoStackRef.current = []
     setRecordedBlob(null)
     setOverlays([])
     setCaptionSegments(null)
@@ -1103,6 +1245,8 @@ export default function App() {
             onCaptionYChange={recordedBlob ? setCaptionPreviewCaptionY : undefined}
             playbackUrl={downloadUrl}
             editPreviewSource={editPreviewSource}
+            onCanvasOverlayGestureStart={onCanvasOverlayGestureStart}
+            onCanvasOverlayGestureEnd={onCanvasOverlayGestureEnd}
           />
           {!videoStream && !recordedBlob && (
             <div className={styles.connectOverlay} aria-label="Connect video source">
@@ -1499,6 +1643,10 @@ export default function App() {
                 programIn={recordedBlob ? programIn : undefined}
                 programOut={recordedBlob ? programOut : undefined}
                 onProgramRangeChange={recordedBlob ? handleProgramRangeChange : undefined}
+                onOverlayClipGestureStart={onOverlayClipGestureStart}
+                onOverlayClipGestureEnd={onOverlayClipGestureEnd}
+                onVideoTrimGestureStart={onVideoTrimGestureStart}
+                onVideoTrimGestureEnd={onVideoTrimGestureEnd}
               />
             </div>
           </div>

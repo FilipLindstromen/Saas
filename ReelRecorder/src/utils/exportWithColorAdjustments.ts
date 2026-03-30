@@ -1,4 +1,5 @@
 import type { OverlayItem, OverlayTextAnimation } from '../types'
+import { attachImageForAnimatedCanvasDraw } from './animatedImageForCanvas'
 import { drawOverlays } from './canvasCapture'
 import { loadInfographicProjectData } from './infographicLoader'
 import type { InfographicProjectData } from './infographicLoader'
@@ -269,7 +270,7 @@ export interface ExportForDownloadOptions {
 }
 
 /** Preload all image overlays (data URL or URL) so they are ready for drawing during export. */
-/** Images must live in the document so animated GIF/WebP frames advance on canvas.drawImage (browser behavior). */
+/** Images must sit in-viewport in the DOM so animated GIF/WebP frames advance on canvas.drawImage (Chrome). */
 function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTMLImageElement>> {
   const imageOverlays = overlays.filter((o) => o.type === 'image' && (o.imageDataUrl || o.imageUrl))
   if (imageOverlays.length === 0) return Promise.resolve(new Map())
@@ -278,21 +279,13 @@ function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTML
     (o) =>
       new Promise<void>((resolve, reject) => {
         const img = document.createElement('img')
-        img.crossOrigin = 'anonymous'
-        img.style.position = 'fixed'
-        img.style.left = '-9999px'
-        img.style.top = '0'
-        img.style.width = 'auto'
-        img.style.height = 'auto'
-        img.style.opacity = '0.01'
-        img.style.pointerEvents = 'none'
+        attachImageForAnimatedCanvasDraw(img)
         img.onload = () => {
           map.set(o.id, img)
           resolve()
         }
         img.onerror = () => reject(new Error(`Failed to load overlay image ${o.id}`))
         img.src = o.imageDataUrl ?? o.imageUrl!
-        document.body.appendChild(img)
       })
   )
   return Promise.all(promises).then(() => map)

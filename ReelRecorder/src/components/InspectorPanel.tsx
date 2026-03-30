@@ -574,17 +574,19 @@ export function InspectorPanel({
                   </button>
                 </div>
               </div>
-              <OverlayEditor
-                overlay={selectedOverlay}
-                onUpdate={(patch) => onOverlayUpdate(patch)}
-                onClose={onDeselectOverlay}
-                onRemove={() => {
-                  onOverlayRemove(selectedOverlay.id)
-                  onDeselectOverlay()
-                }}
-                onSaveToLibrary={onSaveOverlayToLibrary ? () => onSaveOverlayToLibrary(selectedOverlay) : undefined}
-                embedded
-              />
+              <div data-reel-overlay-inspector>
+                <OverlayEditor
+                  overlay={selectedOverlay}
+                  onUpdate={(patch) => onOverlayUpdate(patch)}
+                  onClose={onDeselectOverlay}
+                  onRemove={() => {
+                    onOverlayRemove(selectedOverlay.id)
+                    onDeselectOverlay()
+                  }}
+                  onSaveToLibrary={onSaveOverlayToLibrary ? () => onSaveOverlayToLibrary(selectedOverlay) : undefined}
+                  embedded
+                />
+              </div>
             </section>
           ) : (
             <p className={styles.hint}>Select a text or image overlay on the timeline to edit it here.</p>
