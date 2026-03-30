@@ -3,6 +3,7 @@ import type { CaptionSegment, CaptionWord } from '../services/captions'
 import type { CaptionStyle } from '../types'
 import type { InfographicProjectData } from './infographicLoader'
 import { drawInfographicOnCanvas } from './infographicCanvas'
+import { useAnonymousCrossOriginForOverlaySrc } from './animatedImageForCanvas'
 
 const TEXT_ANIM_DURATION = 0.3
 const STAGGER_PER_WORD = 0.08
@@ -195,8 +196,9 @@ export function drawOverlays(
       const img = options.preloadedImages?.get(o.id)
       const imgToUse = img ?? (() => {
         const im = new Image()
-        im.crossOrigin = 'anonymous'
-        im.src = o.imageDataUrl ?? o.imageUrl!
+        const src = o.imageDataUrl ?? o.imageUrl!
+        if (useAnonymousCrossOriginForOverlaySrc(src)) im.crossOrigin = 'anonymous'
+        im.src = src
         return im
       })()
       if (imgToUse.complete && imgToUse.naturalWidth) {

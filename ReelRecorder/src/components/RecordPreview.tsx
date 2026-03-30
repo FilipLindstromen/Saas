@@ -5,7 +5,7 @@ import { loadInfographicProjectData } from '../utils/infographicLoader'
 import type { InfographicProjectData } from '../utils/infographicLoader'
 import type { CaptionSegment } from '../services/captions'
 import styles from './RecordPreview.module.css'
-import { attachImageForAnimatedCanvasDraw } from '../utils/animatedImageForCanvas'
+import { attachImageForAnimatedCanvasDraw, configureOverlayImageCrossOrigin } from '../utils/animatedImageForCanvas'
 
 const CAPTION_SAMPLE_SEGMENT: CaptionSegment = { start: 0, end: 1, text: 'Sample caption text' }
 
@@ -725,14 +725,14 @@ export function RecordPreview({
       if (existing) {
         if (lastSrc.get(o.id) !== src) {
           lastSrc.set(o.id, src)
-          existing.crossOrigin = 'anonymous'
+          configureOverlayImageCrossOrigin(existing, src)
           existing.src = src
         }
         continue
       }
       const el = new Image()
       lastSrc.set(o.id, src)
-      attachImageForAnimatedCanvasDraw(el)
+      attachImageForAnimatedCanvasDraw(el, src)
       el.src = src
       map.set(o.id, el)
     }

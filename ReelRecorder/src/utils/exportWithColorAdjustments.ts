@@ -279,13 +279,14 @@ function preloadOverlayImages(overlays: OverlayItem[]): Promise<Map<string, HTML
     (o) =>
       new Promise<void>((resolve, reject) => {
         const img = document.createElement('img')
-        attachImageForAnimatedCanvasDraw(img)
+        const src = o.imageDataUrl ?? o.imageUrl!
+        attachImageForAnimatedCanvasDraw(img, src)
         img.onload = () => {
           map.set(o.id, img)
           resolve()
         }
         img.onerror = () => reject(new Error(`Failed to load overlay image ${o.id}`))
-        img.src = o.imageDataUrl ?? o.imageUrl!
+        img.src = src
       })
   )
   return Promise.all(promises).then(() => map)
