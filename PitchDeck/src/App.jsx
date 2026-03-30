@@ -17,15 +17,16 @@ import CommandPalette from './components/CommandPalette'
 import VideoEditingMode from './components/VideoEditingMode'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
-import PresentationFeedback, { LOADING, DONE, ERROR } from './components/PresentationFeedback'
+import PresentationFeedback from './components/PresentationFeedback'
+import { LOADING, DONE, ERROR } from './constants/presentationFeedbackStatus'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { formatTimeAgo } from './utils/formatTimeAgo'
+import { preloadFFmpeg } from './utils/ffmpegExport'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
-// Dynamic imports to avoid circular dependency / initialization order issues
+// Dynamic import keeps IndexedDB folder helpers out of the initial graph when unused
 const getProjectFolderStorage = () => import('@shared/projectFolderStorage')
-const getFfmpegExport = () => import('./utils/ffmpegExport')
 
 function App() {
   // Load slides and selectedSlideId from localStorage on initial mount
@@ -295,7 +296,7 @@ function App() {
 
   // Preload FFmpeg on app load so it's ready when user opens video editing (Transcribe/Export)
   useEffect(() => {
-    getFfmpegExport().then(({ preloadFFmpeg }) => preloadFFmpeg())
+    preloadFFmpeg()
   }, [])
 
   // Update current chapter's slides when slides change

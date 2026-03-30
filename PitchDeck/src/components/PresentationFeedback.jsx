@@ -1,8 +1,5 @@
 import './PresentationFeedback.css'
-
-const LOADING = 'loading'
-const DONE = 'done'
-const ERROR = 'error'
+import { LOADING, DONE, ERROR } from '../constants/presentationFeedbackStatus'
 
 function PresentationFeedback({ onClose, status, transcript, feedback, errorMessage, onUploadVideo }) {
   const isLoading = status === LOADING
@@ -133,4 +130,3 @@ function PresentationFeedback({ onClose, status, transcript, feedback, errorMess
 }
 
 export default PresentationFeedback
-export { LOADING, DONE, ERROR }
