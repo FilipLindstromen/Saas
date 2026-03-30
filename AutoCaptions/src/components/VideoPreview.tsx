@@ -42,7 +42,6 @@ export function VideoPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const dragStartRef = useRef<{ y: number; startCaptionY: number } | null>(null)
 
   useEffect(() => {
@@ -50,7 +49,6 @@ export function VideoPreview({
     if (!video || !videoUrl) return
     const onLoadedMetadata = () => {
       onDurationChange(video.duration)
-      setDimensions({ width: video.videoWidth, height: video.videoHeight })
     }
     const onTimeUpdateHandler = () => onTimeUpdate(video.currentTime)
     video.addEventListener('loadedmetadata', onLoadedMetadata)

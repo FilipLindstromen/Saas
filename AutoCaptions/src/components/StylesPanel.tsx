@@ -1,5 +1,5 @@
 import type { CaptionStyle, CaptionAnimation } from '../types'
-import { CAPTION_STYLES, CAPTION_ANIMATIONS, GOOGLE_FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT } from '../constants'
+import { CAPTION_STYLES, CAPTION_ANIMATIONS, GOOGLE_FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX } from '../constants'
 import styles from './StylesPanel.module.css'
 
 interface StylesPanelProps {

@@ -128,7 +128,7 @@ function drawCaptionWordsAnimated(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  segment: CaptionSegment,
+  _segment: CaptionSegment,
   words: { word: string; start: number; end: number }[],
   currentTime: number,
   centerY: number,
