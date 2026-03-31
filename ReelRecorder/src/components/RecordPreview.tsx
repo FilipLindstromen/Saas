@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from 'react'
+import { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import type { CaptionStyle, OverlayItem, OverlayTextAnimation, SafeZoneType } from '../types'
 import { drawOverlays, drawCaptionStyle, getCaptionBlockRect } from '../utils/canvasCapture'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
@@ -577,6 +577,41 @@ export function RecordPreview({
   const displayTimeRef = useRef(displayTime)
   displayTimeRef.current = displayTime
 
+  const isRecordingRef = useRef(isRecording)
+  isRecordingRef.current = isRecording
+
+  /** Draw loop reads latest overlay/style state without restarting RAF (restarts were flickering and breaking captureStream). */
+  const drawStateRef = useRef({
+    isRecording,
+    flipVideo,
+    editPreviewSource,
+    roundMask,
+    portraitFillHeight,
+    colorAdjustmentsEnabled,
+    colorBrightness,
+    colorContrast,
+    colorSaturation,
+    safeZone,
+    overlayTextAnimation,
+    captionTextAnimation,
+    defaultFontFamily,
+    defaultSecondaryFont,
+    defaultBold,
+    captionPreview,
+    captionSegments,
+    videoTrimStart,
+    showRecordingInEdit: false,
+    selectedOverlayId,
+    onOverlayEdit,
+    overlays,
+    infographicProjects,
+    snapGuides,
+  })
+
+  /** One canvas.captureStream() for the whole record session — recreating it ends the encoded video track (~1s files). */
+  const sessionCaptureStreamRef = useRef<MediaStream | null>(null)
+  const sessionCameraTrackIdRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (internalVideoRef.current) {
       internalVideoRef.current.volume = videoVolume / 100
@@ -631,6 +666,36 @@ export function RecordPreview({
     (editPreviewSource === 'webcam' && !!videoStream) ||
     (isRecording && !!videoStream) ||
     (!recordedBlob && !!videoStream)
+
+  drawStateRef.current = {
+    isRecording,
+    flipVideo,
+    editPreviewSource,
+    roundMask,
+    portraitFillHeight,
+    colorAdjustmentsEnabled,
+    colorBrightness,
+    colorContrast,
+    colorSaturation,
+    safeZone,
+    overlayTextAnimation,
+    captionTextAnimation,
+    defaultFontFamily,
+    defaultSecondaryFont,
+    defaultBold,
+    captionPreview,
+    captionSegments,
+    videoTrimStart,
+    showRecordingInEdit,
+    selectedOverlayId,
+    onOverlayEdit,
+    overlays,
+    infographicProjects,
+    snapGuides,
+  }
+
+  const cameraTrackKey =
+    videoStream != null ? videoStream.getVideoTracks()[0]?.id ?? '_pending' : ''
 
   // Playback mode: show recorded video (only in Edit mode when showing recording)
   useEffect(() => {
@@ -819,25 +884,23 @@ export function RecordPreview({
     }
   }, [infographicProjects])
 
-  // Canvas Drawing Loop
+  const videoStreamRef = useRef(videoStream)
+  videoStreamRef.current = videoStream
+
+  // Canvas RAF: deps only canvas/video size + camera identity + recorded file URL so we do not restart on every overlay/prop change (flicker + canvas.captureStream track death).
   useEffect(() => {
     const canvas = canvasRef.current
-    // Use internal video for both playback and preview drawing
     const video = internalVideoRef.current
     if (!canvas || !video) return
 
-    /** Avoid willReadFrequently — on Chrome it can freeze animated GIF/WebP drawn via drawImage to the first frame. */
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    let rafId: number
-
     const draw = () => {
+      const ds = drawStateRef.current
       if (video.readyState >= 2) {
-        // Draw video frame
         ctx.save()
-        // Flip video for live preview/recording (webcam or when recording)
-        if (flipVideo && (editPreviewSource === 'webcam' || isRecording)) {
+        if (ds.flipVideo && (ds.editPreviewSource === 'webcam' || ds.isRecording)) {
           ctx.translate(width, 0)
           ctx.scale(-1, 1)
         }
@@ -845,7 +908,7 @@ export function RecordPreview({
         const vw = video.videoWidth
         const vh = video.videoHeight
 
-        if (roundMask) {
+        if (ds.roundMask) {
           ctx.fillStyle = '#1a1a1e'
           ctx.fillRect(0, 0, width, height)
         }
@@ -854,7 +917,7 @@ export function RecordPreview({
           const videoRatio = vw / vh
           const canvasRatio = width / height
 
-          if (roundMask) {
+          if (ds.roundMask) {
             ctx.save()
             ctx.beginPath()
             const r = Math.min(width, height) / 2
@@ -862,39 +925,33 @@ export function RecordPreview({
             ctx.clip()
           }
 
-          if (portraitFillHeight) {
-            // Center-crop: fill canvas by cropping video to match canvas aspect ratio
+          if (ds.portraitFillHeight) {
             let sx = 0
             let sy = 0
             let sw = vw
             let sh = vh
 
             if (canvasRatio < videoRatio) {
-              // Canvas is narrower -> crop sides of video (center crop)
               sw = vh * canvasRatio
               sx = (vw - sw) / 2
             } else {
-              // Canvas is wider -> crop top/bottom of video (center crop)
               sh = vw / canvasRatio
               sy = (vh - sh) / 2
             }
 
             ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height)
           } else {
-            // Contain: preserve video aspect ratio, letterbox/pillarbox when different
             let drawW: number
             let drawH: number
             let drawX: number
             let drawY: number
 
             if (videoRatio > canvasRatio) {
-              // Video is wider than canvas -> fit to width, letterbox top/bottom
               drawW = width
               drawH = width / videoRatio
               drawX = 0
               drawY = (height - drawH) / 2
             } else {
-              // Video is taller than canvas -> fit to height, pillarbox left/right
               drawH = height
               drawW = height * videoRatio
               drawX = (width - drawW) / 2
@@ -905,30 +962,27 @@ export function RecordPreview({
             ctx.fillRect(0, 0, width, height)
             ctx.drawImage(video, 0, 0, vw, vh, drawX, drawY, drawW, drawH)
           }
-          if (roundMask) ctx.restore()
+          if (ds.roundMask) ctx.restore()
         } else {
           ctx.drawImage(video, 0, 0, width, height)
         }
 
         ctx.restore()
 
-        // Apply Color Adjustments (Preview Only)
-        if (colorAdjustmentsEnabled && !isRecording) {
-          const filter = `brightness(${colorBrightness}%) contrast(${colorContrast}%) saturate(${colorSaturation}%)`
+        if (ds.colorAdjustmentsEnabled && !ds.isRecording) {
+          const filter = `brightness(${ds.colorBrightness}%) contrast(${ds.colorContrast}%) saturate(${ds.colorSaturation}%)`
           ctx.filter = filter
           ctx.drawImage(canvas, 0, 0)
           ctx.filter = 'none'
         }
 
-        // Draw Safe Zones
-        if (safeZone?.visible && safeZone.type) {
-          drawSafeZoneOverlay(ctx, width, height, safeZone.type)
+        if (ds.safeZone?.visible && ds.safeZone.type) {
+          drawSafeZoneOverlay(ctx, width, height, ds.safeZone.type)
         }
 
-        // Stock overlay videos: keep timeline time in sync and ensure frames decode (paused seek).
         const timeForOverlays = displayTimeRef.current
         const ovVideos = overlayVideoRef.current
-        for (const o of overlays) {
+        for (const o of ds.overlays) {
           if (o.type !== 'video' || !o.videoUrl) continue
           if (timeForOverlays < o.startTime || timeForOverlays > o.endTime) continue
           const v = ovVideos.get(o.id)
@@ -948,37 +1002,36 @@ export function RecordPreview({
           }
         }
 
-        // Draw overlays, texts, and captions – always on top of webcam / program video
-        drawOverlays(ctx, width, height, overlays, timeForOverlays, {
-          textAnimation: overlayTextAnimation,
-          defaultFontFamily,
-          defaultSecondaryFont,
-          defaultBold,
+        drawOverlays(ctx, width, height, ds.overlays, timeForOverlays, {
+          textAnimation: ds.overlayTextAnimation,
+          defaultFontFamily: ds.defaultFontFamily,
+          defaultSecondaryFont: ds.defaultSecondaryFont,
+          defaultBold: ds.defaultBold,
           preloadedImages: overlayImageRef.current,
           preloadedVideos: overlayVideoRef.current,
-          infographicProjects,
+          infographicProjects: ds.infographicProjects,
           infographicElementImages: infographicElementImagesRef.current,
         })
-        if (captionPreview && captionSegments && captionSegments.length > 0) {
-          const captionTime = showRecordingInEdit && videoTrimStart != null
-            ? timeForOverlays + videoTrimStart
-            : timeForOverlays
-          drawCaptionStyle(ctx, width, height, captionSegments, captionTime, captionPreview.style, {
-            fontSizePercent: captionPreview.fontSizePercent,
-            captionY: captionPreview.captionY,
-            textAnimation: captionTextAnimation,
+        if (ds.captionPreview && ds.captionSegments && ds.captionSegments.length > 0) {
+          const captionTime =
+            ds.showRecordingInEdit && ds.videoTrimStart != null
+              ? timeForOverlays + ds.videoTrimStart
+              : timeForOverlays
+          drawCaptionStyle(ctx, width, height, ds.captionSegments, captionTime, ds.captionPreview.style, {
+            fontSizePercent: ds.captionPreview.fontSizePercent,
+            captionY: ds.captionPreview.captionY,
+            textAnimation: ds.captionTextAnimation,
           })
         }
-        // Draw selection border and resize handle when not recording
-        if (!isRecording && selectedOverlayId && onOverlayEdit) {
-          const active = overlays.filter((o) => timeForOverlays >= o.startTime && timeForOverlays <= o.endTime)
-          const sel = active.find((o) => o.id === selectedOverlayId)
+        if (!ds.isRecording && ds.selectedOverlayId && ds.onOverlayEdit) {
+          const active = ds.overlays.filter((o) => timeForOverlays >= o.startTime && timeForOverlays <= o.endTime)
+          const sel = active.find((o) => o.id === ds.selectedOverlayId)
           if (sel) {
-            const rect = getOverlayRect(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)
+            const rect = getOverlayRect(ctx, width, height, sel, ds.defaultFontFamily ?? 'Oswald', ds.defaultBold ?? false)
             if (rect) {
               const showRotateFlip = sel.type === 'image' || sel.type === 'video' || sel.type === 'infographic'
               const resizeCorners =
-                getOverlayResizeCornerPoints(ctx, width, height, sel, defaultFontFamily ?? 'Oswald', defaultBold ?? false)?.map(
+                getOverlayResizeCornerPoints(ctx, width, height, sel, ds.defaultFontFamily ?? 'Oswald', ds.defaultBold ?? false)?.map(
                   (p) => ({ x: p.x, y: p.y })
                 ) ?? []
               if (resizeCorners.length > 0) {
@@ -987,9 +1040,8 @@ export function RecordPreview({
             }
           }
         }
-        // Draw alignment guides when dragging
-        if (!isRecording && snapGuides.length > 0) {
-          drawSnapGuides(ctx, width, height, snapGuides)
+        if (!ds.isRecording && ds.snapGuides.length > 0) {
+          drawSnapGuides(ctx, width, height, ds.snapGuides)
         }
       } else {
         ctx.fillStyle = '#1a1a1e'
@@ -999,29 +1051,72 @@ export function RecordPreview({
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText('Select video source and start', width / 2, height / 2)
-        if (!isRecording && safeZone?.visible && safeZone.type) {
-          drawSafeZoneOverlay(ctx, width, height, safeZone.type)
+        if (!ds.isRecording && ds.safeZone?.visible && ds.safeZone.type) {
+          drawSafeZoneOverlay(ctx, width, height, ds.safeZone.type)
         }
       }
       rafRef.current = requestAnimationFrame(draw)
     }
 
-    if (isRecording) startTimeRef.current = performance.now() / 1000
+    if (isRecordingRef.current) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, portraitFillHeight, overlayTextAnimation, captionTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
+  }, [width, height, playbackUrl, cameraTrackKey])
 
-  // Expose canvas stream for recording (only when we're in live mode with video)
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !videoStream || !isRecording) {
+  /** One canvas.captureStream per record session — do not depend on videoStream identity (it churns) or call onCaptureStream(null) until recording stops. */
+  useLayoutEffect(() => {
+    if (!isRecording) {
+      if (sessionCaptureStreamRef.current) {
+        sessionCaptureStreamRef.current.getTracks().forEach((t) => t.stop())
+        sessionCaptureStreamRef.current = null
+      }
+      sessionCameraTrackIdRef.current = null
       onCaptureStream(null)
       return
     }
-    const stream = canvas.captureStream(30)
-    onCaptureStream(stream)
-    return () => onCaptureStream(null)
-  }, [videoStream, isRecording, onCaptureStream])
+
+    const streamNow = videoStreamRef.current
+    if (!streamNow) return
+
+    const camId = streamNow.getVideoTracks()[0]?.id ?? ''
+    let cancelled = false
+
+    const attach = () => {
+      if (cancelled || !isRecordingRef.current) return
+      const canvas = canvasRef.current
+      if (!canvas) {
+        requestAnimationFrame(attach)
+        return
+      }
+
+      const needNewTrack =
+        sessionCaptureStreamRef.current &&
+        sessionCameraTrackIdRef.current != null &&
+        camId !== '' &&
+        sessionCameraTrackIdRef.current !== camId
+
+      if (needNewTrack) {
+        sessionCaptureStreamRef.current.getTracks().forEach((t) => t.stop())
+        sessionCaptureStreamRef.current = null
+        sessionCameraTrackIdRef.current = null
+        onCaptureStream(null)
+      }
+
+      if (sessionCaptureStreamRef.current) return
+
+      const cap = canvas.captureStream(30)
+      sessionCaptureStreamRef.current = cap
+      sessionCameraTrackIdRef.current = camId || null
+      onCaptureStream(cap)
+    }
+
+    const kick = requestAnimationFrame(() => requestAnimationFrame(attach))
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(kick)
+    }
+  }, [isRecording, onCaptureStream])
 
   const getCanvasCoords = (e: React.PointerEvent | PointerEvent) => {
     const canvas = canvasRef.current

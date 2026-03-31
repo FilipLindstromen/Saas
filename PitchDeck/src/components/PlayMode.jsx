@@ -953,17 +953,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     return () => clearTimeout(timer)
   }, [autoAdvance, autoAdvanceDurationSeconds, currentIndex, isTransitioning, presentationSlides.length, nextSlide])
 
-  // Auto-start recording when entering record mode (stream from Record button, then start recorder)
-  useEffect(() => {
-    if (isRecording && recordingState === 'idle' && !isStartingRecordingRef.current) {
-      isStartingRecordingRef.current = true
-      startRecording()
-    } else if (!isRecording && recordingState === 'recording') {
-      stopRecording()
-      isStartingRecordingRef.current = false
-    }
-  }, [isRecording, recordingState])
-
   // Cleanup only on unmount. Do NOT stop the screen stream if it came from App (initialScreenStreamRef) so it survives React double-mount and recording can start.
   useEffect(() => {
     return () => {
@@ -988,6 +977,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       isStartingRecordingRef.current = false
     }
   }, [])
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      setRecordingState('stopping')
+      mediaRecorderRef.current.stop()
+    }
+    isStartingRecordingRef.current = false
+  }
 
   const startRecording = async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') return
@@ -1159,13 +1156,16 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     }
   }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      setRecordingState('stopping')
-      mediaRecorderRef.current.stop()
+  // Auto-start recording when entering record mode (must run after startRecording/stopRecording exist — avoids TDZ / "Cannot access before initialization" in production bundles)
+  useEffect(() => {
+    if (isRecording && recordingState === 'idle' && !isStartingRecordingRef.current) {
+      isStartingRecordingRef.current = true
+      startRecording()
+    } else if (!isRecording && recordingState === 'recording') {
+      stopRecording()
+      isStartingRecordingRef.current = false
     }
-    isStartingRecordingRef.current = false
-  }
+  }, [isRecording, recordingState])
 
   useEffect(() => {
     const handleKeyDown = (e) => {

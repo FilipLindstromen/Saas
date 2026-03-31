@@ -33,19 +33,72 @@ export function useRecorder({
   const chunksRef = useRef<Blob[]>([])
   const recorderRef = useRef<MediaRecorder | null>(null)
   const mimeTypeRef = useRef('')
+  /** Video track id of the stream we started the current MediaRecorder from (for canvas swaps mid-session). */
+  const recordingSourceVideoTrackIdRef = useRef<string | null>(null)
+  /** True if the active recorder was started from canvas (safe to replace when canvas track id changes). */
+  const recordingFromCanvasRef = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      const rec = recorderRef.current
+      if (!rec) return
+      try {
+        if (rec.state === 'recording') {
+          rec.requestData()
+          rec.stop()
+        }
+      } catch {
+        /* ignore */
+      }
+      recorderRef.current = null
+    }
+  }, [])
 
   const startRecording = useCallback(() => {
     setError(null)
     // Don't clear recordedBlob here — keeps edit mode UI visible while recording.
     // New blob replaces it when recording stops.
     chunksRef.current = []
+    recordingSourceVideoTrackIdRef.current = null
+    recordingFromCanvasRef.current = false
     setIsRecording(true)
   }, [])
 
   useEffect(() => {
-    if (!isRecording || recorderRef.current) return
+    if (!isRecording) {
+      recordingSourceVideoTrackIdRef.current = null
+      recordingFromCanvasRef.current = false
+      return
+    }
 
-    const startWithStream = (source: MediaStream) => {
+    const canvasVid = canvasStream?.getVideoTracks()[0]
+    const canvasTrackId = canvasVid?.id ?? ''
+
+    if (
+      recorderRef.current &&
+      recordingFromCanvasRef.current &&
+      canvasTrackId &&
+      recordingSourceVideoTrackIdRef.current &&
+      canvasTrackId !== recordingSourceVideoTrackIdRef.current
+    ) {
+      const rec = recorderRef.current
+      recorderRef.current = null
+      recordingSourceVideoTrackIdRef.current = null
+      recordingFromCanvasRef.current = false
+      chunksRef.current = []
+      try {
+        if (rec.state === 'recording') {
+          rec.requestData()
+          rec.stop()
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (recorderRef.current) return
+
+    const startWithStream = (source: MediaStream, fromCanvas: boolean) => {
       if (recorderRef.current) return
       if (source.getVideoTracks().length === 0) return
       const stream = source.clone()
@@ -73,6 +126,8 @@ export function useRecorder({
         recorder.onerror = () => setError('Recording failed')
         recorder.start(200)
         recorderRef.current = recorder
+        recordingSourceVideoTrackIdRef.current = source.getVideoTracks()[0]?.id ?? null
+        recordingFromCanvasRef.current = fromCanvas
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to start recording')
         setIsRecording(false)
@@ -80,16 +135,16 @@ export function useRecorder({
     }
 
     if (canvasStream && canvasStream.getVideoTracks().length > 0) {
-      startWithStream(canvasStream)
+      startWithStream(canvasStream, true)
       return
     }
     if (videoStream && videoStream.getVideoTracks().length > 0) {
       const id = setTimeout(() => {
         if (recorderRef.current) return
         if (canvasStream && canvasStream.getVideoTracks().length > 0) {
-          startWithStream(canvasStream)
+          startWithStream(canvasStream, true)
         } else {
-          startWithStream(videoStream)
+          startWithStream(videoStream, false)
         }
       }, 350)
       return () => clearTimeout(id)
@@ -108,6 +163,8 @@ export function useRecorder({
         setError(err instanceof Error ? err.message : 'Failed to stop recording')
       }
       recorderRef.current = null
+      recordingSourceVideoTrackIdRef.current = null
+      recordingFromCanvasRef.current = false
     }
     setIsRecording(false)
   }, [])
