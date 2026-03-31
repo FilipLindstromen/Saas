@@ -1,8 +1,9 @@
 /**
  * FFmpeg: client (WASM) or server. Set VITE_FFMPEG_API_URL to use server-side FFmpeg for faster results.
+ *
+ * FFmpeg is loaded with dynamic import() so its module graph is not evaluated during the initial
+ * app bundle run — avoids rare "Cannot access X before initialization" crashes on production builds.
  */
-
-import { FFmpeg } from '@ffmpeg/ffmpeg'
 
 export function getFfmpegApiBase() {
   const url = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FFMPEG_API_URL
@@ -51,6 +52,7 @@ async function getFFmpeg() {
   if (ffmpegInstance?.loaded) return ffmpegInstance
   if (loadPromise) return loadPromise
   loadPromise = (async () => {
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg')
     const ffmpeg = new FFmpeg()
     await ffmpeg.load({
       coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
