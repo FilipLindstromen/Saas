@@ -43,7 +43,16 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        passes: 2,
+        passes: 1,
+        hoist_funs: false,
+        hoist_props: false,
+        reduce_vars: false,
+        reduce_funcs: false,
+        collapse_vars: false,
+        sequences: false,
+      },
+      format: {
+        safari10: true,
       },
     },
     rollupOptions: {

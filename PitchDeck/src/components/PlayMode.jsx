@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import SlideBackground from './SlideBackground'
 import PersistentVideoLayer from './PersistentVideoLayer'
-import { convertToMp4 } from '../utils/ffmpegExport'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
@@ -1104,7 +1103,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
         const runEncodingAndDownload = (resultBlob, fallbackFilename) => {
           setCaptionsProcessing('encoding')
-          convertToMp4(resultBlob)
+          import('../utils/ffmpegExport')
+            .then(({ convertToMp4 }) => convertToMp4(resultBlob))
             .then((mp4Blob) => {
               doDownload(mp4Blob, mp4Filename)
               setCaptionsProcessing('idle')

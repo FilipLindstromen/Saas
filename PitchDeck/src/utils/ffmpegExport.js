@@ -5,10 +5,9 @@
  * app bundle run — avoids rare "Cannot access X before initialization" crashes on production builds.
  */
 
-export function getFfmpegApiBase() {
-  const url = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FFMPEG_API_URL
-  return (url && String(url).trim()) || ''
-}
+import { getFfmpegApiBase, WHISPER_MAX_BYTES } from './ffmpegConfig'
+
+export { getFfmpegApiBase, WHISPER_MAX_BYTES } from './ffmpegConfig'
 
 async function serverExtractAudio(baseUrl, blob, opts = {}) {
   const report = (msg) => opts.onProgress?.(msg)
@@ -324,9 +323,6 @@ export async function exportTrimmedVideo(blob, segments, opts = {}) {
 
   return finalBlob
 }
-
-/** OpenAI Whisper API max file size (25 MB). */
-export const WHISPER_MAX_BYTES = 25 * 1024 * 1024
 
 /**
  * Extract and compress audio from a video blob for Whisper (stays under 25 MB).

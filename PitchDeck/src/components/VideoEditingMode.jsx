@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { transcribeWithSegments } from '../services/presentationAnalysis'
-import { exportTrimmedVideo, extractAudioForWhisper, WHISPER_MAX_BYTES, preloadFFmpeg, getFfmpegApiBase } from '../utils/ffmpegExport'
+import { getFfmpegApiBase, WHISPER_MAX_BYTES } from '../utils/ffmpegConfig'
 import './VideoEditingMode.css'
 
 function wordId() {
@@ -117,9 +117,9 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
 
   useEffect(() => () => revokeUrl(), [revokeUrl])
 
-  // Preload FFmpeg as soon as video editing is open so it's ready before Transcribe/Export
+  // Preload FFmpeg as soon as video editing is open (dynamic import avoids main-bundle TDZ issues)
   useEffect(() => {
-    preloadFFmpeg()
+    import('../utils/ffmpegExport').then((m) => m.preloadFFmpeg()).catch(() => {})
   }, [])
 
   const applyDuration = useCallback(() => {
@@ -363,6 +363,7 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
         setTranscribeStatus('Uploading to server…')
         let extracted
         try {
+          const { extractAudioForWhisper } = await import('../utils/ffmpegExport')
           extracted = await Promise.race([
             extractAudioForWhisper(blob, { onProgress: setTranscribeStatus }),
             new Promise((_, reject) =>
@@ -478,6 +479,7 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
       if (addCaptions && merged.length > 0) {
         exportOpts.captions = { segments: merged, style: captionStyle }
       }
+      const { exportTrimmedVideo } = await import('../utils/ffmpegExport')
       const result = await exportTrimmedVideo(blob, exportSegments, exportOpts)
       const ext = (getFfmpegApiBase() ? exportFormat : result.type?.includes('mp4') ? 'mp4' : 'webm')
       const url = URL.createObjectURL(result)
