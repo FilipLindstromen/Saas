@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, SafeZoneType, VideoSourceKind, LibraryClip } from './types'
+import type { AspectRatio, CaptionStyle, OverlayItem, OverlayTextAnimation, QualityPreset, SafeZoneType, VideoSourceKind, LibraryClip, LibraryClipPayload } from './types'
 import { useMediaDevices } from './hooks/useMediaDevices'
 import { useRecorder } from './hooks/useRecorder'
 import { getResolutionsForAspect, QUALITY_OPTIONS } from './constants'
@@ -29,6 +29,9 @@ import { getStoredTheme, setStoredTheme, applyTheme, initThemeSync, type Theme }
 import styles from './App.module.css'
 
 const OVERLAY_DURATION = 5
+/** Clipboard prefix for copy/paste overlay JSON (text + image) across tabs/sessions. */
+const CLIPBOARD_OVERLAY_PREFIX = 'reelrecorder:overlay:'
+const MIN_COPIED_CLIP_DURATION = 0.5
 /** When media duration is unknown or invalid, timeline + trim use this instead of 0. */
 const FALLBACK_RECORDING_TIMELINE_SEC = 60
 const PROGRAM_EXPORT_MIN_GAP = 0.5
@@ -43,6 +46,20 @@ type EditorUndoSnapshot = {
 
 function generateId() {
   return Math.random().toString(36).slice(2, 12)
+}
+
+function isTypingInField(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el) return false
+  if (el.tagName === 'TEXTAREA' || el.isContentEditable) return true
+  if (el.tagName === 'SELECT') return true
+  if (el.tagName === 'INPUT') {
+    const type = (el as HTMLInputElement).type
+    if (type === 'button' || type === 'checkbox' || type === 'radio' || type === 'range' || type === 'file' || type === 'color')
+      return false
+    return true
+  }
+  return false
 }
 
 function getVideoInputDeviceId(stream: MediaStream | null): string | undefined {
@@ -180,6 +197,9 @@ export default function App() {
   const inTimelineClipGestureRef = useRef(false)
   const inVideoTrimGestureRef = useRef(false)
   const inInspectorRangeGestureRef = useRef(false)
+  /** Last copied text/image overlay (in-session + synced to system clipboard). */
+  const copiedOverlayRef = useRef<{ payload: LibraryClipPayload; duration: number } | null>(null)
+  const overlayPasteCtxRef = useRef({ timelineDuration: 60 as number, safeDisplayTime: 0 as number })
 
   useEffect(() => {
     undoableRef.current = { overlays, videoTrimStart, videoTrimEnd, videoClipSegments }
@@ -358,6 +378,10 @@ export default function App() {
   const timelineDuration = isPlayback
     ? (validUserTimelineDuration ?? playbackTlFromMedia)
     : (validUserTimelineDuration ?? computedTimelineDuration)
+
+  useEffect(() => {
+    overlayPasteCtxRef.current = { timelineDuration, safeDisplayTime }
+  }, [timelineDuration, safeDisplayTime])
 
   const exportEncoderRange = useMemo(() => {
     if (!recordedBlob) return null
@@ -985,10 +1009,72 @@ export default function App() {
   }, [selectedOverlayId, pushEditorUndo])
 
   useEffect(() => {
+    const applyPastedOverlay = (payload: LibraryClipPayload, clipDuration: number) => {
+      if (payload.type !== 'text' && payload.type !== 'image') return
+      const { timelineDuration: td, safeDisplayTime: start } = overlayPasteCtxRef.current
+      const dur = Math.max(MIN_COPIED_CLIP_DURATION, clipDuration)
+      let end = Math.min(start + dur, td)
+      let startClamped = Math.max(0, start)
+      if (end - startClamped < MIN_COPIED_CLIP_DURATION) {
+        startClamped = Math.max(0, td - MIN_COPIED_CLIP_DURATION)
+        end = td
+      }
+      if (end - startClamped < MIN_COPIED_CLIP_DURATION) return
+      pushEditorUndo()
+      const item: OverlayItem = {
+        ...structuredClone(payload),
+        id: generateId(),
+        startTime: startClamped,
+        endTime: end,
+      }
+      setOverlays((prev) => [...prev, item])
+      setSelectedOverlayId(item.id)
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingInField(e.target)) return
+
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && (e.key === 'c' || e.key === 'C')) {
+        if (isRecording) return
+        if (!selectedOverlayId || selectedOverlayId === 'background') return
+        const o = overlays.find((x) => x.id === selectedOverlayId)
+        if (!o || (o.type !== 'text' && o.type !== 'image')) return
+        e.preventDefault()
+        const { id: _id, startTime: _st, endTime: _et, ...rest } = o
+        const payload = structuredClone(rest) as LibraryClipPayload
+        const clipDur = Math.max(MIN_COPIED_CLIP_DURATION, o.endTime - o.startTime)
+        copiedOverlayRef.current = { payload, duration: clipDur }
+        const line = CLIPBOARD_OVERLAY_PREFIX + JSON.stringify({ payload, duration: clipDur })
+        void navigator.clipboard?.writeText(line).catch(() => {})
+        return
+      }
+
+      if (mod && (e.key === 'v' || e.key === 'V')) {
+        if (isRecording) return
+        e.preventDefault()
+        const local = copiedOverlayRef.current
+        if (local) {
+          applyPastedOverlay(local.payload, local.duration)
+          return
+        }
+        void navigator.clipboard
+          ?.readText()
+          .then((text) => {
+            if (!text?.startsWith(CLIPBOARD_OVERLAY_PREFIX)) return
+            try {
+              const raw = JSON.parse(text.slice(CLIPBOARD_OVERLAY_PREFIX.length))
+              if (!raw?.payload || typeof raw.duration !== 'number') return
+              applyPastedOverlay(raw.payload as LibraryClipPayload, raw.duration)
+            } catch {
+              /* ignore malformed clipboard */
+            }
+          })
+          .catch(() => {})
+        return
+      }
+
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      const target = document.activeElement
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || (target as HTMLElement)?.isContentEditable) return
       if (!selectedOverlayId) return
       e.preventDefault()
       if (selectedOverlayId === 'background') {
@@ -1002,7 +1088,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedOverlayId, recordedBlob, handleRemoveOverlay])
+  }, [selectedOverlayId, recordedBlob, overlays, handleRemoveOverlay, pushEditorUndo, isRecording])
 
   const handleSplitClipAtPlayhead = useCallback(() => {
     if (!selectedOverlayId) return
@@ -1159,7 +1245,7 @@ export default function App() {
               currentTime={safeDisplayTime}
               duration={timelineDuration}
               videoClipSegments={recordedBlob && videoClipSegments ? videoClipSegments : undefined}
-              videoSourceDuration={recordedBlob ? Math.max(sourceDuration ?? 0, 0.01) : undefined}
+              videoSourceDuration={recordedBlob ? Math.max(duration ?? 0, 0.01) : undefined}
             />
           </div>
           <span className={styles.exportFormat}>
@@ -1595,7 +1681,7 @@ export default function App() {
                   if (showLiveStream) {
                     setPreviewTime(clamped)
                   } else if (recordedBlob) {
-                    const trimLen = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : sourceDuration
+                    const trimLen = videoTrimEnd != null ? videoTrimEnd - videoTrimStart : Math.max(0.01, sourceSec)
                     const timelineTime = Math.min(Math.max(0, t), trimLen)
                     const sourceTime = videoTrimStart + timelineTime
                     setSeekTime(sourceTime)
@@ -1633,10 +1719,15 @@ export default function App() {
                 onSplitClip={handleSplitClipAtPlayhead}
                 videoClipTrim={
                   recordedBlob
-                    ? { trimStart: videoTrimStart, trimEnd: videoTrimEnd ?? sourceDuration ?? 1 }
+                    ? {
+                        trimStart: videoTrimStart,
+                        trimEnd:
+                          videoTrimEnd ??
+                          (Number.isFinite(duration) && duration > 0 ? duration : 1),
+                      }
                     : undefined
                 }
-                videoSourceDuration={recordedBlob ? Math.max(sourceDuration, 0.01) : undefined}
+                videoSourceDuration={recordedBlob ? Math.max(duration ?? 0, 0.01) : undefined}
                 onVideoClipTrimChange={recordedBlob ? handleVideoClipTrimChange : undefined}
                 onVideoClipSplit={recordedBlob ? handleVideoClipSplit : undefined}
                 videoClipSegments={recordedBlob && videoClipSegments ? videoClipSegments : undefined}
