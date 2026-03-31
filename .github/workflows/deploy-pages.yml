@@ -31,6 +31,7 @@ jobs:
           mkdir -p deploy
           cp docs/index.html deploy/
           cp docs/apiKeys.js deploy/
+          cp docs/saasStorage.js deploy/
           cp docs/google-drive-callback.html deploy/
           cp -r docs/assets deploy/
           cp docs/.nojekyll deploy/
@@ -55,6 +56,13 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/webquizgenerator/
           cp -r dist ../deploy/webquizgenerator
+
+      - name: Build Video Quiz
+        run: |
+          cd VideoQuiz/app
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/VideoQuiz/
+          cp -r dist ../../deploy/VideoQuiz
 
       - name: Build CopyWriter
         run: |
@@ -125,6 +133,13 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/InfoGraphics/
           cp -r dist ../deploy/InfoGraphics
+
+      - name: Build AutoCaptions
+        run: |
+          cd AutoCaptions
+          npm install
+          npx tsc -b && node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/AutoCaptions/
+          cp -r dist ../deploy/AutoCaptions
 
       - name: Build Power Writer
         run: |

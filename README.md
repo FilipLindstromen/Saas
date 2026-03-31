@@ -12,7 +12,10 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 
 | App | Path | Description |
 |-----|------|-------------|
+| AutoCaptions | `/AutoCaptions` | Automatic captions for video |
+| Bullet Generator | `/BulletGenerator` | Bullet-point / list copy tool |
 | Web Quiz Generator | `/webquizgenerator` | Quiz generation tool |
+| Video Quiz | `/VideoQuiz` | Video-based quiz app |
 | CopyWriter | `/CopyWriter` | AI-powered copywriting tool |
 | Story Writer | `/StoryWriter` | Story writing application |
 | Color Writer | `/ColorWriter` | Color-focused writing tool |
