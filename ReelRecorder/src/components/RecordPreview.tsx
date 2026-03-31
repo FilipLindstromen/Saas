@@ -573,6 +573,9 @@ export function RecordPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const internalVideoRef = useRef<HTMLVideoElement>(null)
   const startTimeRef = useRef(0)
+  /** Timeline time for overlays/captions — ref so the canvas RAF loop effect does not re-run every frame while recording (that was starving canvas.captureStream() and truncating MediaRecorder ~1s). */
+  const displayTimeRef = useRef(displayTime)
+  displayTimeRef.current = displayTime
 
   useEffect(() => {
     if (internalVideoRef.current) {
@@ -922,7 +925,7 @@ export function RecordPreview({
         }
 
         // Stock overlay videos: keep timeline time in sync and ensure frames decode (paused seek).
-        const timeForOverlays = displayTime
+        const timeForOverlays = displayTimeRef.current
         const ovVideos = overlayVideoRef.current
         for (const o of overlays) {
           if (o.type !== 'video' || !o.videoUrl) continue
@@ -1005,7 +1008,7 @@ export function RecordPreview({
     if (isRecording) startTimeRef.current = performance.now() / 1000
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, displayTime, portraitFillHeight, overlayTextAnimation, captionTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
+  }, [videoStream, playbackUrl, isRecording, recordedBlob, width, height, overlays, portraitFillHeight, overlayTextAnimation, captionTextAnimation, defaultFontFamily, defaultSecondaryFont, defaultBold, burnOverlaysIntoExport, flipVideo, roundMask, captionPreview, captionSegments, colorAdjustmentsEnabled, colorBrightness, colorContrast, colorSaturation, videoTrimStart, videoTrimEnd, safeZone, selectedOverlayId, showRecordingInEdit, infographicProjects, snapGuides])
 
   // Expose canvas stream for recording (only when we're in live mode with video)
   useEffect(() => {

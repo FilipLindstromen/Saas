@@ -162,6 +162,9 @@ export default function App() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement | null>(null)
+  /** Synced each render — recorded playback RAF + video `ended` guard */
+  const currentTimeRef = useRef(0)
+  const timelineDurationRef = useRef(0)
   const prevRecordedBlobRef = useRef<Blob | null>(null)
   const userHasTrimmedVideoRef = useRef(false)
   const [timelineResize, setTimelineResize] = useState<{ startY: number; startHeight: number } | null>(null)
@@ -379,6 +382,9 @@ export default function App() {
     ? (validUserTimelineDuration ?? playbackTlFromMedia)
     : (validUserTimelineDuration ?? computedTimelineDuration)
 
+  currentTimeRef.current = currentTime
+  timelineDurationRef.current = timelineDuration
+
   useEffect(() => {
     overlayPasteCtxRef.current = { timelineDuration, safeDisplayTime }
   }, [timelineDuration, safeDisplayTime])
@@ -459,6 +465,95 @@ export default function App() {
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
   }, [isPreviewPlaying, isRecording, showLiveStream, timelineDuration])
+
+  /**
+   * Recorded preview: drive timeline with a wall clock so playback runs the full program/timeline
+   * even when video metadata duration is short (WebM) or the timeline is longer than the file.
+   * Video element is kept in sync (last frame held past media end). Previously, clamping program
+   * out to `sourceSec` stopped at ~2–3s while the ruler showed 1:00.
+   */
+  useEffect(() => {
+    if (!isPreviewPlaying || !recordedBlob || showLiveStream) return
+
+    const video = previewVideoRef.current
+    const trimSpan =
+      videoTrimEnd != null ? Math.max(0.01, videoTrimEnd - videoTrimStart) : null
+    const timelineToSource = (t: number) => {
+      if (videoTrimEnd != null && trimSpan != null) {
+        return videoTrimStart + Math.max(0, Math.min(t, trimSpan))
+      }
+      return t
+    }
+
+    const pIn = Math.max(0, Math.min(programIn, timelineDuration))
+    const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, timelineDuration))
+
+    const t0 = performance.now()
+    const startT = currentTimeRef.current
+    let raf = 0
+
+    const finishAt = (tLine: number, doPause: boolean) => {
+      setCurrentTime(tLine)
+      if (doPause) setIsPreviewPlaying(false)
+      const src = timelineToSource(tLine)
+      if (video) {
+        try {
+          if (doPause) video.pause()
+          if (Math.abs(video.currentTime - src) > 0.02) video.currentTime = src
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    const step = () => {
+      const elapsed = (performance.now() - t0) / 1000
+      let next = startT + elapsed
+
+      if (next >= pOut - 0.05) {
+        finishAt(pOut, true)
+        setSeekTime(timelineToSource(pOut))
+        setTimeout(() => setSeekTime(null), 150)
+        return
+      }
+      if (next >= timelineDuration - 0.001) {
+        finishAt(timelineDuration, true)
+        return
+      }
+
+      setCurrentTime(next)
+
+      if (video) {
+        let src = timelineToSource(next)
+        const dur = video.duration
+        if (Number.isFinite(dur) && dur > 0) {
+          src = Math.min(src, Math.max(0, dur - 1e-3))
+        }
+        if (Math.abs(video.currentTime - src) > 0.04) {
+          try {
+            video.currentTime = src
+          } catch {
+            /* ignore */
+          }
+        }
+        if (video.paused) void video.play().catch(() => {})
+      }
+
+      raf = requestAnimationFrame(step)
+    }
+
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [
+    isPreviewPlaying,
+    recordedBlob,
+    showLiveStream,
+    timelineDuration,
+    programIn,
+    programOut,
+    videoTrimStart,
+    videoTrimEnd,
+  ])
 
   useEffect(() => {
     if (videoDevices.length && !videoDeviceId) setVideoDeviceId(videoDevices[0].deviceId)
@@ -1179,6 +1274,11 @@ export default function App() {
   }, [recordedBlob, openaiApiKey])
 
   const handlePlaybackEnd = useCallback(() => {
+    if (!isPreviewPlayingRef.current) return
+    const ct = currentTimeRef.current
+    const tl = timelineDurationRef.current
+    /** Ignore spurious `ended` while timeline clock still has room (RAF continues past short metadata). */
+    if (ct < tl - 0.08) return
     setIsPreviewPlaying(false)
   }, [])
 
@@ -1277,21 +1377,13 @@ export default function App() {
             onCaptureStream={setCanvasStream}
             onDurationChange={setDuration}
             onTimeUpdate={(time) => {
-              let ct =
+              if (recordedBlob && isPreviewPlayingRef.current && !showLiveStream) {
+                return
+              }
+              const ct =
                 videoTrimEnd != null
                   ? Math.max(0, Math.min(videoTrimEnd - videoTrimStart, time - videoTrimStart))
                   : time
-              const trimLen =
-                videoTrimEnd != null ? videoTrimEnd - videoTrimStart : Math.max(0.01, sourceSec)
-              const pIn = Math.max(0, Math.min(programIn, trimLen))
-              const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, trimLen))
-              if (recordedBlob && isPreviewPlayingRef.current && ct >= pOut - 0.05) {
-                setIsPreviewPlaying(false)
-                ct = pOut
-                const srcSeek = videoTrimEnd != null ? videoTrimStart + pOut : pOut
-                setSeekTime(srcSeek)
-                setTimeout(() => setSeekTime(null), 150)
-              }
               setCurrentTime(ct)
             }}
             videoTrimStart={recordedBlob && videoTrimEnd != null ? videoTrimStart : undefined}
@@ -1700,10 +1792,8 @@ export default function App() {
                 isPreviewPlaying={isPreviewPlaying}
                 onPreviewPlayToggle={() => {
                   if (!isPreviewPlaying && recordedBlob && !showLiveStream) {
-                    const trimLen =
-                      videoTrimEnd != null ? videoTrimEnd - videoTrimStart : Math.max(0.01, sourceSec)
-                    const pIn = Math.max(0, Math.min(programIn, trimLen))
-                    const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, trimLen))
+                    const pIn = Math.max(0, Math.min(programIn, timelineDuration))
+                    const pOut = Math.max(pIn + PROGRAM_EXPORT_MIN_GAP, Math.min(programOut, timelineDuration))
                     if (currentTime < pIn - 0.02 || currentTime >= pOut - 0.02) {
                       const srcSeek = videoTrimEnd != null ? videoTrimStart + pIn : pIn
                       setSeekTime(srcSeek)
@@ -1775,7 +1865,6 @@ export default function App() {
             flipVideo={flipVideo}
             roundMask={roundMask}
             onFlipVideoChange={setFlipVideo}
-            roundMask={roundMask}
             onRoundMaskChange={setRoundMask}
             selectedOverlay={selectedOverlay}
             onOverlayUpdate={(patch) => selectedOverlay && handleEditOverlay(selectedOverlay.id, patch)}

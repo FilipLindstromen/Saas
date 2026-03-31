@@ -351,6 +351,14 @@ function App() {
     }
   }, [selectedSlideId])
 
+  /** Recover when storage/chapters disagree (missing slide id) — avoids crashing SlidePreview on slide.* */
+  useEffect(() => {
+    if (slides.length === 0) return
+    if (!slides.some((s) => s.id === selectedSlideId)) {
+      setSelectedSlideId(slides[0].id)
+    }
+  }, [slides, selectedSlideId])
+
   // Switch to slide settings tab when user selects a different slide (edit/plan mode)
   const prevSelectedSlideIdRef = useRef(selectedSlideId)
   useEffect(() => {
@@ -1859,7 +1867,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
     }
   }
 
-  const selectedSlide = slides.find(s => s.id === selectedSlideId)
+  const selectedSlide =
+    slides.length === 0
+      ? null
+      : (slides.find((s) => s.id === selectedSlideId) ?? slides[0])
 
   // Present: open present view and fullscreen (one button, one action)
   const handlePresentClick = () => {
@@ -2170,7 +2181,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <button
                       className="workspace-item add"
                       onClick={() => {
-                        const newId = Math.max(...workspaces.map(w => w.id), 0) + 1
+                        const numericIds = workspaces.map((w) =>
+                          typeof w.id === 'number' && Number.isFinite(w.id) ? w.id : 0
+                        )
+                        const newId = Math.max(0, ...numericIds) + 1
                         const newWorkspace = { id: newId, name: `Workspace ${newId}` }
                         setWorkspaces([...workspaces, newWorkspace])
                         localStorage.setItem('pitchDeckWorkspaces', JSON.stringify([...workspaces, newWorkspace]))

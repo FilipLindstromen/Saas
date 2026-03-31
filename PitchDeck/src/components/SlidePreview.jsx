@@ -199,6 +199,17 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     onSelectGraphic?.(id)
   }
 
+  if (!slide) {
+    return (
+      <div className="slide-preview slide-preview-empty">
+        <div className="preview-header">
+          <h3>Preview</h3>
+        </div>
+        <p className="slide-preview-empty-msg">No slide to preview. Add a slide or choose a chapter that contains slides.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="slide-preview">
       <div className="preview-header">
