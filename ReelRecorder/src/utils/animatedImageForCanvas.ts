@@ -35,12 +35,15 @@ export function getOrCreateAnimatedImageHelperContainer(): HTMLDivElement {
     el = document.createElement('div')
     el.id = CONTAINER_ID
     el.setAttribute('aria-hidden', 'true')
+    /** Full layout size for decoders; scale down so the corner is tiny (avoid low opacity — it can stall GIFs). */
     el.style.cssText = [
       'position:fixed',
       'right:0',
       'bottom:0',
-      'width:6px',
-      'height:6px',
+      'width:min(320px,100vw)',
+      'height:min(320px,100vh)',
+      'transform:scale(0.02)',
+      'transform-origin:bottom right',
       'opacity:1',
       'pointer-events:none',
       'z-index:2147483646',
@@ -48,6 +51,7 @@ export function getOrCreateAnimatedImageHelperContainer(): HTMLDivElement {
       'display:flex',
       'flex-wrap:wrap',
       'align-content:flex-end',
+      'align-items:flex-end',
       'gap:0',
       'background:transparent',
     ].join(';')
@@ -56,14 +60,26 @@ export function getOrCreateAnimatedImageHelperContainer(): HTMLDivElement {
   return el
 }
 
-/** Call before setting `src`. Appends into the helper container when needed. */
+/** Call before/after setting `src`. Appends into the helper container when needed. */
 export function attachImageForAnimatedCanvasDraw(img: HTMLImageElement, src: string): void {
   configureOverlayImageCrossOrigin(img, src)
-  img.style.width = '1px'
-  img.style.height = '1px'
-  img.style.objectFit = 'cover'
-  img.style.flexShrink = '0'
-  img.style.display = 'block'
+  try {
+    img.loading = 'eager'
+  } catch {
+    /* ignore */
+  }
+  /** Keep images “really” laid out for animation; low opacity on the *image* can pause decoders in Chrome. */
+  Object.assign(img.style, {
+    width: 'auto',
+    height: 'auto',
+    maxWidth: '280px',
+    maxHeight: '280px',
+    objectFit: 'contain',
+    flexShrink: '0',
+    display: 'block',
+    opacity: '1',
+    pointerEvents: 'none',
+  })
   const container = getOrCreateAnimatedImageHelperContainer()
   if (img.parentElement !== container) {
     container.appendChild(img)

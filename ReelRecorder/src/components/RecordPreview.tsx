@@ -757,7 +757,7 @@ export function RecordPreview({
       if (existing) {
         if (lastSrc.get(o.id) !== src) {
           lastSrc.set(o.id, src)
-          configureOverlayImageCrossOrigin(existing, src)
+          attachImageForAnimatedCanvasDraw(existing, src)
           existing.src = src
         }
         continue
@@ -826,7 +826,8 @@ export function RecordPreview({
     const video = internalVideoRef.current
     if (!canvas || !video) return
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    /** Avoid willReadFrequently — on Chrome it can freeze animated GIF/WebP drawn via drawImage to the first frame. */
+    const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     let rafId: number
