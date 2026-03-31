@@ -4,7 +4,6 @@ import { getTheme, setTheme as setSharedTheme, initThemeSync } from '@shared/the
 import ThemeToggle from '@shared/ThemeToggle'
 import SlideList from './components/SlideList'
 import SlidePreview from './components/SlidePreview'
-import PlayMode from './components/PlayMode'
 import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
 import RecordingOptions from './components/RecordingOptions'
@@ -14,17 +13,17 @@ import TextEffectsOptions from './components/TextEffectsOptions'
 import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
-import VideoEditingMode from './components/VideoEditingMode'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
 import PresentationFeedback from './components/PresentationFeedback'
 import { LOADING, DONE, ERROR } from './constants/presentationFeedbackStatus'
 import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { formatTimeAgo } from './utils/formatTimeAgo'
-import { preloadFFmpeg } from './utils/ffmpegExport'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
+const PlayMode = lazy(() => import('./components/PlayMode'))
+const VideoEditingMode = lazy(() => import('./components/VideoEditingMode'))
 // Dynamic import keeps IndexedDB folder helpers out of the initial graph when unused
 const getProjectFolderStorage = () => import('@shared/projectFolderStorage')
 
@@ -294,9 +293,9 @@ function App() {
     }
   })
 
-  // Preload FFmpeg on app load so it's ready when user opens video editing (Transcribe/Export)
+  // Preload FFmpeg after mount (dynamic import keeps ffmpeg out of the initial sync module graph)
   useEffect(() => {
-    preloadFFmpeg()
+    import('./utils/ffmpegExport').then((m) => m.preloadFFmpeg()).catch(() => {})
   }, [])
 
   // Update current chapter's slides when slides change
@@ -2058,7 +2057,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
   // Present mode (fullscreen)
   if (mode === 'present') {
     return (
-      <>
+      <Suspense fallback={null}>
         <PlayMode 
           slides={slides} 
           onExit={() => setMode('edit')} 
@@ -2118,7 +2117,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
             setLastRecordingBlobVersion((v) => v + 1)
           }}
         />
-      </>
+      </Suspense>
     )
   }
 
@@ -2796,13 +2795,15 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
       </div>
       <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'video-editing' ? 'video-editing-content' : ''}`}>
         {mode === 'video-editing' ? (
-          <VideoEditingMode
-            key={lastRecordingBlobVersion}
-            videoBlob={lastRecordingBlobRef.current}
-            latestRecordingRef={lastRecordingBlobRef}
-            onExit={() => setMode('edit')}
-            openaiKey={settings.openaiKey}
-          />
+          <Suspense fallback={null}>
+            <VideoEditingMode
+              key={lastRecordingBlobVersion}
+              videoBlob={lastRecordingBlobRef.current}
+              latestRecordingRef={lastRecordingBlobRef}
+              onExit={() => setMode('edit')}
+              openaiKey={settings.openaiKey}
+            />
+          </Suspense>
         ) : (
           <>
             <div 

@@ -37,11 +37,21 @@ export default defineConfig({
     },
   },
   build: {
-    // One JS chunk avoids rare Rollup/esbuild TDZ ("Cannot access 'X' before initialization")
-    // ordering bugs across chunks on some hosts (e.g. GitHub Pages + cached split assets).
+    // Single chunk + avoid const TDZ in Rollup wrappers; Terser instead of esbuild minify — fixes
+    // "Cannot access 'X' before initialization" on some production hosts (e.g. GitHub Pages).
+    modulePreload: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        passes: 2,
+      },
+    },
     rollupOptions: {
       output: {
         inlineDynamicImports: true,
+        generatedCode: {
+          constBindings: false,
+        },
       },
     },
   },
