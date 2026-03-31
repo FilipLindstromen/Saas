@@ -251,6 +251,8 @@
   flex-direction: column;
   gap: 2px;
   cursor: pointer;
+  /* Match clipsScroll so ruler time scale === strip scale (playhead lines up with t=0 clips). */
+  scrollbar-gutter: stable;
 }
 
 .tracksSection {
@@ -272,6 +274,8 @@
   gap: 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--accent) var(--bg-tertiary);
+  /* Same gutter as rulerTicksWrap so timeline column width matches when a scrollbar appears. */
+  scrollbar-gutter: stable;
 }
 
 .clipsScroll::-webkit-scrollbar {

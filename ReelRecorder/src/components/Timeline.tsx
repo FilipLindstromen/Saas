@@ -7,6 +7,8 @@ const MIN_CLIP_DURATION = 0.5
 const MIN_DURATION = 1
 const MAX_DURATION = 600
 const EDGE_HIT_PX = 10
+/** Snap timeline start to 0 when dragging within this many seconds (px drift / float noise). */
+const SNAP_START_TO_ZERO = 0.03
 type ClipDragMode = 'move' | 'resizeStart' | 'resizeEnd'
 
 /** Trim range for the main video clip (source seconds). When set, a Video track is shown at the bottom. */
@@ -271,8 +273,8 @@ export function Timeline({
       const stripRect = strip.getBoundingClientRect()
       let mode: ClipDragMode = forceMode ?? 'move'
       if (!forceMode) {
-        const clipLeftPct = o.startTime / Math.max(duration, 0.001)
-        const clipWidthPct = (o.endTime - o.startTime) / Math.max(duration, 0.001)
+        const clipLeftPct = o.startTime / Math.max(safeDuration, 0.001)
+        const clipWidthPct = (o.endTime - o.startTime) / Math.max(safeDuration, 0.001)
         const clipLeftPx = clipLeftPct * stripRect.width
         const clipWidthPx = clipWidthPct * stripRect.width
         const xInClip = e.clientX - stripRect.left - clipLeftPx
@@ -309,16 +311,21 @@ export function Timeline({
           newStart = 0
           newEnd = len
         }
+        if (newStart > 0 && newStart < SNAP_START_TO_ZERO) {
+          newStart = 0
+          newEnd = len
+        }
         if (newEnd > safeDuration) {
           newEnd = safeDuration
           newStart = safeDuration - len
         }
         onEditOverlay(clipDrag.id, { startTime: newStart, endTime: newEnd })
       } else if (clipDrag.mode === 'resizeStart') {
-        const newStart = Math.max(0, Math.min(clipDrag.startEndTime - MIN_CLIP_DURATION, tClamped))
+        let newStart = Math.max(0, Math.min(clipDrag.startEndTime - MIN_CLIP_DURATION, tClamped))
+        if (newStart < SNAP_START_TO_ZERO) newStart = 0
         onEditOverlay(clipDrag.id, { startTime: newStart })
       } else {
-        const newEnd = Math.max(clipDrag.startStartTime + MIN_CLIP_DURATION, Math.min(duration, tClamped))
+        const newEnd = Math.max(clipDrag.startStartTime + MIN_CLIP_DURATION, Math.min(safeDuration, tClamped))
         onEditOverlay(clipDrag.id, { endTime: newEnd })
       }
     },
