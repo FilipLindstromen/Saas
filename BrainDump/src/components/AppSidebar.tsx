@@ -74,8 +74,6 @@ type AppSidebarProps = {
   onCapturePhoto?: () => void;
   onCaptureText?: () => void;
   onOpenCoach?: () => void;
-  onOpenToday?: () => void;
-  todayViewActive?: boolean;
 };
 
 function useIsMobile() {
@@ -101,8 +99,6 @@ export function AppSidebar({
   onCapturePhoto,
   onCaptureText,
   onOpenCoach,
-  onOpenToday,
-  todayViewActive = false,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { data: session } = useSession();
@@ -332,32 +328,6 @@ export function AppSidebar({
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t(MODE_KEY[m])}</span> : null}
             </button>
           ))}
-        </nav>
-      ) : null}
-
-      {onOpenToday ? (
-        <nav className="bd-app-sidebar-nav" aria-label={t("today.navAria")}>
-          <button
-            type="button"
-            className="bd-app-sidebar-nav-btn"
-            data-active={todayViewActive ? "true" : "false"}
-            data-collapsed={!showLabels ? "true" : "false"}
-            onClick={() => {
-              onOpenToday();
-              if (isMobile) closeMobileDrawerAnimated();
-            }}
-            title={t("today.title")}
-            aria-label={t("bottom.todayNav")}
-            aria-current={todayViewActive ? "page" : undefined}
-          >
-            <span className="bd-app-sidebar-nav-icon">
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-              </svg>
-            </span>
-            {showLabels ? <span className="bd-app-sidebar-nav-label">{t("today.title")}</span> : null}
-          </button>
         </nav>
       ) : null}
 

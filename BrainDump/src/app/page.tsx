@@ -546,8 +546,6 @@ export default function BrainDumpPage() {
           onCapturePhoto={onSidebarCapturePhoto}
           onCaptureText={onSidebarCaptureText}
           onOpenCoach={() => setCoachChatOpen(true)}
-          onOpenToday={() => setTodayViewActive(true)}
-          todayViewActive={todayViewActive}
         />
         <div className="bd-workspace-column" style={{ gap: "0" }}>
           <div className="bd-page-content-padding" style={{ display: todayViewActive ? "none" : undefined }}>

@@ -113,13 +113,27 @@ export function MobileBottomBarPill({
         }}
       />
       <button
-        ref={todayRef}
+        ref={listRef}
         type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onTodayClick}
-        title={t("today.title")}
-        aria-label={t("bottom.todayNav")}
-        aria-pressed={todayViewActive}
+        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectList}
+        title={t("items.viewList")}
+        aria-label={t("items.viewList")}
+        aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
+      >
+        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
+          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <button
+        ref={textRef}
+        type="button"
+        className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectText}
+        title={t("items.viewText")}
+        aria-label={t("items.viewText")}
+        aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
       >
         <svg
           className="bd-bottom-bar-pill-icon"
@@ -133,22 +147,7 @@ export function MobileBottomBarPill({
           strokeLinejoin="round"
           aria-hidden
         >
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-        </svg>
-      </button>
-      <button
-        ref={listRef}
-        type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectList}
-        title={t("items.viewList")}
-        aria-label={t("items.viewList")}
-        aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
-      >
-        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
-          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 6h16M4 12h16M4 18h11" />
         </svg>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
@@ -183,13 +182,13 @@ export function MobileBottomBarPill({
         </button>
       </div>
       <button
-        ref={textRef}
+        ref={todayRef}
         type="button"
-        className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectText}
-        title={t("items.viewText")}
-        aria-label={t("items.viewText")}
-        aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
+        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onTodayClick}
+        title={t("today.title")}
+        aria-label={t("bottom.todayNav")}
+        aria-pressed={todayViewActive}
       >
         <svg
           className="bd-bottom-bar-pill-icon"
@@ -203,7 +202,8 @@ export function MobileBottomBarPill({
           strokeLinejoin="round"
           aria-hidden
         >
-          <path d="M4 6h16M4 12h16M4 18h11" />
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
         </svg>
       </button>
       <button
