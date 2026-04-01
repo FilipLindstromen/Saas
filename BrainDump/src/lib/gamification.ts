@@ -91,6 +91,26 @@ export function snapshotFromRow(row: {
   };
 }
 
+export async function countCompletedTasksForUser(tx: Tx, userId: string): Promise<number> {
+  return tx.organizedItem.count({
+    where: {
+      userId,
+      deletedAt: null,
+      OR: [
+        { itemType: "task_completed" },
+        {
+          itemType: { in: ["task", "task_completed"] },
+          progress: "completed",
+        },
+        {
+          itemType: { in: ["task", "task_completed"] },
+          kanbanColumn: "completed",
+        },
+      ],
+    },
+  });
+}
+
 export async function ensureUserGamification(tx: Tx, userId: string) {
   const existing = await tx.userGamification.findUnique({
     where: { userId },
@@ -99,23 +119,7 @@ export async function ensureUserGamification(tx: Tx, userId: string) {
 
   const [dumpCount, taskBaseline] = await Promise.all([
     tx.dump.count({ where: { userId } }),
-    tx.organizedItem.count({
-      where: {
-        userId,
-        deletedAt: null,
-        OR: [
-          { itemType: "task_completed" },
-          {
-            itemType: { in: ["task", "task_completed"] },
-            progress: "completed",
-          },
-          {
-            itemType: { in: ["task", "task_completed"] },
-            kanbanColumn: "completed",
-          },
-        ],
-      },
-    }),
+    countCompletedTasksForUser(tx, userId),
   ]);
 
   return tx.userGamification.create({

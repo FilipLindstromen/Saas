@@ -21,6 +21,7 @@ import {
 } from "@/lib/client-preferences-sync";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
+import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 import {
   BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
@@ -1047,8 +1048,14 @@ export function ItemsViewArea({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemType, progress, kanbanColumn }),
     })
-      .then((r) => {
-        if (r.ok && completed) playTaskCompleteCheer();
+      .then(async (r) => {
+        if (!r.ok) return;
+        try {
+          emitGamificationFromResponseBody(await r.json());
+        } catch {
+          /* ignore */
+        }
+        if (completed) playTaskCompleteCheer();
       })
       .catch(() => {});
   }, []);
@@ -1112,19 +1119,23 @@ export function ItemsViewArea({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     })
-      .then((r) => {
-        if (r.ok) {
-          setItems((prev) =>
-            prev.map((it) => {
-              if (it.id !== id) return it;
-              const next = { ...it, itemType: newType };
-              if (newType === "task_completed") return { ...next, progress: "completed", kanbanColumn: "completed" };
-              if (newType === "task") return { ...next, progress: "todo", kanbanColumn: "todo" };
-              return next;
-            })
-          );
-          if (newType === "task_completed") playTaskCompleteCheer();
+      .then(async (r) => {
+        if (!r.ok) return;
+        try {
+          emitGamificationFromResponseBody(await r.json());
+        } catch {
+          /* ignore */
         }
+        setItems((prev) =>
+          prev.map((it) => {
+            if (it.id !== id) return it;
+            const next = { ...it, itemType: newType };
+            if (newType === "task_completed") return { ...next, progress: "completed", kanbanColumn: "completed" };
+            if (newType === "task") return { ...next, progress: "todo", kanbanColumn: "todo" };
+            return next;
+          })
+        );
+        if (newType === "task_completed") playTaskCompleteCheer();
       })
       .catch(() => {});
   }, []);
@@ -1272,6 +1283,7 @@ export function ItemsViewArea({
         }),
       });
       const dumpJson = (await resDump.json()) as { dump?: { id: string } };
+      if (resDump.ok) emitGamificationFromResponseBody(dumpJson);
       const dumpId = dumpJson.dump?.id;
       if (!dumpId) {
         await fetchItems();
@@ -1311,6 +1323,7 @@ export function ItemsViewArea({
         await fetchItems();
         return;
       }
+      emitGamificationFromResponseBody(batchJson);
       const newRows = batchJson.createdItems;
       setItems((prev) => sortItemsByListOrder([...prev, ...newRows]));
       const firstNew = newRows[0];
@@ -1346,7 +1359,10 @@ export function ItemsViewArea({
           status: "organized",
         }),
       });
-      const { dump } = await resDump.json();
+      const dumpPayload = await resDump.json();
+      if (!resDump.ok) return;
+      emitGamificationFromResponseBody(dumpPayload);
+      const dump = (dumpPayload as { dump?: { id: string } }).dump;
       if (!dump?.id) return;
       const payload: Record<string, unknown> = {
         dumpId: dump.id,
@@ -1429,7 +1445,9 @@ export function ItemsViewArea({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const itemPayload = await resItem.json();
       if (resItem.ok) {
+        emitGamificationFromResponseBody(itemPayload);
         fetchItems();
         setAddEntryOpen(false);
       }

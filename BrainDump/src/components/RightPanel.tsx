@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import type { OrganizedItemPreview } from "./CenterPanel";
 import { SavedItemsList } from "./SavedItemsList";
+import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
 
 interface EditableItem extends OrganizedItemPreview {
   _localId?: string;
@@ -114,6 +115,7 @@ export function RightPanel({
       });
       const dataBatch = await resBatch.json();
       if (!resBatch.ok) throw new Error(dataBatch.error || "Failed to save items");
+      emitGamificationFromResponseBody(dataBatch);
 
       await fetch(`/api/dumps/${dump.id}`, {
         method: "PATCH",

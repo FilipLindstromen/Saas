@@ -2158,6 +2158,178 @@ select.bd-input::-ms-expand {
   min-width: 0;
 }
 
+/* Server-backed gamification (capture + tasks) */
+.bd-gamification-modal-backdrop.bd-modal-backdrop {
+  z-index: 12040;
+}
+
+.bd-gamification-modal-panel.bd-modal-panel {
+  max-width: min(420px, calc(100vw - 2rem));
+}
+
+.bd-gamification-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.bd-gamification-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.bd-gamification-modal-close {
+  flex-shrink: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0.15rem 0.45rem;
+}
+
+.bd-gamification-modal-intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.bd-gamification-modal-hint,
+.bd-gamification-modal-error {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.bd-gamification-modal-error {
+  color: var(--danger, #c94b4b);
+}
+
+.bd-gamification-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bd-gamification-track {
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--card-radius);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+
+.bd-gamification-track-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.bd-gamification-track-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.bd-gamification-track-meta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: right;
+  line-height: 1.2;
+}
+
+.bd-gamification-track-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.bd-gamification-track-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-muted), var(--accent));
+  transition: width 0.35s ease;
+}
+
+.bd-gamification-track-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.bd-gamification-track-count {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bd-gamification-toast-host {
+  position: fixed;
+  z-index: 13000;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(380px, calc(100vw - 1.5rem));
+  pointer-events: none;
+}
+
+.bd-gamification-toast {
+  pointer-events: auto;
+  position: relative;
+  padding: 0.75rem 2.25rem 0.75rem 1rem;
+  border-radius: var(--card-radius);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: bd-gamification-toast-in 0.35s ease;
+}
+
+@keyframes bd-gamification-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bd-gamification-toast-body {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  white-space: pre-line;
+}
+
+.bd-gamification-toast-dismiss {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 0.25rem;
+}
+
+.bd-gamification-toast-dismiss:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
 /* Unauthenticated app gate: primary actions full-width */
 .bd-auth-gate-card {
   width: 100%;

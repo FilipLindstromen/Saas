@@ -482,6 +482,9 @@ export function AppSidebar({
   );
 
   const streaksModal = <StreaksModal isOpen={streaksOpen} onClose={() => setStreaksOpen(false)} state={streakState} />;
+  const gamificationModal = (
+    <GamificationModal isOpen={gamificationOpen} onClose={() => setGamificationOpen(false)} />
+  );
   const habitReminderModal = (
     <BrainDumpHabitReminderModal isOpen={habitRemindersOpen} onClose={() => setHabitRemindersOpen(false)} />
   );

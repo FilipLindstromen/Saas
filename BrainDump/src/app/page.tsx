@@ -25,6 +25,7 @@ import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
 import { recordOrganizedDump } from "@/lib/dump-streak";
 import { loadWorkspaceScope, saveWorkspaceScope } from "@/lib/workspace-scope-settings";
+import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -359,6 +360,7 @@ export default function BrainDumpPage() {
         });
         const dataDump = await resDump.json();
         if (!resDump.ok) throw new Error((dataDump as { error?: string }).error || "Failed to create dump");
+        emitGamificationFromResponseBody(dataDump);
         const dump = (dataDump as { dump?: { id: string } }).dump;
         if (!dump?.id) throw new Error("Failed to create dump");
         const n = new Date();
@@ -403,6 +405,7 @@ export default function BrainDumpPage() {
         if (!resBatch.ok) {
           throw new Error((dataBatch as { error?: string }).error ?? "Failed to save items");
         }
+        emitGamificationFromResponseBody(dataBatch);
         const created = (dataBatch as { created?: { id: string }[] }).created ?? [];
         saveLastNewBatchIds(created.map((c) => c.id));
         recordOrganizedDump();
