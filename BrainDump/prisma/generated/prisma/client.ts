@@ -72,6 +72,11 @@ export type OrganizedItemTag = Prisma.OrganizedItemTagModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model SiteSettings
+ * Singleton row with `id: "global"` for server-controlled feature flags (admin dashboard).
+ */
+export type SiteSettings = Prisma.SiteSettingsModel
+/**
  * Model PasswordResetToken
  * One-time token for email/password reset flow
  */

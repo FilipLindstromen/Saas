@@ -370,8 +370,6 @@
   "settings.showDumpFaceHelp": "Ett enkelt animerat ansikte ovanför dumppanelen när du spelar in och organiserar. Stäng av för minimalare gränssnitt. Sparas bara i din webbläsare.",
   "settings.soundEffects": "Ljudeffekter",
   "settings.soundEffectsHelp": "När på: bockar du av en uppgift spelas en jubel-högtid från Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Sparas bara i din webbläsare.",
-  "settings.revenueCat": "Använd RevenueCat (prenumerationer & paywall)",
-  "settings.revenueCatHelp": "När av: hoppar appen över RevenueCat så du kan utveckla utan API-nycklar. I produktionsbyggen är standard på tills du ändrar det. Sparas bara i din webbläsare.",
   "settings.privacy": "Integritet",
   "settings.privacyHelp": "Hur BrainDump lagrar data och använder AI. Öppnas i ny flik.",
   "profile.title": "Profil",

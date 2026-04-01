@@ -370,8 +370,6 @@
   "settings.showDumpFaceHelp": "Simple animated face above the dump panel while you record and organize. Turn off if you prefer a minimal UI. Stored in your browser only.",
   "settings.soundEffects": "Sound effects",
   "settings.soundEffectsHelp": "When on, checking off a task plays a crowd cheer from Pixabay (People crowd cheers — royalty-free: https://pixabay.com/sound-effects/people-crowd-cheers-314919/). Stored in your browser only.",
-  "settings.revenueCat": "Use RevenueCat (subscriptions & paywall)",
-  "settings.revenueCatHelp": "When off, the app skips RevenueCat so you can use BrainDump locally without API keys. In production builds the default is on until you change it. Stored in your browser only.",
   "settings.privacy": "Privacy",
   "settings.privacyHelp": "How BrainDump stores data and uses AI. Opens in a new tab.",
   "profile.title": "Profile",

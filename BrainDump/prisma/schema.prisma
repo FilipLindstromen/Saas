@@ -119,6 +119,7 @@ model OrganizedItemTag {
 /// Auth.js / NextAuth user model (credentials: passwordHash set; OAuth: accounts used)
 model User {
   id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
   name          String?
   email         String?    @unique
   emailVerified DateTime?
@@ -134,6 +135,15 @@ model User {
   projects           Project[]
   tags               Tag[]
   passwordResetTokens PasswordResetToken[]
+
+  @@index([createdAt])
+}
+
+/// Singleton row with `id: "global"` for server-controlled feature flags (admin dashboard).
+model SiteSettings {
+  id                String   @id
+  revenueCatEnabled Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
 }
 
 /// One-time token for email/password reset flow

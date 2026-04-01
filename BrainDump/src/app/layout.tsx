@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
 import { ClientPreferencesBootstrap } from "@/components/ClientPreferencesBootstrap";
+import { SiteConfigProvider } from "@/components/SiteConfigProvider";
 import { I18nProvider } from "@/lib/i18n";
 import { Inter } from "next/font/google";
 
@@ -45,10 +46,12 @@ export default function RootLayout({
       </head>
       <body className={fontSans.className}>
         <AuthSessionProvider>
-          <I18nProvider>
-            <ClientPreferencesBootstrap />
-            {children}
-          </I18nProvider>
+          <SiteConfigProvider>
+            <I18nProvider>
+              <ClientPreferencesBootstrap />
+              {children}
+            </I18nProvider>
+          </SiteConfigProvider>
         </AuthSessionProvider>
       </body>
     </html>

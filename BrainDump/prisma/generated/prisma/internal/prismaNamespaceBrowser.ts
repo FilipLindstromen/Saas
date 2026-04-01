@@ -57,6 +57,7 @@ export const ModelName = {
   Tag: 'Tag',
   OrganizedItemTag: 'OrganizedItemTag',
   User: 'User',
+  SiteSettings: 'SiteSettings',
   PasswordResetToken: 'PasswordResetToken',
   Account: 'Account',
   Session: 'Session',
@@ -165,6 +166,7 @@ export type OrganizedItemTagScalarFieldEnum = (typeof OrganizedItemTagScalarFiel
 
 export const UserScalarFieldEnum = {
   id: 'id',
+  createdAt: 'createdAt',
   name: 'name',
   email: 'email',
   emailVerified: 'emailVerified',
@@ -174,6 +176,15 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const SiteSettingsScalarFieldEnum = {
+  id: 'id',
+  revenueCatEnabled: 'revenueCatEnabled',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SiteSettingsScalarFieldEnum = (typeof SiteSettingsScalarFieldEnum)[keyof typeof SiteSettingsScalarFieldEnum]
 
 
 export const PasswordResetTokenScalarFieldEnum = {

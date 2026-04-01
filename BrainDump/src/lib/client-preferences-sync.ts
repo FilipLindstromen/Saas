@@ -12,7 +12,6 @@ import {
 } from "@/lib/habit-reminders";
 import { CUSTOM_AREAS_KEY } from "@/lib/personal-areas";
 import { BRAINDUMP_NEW_BATCH_IDS_KEY } from "@/lib/newBatch";
-import { loadRevenueCatEnabled, REVENUECAT_ENABLED_STORAGE_KEY } from "@/lib/revenuecat-settings";
 import { loadSoundEffectsEnabled, SOUND_EFFECTS_KEY } from "@/lib/sound-effects-settings";
 import {
   DUMP_FACE_CHANGED,
@@ -59,7 +58,6 @@ export type ClientPreferencesPayloadV1 = {
   googleCalendarId?: string | null;
   googleCalendarSummary?: string | null;
   saasApiKeys?: Record<string, unknown> | null;
-  revenuecatEnabled?: boolean | null;
   soundEffects?: boolean | null;
   dumpStreak?: DumpStreakState | null;
   showDumpFace?: boolean | null;
@@ -192,7 +190,6 @@ export function collectClientPreferencesFromLocal(): ClientPreferencesPayloadV1 
     /* ignore */
   }
 
-  out.revenuecatEnabled = loadRevenueCatEnabled();
   out.soundEffects = loadSoundEffectsEnabled();
 
   try {
@@ -334,14 +331,6 @@ export function applyClientPreferencesToLocal(payload: unknown): void {
       delete copy.googleClientId;
       if (Object.keys(copy).length > 0) localStorage.setItem(SAAS_API_KEYS, JSON.stringify(copy));
       else localStorage.removeItem(SAAS_API_KEYS);
-    }
-  } catch {
-    /* ignore */
-  }
-
-  try {
-    if (typeof p.revenuecatEnabled === "boolean") {
-      localStorage.setItem(REVENUECAT_ENABLED_STORAGE_KEY, p.revenuecatEnabled ? "true" : "false");
     }
   } catch {
     /* ignore */

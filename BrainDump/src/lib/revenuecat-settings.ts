@@ -1,32 +1,8 @@
-/** Browser-only: gate RevenueCat SDK / paywall so you can develop without keys. */
+/**
+ * RevenueCat / paywall gating is controlled globally in the admin dashboard (`/admin`)
+ * and stored in Postgres (`SiteSettings`). The web app reads it via `GET /api/site-config`.
+ *
+ * In React, use `useSiteConfig()` from `@/components/SiteConfigProvider` (`revenueCatEnabled`).
+ */
 
-export const REVENUECAT_ENABLED_STORAGE_KEY = "braindump_revenuecat_enabled";
-
-export const REVENUECAT_ENABLED_CHANGED = "braindump-revenuecat-enabled-changed";
-
-function defaultRevenueCatEnabled(): boolean {
-  return process.env.NODE_ENV !== "development";
-}
-
-export function loadRevenueCatEnabled(): boolean {
-  if (typeof window === "undefined") return defaultRevenueCatEnabled();
-  try {
-    const v = localStorage.getItem(REVENUECAT_ENABLED_STORAGE_KEY);
-    if (v === "true") return true;
-    if (v === "false") return false;
-    return defaultRevenueCatEnabled();
-  } catch {
-    return defaultRevenueCatEnabled();
-  }
-}
-
-export function saveRevenueCatEnabled(enabled: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(REVENUECAT_ENABLED_STORAGE_KEY, enabled ? "true" : "false");
-    window.dispatchEvent(new CustomEvent(REVENUECAT_ENABLED_CHANGED));
-    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
-  } catch {
-    /* ignore */
-  }
-}
+export { useSiteConfig } from "@/components/SiteConfigProvider";

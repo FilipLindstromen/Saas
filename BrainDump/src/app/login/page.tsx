@@ -91,7 +91,10 @@ function LoginContent() {
         return;
       }
       if (res?.ok) {
-        window.location.href = "/";
+        const raw = searchParams.get("callbackUrl");
+        const next =
+          raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+        window.location.href = next;
         return;
       }
       setError("Something went wrong. Please try again.");
