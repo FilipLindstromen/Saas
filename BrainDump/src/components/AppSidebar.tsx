@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { DeleteEntriesOverlay } from "./DeleteEntriesOverlay";
 import { BrainDumpHabitReminderModal } from "./BrainDumpHabitReminderModal";
 import { StreaksModal } from "./StreaksModal";
+import { GamificationModal } from "./GamificationModal";
 import { TrashModal } from "./TrashModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useI18n } from "@/lib/i18n";
@@ -105,6 +106,7 @@ export function AppSidebar({
   const [expanded, setExpanded] = useState(false);
   const [streakState, setStreakState] = useState<DumpStreakState>(() => getDumpStreakState());
   const [streaksOpen, setStreaksOpen] = useState(false);
+  const [gamificationOpen, setGamificationOpen] = useState(false);
   const [habitRemindersOpen, setHabitRemindersOpen] = useState(false);
   const [deleteEntriesOpen, setDeleteEntriesOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -370,6 +372,29 @@ export function AppSidebar({
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("topBar.streaks")}</span> : null}
         </button>
 
+        {user ? (
+          <button
+            type="button"
+            className="bd-app-sidebar-nav-btn"
+            data-collapsed={!showLabels ? "true" : "false"}
+            onClick={() => {
+              setGamificationOpen(true);
+              if (isMobile) closeMobileDrawerAnimated();
+            }}
+            title={t("gamification.title")}
+            aria-label={t("gamification.title")}
+          >
+            <span className="bd-app-sidebar-nav-icon">
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 15c-3.866 0-7-1.567-7-3.5V6.5C5 4.567 8.134 3 12 3s7 1.567 7 3.5V11.5c0 1.933-3.134 3.5-7 3.5z" />
+                <path d="M5 10v4c0 2 3 4 7 4s7-2 7-4v-4" />
+                <path d="M12 11v6" />
+              </svg>
+            </span>
+            {showLabels ? <span className="bd-app-sidebar-nav-label">{t("gamification.shortLabel")}</span> : null}
+          </button>
+        ) : null}
+
         <button
           type="button"
           className="bd-app-sidebar-nav-btn"
@@ -486,6 +511,7 @@ export function AppSidebar({
           </div>
         )}
         {streaksModal}
+        {gamificationModal}
         {habitReminderModal}
         {trashModal}
         {deleteEntriesOverlay}
@@ -503,6 +529,7 @@ export function AppSidebar({
         {sidebarBody}
       </aside>
       {streaksModal}
+      {gamificationModal}
       {habitReminderModal}
       {trashModal}
       {deleteEntriesOverlay}

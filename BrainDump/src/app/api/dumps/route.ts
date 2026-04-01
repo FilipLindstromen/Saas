@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
+import { recordDumpCaptured } from "@/lib/gamification";
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +58,13 @@ export async function POST(request: NextRequest) {
         audioUrl: audioUrl ?? null,
       },
     });
-    return NextResponse.json({ dump });
+    let gamification = null;
+    try {
+      gamification = await recordDumpCaptured(prisma, userId);
+    } catch (geo) {
+      console.warn("Gamification dump capture:", geo);
+    }
+    return NextResponse.json({ dump, ...(gamification ? { gamification } : {}) });
   } catch (e) {
     console.error("Dumps POST error:", e);
     const message = getDbErrorMessage(e) || "Failed to create dump";

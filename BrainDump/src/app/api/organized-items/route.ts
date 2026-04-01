@@ -6,6 +6,7 @@ import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 import type { Prisma } from "../../../../prisma/generated/prisma/client";
 import { withActiveOrganizedItems, withTrashedOrganizedItems } from "@/lib/organized-item-scope";
+import { itemRepresentsCompletedTask, recordTaskCompletions } from "@/lib/gamification";
 
 export async function GET(request: NextRequest) {
   try {
@@ -224,7 +225,22 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({ item });
+    let gamification = null;
+    if (
+      itemRepresentsCompletedTask({
+        itemType: item.itemType,
+        progress: item.progress,
+        kanbanColumn: item.kanbanColumn,
+      })
+    ) {
+      try {
+        gamification = await recordTaskCompletions(prisma, userId, 1);
+      } catch (geo) {
+        console.warn("Gamification new completed task:", geo);
+      }
+    }
+
+    return NextResponse.json({ item, ...(gamification ? { gamification } : {}) });
   } catch (e) {
     console.error("Organized items POST error:", e);
     const message = getDbErrorMessage(e) || "Failed to create item";

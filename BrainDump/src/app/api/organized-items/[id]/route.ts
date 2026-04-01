@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 import { withActiveOrganizedItems } from "@/lib/organized-item-scope";
+import { maybeRecordSingleTaskCompletion } from "@/lib/gamification";
 
 export async function GET(
   _request: NextRequest,
@@ -89,6 +90,12 @@ export async function PATCH(
 
     const shouldWriteItemType = resolvedItemType !== undefined && resolvedItemType !== existing.itemType;
 
+    const beforeGamification = {
+      itemType: existing.itemType,
+      progress: existing.progress,
+      kanbanColumn: existing.kanbanColumn,
+    };
+
     const item = await prisma.organizedItem.update({
       where: { id, userId },
       data: {
@@ -121,7 +128,18 @@ export async function PATCH(
       },
       include: { project: true, tags: { include: { tag: true } } },
     });
-    return NextResponse.json({ item });
+    let gamification = null;
+    try {
+      const afterGamification = {
+        itemType: item.itemType,
+        progress: item.progress,
+        kanbanColumn: item.kanbanColumn,
+      };
+      gamification = await maybeRecordSingleTaskCompletion(prisma, userId, beforeGamification, afterGamification);
+    } catch (geo) {
+      console.warn("Gamification task completion:", geo);
+    }
+    return NextResponse.json({ item, ...(gamification ? { gamification } : {}) });
   } catch (e) {
     console.error("Item PATCH error:", e);
     return NextResponse.json({ error: "Failed to update item" }, { status: 500 });

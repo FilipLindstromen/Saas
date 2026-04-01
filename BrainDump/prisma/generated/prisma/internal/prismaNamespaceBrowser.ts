@@ -57,6 +57,7 @@ export const ModelName = {
   Tag: 'Tag',
   OrganizedItemTag: 'OrganizedItemTag',
   User: 'User',
+  UserGamification: 'UserGamification',
   SiteSettings: 'SiteSettings',
   PasswordResetToken: 'PasswordResetToken',
   Account: 'Account',
@@ -176,6 +177,16 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const UserGamificationScalarFieldEnum = {
+  userId: 'userId',
+  dumpsCapturedCount: 'dumpsCapturedCount',
+  tasksCompletedLifetime: 'tasksCompletedLifetime',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserGamificationScalarFieldEnum = (typeof UserGamificationScalarFieldEnum)[keyof typeof UserGamificationScalarFieldEnum]
 
 
 export const SiteSettingsScalarFieldEnum = {

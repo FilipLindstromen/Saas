@@ -72,6 +72,11 @@ export type OrganizedItemTag = Prisma.OrganizedItemTagModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model UserGamification
+ * Server-backed XP for capture (dumps) and task completion — see /api/gamification.
+ */
+export type UserGamification = Prisma.UserGamificationModel
+/**
  * Model SiteSettings
  * Singleton row with `id: "global"` for server-controlled feature flags (admin dashboard).
  */

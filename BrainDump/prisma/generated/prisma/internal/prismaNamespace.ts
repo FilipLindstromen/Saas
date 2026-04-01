@@ -390,6 +390,7 @@ export const ModelName = {
   Tag: 'Tag',
   OrganizedItemTag: 'OrganizedItemTag',
   User: 'User',
+  UserGamification: 'UserGamification',
   SiteSettings: 'SiteSettings',
   PasswordResetToken: 'PasswordResetToken',
   Account: 'Account',
@@ -410,7 +411,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "dump" | "organizedItem" | "project" | "tag" | "organizedItemTag" | "user" | "siteSettings" | "passwordResetToken" | "account" | "session" | "verificationToken"
+    modelProps: "dump" | "organizedItem" | "project" | "tag" | "organizedItemTag" | "user" | "userGamification" | "siteSettings" | "passwordResetToken" | "account" | "session" | "verificationToken"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -855,6 +856,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    UserGamification: {
+      payload: Prisma.$UserGamificationPayload<ExtArgs>
+      fields: Prisma.UserGamificationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.UserGamificationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.UserGamificationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        findFirst: {
+          args: Prisma.UserGamificationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.UserGamificationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        findMany: {
+          args: Prisma.UserGamificationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>[]
+        }
+        create: {
+          args: Prisma.UserGamificationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        createMany: {
+          args: Prisma.UserGamificationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.UserGamificationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>[]
+        }
+        delete: {
+          args: Prisma.UserGamificationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        update: {
+          args: Prisma.UserGamificationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        deleteMany: {
+          args: Prisma.UserGamificationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.UserGamificationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.UserGamificationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>[]
+        }
+        upsert: {
+          args: Prisma.UserGamificationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserGamificationPayload>
+        }
+        aggregate: {
+          args: Prisma.UserGamificationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUserGamification>
+        }
+        groupBy: {
+          args: Prisma.UserGamificationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserGamificationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.UserGamificationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserGamificationCountAggregateOutputType> | number
         }
       }
     }
@@ -1365,6 +1440,16 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const UserGamificationScalarFieldEnum = {
+  userId: 'userId',
+  dumpsCapturedCount: 'dumpsCapturedCount',
+  tasksCompletedLifetime: 'tasksCompletedLifetime',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserGamificationScalarFieldEnum = (typeof UserGamificationScalarFieldEnum)[keyof typeof UserGamificationScalarFieldEnum]
+
+
 export const SiteSettingsScalarFieldEnum = {
   id: 'id',
   revenueCatEnabled: 'revenueCatEnabled',
@@ -1642,6 +1727,7 @@ export type GlobalOmitConfig = {
   tag?: Prisma.TagOmit
   organizedItemTag?: Prisma.OrganizedItemTagOmit
   user?: Prisma.UserOmit
+  userGamification?: Prisma.UserGamificationOmit
   siteSettings?: Prisma.SiteSettingsOmit
   passwordResetToken?: Prisma.PasswordResetTokenOmit
   account?: Prisma.AccountOmit

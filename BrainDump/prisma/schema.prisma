@@ -135,8 +135,21 @@ model User {
   projects           Project[]
   tags               Tag[]
   passwordResetTokens PasswordResetToken[]
+  gamification         UserGamification?
 
   @@index([createdAt])
+}
+
+/// Server-backed XP for capture (dumps) and task completion — see /api/gamification.
+model UserGamification {
+  userId                  String   @id
+  /** Number of voice/text dumps created (POST /api/dumps). */
+  dumpsCapturedCount      Int      @default(0)
+  /** Lifetime task completions (incremented when a task is marked done). */
+  tasksCompletedLifetime  Int      @default(0)
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// Singleton row with `id: "global"` for server-controlled feature flags (admin dashboard).

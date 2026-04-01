@@ -209,6 +209,7 @@ export type UserWhereInput = {
   projects?: Prisma.ProjectListRelationFilter
   tags?: Prisma.TagListRelationFilter
   passwordResetTokens?: Prisma.PasswordResetTokenListRelationFilter
+  gamification?: Prisma.XOR<Prisma.UserGamificationNullableScalarRelationFilter, Prisma.UserGamificationWhereInput> | null
 }
 
 export type UserOrderByWithRelationInput = {
@@ -227,6 +228,7 @@ export type UserOrderByWithRelationInput = {
   projects?: Prisma.ProjectOrderByRelationAggregateInput
   tags?: Prisma.TagOrderByRelationAggregateInput
   passwordResetTokens?: Prisma.PasswordResetTokenOrderByRelationAggregateInput
+  gamification?: Prisma.UserGamificationOrderByWithRelationInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -248,6 +250,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   projects?: Prisma.ProjectListRelationFilter
   tags?: Prisma.TagListRelationFilter
   passwordResetTokens?: Prisma.PasswordResetTokenListRelationFilter
+  gamification?: Prisma.XOR<Prisma.UserGamificationNullableScalarRelationFilter, Prisma.UserGamificationWhereInput> | null
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -294,6 +297,7 @@ export type UserCreateInput = {
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -312,6 +316,7 @@ export type UserUncheckedCreateInput = {
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -330,6 +335,7 @@ export type UserUpdateInput = {
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -348,6 +354,7 @@ export type UserUncheckedUpdateInput = {
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -475,6 +482,20 @@ export type UserUpdateOneRequiredWithoutTagsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTagsInput, Prisma.UserUpdateWithoutTagsInput>, Prisma.UserUncheckedUpdateWithoutTagsInput>
 }
 
+export type UserCreateNestedOneWithoutGamificationInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGamificationInput, Prisma.UserUncheckedCreateWithoutGamificationInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGamificationInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutGamificationNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGamificationInput, Prisma.UserUncheckedCreateWithoutGamificationInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGamificationInput
+  upsert?: Prisma.UserUpsertWithoutGamificationInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutGamificationInput, Prisma.UserUpdateWithoutGamificationInput>, Prisma.UserUncheckedUpdateWithoutGamificationInput>
+}
+
 export type UserCreateNestedOneWithoutPasswordResetTokensInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutPasswordResetTokensInput, Prisma.UserUncheckedCreateWithoutPasswordResetTokensInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutPasswordResetTokensInput
@@ -532,6 +553,7 @@ export type UserCreateWithoutDumpsInput = {
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutDumpsInput = {
@@ -549,6 +571,7 @@ export type UserUncheckedCreateWithoutDumpsInput = {
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutDumpsInput = {
@@ -582,6 +605,7 @@ export type UserUpdateWithoutDumpsInput = {
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutDumpsInput = {
@@ -599,6 +623,7 @@ export type UserUncheckedUpdateWithoutDumpsInput = {
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutItemsInput = {
@@ -616,6 +641,7 @@ export type UserCreateWithoutItemsInput = {
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutItemsInput = {
@@ -633,6 +659,7 @@ export type UserUncheckedCreateWithoutItemsInput = {
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutItemsInput = {
@@ -666,6 +693,7 @@ export type UserUpdateWithoutItemsInput = {
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutItemsInput = {
@@ -683,6 +711,7 @@ export type UserUncheckedUpdateWithoutItemsInput = {
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutProjectsInput = {
@@ -700,6 +729,7 @@ export type UserCreateWithoutProjectsInput = {
   items?: Prisma.OrganizedItemCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutProjectsInput = {
@@ -717,6 +747,7 @@ export type UserUncheckedCreateWithoutProjectsInput = {
   items?: Prisma.OrganizedItemUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutProjectsInput = {
@@ -750,6 +781,7 @@ export type UserUpdateWithoutProjectsInput = {
   items?: Prisma.OrganizedItemUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutProjectsInput = {
@@ -767,6 +799,7 @@ export type UserUncheckedUpdateWithoutProjectsInput = {
   items?: Prisma.OrganizedItemUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTagsInput = {
@@ -784,6 +817,7 @@ export type UserCreateWithoutTagsInput = {
   items?: Prisma.OrganizedItemCreateNestedManyWithoutUserInput
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTagsInput = {
@@ -801,6 +835,7 @@ export type UserUncheckedCreateWithoutTagsInput = {
   items?: Prisma.OrganizedItemUncheckedCreateNestedManyWithoutUserInput
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTagsInput = {
@@ -834,6 +869,7 @@ export type UserUpdateWithoutTagsInput = {
   items?: Prisma.OrganizedItemUpdateManyWithoutUserNestedInput
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTagsInput = {
@@ -850,6 +886,95 @@ export type UserUncheckedUpdateWithoutTagsInput = {
   dumps?: Prisma.DumpUncheckedUpdateManyWithoutUserNestedInput
   items?: Prisma.OrganizedItemUncheckedUpdateManyWithoutUserNestedInput
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
+  passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
+}
+
+export type UserCreateWithoutGamificationInput = {
+  id?: string
+  createdAt?: Date | string
+  name?: string | null
+  email?: string | null
+  emailVerified?: Date | string | null
+  image?: string | null
+  passwordHash?: string | null
+  clientPreferences?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  dumps?: Prisma.DumpCreateNestedManyWithoutUserInput
+  items?: Prisma.OrganizedItemCreateNestedManyWithoutUserInput
+  projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
+  tags?: Prisma.TagCreateNestedManyWithoutUserInput
+  passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutGamificationInput = {
+  id?: string
+  createdAt?: Date | string
+  name?: string | null
+  email?: string | null
+  emailVerified?: Date | string | null
+  image?: string | null
+  passwordHash?: string | null
+  clientPreferences?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  dumps?: Prisma.DumpUncheckedCreateNestedManyWithoutUserInput
+  items?: Prisma.OrganizedItemUncheckedCreateNestedManyWithoutUserInput
+  projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
+  tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
+  passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutGamificationInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutGamificationInput, Prisma.UserUncheckedCreateWithoutGamificationInput>
+}
+
+export type UserUpsertWithoutGamificationInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutGamificationInput, Prisma.UserUncheckedUpdateWithoutGamificationInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutGamificationInput, Prisma.UserUncheckedCreateWithoutGamificationInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutGamificationInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutGamificationInput, Prisma.UserUncheckedUpdateWithoutGamificationInput>
+}
+
+export type UserUpdateWithoutGamificationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  clientPreferences?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  dumps?: Prisma.DumpUpdateManyWithoutUserNestedInput
+  items?: Prisma.OrganizedItemUpdateManyWithoutUserNestedInput
+  projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
+  tags?: Prisma.TagUpdateManyWithoutUserNestedInput
+  passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutGamificationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  clientPreferences?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  dumps?: Prisma.DumpUncheckedUpdateManyWithoutUserNestedInput
+  items?: Prisma.OrganizedItemUncheckedUpdateManyWithoutUserNestedInput
+  projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
+  tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
 }
 
@@ -868,6 +993,7 @@ export type UserCreateWithoutPasswordResetTokensInput = {
   items?: Prisma.OrganizedItemCreateNestedManyWithoutUserInput
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPasswordResetTokensInput = {
@@ -885,6 +1011,7 @@ export type UserUncheckedCreateWithoutPasswordResetTokensInput = {
   items?: Prisma.OrganizedItemUncheckedCreateNestedManyWithoutUserInput
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPasswordResetTokensInput = {
@@ -918,6 +1045,7 @@ export type UserUpdateWithoutPasswordResetTokensInput = {
   items?: Prisma.OrganizedItemUpdateManyWithoutUserNestedInput
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPasswordResetTokensInput = {
@@ -935,6 +1063,7 @@ export type UserUncheckedUpdateWithoutPasswordResetTokensInput = {
   items?: Prisma.OrganizedItemUncheckedUpdateManyWithoutUserNestedInput
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAccountsInput = {
@@ -952,6 +1081,7 @@ export type UserCreateWithoutAccountsInput = {
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAccountsInput = {
@@ -969,6 +1099,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAccountsInput = {
@@ -1002,6 +1133,7 @@ export type UserUpdateWithoutAccountsInput = {
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -1019,6 +1151,7 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSessionsInput = {
@@ -1036,6 +1169,7 @@ export type UserCreateWithoutSessionsInput = {
   projects?: Prisma.ProjectCreateNestedManyWithoutUserInput
   tags?: Prisma.TagCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
@@ -1053,6 +1187,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   projects?: Prisma.ProjectUncheckedCreateNestedManyWithoutUserInput
   tags?: Prisma.TagUncheckedCreateNestedManyWithoutUserInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedCreateNestedManyWithoutUserInput
+  gamification?: Prisma.UserGamificationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -1086,6 +1221,7 @@ export type UserUpdateWithoutSessionsInput = {
   projects?: Prisma.ProjectUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -1103,6 +1239,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   projects?: Prisma.ProjectUncheckedUpdateManyWithoutUserNestedInput
   tags?: Prisma.TagUncheckedUpdateManyWithoutUserNestedInput
   passwordResetTokens?: Prisma.PasswordResetTokenUncheckedUpdateManyWithoutUserNestedInput
+  gamification?: Prisma.UserGamificationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -1206,6 +1343,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   projects?: boolean | Prisma.User$projectsArgs<ExtArgs>
   tags?: boolean | Prisma.User$tagsArgs<ExtArgs>
   passwordResetTokens?: boolean | Prisma.User$passwordResetTokensArgs<ExtArgs>
+  gamification?: boolean | Prisma.User$gamificationArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1251,6 +1389,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   projects?: boolean | Prisma.User$projectsArgs<ExtArgs>
   tags?: boolean | Prisma.User$tagsArgs<ExtArgs>
   passwordResetTokens?: boolean | Prisma.User$passwordResetTokensArgs<ExtArgs>
+  gamification?: boolean | Prisma.User$gamificationArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1266,6 +1405,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     projects: Prisma.$ProjectPayload<ExtArgs>[]
     tags: Prisma.$TagPayload<ExtArgs>[]
     passwordResetTokens: Prisma.$PasswordResetTokenPayload<ExtArgs>[]
+    gamification: Prisma.$UserGamificationPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1680,6 +1820,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   projects<T extends Prisma.User$projectsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$projectsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tags<T extends Prisma.User$tagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   passwordResetTokens<T extends Prisma.User$passwordResetTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$passwordResetTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PasswordResetTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  gamification<T extends Prisma.User$gamificationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$gamificationArgs<ExtArgs>>): Prisma.Prisma__UserGamificationClient<runtime.Types.Result.GetResult<Prisma.$UserGamificationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2270,6 +2411,25 @@ export type User$passwordResetTokensArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   distinct?: Prisma.PasswordResetTokenScalarFieldEnum | Prisma.PasswordResetTokenScalarFieldEnum[]
+}
+
+/**
+ * User.gamification
+ */
+export type User$gamificationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the UserGamification
+   */
+  select?: Prisma.UserGamificationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the UserGamification
+   */
+  omit?: Prisma.UserGamificationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserGamificationInclude<ExtArgs> | null
+  where?: Prisma.UserGamificationWhereInput
 }
 
 /**

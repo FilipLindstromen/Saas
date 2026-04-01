@@ -9,6 +9,7 @@ import {
   normalizeReminderMinutesBefore,
 } from "@/lib/calendar-schedule";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
+import { recordTaskCompletions } from "@/lib/gamification";
 
 /**
  * POST /api/organized-items/batch
@@ -299,7 +300,22 @@ export async function POST(request: NextRequest) {
 
     const created = createdItems.map((row) => ({ id: row.id, title: row.title }));
 
-    return NextResponse.json({ created, createdItems, count: created.length });
+    const taskCompletedInBatch = items.filter((it) => String(it.item_type ?? "") === "task_completed").length;
+    let gamification = null;
+    if (taskCompletedInBatch > 0) {
+      try {
+        gamification = await recordTaskCompletions(prisma, userId, taskCompletedInBatch);
+      } catch (geo) {
+        console.warn("Gamification batch tasks:", geo);
+      }
+    }
+
+    return NextResponse.json({
+      created,
+      createdItems,
+      count: created.length,
+      ...(gamification ? { gamification } : {}),
+    });
   } catch (e) {
     console.error("Batch create organized items error:", e);
     const message = getDbErrorMessage(e) || "Failed to create items";
