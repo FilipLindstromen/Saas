@@ -3,6 +3,7 @@ import { organizeTranscriptResilient } from "@/lib/organize-engine";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 export const maxDuration = 120;
 
@@ -19,6 +20,8 @@ export async function POST(request: NextRequest) {
     }
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const keyRes = resolveOpenAiApiKey(userId);
     if (!keyRes.ok) {

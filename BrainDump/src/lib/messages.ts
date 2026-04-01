@@ -31,7 +31,7 @@ const en: Msg = {
   "sidebar.menu": "Menu",
   "sidebar.capturePhoto": "Photo dump",
   "sidebar.captureText": "Text dump",
-  "sidebar.dumpInputsAria": "Photo, text dumps, and coach",
+  "sidebar.dumpInputsAria": "Text dump, photo capture, and coach",
   "sidebar.habitReminders": "BrainDump reminders",
   "sidebar.trash": "Trash",
 
@@ -244,6 +244,8 @@ const en: Msg = {
   "error.noTextInImage": "No readable text was found in the image. Try a clearer photo.",
   "error.recordFirst": "Record audio first, then click Transcribe.",
   "error.emptyRecording": "Recording is empty. Record again and wait a few seconds before stopping.",
+  "error.audioTooLarge":
+    "This audio clip is too large to send in one piece. Try a shorter recording or update the app so it can split long takes automatically.",
   "error.micDenied": "Microphone access denied or unavailable.",
   "error.noAudio": "No audio was captured. Check that the microphone is working and not muted, then try again.",
   "error.enterTranscript": "Enter or paste a transcript, then click Organize.",
@@ -501,7 +503,7 @@ const sv: Msg = {
   "sidebar.menu": "Meny",
   "sidebar.capturePhoto": "Fotodump",
   "sidebar.captureText": "Textdump",
-  "sidebar.dumpInputsAria": "Foto-, textdumpar och coach",
+  "sidebar.dumpInputsAria": "Textdump, fotoinspelning och coach",
   "sidebar.habitReminders": "BrainDump-påminnelser",
   "sidebar.trash": "Papperskorg",
 
@@ -715,6 +717,8 @@ const sv: Msg = {
   "error.noTextInImage": "Ingen läsbar text hittades i bilden. Prova en tydligare bild.",
   "error.recordFirst": "Spela in ljud först, klicka sedan på Transkribera.",
   "error.emptyRecording": "Inspelningen är tom. Spela in igen och vänta några sekunder innan du stoppar.",
+  "error.audioTooLarge":
+    "Ljudklippet är för stort att skicka på en gång. Prova en kortare inspelning eller uppdatera appen så att långa tagningar delas automatiskt.",
   "error.micDenied": "Mikrofon nekad eller otillgänglig.",
   "error.noAudio": "Inget ljud spelades in. Kontrollera mikrofonen och försök igen.",
   "error.enterTranscript": "Ange eller klistra in ett transkript och klicka Organisera.",

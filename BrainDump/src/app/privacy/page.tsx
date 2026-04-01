@@ -99,6 +99,11 @@ export default function PrivacyPage() {
               BrainDump does not claim that prompts are invisible to the host—only that they are used to provide the
               feature.
             </p>
+            <p style={{ margin: "0.75rem 0 0", lineHeight: 1.65, color: "var(--text-secondary)" }}>
+              Long voice recordings are transcribed in shorter segments when needed so each request stays within
+              service limits; segmenting happens on your device before upload, so the same privacy rules apply as for
+              any other transcription request.
+            </p>
           </section>
 
           <section style={{ marginBottom: "1.75rem" }}>
@@ -145,13 +150,50 @@ export default function PrivacyPage() {
 
           <section style={{ marginBottom: "1.75rem" }}>
             <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: "0 0 0.65rem" }}>
+              Deleting entries (workspace, trash, and permanent removal)
+            </h2>
+            <ul
+              style={{
+                margin: "0 0 0.75rem",
+                paddingLeft: "1.25rem",
+                lineHeight: 1.65,
+                color: "var(--text-secondary)",
+              }}
+            >
+              <li style={{ marginBottom: "0.5rem" }}>
+                <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>Move to trash</strong>: When you
+                remove an organized item from a list, it is usually{" "}
+                <em style={{ fontStyle: "italic" }}>soft-deleted</em>: it stays in the database with a trash timestamp,
+                hidden from normal views, until you restore it from Trash in the sidebar or until you delete it forever.
+                Linked dump rows and other references follow the same account as before.
+              </li>
+              <li style={{ marginBottom: "0.5rem" }}>
+                <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>Delete forever / empty trash</strong>:
+                Actions in the Trash screen permanently remove those rows from the application database (hard delete).
+                This cannot be undone in the app.
+              </li>
+              <li style={{ marginBottom: "0.5rem" }}>
+                <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>Bulk delete</strong>: Domain-wide or
+                catalog delete controls, if your build exposes them, remove matching rows from the database as implemented
+                in that version (often a hard delete for the selection).
+              </li>
+            </ul>
+            <p style={{ margin: 0, lineHeight: 1.65, color: "var(--text-secondary)" }}>
+              Copies in server backups, hosting logs, or provider dashboards are outside the app’s control and may
+              persist for a period depending on how the deployment is operated. Voice audio for transcription is sent
+              to OpenAI for processing and is handled under their retention policies; it is not stored as a persistent
+              file by BrainDump for that step unless your deployment adds separate storage.
+            </p>
+          </section>
+
+          <section style={{ marginBottom: "1.75rem" }}>
+            <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: "0 0 0.65rem" }}>
               Your choices
             </h2>
             <p style={{ margin: 0, lineHeight: 1.65, color: "var(--text-secondary)" }}>
-              You can avoid sending specific content to AI by not using organize, coach, transcription, or suggestion
-              features for that content. Deleting entries in the app removes that data from the application database
-              (subject to backups or logs the operator may keep outside the app). For rights requests or questions
-              about a particular hosted instance, contact whoever runs that deployment.
+              You can avoid sending specific content to AI by not using organize, coach, transcription/image extraction,
+              or suggestion features for that content. For rights requests or questions about a particular hosted
+              instance, contact whoever runs that deployment.
             </p>
           </section>
         </article>

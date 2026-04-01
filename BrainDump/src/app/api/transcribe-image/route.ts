@@ -7,16 +7,11 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_BODY = MAX_BYTES + 256 * 1024; /* multipart overhead */
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("image") as File | null;
-    if (!file) {
-      return NextResponse.json({ error: "Missing image file" }, { status: 400 });
-    }
-
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
     const keyRes = resolveOpenAiApiKey(userId);
@@ -24,6 +19,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }
     const apiKey = keyRes.apiKey;
+
+    const cl = request.headers.get("content-length");
+    if (cl && /^\d+$/.test(cl) && Number(cl) > MAX_BODY) {
+      return NextResponse.json({ error: "Image is too large (max 20 MB)." }, { status: 413 });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get("image") as File | null;
+    if (!file) {
+      return NextResponse.json({ error: "Missing image file" }, { status: 400 });
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     if (buffer.length === 0) {

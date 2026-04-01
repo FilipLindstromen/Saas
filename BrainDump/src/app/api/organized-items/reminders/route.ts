@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 /**
  * GET /api/organized-items/reminders
@@ -14,6 +15,8 @@ export async function GET() {
       return NextResponse.json({ items: [] });
     }
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const items = await prisma.organizedItem.findMany({
       where: { userId, reminderAt: { not: null }, deletedAt: null },

@@ -562,6 +562,19 @@ export default function BrainDumpPage() {
           <nav className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
             <button
               type="button"
+              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setTodayViewActive((v) => !v)}
+              title={t("today.title")}
+              aria-label={t("bottom.todayNav")}
+              aria-pressed={todayViewActive}
+            >
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </svg>
+            </button>
+            <button
+              type="button"
               className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
               onClick={() => {
                 setTodayViewActive(false);
@@ -643,19 +656,6 @@ export default function BrainDumpPage() {
                 >
                   {new Date().getDate()}
                 </text>
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setTodayViewActive((v) => !v)}
-              title={t("today.title")}
-              aria-label={t("bottom.todayNav")}
-              aria-pressed={todayViewActive}
-            >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
               </svg>
             </button>
           </nav>

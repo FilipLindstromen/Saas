@@ -17,6 +17,7 @@ import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
 import { emitSuggestedItemTypesFromOrganize } from "@/lib/item-types";
 import { filterNewStandaloneProjectNames } from "@/lib/project-name-match";
+import { transcribeAudioBlobs } from "@/lib/transcribe-audio-client";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
 import { PhotoCaptureTrigger, type PhotoCaptureTriggerHandle } from "./PhotoCaptureTrigger";
@@ -57,6 +58,8 @@ const ORGANIZE_TIMEOUT_MS = 180_000;
 const TRANSCRIBE_IMAGE_TIMEOUT_MS = 120_000;
 /** Hard cap on continuous microphone recording (Whisper / UX / cost). */
 const MAX_RECORDING_SECONDS = 5 * 60;
+/** New MediaRecorder segment every N ms so each /api/transcribe chunk stays small (timeout + Whisper limits). */
+const TRANSCRIBE_SEGMENT_MS = 55 * 1000;
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -158,6 +161,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   notifyAudioReadyRef.current = () => setAudioReadyTick((t) => t + 1);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const completedAudioSegmentBlobsRef = useRef<Blob[]>([]);
+  /** Browser `setTimeout` id (number); avoids NodeJS.Timeout vs DOM mismatch in `tsc`. */
+  const audioRotationTimerRef = useRef<number | null>(null);
+  const pendingAudioRotationRef = useRef(false);
+  const userEndedRecordingRef = useRef(false);
+  const captureStreamsRef = useRef<{ stream: MediaStream; streamToRecord: MediaStream } | null>(null);
   const recordingStartRef = useRef<number>(0);
   const recordingMimeTypeRef = useRef<string>("audio/webm");
   const streamRef = useRef<MediaStream | null>(null);
@@ -173,6 +182,15 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
   const photoAnchorRef = useRef<PhotoCaptureTriggerHandle | null>(null);
   const isDumpProcessing = transcribeLoading || organizeLoading;
+
+  const clearAudioRotationTimer = useCallback(() => {
+    if (audioRotationTimerRef.current != null && typeof window !== "undefined") {
+      window.clearTimeout(audioRotationTimerRef.current);
+      audioRotationTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearAudioRotationTimer(), [clearAudioRotationTimer]);
 
   useEffect(() => {
     const sync = () => setShowDumpFace(loadShowDumpFace());
@@ -375,6 +393,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       streamRef.current = stream;
       chunksRef.current = [];
       recordingStartRef.current = Date.now();
+      {
+        const w = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string; __lastAudioSegments?: Blob[] };
+        w.__lastAudioBlob = undefined;
+        w.__lastAudioFileName = undefined;
+        w.__lastAudioSegments = undefined;
+      }
 
       const AudioContextClass = typeof window !== "undefined" && (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
       let streamToRecord: MediaStream = stream;
@@ -401,31 +425,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         }
       }
 
-      const recorder = new MediaRecorder(streamToRecord);
-      recordingMimeTypeRef.current = recorder.mimeType || "audio/webm";
-      recorder.ondataavailable = (e) => {
-        if (e.data.size) chunksRef.current.push(e.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        if (streamToRecord !== stream) streamToRecord.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (analyserRef.current?.ctx) {
-          analyserRef.current.ctx.close().catch(() => {});
-          analyserRef.current = null;
-        }
-        const mime = recordingMimeTypeRef.current || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: mime });
-        const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string };
-        if (blob.size > 0) {
-          win.__lastAudioBlob = blob;
-          win.__lastAudioFileName = mime.includes("mp4") || mime.includes("m4a") ? "recording.mp4" : "recording.webm";
-          notifyAudioReadyRef.current();
-        } else {
-          win.__lastAudioBlob = undefined;
-          win.__lastAudioFileName = undefined;
-        }
-      };
       if (!showDumpOverlayRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         if (streamToRecord !== stream) streamToRecord.getTracks().forEach((t) => t.stop());
@@ -436,32 +435,111 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         analyserRef.current = null;
         return;
       }
-      mediaRecorderRef.current = recorder;
-      recorder.start(250);
+
+      const finalizeAudioCapture = () => {
+        clearAudioRotationTimer();
+        pendingAudioRotationRef.current = false;
+        const cap = captureStreamsRef.current;
+        captureStreamsRef.current = null;
+        if (cap) {
+          cap.stream.getTracks().forEach((t) => t.stop());
+          if (cap.streamToRecord !== cap.stream) cap.streamToRecord.getTracks().forEach((t) => t.stop());
+        }
+        streamRef.current = null;
+        if (analyserRef.current?.ctx) {
+          analyserRef.current.ctx.close().catch(() => {});
+          analyserRef.current = null;
+        }
+        const mime = recordingMimeTypeRef.current || "audio/webm";
+        const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string; __lastAudioSegments?: Blob[] };
+        const segs = completedAudioSegmentBlobsRef.current.filter((b) => b.size > 0);
+        if (segs.length > 0) {
+          win.__lastAudioSegments = segs;
+          win.__lastAudioBlob = segs[segs.length - 1];
+          win.__lastAudioFileName = mime.includes("mp4") || mime.includes("m4a") ? "recording.mp4" : "recording.webm";
+        } else {
+          win.__lastAudioSegments = undefined;
+          win.__lastAudioBlob = undefined;
+          win.__lastAudioFileName = undefined;
+        }
+        notifyAudioReadyRef.current();
+      };
+
+      const startSegmentRecorder = () => {
+        const cap = captureStreamsRef.current;
+        if (!cap || !showDumpOverlayRef.current) {
+          userEndedRecordingRef.current = true;
+          finalizeAudioCapture();
+          return;
+        }
+        const recorder = new MediaRecorder(cap.streamToRecord);
+        recordingMimeTypeRef.current = recorder.mimeType || "audio/webm";
+        recorder.ondataavailable = (e) => {
+          if (e.data.size) chunksRef.current.push(e.data);
+        };
+        recorder.onstop = () => {
+          const mime = recordingMimeTypeRef.current || "audio/webm";
+          const blob = new Blob(chunksRef.current, { type: mime });
+          chunksRef.current = [];
+          if (blob.size > 0) completedAudioSegmentBlobsRef.current.push(blob);
+          clearAudioRotationTimer();
+
+          if (userEndedRecordingRef.current) {
+            finalizeAudioCapture();
+            return;
+          }
+          if (pendingAudioRotationRef.current) {
+            pendingAudioRotationRef.current = false;
+            startSegmentRecorder();
+            return;
+          }
+          finalizeAudioCapture();
+        };
+        mediaRecorderRef.current = recorder;
+        recorder.start(250);
+        const tid = window.setTimeout(() => {
+          if (userEndedRecordingRef.current) return;
+          pendingAudioRotationRef.current = true;
+          const r = mediaRecorderRef.current;
+          if (r && r.state !== "inactive") r.stop();
+        }, TRANSCRIBE_SEGMENT_MS);
+        audioRotationTimerRef.current = tid;
+      };
+
+      completedAudioSegmentBlobsRef.current = [];
+      userEndedRecordingRef.current = false;
+      pendingAudioRotationRef.current = false;
+      captureStreamsRef.current = { stream, streamToRecord };
+      startSegmentRecorder();
       setRecordState("recording");
     } catch (e) {
       setError(t("error.micDenied"));
     }
-  }, [selectedDeviceId, isMobile, t]);
+  }, [selectedDeviceId, isMobile, t, clearAudioRotationTimer]);
 
   const stopRecording = useCallback((opts?: { silent?: boolean }) => {
     const silent = opts?.silent ?? false;
+    clearAudioRotationTimer();
+    pendingAudioRotationRef.current = false;
+    userEndedRecordingRef.current = true;
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== "inactive") {
       rec.stop();
-      setRecordState("idle");
       mediaRecorderRef.current = null;
-      if (!silent) {
-        setTimeout(() => {
-          const win = window as unknown as { __lastAudioBlob?: Blob };
-          const blob = win.__lastAudioBlob;
-          if (!blob || blob.size === 0) {
-            setError(t("error.noAudio"));
-          }
-        }, 200);
-      }
     }
-  }, [t]);
+    setRecordState("idle");
+    if (!silent) {
+      setTimeout(() => {
+        const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioSegments?: Blob[] };
+        const blob = win.__lastAudioBlob;
+        const segs = win.__lastAudioSegments;
+        const hasAudio = (segs && segs.length > 0 && segs.some((b) => b.size > 0)) || (blob && blob.size > 0);
+        if (!hasAudio) {
+          setError(t("error.noAudio"));
+        }
+      }, 320);
+    }
+  }, [t, clearAudioRotationTimer]);
 
   const stopRecordingRef = useRef(stopRecording);
   stopRecordingRef.current = stopRecording;
@@ -484,43 +562,45 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   }, [recordState, t]);
 
   const transcribe = useCallback(async (): Promise<string | null> => {
-    const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioFileName?: string };
-    const blob = win.__lastAudioBlob;
-    const fileName = win.__lastAudioFileName || "recording.webm";
-    if (!blob) {
+    const win = window as unknown as { __lastAudioBlob?: Blob; __lastAudioSegments?: Blob[] };
+    const segments = win.__lastAudioSegments;
+    const blobs =
+      segments && segments.length > 0
+        ? segments.filter((b) => b.size > 0)
+        : win.__lastAudioBlob && win.__lastAudioBlob.size > 0
+          ? [win.__lastAudioBlob]
+          : [];
+    if (blobs.length === 0) {
       setError(t("error.recordFirst"));
-      return null;
-    }
-    if (blob.size === 0) {
-      setError(t("error.emptyRecording"));
       return null;
     }
     setError(null);
     setTranscribeLoading(true);
     try {
-      const form = new FormData();
-      form.append("file", blob, fileName);
-      /** Match Whisper to UI language (sv/en); API maps to ISO 639-1 for whisper-1 */
-      form.append("language", locale);
-      const res = await fetchWithTimeout("/api/transcribe", { method: "POST", body: form }, TRANSCRIBE_TIMEOUT_MS);
-      const raw = await res.text();
-      let data: { error?: string; transcript?: string };
-      try {
-        data = raw.trim() ? JSON.parse(raw) : {};
-      } catch {
-        throw new Error(!res.ok ? raw.trim().slice(0, 240) || `Transcription failed (${res.status})` : "Invalid response from server");
+      const whisperLang = locale === "sv" ? "sv" : locale === "en" ? "en" : "";
+      const text = await transcribeAudioBlobs(blobs, {
+        language: whisperLang,
+        timeoutMs: TRANSCRIBE_TIMEOUT_MS,
+      });
+      const trimmed = text.trim();
+      if (!trimmed) {
+        setError(t("error.emptyRecording"));
+        return null;
       }
-      if (!res.ok) {
-        const msg = data.error || "Transcription failed";
-        throw new Error(msg);
-      }
-      const text = (data.transcript || "").trim();
-      setTranscript((prev) => (prev ? prev + "\n\n" + text : text));
-      saveFormState({ transcriptRaw: text, transcriptEdited: (transcript || "") + (transcript ? "\n\n" + text : text) });
-      onTranscriptReady(text);
-      return text;
+      setTranscript((prev) => (prev ? prev + "\n\n" + trimmed : trimmed));
+      saveFormState({
+        transcriptRaw: trimmed,
+        transcriptEdited: (transcript || "") + (transcript ? "\n\n" + trimmed : trimmed),
+      });
+      onTranscriptReady(trimmed);
+      return trimmed;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Transcription failed");
+      const msg = e instanceof Error ? e.message : "Transcription failed";
+      if (msg === "AUDIO_SEGMENT_TOO_LARGE") {
+        setError(t("error.audioTooLarge"));
+      } else {
+        setError(msg);
+      }
       return null;
     } finally {
       setTranscribeLoading(false);

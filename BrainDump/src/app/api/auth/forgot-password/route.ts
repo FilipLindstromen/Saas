@@ -6,20 +6,18 @@ import { sendPasswordResetEmail } from "@/lib/send-password-reset-email";
 const TOKEN_BYTES = 32;
 const EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
-function publicBaseUrl(request: Request): string {
-  const origin = request.headers.get("origin");
-  if (origin) return origin.replace(/\/$/, "");
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      /* fall through */
-    }
-  }
-  const envUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
+/**
+ * Password reset links must never use client-controlled Origin/Referer (open-redirect / token leak).
+ * Prefer env; fall back to this deployment's own origin from the incoming request URL.
+ */
+function trustedAppBaseUrl(request: Request): string {
+  const envUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL)?.trim();
   if (envUrl) return envUrl.replace(/\/$/, "");
-  return "http://localhost:3001";
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return "http://localhost:3001";
+  }
 }
 
 export async function POST(request: Request) {
@@ -58,7 +56,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const base = publicBaseUrl(request);
+    const base = trustedAppBaseUrl(request);
     const resetUrl = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
     const { sent } = await sendPasswordResetEmail(email, resetUrl);

@@ -384,6 +384,26 @@ export function AppSidebar({
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t("coach.title")}</span> : null}
             </button>
           ) : null}
+          {onCaptureText ? (
+            <button
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => {
+                onCaptureText();
+                if (isMobile) closeMobileDrawerAnimated();
+              }}
+              title={t("sidebar.captureText")}
+              aria-label={t("sidebar.captureText")}
+            >
+              <span className="bd-app-sidebar-nav-icon">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 6h16M4 12h16M4 18h11" />
+                </svg>
+              </span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.captureText")}</span> : null}
+            </button>
+          ) : null}
           {onCapturePhoto ? (
             <button
               type="button"
@@ -403,26 +423,6 @@ export function AppSidebar({
                 </svg>
               </span>
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.capturePhoto")}</span> : null}
-            </button>
-          ) : null}
-          {onCaptureText ? (
-            <button
-              type="button"
-              className="bd-app-sidebar-nav-btn"
-              data-collapsed={!showLabels ? "true" : "false"}
-              onClick={() => {
-                onCaptureText();
-                if (isMobile) closeMobileDrawerAnimated();
-              }}
-              title={t("sidebar.captureText")}
-              aria-label={t("sidebar.captureText")}
-            >
-              <span className="bd-app-sidebar-nav-icon">
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M4 6h16M4 12h16M4 18h11" />
-                </svg>
-              </span>
-              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.captureText")}</span> : null}
             </button>
           ) : null}
         </nav>

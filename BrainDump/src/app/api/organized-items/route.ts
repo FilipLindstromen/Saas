@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
     }
     const userId = (session.user as { id?: string }).id!;
 
+    await ensureOrganizedItemListOrderColumn(prisma);
+
     const { searchParams } = new URL(request.url);
     const trashedOnly =
       searchParams.get("trashed") === "1" || searchParams.get("trashed") === "true";
@@ -89,6 +91,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = (session.user as { id?: string }).id!;
+
+    await ensureOrganizedItemListOrderColumn(prisma);
 
     const { searchParams } = new URL(request.url);
     const domainParam = searchParams.get("domain");

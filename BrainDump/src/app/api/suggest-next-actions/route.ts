@@ -18,10 +18,6 @@ export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
-    const rawItems = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
-    const items = rawItems.filter((it) => !isPastScheduledForAiSuggestions(it));
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
     const keyRes = resolveOpenAiApiKey(userId);
@@ -29,6 +25,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });
     }
     const apiKey = keyRes.apiKey;
+
+    const body = await request.json();
+    const locale = body.locale === "sv" || body.locale === "en" ? body.locale : "en";
+    const rawItems = (Array.isArray(body.items) ? body.items : []) as SuggestItem[];
+    const items = rawItems.filter((it) => !isPastScheduledForAiSuggestions(it));
 
     if (items.length === 0) {
       return NextResponse.json({ suggestions: [] });

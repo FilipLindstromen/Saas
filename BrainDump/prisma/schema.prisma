@@ -71,6 +71,7 @@ model OrganizedItem {
 
   @@index([userId, dumpId])
   @@index([userId, domain, category])
+  @@index([userId, domain, deletedAt])
   @@index([userId, projectId])
   @@index([userId, itemType])
   @@index([userId, status])

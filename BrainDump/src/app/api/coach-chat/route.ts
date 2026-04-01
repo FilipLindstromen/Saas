@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 import { coachModeStyleInstruction, parseCoachMode } from "@/lib/coach-modes";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    await ensureOrganizedItemListOrderColumn(prisma);
     const keyRes = resolveOpenAiApiKey(userId);
     if (!keyRes.ok) {
       return NextResponse.json({ error: keyRes.error }, { status: keyRes.status });

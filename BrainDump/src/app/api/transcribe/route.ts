@@ -4,18 +4,18 @@ import { auth } from "@/auth";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/** Long recordings are split client-side; allow headroom per chunk (platform may still cap lower). */
+export const maxDuration = 120;
 
 const SUPPORTED_EXT = ["webm", "mp4", "mp3", "wav", "m4a", "mpeg", "mpga", "ogg", "flac", "oga"] as const;
 
+/** OpenAI Whisper file limit is 25 MB; stay slightly under */
+const WHISPER_MAX_BYTES = 24 * 1024 * 1024;
+/** Reject obviously oversized multipart bodies before buffering (multipart overhead ~2×) */
+const MAX_CONTENT_LENGTH = WHISPER_MAX_BYTES * 2 + 512 * 1024;
+
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) {
-      return NextResponse.json({ error: "Missing audio file" }, { status: 400 });
-    }
-
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
     const keyRes = resolveOpenAiApiKey(userId);
@@ -24,9 +24,29 @@ export async function POST(request: NextRequest) {
     }
     const apiKey = keyRes.apiKey;
 
+    const cl = request.headers.get("content-length");
+    if (cl && /^\d+$/.test(cl) && Number(cl) > MAX_CONTENT_LENGTH) {
+      return NextResponse.json(
+        { error: "Audio upload is too large. Try a shorter recording or update the app." },
+        { status: 413 }
+      );
+    }
+
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return NextResponse.json({ error: "Missing audio file" }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     if (buffer.length === 0) {
       return NextResponse.json({ error: "Audio file is empty. Record something first." }, { status: 400 });
+    }
+    if (buffer.length > WHISPER_MAX_BYTES) {
+      return NextResponse.json(
+        { error: "Audio file exceeds the maximum size for transcription. The app should split long recordings — please update or shorten the clip." },
+        { status: 413 }
+      );
     }
 
     const mimeType = (file.type || "audio/webm").toLowerCase();
