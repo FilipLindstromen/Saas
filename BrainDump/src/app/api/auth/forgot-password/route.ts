@@ -11,7 +11,7 @@ const EXPIRY_MS = 60 * 60 * 1000; // 1 hour
  * Prefer env; fall back to this deployment's own origin from the incoming request URL.
  */
 function trustedAppBaseUrl(request: Request): string {
-  const envUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL)?.trim();
+  const envUrl = (process.env.AUTH_URL || process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL)?.trim();
   if (envUrl) return envUrl.replace(/\/$/, "");
   try {
     return new URL(request.url).origin;
