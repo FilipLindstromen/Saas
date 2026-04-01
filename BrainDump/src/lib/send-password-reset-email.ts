@@ -1,21 +1,29 @@
 /**
  * Password reset via Resend (https://resend.com).
- * Set RESEND_API_KEY in the server environment. Use EMAIL_FROM with a domain you verified in Resend.
+ *
+ * Required on the server: RESEND_API_KEY (from Resend → API Keys).
+ * Recommended: EMAIL_FROM = "App name <mail@your-verified-domain.com>" after you verify a domain in Resend.
+ * The default onboarding@resend.dev sender only works for testing and may refuse or limit real recipients.
  */
 
 import { Resend } from "resend";
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<{ sent: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.EMAIL_FROM?.trim() ||
-    "BrainDump <onboarding@resend.dev>";
+  const fromRaw = process.env.EMAIL_FROM?.trim();
+  const from = fromRaw || "BrainDump <onboarding@resend.dev>";
 
   if (!key) {
     console.warn(
       "[BrainDump] RESEND_API_KEY is not set — password reset emails are not sent. Add RESEND_API_KEY (and ideally EMAIL_FROM with your verified domain) to environment variables."
     );
     return { sent: false };
+  }
+
+  if (!fromRaw) {
+    console.warn(
+      "[BrainDump] EMAIL_FROM is not set — using onboarding@resend.dev. For production, verify your domain in Resend and set EMAIL_FROM (e.g. BrainDump <reset@yourdomain.com>)."
+    );
   }
 
   const text = [
@@ -40,6 +48,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
       subject: "Reset your BrainDump password",
       html,
       text,
+      tags: [{ name: "category", value: "password-reset" }],
     });
 
     if (error) {

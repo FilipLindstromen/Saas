@@ -137,7 +137,11 @@ function LoginContent() {
       if (typeof data.message === "string") {
         setForgotMessage(data.message);
       } else {
-        setForgotMessage("If that account can receive mail, we sent password reset instructions.");
+        setForgotMessage(
+          data.emailSent
+            ? "We sent a password reset link. Check your inbox and spam folder."
+            : "The reset email could not be sent. Try again or contact support."
+        );
       }
       if (typeof data.devResetUrl === "string") {
         setDevResetUrl(data.devResetUrl);
@@ -378,8 +382,8 @@ function LoginContent() {
                     }}
                   >
                     {forgotSendMeta.configured
-                      ? "We could not send the email (the mail provider rejected the request). Try again in a few minutes or contact support."
-                      : "Email is not configured on this server: add RESEND_API_KEY and a verified EMAIL_FROM to the environment so reset links can be delivered."}
+                      ? "Tip: In Resend, confirm the API key, EMAIL_FROM domain is verified, and check Logs for bounces or blocks."
+                      : "Tip: Add RESEND_API_KEY (and EMAIL_FROM on a verified domain) in Vercel → Environment Variables, then redeploy."}
                   </p>
                 )}
                 {devResetUrl && (

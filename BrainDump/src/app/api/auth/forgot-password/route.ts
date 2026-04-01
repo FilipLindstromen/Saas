@@ -25,9 +25,6 @@ function trustedAppBaseUrl(request: Request): string {
 }
 
 export async function POST(request: Request) {
-  const successMessage =
-    "If that account can receive mail, we sent password reset instructions. Check your inbox.";
-
   try {
     const body = await request.json();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -82,14 +79,21 @@ export async function POST(request: Request) {
 
     if (!sent) {
       console.error("[BrainDump] Password reset email was not sent.", sendErr ?? "unknown", { email });
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
       if (process.env.NODE_ENV === "development") {
         console.info("[BrainDump] Password reset link (dev fallback):", resetUrl);
       }
     }
 
+    const message = sent
+      ? "We sent a password reset link to your email. Check your inbox and spam folder. The link expires in 1 hour."
+      : !configured
+        ? "No email was sent: this deployment is missing RESEND_API_KEY. The site owner must add a Resend API key (and usually EMAIL_FROM with a verified domain) in the server environment."
+        : "No email was sent: Resend rejected the message or delivery failed. Try again later, check spam, or contact support. Owners should verify RESEND_API_KEY, EMAIL_FROM, and domain verification in the Resend dashboard.";
+
     return NextResponse.json({
       ok: true,
-      message: successMessage,
+      message,
       attemptedEmailDelivery: true,
       emailSent: sent,
       emailDeliveryConfigured: configured,
