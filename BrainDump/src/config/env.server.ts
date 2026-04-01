@@ -41,12 +41,19 @@ export const env = {
     }
     return v;
   },
-  // Google OAuth disabled; using email/password only
+  /** Web OAuth for “Sign in with Google” (server-side secret). Optional — omit both to hide the button. */
   get GOOGLE_CLIENT_ID() {
     return optional("GOOGLE_CLIENT_ID") ?? "";
   },
   get GOOGLE_CLIENT_SECRET() {
     return optional("GOOGLE_CLIENT_SECRET") ?? "";
+  },
+  /** Apple Sign In: Service ID + client secret (often a JWT). Optional — omit both to hide the button. */
+  get AUTH_APPLE_ID() {
+    return optional("AUTH_APPLE_ID") ?? "";
+  },
+  get AUTH_APPLE_SECRET() {
+    return optional("AUTH_APPLE_SECRET") ?? "";
   },
   get UNSPLASH_ACCESS_KEY() {
     return optional("UNSPLASH_ACCESS_KEY");

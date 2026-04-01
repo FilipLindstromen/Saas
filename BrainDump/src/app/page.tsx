@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSession } from "next-auth/react";
+import { getProviders, signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopBar } from "@/components/TopBar";
@@ -68,6 +68,17 @@ export default function BrainDumpPage() {
   const [desktopScopeBeforeFilter, setDesktopScopeBeforeFilter] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
+  const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
+
+  useEffect(() => {
+    void getProviders().then(setAuthProviders);
+  }, []);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      void getProviders().then(setAuthProviders);
+    }
+  }, [status]);
   const [isMobileLayout, setIsMobileLayout] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
@@ -452,6 +463,9 @@ export default function BrainDumpPage() {
   }
 
   if (!session) {
+    const googleAvailable = Boolean(authProviders?.google);
+    const appleAvailable = Boolean(authProviders?.apple);
+
     return (
       <div
         className="bd-page-gate"
@@ -464,49 +478,44 @@ export default function BrainDumpPage() {
           padding: "1.5rem",
         }}
       >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 420,
-            padding: "1.75rem 1.5rem",
-            borderRadius: "var(--card-radius)",
-            background: "var(--bg-elevated)",
-            boxShadow: "var(--shadow-md)",
-            border: "1px solid var(--border-subtle)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-          }}
-        >
+        <div className="bd-auth-gate-card">
           <div>
             <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>{t("topBar.title")}</h1>
             <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
               {t("auth.signInPrompt")}
             </p>
           </div>
-          <Link
-            href="/login"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-              padding: "0.7rem 1.2rem",
-              borderRadius: "var(--button-radius)",
-              border: "none",
-              background: "var(--accent)",
-              color: "#fff",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              textDecoration: "none",
-              boxShadow: "var(--shadow-sm)",
-            }}
-          >
-            Sign in
-          </Link>
-          <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-tertiary)" }}>
-            Use a secure cookie-based session (up to 30 days with &quot;Remember me&quot;).
-          </p>
+          <nav className="bd-auth-gate-actions" aria-label={t("auth.gateNavAria")}>
+            <Link href="/login" className="bd-btn bd-btn-primary">
+              {t("auth.signIn")}
+            </Link>
+            <Link href="/register" className="bd-btn">
+              {t("auth.createAccount")}
+            </Link>
+            <button
+              type="button"
+              className="bd-btn"
+              disabled={!googleAvailable}
+              title={!googleAvailable ? t("auth.providerNotConfigured") : undefined}
+              onClick={() => {
+                if (googleAvailable) void signIn("google", { callbackUrl: "/" });
+              }}
+            >
+              {t("auth.signInWithGoogle")}
+            </button>
+            <button
+              type="button"
+              className="bd-btn"
+              disabled={!appleAvailable}
+              title={!appleAvailable ? t("auth.providerNotConfigured") : undefined}
+              onClick={() => {
+                if (appleAvailable) void signIn("apple", { callbackUrl: "/" });
+              }}
+            >
+              {t("auth.signInWithApple")}
+            </button>
+          </nav>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-tertiary)" }}>{t("auth.cookieNote")}</p>
         </div>
       </div>
     );

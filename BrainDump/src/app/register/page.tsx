@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
 
 const cardStyle: React.CSSProperties = {
   width: "100%",
@@ -34,6 +35,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function RegisterPage() {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,11 +48,11 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     if (password !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("auth.errorPasswordMismatch"));
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("auth.errorPasswordMin8"));
       return;
     }
     setLoading(true);
@@ -62,13 +64,13 @@ export default function RegisterPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { error?: string }).error ?? "Registration failed.");
+        setError((data as { error?: string }).error ?? t("auth.registrationFailed"));
         setLoading(false);
         return;
       }
       setSuccess(true);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("auth.errorGeneric"));
     }
     setLoading(false);
   };
@@ -87,26 +89,12 @@ export default function RegisterPage() {
         }}
       >
         <div style={cardStyle}>
-          <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>Account created</h1>
+          <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>{t("auth.accountCreatedTitle")}</h1>
           <p style={{ margin: 0, fontSize: "0.95rem", color: "var(--text-secondary)" }}>
-            You can now sign in with your email and password.
+            {t("auth.accountCreatedBody")}
           </p>
-          <Link
-            href="/login"
-            style={{
-              display: "inline-block",
-              padding: "0.7rem 1.2rem",
-              borderRadius: "var(--button-radius)",
-              border: "none",
-              background: "var(--accent)",
-              color: "#fff",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              textDecoration: "none",
-              textAlign: "center",
-            }}
-          >
-            Go to sign in
+          <Link href="/login" className="bd-btn bd-btn-primary" style={{ textAlign: "center", textDecoration: "none" }}>
+            {t("auth.goToSignIn")}
           </Link>
         </div>
       </div>
@@ -127,16 +115,16 @@ export default function RegisterPage() {
     >
       <div style={cardStyle}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>Create account</h1>
+          <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 600 }}>{t("auth.createAccount")}</h1>
           <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
-            Register with your name, email and a password.
+            {t("auth.registrationSubtitle")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <label htmlFor="reg-name" style={labelStyle}>
-              Name
+              {t("auth.fieldName")}
             </label>
             <input
               id="reg-name"
@@ -145,12 +133,12 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               style={{ ...inputStyle, marginTop: "0.35rem" }}
-              placeholder="Your name"
+              placeholder={t("auth.placeholderYourName")}
             />
           </div>
           <div>
             <label htmlFor="reg-email" style={labelStyle}>
-              Email
+              {t("auth.fieldEmail")}
             </label>
             <input
               id="reg-email"
@@ -160,12 +148,12 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               style={{ ...inputStyle, marginTop: "0.35rem" }}
-              placeholder="you@example.com"
+              placeholder={t("auth.placeholderEmailExample")}
             />
           </div>
           <div>
             <label htmlFor="reg-password" style={labelStyle}>
-              Password
+              {t("auth.fieldPassword")}
             </label>
             <input
               id="reg-password"
@@ -176,12 +164,12 @@ export default function RegisterPage() {
               required
               minLength={8}
               style={{ ...inputStyle, marginTop: "0.35rem" }}
-              placeholder="At least 8 characters"
+              placeholder={t("auth.placeholderPasswordMin8")}
             />
           </div>
           <div>
             <label htmlFor="reg-confirm" style={labelStyle}>
-              Confirm password
+              {t("auth.fieldConfirmPassword")}
             </label>
             <input
               id="reg-confirm"
@@ -193,32 +181,18 @@ export default function RegisterPage() {
               style={{ ...inputStyle, marginTop: "0.35rem" }}
             />
           </div>
-          {error && (
+          {error ? (
             <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--accent)" }}>{error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: "0.7rem 1.2rem",
-              borderRadius: "var(--button-radius)",
-              border: "none",
-              background: "var(--accent)",
-              color: "#fff",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.8 : 1,
-            }}
-          >
-            {loading ? "Creating account…" : "Create account"}
+          ) : null}
+          <button type="submit" className="bd-btn bd-btn-primary" disabled={loading}>
+            {loading ? t("auth.creatingAccount") : t("auth.createAccount")}
           </button>
         </form>
 
         <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-tertiary)" }}>
-          Already have an account?{" "}
+          {t("auth.alreadyHaveAccount")}{" "}
           <Link href="/login" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>
-            Sign in
+            {t("auth.signIn")}
           </Link>
         </p>
       </div>
