@@ -3,16 +3,12 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { prismaErrorMeta } from "@/lib/prisma-error-meta";
 import { resolveDatabaseUrl } from "@/lib/database-url";
-import { sendPasswordResetEmail } from "@/lib/send-password-reset-email";
+import { isEmailDeliveryConfigured, sendPasswordResetEmail } from "@/lib/send-password-reset-email";
 
 export const runtime = "nodejs";
 
 const TOKEN_BYTES = 32;
 const EXPIRY_MS = 60 * 60 * 1000; // 1 hour
-
-function emailDeliveryConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY?.trim());
-}
 
 /**
  * Password reset links must never use client-controlled Origin/Referer (open-redirect / token leak).
@@ -52,7 +48,7 @@ export async function POST(request: Request) {
         ? (body as { email: string }).email.trim().toLowerCase()
         : "";
 
-    const configured = emailDeliveryConfigured();
+    const configured = isEmailDeliveryConfigured();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
@@ -139,7 +135,7 @@ export async function POST(request: Request) {
             "Password reset is not fully set up on the server (database missing reset-token table). Ask the administrator to run: npx prisma db push — against production — then redeploy.",
           attemptedEmailDelivery: false,
           emailSent: false,
-          emailDeliveryConfigured: emailDeliveryConfigured(),
+          emailDeliveryConfigured: isEmailDeliveryConfigured(),
         },
         { status: 503 }
       );
@@ -159,7 +155,7 @@ export async function POST(request: Request) {
             "Cannot reach the database right now. Try again in a moment. If this persists, the server database URL or network access may be misconfigured.",
           attemptedEmailDelivery: false,
           emailSent: false,
-          emailDeliveryConfigured: emailDeliveryConfigured(),
+          emailDeliveryConfigured: isEmailDeliveryConfigured(),
         },
         { status: 503 }
       );
@@ -174,7 +170,7 @@ export async function POST(request: Request) {
             : "Something went wrong. Please try again.",
         attemptedEmailDelivery: false,
         emailSent: false,
-        emailDeliveryConfigured: emailDeliveryConfigured(),
+        emailDeliveryConfigured: isEmailDeliveryConfigured(),
       },
       { status: 500 }
     );

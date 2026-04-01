@@ -385,8 +385,8 @@ function LoginContent() {
                     }}
                   >
                     {forgotSendMeta.configured
-                      ? "Tip: In Resend, confirm the API key, EMAIL_FROM domain is verified, and check Logs for bounces or blocks."
-                      : "Tip: Add RESEND_API_KEY (and EMAIL_FROM on a verified domain) in Vercel → Environment Variables, then redeploy."}
+                      ? "Tip: Confirm Resend API key and verified domain, or SMTP host/credentials. Check EMAIL_FROM and provider logs for bounces or blocks."
+                      : "Tip: In Vercel → Environment Variables, add RESEND_API_KEY (Resend) or SMTP (see .env.example: SMTP_URL or SMTP_HOST + SMTP_USER + SMTP_PASSWORD), plus EMAIL_FROM — then redeploy."}
                   </p>
                 )}
                 {devResetUrl && (

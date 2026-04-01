@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/admin-email";
 import { prisma } from "@/lib/db";
+import { isEmailDeliveryConfigured } from "@/lib/send-password-reset-email";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,13 @@ export async function GET() {
         process.env.AUTH_APPLE_ID?.trim() && process.env.AUTH_APPLE_SECRET?.trim()
       ),
       resendConfigured: Boolean(process.env.RESEND_API_KEY?.trim()),
+      smtpConfigured: Boolean(
+        process.env.SMTP_URL?.trim() ||
+          (process.env.SMTP_HOST?.trim() &&
+            process.env.SMTP_USER?.trim() &&
+            (process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim()))
+      ),
+      emailDeliveryConfigured: isEmailDeliveryConfigured(),
     };
 
     const itemTypeRows = [...itemTypes]
