@@ -70,6 +70,9 @@ export function RightPanel({
       const dump = (dataDump as { dump?: { id: string } }).dump;
       if (!dump?.id) throw new Error("Failed to create dump");
 
+      const now = new Date();
+      const referenceLocalDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
       const payload = editing.map((it) => ({
         domain: it.domain,
         category: it.category,
@@ -107,7 +110,7 @@ export function RightPanel({
       const resBatch = await fetch("/api/organized-items/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dumpId: dump.id, items: payload }),
+        body: JSON.stringify({ dumpId: dump.id, items: payload, referenceLocalDate }),
       });
       const dataBatch = await resBatch.json();
       if (!resBatch.ok) throw new Error(dataBatch.error || "Failed to save items");

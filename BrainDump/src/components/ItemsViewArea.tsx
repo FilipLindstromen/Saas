@@ -47,7 +47,11 @@ import {
   type TextViewCommitFocus,
 } from "@/lib/text-view-entry-split";
 import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
-import { filterItemsByDueDatePreset, type DueDateFilterPreset } from "@/lib/due-date-filter";
+import {
+  filterItemsByDueDatePreset,
+  scheduledAtToDateKey,
+  type DueDateFilterPreset,
+} from "@/lib/due-date-filter";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -363,9 +367,10 @@ function taskDueCompactForTypeLine(
   t: (key: string, vars?: Record<string, string | number>) => string
 ): string | null {
   if (!isTaskRow(it) || !it.scheduledAt) return null;
-  const key = String(it.scheduledAt).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
-  const target = new Date(`${key}T12:00:00`);
+  const key = scheduledAtToDateKey(it.scheduledAt);
+  if (!key) return null;
+  const [yy, mm, dd] = key.split("-").map(Number);
+  const target = new Date(yy, mm - 1, dd, 12, 0, 0);
   if (!Number.isFinite(target.getTime())) return null;
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -402,17 +407,34 @@ function formatCalendarScheduleLabel(it: { scheduledAt?: string | null; schedule
   if (!hasSchedule) return null;
   const time = it.scheduledTime ? ` · ${it.scheduledTime}` : "";
   if (it.recurrence === "daily") return `Daily${time}`;
+  const anchorKey = it.scheduledAt ? scheduledAtToDateKey(it.scheduledAt) : null;
+  const formatAnchorFull = (key: string | null) => {
+    if (!key) return "";
+    const [y, m, d] = key.split("-").map(Number);
+    if (![y, m, d].every((n) => Number.isFinite(n))) return "";
+    const loc = new Date(y, m - 1, d, 12, 0, 0);
+    if (!Number.isFinite(loc.getTime())) return "";
+    return loc.toLocaleDateString("default", { day: "numeric", month: "short", year: "numeric" });
+  };
+  const anchorLabel = formatAnchorFull(anchorKey);
   if (it.recurrence === "weekly") {
-    const datePart = it.scheduledAt ? new Date(it.scheduledAt + "T00:00:00").toLocaleDateString("default", { day: "numeric", month: "short", year: "numeric" }) : "";
-    return datePart ? `Weekly · ${datePart}${time}` : `Weekly${time}`;
+    return anchorLabel ? `Weekly · ${anchorLabel}${time}` : `Weekly${time}`;
   }
   if (it.recurrence === "monthly") {
-    const datePart = it.scheduledAt ? new Date(it.scheduledAt + "T00:00:00").toLocaleDateString("default", { day: "numeric", month: "short" }) : "";
-    return datePart ? `Monthly · ${datePart}${time}` : `Monthly${time}`;
+    const short = (() => {
+      if (!anchorKey) return "";
+      const [y, m, d] = anchorKey.split("-").map(Number);
+      if (![y, m, d].every((n) => Number.isFinite(n))) return "";
+      const loc = new Date(y, m - 1, d, 12, 0, 0);
+      if (!Number.isFinite(loc.getTime())) return "";
+      return loc.toLocaleDateString("default", { day: "numeric", month: "short" });
+    })();
+    return short ? `Monthly · ${short}${time}` : `Monthly${time}`;
   }
   if (it.scheduledAt) {
-    const datePart = new Date(it.scheduledAt + "T00:00:00").toLocaleDateString("default", { day: "numeric", month: "short", year: "numeric" });
-    return `${datePart}${time}`;
+    const trimmedTime = time.trim();
+    if (!anchorLabel && trimmedTime) return trimmedTime.startsWith("·") ? trimmedTime.replace(/^·\s*/, "") : trimmedTime;
+    return `${anchorLabel}${time}`.trim();
   }
   return null;
 }
@@ -576,7 +598,7 @@ export function ItemsViewArea({
     id: it.id,
     title: it.title,
     content: it.content ?? "",
-    scheduledAt: it.scheduledAt ? String(it.scheduledAt).slice(0, 10) : "",
+    scheduledAt: scheduledAtToDateKey(it.scheduledAt) ?? "",
     scheduledTime: it.scheduledTime ?? "",
     recurrence: it.recurrence ?? "none",
     sendNotification: it.sendNotification ?? false,
@@ -785,6 +807,15 @@ export function ItemsViewArea({
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  const prevViewTypeRef = useRef<ItemsViewType | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevViewTypeRef.current;
+    prevViewTypeRef.current = viewType;
+    if (viewType === "calendar" && prev !== undefined && prev !== "calendar") {
+      void fetchItems();
+    }
+  }, [viewType, fetchItems]);
 
   const reorderEntriesPersist = useCallback(
     (visibleOrderedIds: string[]) => {
@@ -1020,6 +1051,21 @@ export function ItemsViewArea({
       const it = items.find((i) => i.id === id);
       const title = (it?.title ?? "").trim() || "—";
       if (!skipConfirm && !confirm(t("items.moveToTrashConfirm"))) return;
+
+      // Swipe-to-delete / instant trash: remove from UI immediately; sync server in background.
+      if (skipConfirm) {
+        setItems((prev) => prev.filter((x) => x.id !== id));
+        onItemMovedToTrash?.(id, title);
+        fetch(`/api/organized-items/${id}`, { method: "DELETE" })
+          .then((r) => {
+            if (!r.ok) void fetchItems();
+          })
+          .catch(() => {
+            void fetchItems();
+          });
+        return;
+      }
+
       fetch(`/api/organized-items/${id}`, { method: "DELETE" })
         .then((r) => {
           if (r.ok) {
@@ -1029,7 +1075,7 @@ export function ItemsViewArea({
         })
         .catch(() => {});
     },
-    [items, onItemMovedToTrash, t]
+    [items, onItemMovedToTrash, t, fetchItems]
   );
 
   const updateItemType = useCallback((id: string, newType: string) => {
@@ -1301,13 +1347,26 @@ export function ItemsViewArea({
         payload.kanbanColumn = "completed";
       }
       if (form.itemType === "calendar") {
-        payload.scheduledAt = form.scheduledAt || null;
+        const raw = form.scheduledAt?.trim() ?? "";
+        const dateKey = raw.length >= 10 ? raw.slice(0, 10) : raw;
+        const timeRaw = form.scheduledTime?.trim() || "";
+        let scheduledIso: string | null = null;
+        if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+          if (timeRaw && /^\d{1,2}:\d{2}$/.test(timeRaw)) {
+            const at = localDateTimeToDate(dateKey, timeRaw);
+            scheduledIso = at ? at.toISOString() : null;
+          } else {
+            const d = dateOnlyToStartOfDay(dateKey);
+            scheduledIso = d ? d.toISOString() : null;
+          }
+        }
+        payload.scheduledAt = scheduledIso;
         payload.scheduledTime = form.scheduledTime || null;
         payload.recurrence = form.recurrence === "none" ? null : form.recurrence;
         payload.sendNotification = form.sendNotification;
         const rMin = normalizeReminderMinutesBefore(form.reminderMinutesBefore ?? 0);
-        if (form.sendNotification && form.scheduledAt?.trim()) {
-          const at = localDateTimeToDate(form.scheduledAt.trim(), form.scheduledTime || "09:00");
+        if (form.sendNotification && dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+          const at = localDateTimeToDate(dateKey, timeRaw || "09:00");
           if (at) {
             payload.reminderAt = at.toISOString();
             payload.reminderMinutesBefore = rMin;
@@ -1451,14 +1510,25 @@ export function ItemsViewArea({
       if (currentItem?.itemType === "calendar") {
         const rMin = normalizeReminderMinutesBefore(ed.reminderMinutesBefore ?? 0);
         const dateStr = ed.scheduledAt?.trim();
-        const timeStr = ed.scheduledTime?.trim() || "09:00";
+        const timeStr = ed.scheduledTime?.trim() || "";
+        const dateKey = dateStr ? (dateStr.length >= 10 ? dateStr.slice(0, 10) : dateStr) : "";
+        let scheduledAtIso: string | null = null;
+        if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+          if (timeStr && /^\d{1,2}:\d{2}$/.test(timeStr)) {
+            const at = localDateTimeToDate(dateKey, timeStr);
+            scheduledAtIso = at ? at.toISOString() : null;
+          } else {
+            const d = dateOnlyToStartOfDay(dateKey);
+            scheduledAtIso = d ? d.toISOString() : null;
+          }
+        }
         let reminderAtIso: string | null = null;
-        if (ed.sendNotification && dateStr) {
-          const dt = localDateTimeToDate(dateStr, timeStr);
+        if (ed.sendNotification && dateKey) {
+          const dt = localDateTimeToDate(dateKey, timeStr || "09:00");
           reminderAtIso = dt ? dt.toISOString() : null;
         }
         updateSchedule(ed.id, {
-          scheduledAt: ed.scheduledAt || null,
+          scheduledAt: scheduledAtIso,
           scheduledTime: ed.scheduledTime || null,
           recurrence: (ed.recurrence === "none" ? null : ed.recurrence) || null,
           sendNotification: ed.sendNotification ?? false,
@@ -1940,41 +2010,13 @@ export function ItemsViewArea({
         const placementIsPersonal = domainKey === "personal";
         const showDomainAndPlacement = placementIsWork || placementIsPersonal;
 
-        const subFlyoutStyle: CSSProperties = {
-          position: "fixed",
-          left: itemContextMenu.x + 168,
-          top: itemContextMenu.y,
-          zIndex: "calc(var(--bd-z-dropdown) + 1)",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          borderRadius: "12px",
-          boxShadow: "var(--shadow-md)",
-          padding: "0.25rem 0",
-          minWidth: "188px",
-          maxHeight: "min(320px, 70dvh)",
-          overflow: "auto",
-        };
-
-        const submenuHeader = (label: string) => (
-          <div
-            style={{
-              padding: "0.25rem 0.5rem",
-              fontSize: "0.7rem",
-              fontWeight: 600,
-              color: "var(--text-tertiary)",
-              borderBottom: "1px solid var(--border-default)",
-            }}
-          >
-            {label}
-          </div>
-        );
+        const submenuHeader = (label: string) => <div className="bd-entry-context-menu__header">{label}</div>;
 
         const workPrivateOptions = () => (
           <>
             <button
               type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "work" ? 600 : 400 }}
+              className={`bd-entry-context-menu__btn${domainKey === "work" ? " bd-entry-context-menu__btn--strong" : ""}`}
               onClick={() => {
                 updateItemDomain(itemContextMenu.id, "work");
                 closeMenu();
@@ -1985,8 +2027,7 @@ export function ItemsViewArea({
             </button>
             <button
               type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "personal" ? 600 : 400 }}
+              className={`bd-entry-context-menu__btn${domainKey === "personal" ? " bd-entry-context-menu__btn--strong" : ""}`}
               onClick={() => {
                 updateItemDomain(itemContextMenu.id, "personal");
                 closeMenu();
@@ -2004,8 +2045,7 @@ export function ItemsViewArea({
             <>
               <button
                 type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === null ? 600 : 400 }}
+                className={`bd-entry-context-menu__btn${currentProjectId === null ? " bd-entry-context-menu__btn--strong" : ""}`}
                 onClick={() => {
                   updateProject(itemContextMenu.id, null);
                   closeMenu();
@@ -2018,8 +2058,7 @@ export function ItemsViewArea({
                 <button
                   key={p.id}
                   type="button"
-                  className="bd-btn"
-                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === p.id ? 600 : 400 }}
+                  className={`bd-entry-context-menu__btn${currentProjectId === p.id ? " bd-entry-context-menu__btn--strong" : ""}`}
                   onClick={() => {
                     updateProject(itemContextMenu.id, p.id);
                     closeMenu();
@@ -2041,8 +2080,7 @@ export function ItemsViewArea({
                 <button
                   key={areaKey}
                   type="button"
-                  className="bd-btn"
-                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentCategory === areaKey ? 600 : 400 }}
+                  className={`bd-entry-context-menu__btn${currentCategory === areaKey ? " bd-entry-context-menu__btn--strong" : ""}`}
                   onClick={() => {
                     updateCategory(itemContextMenu.id, areaKey);
                     closeMenu();
@@ -2062,12 +2100,7 @@ export function ItemsViewArea({
               <button
                 key={value}
                 type="button"
-                className="bd-btn"
-                style={{
-                  width: "100%",
-                  justifyContent: "flex-start",
-                  fontWeight: itemContextMenu.currentType === value ? 600 : 400,
-                }}
+                className={`bd-entry-context-menu__btn${itemContextMenu.currentType === value ? " bd-entry-context-menu__btn--strong" : ""}`}
                 onClick={() => {
                   updateItemType(itemContextMenu.id, value);
                   closeMenu();
@@ -2097,20 +2130,11 @@ export function ItemsViewArea({
             onClick={isMobile ? closeMenu : undefined}
           >
             <div
+              className={`bd-entry-context-menu${isMobile ? " bd-entry-context-menu--mobile-sheet" : ""}`}
               style={{
                 position: isMobile ? "relative" : "fixed",
                 left: isMobile ? undefined : itemContextMenu.x,
                 top: isMobile ? undefined : itemContextMenu.y,
-                zIndex: "var(--bd-z-dropdown)",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-                borderRadius: isMobile ? "16px" : "12px",
-                boxShadow: "var(--shadow-md)",
-                padding: "0.25rem 0",
-                minWidth: "168px",
-                width: isMobile ? "min(100%, 560px)" : undefined,
-                maxHeight: isMobile ? "80dvh" : undefined,
-                overflow: "auto",
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -2118,15 +2142,12 @@ export function ItemsViewArea({
                 <>
                   <button
                     type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: 600 }}
+                    className="bd-entry-context-menu__btn bd-entry-context-menu__btn--strong"
                     onClick={() => setItemContextSubmenu(null)}
                   >
                     {t("menu.back")}
                   </button>
-                  <div style={{ padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 600, color: "var(--text-tertiary)", borderBottom: "1px solid var(--border-default)" }}>
-                    {mobileSubTitle}
-                  </div>
+                  <div className="bd-entry-context-menu__header bd-entry-context-menu__header--compact">{mobileSubTitle}</div>
                   {itemContextSubmenu === "workPrivate" ? workPrivateOptions() : null}
                   {itemContextSubmenu === "areaProject"
                     ? placementIsWork
@@ -2139,21 +2160,10 @@ export function ItemsViewArea({
                 </>
               ) : (
                 <>
-                  <div
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      color: "var(--text-tertiary)",
-                      borderBottom: "1px solid var(--border-default)",
-                    }}
-                  >
-                    {t("menu.actions")}
-                  </div>
+                  <div className="bd-entry-context-menu__header">{t("menu.actions")}</div>
                   <button
                     type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    className="bd-entry-context-menu__btn"
                     onClick={() => {
                       const it = items.find((i) => i.id === itemContextMenu.id);
                       if (it) setEditingEntry(toEditEntry(it));
@@ -2165,8 +2175,7 @@ export function ItemsViewArea({
                   {showDomainAndPlacement ? (
                     <button
                       type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      className="bd-entry-context-menu__btn"
                       onClick={() => setItemContextSubmenu("workPrivate")}
                     >
                       {t("menu.changeWorkPrivate")}
@@ -2175,46 +2184,43 @@ export function ItemsViewArea({
                   {showDomainAndPlacement ? (
                     <button
                       type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      className="bd-entry-context-menu__btn"
                       onClick={() => setItemContextSubmenu("areaProject")}
                     >
                       {t("menu.changeAreaProject")}
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start" }}
-                    onClick={() => setItemContextSubmenu("type")}
-                  >
+                  <button type="button" className="bd-entry-context-menu__btn" onClick={() => setItemContextSubmenu("type")}>
                     {t("menu.changeType")}
                   </button>
-                  <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-                      onClick={() => {
-                        deleteItem(itemContextMenu.id, true);
-                        closeMenu();
-                      }}
-                    >
-                      {t("menu.delete")}
-                    </button>
-                  </div>
+                  <div className="bd-entry-context-menu__divider" role="separator" aria-hidden />
+                  <button
+                    type="button"
+                    className="bd-entry-context-menu__btn bd-entry-context-menu__btn--danger"
+                    onClick={() => {
+                      deleteItem(itemContextMenu.id, true);
+                      closeMenu();
+                    }}
+                  >
+                    {t("menu.delete")}
+                  </button>
                   {isMobile ? (
-                    <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                      <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                    <>
+                      <div className="bd-entry-context-menu__divider" role="separator" aria-hidden />
+                      <button type="button" className="bd-entry-context-menu__btn" onClick={closeMenu}>
                         {t("menu.cancel")}
                       </button>
-                    </div>
+                    </>
                   ) : null}
                 </>
               )}
             </div>
             {!isMobile && itemContextSubmenu ? (
-              <div style={subFlyoutStyle} onClick={(e) => e.stopPropagation()}>
+              <div
+                className="bd-entry-context-menu bd-entry-context-menu--flyout"
+                style={{ left: itemContextMenu.x + 168, top: itemContextMenu.y }}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {itemContextSubmenu === "workPrivate" ? (
                   <>
                     {submenuHeader(t("menu.changeWorkPrivate"))}
@@ -3323,6 +3329,12 @@ function startOfWeekMonday(d: Date): Date {
   return x;
 }
 
+function localMidnightFromDateKey(key: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const [yy, mm, dd] = key.split("-").map(Number);
+  return new Date(yy, mm - 1, dd);
+}
+
 function getScheduledItemsForCalendarDay(cellDate: Date, scheduledItems: ViewItem[]): ViewItem[] {
   const y = cellDate.getFullYear();
   const m = cellDate.getMonth();
@@ -3330,21 +3342,21 @@ function getScheduledItemsForCalendarDay(cellDate: Date, scheduledItems: ViewIte
   const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const cellTime = new Date(y, m, day).getTime();
   return scheduledItems.filter((it) => {
-    const at = it.scheduledAt ? String(it.scheduledAt).slice(0, 10) : null;
-    const startDate = at ? new Date(at + "T00:00:00") : null;
-    if (it.recurrence === "daily" && startDate) {
+    const atKey = scheduledAtToDateKey(it.scheduledAt);
+    if (!atKey) return false;
+    const startDate = localMidnightFromDateKey(atKey);
+    if (!startDate) return false;
+    if (it.recurrence === "daily") {
       return cellTime >= startDate.getTime();
     }
-    if (it.recurrence === "weekly" && at) {
-      const start = new Date(at + "T00:00:00");
-      const diffDays = Math.floor((cellTime - start.getTime()) / 86400000);
+    if (it.recurrence === "weekly") {
+      const diffDays = Math.floor((cellTime - startDate.getTime()) / 86400000);
       return diffDays >= 0 && diffDays % 7 === 0;
     }
-    if (it.recurrence === "monthly" && at) {
-      const d0 = new Date(at + "T00:00:00");
-      return cellTime >= d0.getTime() && day === new Date(at).getDate();
+    if (it.recurrence === "monthly") {
+      return cellTime >= startDate.getTime() && day === startDate.getDate();
     }
-    return at === dateStr;
+    return atKey === dateStr;
   });
 }
 
@@ -3604,9 +3616,9 @@ function CalendarView({
           </div>
         ) : (
           dayItems.map((it) => {
-            const past =
-              it.scheduledAt &&
-              new Date(String(it.scheduledAt).slice(0, 10)) < new Date(todayNorm.getFullYear(), todayNorm.getMonth(), todayNorm.getDate());
+            const schedKey = scheduledAtToDateKey(it.scheduledAt);
+            const todayKey = `${todayNorm.getFullYear()}-${String(todayNorm.getMonth() + 1).padStart(2, "0")}-${String(todayNorm.getDate()).padStart(2, "0")}`;
+            const past = schedKey != null && schedKey < todayKey;
             const completed = isCompletedInCalendarView(it);
             const taskDeadline = isTaskRow(it);
             const typeColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
@@ -4432,7 +4444,7 @@ function SwipeDeleteRow({
         className={slideClass}
         style={{
           transform: `translate3d(${-offset}px, 0, 0)`,
-          transition: transitioning ? "transform 0.22s var(--bd-ease-out)" : "none",
+          transition: transitioning ? "transform 0.14s var(--bd-ease-out)" : "none",
         }}
         onPointerDownCapture={(e) => {
           if (disabled) return;
@@ -4582,9 +4594,13 @@ function ListView({
     const taskCompleted = isTaskRow(it) && isTaskCompleted(it);
     let scheduleLabel: string | null = null;
     if (it.itemType === "shopping" && it.scheduledAt) {
-      const d = new Date(`${String(it.scheduledAt).slice(0, 10)}T12:00:00`);
-      const ds = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-      scheduleLabel = t("items.shoppingDueShort", { date: ds });
+      const sk = scheduledAtToDateKey(it.scheduledAt);
+      const d = sk ? localMidnightFromDateKey(sk) : null;
+      if (!d) scheduleLabel = null;
+      else {
+        const ds = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        scheduleLabel = t("items.shoppingDueShort", { date: ds });
+      }
     } else if (
       it.itemType === "calendar" ||
       ((!isTaskRow(it) && it.scheduledAt) || (it.recurrence && it.recurrence !== "none"))

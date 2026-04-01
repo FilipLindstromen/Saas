@@ -9,16 +9,25 @@ function toYyyyMmDd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function isRealCalendarYyyyMmDd(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
 function startOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/** YYYY-MM-DD from API scheduledAt (ISO or date string). */
+/**
+ * YYYY-MM-DD for the user's **local** calendar day of this schedule.
+ * Do not use the first 10 chars of an ISO string — that is the UTC date (e.g. Europe: Apr 1 local → …T22Z → "2025-03-31").
+ */
 export function scheduledAtToDateKey(scheduledAt: string | null | undefined): string | null {
   if (scheduledAt == null || scheduledAt === "") return null;
-  const s = String(scheduledAt);
-  const slice = s.slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(slice)) return slice;
+  const s = String(scheduledAt).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return isRealCalendarYyyyMmDd(s) ? s : null;
   const t = Date.parse(s);
   if (Number.isNaN(t)) return null;
   return toYyyyMmDd(new Date(t));

@@ -231,20 +231,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }, [t]);
 
-  const handleSave = () => {
-    saveTextSize(textSize);
-    saveShowEntryTitles(showEntryTitles);
-    saveShowDumpFace(showDumpFace);
-    saveSoundEffectsEnabled(soundEffects);
-    saveRevenueCatEnabled(revenueCatEnabled);
-    saveGoogleCalendarSync(googleCalendarSync);
+  const persistGoogleClientId = useCallback(() => {
     saveGoogleClientId(googleClientId);
-    if (selectedCalendarId && selectedCalendarSummary) {
-      saveGoogleCalendarSelection(selectedCalendarId, selectedCalendarSummary);
-    }
-    scheduleClientPreferencesUpload();
-    onClose();
-  };
+  }, [googleClientId]);
+
+  const closeClientIdOverlay = useCallback(() => {
+    persistGoogleClientId();
+    setShowClientIdOverlay(false);
+  }, [persistGoogleClientId]);
 
   const openGoogleOAuth = useCallback(() => {
     const clientId = (googleClientId || loadGoogleClientId()).trim();
@@ -303,6 +297,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 const primary = items.find((i) => i.primary) ?? items[0];
                 setSelectedCalendarId(primary.id);
                 setSelectedCalendarSummary(primary.summary);
+                saveGoogleCalendarSelection(primary.id, primary.summary);
               }
             }
           })
@@ -383,7 +378,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <input
               type="checkbox"
               checked={showEntryTitles}
-              onChange={(e) => setShowEntryTitles(e.target.checked)}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setShowEntryTitles(v);
+                saveShowEntryTitles(v);
+              }}
               style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
             />
             <span>{t("settings.showEntryTitles")}</span>
@@ -392,7 +391,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <input
               type="checkbox"
               checked={showDumpFace}
-              onChange={(e) => setShowDumpFace(e.target.checked)}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setShowDumpFace(v);
+                saveShowDumpFace(v);
+              }}
               style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
             />
             <span>{t("settings.showDumpFace")}</span>
@@ -413,7 +416,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <input
               type="checkbox"
               checked={revenueCatEnabled}
-              onChange={(e) => setRevenueCatEnabled(e.target.checked)}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setRevenueCatEnabled(v);
+                saveRevenueCatEnabled(v);
+              }}
               style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
             />
             <span>{t("settings.revenueCat")}</span>
@@ -429,6 +436,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 onChange={(e) => {
                   const on = e.target.checked;
                   setGoogleCalendarSync(on);
+                  saveGoogleCalendarSync(on);
                   if (!on) clearGoogleCalendarAccessToken();
                   if (on && !loadGoogleClientId()) setShowClientIdOverlay(true);
                 }}
@@ -452,6 +460,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       className="bd-input"
                       value={googleClientId}
                       onChange={(e) => setGoogleClientId(e.target.value)}
+                      onBlur={persistGoogleClientId}
                       placeholder="xxxxx.apps.googleusercontent.com"
                       style={{ width: "100%", marginBottom: "0.5rem" }}
                       autoComplete="off"
@@ -482,7 +491,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         const id = e.target.value;
                         const cal = calendarList.find((c) => c.id === id);
                         setSelectedCalendarId(id || null);
-                        setSelectedCalendarSummary(cal?.summary ?? "");
+                        const summary = cal?.summary ?? "";
+                        setSelectedCalendarSummary(summary);
+                        if (id && summary) saveGoogleCalendarSelection(id, summary);
                       }}
                       style={{ width: "100%" }}
                     >
@@ -728,7 +739,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 zIndex: 1001,
                 padding: "1rem",
               }}
-              onClick={() => setShowClientIdOverlay(false)}
+              onClick={closeClientIdOverlay}
             >
               <div
                 style={{
@@ -754,38 +765,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   className="bd-input"
                   value={googleClientId}
                   onChange={(e) => setGoogleClientId(e.target.value)}
+                  onBlur={persistGoogleClientId}
                   placeholder="xxxxx.apps.googleusercontent.com"
                   style={{ width: "100%", marginBottom: "1rem" }}
                   autoComplete="off"
                 />
-                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                  <button type="button" className="bd-btn" onClick={() => setShowClientIdOverlay(false)}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="bd-btn bd-btn-primary"
-                    onClick={() => {
-                      if (googleClientId.trim()) {
-                        saveGoogleClientId(googleClientId);
-                        setShowClientIdOverlay(false);
-                      }
-                    }}
-                  >
-                    Save
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button type="button" className="bd-btn bd-btn-primary" onClick={closeClientIdOverlay}>
+                    {t("settings.done")}
                   </button>
                 </div>
               </div>
             </div>
           )}
-          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-            <button type="button" className="bd-btn" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="button" className="bd-btn bd-btn-primary" onClick={handleSave}>
-              Save
-            </button>
-          </div>
         </div>
         </div>
       </div>

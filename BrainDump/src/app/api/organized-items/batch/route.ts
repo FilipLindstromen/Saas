@@ -29,8 +29,11 @@ export async function POST(request: NextRequest) {
       items,
       insertAfterItemId: insertAfterRaw,
       insertBeforeItemId: insertBeforeRaw,
+      referenceLocalDate: referenceLocalDateRaw,
     } = body as {
       dumpId: string;
+      /** YYYY-MM-DD: fallback "today" when calendar has time but no valid date (voice organize). */
+      referenceLocalDate?: string;
       /** When splitting text view, new rows are ordered between this item and `insertBeforeItemId` (listOrder). */
       insertAfterItemId?: string | null;
       insertBeforeItemId?: string | null;
@@ -59,6 +62,12 @@ export async function POST(request: NextRequest) {
         reminder_minutes_before?: number;
       }>;
     };
+
+    const refLocal =
+      typeof referenceLocalDateRaw === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(referenceLocalDateRaw.trim())
+        ? referenceLocalDateRaw.trim()
+        : undefined;
 
     const dumpIdStr = typeof dumpId === "string" ? dumpId.trim() : "";
     if (!dumpIdStr || !Array.isArray(items) || items.length === 0) {
@@ -166,14 +175,29 @@ export async function POST(request: NextRequest) {
         const isCalendar = itemTypeStr === "calendar";
         const isTaskLike = itemTypeStr === "task" || itemTypeStr === "task_completed";
         const isShopping = itemTypeStr === "shopping";
-        const scheduledDateRaw =
-          typeof it.scheduled_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(it.scheduled_date.trim())
+        const normalizeBatchTime = (raw: unknown): string | undefined => {
+          if (typeof raw !== "string") return undefined;
+          let s = raw.trim();
+          const sec = /^(\d{1,2}):(\d{2}):(\d{2})$/.exec(s);
+          if (sec) s = `${sec[1]}:${sec[2]}`;
+          if (!/^\d{1,2}:\d{2}$/.test(s)) return undefined;
+          const [h, m] = s.split(":");
+          return `${h!.padStart(2, "0")}:${m!}`;
+        };
+        const isRealYyyyMmDd = (s: string): boolean => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+          const [y, mo, d] = s.split("-").map(Number);
+          const dt = new Date(y, mo - 1, d);
+          return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
+        };
+        let scheduledDateRaw =
+          typeof it.scheduled_date === "string" && isRealYyyyMmDd(it.scheduled_date.trim())
             ? it.scheduled_date.trim()
             : undefined;
-        const scheduledTimeRaw =
-          typeof it.scheduled_time === "string" && /^\d{2}:\d{2}$/.test(it.scheduled_time.trim())
-            ? it.scheduled_time.trim()
-            : undefined;
+        const scheduledTimeRaw = normalizeBatchTime(it.scheduled_time);
+        if (isCalendar && !scheduledDateRaw && scheduledTimeRaw && refLocal) {
+          scheduledDateRaw = refLocal;
+        }
         const scheduledAtDate = scheduledDateRaw ? dateOnlyToStartOfDay(scheduledDateRaw) : null;
         const recurrenceVal =
           it.recurrence && ["daily", "weekly", "monthly"].includes(it.recurrence) ? it.recurrence : null;

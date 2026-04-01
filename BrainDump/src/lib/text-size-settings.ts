@@ -28,6 +28,7 @@ export function saveTextSize(value: string): void {
     localStorage.setItem(TEXT_SIZE_KEY, value);
     const opt = TEXT_SIZE_OPTIONS.find((o) => o.value === value);
     document.documentElement.style.setProperty("--text-scale", String(opt?.scale ?? 1));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch (e) {
     console.warn("Failed to save text size", e);
   }

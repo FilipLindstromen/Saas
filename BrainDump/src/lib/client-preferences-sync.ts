@@ -25,6 +25,11 @@ import {
   SHOW_ENTRY_TITLES_KEY,
 } from "@/lib/entry-display-settings";
 import { applyTextSizeOnLoad, loadTextSize, TEXT_SIZE_KEY } from "@/lib/text-size-settings";
+import {
+  WORKSPACE_SCOPE_STORAGE_KEY,
+  normalizeWorkspaceScope,
+  type WorkspaceScopePersisted,
+} from "@/lib/workspace-scope-settings";
 
 export const BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT = "braindump-client-prefs-applied";
 
@@ -60,6 +65,8 @@ export type ClientPreferencesPayloadV1 = {
   showDumpFace?: boolean | null;
   showEntryTitles?: boolean | null;
   newBatchIds?: string[] | null;
+  /** Work/personal scope, project, area, filters (see `workspace-scope-settings`). */
+  workspaceScope?: WorkspaceScopePersisted | null;
 };
 
 const VIEW_TYPES = new Set(["kanban", "list", "postits", "calendar", "flowchart", "text"]);
@@ -103,6 +110,15 @@ export function collectClientPreferencesFromLocal(): ClientPreferencesPayloadV1 
   try {
     const iv = localStorage.getItem(VIEW_STORAGE_KEY);
     if (iv && VIEW_TYPES.has(iv)) out.itemsView = iv;
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const wsRaw = localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY);
+    if (wsRaw) {
+      out.workspaceScope = normalizeWorkspaceScope(JSON.parse(wsRaw));
+    }
   } catch {
     /* ignore */
   }
@@ -377,6 +393,15 @@ export function applyClientPreferencesToLocal(payload: unknown): void {
   try {
     if (p.newBatchIds != null && Array.isArray(p.newBatchIds)) {
       localStorage.setItem(BRAINDUMP_NEW_BATCH_IDS_KEY, JSON.stringify(p.newBatchIds));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    if (p.workspaceScope != null && typeof p.workspaceScope === "object" && !Array.isArray(p.workspaceScope)) {
+      const w = normalizeWorkspaceScope(p.workspaceScope);
+      localStorage.setItem(WORKSPACE_SCOPE_STORAGE_KEY, JSON.stringify(w));
     }
   } catch {
     /* ignore */

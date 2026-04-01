@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
@@ -484,41 +484,13 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
         const placementIsPersonal = domainKey === "personal";
         const showDomainAndPlacement = placementIsWork || placementIsPersonal;
 
-        const subFlyoutStyle: CSSProperties = {
-          position: "fixed",
-          left: itemContextMenu.x + 168,
-          top: itemContextMenu.y,
-          zIndex: "calc(var(--bd-z-dropdown) + 1)",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          borderRadius: "12px",
-          boxShadow: "var(--shadow-md)",
-          padding: "0.25rem 0",
-          minWidth: "188px",
-          maxHeight: "min(320px, 70dvh)",
-          overflow: "auto",
-        };
-
-        const submenuHeader = (label: string) => (
-          <div
-            style={{
-              padding: "0.25rem 0.5rem",
-              fontSize: "0.7rem",
-              fontWeight: 600,
-              color: "var(--text-tertiary)",
-              borderBottom: "1px solid var(--border-default)",
-            }}
-          >
-            {label}
-          </div>
-        );
+        const submenuHeader = (label: string) => <div className="bd-entry-context-menu__header">{label}</div>;
 
         const workPrivateOptions = () => (
           <>
             <button
               type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "work" ? 600 : 400 }}
+              className={`bd-entry-context-menu__btn${domainKey === "work" ? " bd-entry-context-menu__btn--strong" : ""}`}
               onClick={() => {
                 updateItemDomain(itemContextMenu.id, "work");
                 closeMenu();
@@ -529,8 +501,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
             </button>
             <button
               type="button"
-              className="bd-btn"
-              style={{ width: "100%", justifyContent: "flex-start", fontWeight: domainKey === "personal" ? 600 : 400 }}
+              className={`bd-entry-context-menu__btn${domainKey === "personal" ? " bd-entry-context-menu__btn--strong" : ""}`}
               onClick={() => {
                 updateItemDomain(itemContextMenu.id, "personal");
                 closeMenu();
@@ -548,8 +519,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
             <>
               <button
                 type="button"
-                className="bd-btn"
-                style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === null ? 600 : 400 }}
+                className={`bd-entry-context-menu__btn${currentProjectId === null ? " bd-entry-context-menu__btn--strong" : ""}`}
                 onClick={() => {
                   updateProject(itemContextMenu.id, null);
                   closeMenu();
@@ -562,8 +532,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                 <button
                   key={p.id}
                   type="button"
-                  className="bd-btn"
-                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentProjectId === p.id ? 600 : 400 }}
+                  className={`bd-entry-context-menu__btn${currentProjectId === p.id ? " bd-entry-context-menu__btn--strong" : ""}`}
                   onClick={() => {
                     updateProject(itemContextMenu.id, p.id);
                     closeMenu();
@@ -585,8 +554,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                 <button
                   key={areaKey}
                   type="button"
-                  className="bd-btn"
-                  style={{ width: "100%", justifyContent: "flex-start", fontWeight: currentCategory === areaKey ? 600 : 400 }}
+                  className={`bd-entry-context-menu__btn${currentCategory === areaKey ? " bd-entry-context-menu__btn--strong" : ""}`}
                   onClick={() => {
                     updateCategory(itemContextMenu.id, areaKey);
                     closeMenu();
@@ -606,12 +574,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
               <button
                 key={value}
                 type="button"
-                className="bd-btn"
-                style={{
-                  width: "100%",
-                  justifyContent: "flex-start",
-                  fontWeight: itemContextMenu.currentType === value ? 600 : 400,
-                }}
+                className={`bd-entry-context-menu__btn${itemContextMenu.currentType === value ? " bd-entry-context-menu__btn--strong" : ""}`}
                 onClick={() => {
                   updateItemType(itemContextMenu.id, value);
                   closeMenu();
@@ -637,37 +600,15 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
 
         return (
           <div
-            style={
-              isMobile
-                ? {
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: "var(--bd-z-dropdown)",
-                    background: "rgba(0,0,0,0.35)",
-                    display: "flex",
-                    alignItems: "flex-end",
-                    justifyContent: "center",
-                    padding: "0.75rem",
-                  }
-                : undefined
-            }
+            className={isMobile ? "bd-items-sheet-backdrop bd-items-context-menu-backdrop" : undefined}
             onClick={isMobile ? closeMenu : undefined}
           >
             <div
+              className={`bd-entry-context-menu${isMobile ? " bd-entry-context-menu--mobile-sheet" : ""}`}
               style={{
                 position: isMobile ? "relative" : "fixed",
                 left: isMobile ? undefined : itemContextMenu.x,
                 top: isMobile ? undefined : itemContextMenu.y,
-                zIndex: "var(--bd-z-dropdown)",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-                borderRadius: isMobile ? "16px" : "12px",
-                boxShadow: "var(--shadow-md)",
-                padding: "0.25rem 0",
-                minWidth: "168px",
-                width: isMobile ? "min(100%, 420px)" : undefined,
-                maxHeight: isMobile ? "80dvh" : undefined,
-                overflow: "auto",
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -675,23 +616,12 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                 <>
                   <button
                     type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start", fontWeight: 600 }}
+                    className="bd-entry-context-menu__btn bd-entry-context-menu__btn--strong"
                     onClick={() => setItemContextSubmenu(null)}
                   >
                     {t("menu.back")}
                   </button>
-                  <div
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      color: "var(--text-tertiary)",
-                      borderBottom: "1px solid var(--border-default)",
-                    }}
-                  >
-                    {mobileSubTitle}
-                  </div>
+                  <div className="bd-entry-context-menu__header bd-entry-context-menu__header--compact">{mobileSubTitle}</div>
                   {itemContextSubmenu === "workPrivate" ? workPrivateOptions() : null}
                   {itemContextSubmenu === "areaProject"
                     ? placementIsWork
@@ -704,21 +634,10 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                 </>
               ) : (
                 <>
-                  <div
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      color: "var(--text-tertiary)",
-                      borderBottom: "1px solid var(--border-default)",
-                    }}
-                  >
-                    {t("menu.actions")}
-                  </div>
+                  <div className="bd-entry-context-menu__header">{t("menu.actions")}</div>
                   <button
                     type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start" }}
+                    className="bd-entry-context-menu__btn"
                     onClick={() => {
                       const it = items.find((i) => i.id === itemContextMenu.id);
                       if (it) setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" });
@@ -730,8 +649,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                   {showDomainAndPlacement ? (
                     <button
                       type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      className="bd-entry-context-menu__btn"
                       onClick={() => setItemContextSubmenu("workPrivate")}
                     >
                       {t("menu.changeWorkPrivate")}
@@ -740,46 +658,43 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                   {showDomainAndPlacement ? (
                     <button
                       type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start" }}
+                      className="bd-entry-context-menu__btn"
                       onClick={() => setItemContextSubmenu("areaProject")}
                     >
                       {t("menu.changeAreaProject")}
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="bd-btn"
-                    style={{ width: "100%", justifyContent: "flex-start" }}
-                    onClick={() => setItemContextSubmenu("type")}
-                  >
+                  <button type="button" className="bd-entry-context-menu__btn" onClick={() => setItemContextSubmenu("type")}>
                     {t("menu.changeType")}
                   </button>
-                  <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      style={{ width: "100%", justifyContent: "flex-start", color: "var(--text-danger, #c53030)" }}
-                      onClick={() => {
-                        deleteItem(itemContextMenu.id, true);
-                        closeMenu();
-                      }}
-                    >
-                      {t("menu.delete")}
-                    </button>
-                  </div>
+                  <div className="bd-entry-context-menu__divider" role="separator" aria-hidden />
+                  <button
+                    type="button"
+                    className="bd-entry-context-menu__btn bd-entry-context-menu__btn--danger"
+                    onClick={() => {
+                      deleteItem(itemContextMenu.id, true);
+                      closeMenu();
+                    }}
+                  >
+                    {t("menu.delete")}
+                  </button>
                   {isMobile ? (
-                    <div style={{ borderTop: "1px solid var(--border-default)", marginTop: "0.25rem", paddingTop: "0.25rem" }}>
-                      <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeMenu}>
+                    <>
+                      <div className="bd-entry-context-menu__divider" role="separator" aria-hidden />
+                      <button type="button" className="bd-entry-context-menu__btn" onClick={closeMenu}>
                         {t("menu.cancel")}
                       </button>
-                    </div>
+                    </>
                   ) : null}
                 </>
               )}
             </div>
             {!isMobile && itemContextSubmenu ? (
-              <div style={subFlyoutStyle} onClick={(e) => e.stopPropagation()}>
+              <div
+                className="bd-entry-context-menu bd-entry-context-menu--flyout"
+                style={{ left: itemContextMenu.x + 168, top: itemContextMenu.y }}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {itemContextSubmenu === "workPrivate" ? (
                   <>
                     {submenuHeader(t("menu.changeWorkPrivate"))}

@@ -2195,6 +2195,109 @@ select.bd-input::-ms-expand {
   padding-bottom: max(0.75rem, var(--bd-bottom-bar-clearance));
 }
 
+/* Entry context menu (long-press / right-click) — same chrome as .bd-panel & sheets */
+.bd-entry-context-menu {
+  position: fixed;
+  z-index: var(--bd-z-dropdown);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--card-radius);
+  box-shadow: var(--bd-shadow-panel);
+  padding: var(--bd-space-2);
+  min-width: 12rem;
+  max-height: min(320px, 70dvh);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.bd-entry-context-menu--mobile-sheet {
+  position: relative;
+  width: min(100%, 560px);
+  max-height: 80dvh;
+  left: auto;
+  top: auto;
+}
+
+.bd-entry-context-menu--flyout {
+  z-index: calc(var(--bd-z-dropdown) + 1);
+  min-width: 12.5rem;
+  padding: var(--bd-space-2);
+}
+
+.bd-entry-context-menu__header {
+  padding: var(--bd-space-2) var(--bd-space-3) var(--bd-space-3);
+  margin: calc(-1 * var(--bd-space-2)) calc(-1 * var(--bd-space-2)) var(--bd-space-2);
+  font-size: var(--bd-label-size);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-quaternary);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: calc(var(--card-radius) - 2px) calc(var(--card-radius) - 2px) 0 0;
+}
+
+.bd-entry-context-menu__header--compact {
+  margin-bottom: var(--bd-space-1);
+  letter-spacing: 0.03em;
+}
+
+.bd-entry-context-menu__divider {
+  height: 1px;
+  margin: var(--bd-space-2) 0;
+  background: var(--border-subtle);
+  border: none;
+}
+
+.bd-entry-context-menu__btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  min-height: var(--bd-touch-min);
+  padding: 0.45rem 0.65rem;
+  border: none;
+  border-radius: var(--bd-input-radius);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--bd-duration-fast) var(--bd-ease-soft),
+    color var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-entry-context-menu__btn:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.bd-entry-context-menu__btn:active {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.bd-entry-context-menu__btn--strong {
+  font-weight: 600;
+}
+
+.bd-entry-context-menu__btn--danger {
+  color: var(--bd-danger-text);
+}
+
+.bd-entry-context-menu__btn--danger:hover {
+  background: var(--bd-danger-bg);
+  color: var(--bd-danger-text);
+}
+
+.bd-entry-context-menu__btn--danger:active {
+  background: color-mix(in srgb, var(--bd-danger) 22%, transparent);
+}
+
 /* BrainDump mobile layout */
 .bd-layout-main {
   /* extra bottom space so content isn't hidden behind bottom bar on mobile */
@@ -4002,6 +4105,30 @@ input.bd-todo-checkbox:checked {
     border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+
+  /* Sliding selection highlight (tabs only; mic sits above in z-order) */
+  .bd-bottom-bar-pill-highlight {
+    position: absolute;
+    z-index: 0;
+    border-radius: 999px;
+    pointer-events: none;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+    transition:
+      left 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+      top 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+      width 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+      height 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+      opacity 0.22s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bd-bottom-bar-pill-highlight {
+      transition-duration: 0.04s;
+      transition-timing-function: ease-out;
+    }
   }
 
   :root[data-theme="light"] .bd-bottom-bar-pill {
@@ -4015,6 +4142,8 @@ input.bd-todo-checkbox:checked {
   .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
     flex: 1 1 0;
     min-width: 0;
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4026,9 +4155,7 @@ input.bd-todo-checkbox:checked {
     cursor: pointer;
     padding: 0.2rem;
     font-size: 0;
-    transition:
-      background var(--bd-duration-fast) var(--bd-ease-soft),
-      color var(--bd-duration-fast) var(--bd-ease-soft);
+    transition: color 0.24s var(--bd-ease-soft);
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -4038,7 +4165,6 @@ input.bd-todo-checkbox:checked {
 
   .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--active {
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--text-primary) 9%, transparent);
   }
 
   /* Tasks tab: selection is background only; icon stays same tone as other inactive tabs */
@@ -4061,6 +4187,7 @@ input.bd-todo-checkbox:checked {
     flex: 0 0 auto;
     width: 72px;
     position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-end;
     justify-content: center;

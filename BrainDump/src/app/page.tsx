@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -11,6 +11,7 @@ import { RightPanel } from "@/components/RightPanel";
 import { CoachChatOverlay } from "@/components/CoachChatOverlay";
 import { SettingsModal } from "@/components/SettingsModal";
 import { TodayView } from "@/components/TodayView";
+import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
@@ -22,6 +23,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
 import { recordOrganizedDump } from "@/lib/dump-streak";
+import { loadWorkspaceScope, saveWorkspaceScope } from "@/lib/workspace-scope-settings";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
@@ -56,6 +58,7 @@ export default function BrainDumpPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [todayViewActive, setTodayViewActive] = useState(false);
+  const [workspaceScopeHydrated, setWorkspaceScopeHydrated] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
@@ -197,6 +200,37 @@ export default function BrainDumpPage() {
     }
   }, [hasUncategorizedEntries, mode]);
 
+  useLayoutEffect(() => {
+    const s = loadWorkspaceScope();
+    setMode(s.mode);
+    setSelectedProjectId(s.projectId);
+    setSelectedCategory(s.category);
+    setSelectedItemType(s.itemType);
+    setDueDateFilter(s.dueDateFilter);
+    setTodayViewActive(s.todayViewActive);
+    setWorkspaceScopeHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceScopeHydrated) return;
+    saveWorkspaceScope({
+      mode,
+      projectId: selectedProjectId,
+      category: selectedCategory,
+      itemType: selectedItemType,
+      dueDateFilter,
+      todayViewActive,
+    });
+  }, [
+    workspaceScopeHydrated,
+    mode,
+    selectedProjectId,
+    selectedCategory,
+    selectedItemType,
+    dueDateFilter,
+    todayViewActive,
+  ]);
+
   useEffect(() => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, viewType);
@@ -211,6 +245,13 @@ export default function BrainDumpPage() {
         if (next === "kanban" || next === "postits") next = "list";
       }
       setViewType(next);
+      const ws = loadWorkspaceScope();
+      setMode(ws.mode);
+      setSelectedProjectId(ws.projectId);
+      setSelectedCategory(ws.category);
+      setSelectedItemType(ws.itemType);
+      setDueDateFilter(ws.dueDateFilter);
+      setTodayViewActive(ws.todayViewActive);
     };
     window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
     return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
@@ -306,6 +347,8 @@ export default function BrainDumpPage() {
         if (!resDump.ok) throw new Error((dataDump as { error?: string }).error || "Failed to create dump");
         const dump = (dataDump as { dump?: { id: string } }).dump;
         if (!dump?.id) throw new Error("Failed to create dump");
+        const n = new Date();
+        const referenceLocalDate = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
         const payload = items.map((it) => ({
           domain: it.domain,
           category: it.category,
@@ -340,7 +383,7 @@ export default function BrainDumpPage() {
         const resBatch = await fetch("/api/organized-items/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dumpId: dump.id, items: payload }),
+          body: JSON.stringify({ dumpId: dump.id, items: payload, referenceLocalDate }),
         });
         const dataBatch = await resBatch.json();
         if (!resBatch.ok) {
@@ -559,106 +602,25 @@ export default function BrainDumpPage() {
 
       <div className="bd-bottom-bar" role="navigation" aria-label={t("bottom.navAria")}>
         <div className="bd-bottom-bar-mobile-col">
-          <nav className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setTodayViewActive((v) => !v)}
-              title={t("today.title")}
-              aria-label={t("bottom.todayNav")}
-              aria-pressed={todayViewActive}
-            >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => {
-                setTodayViewActive(false);
-                setViewType("list");
-              }}
-              title={t("items.viewList")}
-              aria-label={t("items.viewList")}
-              aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
-            >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
-                <path
-                  d="M8.5 12.5 11 15l4.5-5.5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <div className="bd-bottom-bar-pill-mic-wrap">
-              <button
-                type="button"
-                className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}
-                onClick={() => centerPanelRef.current?.toggleDumpRecording()}
-                title={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
-                aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
-              >
-                {dumpRecordingActive ? (
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                    <rect x="6" y="6" width="12" height="12" rx="2" />
-                  </svg>
-                ) : (
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => {
-                setTodayViewActive(false);
-                setViewType("text");
-              }}
-              title={t("items.viewText")}
-              aria-label={t("items.viewText")}
-              aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
-            >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 6h16M4 12h16M4 18h11" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => {
-                setTodayViewActive(false);
-                setViewType("calendar");
-              }}
-              title={t("items.viewCalendar")}
-              aria-label={t("items.viewCalendar")}
-              aria-current={viewType === "calendar" ? "page" : undefined}
-            >
-              <svg className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-                <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <text
-                  x="12"
-                  y="17.5"
-                  textAnchor="middle"
-                  fontSize="9"
-                  fontWeight="600"
-                  fill="currentColor"
-                  className="bd-bottom-bar-cal-day"
-                >
-                  {new Date().getDate()}
-                </text>
-              </svg>
-            </button>
-          </nav>
+          <MobileBottomBarPill
+            viewType={viewType}
+            todayViewActive={todayViewActive}
+            dumpRecordingActive={dumpRecordingActive}
+            centerPanelRef={centerPanelRef}
+            onTodayClick={() => setTodayViewActive((v) => !v)}
+            onSelectList={() => {
+              setTodayViewActive(false);
+              setViewType("list");
+            }}
+            onSelectText={() => {
+              setTodayViewActive(false);
+              setViewType("text");
+            }}
+            onSelectCalendar={() => {
+              setTodayViewActive(false);
+              setViewType("calendar");
+            }}
+          />
         </div>
       </div>
 

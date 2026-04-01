@@ -328,7 +328,10 @@ function getReferenceLocalDateForGuardrails(options: OrganizeOptions): string | 
   if (!iso) return undefined;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
 }
 
 /** Heuristic: picking up / meeting people vs groceries or store pickups (EN/SV). */
@@ -365,6 +368,22 @@ function blobLooksLikeWorkContext(text: string): boolean {
 function padHHmm(time: string): string {
   if (!/^\d{1,2}:\d{2}$/.test(time)) return time;
   const [h, m] = time.split(":");
+  return `${h!.padStart(2, "0")}:${m!}`;
+}
+
+/** Strict calendar date: format + real calendar day (rejects 2025-02-31 etc.). */
+function isValidYyyyMmDd(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+/** Normalize model clock output to HH:mm (accepts H:mm). */
+function normalizeClockHHmm(raw: string | undefined): string | null {
+  const t = String(raw ?? "").trim();
+  if (!/^\d{1,2}:\d{2}$/.test(t)) return null;
+  const [h, m] = t.split(":");
   return `${h!.padStart(2, "0")}:${m!}`;
 }
 
@@ -406,17 +425,20 @@ function applyPersonalLogisticsGuardrails(item: OrganizedItemInput, options: Org
     };
   }
 
-  const t = out.scheduled_time?.trim();
-  const hasValidTime = Boolean(t && /^\d{1,2}:\d{2}$/.test(t));
-  const d = out.scheduled_date?.trim();
-  const hasValidDate = Boolean(d && /^\d{4}-\d{2}-\d{2}$/.test(d));
-
-  if (refLocal && hasValidTime && !hasValidDate && out.item_type === "calendar") {
-    out = { ...out, scheduled_date: refLocal };
+  const timeNorm = normalizeClockHHmm(out.scheduled_time);
+  if (timeNorm) {
+    out = { ...out, scheduled_time: timeNorm };
   }
+  const hasValidTime = Boolean(timeNorm);
+  const dateRaw = out.scheduled_date?.trim() ?? "";
+  const hasValidDate = isValidYyyyMmDd(dateRaw);
 
-  if (out.scheduled_time && /^\d{1,2}:\d{2}$/.test(out.scheduled_time)) {
-    out = { ...out, scheduled_time: padHHmm(out.scheduled_time) };
+  if (refLocal && out.item_type === "calendar") {
+    if (hasValidTime && !hasValidDate) {
+      out = { ...out, scheduled_date: refLocal };
+    } else if (dateRaw && !hasValidDate) {
+      out = { ...out, scheduled_date: refLocal };
+    }
   }
 
   return out;

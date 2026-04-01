@@ -346,6 +346,7 @@ const en: Msg = {
   "items.notifyOneHourBefore": "1 hour before",
 
   "settings.title": "Settings",
+  "settings.done": "Done",
   "settings.deleteAllEntries": "Delete all entries",
   "settings.deleteEntriesOpen": "Delete entries…",
   "settings.deleteAllIntro":
@@ -822,6 +823,7 @@ const sv: Msg = {
   "items.notifyOneHourBefore": "1 timme innan",
 
   "settings.title": "Inställningar",
+  "settings.done": "Klart",
   "settings.deleteAllEntries": "Ta bort alla poster",
   "settings.deleteEntriesOpen": "Ta bort poster…",
   "settings.deleteAllIntro":
