@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { resolveDatabaseUrl } from "@/lib/database-url";
 import { hash } from "bcryptjs";
+
+export const runtime = "nodejs";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export async function POST(request: Request) {
   try {
+    if (!resolveDatabaseUrl()) {
+      return NextResponse.json(
+        {
+          error:
+            "Database is not configured. Set DATABASE_URL or POSTGRES_PRISMA_URL / POSTGRES_URL (e.g. from Vercel Postgres).",
+        },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -39,6 +52,7 @@ export async function POST(request: Request) {
         name: name || null,
         email,
         passwordHash,
+        clientPreferences: {},
       },
     });
 
@@ -46,6 +60,14 @@ export async function POST(request: Request) {
   } catch (e) {
     const err = e as { code?: string; message?: string };
     console.error("Register error:", e);
+
+    // Unique violation (race: two sign-ups for same email)
+    if (err?.code === "P2002") {
+      return NextResponse.json(
+        { error: "An account with this email already exists." },
+        { status: 409 }
+      );
+    }
 
     // Schema out of date: passwordHash column missing (run prisma db push on production)
     if (err?.code === "P2009" || err?.message?.includes("Unknown arg") || err?.message?.includes("passwordHash")) {

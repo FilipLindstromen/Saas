@@ -62,6 +62,11 @@ function LoginContent() {
   const [forgotMessage, setForgotMessage] = useState("");
   const [forgotError, setForgotError] = useState("");
   const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
+  const [forgotSendMeta, setForgotSendMeta] = useState<{
+    attempted: boolean;
+    sent: boolean;
+    configured: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
@@ -101,6 +106,7 @@ function LoginContent() {
     setForgotMessage("");
     setForgotError("");
     setDevResetUrl(null);
+    setForgotSendMeta(null);
     setForgotOpen(true);
   };
 
@@ -109,6 +115,7 @@ function LoginContent() {
     setForgotError("");
     setForgotMessage("");
     setDevResetUrl(null);
+    setForgotSendMeta(null);
     const em = forgotEmail.trim().toLowerCase();
     if (!em) {
       setForgotError("Enter your email address.");
@@ -348,6 +355,23 @@ function LoginContent() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--text-secondary)" }}>{forgotMessage}</p>
+                {forgotSendMeta?.attempted && !forgotSendMeta.sent && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "0.85rem",
+                      padding: "0.6rem 0.7rem",
+                      borderRadius: "var(--button-radius)",
+                      background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                      border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {forgotSendMeta.configured
+                      ? "We could not send the email (the mail provider rejected the request). Try again in a few minutes or contact support."
+                      : "Email is not configured on this server: add RESEND_API_KEY and a verified EMAIL_FROM to the environment so reset links can be delivered."}
+                  </p>
+                )}
                 {devResetUrl && (
                   <div
                     style={{
@@ -374,6 +398,7 @@ function LoginContent() {
                     setForgotOpen(false);
                     setForgotMessage("");
                     setDevResetUrl(null);
+                    setForgotSendMeta(null);
                   }}
                   style={{
                     padding: "0.65rem 1rem",

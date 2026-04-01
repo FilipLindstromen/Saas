@@ -6,6 +6,10 @@ import { sendPasswordResetEmail } from "@/lib/send-password-reset-email";
 const TOKEN_BYTES = 32;
 const EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
+function emailDeliveryConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
 /**
  * Password reset links must never use client-controlled Origin/Referer (open-redirect / token leak).
  * Prefer env; fall back to this deployment's own origin from the incoming request URL.
@@ -28,8 +32,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
+    const configured = emailDeliveryConfigured();
+
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ ok: true, message: genericMessage });
+      return NextResponse.json({
+        ok: true,
+        message: genericMessage,
+        attemptedEmailDelivery: false,
+        emailSent: false,
+        emailDeliveryConfigured: configured,
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -38,7 +50,13 @@ export async function POST(request: Request) {
     });
 
     if (!user?.passwordHash) {
-      return NextResponse.json({ ok: true, message: genericMessage });
+      return NextResponse.json({
+        ok: true,
+        message: genericMessage,
+        attemptedEmailDelivery: false,
+        emailSent: false,
+        emailDeliveryConfigured: configured,
+      });
     }
 
     await prisma.passwordResetToken.deleteMany({
@@ -59,19 +77,31 @@ export async function POST(request: Request) {
     const base = trustedAppBaseUrl(request);
     const resetUrl = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
-    const { sent } = await sendPasswordResetEmail(email, resetUrl);
+    const { sent, error: sendErr } = await sendPasswordResetEmail(email, resetUrl);
 
-    if (process.env.NODE_ENV === "development" && !sent) {
-      console.info("[BrainDump] Password reset link (dev, no email):", resetUrl);
+    if (!sent) {
+      console.error("[BrainDump] Password reset email was not sent.", sendErr ?? "unknown", { email });
+      if (process.env.NODE_ENV === "development") {
+        console.info("[BrainDump] Password reset link (dev fallback):", resetUrl);
+      }
     }
 
     return NextResponse.json({
       ok: true,
       message: genericMessage,
+      attemptedEmailDelivery: true,
+      emailSent: sent,
+      emailDeliveryConfigured: configured,
       ...(process.env.NODE_ENV === "development" && !sent ? { devResetUrl: resetUrl } : {}),
     });
   } catch (e) {
     console.error("forgot-password error:", e);
-    return NextResponse.json({ ok: true, message: genericMessage });
+    return NextResponse.json({
+      ok: true,
+      message: genericMessage,
+      attemptedEmailDelivery: false,
+      emailSent: false,
+      emailDeliveryConfigured: emailDeliveryConfigured(),
+    });
   }
 }
