@@ -6,7 +6,7 @@
     "predev": "npx prisma db push",
     "dev": "npx next dev -p 3001",
     "build": "npx next build",
-    "build:vercel": "npx prisma generate && npx prisma migrate deploy && npx next build",
+    "build:vercel": "npx prisma generate && node scripts/vercel-prisma-migrate.cjs && npx next build",
     "start": "npx next start -p 3001",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
@@ -15,9 +15,10 @@
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:migrate": "npx prisma migrate deploy",
-    "vercel:env:production": "vercel env pull .env.vercel.production --environment=production --yes",
-    "db:migrate:vercel": "dotenv -e .env.vercel.production -- prisma migrate deploy",
-    "db:push:vercel": "dotenv -e .env.vercel.production -- prisma db push",
+    "vercel:link": "npx vercel link",
+    "vercel:env:production": "npx vercel env pull .env.vercel.production --environment=production --yes",
+    "db:migrate:vercel": "dotenv -e .env.vercel.production -- node scripts/vercel-prisma-migrate.cjs",
+    "db:push:vercel": "dotenv -e .env.vercel.production -- npx prisma db push",
     "db:seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
