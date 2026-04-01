@@ -3314,11 +3314,12 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** Week strip starts Sunday (S M T W T F S) to match common mobile calendar patterns. */
-function startOfWeekSunday(d: Date): Date {
+/** Week strip starts Monday (ISO 8601 / European convention). `getDay()`: 0 = Sun … 6 = Sat. */
+function startOfWeekMonday(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const dow = x.getDay();
-  x.setDate(x.getDate() - dow);
+  const daysSinceMonday = (dow + 6) % 7;
+  x.setDate(x.getDate() - daysSinceMonday);
   return x;
 }
 
@@ -3385,7 +3386,7 @@ function CalendarView({
     [items]
   );
 
-  const weekStart = useMemo(() => startOfWeekSunday(selectedDate), [selectedDate]);
+  const weekStart = useMemo(() => startOfWeekMonday(selectedDate), [selectedDate]);
 
   const weekDays = useMemo(
     () =>
@@ -3419,8 +3420,8 @@ function CalendarView({
     const n = new Date();
     const target = new Date(n.getFullYear(), n.getMonth(), n.getDate());
     setSelectedDate((prev) => {
-      const wPrev = startOfWeekSunday(prev).getTime();
-      const wNext = startOfWeekSunday(target).getTime();
+      const wPrev = startOfWeekMonday(prev).getTime();
+      const wNext = startOfWeekMonday(target).getTime();
       if (wPrev !== wNext) {
         setWeekStripSlideDir(wNext > wPrev ? "next" : "prev");
         setWeekStripSlideKey((k) => k + 1);
@@ -4593,7 +4594,6 @@ function ListView({
     const hideRedundantBody =
       showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
     const bodySnippet = hideRedundantBody ? "" : (it.content ?? "").trim();
-    const showNotesGlyph = !hideRedundantBody && !!(it.content ?? "").trim();
     const isTask = isTaskRow(it);
 
     const primaryTitleStyle: CSSProperties = {
@@ -4616,6 +4616,21 @@ function ListView({
         ? { boxShadow: "inset 0 3px 0 0 var(--accent)" }
         : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
 
+    const showsBodySnippetBelow =
+      showEntryTitles &&
+      !!bodySnippet &&
+      !(onUpdate && editing?.id === it.id && editing.field === "content");
+    const hasSecondaryLineNoTitles =
+      !showEntryTitles &&
+      !(onUpdate && editing?.id === it.id && editing.field === "content") &&
+      (it.content ?? "").trim().split("\n").length > 1;
+    const isEditingContentField = !!(onUpdate && editing?.id === it.id && editing.field === "content");
+    const singleLineRow =
+      !scheduleLabel &&
+      !isEditingContentField &&
+      !showsBodySnippetBelow &&
+      !hasSecondaryLineNoTitles;
+
     return (
       <SwipeDeleteRow
         key={it.id}
@@ -4627,7 +4642,7 @@ function ListView({
         slideSurface="elevated"
       >
       <div
-        className={`bd-todo-row ${ep.className}`}
+        className={`bd-todo-row${singleLineRow ? " bd-todo-row--single-line" : ""} ${ep.className}`}
         data-bd-entry-id={it.id}
         data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
         onDoubleClick={() => onEdit?.(it)}
@@ -4888,20 +4903,6 @@ function ListView({
             <div style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>{scheduleLabel}</div>
           )}
         </div>
-        {showNotesGlyph ? (
-          <div className="bd-todo-row-trail" title={t("items.description")}>
-            <span className="bd-todo-notes-glyph" aria-hidden>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="8" y1="6" x2="21" y2="6" />
-                <line x1="8" y1="12" x2="21" y2="12" />
-                <line x1="8" y1="18" x2="21" y2="18" />
-                <line x1="3" y1="6" x2="3.01" y2="6" />
-                <line x1="3" y1="12" x2="3.01" y2="12" />
-                <line x1="3" y1="18" x2="3.01" y2="18" />
-              </svg>
-            </span>
-          </div>
-        ) : null}
       </div>
       </SwipeDeleteRow>
     );

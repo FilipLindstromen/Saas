@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div
+      className="bd-page-gate"
       style={{
-        minHeight: "100vh",
         background: "var(--bg-primary)",
         color: "var(--text-primary)",
         padding: "2rem 1.25rem 3rem",

@@ -166,7 +166,11 @@ export function collectClientPreferencesFromLocal(): ClientPreferencesPayloadV1 
     const raw = localStorage.getItem(SAAS_API_KEYS);
     if (raw) {
       const p = JSON.parse(raw) as unknown;
-      if (p && typeof p === "object" && !Array.isArray(p)) out.saasApiKeys = p as Record<string, unknown>;
+      if (p && typeof p === "object" && !Array.isArray(p)) {
+        const copy = { ...(p as Record<string, unknown>) };
+        delete copy.googleClientId;
+        if (Object.keys(copy).length > 0) out.saasApiKeys = copy;
+      }
     }
   } catch {
     /* ignore */
@@ -310,7 +314,10 @@ export function applyClientPreferencesToLocal(payload: unknown): void {
 
   try {
     if (p.saasApiKeys != null && typeof p.saasApiKeys === "object" && !Array.isArray(p.saasApiKeys)) {
-      localStorage.setItem(SAAS_API_KEYS, JSON.stringify(p.saasApiKeys));
+      const copy = { ...(p.saasApiKeys as Record<string, unknown>) };
+      delete copy.googleClientId;
+      if (Object.keys(copy).length > 0) localStorage.setItem(SAAS_API_KEYS, JSON.stringify(copy));
+      else localStorage.removeItem(SAAS_API_KEYS);
     }
   } catch {
     /* ignore */

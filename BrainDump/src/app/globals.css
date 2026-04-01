@@ -3020,7 +3020,7 @@ select.bd-input::-ms-expand {
 .bd-todo-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 1.125rem;
   padding: 0.85rem 1rem;
   min-height: 52px;
   box-sizing: border-box;
@@ -3030,6 +3030,19 @@ select.bd-input::-ms-expand {
 
 .bd-todo-row:last-child {
   border-bottom: none;
+}
+
+/* Title-only (or single primary line): align checkbox / type icon with text, not top of row */
+.bd-todo-row--single-line {
+  align-items: center;
+}
+
+.bd-todo-row--single-line .bd-todo-row-lead {
+  padding-top: 0;
+}
+
+.bd-todo-row--single-line .bd-todo-row-type-lead {
+  padding-top: 0;
 }
 
 /*
@@ -3132,23 +3145,6 @@ input.bd-todo-checkbox:checked {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-}
-
-.bd-todo-row-trail {
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.bd-todo-notes-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-primary) 40%, var(--bg-elevated));
-  border: 1px solid var(--border-default);
-  color: var(--text-tertiary);
 }
 
 /* Full-screen entry editor (mobile) */

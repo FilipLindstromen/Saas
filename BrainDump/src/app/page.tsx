@@ -595,21 +595,6 @@ export default function BrainDumpPage() {
                 />
               </svg>
             </button>
-            <button
-              type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => {
-                setTodayViewActive(false);
-                setViewType("text");
-              }}
-              title={t("items.viewText")}
-              aria-label={t("items.viewText")}
-              aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
-            >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 6h16M4 12h16M4 18h11" />
-              </svg>
-            </button>
             <div className="bd-bottom-bar-pill-mic-wrap">
               <button
                 type="button"
@@ -631,6 +616,21 @@ export default function BrainDumpPage() {
                 )}
               </button>
             </div>
+            <button
+              type="button"
+              className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => {
+                setTodayViewActive(false);
+                setViewType("text");
+              }}
+              title={t("items.viewText")}
+              aria-label={t("items.viewText")}
+              aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
+            >
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 6h16M4 12h16M4 18h11" />
+              </svg>
+            </button>
             <button
               type="button"
               className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}

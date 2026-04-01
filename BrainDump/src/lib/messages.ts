@@ -404,6 +404,8 @@ const en: Msg = {
   "settings.googleCalendarSync": "Connect Google Calendar",
   "settings.googleCalendarHelp":
     "After you connect and pick a calendar, use “Import into BrainDump” to copy events into BrainDump’s Calendar view. Nothing is imported automatically.",
+  "settings.googleCalendarOAuthNotConfigured":
+    "Google Calendar sign-in is not set up on this deployment. Add GOOGLE_CLIENT_ID (and matching OAuth redirect URIs) to the server environment.",
   "settings.googleCalendarImportButton": "Import into BrainDump",
   "settings.googleCalendarImporting": "Importing…",
   "settings.googleCalendarImportDone": "Imported {count} events into BrainDump.",
@@ -878,6 +880,8 @@ const sv: Msg = {
   "settings.googleCalendarSync": "Koppla Google Kalender",
   "settings.googleCalendarHelp":
     "När du kopplat och valt kalender: använd ”Importera till BrainDump” för att kopiera händelser till BrainDumps kalendervy. Inget importeras automatiskt.",
+  "settings.googleCalendarOAuthNotConfigured":
+    "Google Kalender-inloggning är inte konfigurerad. Lägg till GOOGLE_CLIENT_ID (och matchande OAuth-omdirigeringar) i serverns miljövariabler.",
   "settings.googleCalendarImportButton": "Importera till BrainDump",
   "settings.googleCalendarImporting": "Importerar…",
   "settings.googleCalendarImportDone": "Importerade {count} händelser till BrainDump.",
