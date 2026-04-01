@@ -10,6 +10,7 @@ import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } fr
 import { RightPanel } from "@/components/RightPanel";
 import { CoachChatOverlay } from "@/components/CoachChatOverlay";
 import { SettingsModal } from "@/components/SettingsModal";
+import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { TodayView } from "@/components/TodayView";
 import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -55,6 +56,7 @@ export default function BrainDumpPage() {
   const [searchFilter, setSearchFilter] = useState("");
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilterPreset>("all");
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [todayViewActive, setTodayViewActive] = useState(false);
@@ -65,6 +67,7 @@ export default function BrainDumpPage() {
   const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
   const [desktopScopeBeforeFilter, setDesktopScopeBeforeFilter] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
+  const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
@@ -541,6 +544,7 @@ export default function BrainDumpPage() {
           }}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenProfile={() => setShowProfile(true)}
           mobileOpen={mobileNavOpen}
           onMobileOpenChange={setMobileNavOpen}
           onCapturePhoto={onSidebarCapturePhoto}
@@ -574,6 +578,8 @@ export default function BrainDumpPage() {
               onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
               onDesktopScopeBeforeFilterSlot={setDesktopScopeBeforeFilter}
               onDumpRecordingChange={setDumpRecordingActive}
+              onDumpEmptyHintChange={setDumpEmptyHintActive}
+              dumpHintSuppressed={todayViewActive}
             />
           </div>
           {todayViewActive ? (
@@ -605,6 +611,7 @@ export default function BrainDumpPage() {
             todayViewActive={todayViewActive}
             dumpRecordingActive={dumpRecordingActive}
             centerPanelRef={centerPanelRef}
+            showDumpEmptyHint={dumpEmptyHintActive}
             onTodayClick={() => setTodayViewActive((v) => !v)}
             onSelectList={() => {
               setTodayViewActive(false);
@@ -633,6 +640,14 @@ export default function BrainDumpPage() {
 
       <CoachChatOverlay open={coachChatOpen} onClose={() => setCoachChatOpen(false)} />
 
+      <ProfileOverlay
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        onOpenSettings={() => {
+          setShowProfile(false);
+          setShowSettings(true);
+        }}
+      />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
     </ErrorBoundary>

@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useI18n } from "@/lib/i18n";
-import type { BrainDumpCenterHandle } from "@/components/CenterPanel";
+import { DumpEmptyHintCallout, type BrainDumpCenterHandle } from "@/components/CenterPanel";
 import type { ItemsViewType } from "@/components/ItemsViewArea";
 
 function bottomBarTarget(
@@ -21,6 +21,8 @@ export type MobileBottomBarPillProps = {
   todayViewActive: boolean;
   dumpRecordingActive: boolean;
   centerPanelRef: RefObject<BrainDumpCenterHandle | null>;
+  /** List/text view empty — show hint above the dump mic. */
+  showDumpEmptyHint?: boolean;
   onTodayClick: () => void;
   onSelectList: () => void;
   onSelectText: () => void;
@@ -42,6 +44,7 @@ export function MobileBottomBarPill({
   todayViewActive,
   dumpRecordingActive,
   centerPanelRef,
+  showDumpEmptyHint = false,
   onTodayClick,
   onSelectList,
   onSelectText,
@@ -151,6 +154,7 @@ export function MobileBottomBarPill({
         </svg>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
+        {showDumpEmptyHint ? <DumpEmptyHintCallout className="bd-dump-empty-hint--mobile" /> : null}
         <button
           type="button"
           className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}

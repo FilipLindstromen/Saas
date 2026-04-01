@@ -3,14 +3,11 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
-  useRef,
   useState,
   type AnimationEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { DeleteEntriesOverlay } from "./DeleteEntriesOverlay";
 import { BrainDumpHabitReminderModal } from "./BrainDumpHabitReminderModal";
 import { StreaksModal } from "./StreaksModal";
@@ -69,6 +66,7 @@ type AppSidebarProps = {
   onModeChange: (mode: Mode) => void;
   showUncategorizedWorkspace: boolean;
   onOpenSettings: () => void;
+  onOpenProfile: () => void;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
   onCapturePhoto?: () => void;
@@ -94,6 +92,7 @@ export function AppSidebar({
   onModeChange,
   showUncategorizedWorkspace,
   onOpenSettings,
+  onOpenProfile,
   mobileOpen,
   onMobileOpenChange,
   onCapturePhoto,
@@ -110,9 +109,6 @@ export function AppSidebar({
   const [deleteEntriesOpen, setDeleteEntriesOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [mobileDrawerExiting, setMobileDrawerExiting] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileBtnRef = useRef<HTMLButtonElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -149,38 +145,6 @@ export function AppSidebar({
   const sidebarWorkspaceModes: Mode[] = showUncategorizedWorkspace ? ["inbox"] : [];
 
   const showLabels = isMobile || expanded;
-
-  const updatePopoverPos = useCallback(() => {
-    const el = profileBtnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const gap = 8;
-    if (expanded || isMobile) {
-      setPopoverPos({ top: r.bottom + gap, left: Math.max(12, Math.min(r.left, window.innerWidth - 268)) });
-    } else {
-      /* Collapsed rail on the left: open popover to the right of the avatar */
-      setPopoverPos({
-        top: r.top,
-        left: Math.min(r.right + gap, window.innerWidth - 268 - 12),
-      });
-    }
-  }, [expanded, isMobile]);
-
-  useLayoutEffect(() => {
-    if (!profileOpen || isMobile) {
-      setPopoverPos(null);
-      return;
-    }
-    updatePopoverPos();
-    const onScroll = () => updatePopoverPos();
-    const onResize = () => updatePopoverPos();
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [profileOpen, isMobile, expanded, updatePopoverPos]);
 
   useEffect(() => {
     if (!isMobile || (!mobileOpen && !mobileDrawerExiting)) return;
@@ -222,8 +186,12 @@ export function AppSidebar({
   );
 
   const openSettings = () => {
-    setProfileOpen(false);
     onOpenSettings();
+    if (isMobile) closeMobileDrawerAnimated();
+  };
+
+  const openProfile = () => {
+    onOpenProfile();
     if (isMobile) closeMobileDrawerAnimated();
   };
 
@@ -265,15 +233,13 @@ export function AppSidebar({
         </div>
       )}
 
-      <div className={`bd-app-sidebar-profile-wrap ${profileOpen ? "bd-app-sidebar-profile-wrap--open" : ""}`}>
+      <div className="bd-app-sidebar-profile-wrap">
         <button
-          ref={profileBtnRef}
           type="button"
           className="bd-app-sidebar-profile-trigger"
           data-collapsed={!showLabels ? "true" : "false"}
-          onClick={() => setProfileOpen((v) => !v)}
-          aria-expanded={profileOpen}
-          aria-haspopup="true"
+          onClick={openProfile}
+          aria-haspopup="dialog"
           title={email || t("sidebar.profile")}
           aria-label={t("sidebar.profile")}
         >
@@ -291,23 +257,6 @@ export function AppSidebar({
             </span>
           )}
         </button>
-
-        {profileOpen && isMobile && (
-          <div className="bd-app-sidebar-profile-menu bd-app-sidebar-profile-menu--inline" role="menu">
-            {email ? (
-              <p className="bd-app-sidebar-profile-muted">
-                <span className="bd-app-sidebar-profile-muted-label">{t("sidebar.signedInAs")}</span>
-                <span className="bd-app-sidebar-profile-email">{email}</span>
-              </p>
-            ) : null}
-            <button type="button" className="bd-app-sidebar-profile-action" role="menuitem" onClick={openSettings}>
-              {t("topBar.settings")}
-            </button>
-            <button type="button" className="bd-app-sidebar-profile-action" role="menuitem" onClick={() => void signOut({ callbackUrl: "/" })}>
-              {t("sidebar.signOut")}
-            </button>
-          </div>
-        )}
       </div>
 
       {sidebarWorkspaceModes.length > 0 ? (
@@ -507,44 +456,6 @@ export function AppSidebar({
     </>
   );
 
-  useEffect(() => {
-    if (!profileOpen) return;
-    const close = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (profileBtnRef.current?.contains(t)) return;
-      const pop = document.querySelector(".bd-app-sidebar-profile-popover");
-      if (pop?.contains(t)) return;
-      setProfileOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [profileOpen]);
-
-  const profilePopover =
-    profileOpen && !isMobile && typeof document !== "undefined" && popoverPos
-      ? createPortal(
-          <div
-            className="bd-app-sidebar-profile-popover bd-panel"
-            style={{ top: popoverPos.top, left: popoverPos.left }}
-            role="menu"
-          >
-            {email ? (
-              <p className="bd-app-sidebar-profile-muted">
-                <span className="bd-app-sidebar-profile-muted-label">{t("sidebar.signedInAs")}</span>
-                <span className="bd-app-sidebar-profile-email">{email}</span>
-              </p>
-            ) : null}
-            <button type="button" className="bd-app-sidebar-profile-action" role="menuitem" onClick={openSettings}>
-              {t("topBar.settings")}
-            </button>
-            <button type="button" className="bd-app-sidebar-profile-action" role="menuitem" onClick={() => void signOut({ callbackUrl: "/" })}>
-              {t("sidebar.signOut")}
-            </button>
-          </div>,
-          document.body
-        )
-      : null;
-
   const streaksModal = <StreaksModal isOpen={streaksOpen} onClose={() => setStreaksOpen(false)} state={streakState} />;
   const habitReminderModal = (
     <BrainDumpHabitReminderModal isOpen={habitRemindersOpen} onClose={() => setHabitRemindersOpen(false)} />
@@ -574,7 +485,6 @@ export function AppSidebar({
             </aside>
           </div>
         )}
-        {profilePopover}
         {streaksModal}
         {habitReminderModal}
         {trashModal}
@@ -592,7 +502,6 @@ export function AppSidebar({
       >
         {sidebarBody}
       </aside>
-      {profilePopover}
       {streaksModal}
       {habitReminderModal}
       {trashModal}

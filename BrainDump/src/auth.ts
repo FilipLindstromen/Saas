@@ -38,16 +38,29 @@ export const {
           id: user.id,
           email: user.email ?? undefined,
           name: user.name ?? undefined,
+          image: user.image ?? undefined,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.picture = user.image ?? null;
+      }
+      if (trigger === "update" && token.id) {
+        const u = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { name: true, email: true, image: true },
+        });
+        if (u) {
+          token.name = u.name;
+          token.email = u.email;
+          token.picture = u.image;
+        }
       }
       return token;
     },
@@ -56,6 +69,7 @@ export const {
         (session.user as typeof session.user & { id: string }).id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        session.user.image = (token.picture as string | null | undefined) ?? null;
       }
       return session;
     },

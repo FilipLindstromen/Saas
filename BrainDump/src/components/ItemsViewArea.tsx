@@ -129,6 +129,10 @@ interface ItemsViewAreaProps {
   onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
   /** After a successful soft-delete (trash); parent may show undo. */
   onItemMovedToTrash?: (id: string, title: string) => void;
+  /** List or text view has no items (workspace empty); parent may show dump FAB hint. */
+  onDumpEmptyListTextHintChange?: (show: boolean) => void;
+  /** When true, never reports the empty hint (e.g. Today view hides the items panel). */
+  dumpEmptyHintSuppressed?: boolean;
 }
 
 function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
@@ -517,6 +521,8 @@ export function ItemsViewArea({
   onMobileTopBarBeforeMenuSlot,
   onDesktopScopeBeforeFilterSlot,
   onItemMovedToTrash,
+  onDumpEmptyListTextHintChange,
+  dumpEmptyHintSuppressed = false,
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
@@ -550,6 +556,20 @@ export function ItemsViewArea({
   const [internalViewType, setInternalViewType] = useState<ItemsViewType>(loadViewPreference);
   const viewType = controlledViewType ?? internalViewType;
   const setViewType = onViewTypeChange ?? setInternalViewType;
+
+  useEffect(() => {
+    const cb = onDumpEmptyListTextHintChange;
+    if (!cb) return;
+    if (loading) {
+      cb(false);
+      return;
+    }
+    const listOrText = viewType === "list" || viewType === "text";
+    cb(listOrText && items.length === 0 && !dumpEmptyHintSuppressed);
+    return () => {
+      cb(false);
+    };
+  }, [loading, viewType, items.length, dumpEmptyHintSuppressed, onDumpEmptyListTextHintChange]);
   const [postitPositions, setPostitPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
   const [itemContextSubmenu, setItemContextSubmenu] = useState<ItemContextSubmenu | null>(null);
@@ -4103,37 +4123,69 @@ function applyReorderPreview(items: ViewItem[], preview: ReorderDragPreview | nu
   return next.map((id) => items.find((i) => i.id === id)).filter(Boolean) as ViewItem[];
 }
 
-function mergeDragPlace(e: DragEvent, rowEl: HTMLElement): "before" | "after" {
+function mergeDragPlace(e: DragEvent, rowEl: HTMLElement | null | undefined): "before" | "after" {
+  if (!rowEl || typeof rowEl.getBoundingClientRect !== "function") return "before";
   const r = rowEl.getBoundingClientRect();
+  if (!Number.isFinite(r.height) || r.height <= 0) return "before";
   return e.clientY < r.top + r.height / 2 ? "before" : "after";
 }
 
-/** Custom drag snapshot so the row content follows the cursor clearly. */
+/** Custom drag snapshot: must keep the node in the DOM until drag ends (immediate removal → blank/black ghost). */
 function attachRowDragImage(e: DragEvent, handleEl: HTMLElement) {
+  const dt = e.dataTransfer;
+  if (!dt) return;
+
   const row = handleEl.closest("[data-bd-entry-id]") as HTMLElement | null;
   if (!row) return;
+
   const rect = row.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return;
+
   const clone = row.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(".bd-entry-drag-handle").forEach((el) => el.remove());
+
   const cs = window.getComputedStyle(row);
+  const bg = cs.backgroundColor && cs.backgroundColor !== "rgba(0, 0, 0, 0)" ? cs.backgroundColor : "";
+  const surface = bg || "var(--bg-elevated)";
+
   clone.style.cssText = [
     "position:fixed",
     "left:-9999px",
     "top:0",
     `width:${rect.width}px`,
+    `max-width:${rect.width}px`,
     `box-sizing:${cs.boxSizing || "border-box"}`,
-    "opacity:0.96",
+    "margin:0",
+    "opacity:0.98",
     "pointer-events:none",
-    "z-index:99999",
-    "box-shadow:0 14px 40px rgba(0,0,0,0.2)",
+    "z-index:2147483647",
+    "box-shadow:0 12px 36px rgba(0,0,0,0.22)",
     "border-radius:12px",
-    "background:var(--bg-elevated)",
-    "color:var(--text-primary)",
+    `background:${surface}`,
+    `color:${cs.color}`,
+    "overflow:hidden",
   ].join(";");
+
   document.body.appendChild(clone);
-  const ox = Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left));
-  const oy = Math.min(rect.height - 4, Math.max(4, e.clientY - rect.top));
-  e.dataTransfer.setDragImage(clone, ox, oy);
-  window.setTimeout(() => clone.remove(), 0);
+
+  const ox = Math.min(Math.max(6, e.clientX - rect.left), Math.max(6, rect.width - 6));
+  const oy = Math.min(Math.max(6, e.clientY - rect.top), Math.max(6, rect.height - 6));
+
+  try {
+    dt.setDragImage(clone, ox, oy);
+  } catch {
+    clone.remove();
+    return;
+  }
+
+  const cleanup = () => {
+    document.removeEventListener("dragend", cleanup, true);
+    clone.remove();
+  };
+  document.addEventListener("dragend", cleanup, true);
+  window.setTimeout(() => {
+    if (clone.parentNode) cleanup();
+  }, 60_000);
 }
 
 const MOBILE_LONG_PRESS_MS = 520;

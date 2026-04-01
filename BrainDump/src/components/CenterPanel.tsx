@@ -67,6 +67,21 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+export function DumpEmptyHintCallout({ className = "" }: { className?: string }) {
+  const { t } = useI18n();
+  return (
+    <div className={`bd-dump-empty-hint ${className}`.trim()} aria-live="polite">
+      <p className="bd-dump-empty-hint-text">{t("center.dumpEmptyHint")}</p>
+      <div className="bd-dump-empty-hint-arrow">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <line x1="12" y1="5" x2="12" y2="17" />
+          <polyline points="8 13 12 17 16 13" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 interface CenterPanelProps {
   mode: string;
   onTranscriptReady: (text: string) => void;
@@ -96,6 +111,10 @@ interface CenterPanelProps {
   /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
   onDumpRecordingChange?: (active: boolean) => void;
   onItemMovedToTrash?: (id: string, title: string) => void;
+  /** Fires when list/text view is empty and dump hint should show (false when Today view suppresses). */
+  onDumpEmptyHintChange?: (show: boolean) => void;
+  /** Hide empty-state dump hint (e.g. while Today view is active). */
+  dumpHintSuppressed?: boolean;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -138,6 +157,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     onWorkProjectsChanged,
     onDumpRecordingChange,
     onItemMovedToTrash,
+    onDumpEmptyHintChange,
+    dumpHintSuppressed = false,
   },
   ref
 ) {
@@ -847,6 +868,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
   const isInbox = mode === "inbox";
 
+  const [dumpEmptyListHint, setDumpEmptyListHint] = useState(false);
+
+  useEffect(() => {
+    onDumpEmptyHintChange?.(dumpEmptyListHint);
+  }, [dumpEmptyListHint, onDumpEmptyHintChange]);
+
   const handleTypedDumpOrganize = useCallback(async () => {
     const text = typedDumpText.trim();
     if (!text || isDumpProcessing) return;
@@ -1033,28 +1060,31 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         </p>
       )}
       {!isMobile && (
-        <div className="bd-dump-fab-row">
-          <button
-            id="bd-dump-fab"
-            className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
-            type="button"
-            onClick={onDumpFabClick}
-            disabled={isDumpProcessing || photoOrganizeFlow}
-            title={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
-            aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
-          >
-            {recordState === "recording" ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            )}
-          </button>
+        <div className="bd-dump-fab-cluster">
+          {dumpEmptyListHint ? <DumpEmptyHintCallout /> : null}
+          <div className="bd-dump-fab-row">
+            <button
+              id="bd-dump-fab"
+              className={`bd-dump-fab${recordState === "recording" ? " bd-dump-fab--recording" : ""}`}
+              type="button"
+              onClick={onDumpFabClick}
+              disabled={isDumpProcessing || photoOrganizeFlow}
+              title={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
+              aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
+            >
+              {recordState === "recording" ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       )}
       <PhotoCaptureTrigger
@@ -1219,6 +1249,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
           onDesktopScopeBeforeFilterSlot={onDesktopScopeBeforeFilterSlot}
           onItemMovedToTrash={onItemMovedToTrash}
+          onDumpEmptyListTextHintChange={setDumpEmptyListHint}
+          dumpEmptyHintSuppressed={dumpHintSuppressed}
         />
       )}
       {isInbox && unclearItems && (

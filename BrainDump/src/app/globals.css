@@ -1328,13 +1328,69 @@ select.bd-input::-ms-expand {
   filter: brightness(0.98);
 }
 
-/* Mic FAB + photo capture (desktop): single fixed cluster */
-.bd-dump-fab-row {
+/* Mic FAB + photo capture (desktop): fixed cluster; optional empty-state hint stacks above */
+.bd-dump-fab-cluster {
   position: fixed;
   bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  pointer-events: none;
+  max-width: min(380px, calc(100vw - 2rem));
+}
+
+.bd-dump-fab-cluster .bd-dump-fab-row {
+  pointer-events: auto;
+}
+
+.bd-dump-empty-hint {
+  text-align: center;
+  padding: 0.4rem 0.75rem 0.25rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
+  border: 1px solid color-mix(in srgb, var(--border-default) 85%, var(--accent) 15%);
+  box-shadow: var(--shadow-sm);
+}
+
+.bd-dump-empty-hint-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.bd-dump-empty-hint-arrow {
+  display: flex;
+  justify-content: center;
+  color: var(--accent);
+  opacity: 0.92;
+  margin: -0.15rem 0 0;
+  animation: bd-dump-hint-nudge 1.35s var(--bd-ease-in-out) infinite;
+}
+
+@keyframes bd-dump-hint-nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-dump-empty-hint-arrow {
+    animation: none;
+  }
+}
+
+/* Mic FAB + photo capture (desktop): single fixed cluster */
+.bd-dump-fab-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2587,8 +2643,11 @@ select.bd-input::-ms-expand {
 /* Workspace dropdown: don’t stretch full width (bd-input is width:100% by default) */
 .bd-topbar-workspace-select {
   width: auto !important;
-  max-width: 9rem;
-  min-width: 4.75rem;
+  max-width: 12.5rem;
+  min-width: 6.5rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.9375rem;
   flex-shrink: 0;
 }
 
@@ -2630,14 +2689,15 @@ select.bd-input::-ms-expand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  max-width: min(42vw, 11rem);
-  padding: 0.32rem 0.55rem 0.32rem 0.65rem;
+  gap: 0.45rem;
+  max-width: min(48vw, 13rem);
+  padding: 0.42rem 0.72rem 0.42rem 0.8rem;
+  min-height: 2.5rem;
   border-radius: 999px;
   border: 1px solid var(--border-default);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   font-family: inherit;
   line-height: 1.2;
@@ -2691,7 +2751,7 @@ select.bd-input::-ms-expand {
 
 .bd-topbar-workspace-sheet__title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -2703,10 +2763,12 @@ select.bd-input::-ms-expand {
 }
 
 .bd-topbar-workspace-sheet__option {
-  min-height: 48px;
+  min-height: 52px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9375rem;
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   justify-content: flex-start;
   flex-wrap: nowrap;
   font-weight: 600;
@@ -2753,12 +2815,11 @@ select.bd-input::-ms-expand {
     letter-spacing: 0.06em;
   }
 
+  /* Narrow screens: workspace uses pill; this rule applies if the select is shown (e.g. layout tweaks). */
   .bd-topbar-workspace-select {
-    max-width: 6.25rem;
-    min-width: 4.25rem;
-    padding-left: 0.5rem;
-    padding-right: 1.75rem;
-    font-size: 0.8125rem;
+    max-width: 10rem;
+    min-width: 5.75rem;
+    font-size: 0.875rem;
   }
 
   .bd-topbar-ai-suggest-btn,
@@ -2854,9 +2915,10 @@ select.bd-input::-ms-expand {
   display: inline-flex !important;
   align-items: center;
   justify-content: space-between;
-  gap: 0.35rem;
+  gap: 0.5rem;
   cursor: pointer;
   font: inherit;
+  font-size: 0.9375rem;
   font-weight: 600;
   text-align: left;
   -webkit-tap-highlight-color: transparent;
@@ -4203,6 +4265,17 @@ input.bd-todo-checkbox:checked {
     left: 50%;
     margin-left: -28px;
     transform: translateY(-12px);
+  }
+
+  .bd-bottom-bar-pill-mic-wrap .bd-dump-empty-hint.bd-dump-empty-hint--mobile {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(100% + 10px);
+    width: min(300px, 92vw);
+    z-index: 4;
+    pointer-events: none;
+    box-sizing: border-box;
   }
 
   /* Raised primary mic inside pill */
