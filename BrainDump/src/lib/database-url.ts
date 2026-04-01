@@ -1,16 +1,28 @@
 /**
  * Postgres URL for Prisma + the pg driver adapter.
- * Vercel Postgres / Neon often set POSTGRES_PRISMA_URL or POSTGRES_URL;
- * only reading DATABASE_URL leaves the runtime adapter with an empty string.
+ *
+ * Important: use first *non-empty* value. Vercel projects often define DATABASE_URL as an
+ * empty placeholder; `process.env.DATABASE_URL ?? POSTGRES_URL` would incorrectly stick to "".
  */
+const CANDIDATE_ENV_KEYS = [
+  "DATABASE_URL",
+  "POSTGRES_PRISMA_URL",
+  "POSTGRES_URL",
+  "PRISMA_DATABASE_URL",
+  /** Direct connection; use when pooled URLs misbehave with the pg adapter */
+  "POSTGRES_URL_NON_POOLING",
+] as const;
+
 export function resolveDatabaseUrl(): string {
-  const raw =
-    process.env.DATABASE_URL ??
-    process.env.POSTGRES_PRISMA_URL ??
-    process.env.POSTGRES_URL ??
-    "";
-  const url = (typeof raw === "string" ? raw : "").trim();
-  if (!url) return "";
-  if (url.startsWith("postgres://")) return `postgresql://${url.slice("postgres://".length)}`;
-  return url;
+  let raw = "";
+  for (const key of CANDIDATE_ENV_KEYS) {
+    const v = process.env[key];
+    if (typeof v === "string" && v.trim()) {
+      raw = v.trim();
+      break;
+    }
+  }
+  if (!raw) return "";
+  if (raw.startsWith("postgres://")) return `postgresql://${raw.slice("postgres://".length)}`;
+  return raw;
 }

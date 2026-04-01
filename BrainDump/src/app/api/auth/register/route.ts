@@ -13,16 +13,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Database is not configured. Set DATABASE_URL or POSTGRES_PRISMA_URL / POSTGRES_URL (e.g. from Vercel Postgres).",
+            "Database is not configured. Set a non-empty DATABASE_URL or rely on Vercel Postgres variables (POSTGRES_PRISMA_URL / POSTGRES_URL).",
         },
         { status: 503 }
       );
     }
 
-    const body = await request.json();
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const password = typeof body.password === "string" ? body.password : "";
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+    const name = typeof (body as { name?: unknown }).name === "string" ? (body as { name: string }).name.trim() : "";
+    const email =
+      typeof (body as { email?: unknown }).email === "string" ? (body as { email: string }).email.trim().toLowerCase() : "";
+    const password =
+      typeof (body as { password?: unknown }).password === "string" ? (body as { password: string }).password : "";
 
     if (!email || !password) {
       return NextResponse.json(

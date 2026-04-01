@@ -25,8 +25,8 @@ function trustedAppBaseUrl(request: Request): string {
 }
 
 export async function POST(request: Request) {
-  const genericMessage =
-    "If an account exists for that email, we sent password reset instructions. Check your inbox.";
+  const successMessage =
+    "If that account can receive mail, we sent password reset instructions. Check your inbox.";
 
   try {
     const body = await request.json();
@@ -35,13 +35,10 @@ export async function POST(request: Request) {
     const configured = emailDeliveryConfigured();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({
-        ok: true,
-        message: genericMessage,
-        attemptedEmailDelivery: false,
-        emailSent: false,
-        emailDeliveryConfigured: configured,
-      });
+      return NextResponse.json(
+        { ok: false, error: "Enter a valid email address." },
+        { status: 400 }
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -49,14 +46,18 @@ export async function POST(request: Request) {
       select: { id: true, passwordHash: true },
     });
 
-    if (!user?.passwordHash) {
-      return NextResponse.json({
-        ok: true,
-        message: genericMessage,
-        attemptedEmailDelivery: false,
-        emailSent: false,
-        emailDeliveryConfigured: configured,
-      });
+    if (!user) {
+      return NextResponse.json({ ok: false, error: "Email doesn't exist" }, { status: 404 });
+    }
+
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No password is set for this account. Sign in with Google or Apple if you used those.",
+        },
+        { status: 400 }
+      );
     }
 
     await prisma.passwordResetToken.deleteMany({
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: genericMessage,
+      message: successMessage,
       attemptedEmailDelivery: true,
       emailSent: sent,
       emailDeliveryConfigured: configured,
@@ -96,12 +97,15 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     console.error("forgot-password error:", e);
-    return NextResponse.json({
-      ok: true,
-      message: genericMessage,
-      attemptedEmailDelivery: false,
-      emailSent: false,
-      emailDeliveryConfigured: emailDeliveryConfigured(),
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Something went wrong. Please try again.",
+        attemptedEmailDelivery: false,
+        emailSent: false,
+        emailDeliveryConfigured: emailDeliveryConfigured(),
+      },
+      { status: 500 }
+    );
   }
 }

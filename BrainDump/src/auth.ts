@@ -1,10 +1,29 @@
 import NextAuth from "next-auth";
+import type { User } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { env } from "@/config/env.server";
+
+/**
+ * Email for OAuth signIn/jwt: user is normalized by Auth.js, but profile still has
+ * the OIDC claims if user.email is missing (and Apple may nest email under profile.user).
+ */
+function resolveOAuthEmail(user: User, profile: unknown): string | null {
+  const fromUser = typeof user.email === "string" ? user.email.trim().toLowerCase() : "";
+  if (fromUser) return fromUser;
+  const p = profile as Record<string, unknown> | null | undefined;
+  if (p && typeof p.email === "string" && p.email.trim()) {
+    return p.email.trim().toLowerCase();
+  }
+  if (p?.user && typeof p.user === "object" && p.user !== null) {
+    const nested = (p.user as { email?: string }).email;
+    if (typeof nested === "string" && nested.trim()) return nested.trim().toLowerCase();
+  }
+  return null;
+}
 
 const googleId = env.GOOGLE_CLIENT_ID.trim();
 const googleSecret = env.GOOGLE_CLIENT_SECRET.trim();
@@ -32,6 +51,13 @@ export const {
           Google({
             clientId: googleId,
             clientSecret: googleSecret,
+            authorization: {
+              params: {
+                scope: "openid email profile",
+              },
+            },
+            /** Trust Google-verified email so “already registered with password” + Google same address works without adapter linking errors. */
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
@@ -40,6 +66,7 @@ export const {
           Apple({
             clientId: appleId,
             clientSecret: appleSecret,
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
@@ -74,41 +101,56 @@ export const {
       if (account?.provider !== "google" && account?.provider !== "apple") {
         return true;
       }
-      const emailRaw = user.email ?? (profile as { email?: string } | undefined)?.email;
-      if (!emailRaw || typeof emailRaw !== "string") {
+      const email = resolveOAuthEmail(user, profile);
+      if (!email) {
+        console.error(
+          "[BrainDump] OAuth sign-in rejected: missing email from provider.",
+          account?.provider
+        );
         return false;
       }
-      const email = emailRaw.trim().toLowerCase();
+
+      const p = profile as { email_verified?: boolean; name?: string; given_name?: string; family_name?: string; picture?: string; image?: string } | undefined;
+      if (account?.provider === "google" && p?.email_verified === false) {
+        console.error("[BrainDump] Google sign-in rejected: email not verified.");
+        return false;
+      }
+
       const name =
         user.name ??
-        (profile as { name?: string } | undefined)?.name ??
-        ((profile as { given_name?: string; family_name?: string } | undefined)?.given_name
-          ? `${(profile as { given_name?: string }).given_name ?? ""} ${(profile as { family_name?: string }).family_name ?? ""}`.trim()
+        p?.name ??
+        (p?.given_name
+          ? `${p.given_name ?? ""} ${p.family_name ?? ""}`.trim()
           : null);
       const image =
-        user.image ??
-        (profile as { picture?: string } | undefined)?.picture ??
-        (profile as { image?: string } | undefined)?.image ??
-        null;
-      await prisma.user.upsert({
-        where: { email },
-        create: {
-          email,
-          name: name || null,
-          image,
-          emailVerified: new Date(),
-        },
-        update: {
-          ...(name ? { name } : {}),
-          ...(image != null ? { image } : {}),
-        },
-      });
+        user.image ?? p?.picture ?? p?.image ?? null;
+
+      try {
+        await prisma.user.upsert({
+          where: { email },
+          create: {
+            email,
+            name: name || null,
+            image,
+            emailVerified: new Date(),
+            clientPreferences: {},
+          },
+          update: {
+            ...(name ? { name } : {}),
+            ...(image != null ? { image } : {}),
+            emailVerified: new Date(),
+          },
+        });
+      } catch (e) {
+        console.error("[BrainDump] OAuth user upsert failed:", e);
+        return false;
+      }
       return true;
     },
-    async jwt({ token, user, account, trigger }) {
+    async jwt({ token, user, account, profile, trigger }) {
       if (user) {
         if (account?.provider === "google" || account?.provider === "apple") {
-          const email = (user.email ?? "").trim().toLowerCase();
+          const email = resolveOAuthEmail(user, profile) ?? "";
           const dbUser = email
             ? await prisma.user.findUnique({
                 where: { email },
@@ -120,6 +162,11 @@ export const {
             token.email = dbUser.email;
             token.name = dbUser.name;
             token.picture = dbUser.image ?? null;
+          } else if (trigger === "signIn" || trigger === "signUp") {
+            console.error(
+              "[BrainDump] JWT: no DB user after OAuth sign-in for email:",
+              email || "(empty)"
+            );
           }
         } else {
           token.id = user.id;

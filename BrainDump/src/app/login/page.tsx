@@ -129,14 +129,24 @@ function LoginContent() {
         body: JSON.stringify({ email: em }),
       });
       const data = await res.json();
+      if (!res.ok && typeof data.error === "string") {
+        setForgotError(data.error);
+        setForgotLoading(false);
+        return;
+      }
       if (typeof data.message === "string") {
         setForgotMessage(data.message);
       } else {
-        setForgotMessage("If an account exists for that email, we sent password reset instructions.");
+        setForgotMessage("If that account can receive mail, we sent password reset instructions.");
       }
       if (typeof data.devResetUrl === "string") {
         setDevResetUrl(data.devResetUrl);
       }
+      setForgotSendMeta({
+        attempted: Boolean(data.attemptedEmailDelivery),
+        sent: Boolean(data.emailSent),
+        configured: Boolean(data.emailDeliveryConfigured),
+      });
     } catch {
       setForgotError("Request failed. Try again.");
     }
