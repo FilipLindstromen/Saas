@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const owned = await prisma.organizedItem.findMany({
-      where: { userId, id: { in: ids } },
+      where: { userId, id: { in: ids }, deletedAt: null },
       select: { id: true },
     });
     if (owned.length !== ids.length) {

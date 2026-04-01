@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
 import type { Prisma } from "../../../../../prisma/generated/prisma/client";
+import { withActiveOrganizedItems } from "@/lib/organized-item-scope";
 
 function completedTasksWhere(
   userId: string,
@@ -42,7 +43,9 @@ export async function GET() {
 
     const projectCounts = await Promise.all(
       projects.map((p) =>
-        prisma.organizedItem.count({ where: { userId, projectId: p.id } }).then((c) => c)
+        prisma.organizedItem
+          .count({ where: withActiveOrganizedItems({ userId, projectId: p.id }) })
+          .then((c) => c)
       )
     );
     const emptyProjectCount = projectCounts.filter((c) => c === 0).length;

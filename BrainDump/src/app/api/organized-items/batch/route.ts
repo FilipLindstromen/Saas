@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       // findFirst avoids aggregate + driver edge cases; same as min(listOrder) for this user
       const minRow = await tx.organizedItem.findFirst({
-        where: { userId },
+        where: { userId, deletedAt: null },
         orderBy: { listOrder: "asc" },
         select: { listOrder: true },
       });
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
             insertBeforeItemId !== insertAfterItemId
           ) {
             const beforeRow = await tx.organizedItem.findFirst({
-              where: { id: insertBeforeItemId, userId },
+              where: { id: insertBeforeItemId, userId, deletedAt: null },
               select: { listOrder: true, createdAt: true },
             });
             if (beforeRow) {

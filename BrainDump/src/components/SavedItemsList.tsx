@@ -41,6 +41,7 @@ interface SavedItemsListProps {
   projectId: string | null;
   category: string | null;
   itemType: string | null;
+  onItemMovedToTrash?: (id: string, title: string) => void;
 }
 
 function isTaskRow(it: Pick<SavedItem, "itemType">): boolean {
@@ -69,7 +70,7 @@ function savedItemToViewItem(it: SavedItem): ViewItem {
   };
 }
 
-export function SavedItemsList({ mode, projectId, category, itemType }: SavedItemsListProps) {
+export function SavedItemsList({ mode, projectId, category, itemType, onItemMovedToTrash }: SavedItemsListProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,14 +134,22 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
       .catch(() => {});
   }, []);
 
-  const deleteItem = useCallback((id: string, skipConfirm?: boolean) => {
-    if (!skipConfirm && !confirm("Delete this item?")) return;
-    fetch(`/api/organized-items/${id}`, { method: "DELETE" })
-      .then((r) => {
-        if (r.ok) setItems((prev) => prev.filter((it) => it.id !== id));
-      })
-      .catch(() => {});
-  }, []);
+  const deleteItem = useCallback(
+    (id: string, skipConfirm?: boolean) => {
+      const it = items.find((i) => i.id === id);
+      const title = (it?.title ?? "").trim() || "—";
+      if (!skipConfirm && !confirm(t("items.moveToTrashConfirm"))) return;
+      fetch(`/api/organized-items/${id}`, { method: "DELETE" })
+        .then((r) => {
+          if (r.ok) {
+            setItems((prev) => prev.filter((x) => x.id !== id));
+            onItemMovedToTrash?.(id, title);
+          }
+        })
+        .catch(() => {});
+    },
+    [items, onItemMovedToTrash, t]
+  );
 
   const updateItemType = useCallback((id: string, newType: string) => {
     const patch: Record<string, unknown> = { itemType: newType };
@@ -386,6 +395,7 @@ export function SavedItemsList({ mode, projectId, category, itemType }: SavedIte
         {items.map((it) => (
           <div
             key={it.id}
+            data-bd-mobile-entry={isMobile ? "1" : undefined}
             onDoubleClick={() => setEditingEntry({ id: it.id, title: it.title, content: it.content ?? "" })}
             {...(isMobile
               ? bindSavedCardTouch(savedItemToViewItem(it), undefined, () =>

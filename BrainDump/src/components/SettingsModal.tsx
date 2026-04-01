@@ -21,39 +21,13 @@ import {
   loadGoogleCalendarAccessToken,
   saveGoogleCalendarAccessToken,
 } from "@/lib/google-calendar-token";
+import { scheduleClientPreferencesUpload } from "@/lib/client-preferences-sync";
+import { applyTextSizeOnLoad, loadTextSize, saveTextSize, TEXT_SIZE_OPTIONS } from "@/lib/text-size-settings";
 
-const TEXT_SIZE_KEY = "braindump_text_size";
 const GOOGLE_CALENDAR_SYNC_KEY = "braindump_google_calendar_sync";
 const GOOGLE_CALENDAR_ID_KEY = "braindump_google_calendar_id";
 const GOOGLE_CALENDAR_SUMMARY_KEY = "braindump_google_calendar_summary";
 const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
-
-const TEXT_SIZE_OPTIONS = [
-  { value: "small", label: "Small", scale: 0.8 },
-  { value: "medium", label: "Medium", scale: 0.875 },
-  { value: "large", label: "Large", scale: 1.125 },
-  { value: "xlarge", label: "Extra large", scale: 1.25 },
-] as const;
-
-function loadTextSize(): string {
-  if (typeof window === "undefined") return "medium";
-  try {
-    const v = localStorage.getItem(TEXT_SIZE_KEY);
-    if (v && TEXT_SIZE_OPTIONS.some((o) => o.value === v)) return v;
-  } catch {}
-  return "medium";
-}
-
-function saveTextSize(value: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(TEXT_SIZE_KEY, value);
-    const opt = TEXT_SIZE_OPTIONS.find((o) => o.value === value);
-    document.documentElement.style.setProperty("--text-scale", String(opt?.scale ?? 1));
-  } catch (e) {
-    console.warn("Failed to save text size", e);
-  }
-}
 
 export function loadGoogleCalendarSync(): boolean {
   if (typeof window === "undefined") return false;
@@ -67,6 +41,7 @@ function saveGoogleCalendarSync(enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(GOOGLE_CALENDAR_SYNC_KEY, enabled ? "true" : "false");
+    scheduleClientPreferencesUpload();
   } catch (e) {
     console.warn("Failed to save Google Calendar sync preference", e);
   }
@@ -91,6 +66,7 @@ function saveGoogleClientId(clientId: string): void {
     const current = raw ? JSON.parse(raw) : {};
     const next = { ...current, googleClientId: clientId.trim() };
     localStorage.setItem("saasApiKeys", JSON.stringify(next));
+    scheduleClientPreferencesUpload();
   } catch (e) {
     console.warn("Failed to save Google Client ID", e);
   }
@@ -117,16 +93,10 @@ function saveGoogleCalendarSelection(id: string, summary: string): void {
   try {
     localStorage.setItem(GOOGLE_CALENDAR_ID_KEY, id);
     localStorage.setItem(GOOGLE_CALENDAR_SUMMARY_KEY, summary);
+    scheduleClientPreferencesUpload();
   } catch (e) {
     console.warn("Failed to save calendar selection", e);
   }
-}
-
-export function applyTextSizeOnLoad(): void {
-  if (typeof window === "undefined") return;
-  const value = loadTextSize();
-  const opt = TEXT_SIZE_OPTIONS.find((o) => o.value === value);
-  document.documentElement.style.setProperty("--text-scale", String(opt?.scale ?? 1));
 }
 
 interface SettingsModalProps {
@@ -272,6 +242,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (selectedCalendarId && selectedCalendarSummary) {
       saveGoogleCalendarSelection(selectedCalendarId, selectedCalendarSummary);
     }
+    scheduleClientPreferencesUpload();
     onClose();
   };
 
@@ -723,6 +694,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {calendarImportMessage.text}
               </p>
             )}
+          </div>
+          <div
+            style={{
+              marginBottom: "1rem",
+              paddingTop: "0.75rem",
+              borderTop: "1px solid var(--border-subtle)",
+            }}
+          >
+            <button
+              type="button"
+              className="bd-btn"
+              style={{ width: "100%", justifyContent: "center" }}
+              onClick={() => window.open(`${window.location.origin}/privacy`, "_blank", "noopener,noreferrer")}
+            >
+              {t("settings.privacy")}
+            </button>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0.45rem 0 0", lineHeight: 1.45 }}>
+              {t("settings.privacyHelp")}
+            </p>
           </div>
           {showClientIdOverlay && (
             <div

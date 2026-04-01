@@ -17,6 +17,7 @@ export function saveShowEntryTitles(show: boolean): void {
   try {
     localStorage.setItem(SHOW_ENTRY_TITLES_KEY, show ? "true" : "false");
     window.dispatchEvent(new Event(ENTRY_DISPLAY_CHANGED));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {
     /* ignore */
   }

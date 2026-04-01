@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { auth } from "@/auth";
 import type { Prisma } from "../../../../../prisma/generated/prisma/client";
+import { withActiveOrganizedItems } from "@/lib/organized-item-scope";
 
 type DomainFilter = "work" | "personal" | "all";
 
@@ -147,6 +148,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: "Unknown scope type" }, { status: 400 });
     }
+
+    where = withActiveOrganizedItems(where);
 
     if (dryRun) {
       const count = await prisma.organizedItem.count({ where });

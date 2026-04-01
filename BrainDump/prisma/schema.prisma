@@ -61,6 +61,8 @@ model OrganizedItem {
   listOrder        Float     @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  /// Soft-delete: set when user moves item to trash; null = active.
+  deletedAt        DateTime?
 
   dump     Dump     @relation(fields: [dumpId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -73,6 +75,7 @@ model OrganizedItem {
   @@index([userId, itemType])
   @@index([userId, status])
   @@index([userId, scheduledAt])
+  @@index([userId, deletedAt])
 }
 
 model Project {
@@ -120,6 +123,8 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?    // for email/password sign-in only
+  /// Client-only UI settings (localStorage mirror) for cross-device sync — not secrets; OAuth tokens stay local.
+  clientPreferences Json     @default("{}")
 
   accounts           Account[]
   sessions           Session[]

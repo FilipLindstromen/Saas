@@ -15,6 +15,10 @@ import {
   type SetStateAction,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT,
+  scheduleClientPreferencesUpload,
+} from "@/lib/client-preferences-sync";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
@@ -119,6 +123,8 @@ interface ItemsViewAreaProps {
   onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
   /** Desktop: register content immediately left of the scope search filter (e.g. AI next-actions). */
   onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
+  /** After a successful soft-delete (trash); parent may show undo. */
+  onItemMovedToTrash?: (id: string, title: string) => void;
 }
 
 function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
@@ -130,6 +136,13 @@ function isTaskCompleted(it: Pick<ViewItem, "itemType" | "progress" | "kanbanCol
     it.itemType === "task_completed" ||
     (it.itemType === "task" && (it.progress === "completed" || it.kanbanColumn === "completed"))
   );
+}
+
+/** Calendar view: strikethrough for checked-off tasks and completed calendar events. */
+function isCompletedInCalendarView(it: Pick<ViewItem, "itemType" | "progress" | "kanbanColumn">): boolean {
+  if (isTaskCompleted(it)) return true;
+  if (it.itemType === "calendar" && (it.progress === "completed" || it.kanbanColumn === "completed")) return true;
+  return false;
 }
 
 /** Type filter chip / count bucket: incomplete tasks → "task", completed → "task_completed". */
@@ -481,6 +494,7 @@ export function ItemsViewArea({
   scopeSlot,
   onMobileTopBarBeforeMenuSlot,
   onDesktopScopeBeforeFilterSlot,
+  onItemMovedToTrash,
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
@@ -921,15 +935,21 @@ export function ItemsViewArea({
   useEffect(() => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, viewType);
+      scheduleClientPreferencesUpload();
     } catch {}
   }, [viewType]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("braindump_postit_links");
-      const parsed: Record<string, { fromId: string; toId: string }[]> = raw ? JSON.parse(raw) : {};
-      setPostitLinks(parsed[mode] ?? []);
-    } catch {}
+    const load = () => {
+      try {
+        const raw = localStorage.getItem("braindump_postit_links");
+        const parsed: Record<string, { fromId: string; toId: string }[]> = raw ? JSON.parse(raw) : {};
+        setPostitLinks(parsed[mode] ?? []);
+      } catch {}
+    };
+    load();
+    window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, load);
+    return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, load);
   }, [mode]);
 
   useEffect(() => {
@@ -939,6 +959,7 @@ export function ItemsViewArea({
       const parsed: Record<string, { fromId: string; toId: string }[]> = raw ? JSON.parse(raw) : {};
       parsed[mode] = postitLinks;
       localStorage.setItem(key, JSON.stringify(parsed));
+      scheduleClientPreferencesUpload();
     } catch {}
   }, [mode, postitLinks]);
 
@@ -996,14 +1017,19 @@ export function ItemsViewArea({
 
   const deleteItem = useCallback(
     (id: string, skipConfirm?: boolean) => {
-      if (!skipConfirm && !confirm("Delete this item?")) return;
+      const it = items.find((i) => i.id === id);
+      const title = (it?.title ?? "").trim() || "—";
+      if (!skipConfirm && !confirm(t("items.moveToTrashConfirm"))) return;
       fetch(`/api/organized-items/${id}`, { method: "DELETE" })
         .then((r) => {
-          if (r.ok) setItems((prev) => prev.filter((it) => it.id !== id));
+          if (r.ok) {
+            setItems((prev) => prev.filter((x) => x.id !== id));
+            onItemMovedToTrash?.(id, title);
+          }
         })
         .catch(() => {});
     },
-    []
+    [items, onItemMovedToTrash, t]
   );
 
   const updateItemType = useCallback((id: string, newType: string) => {
@@ -1506,16 +1532,6 @@ export function ItemsViewArea({
     ],
     [t]
   );
-
-  const editSheetScopeLabel = useMemo(() => {
-    if (mode === "work") {
-      return !projectId ? t("scope.all") : projectsList.find((p) => p.id === projectId)?.name ?? t("scope.all");
-    }
-    if (mode === "personal" || mode === "all") {
-      return category ? formatAreaLabel(category) : t("scope.all");
-    }
-    return t("scope.all");
-  }, [mode, projectId, category, projectsList, t]);
 
   if (loading) {
     return (
@@ -2241,36 +2257,7 @@ export function ItemsViewArea({
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
-            <button
-              type="button"
-              className="bd-edit-entry-mobile-scope"
-              onClick={() => {
-                if (mode === "inbox") return;
-                window.dispatchEvent(new Event("braindump-open-scope-picker"));
-              }}
-              aria-label={t("scope.openProjectMenu")}
-              disabled={mode === "inbox"}
-            >
-              <span className="bd-edit-entry-mobile-scope-label">{editSheetScopeLabel}</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
             <div className="bd-edit-entry-mobile-top-actions">
-              <button
-                type="button"
-                className="bd-edit-entry-icon-btn"
-                aria-pressed={Boolean(editingEntry.priority)}
-                aria-label={t("items.editFlag")}
-                onClick={() =>
-                  setEditingEntry((p) => (p ? { ...p, priority: p.priority ? null : 1 } : null))
-                }
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill={editingEntry.priority ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                  <line x1="4" y1="22" x2="4" y2="15" />
-                </svg>
-              </button>
               <button
                 type="button"
                 className="bd-edit-entry-icon-btn"
@@ -3619,12 +3606,14 @@ function CalendarView({
             const past =
               it.scheduledAt &&
               new Date(String(it.scheduledAt).slice(0, 10)) < new Date(todayNorm.getFullYear(), todayNorm.getMonth(), todayNorm.getDate());
+            const completed = isCompletedInCalendarView(it);
             const taskDeadline = isTaskRow(it);
             const typeColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
             return (
               <button
                 key={it.id}
                 type="button"
+                data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
                 onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
                 {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
                 onDoubleClick={() => onEdit(it)}
@@ -3664,8 +3653,24 @@ function CalendarView({
                   >
                     <EntryTypeIcon type={it.itemType || "note"} size={isMobile ? 18 : 20} />
                   </span>
-                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
-                    {it.scheduledTime && <span style={{ marginRight: "0.35rem", opacity: 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>}
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      lineHeight: 1.35,
+                      ...(completed
+                        ? {
+                            textDecoration: "line-through",
+                            textDecorationThickness: "0.08em",
+                            textUnderlineOffset: "0.12em",
+                            opacity: 0.9,
+                          }
+                        : {}),
+                    }}
+                  >
+                    {it.scheduledTime && (
+                      <span style={{ marginRight: "0.35rem", opacity: completed ? 0.85 : 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>
+                    )}
                     {entryPrimaryLine(it, showEntryTitles)}
                   </span>
                 </span>
@@ -3864,6 +3869,7 @@ function MindmapView({
       <div
         key={it.id}
         className={ep.className}
+        data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
         style={{
           ...ep.style,
           display: "flex",
@@ -3898,6 +3904,7 @@ function MindmapView({
         <button
           type="button"
           className="bd-mindmap-entry"
+          data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
           style={{
             flex: 1,
             minWidth: 0,
@@ -4189,6 +4196,11 @@ export function useMobileEntryFieldGestures(
                 if (!cur || cur.pointerId !== pointerId || !onItemContextMenu) return;
                 cur.longFired = true;
                 cur.timer = null;
+                try {
+                  window.getSelection()?.removeAllRanges();
+                } catch {
+                  /* ignore */
+                }
                 onItemContextMenu(syntheticContextMenuEvent(clientX, clientY), it.id, it.domain, it.itemType);
               }, MOBILE_LONG_PRESS_MS) as unknown as number)
             : null;
@@ -4330,49 +4342,60 @@ function SwipeDeleteRow({
       ? "bd-swipe-delete-slide bd-swipe-delete-slide--elevated"
       : "bd-swipe-delete-slide bd-swipe-delete-slide--canvas";
 
+  /** Commit open/closed snap after a horizontal swipe ends (pointer up, cancel, or implicit capture loss). */
+  const commitHorizontalSwipeEnd = (pointerId: number, slideEl: HTMLElement) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== pointerId || d.lock !== "h") return;
+    /** Clear before `releasePointerCapture` so a synchronous `lostpointercapture` does not re-enter this commit. */
+    drag.current = null;
+    try {
+      slideEl.releasePointerCapture(pointerId);
+    } catch {
+      /* already released — common on mobile when the browser steals the gesture */
+    }
+    const final = offsetRef.current;
+    setTransitioning(true);
+    const samples = swipeVelSamplesRef.current;
+    let vx = 0;
+    if (samples.length >= 2) {
+      const last = samples[samples.length - 1];
+      const first = samples[0];
+      const dt = (last.t - first.t) / 1000;
+      if (dt > 0.012) vx = (last.x - first.x) / dt;
+    }
+    swipeVelSamplesRef.current = [];
+    const commitLine = SWIPE_DELETE_WIDTH_PX * SWIPE_OPEN_COMMIT_RATIO;
+    let snapOpen: boolean;
+    if (vx < SWIPE_FLING_OPEN_VX) snapOpen = true;
+    else if (vx > SWIPE_FLING_CLOSE_VX) snapOpen = false;
+    else snapOpen = final >= commitLine;
+    if (snapOpen) {
+      const full = SWIPE_DELETE_WIDTH_PX;
+      offsetRef.current = full;
+      setSwipeOpenId(entryId);
+      setOffset(full);
+    } else {
+      offsetRef.current = 0;
+      setOffset(0);
+      setSwipeOpenId((prev) => (prev === entryId ? null : prev));
+    }
+    window.dispatchEvent(
+      new CustomEvent("bd-mobile-field-gesture-end", { detail: { pointerId } })
+    );
+  };
+
   const finishPointer = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d || d.pointerId !== e.pointerId) return;
     if (d.lock === "h") {
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      const final = offsetRef.current;
-      drag.current = null;
-      setTransitioning(true);
-      const samples = swipeVelSamplesRef.current;
-      let vx = 0;
-      if (samples.length >= 2) {
-        const last = samples[samples.length - 1];
-        const first = samples[0];
-        const dt = (last.t - first.t) / 1000;
-        if (dt > 0.012) vx = (last.x - first.x) / dt;
-      }
-      swipeVelSamplesRef.current = [];
-      const commitLine = SWIPE_DELETE_WIDTH_PX * SWIPE_OPEN_COMMIT_RATIO;
-      let snapOpen: boolean;
-      if (vx < SWIPE_FLING_OPEN_VX) snapOpen = true;
-      else if (vx > SWIPE_FLING_CLOSE_VX) snapOpen = false;
-      else snapOpen = final >= commitLine;
-      if (snapOpen) {
-        const full = SWIPE_DELETE_WIDTH_PX;
-        offsetRef.current = full;
-        setSwipeOpenId(entryId);
-        setOffset(full);
-      } else {
-        offsetRef.current = 0;
-        setOffset(0);
-        setSwipeOpenId((prev) => (prev === entryId ? null : prev));
-      }
+      commitHorizontalSwipeEnd(e.pointerId, e.currentTarget as HTMLElement);
     } else {
       drag.current = null;
       setTransitioning(true);
+      window.dispatchEvent(
+        new CustomEvent("bd-mobile-field-gesture-end", { detail: { pointerId: e.pointerId } })
+      );
     }
-    window.dispatchEvent(
-      new CustomEvent("bd-mobile-field-gesture-end", { detail: { pointerId: e.pointerId } })
-    );
   };
 
   return (
@@ -4433,7 +4456,8 @@ function SwipeDeleteRow({
           if (d.lock === "none") {
             if (Math.abs(dx) < SWIPE_LOCK_THRESHOLD_PX && Math.abs(dy) < SWIPE_LOCK_THRESHOLD_PX) return;
             // Bias horizontal: only treat as vertical scroll when clearly more vertical than horizontal.
-            if (Math.abs(dy) > Math.abs(dx) * 1.18) {
+            /* Prefer horizontal swipe: require a clearly vertical intent before handing off to scroll */
+            if (Math.abs(dy) > Math.abs(dx) * 1.45) {
               d.lock = "v";
               drag.current = null;
               swipeVelSamplesRef.current = [];
@@ -4462,7 +4486,12 @@ function SwipeDeleteRow({
         }}
         onPointerUp={finishPointer}
         onPointerCancel={finishPointer}
-        onLostPointerCapture={() => {
+        onLostPointerCapture={(e) => {
+          const d = drag.current;
+          if (d && d.pointerId === e.pointerId && d.lock === "h") {
+            commitHorizontalSwipeEnd(e.pointerId, e.currentTarget as HTMLElement);
+            return;
+          }
           drag.current = null;
           setTransitioning(true);
         }}
@@ -4600,6 +4629,7 @@ function ListView({
       <div
         className={`bd-todo-row ${ep.className}`}
         data-bd-entry-id={it.id}
+        data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
         onDoubleClick={() => onEdit?.(it)}
         onContextMenu={
           onItemContextMenu && !isMobile ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); } : undefined
@@ -5061,6 +5091,7 @@ function TextView({
           <div
             className={ep.className}
             data-bd-entry-id={it.id}
+            data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
             style={{
               ...ep.style,
               display: "flex",
@@ -5516,6 +5547,7 @@ function KanbanView({
               key={it.id}
               className={ep.className}
               draggable
+              data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
               onDragStart={(e) => handleDragStart(e, it.id)}
               onDragEnd={handleDragEnd}
               onDragOver={(e) => handleDragOver(e, col.key)}
@@ -5888,6 +5920,7 @@ function PostitsView({
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
                 cursor: lineToolActive ? "crosshair" : dragState?.id === it.id ? "grabbing" : "grab",
                 userSelect: "none",
+                WebkitTouchCallout: "none",
                 display: "flex",
                 flexDirection: "row",
                 overflow: "hidden",

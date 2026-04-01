@@ -17,6 +17,7 @@ export function saveShowDumpFace(show: boolean): void {
   try {
     localStorage.setItem(SHOW_DUMP_FACE_KEY, show ? "true" : "false");
     window.dispatchEvent(new Event(DUMP_FACE_CHANGED));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {
     /* ignore */
   }

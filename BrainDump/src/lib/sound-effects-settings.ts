@@ -14,6 +14,7 @@ export function saveSoundEffectsEnabled(enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(SOUND_EFFECTS_KEY, enabled ? "true" : "false");
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {
     /* ignore */
   }

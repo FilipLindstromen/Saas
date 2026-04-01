@@ -16,7 +16,7 @@ export async function GET() {
     const userId = (session.user as { id?: string }).id!;
 
     const items = await prisma.organizedItem.findMany({
-      where: { userId, reminderAt: { not: null } },
+      where: { userId, reminderAt: { not: null }, deletedAt: null },
       select: {
         id: true,
         title: true,

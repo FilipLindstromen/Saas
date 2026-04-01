@@ -25,6 +25,7 @@ export function saveRevenueCatEnabled(enabled: boolean): void {
   try {
     localStorage.setItem(REVENUECAT_ENABLED_STORAGE_KEY, enabled ? "true" : "false");
     window.dispatchEvent(new CustomEvent(REVENUECAT_ENABLED_CHANGED));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {
     /* ignore */
   }

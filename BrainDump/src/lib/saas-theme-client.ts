@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT } from "@/lib/client-preferences-sync";
 
 /** Resolved app theme from `data-theme` / localStorage (matches ThemeToggle). */
 export function useSaasTheme(): "light" | "dark" {
@@ -38,11 +39,14 @@ export function useSaasTheme(): "light" | "dark" {
         /* ignore */
       }
     };
+    const onPrefsApplied = () => onStorage();
     window.addEventListener("storage", onStorage);
     window.addEventListener("saas-theme-change", onThemeChange);
+    window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, onPrefsApplied);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("saas-theme-change", onThemeChange);
+      window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, onPrefsApplied);
     };
   }, []);
 

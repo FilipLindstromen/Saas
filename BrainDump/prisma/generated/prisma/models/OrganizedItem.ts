@@ -75,6 +75,7 @@ export type OrganizedItemMinAggregateOutputType = {
   listOrder: number | null
   createdAt: Date | null
   updatedAt: Date | null
+  deletedAt: Date | null
 }
 
 export type OrganizedItemMaxAggregateOutputType = {
@@ -108,6 +109,7 @@ export type OrganizedItemMaxAggregateOutputType = {
   listOrder: number | null
   createdAt: Date | null
   updatedAt: Date | null
+  deletedAt: Date | null
 }
 
 export type OrganizedItemCountAggregateOutputType = {
@@ -141,6 +143,7 @@ export type OrganizedItemCountAggregateOutputType = {
   listOrder: number
   createdAt: number
   updatedAt: number
+  deletedAt: number
   _all: number
 }
 
@@ -194,6 +197,7 @@ export type OrganizedItemMinAggregateInputType = {
   listOrder?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
 }
 
 export type OrganizedItemMaxAggregateInputType = {
@@ -227,6 +231,7 @@ export type OrganizedItemMaxAggregateInputType = {
   listOrder?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
 }
 
 export type OrganizedItemCountAggregateInputType = {
@@ -260,6 +265,7 @@ export type OrganizedItemCountAggregateInputType = {
   listOrder?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
   _all?: true
 }
 
@@ -380,6 +386,7 @@ export type OrganizedItemGroupByOutputType = {
   listOrder: number
   createdAt: Date
   updatedAt: Date
+  deletedAt: Date | null
   _count: OrganizedItemCountAggregateOutputType | null
   _avg: OrganizedItemAvgAggregateOutputType | null
   _sum: OrganizedItemSumAggregateOutputType | null
@@ -436,6 +443,7 @@ export type OrganizedItemWhereInput = {
   listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
@@ -473,6 +481,7 @@ export type OrganizedItemOrderByWithRelationInput = {
   listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   dump?: Prisma.DumpOrderByWithRelationInput
   user?: Prisma.UserOrderByWithRelationInput
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -513,6 +522,7 @@ export type OrganizedItemWhereUniqueInput = Prisma.AtLeast<{
   listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
   dump?: Prisma.XOR<Prisma.DumpScalarRelationFilter, Prisma.DumpWhereInput>
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
@@ -550,6 +560,7 @@ export type OrganizedItemOrderByWithAggregationInput = {
   listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.OrganizedItemCountOrderByAggregateInput
   _avg?: Prisma.OrganizedItemAvgOrderByAggregateInput
   _max?: Prisma.OrganizedItemMaxOrderByAggregateInput
@@ -591,6 +602,7 @@ export type OrganizedItemScalarWhereWithAggregatesInput = {
   listOrder?: Prisma.FloatWithAggregatesFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"OrganizedItem"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OrganizedItem"> | Date | string | null
 }
 
 export type OrganizedItemCreateInput = {
@@ -621,6 +633,7 @@ export type OrganizedItemCreateInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
   user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
@@ -658,6 +671,7 @@ export type OrganizedItemUncheckedCreateInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
 }
 
@@ -689,6 +703,7 @@ export type OrganizedItemUpdateInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
@@ -726,6 +741,7 @@ export type OrganizedItemUncheckedUpdateInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
 }
 
@@ -760,6 +776,7 @@ export type OrganizedItemCreateManyInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
 }
 
 export type OrganizedItemUpdateManyMutationInput = {
@@ -790,6 +807,7 @@ export type OrganizedItemUpdateManyMutationInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OrganizedItemUncheckedUpdateManyInput = {
@@ -823,6 +841,7 @@ export type OrganizedItemUncheckedUpdateManyInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OrganizedItemListRelationFilter = {
@@ -866,6 +885,7 @@ export type OrganizedItemCountOrderByAggregateInput = {
   listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
 }
 
 export type OrganizedItemAvgOrderByAggregateInput = {
@@ -908,6 +928,7 @@ export type OrganizedItemMaxOrderByAggregateInput = {
   listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
 }
 
 export type OrganizedItemMinOrderByAggregateInput = {
@@ -941,6 +962,7 @@ export type OrganizedItemMinOrderByAggregateInput = {
   listOrder?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
 }
 
 export type OrganizedItemSumOrderByAggregateInput = {
@@ -1153,6 +1175,7 @@ export type OrganizedItemCreateWithoutDumpInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
@@ -1188,6 +1211,7 @@ export type OrganizedItemUncheckedCreateWithoutDumpInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
 }
 
@@ -1251,6 +1275,7 @@ export type OrganizedItemScalarWhereInput = {
   listOrder?: Prisma.FloatFilter<"OrganizedItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OrganizedItem"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableFilter<"OrganizedItem"> | Date | string | null
 }
 
 export type OrganizedItemCreateWithoutProjectInput = {
@@ -1281,6 +1306,7 @@ export type OrganizedItemCreateWithoutProjectInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
   user: Prisma.UserCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
@@ -1316,6 +1342,7 @@ export type OrganizedItemUncheckedCreateWithoutProjectInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
 }
 
@@ -1373,6 +1400,7 @@ export type OrganizedItemCreateWithoutTagsInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
   user: Prisma.UserCreateNestedOneWithoutItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
@@ -1409,6 +1437,7 @@ export type OrganizedItemUncheckedCreateWithoutTagsInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
 }
 
 export type OrganizedItemCreateOrConnectWithoutTagsInput = {
@@ -1455,6 +1484,7 @@ export type OrganizedItemUpdateWithoutTagsInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
@@ -1491,6 +1521,7 @@ export type OrganizedItemUncheckedUpdateWithoutTagsInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OrganizedItemCreateWithoutUserInput = {
@@ -1521,6 +1552,7 @@ export type OrganizedItemCreateWithoutUserInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   dump: Prisma.DumpCreateNestedOneWithoutOrganizedItemsInput
   project?: Prisma.ProjectCreateNestedOneWithoutItemsInput
   tags?: Prisma.OrganizedItemTagCreateNestedManyWithoutItemInput
@@ -1556,6 +1588,7 @@ export type OrganizedItemUncheckedCreateWithoutUserInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedCreateNestedManyWithoutItemInput
 }
 
@@ -1615,6 +1648,7 @@ export type OrganizedItemCreateManyDumpInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
 }
 
 export type OrganizedItemUpdateWithoutDumpInput = {
@@ -1645,6 +1679,7 @@ export type OrganizedItemUpdateWithoutDumpInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
@@ -1680,6 +1715,7 @@ export type OrganizedItemUncheckedUpdateWithoutDumpInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
 }
 
@@ -1713,6 +1749,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutDumpInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OrganizedItemCreateManyProjectInput = {
@@ -1745,6 +1782,7 @@ export type OrganizedItemCreateManyProjectInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
 }
 
 export type OrganizedItemUpdateWithoutProjectInput = {
@@ -1775,6 +1813,7 @@ export type OrganizedItemUpdateWithoutProjectInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
@@ -1810,6 +1849,7 @@ export type OrganizedItemUncheckedUpdateWithoutProjectInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
 }
 
@@ -1843,6 +1883,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutProjectInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type OrganizedItemCreateManyUserInput = {
@@ -1875,6 +1916,7 @@ export type OrganizedItemCreateManyUserInput = {
   listOrder?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
 }
 
 export type OrganizedItemUpdateWithoutUserInput = {
@@ -1905,6 +1947,7 @@ export type OrganizedItemUpdateWithoutUserInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   dump?: Prisma.DumpUpdateOneRequiredWithoutOrganizedItemsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutItemsNestedInput
   tags?: Prisma.OrganizedItemTagUpdateManyWithoutItemNestedInput
@@ -1940,6 +1983,7 @@ export type OrganizedItemUncheckedUpdateWithoutUserInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   tags?: Prisma.OrganizedItemTagUncheckedUpdateManyWithoutItemNestedInput
 }
 
@@ -1973,6 +2017,7 @@ export type OrganizedItemUncheckedUpdateManyWithoutUserInput = {
   listOrder?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 
@@ -2037,6 +2082,7 @@ export type OrganizedItemSelect<ExtArgs extends runtime.Types.Extensions.Interna
   listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
@@ -2075,6 +2121,7 @@ export type OrganizedItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
@@ -2111,6 +2158,7 @@ export type OrganizedItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.OrganizedItem$projectArgs<ExtArgs>
@@ -2147,9 +2195,10 @@ export type OrganizedItemSelectScalar = {
   listOrder?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
 }
 
-export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "userId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "listOrder" | "createdAt" | "updatedAt", ExtArgs["result"]["organizedItem"]>
+export type OrganizedItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dumpId" | "userId" | "domain" | "category" | "subcategory" | "projectId" | "itemType" | "title" | "content" | "emotionLabel" | "status" | "progress" | "priority" | "recommendedView" | "confidenceScore" | "positionX" | "positionY" | "kanbanColumn" | "scheduledAt" | "scheduledTime" | "recurrence" | "sendNotification" | "reminderAt" | "reminderMinutesBefore" | "reminderNotifiedAt" | "reminderEarlyNotifiedAt" | "listOrder" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["organizedItem"]>
 export type OrganizedItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dump?: boolean | Prisma.DumpDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -2210,6 +2259,10 @@ export type $OrganizedItemPayload<ExtArgs extends runtime.Types.Extensions.Inter
     listOrder: number
     createdAt: Date
     updatedAt: Date
+    /**
+     * Soft-delete: set when user moves item to trash; null = active.
+     */
+    deletedAt: Date | null
   }, ExtArgs["result"]["organizedItem"]>
   composites: {}
 }
@@ -2667,6 +2720,7 @@ export interface OrganizedItemFieldRefs {
   readonly listOrder: Prisma.FieldRef<"OrganizedItem", 'Float'>
   readonly createdAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
+  readonly deletedAt: Prisma.FieldRef<"OrganizedItem", 'DateTime'>
 }
     
 

@@ -1,6 +1,8 @@
-/** Lightweight dump habit streaks — localStorage only. */
+/** Lightweight dump habit streaks — localStorage with optional cloud sync via `client-preferences-sync`. */
 
-const STORAGE_KEY = "braindump-dump-streak-v1";
+export const DUMP_STREAK_STORAGE_KEY = "braindump-dump-streak-v1";
+
+const STORAGE_KEY = DUMP_STREAK_STORAGE_KEY;
 
 export const STREAK_RECORDED_EVENT = "braindump-streak-recorded";
 
@@ -53,6 +55,7 @@ function save(state: DumpStreakState): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {}
 }
 

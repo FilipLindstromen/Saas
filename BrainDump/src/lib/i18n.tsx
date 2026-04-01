@@ -9,6 +9,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT,
+  scheduleClientPreferencesUpload,
+} from "@/lib/client-preferences-sync";
 import { BRAINDUMP_LOCALE_KEY, interpolate, messages, type Locale } from "./messages";
 
 export type { Locale };
@@ -45,6 +49,18 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const sync = () => {
+      const l = readStoredLocale();
+      setLocaleState(l);
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = l === "sv" ? "sv" : "en";
+      }
+    };
+    window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
+    return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
+  }, []);
+
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     try {
@@ -55,6 +71,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (typeof document !== "undefined") {
       document.documentElement.lang = l === "sv" ? "sv" : "en";
     }
+    scheduleClientPreferencesUpload();
   }, []);
 
   const t = useCallback<TFn>(

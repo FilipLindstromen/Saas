@@ -1,10 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
+import { COACH_MODE_IDS, type CoachModeId } from "@/lib/coach-modes";
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
+
+/** Renders markdown-style **bold** as <strong>; leaves unmatched ** as plain text. */
+function coachChatFormattedContent(text: string): ReactNode {
+  const re = /\*\*([\s\S]*?)\*\*/g;
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    nodes.push(<strong key={`bd-coach-b-${k++}`}>{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes.length === 0 ? text : <Fragment>{nodes}</Fragment>;
+}
 
 type CoachChatOverlayProps = {
   open: boolean;
@@ -18,6 +35,7 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [coachMode, setCoachMode] = useState<CoachModeId>("balanced");
   const listRef = useRef<HTMLDivElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -121,6 +139,14 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
     setRecording(false);
   };
 
+  const startNewChat = useCallback(() => {
+    if (loading) return;
+    abortRecording();
+    setMessages([]);
+    setInput("");
+    setError(null);
+  }, [loading, abortRecording]);
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -133,7 +159,7 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
       const r = await fetch("/api/coach-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, locale }),
+        body: JSON.stringify({ messages: next, locale, coachMode }),
       });
       const data = (await r.json()) as { message?: string; error?: string };
       if (!r.ok) {
@@ -169,6 +195,36 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
           </button>
         </header>
 
+        <div className="bd-coach-chat-toolbar">
+          <button
+            type="button"
+            className="bd-btn bd-coach-new-chat"
+            onClick={startNewChat}
+            disabled={loading}
+            aria-label={t("coach.newChat")}
+            title={t("coach.newChat")}
+          >
+            {t("coach.newChat")}
+          </button>
+          <label className="bd-coach-style-field">
+            <span className="bd-coach-style-label">{t("coach.styleLabel")}</span>
+            <select
+              id="bd-coach-style"
+              className="bd-input bd-coach-style-select"
+              value={coachMode}
+              onChange={(e) => setCoachMode(e.target.value as CoachModeId)}
+              disabled={loading}
+              aria-label={t("coach.styleLabel")}
+            >
+              {COACH_MODE_IDS.map((id) => (
+                <option key={id} value={id}>
+                  {t(`coach.style.${id}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <div ref={listRef} className="bd-coach-messages">
           {messages.length === 0 ? (
             <p className="bd-coach-hint">{t("coach.emptyHint")}</p>
@@ -178,7 +234,7 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
                 key={`${m.role}-${i}-${m.content.slice(0, 24)}`}
                 className={`bd-coach-bubble bd-coach-bubble--${m.role}`}
               >
-                {m.content}
+                {coachChatFormattedContent(m.content)}
               </div>
             ))
           )}

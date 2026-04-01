@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
+import { scheduleClientPreferencesUpload } from "@/lib/client-preferences-sync";
 import { CUSTOM_AREAS_KEY, PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
 
 interface Project {
@@ -25,7 +26,7 @@ interface ScopeBarProps {
   /** Filter entries by due date (tasks, calendar) — shown with search when filter is open. */
   dueDateFilter?: DueDateFilterPreset;
   onDueDateFilterChange?: (preset: DueDateFilterPreset) => void;
-  /** Desktop: content immediately left of the filter field (e.g. “Next 3 — AI”). */
+  /** Desktop: content immediately left of the filter field (e.g. “Next 5 — coach (AI)”). */
   beforeFilterSlot?: ReactNode;
 }
 
@@ -52,6 +53,7 @@ function saveCustomAreas(areas: string[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(CUSTOM_AREAS_KEY, JSON.stringify(areas));
+    scheduleClientPreferencesUpload();
   } catch {}
 }
 
@@ -784,7 +786,7 @@ export function ScopeBar({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "flex-start",
-                      gap: "0.35rem",
+                      gap: "0.5rem",
                       padding: "0.35rem 0",
                       border: "none",
                       background: "none",
@@ -798,7 +800,16 @@ export function ScopeBar({
                       WebkitTapHighlightColor: "transparent",
                     }}
                   >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", flex: 1, minWidth: 0 }}>
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        textAlign: "left",
+                        flex: "0 1 auto",
+                        minWidth: 0,
+                      }}
+                    >
                       {selectedProjectLabel}
                     </span>
                     <svg
@@ -811,7 +822,7 @@ export function ScopeBar({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.85, marginTop: 2 }}
+                      style={{ flexShrink: 0, opacity: 0.85 }}
                     >
                       <path d="m6 9 6 6 6-6" />
                     </svg>
@@ -1392,7 +1403,7 @@ export function ScopeBar({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "flex-start",
-                      gap: "0.35rem",
+                      gap: "0.5rem",
                       padding: "0.35rem 0",
                       border: "none",
                       background: "none",
@@ -1406,7 +1417,16 @@ export function ScopeBar({
                       WebkitTapHighlightColor: "transparent",
                     }}
                   >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", flex: 1, minWidth: 0 }}>
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        textAlign: "left",
+                        flex: "0 1 auto",
+                        minWidth: 0,
+                      }}
+                    >
                       {selectedCategory ? formatCategoryLabel(selectedCategory) : t("scope.all")}
                     </span>
                     <svg
@@ -1419,7 +1439,7 @@ export function ScopeBar({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.85, marginTop: 2 }}
+                      style={{ flexShrink: 0, opacity: 0.85 }}
                     >
                       <path d="m6 9 6 6 6-6" />
                     </svg>

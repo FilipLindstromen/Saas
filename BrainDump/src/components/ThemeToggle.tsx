@@ -1,5 +1,6 @@
 "use client";
 
+import { scheduleClientPreferencesUpload } from "@/lib/client-preferences-sync";
 import { useI18n } from "@/lib/i18n";
 import { useSaasTheme } from "@/lib/saas-theme-client";
 
@@ -18,6 +19,7 @@ export function ThemeToggle({ showLabels }: ThemeToggleProps) {
     try {
       localStorage.setItem("saas-apps-theme", next);
       window.dispatchEvent(new CustomEvent("saas-theme-change", { detail: next }));
+      scheduleClientPreferencesUpload();
     } catch {
       /* ignore */
     }

@@ -92,6 +92,7 @@ interface CenterPanelProps {
   onWorkProjectsChanged?: () => void;
   /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
   onDumpRecordingChange?: (active: boolean) => void;
+  onItemMovedToTrash?: (id: string, title: string) => void;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -133,6 +134,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     onDesktopScopeBeforeFilterSlot,
     onWorkProjectsChanged,
     onDumpRecordingChange,
+    onItemMovedToTrash,
   },
   ref
 ) {
@@ -897,30 +899,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                     <span className="bd-dump-timer-hint">{t("center.recordingMaxHint")}</span>
                   </span>
                 </div>
-                <div className="bd-dump-actions-row bd-dump-actions-row--split">
+                <div className="bd-dump-actions-row">
                   <button
                     type="button"
-                    className="bd-btn bd-btn-danger bd-dump-btn-main"
+                    className="bd-btn bd-btn-danger bd-dump-btn-wide"
                     onClick={closeDumpOverlay}
                     disabled={transcribeLoading || organizeLoading}
                     title={t("center.cancelRecording")}
                     aria-label={t("center.cancelRecording")}
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="bd-btn bd-btn-primary bd-dump-btn-main"
-                    onClick={handleStopAndProcess}
-                    disabled={transcribeLoading || organizeLoading}
-                    title={t("center.stopOrganize")}
-                    aria-label={t("center.stopOrganize")}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
+                    {t("center.cancelRecording")}
                   </button>
                 </div>
               </div>
@@ -1008,17 +996,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             onClick={(e) => e.stopPropagation()}
           >
             <header className="bd-dump-sheet-header">
-              <button
-                type="button"
-                className="bd-btn bd-dump-sheet-header-btn"
-                onClick={closeDumpOverlay}
-                disabled={isDumpProcessing}
-                aria-label={t("center.close")}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
               <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
                 {t("center.newDump")}
               </h2>
@@ -1033,79 +1010,58 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           </div>
         </div>
       )}
-      {showTypedDumpSheet && (
-        <div
-          className="bd-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bd-typed-dump-title"
-          onClick={closeTypedDumpSheet}
-        >
+      {showTypedDumpSheet &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="bd-panel bd-modal-panel bd-typed-dump-panel"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 560,
-              maxHeight: "min(90dvh, 90vh)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "1rem",
-              padding: "1.25rem",
-              overflow: "hidden",
-              boxSizing: "border-box",
-            }}
+            className="bd-modal-backdrop bd-typed-dump-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bd-typed-dump-title"
+            onClick={closeTypedDumpSheet}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexShrink: 0 }}>
-              <h2 id="bd-typed-dump-title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+            <div className="bd-panel bd-modal-panel bd-typed-dump-panel" onClick={(e) => e.stopPropagation()}>
+              <h2 id="bd-typed-dump-title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)", flexShrink: 0 }}>
                 {t("center.typeDumpTitle")}
               </h2>
-              <button
-                type="button"
-                className="bd-btn"
-                onClick={closeTypedDumpSheet}
-                aria-label={t("center.close")}
-                style={{ minHeight: 40, paddingInline: "0.65rem", flexShrink: 0 }}
+              <textarea
+                className="bd-input bd-typed-dump-textarea"
+                value={typedDumpText}
+                onChange={(e) => setTypedDumpText(e.target.value)}
+                placeholder={t("center.transcriptPlaceholder")}
+                autoFocus
+                aria-label={t("center.transcript")}
+                rows={8}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: "0.75rem",
+                  flexShrink: 0,
+                  marginTop: "auto",
+                }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
+                <button
+                  type="button"
+                  className="bd-btn bd-btn-primary"
+                  style={{ width: "100%" }}
+                  onClick={() => void handleTypedDumpOrganize()}
+                  disabled={!typedDumpText.trim() || isDumpProcessing}
+                >
+                  {t("center.typeDumpOrganize")}
+                </button>
+                <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+                  <button type="button" className="bd-btn" onClick={closeTypedDumpSheet}>
+                    {t("center.cancelDump")}
+                  </button>
+                </div>
+              </div>
             </div>
-            <textarea
-              className="bd-input"
-              value={typedDumpText}
-              onChange={(e) => setTypedDumpText(e.target.value)}
-              placeholder={t("center.transcriptPlaceholder")}
-              autoFocus
-              aria-label={t("center.transcript")}
-              rows={14}
-              style={{
-                flex: "1 1 auto",
-                minHeight: 200,
-                resize: "vertical",
-                width: "100%",
-                fontSize: "16px",
-                lineHeight: 1.45,
-                boxSizing: "border-box",
-              }}
-            />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", flexWrap: "wrap", flexShrink: 0 }}>
-              <button type="button" className="bd-btn" onClick={closeTypedDumpSheet}>
-                {t("center.cancelDump")}
-              </button>
-              <button
-                type="button"
-                className="bd-btn bd-btn-primary"
-                onClick={() => void handleTypedDumpOrganize()}
-                disabled={!typedDumpText.trim() || isDumpProcessing}
-              >
-                {t("center.typeDumpOrganize")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
       {(isDumpProcessing || photoOrganizeFlow) &&
         typeof document !== "undefined" &&
         createPortal(
@@ -1182,6 +1138,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           scopeSlot={scopeSlot}
           onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
           onDesktopScopeBeforeFilterSlot={onDesktopScopeBeforeFilterSlot}
+          onItemMovedToTrash={onItemMovedToTrash}
         />
       )}
       {isInbox && unclearItems && (

@@ -14,6 +14,7 @@ export function saveLastNewBatchIds(ids: string[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(BRAINDUMP_NEW_BATCH_IDS_KEY, JSON.stringify(ids));
+    void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
   } catch {
     /* ignore */
   }

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (userId && (defaultDomain === "work" || defaultDomain === "personal")) {
       const rows = await prisma.organizedItem.groupBy({
         by: ["category"],
-        where: { domain: defaultDomain, userId },
+        where: { domain: defaultDomain, userId, deletedAt: null },
       });
       existingCategories = rows.map((r) => r.category).filter(Boolean);
     }

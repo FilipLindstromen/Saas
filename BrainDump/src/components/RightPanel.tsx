@@ -17,9 +17,19 @@ interface RightPanelProps {
   projectId?: string | null;
   category?: string | null;
   itemType?: string | null;
+  onItemMovedToTrash?: (id: string, title: string) => void;
 }
 
-export function RightPanel({ mode, items, transcript, onSaveComplete, projectId, category, itemType }: RightPanelProps) {
+export function RightPanel({
+  mode,
+  items,
+  transcript,
+  onSaveComplete,
+  projectId,
+  category,
+  itemType,
+  onItemMovedToTrash,
+}: RightPanelProps) {
   const { t } = useI18n();
   const [editing, setEditing] = useState<EditableItem[]>([]);
 
@@ -133,6 +143,7 @@ export function RightPanel({ mode, items, transcript, onSaveComplete, projectId,
         projectId={projectId ?? null}
         category={category ?? null}
         itemType={itemType ?? null}
+        onItemMovedToTrash={onItemMovedToTrash}
       />
     );
   }

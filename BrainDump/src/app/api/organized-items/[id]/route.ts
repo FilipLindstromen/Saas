@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
+import { withActiveOrganizedItems } from "@/lib/organized-item-scope";
 
 export async function GET(
   _request: NextRequest,
@@ -68,7 +69,7 @@ export async function PATCH(
     } = body;
 
     const existing = await prisma.organizedItem.findFirst({
-      where: { id, userId },
+      where: withActiveOrganizedItems({ id, userId }),
     });
     if (!existing) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
@@ -128,7 +129,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -139,8 +140,32 @@ export async function DELETE(
     await ensureOrganizedItemListOrderColumn(prisma);
 
     const { id } = await params;
-    await prisma.organizedItem.delete({ where: { id, userId } });
-    return NextResponse.json({ ok: true });
+    const permanent =
+      request.nextUrl.searchParams.get("permanent") === "1" ||
+      request.nextUrl.searchParams.get("permanent") === "true";
+
+    const existing = await prisma.organizedItem.findFirst({ where: { id, userId } });
+    if (!existing) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    if (permanent) {
+      if (existing.deletedAt == null) {
+        return NextResponse.json({ error: "Move to trash before permanent delete" }, { status: 400 });
+      }
+      await prisma.organizedItem.delete({ where: { id, userId } });
+      return NextResponse.json({ ok: true, permanent: true });
+    }
+
+    if (existing.deletedAt != null) {
+      return NextResponse.json({ error: "Already in trash" }, { status: 400 });
+    }
+
+    await prisma.organizedItem.update({
+      where: { id, userId },
+      data: { deletedAt: new Date() },
+    });
+    return NextResponse.json({ ok: true, trashed: true });
   } catch (e) {
     console.error("Item DELETE error:", e);
     return NextResponse.json({ error: "Failed to delete item" }, { status: 500 });

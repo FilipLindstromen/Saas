@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
+import { coachModeStyleInstruction, parseCoachMode } from "@/lib/coach-modes";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -64,7 +65,7 @@ function formatDumpsForCoach(
 
 async function loadOrganizedItemsForCoach(userId: string) {
   return prisma.organizedItem.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     orderBy: [{ updatedAt: "desc" }],
     take: MAX_ITEMS,
     include: {
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       messages?: unknown;
       locale?: string;
+      coachMode?: unknown;
     };
 
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
@@ -119,6 +121,8 @@ export async function POST(request: NextRequest) {
     }
 
     const locale = body.locale === "sv" ? "sv" : "en";
+    const coachMode = parseCoachMode(body.coachMode);
+    const styleBlock = coachModeStyleInstruction(coachMode);
     const replyLang =
       locale === "sv"
         ? "Svara på svenska när användaren skriver på svenska; annars på engelska."
@@ -145,6 +149,8 @@ Rules:
 - If the workspace is empty or nearly empty, acknowledge that and suggest a gentle first step (one small capture or one tiny task).
 - You cannot edit the app; you only coach. If they want new tasks in the app, suggest clear wording they could add via BrainDump.
 - ${replyLang}
+
+${styleBlock}
 
 ### Workspace snapshot (${items.length} items)
 ${itemsBlock}${dumpsSection}`;

@@ -12,10 +12,17 @@ import {
 import { createPortal } from "react-dom";
 import { signOut, useSession } from "next-auth/react";
 import { DeleteEntriesOverlay } from "./DeleteEntriesOverlay";
+import { BrainDumpHabitReminderModal } from "./BrainDumpHabitReminderModal";
 import { StreaksModal } from "./StreaksModal";
+import { TrashModal } from "./TrashModal";
 import { ThemeToggle } from "./ThemeToggle";
 import { useI18n } from "@/lib/i18n";
+import {
+  BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT,
+  scheduleClientPreferencesUpload,
+} from "@/lib/client-preferences-sync";
 import { getDumpStreakState, STREAK_RECORDED_EVENT, type DumpStreakState } from "@/lib/dump-streak";
+import { streakLevelFromTotal } from "@/lib/streak-gamification";
 
 const SIDEBAR_EXPANDED_KEY = "braindump-sidebar-expanded";
 
@@ -67,6 +74,8 @@ type AppSidebarProps = {
   onCapturePhoto?: () => void;
   onCaptureText?: () => void;
   onOpenCoach?: () => void;
+  onOpenToday?: () => void;
+  todayViewActive?: boolean;
 };
 
 function useIsMobile() {
@@ -92,6 +101,8 @@ export function AppSidebar({
   onCapturePhoto,
   onCaptureText,
   onOpenCoach,
+  onOpenToday,
+  todayViewActive = false,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { data: session } = useSession();
@@ -99,7 +110,9 @@ export function AppSidebar({
   const [expanded, setExpanded] = useState(false);
   const [streakState, setStreakState] = useState<DumpStreakState>(() => getDumpStreakState());
   const [streaksOpen, setStreaksOpen] = useState(false);
+  const [habitRemindersOpen, setHabitRemindersOpen] = useState(false);
   const [deleteEntriesOpen, setDeleteEntriesOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [mobileDrawerExiting, setMobileDrawerExiting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileBtnRef = useRef<HTMLButtonElement>(null);
@@ -130,6 +143,7 @@ export function AppSidebar({
     setExpanded(next);
     try {
       localStorage.setItem(SIDEBAR_EXPANDED_KEY, next ? "1" : "0");
+      scheduleClientPreferencesUpload();
     } catch {
       /* ignore */
     }
@@ -321,8 +335,55 @@ export function AppSidebar({
         </nav>
       ) : null}
 
+      {onOpenToday ? (
+        <nav className="bd-app-sidebar-nav" aria-label={t("today.navAria")}>
+          <button
+            type="button"
+            className="bd-app-sidebar-nav-btn"
+            data-active={todayViewActive ? "true" : "false"}
+            data-collapsed={!showLabels ? "true" : "false"}
+            onClick={() => {
+              onOpenToday();
+              if (isMobile) closeMobileDrawerAnimated();
+            }}
+            title={t("today.title")}
+            aria-label={t("bottom.todayNav")}
+            aria-current={todayViewActive ? "page" : undefined}
+          >
+            <span className="bd-app-sidebar-nav-icon">
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+              </svg>
+            </span>
+            {showLabels ? <span className="bd-app-sidebar-nav-label">{t("today.title")}</span> : null}
+          </button>
+        </nav>
+      ) : null}
+
       {onCapturePhoto || onCaptureText || onOpenCoach ? (
         <nav className="bd-app-sidebar-nav" aria-label={t("sidebar.dumpInputsAria")}>
+          {onOpenCoach ? (
+            <button
+              type="button"
+              className="bd-app-sidebar-nav-btn"
+              data-collapsed={!showLabels ? "true" : "false"}
+              onClick={() => {
+                onOpenCoach();
+                if (isMobile) closeMobileDrawerAnimated();
+              }}
+              title={t("coach.title")}
+              aria-label={t("coach.title")}
+            >
+              <span className="bd-app-sidebar-nav-icon">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M21 15a4 4 0 0 1-4 4H8l-4 4V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z" />
+                  <path d="M8 10h.01M12 10h.01M16 10h.01" />
+                </svg>
+              </span>
+              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("coach.title")}</span> : null}
+            </button>
+          ) : null}
           {onCapturePhoto ? (
             <button
               type="button"
@@ -364,27 +425,6 @@ export function AppSidebar({
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.captureText")}</span> : null}
             </button>
           ) : null}
-          {onOpenCoach ? (
-            <button
-              type="button"
-              className="bd-app-sidebar-nav-btn"
-              data-collapsed={!showLabels ? "true" : "false"}
-              onClick={() => {
-                onOpenCoach();
-                if (isMobile) closeMobileDrawerAnimated();
-              }}
-              title={t("coach.title")}
-              aria-label={t("coach.title")}
-            >
-              <span className="bd-app-sidebar-nav-icon">
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M21 15a4 4 0 0 1-4 4H8l-4 4V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z" />
-                  <path d="M8 10h.01M12 10h.01M16 10h.01" />
-                </svg>
-              </span>
-              {showLabels ? <span className="bd-app-sidebar-nav-label">{t("coach.title")}</span> : null}
-            </button>
-          ) : null}
         </nav>
       ) : null}
 
@@ -399,8 +439,8 @@ export function AppSidebar({
             setStreaksOpen(true);
             if (isMobile) closeMobileDrawerAnimated();
           }}
-          title={t("topBar.streaks")}
-          aria-label={t("topBar.streaks")}
+          title={`${t("topBar.streaks")} · ${t("streaks.levelShort", { n: streakLevelFromTotal(streakState.totalOrganizedDumps) })}`}
+          aria-label={`${t("topBar.streaks")}. ${t("streaks.levelShort", { n: streakLevelFromTotal(streakState.totalOrganizedDumps) })}`}
         >
           <span className="bd-app-sidebar-nav-icon">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -411,7 +451,49 @@ export function AppSidebar({
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("topBar.streaks")}</span> : null}
         </button>
 
+        <button
+          type="button"
+          className="bd-app-sidebar-nav-btn"
+          data-collapsed={!showLabels ? "true" : "false"}
+          onClick={() => {
+            setHabitRemindersOpen(true);
+            if (isMobile) closeMobileDrawerAnimated();
+          }}
+          title={t("sidebar.habitReminders")}
+          aria-label={t("sidebar.habitReminders")}
+        >
+          <span className="bd-app-sidebar-nav-icon">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </span>
+          {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.habitReminders")}</span> : null}
+        </button>
+
         <ThemeToggle showLabels={showLabels} />
+
+        <button
+          type="button"
+          className="bd-app-sidebar-nav-btn"
+          data-collapsed={!showLabels ? "true" : "false"}
+          onClick={() => {
+            setTrashOpen(true);
+            if (isMobile) closeMobileDrawerAnimated();
+          }}
+          title={t("sidebar.trash")}
+          aria-label={t("sidebar.trash")}
+        >
+          <span className="bd-app-sidebar-nav-icon">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </span>
+          {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.trash")}</span> : null}
+        </button>
 
         <button
           type="button"
@@ -494,9 +576,13 @@ export function AppSidebar({
       : null;
 
   const streaksModal = <StreaksModal isOpen={streaksOpen} onClose={() => setStreaksOpen(false)} state={streakState} />;
+  const habitReminderModal = (
+    <BrainDumpHabitReminderModal isOpen={habitRemindersOpen} onClose={() => setHabitRemindersOpen(false)} />
+  );
   const deleteEntriesOverlay = (
     <DeleteEntriesOverlay isOpen={deleteEntriesOpen} onClose={() => setDeleteEntriesOpen(false)} />
   );
+  const trashModal = <TrashModal isOpen={trashOpen} onClose={() => setTrashOpen(false)} />;
 
   if (isMobile) {
     return (
@@ -520,6 +606,8 @@ export function AppSidebar({
         )}
         {profilePopover}
         {streaksModal}
+        {habitReminderModal}
+        {trashModal}
         {deleteEntriesOverlay}
       </>
     );
@@ -536,6 +624,8 @@ export function AppSidebar({
       </aside>
       {profilePopover}
       {streaksModal}
+      {habitReminderModal}
+      {trashModal}
       {deleteEntriesOverlay}
     </>
   );

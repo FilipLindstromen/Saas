@@ -10,14 +10,22 @@ import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } fr
 import { RightPanel } from "@/components/RightPanel";
 import { CoachChatOverlay } from "@/components/CoachChatOverlay";
 import { SettingsModal } from "@/components/SettingsModal";
+import { TodayView } from "@/components/TodayView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
+import { useHabitRemindersTick } from "@/hooks/useHabitRemindersTick";
+import {
+  BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT,
+  scheduleClientPreferencesUpload,
+} from "@/lib/client-preferences-sync";
 import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
 import { recordOrganizedDump } from "@/lib/dump-streak";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
+
+const TRASH_UNDO_MS = 8000;
 
 type Mode = "inbox" | "work" | "personal" | "all";
 type DumpMode = "inbox" | "work" | "personal";
@@ -34,6 +42,7 @@ function inferDumpModeFromItems(items: OrganizedItemPreview[], fallback: DumpMod
 
 export default function BrainDumpPage() {
   const { t } = useI18n();
+  useHabitRemindersTick(t);
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("work");
   const [organizedItems, setOrganizedItems] = useState<OrganizedItemPreview[]>([]);
@@ -46,6 +55,7 @@ export default function BrainDumpPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [coachChatOpen, setCoachChatOpen] = useState(false);
+  const [todayViewActive, setTodayViewActive] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
@@ -56,6 +66,48 @@ export default function BrainDumpPage() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+  const trashUndoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [trashUndo, setTrashUndo] = useState<{ id: string; title: string } | null>(null);
+
+  const clearTrashUndoTimer = useCallback(() => {
+    if (trashUndoTimeoutRef.current != null) {
+      clearTimeout(trashUndoTimeoutRef.current);
+      trashUndoTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearTrashUndoTimer(), [clearTrashUndoTimer]);
+
+  const onItemMovedToTrash = useCallback(
+    (id: string, title: string) => {
+      clearTrashUndoTimer();
+      setTrashUndo({ id, title });
+      trashUndoTimeoutRef.current = setTimeout(() => {
+        setTrashUndo(null);
+        trashUndoTimeoutRef.current = null;
+      }, TRASH_UNDO_MS);
+    },
+    [clearTrashUndoTimer]
+  );
+
+  const undoMoveToTrash = useCallback(async () => {
+    if (!trashUndo) return;
+    const { id } = trashUndo;
+    try {
+      const r = await fetch(`/api/organized-items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (r.ok) {
+        clearTrashUndoTimer();
+        setTrashUndo(null);
+        window.dispatchEvent(new Event("braindump-reload-items"));
+      }
+    } catch {
+      /* keep bar visible */
+    }
+  }, [trashUndo, clearTrashUndoTimer]);
 
   const onSidebarCapturePhoto = useCallback(() => {
     centerPanelRef.current?.openPhotoCaptureMenu();
@@ -64,6 +116,19 @@ export default function BrainDumpPage() {
   const onSidebarCaptureText = useCallback(() => {
     centerPanelRef.current?.openTypedDumpSheet();
   }, []);
+
+  const goToTodayItemWorkspace = useCallback(
+    (domain: "work" | "personal", opts: { projectId: string | null; category: string | null }) => {
+      setTodayViewActive(false);
+      setMode(domain);
+      setSelectedProjectId(opts.projectId);
+      setSelectedCategory(opts.category);
+      setSelectedItemType(null);
+      setSearchFilter("");
+      setDueDateFilter("today");
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -76,7 +141,7 @@ export default function BrainDumpPage() {
 
   const scopeBarSlot = useMemo(
     () =>
-      mode === "work" || mode === "personal" || mode === "all" ? (
+      !todayViewActive && (mode === "work" || mode === "personal" || mode === "all") ? (
         <ScopeBar
           key="bd-scope-main"
           mode={mode}
@@ -91,7 +156,15 @@ export default function BrainDumpPage() {
           beforeFilterSlot={desktopScopeBeforeFilter}
         />
       ) : null,
-    [mode, selectedProjectId, selectedCategory, searchFilter, dueDateFilter, desktopScopeBeforeFilter]
+    [
+      todayViewActive,
+      mode,
+      selectedProjectId,
+      selectedCategory,
+      searchFilter,
+      dueDateFilter,
+      desktopScopeBeforeFilter,
+    ]
   );
 
   const refreshUncategorizedAvailability = useCallback(async () => {
@@ -127,8 +200,21 @@ export default function BrainDumpPage() {
   useEffect(() => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, viewType);
+      scheduleClientPreferencesUpload();
     } catch {}
   }, [viewType]);
+
+  useEffect(() => {
+    const sync = () => {
+      let next = loadViewPreference();
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches) {
+        if (next === "kanban" || next === "postits") next = "list";
+      }
+      setViewType(next);
+    };
+    window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
+    return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
+  }, []);
 
   useEffect(() => {
     if (!isMobileLayout) return;
@@ -385,11 +471,14 @@ export default function BrainDumpPage() {
       <div className="bd-app-shell" style={{ background: "var(--bg-primary)" }}>
         <TopBar
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={(next) => {
+            setTodayViewActive(false);
+            setMode(next);
+          }}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
           beforeMenuSlot={mobileTopBarBeforeMenu}
-          scopeSlot={isMobileLayout ? null : scopeBarSlot}
+          scopeSlot={isMobileLayout || todayViewActive ? null : scopeBarSlot}
         />
 
       <div
@@ -403,7 +492,10 @@ export default function BrainDumpPage() {
       >
         <AppSidebar
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={(next) => {
+            setTodayViewActive(false);
+            setMode(next);
+          }}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenSettings={() => setShowSettings(true)}
           mobileOpen={mobileNavOpen}
@@ -411,9 +503,11 @@ export default function BrainDumpPage() {
           onCapturePhoto={onSidebarCapturePhoto}
           onCaptureText={onSidebarCaptureText}
           onOpenCoach={() => setCoachChatOpen(true)}
+          onOpenToday={() => setTodayViewActive(true)}
+          todayViewActive={todayViewActive}
         />
         <div className="bd-workspace-column" style={{ gap: "0" }}>
-          <div className="bd-page-content-padding">
+          <div className="bd-page-content-padding" style={{ display: todayViewActive ? "none" : undefined }}>
             <CenterPanel
               ref={centerPanelRef}
               mode={mode}
@@ -429,7 +523,10 @@ export default function BrainDumpPage() {
               itemType={selectedItemType}
               onItemTypeSelect={setSelectedItemType}
               viewType={viewType}
-              onViewTypeChange={setViewType}
+              onViewTypeChange={(v) => {
+                setTodayViewActive(false);
+                setViewType(v);
+              }}
               searchFilter={searchFilter}
               dueDateFilter={dueDateFilter}
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
@@ -438,7 +535,12 @@ export default function BrainDumpPage() {
               onDumpRecordingChange={setDumpRecordingActive}
             />
           </div>
-          {mode === "inbox" && (
+          {todayViewActive ? (
+            <div className="bd-page-content-padding bd-main-scroll" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+              <TodayView onGoToWorkspace={goToTodayItemWorkspace} />
+            </div>
+          ) : null}
+          {mode === "inbox" && !todayViewActive && (
             <div style={{ width: 320, flexShrink: 0, minWidth: 0, overflow: "auto" }}>
               <RightPanel
                 mode={mode}
@@ -448,6 +550,7 @@ export default function BrainDumpPage() {
                 projectId={selectedProjectId}
                 category={selectedCategory}
                 itemType={selectedItemType}
+                onItemMovedToTrash={onItemMovedToTrash}
               />
             </div>
           )}
@@ -459,11 +562,14 @@ export default function BrainDumpPage() {
           <nav className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
             <button
               type="button"
-              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setViewType("list")}
+              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => {
+                setTodayViewActive(false);
+                setViewType("list");
+              }}
               title={t("items.viewList")}
               aria-label={t("items.viewList")}
-              aria-current={viewType === "list" ? "page" : undefined}
+              aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
             >
               <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
@@ -478,11 +584,14 @@ export default function BrainDumpPage() {
             </button>
             <button
               type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "text" ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setViewType("text")}
+              className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => {
+                setTodayViewActive(false);
+                setViewType("text");
+              }}
               title={t("items.viewText")}
               aria-label={t("items.viewText")}
-              aria-current={viewType === "text" ? "page" : undefined}
+              aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
             >
               <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M4 6h16M4 12h16M4 18h11" />
@@ -511,8 +620,11 @@ export default function BrainDumpPage() {
             </div>
             <button
               type="button"
-              className={`bd-bottom-bar-pill-item${viewType === "calendar" ? " bd-bottom-bar-pill-item--active" : ""}`}
-              onClick={() => setViewType("calendar")}
+              className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => {
+                setTodayViewActive(false);
+                setViewType("calendar");
+              }}
               title={t("items.viewCalendar")}
               aria-label={t("items.viewCalendar")}
               aria-current={viewType === "calendar" ? "page" : undefined}
@@ -535,20 +647,29 @@ export default function BrainDumpPage() {
             </button>
             <button
               type="button"
-              className="bd-bottom-bar-pill-item bd-bottom-bar-pill-item--coach"
-              onClick={() => setCoachChatOpen(true)}
-              title={t("coach.title")}
-              aria-label={t("bottom.coachNav")}
-              aria-haspopup="dialog"
+              className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+              onClick={() => setTodayViewActive((v) => !v)}
+              title={t("today.title")}
+              aria-label={t("bottom.todayNav")}
+              aria-pressed={todayViewActive}
             >
-              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <path d="M21 15a4 4 0 0 1-4 4H8l-4 4V7a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v8Z" />
-                <path d="M8 10h.01M12 10h.01M16 10h.01" />
+              <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
               </svg>
             </button>
           </nav>
         </div>
       </div>
+
+      {trashUndo ? (
+        <div className="bd-trash-undo-bar" role="status" aria-live="polite">
+          <span className="bd-trash-undo-bar-text">{t("trash.movedToTrash")}</span>
+          <button type="button" className="bd-btn bd-trash-undo-bar-action" onClick={() => void undoMoveToTrash()}>
+            {t("trash.undo")}
+          </button>
+        </div>
+      ) : null}
 
       <CoachChatOverlay open={coachChatOpen} onClose={() => setCoachChatOpen(false)} />
 

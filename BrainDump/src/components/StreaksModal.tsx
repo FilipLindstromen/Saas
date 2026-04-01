@@ -2,6 +2,7 @@
 
 import { useI18n } from "@/lib/i18n";
 import type { DumpStreakState } from "@/lib/dump-streak";
+import { streakBadgeStatuses, streakLevelProgress } from "@/lib/streak-gamification";
 
 interface StreaksModalProps {
   isOpen: boolean;
@@ -11,6 +12,10 @@ interface StreaksModalProps {
 
 export function StreaksModal({ isOpen, onClose, state }: StreaksModalProps) {
   const { t } = useI18n();
+  const { level, inLevel, need } = streakLevelProgress(state.totalOrganizedDumps);
+  const badges = streakBadgeStatuses(state);
+  const progressPct = need > 0 ? Math.min(100, Math.round((inLevel / need) * 100)) : 0;
+
   if (!isOpen) return null;
 
   return (
@@ -23,73 +28,74 @@ export function StreaksModal({ isOpen, onClose, state }: StreaksModalProps) {
     >
       <div
         className="bd-modal-panel bd-streaks-modal-panel"
-        style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          borderRadius: "var(--card-radius)",
-          maxWidth: "400px",
-          width: "100%",
-          boxShadow: "var(--shadow-xl)",
-          padding: "1.25rem 1.5rem",
-        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", marginBottom: "1rem" }}>
-          <h2 id="bd-streaks-title" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600, color: "var(--text-primary)" }}>
+        <div className="bd-streaks-modal-head">
+          <h2 id="bd-streaks-title" className="bd-streaks-modal-title">
             {t("streaks.title")}
           </h2>
-          <button type="button" className="bd-btn" onClick={onClose} style={{ padding: "0.25rem 0.45rem", minWidth: 44, minHeight: 44 }} aria-label={t("scope.cancel")}>
+          <button type="button" className="bd-btn bd-streaks-modal-close" onClick={onClose} aria-label={t("center.close")}>
             ×
           </button>
         </div>
-        <p style={{ margin: "0 0 1rem", fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-          {t("streaks.intro")}
-        </p>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "0.75rem",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              padding: "0.85rem 1rem",
-              borderRadius: "var(--card-radius)",
-              border: "1px solid var(--border-default)",
-              background: "var(--bg-secondary)",
-            }}
-          >
-            <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem", fontWeight: 500 }}>{t("streaks.current")}</div>
-            <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--accent)", lineHeight: 1.2 }}>{state.currentStreak}</div>
-            <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.2rem" }}>{t("streaks.days")}</div>
+        <p className="bd-streaks-modal-intro">{t("streaks.intro")}</p>
+
+        <div className="bd-streaks-level-block">
+          <div className="bd-streaks-level-row">
+            <span className="bd-streaks-level-label">{t("streaks.levelHeading")}</span>
+            <span className="bd-streaks-level-value">{level}</span>
           </div>
           <div
-            style={{
-              padding: "0.85rem 1rem",
-              borderRadius: "var(--card-radius)",
-              border: "1px solid var(--border-default)",
-              background: "var(--bg-secondary)",
-            }}
+            className="bd-streaks-level-track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={need}
+            aria-valuenow={inLevel}
+            aria-label={t("streaks.levelProgressAria", { current: inLevel, need })}
           >
-            <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem", fontWeight: 500 }}>{t("streaks.best")}</div>
-            <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.2 }}>{state.longestStreak}</div>
-            <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "0.2rem" }}>{t("streaks.days")}</div>
+            <div className="bd-streaks-level-fill" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
-        <div
-          style={{
-            padding: "0.65rem 0.85rem",
-            borderRadius: "var(--button-radius)",
-            background: "var(--bg-tertiary)",
-            fontSize: "0.8125rem",
-            color: "var(--text-secondary)",
-          }}
-        >
-          {t("streaks.totalOrganized", { n: state.totalOrganizedDumps })}
+
+        <div className="bd-streaks-stats-grid">
+          <div className="bd-streaks-stat-card">
+            <div className="bd-streaks-stat-label">{t("streaks.current")}</div>
+            <div className="bd-streaks-stat-value bd-streaks-stat-value--accent">{state.currentStreak}</div>
+            <div className="bd-streaks-stat-unit">{t("streaks.days")}</div>
+          </div>
+          <div className="bd-streaks-stat-card">
+            <div className="bd-streaks-stat-label">{t("streaks.best")}</div>
+            <div className="bd-streaks-stat-value">{state.longestStreak}</div>
+            <div className="bd-streaks-stat-unit">{t("streaks.days")}</div>
+          </div>
         </div>
+
+        <div className="bd-streaks-total">{t("streaks.totalOrganized", { n: state.totalOrganizedDumps })}</div>
+
+        <h3 className="bd-streaks-badges-heading">{t("streaks.badgesHeading")}</h3>
+        <ul className="bd-streaks-badge-grid">
+          {badges.map((b) => (
+            <li key={b.id}>
+              <BadgeTile unlocked={b.unlocked} title={t(`streaks.badge.${b.id}`)} lockedLabel={t("streaks.badgeLocked")} />
+            </li>
+          ))}
+        </ul>
       </div>
+    </div>
+  );
+}
+
+function BadgeTile({ unlocked, title, lockedLabel }: { unlocked: boolean; title: string; lockedLabel: string }) {
+  return (
+    <div
+      className={`bd-streak-mint-badge${unlocked ? " bd-streak-mint-badge--on" : ""}`}
+      title={unlocked ? title : `${title} — ${lockedLabel}`}
+      aria-label={unlocked ? title : `${title}, ${lockedLabel}`}
+    >
+      <span className="bd-streak-mint-badge-mark" aria-hidden>
+        {unlocked ? "✓" : "·"}
+      </span>
+      <span className="bd-streak-mint-badge-title">{title}</span>
     </div>
   );
 }

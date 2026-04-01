@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { resolveOrCreateProjectByName } from "@/lib/resolve-project-for-item";
 import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
 import type { Prisma } from "../../../../prisma/generated/prisma/client";
+import { withActiveOrganizedItems, withTrashedOrganizedItems } from "@/lib/organized-item-scope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
     const userId = (session.user as { id?: string }).id!;
 
     const { searchParams } = new URL(request.url);
+    const trashedOnly =
+      searchParams.get("trashed") === "1" || searchParams.get("trashed") === "true";
     const domain = searchParams.get("domain");
     const category = searchParams.get("category");
     const itemType = searchParams.get("itemType");
@@ -47,15 +50,17 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status;
     if (dumpId) where.dumpId = dumpId;
 
+    const scopedWhere = trashedOnly ? withTrashedOrganizedItems(where) : withActiveOrganizedItems(where);
+
     const countOnly =
       searchParams.get("countOnly") === "1" || searchParams.get("countOnly") === "true";
     if (countOnly) {
-      const count = await prisma.organizedItem.count({ where });
+      const count = await prisma.organizedItem.count({ where: scopedWhere });
       return NextResponse.json({ count });
     }
 
     const items = await prisma.organizedItem.findMany({
-      where,
+      where: scopedWhere,
       orderBy: [{ listOrder: "asc" }, { createdAt: "desc" }],
       take: 200,
       include: {
@@ -153,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     const item = await prisma.$transaction(async (tx) => {
       const minRow = await tx.organizedItem.findFirst({
-        where: { userId },
+        where: { userId, deletedAt: null },
         orderBy: { listOrder: "asc" },
         select: { listOrder: true },
       });
