@@ -5,6 +5,9 @@ import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 
 export const WORKSPACE_SCOPE_STORAGE_KEY = "braindump_workspace_scope";
 
+/** Desktop only: remember due-date filter for this tab (session). Absent = show no filtering until you pick one; shared prefs stay unchanged for other tabs / mobile. */
+export const TAB_DUE_DATE_FILTER_KEY = "braindump_tab_due_date_filter";
+
 export type WorkspaceMode = "inbox" | "work" | "personal" | "all";
 
 export type WorkspaceScopePersisted = {
@@ -74,6 +77,25 @@ export function saveWorkspaceScope(scope: WorkspaceScopePersisted): void {
   try {
     localStorage.setItem(WORKSPACE_SCOPE_STORAGE_KEY, JSON.stringify(scope));
     void import("@/lib/client-preferences-sync").then((m) => m.scheduleClientPreferencesUpload());
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readTabDueDateFilter(): DueDateFilterPreset | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = sessionStorage.getItem(TAB_DUE_DATE_FILTER_KEY);
+    return isDuePreset(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeTabDueDateFilter(preset: DueDateFilterPreset): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(TAB_DUE_DATE_FILTER_KEY, preset);
   } catch {
     /* ignore */
   }

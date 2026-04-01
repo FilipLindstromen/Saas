@@ -5,6 +5,7 @@ import { ClientPreferencesBootstrap } from "@/components/ClientPreferencesBootst
 import { SiteConfigProvider } from "@/components/SiteConfigProvider";
 import { I18nProvider } from "@/lib/i18n";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
+import { RevenueCatProvider } from "@/components/RevenueCatProvider";
 import { Inter } from "next/font/google";
 
 const fontSans = Inter({
@@ -49,9 +50,11 @@ export default function RootLayout({
         <AuthSessionProvider>
           <SiteConfigProvider>
             <I18nProvider>
-              <ClientPreferencesBootstrap />
-              <GamificationToastHost />
-              {children}
+              <RevenueCatProvider>
+                <ClientPreferencesBootstrap />
+                <GamificationToastHost />
+                {children}
+              </RevenueCatProvider>
             </I18nProvider>
           </SiteConfigProvider>
         </AuthSessionProvider>

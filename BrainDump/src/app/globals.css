@@ -1088,16 +1088,20 @@ select.bd-input::-ms-expand {
   overflow: visible;
 }
 
+/* Same duration + inline animation-delay on both eyes so they blink in sync */
 .bd-dump-face--animate.bd-dump-face--sheet .bd-dump-face-eye--l,
 .bd-dump-face--animate.bd-dump-face--overlay .bd-dump-face-eye--l {
   transform-origin: 38px 25px;
-  animation: bd-dump-face-blink 4.1s ease-in-out infinite;
 }
 
 .bd-dump-face--animate.bd-dump-face--sheet .bd-dump-face-eye--r,
 .bd-dump-face--animate.bd-dump-face--overlay .bd-dump-face-eye--r {
   transform-origin: 82px 25px;
-  animation: bd-dump-face-blink 4.65s ease-in-out infinite;
+}
+
+.bd-dump-face--animate.bd-dump-face--sheet .bd-dump-face-eye,
+.bd-dump-face--animate.bd-dump-face--overlay .bd-dump-face-eye {
+  animation: bd-dump-face-blink 4.2s ease-in-out infinite;
 }
 
 @keyframes bd-dump-face-blink {
@@ -1131,8 +1135,7 @@ select.bd-input::-ms-expand {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bd-dump-face--animate .bd-dump-face-eye--l,
-  .bd-dump-face--animate .bd-dump-face-eye--r {
+  .bd-dump-face--animate .bd-dump-face-eye {
     animation: none;
   }
   .bd-dump-face--animate .bd-dump-face-mouth-wrap {

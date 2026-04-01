@@ -125,7 +125,7 @@ function fetchCounts(domain: string): Promise<CountsResponse> {
 }
 
 const DUE_DATE_LABEL_KEY: Record<DueDateFilterPreset, string> = {
-  all: "scope.dateFilterAll",
+  all: "scope.dateFilterNone",
   today: "scope.dateFilterToday",
   tomorrow: "scope.dateFilterTomorrow",
   this_week: "scope.dateFilterThisWeek",
@@ -335,7 +335,7 @@ function DueDateQuickPresets({
         flexWrap: "nowrap",
       }}
     >
-      {(["today", "tomorrow", "this_week"] as const).map((p) => {
+      {(["all", "today", "tomorrow", "this_week"] as const).map((p) => {
         const on = value === p;
         return (
           <button
@@ -343,7 +343,10 @@ function DueDateQuickPresets({
             type="button"
             aria-pressed={on}
             className="bd-btn"
-            onClick={() => onChange(on ? "all" : p)}
+            onClick={() => {
+              if (p === "all") onChange("all");
+              else onChange(on ? "all" : p);
+            }}
             style={{
               padding: isMobile ? "0.32rem 0.42rem" : "0.32rem 0.5rem",
               fontSize: isMobile ? "0.6875rem" : "0.75rem",
@@ -390,7 +393,7 @@ function ScopeFilterSearchBlock({
         flexShrink: 0,
         flex: "0 0 auto",
         width: isMobile ? "100%" : "auto",
-        maxWidth: isMobile ? "100%" : 560,
+        maxWidth: isMobile ? "100%" : "none",
         alignItems: isMobile ? "stretch" : "flex-end",
         alignSelf: isMobile ? "stretch" : undefined,
         minWidth: 0,
@@ -403,32 +406,38 @@ function ScopeFilterSearchBlock({
           gap: "0.5rem",
           width: "100%",
           justifyContent: isMobile ? "stretch" : "flex-end",
-          flexWrap: "wrap",
+          flexWrap: isMobile ? "wrap" : "nowrap",
           minWidth: 0,
         }}
       >
         {!isMobile && beforeFilterSlot ? (
           <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{beforeFilterSlot}</span>
         ) : null}
-        {!isMobile && <span className="bd-scope-label">{t("scope.filter")}</span>}
+        {!isMobile && (
+          <span className="bd-scope-label" style={{ flexShrink: 0 }}>
+            {t("scope.filter")}
+          </span>
+        )}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.5rem",
-            flex: isMobile ? "1 1 100%" : "1 1 auto",
-            minWidth: isMobile ? "100%" : 200,
+            flex: isMobile ? "1 1 100%" : "0 0 auto",
+            minWidth: isMobile ? "100%" : 0,
             width: isMobile ? "100%" : "auto",
-            flexWrap: "wrap",
+            flexWrap: isMobile ? "wrap" : "nowrap",
+            flexShrink: 0,
           }}
         >
           <div
             style={{
               position: "relative",
-              flex: isMobile ? "1 1 160px" : "1 1 auto",
+              flex: isMobile ? "1 1 160px" : "0 0 auto",
               minWidth: isMobile ? "min(100%, 9rem)" : 160,
               width: isMobile ? undefined : 200,
               maxWidth: isMobile ? "100%" : 280,
+              flexShrink: isMobile ? 1 : 0,
             }}
           >
             <input
@@ -748,7 +757,7 @@ export function ScopeBar({
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
             /* visible so native <select> dropdown is not clipped */
-            overflowX: "visible",
+            overflowX: isMobile ? "visible" : "auto",
             width: !isMobile ? "100%" : undefined,
             minWidth: !isMobile ? 0 : undefined,
             flex: isMobile && onSearchFilterChange && showScopeFilterInput ? "0 0 auto" : undefined,
@@ -1365,7 +1374,7 @@ export function ScopeBar({
             gap: isMobile ? "0.75rem" : "1rem",
             padding: isMobile ? "0.15rem 0" : "0.25rem 0",
             background: "transparent",
-            overflowX: "visible",
+            overflowX: isMobile ? "visible" : "auto",
             width: !isMobile ? "100%" : undefined,
             minWidth: !isMobile ? 0 : undefined,
             flex: isMobile && onSearchFilterChange && showScopeFilterInput ? "0 0 auto" : undefined,

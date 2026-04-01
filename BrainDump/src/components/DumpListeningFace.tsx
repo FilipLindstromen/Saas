@@ -11,12 +11,12 @@ interface DumpListeningFaceProps {
 
 /**
  * Minimal hand-drawn-style face: two vertical eyes + smile.
- * Blink uses CSS with staggered delays; mouth has a slow “listening” pulse.
+ * Blink uses one shared delay + duration so both eyes close together; mouth has a slow “listening” pulse.
  */
 export function DumpListeningFace({ variant = "sheet", className = "" }: DumpListeningFaceProps) {
   const [reduceMotion, setReduceMotion] = useState(false);
 
-  const eyeDelays = useMemo(() => [Math.random() * 1.4, 0.4 + Math.random() * 1.1], []);
+  const blinkPhaseDelay = useMemo(() => Math.random() * 1.4, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,13 +50,13 @@ export function DumpListeningFace({ variant = "sheet", className = "" }: DumpLis
         {/* Eyes: short vertical strokes */}
         <g
           className="bd-dump-face-eye bd-dump-face-eye--l"
-          style={animate ? { animationDelay: `${eyeDelays[0]}s` } : undefined}
+          style={animate ? { animationDelay: `${blinkPhaseDelay}s` } : undefined}
         >
           <line x1={38} y1={18} x2={38} y2={32} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
         </g>
         <g
           className="bd-dump-face-eye bd-dump-face-eye--r"
-          style={animate ? { animationDelay: `${eyeDelays[1]}s` } : undefined}
+          style={animate ? { animationDelay: `${blinkPhaseDelay}s` } : undefined}
         >
           <line x1={82} y1={18} x2={82} y2={32} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
         </g>

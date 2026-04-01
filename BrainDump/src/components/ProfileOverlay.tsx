@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useI18n } from "@/lib/i18n";
+import { ProfileRevenueCatSection } from "@/components/ProfileRevenueCatSection";
 
 const CLIENT_AVATAR_MAX_BYTES = 320 * 1024;
 
@@ -249,6 +250,8 @@ export function UserProfilePanel({
           {t("profile.emailReadOnly")}
         </span>
       </div>
+
+      <ProfileRevenueCatSection />
 
       {saveError ? (
         <p role="alert" style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "var(--danger, #c0392b)" }}>

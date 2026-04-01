@@ -24,7 +24,12 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { saveLastNewBatchIds } from "@/lib/newBatch";
 import { recordOrganizedDump } from "@/lib/dump-streak";
-import { loadWorkspaceScope, saveWorkspaceScope } from "@/lib/workspace-scope-settings";
+import {
+  loadWorkspaceScope,
+  readTabDueDateFilter,
+  saveWorkspaceScope,
+  writeTabDueDateFilter,
+} from "@/lib/workspace-scope-settings";
 import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
@@ -84,6 +89,8 @@ export default function BrainDumpPage() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+  /** Desktop: new browser tab shows no date filter until you pick one; then we remember the tab choice in sessionStorage. */
+  const dueDateFilterFromUserRef = useRef(false);
   const trashUndoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [trashUndo, setTrashUndo] = useState<{ id: string; title: string } | null>(null);
 
@@ -143,10 +150,16 @@ export default function BrainDumpPage() {
       setSelectedCategory(opts.category);
       setSelectedItemType(null);
       setSearchFilter("");
+      dueDateFilterFromUserRef.current = true;
       setDueDateFilter("today");
     },
     []
   );
+
+  const onDueDateFilterChangeFromUser = useCallback((preset: DueDateFilterPreset) => {
+    dueDateFilterFromUserRef.current = true;
+    setDueDateFilter(preset);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -170,7 +183,7 @@ export default function BrainDumpPage() {
           searchFilter={searchFilter}
           onSearchFilterChange={setSearchFilter}
           dueDateFilter={dueDateFilter}
-          onDueDateFilterChange={setDueDateFilter}
+          onDueDateFilterChange={onDueDateFilterChangeFromUser}
           beforeFilterSlot={desktopScopeBeforeFilter}
         />
       ) : null,
@@ -182,6 +195,7 @@ export default function BrainDumpPage() {
       searchFilter,
       dueDateFilter,
       desktopScopeBeforeFilter,
+      onDueDateFilterChangeFromUser,
     ]
   );
 
@@ -216,24 +230,42 @@ export default function BrainDumpPage() {
   }, [hasUncategorizedEntries, mode]);
 
   useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
     const s = loadWorkspaceScope();
+    const mobile = window.matchMedia("(max-width: 768px)").matches;
     setMode(s.mode);
     setSelectedProjectId(s.projectId);
     setSelectedCategory(s.category);
     setSelectedItemType(s.itemType);
-    setDueDateFilter(s.dueDateFilter);
+    dueDateFilterFromUserRef.current = false;
+    if (mobile) {
+      setDueDateFilter(s.dueDateFilter);
+    } else {
+      setDueDateFilter(readTabDueDateFilter() ?? "all");
+    }
     setTodayViewActive(s.todayViewActive);
     setWorkspaceScopeHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!workspaceScopeHydrated) return;
+    if (!workspaceScopeHydrated || typeof window === "undefined") return;
+    const mobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!mobile && dueDateFilterFromUserRef.current) {
+      writeTabDueDateFilter(dueDateFilter);
+    }
+    let persistDue = dueDateFilter;
+    if (!mobile) {
+      const tab = readTabDueDateFilter();
+      if (tab === null && !dueDateFilterFromUserRef.current) {
+        persistDue = loadWorkspaceScope().dueDateFilter;
+      }
+    }
     saveWorkspaceScope({
       mode,
       projectId: selectedProjectId,
       category: selectedCategory,
       itemType: selectedItemType,
-      dueDateFilter,
+      dueDateFilter: persistDue,
       todayViewActive,
     });
   }, [
@@ -261,11 +293,17 @@ export default function BrainDumpPage() {
       }
       setViewType(next);
       const ws = loadWorkspaceScope();
+      const mobile = window.matchMedia("(max-width: 768px)").matches;
       setMode(ws.mode);
       setSelectedProjectId(ws.projectId);
       setSelectedCategory(ws.category);
       setSelectedItemType(ws.itemType);
-      setDueDateFilter(ws.dueDateFilter);
+      dueDateFilterFromUserRef.current = false;
+      if (mobile) {
+        setDueDateFilter(ws.dueDateFilter);
+      } else {
+        setDueDateFilter(readTabDueDateFilter() ?? "all");
+      }
       setTodayViewActive(ws.todayViewActive);
     };
     window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
