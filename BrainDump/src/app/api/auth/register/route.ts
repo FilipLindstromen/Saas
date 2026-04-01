@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveDatabaseUrl } from "@/lib/database-url";
+import { prismaErrorMeta } from "@/lib/prisma-error-meta";
 import { hash } from "bcryptjs";
 
 export const runtime = "nodejs";
@@ -65,35 +66,56 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const err = e as { code?: string; message?: string };
-    console.error("Register error:", e);
+    const { code, message } = prismaErrorMeta(e);
+    console.error("Register error:", code ?? "no-code", message, e);
 
-    // Unique violation (race: two sign-ups for same email)
-    if (err?.code === "P2002") {
+    if (code === "P2002") {
       return NextResponse.json(
         { error: "An account with this email already exists." },
         { status: 409 }
       );
     }
 
-    // Schema out of date: passwordHash column missing (run prisma db push on production)
-    if (err?.code === "P2009" || err?.message?.includes("Unknown arg") || err?.message?.includes("passwordHash")) {
+    if (
+      code === "P2009" ||
+      code === "P2021" ||
+      code === "P2022" ||
+      message.includes("Unknown arg") ||
+      message.includes("passwordHash") ||
+      message.includes("does not exist")
+    ) {
       return NextResponse.json(
-        { error: "Server database schema is out of date. Please run 'prisma db push' against your production database and redeploy." },
+        {
+          error:
+            "Server database is out of sync. Run `npx prisma db push` (or migrate) against the production database, then redeploy.",
+        },
         { status: 503 }
       );
     }
 
-    // Connection / DB unreachable
-    if (err?.code === "P1001" || err?.code === "P1017" || err?.message?.includes("connect")) {
+    if (
+      code === "P1001" ||
+      code === "P1000" ||
+      code === "P1013" ||
+      code === "P1017" ||
+      /connect|ECONNREFUSED|timeout|certificate/i.test(message)
+    ) {
       return NextResponse.json(
-        { error: "Database is not available. Check DATABASE_URL and that the database is running." },
+        {
+          error:
+            "Cannot reach the database. Confirm DATABASE_URL / Neon / Vercel Postgres env vars on the server and that the DB allows connections.",
+        },
         { status: 503 }
       );
     }
 
     return NextResponse.json(
-      { error: "Registration failed. Please try again." },
+      {
+        error:
+          process.env.NODE_ENV === "development"
+            ? `Registration failed (${code ?? "error"}): ${message}`
+            : "Registration failed. Please try again.",
+      },
       { status: 500 }
     );
   }

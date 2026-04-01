@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
+import { prismaErrorMeta } from "@/lib/prisma-error-meta";
+import { resolveDatabaseUrl } from "@/lib/database-url";
 import { sendPasswordResetEmail } from "@/lib/send-password-reset-email";
+
+export const runtime = "nodejs";
 
 const TOKEN_BYTES = 32;
 const EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -26,8 +30,27 @@ function trustedAppBaseUrl(request: Request): string {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!resolveDatabaseUrl()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Database is not configured on the server. Set DATABASE_URL or NEON_DATABASE_URL / POSTGRES_URL, then redeploy.",
+        },
+        { status: 503 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
+    }
+    const email =
+      typeof (body as { email?: unknown }).email === "string"
+        ? (body as { email: string }).email.trim().toLowerCase()
+        : "";
 
     const configured = emailDeliveryConfigured();
 
@@ -100,11 +123,55 @@ export async function POST(request: Request) {
       ...(process.env.NODE_ENV === "development" && !sent ? { devResetUrl: resetUrl } : {}),
     });
   } catch (e) {
-    console.error("forgot-password error:", e);
+    const { code, message } = prismaErrorMeta(e);
+    console.error("forgot-password error:", code ?? "no-code", message, e);
+
+    if (
+      code === "P2009" ||
+      code === "P2021" ||
+      code === "P2022" ||
+      /password_reset|PasswordResetToken|does not exist|relation/i.test(message)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Password reset is not fully set up on the server (database missing reset-token table). Ask the administrator to run: npx prisma db push — against production — then redeploy.",
+          attemptedEmailDelivery: false,
+          emailSent: false,
+          emailDeliveryConfigured: emailDeliveryConfigured(),
+        },
+        { status: 503 }
+      );
+    }
+
+    if (
+      code === "P1001" ||
+      code === "P1000" ||
+      code === "P1013" ||
+      code === "P1017" ||
+      /connect|ECONNREFUSED|timeout|certificate/i.test(message)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Cannot reach the database right now. Try again in a moment. If this persists, the server database URL or network access may be misconfigured.",
+          attemptedEmailDelivery: false,
+          emailSent: false,
+          emailDeliveryConfigured: emailDeliveryConfigured(),
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       {
         ok: false,
-        error: "Something went wrong. Please try again.",
+        error:
+          process.env.NODE_ENV === "development"
+            ? `Password reset failed (${code ?? "error"}): ${message}`
+            : "Something went wrong. Please try again.",
         attemptedEmailDelivery: false,
         emailSent: false,
         emailDeliveryConfigured: emailDeliveryConfigured(),

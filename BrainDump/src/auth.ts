@@ -25,6 +25,42 @@ function resolveOAuthEmail(user: User, profile: unknown): string | null {
   return null;
 }
 
+type OidcProfile = {
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  image?: string;
+};
+
+function oauthNameAndImage(user: User, profile: unknown): { name: string | null; image: string | null } {
+  const p = profile as OidcProfile | undefined;
+  const name =
+    user.name ??
+    p?.name ??
+    (p?.given_name ? `${p.given_name ?? ""} ${p.family_name ?? ""}`.trim() : null);
+  const image = user.image ?? p?.picture ?? p?.image ?? null;
+  return { name: name || null, image };
+}
+
+async function upsertOAuthUserRecord(email: string, name: string | null, image: string | null): Promise<void> {
+  await prisma.user.upsert({
+    where: { email },
+    create: {
+      email,
+      name,
+      image,
+      emailVerified: new Date(),
+      clientPreferences: {},
+    },
+    update: {
+      ...(name ? { name } : {}),
+      ...(image != null ? { image } : {}),
+      emailVerified: new Date(),
+    },
+  });
+}
+
 const googleId = env.GOOGLE_CLIENT_ID.trim();
 const googleSecret = env.GOOGLE_CLIENT_SECRET.trim();
 const googleEnabled = googleId.length > 0 && googleSecret.length > 0;
@@ -110,37 +146,10 @@ export const {
         return false;
       }
 
-      const p = profile as { email_verified?: boolean; name?: string; given_name?: string; family_name?: string; picture?: string; image?: string } | undefined;
-      if (account?.provider === "google" && p?.email_verified === false) {
-        console.error("[BrainDump] Google sign-in rejected: email not verified.");
-        return false;
-      }
-
-      const name =
-        user.name ??
-        p?.name ??
-        (p?.given_name
-          ? `${p.given_name ?? ""} ${p.family_name ?? ""}`.trim()
-          : null);
-      const image =
-        user.image ?? p?.picture ?? p?.image ?? null;
+      const { name, image } = oauthNameAndImage(user, profile);
 
       try {
-        await prisma.user.upsert({
-          where: { email },
-          create: {
-            email,
-            name: name || null,
-            image,
-            emailVerified: new Date(),
-            clientPreferences: {},
-          },
-          update: {
-            ...(name ? { name } : {}),
-            ...(image != null ? { image } : {}),
-            emailVerified: new Date(),
-          },
-        });
+        await upsertOAuthUserRecord(email, name, image);
       } catch (e) {
         console.error("[BrainDump] OAuth user upsert failed:", e);
         return false;
@@ -151,12 +160,24 @@ export const {
       if (user) {
         if (account?.provider === "google" || account?.provider === "apple") {
           const email = resolveOAuthEmail(user, profile) ?? "";
-          const dbUser = email
+          let dbUser = email
             ? await prisma.user.findUnique({
                 where: { email },
                 select: { id: true, email: true, name: true, image: true },
               })
             : null;
+          if (!dbUser && email) {
+            try {
+              const { name, image } = oauthNameAndImage(user, profile);
+              await upsertOAuthUserRecord(email, name, image);
+              dbUser = await prisma.user.findUnique({
+                where: { email },
+                select: { id: true, email: true, name: true, image: true },
+              });
+            } catch (e) {
+              console.error("[BrainDump] JWT OAuth user repair upsert failed:", e);
+            }
+          }
           if (dbUser) {
             token.id = dbUser.id;
             token.email = dbUser.email;
