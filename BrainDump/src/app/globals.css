@@ -4240,6 +4240,234 @@ input.bd-todo-checkbox:checked {
   }
 }
 
+/* ─── Bottom bar pill — shared between mobile & desktop ─────────────────── */
+@keyframes bd-bottom-dump-mic-pulse {
+  0%,
+  100% {
+    filter: brightness(1.05);
+    box-shadow: var(--bd-dump-mic-shadow);
+  }
+  50% {
+    filter: brightness(1.16);
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, var(--bd-dump-mic-fg) 28%, transparent),
+      0 8px 26px rgba(232, 93, 45, 0.42);
+  }
+}
+
+.bd-bottom-bar-pill {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.42rem 0.5rem 0.48rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #0a0a0a);
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.38),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+
+/* Sliding selection highlight (tabs only; mic sits above in z-order) */
+.bd-bottom-bar-pill-highlight {
+  position: absolute;
+  z-index: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  transition:
+    left 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+    top 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+    width 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+    height 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
+    opacity 0.22s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-bottom-bar-pill-highlight {
+    transition-duration: 0.04s;
+    transition-timing-function: ease-out;
+  }
+}
+
+:root[data-theme="light"] .bd-bottom-bar-pill {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, #f3f3f3);
+  box-shadow:
+    0 6px 22px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.9);
+  border-color: var(--border-subtle);
+}
+
+.bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0;
+  transition: color 0.24s var(--bd-ease-soft);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item:active {
+  transform: scale(0.95);
+}
+
+.bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--active {
+  color: var(--text-primary);
+}
+
+/* Tasks tab: selection is background only; icon stays same tone as other inactive tabs */
+.bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--tasks.bd-bottom-bar-pill-item--active {
+  color: var(--text-secondary);
+}
+
+.bd-bottom-bar-pill-icon {
+  display: block;
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.bd-bottom-bar-pill-icon--calendar .bd-bottom-bar-cal-day {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  dominant-baseline: middle;
+}
+
+.bd-bottom-bar-pill-mic-wrap {
+  flex: 0 0 auto;
+  width: 72px;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 26px;
+  pointer-events: auto;
+}
+
+.bd-bottom-bar-pill-mic-wrap .bd-bottom-dump-mic {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  margin-left: -28px;
+  transform: translateY(-12px);
+}
+
+.bd-bottom-bar-pill-mic-wrap .bd-dump-empty-hint.bd-dump-empty-hint--mobile {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 10px);
+  width: min(300px, 92vw);
+  z-index: 4;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* Raised primary mic inside pill */
+.bd-bottom-bar .bd-bottom-dump-mic {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border-radius: 50%;
+  aspect-ratio: 1;
+  background: var(--bd-dump-mic-bg);
+  color: var(--bd-dump-mic-fg);
+  border: 1px solid var(--bd-dump-mic-border);
+  box-shadow: var(--bd-dump-mic-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+  flex: 0 0 auto;
+  transition:
+    transform var(--bd-duration-fast) var(--bd-ease-spring),
+    box-shadow var(--bd-duration-normal) var(--bd-ease-in-out),
+    filter var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-bottom-bar .bd-bottom-dump-mic:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 8px 28px rgba(232, 93, 45, 0.45);
+}
+
+.bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording {
+  animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
+}
+
+.bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording:hover {
+  animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
+  filter: brightness(1.08);
+}
+
+.bd-bottom-bar .bd-bottom-dump-mic svg {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+
+/* ─── Desktop bottom bar ─────────────────────────────────────────────────── */
+@media (min-width: 769px) {
+  :root {
+    --bd-bottom-bar-clearance: calc(72px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
+  }
+
+  .bd-bottom-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.35rem 0 0;
+    background: none;
+    background-color: transparent;
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .bd-bottom-bar-mobile-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+
+  .bd-app-shell--dump-recording .bd-bottom-bar {
+    z-index: calc(var(--bd-z-bottom-bar) + 50);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   :root {
     /* Pill bar + raised mic + quick tools row + safe area */
@@ -4344,195 +4572,6 @@ input.bd-todo-checkbox:checked {
 
   .bd-app-shell--dump-recording .bd-bottom-bar {
     z-index: calc(var(--bd-z-bottom-bar) + 50);
-  }
-
-  @keyframes bd-bottom-dump-mic-pulse {
-    0%,
-    100% {
-      filter: brightness(1.05);
-      box-shadow: var(--bd-dump-mic-shadow);
-    }
-    50% {
-      filter: brightness(1.16);
-      box-shadow:
-        0 0 0 5px color-mix(in srgb, var(--bd-dump-mic-fg) 28%, transparent),
-        0 8px 26px rgba(232, 93, 45, 0.42);
-    }
-  }
-
-  .bd-bottom-bar-pill {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 0.35rem;
-    width: 100%;
-    min-height: 52px;
-    padding: 0.42rem 0.5rem 0.48rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--bg-elevated) 94%, #0a0a0a);
-    box-shadow:
-      0 6px 28px rgba(0, 0, 0, 0.38),
-      0 1px 0 rgba(255, 255, 255, 0.05);
-    border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-  }
-
-  /* Sliding selection highlight (tabs only; mic sits above in z-order) */
-  .bd-bottom-bar-pill-highlight {
-    position: absolute;
-    z-index: 0;
-    border-radius: 999px;
-    pointer-events: none;
-    box-sizing: border-box;
-    background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-    transition:
-      left 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
-      top 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
-      width 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
-      height 0.36s cubic-bezier(0.34, 1.06, 0.32, 1),
-      opacity 0.22s ease;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .bd-bottom-bar-pill-highlight {
-      transition-duration: 0.04s;
-      transition-timing-function: ease-out;
-    }
-  }
-
-  :root[data-theme="light"] .bd-bottom-bar-pill {
-    background: color-mix(in srgb, var(--bg-elevated) 88%, #f3f3f3);
-    box-shadow:
-      0 6px 22px rgba(15, 23, 42, 0.12),
-      0 1px 0 rgba(255, 255, 255, 0.9);
-    border-color: var(--border-subtle);
-  }
-
-  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
-    flex: 1 1 0;
-    min-width: 0;
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    border: none;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.2rem;
-    font-size: 0;
-    transition: color 0.24s var(--bd-ease-soft);
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item:active {
-    transform: scale(0.95);
-  }
-
-  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--active {
-    color: var(--text-primary);
-  }
-
-  /* Tasks tab: selection is background only; icon stays same tone as other inactive tabs */
-  .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item--tasks.bd-bottom-bar-pill-item--active {
-    color: var(--text-secondary);
-  }
-
-  .bd-bottom-bar-pill-icon {
-    display: block;
-    flex-shrink: 0;
-    opacity: 0.95;
-  }
-
-  .bd-bottom-bar-pill-icon--calendar .bd-bottom-bar-cal-day {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    dominant-baseline: middle;
-  }
-
-  .bd-bottom-bar-pill-mic-wrap {
-    flex: 0 0 auto;
-    width: 72px;
-    position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    height: 26px;
-    /* Must not use pointer-events: none — taps would fall through to content under the bar */
-    pointer-events: auto;
-  }
-
-  .bd-bottom-bar-pill-mic-wrap .bd-bottom-dump-mic {
-    pointer-events: auto;
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    margin-left: -28px;
-    transform: translateY(-12px);
-  }
-
-  .bd-bottom-bar-pill-mic-wrap .bd-dump-empty-hint.bd-dump-empty-hint--mobile {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(100% + 10px);
-    width: min(300px, 92vw);
-    z-index: 4;
-    pointer-events: none;
-    box-sizing: border-box;
-  }
-
-  /* Raised primary mic inside pill */
-  .bd-bottom-bar .bd-bottom-dump-mic {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
-    min-height: 56px;
-    max-width: none;
-    max-height: none;
-    padding: 0;
-    border-radius: 50%;
-    aspect-ratio: 1;
-    background: var(--bd-dump-mic-bg);
-    color: var(--bd-dump-mic-fg);
-    border: 1px solid var(--bd-dump-mic-border);
-    box-shadow: var(--bd-dump-mic-shadow);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0;
-    line-height: 0;
-    flex: 0 0 auto;
-    transition:
-      transform var(--bd-duration-fast) var(--bd-ease-spring),
-      box-shadow var(--bd-duration-normal) var(--bd-ease-in-out),
-      filter var(--bd-duration-fast) var(--bd-ease-soft);
-  }
-
-  .bd-bottom-bar .bd-bottom-dump-mic:hover {
-    filter: brightness(1.05);
-    box-shadow: 0 8px 28px rgba(232, 93, 45, 0.45);
-  }
-
-  .bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording {
-    animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
-  }
-
-  .bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording:hover {
-    animation: bd-bottom-dump-mic-pulse 1.2s var(--bd-ease-in-out) infinite;
-    filter: brightness(1.08);
-  }
-
-  .bd-bottom-bar .bd-bottom-dump-mic svg {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
   }
 
   .bd-bottom-bar-quick-tools {
