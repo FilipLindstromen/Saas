@@ -6,7 +6,7 @@
     "predev": "npx prisma db push",
     "dev": "npx next dev -p 3001",
     "build": "npx next build",
-    "build:vercel": "npx prisma generate && node scripts/vercel-prisma-migrate.cjs && npx next build",
+    "build:vercel": "npx prisma generate && npx next build",
     "start": "npx next start -p 3001",
     "cap:sync": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
