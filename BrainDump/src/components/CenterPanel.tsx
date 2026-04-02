@@ -21,6 +21,7 @@ import { transcribeAudioBlobs } from "@/lib/transcribe-audio-client";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
 import { PhotoCaptureTrigger, type PhotoCaptureTriggerHandle } from "./PhotoCaptureTrigger";
+import { useRevenueCatOptional } from "./RevenueCatProvider";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
 const UNCLEAR_CONFIDENCE_THRESHOLD = 0.65;
@@ -163,6 +164,13 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   ref
 ) {
   const { t, locale } = useI18n();
+  const rc = useRevenueCatOptional();
+  /** Always reflects the latest isPro so we can read it after async presentPaywall resolves. */
+  const isProRef = useRef(false);
+  isProRef.current = rc?.isPro ?? false;
+  /** True when RC is active (enabled + API key + signed in + SDK ready) and user has no subscription. */
+  const paywallActive = Boolean(rc?.ready && rc?.disabledReason === null && !rc?.isPro);
+
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [transcript, setTranscript] = useState("");
   const [transcribeLoading, setTranscribeLoading] = useState(false);
@@ -565,6 +573,41 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const stopRecordingRef = useRef(stopRecording);
   stopRecordingRef.current = stopRecording;
 
+  const startRecordingRef = useRef(startRecording);
+  startRecordingRef.current = startRecording;
+
+  /**
+   * Hot-swap the microphone while recording is active: silently stop the
+   * current capture, discard the partial audio, then restart with the newly
+   * selected device. Called from the mic <select> onChange.
+   */
+  const switchMicAndRestart = useCallback(
+    (newDeviceId: string) => {
+      setSelectedDeviceId(newDeviceId);
+      if (recordState !== "recording") return;
+      // Discard audio captured so far so the restart is a clean take.
+      completedAudioSegmentBlobsRef.current = [];
+      chunksRef.current = [];
+      const win = window as unknown as {
+        __lastAudioBlob?: Blob;
+        __lastAudioFileName?: string;
+        __lastAudioSegments?: Blob[];
+      };
+      win.__lastAudioBlob = undefined;
+      win.__lastAudioSegments = undefined;
+      win.__lastAudioFileName = undefined;
+      stopRecording({ silent: true });
+      // Wait for the React re-render that picks up the new selectedDeviceId
+      // (startRecordingRef.current is updated via its own assignment above).
+      setTimeout(() => {
+        if (showDumpOverlayRef.current) {
+          void startRecordingRef.current();
+        }
+      }, 200);
+    },
+    [recordState, stopRecording]
+  );
+
   useEffect(() => {
     if (recordState !== "recording") return;
     setRecordingElapsed("0:00");
@@ -804,12 +847,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
   }, [isDumpProcessing, showDumpOverlay, recordState, stopRecording, mode]);
 
-  const openTypedDumpSheet = useCallback(() => {
+  const openTypedDumpSheet = useCallback(async () => {
     if (isDumpProcessing || photoOrganizeFlow) return;
+    if (paywallActive) {
+      await rc?.presentPaywall();
+      if (!isProRef.current) return;
+    }
     leaveVoiceDumpSessionForOtherInput();
     setTypedDumpText("");
     setShowTypedDumpSheet(true);
-  }, [isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput]);
+  }, [isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, paywallActive, rc]);
 
   const closeTypedDumpSheet = useCallback(() => {
     setShowTypedDumpSheet(false);
@@ -931,23 +978,31 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     return () => window.removeEventListener("keydown", onKey);
   }, [showDumpOverlay, showHelpOverlay, closeDumpOverlay]);
 
-  const onDumpFabClick = useCallback(() => {
+  const onDumpFabClick = useCallback(async () => {
     if (isDumpProcessing || photoOrganizeFlow) return;
     if (recordState === "recording") {
       void handleStopAndProcess();
       return;
     }
     if (showDumpOverlay) return;
+    if (paywallActive) {
+      await rc?.presentPaywall();
+      if (!isProRef.current) return;
+    }
     openDumpOverlay();
-  }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay]);
+  }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay, paywallActive, rc]);
 
   useImperativeHandle(
     ref,
     () => ({
       processImageForOrganize,
       openTypedDumpSheet,
-      openPhotoCaptureMenu: () => {
+      openPhotoCaptureMenu: async () => {
         if (isDumpProcessing || photoOrganizeFlow) return;
+        if (paywallActive) {
+          await rc?.presentPaywall();
+          if (!isProRef.current) return;
+        }
         leaveVoiceDumpSessionForOtherInput();
         requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
       },
@@ -955,7 +1010,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         onDumpFabClick();
       },
     }),
-    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick, isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput]
+    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick, isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, paywallActive, rc]
   );
 
   const dumpPanelContent = (
@@ -970,8 +1025,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               id="bd-mic-select"
               className="bd-input"
               value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-              disabled={recordState === "recording"}
+              onChange={(e) => switchMicAndRestart(e.target.value)}
+              disabled={isDumpProcessing}
               style={{ width: "100%", maxWidth: "100%", minHeight: "44px" }}
               aria-label={t("center.microphone")}
             >

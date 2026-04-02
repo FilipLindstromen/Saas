@@ -135,7 +135,7 @@ function ResetPasswordForm() {
               borderRadius: "var(--button-radius)",
               border: "none",
               background: "var(--accent)",
-              color: "#fff",
+              color: "var(--accent-text)",
               fontSize: "0.95rem",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
