@@ -1012,17 +1012,27 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   }, [showDumpOverlay, showHelpOverlay, closeDumpOverlay]);
 
   const onDumpFabClick = useCallback(async () => {
+    console.log("[dump] fab clicked", { isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay });
     if (isDumpProcessing || photoOrganizeFlow) return;
     if (recordState === "recording") {
       void handleStopAndProcess();
       return;
     }
     if (showDumpOverlay) return;
+    console.log("[dump] waiting for RC ready…", { disabledReason: rcRef.current?.disabledReason, ready: rcRef.current?.ready, isPro: rcRef.current?.isPro });
     await waitForRCReady();
-    if (shouldShowPaywall()) {
+    const gate = shouldShowPaywall();
+    console.log("[dump] RC ready", { disabledReason: rcRef.current?.disabledReason, ready: rcRef.current?.ready, isPro: rcRef.current?.isPro, gate, lastError: rcRef.current?.lastError });
+    if (gate) {
+      console.log("[dump] showing paywall…");
       const result = await rcRef.current?.presentPaywall();
+      console.log("[dump] paywall result", result);
       if (!result?.isPro) {
-        if (result?.error) setError(result.error);
+        if (result?.error) {
+          console.warn("[dump] paywall error:", result.error);
+          // Show error visibly even before the overlay opens
+          window.alert(`Subscription check failed: ${result.error}\n\nCheck the browser console for details.`);
+        }
         return;
       }
     }

@@ -39,7 +39,7 @@ const RevenueCatContext = createContext<RevenueCatContextValue | undefined>(unde
 
 function entitlementActive(info: CustomerInfo | null, entitlementId: string): boolean {
   if (!info) return false;
-  return Boolean(info.entitlements.active[entitlementId]?.isActive);
+  return entitlementId in info.entitlements.active;
 }
 
 export function RevenueCatProvider({ children }: { children: ReactNode }) {
@@ -127,6 +127,7 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
           setLastError(null);
         }
       } catch (e) {
+        console.error("[RevenueCat] SDK init error:", e);
         if (!cancelled) {
           setCustomerInfo(null);
           setLastError(purchasesErrorMessage(e) ?? "RevenueCat configuration failed");
@@ -156,6 +157,16 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
         }
         const inst = Purchases.getSharedInstance();
 
+        // Fetch the current offering — required for presentPaywall to know what to display.
+        const offerings = await inst.getOfferings();
+        const currentOffering = offerings.current;
+        if (!currentOffering) {
+          const msg = "No active offering found in RevenueCat. Make sure a default offering is published.";
+          console.error("[RevenueCat]", msg);
+          setLastError(msg);
+          return { isPro: false, error: msg };
+        }
+
         const openManagement = async () => {
           try {
             const info = await inst.getCustomerInfo();
@@ -168,6 +179,7 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
         };
 
         const result = await inst.presentPaywall({
+          offering: currentOffering,
           htmlTarget: options?.htmlTarget ?? undefined,
           customerEmail: userEmail,
           onVisitCustomerCenter: () => {

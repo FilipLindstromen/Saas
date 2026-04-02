@@ -4434,10 +4434,23 @@ input.bd-todo-checkbox:checked {
 /* ─── Desktop bottom bar ─────────────────────────────────────────────────── */
 @media (min-width: 769px) {
   :root {
-    --bd-bottom-bar-clearance: calc(72px + max(0.5rem, env(safe-area-inset-bottom, 0px)));
+    /* Bottom bar is in-flow on desktop (not fixed), so no extra scroll clearance needed. */
+    --bd-bottom-bar-clearance: 0px;
+  }
+
+  /* Constrain app to 1024px and center it on wide screens. */
+  .bd-app-shell {
+    max-width: 1024px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .bd-bottom-bar {
+    /* Remove fixed viewport positioning so the bar stays inside the 1024px shell. */
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
