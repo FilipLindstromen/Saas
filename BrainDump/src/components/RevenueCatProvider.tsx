@@ -103,7 +103,6 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
 
       try {
         const { Purchases, LogLevel } = await import("@revenuecat/purchases-js");
-        await import("@revenuecat/purchases-js/styles");
 
         if (process.env.NODE_ENV === "development") {
           Purchases.setLogLevel(LogLevel.Warn);
