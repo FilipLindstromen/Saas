@@ -5,6 +5,25 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { SITE_CONFIG_CHANGED_EVENT } from "@/components/SiteConfigProvider";
 
+type AdminUser = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  createdAt: string;
+  hasPassword: boolean;
+  providers: string[];
+  dumpCount: number;
+  itemCount: number;
+};
+
+type UsersPayload = {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  pages: number;
+  pageSize: number;
+};
+
 type StatsPayload = {
   users: {
     total: number;
@@ -92,6 +111,14 @@ export default function AdminDashboardPage() {
   const [rc, setRc] = useState<boolean | null>(null);
   const [rcSaving, setRcSaving] = useState(false);
 
+  const [usersData, setUsersData] = useState<UsersPayload | null>(null);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersSearch, setUsersSearch] = useState("");
+  const [usersSearchInput, setUsersSearchInput] = useState("");
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const loadStats = useCallback(async () => {
     setStatsError(null);
     const res = await fetch("/api/admin/stats", { cache: "no-store" });
@@ -114,11 +141,43 @@ export default function AdminDashboardPage() {
     if (typeof d.revenueCatEnabled === "boolean") setRc(d.revenueCatEnabled);
   }, []);
 
+  const loadUsers = useCallback(async (page: number, search: string) => {
+    setUsersLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (search) params.set("q", search);
+      const res = await fetch(`/api/admin/users?${params.toString()}`, { cache: "no-store" });
+      if (res.ok) setUsersData((await res.json()) as UsersPayload);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  const deleteUser = async (user: AdminUser) => {
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleteConfirm(null);
+        void loadUsers(usersPage, usersSearch);
+        void loadStats();
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.email) return;
     void loadStats();
     void loadSettings();
-  }, [status, session?.user?.email, loadStats, loadSettings]);
+    void loadUsers(1, "");
+  }, [status, session?.user?.email, loadStats, loadSettings, loadUsers]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.email) return;
+    void loadUsers(usersPage, usersSearch);
+  }, [usersPage, usersSearch, status, session?.user?.email, loadUsers]);
 
   const saveRc = async (next: boolean) => {
     setRcSaving(true);
@@ -319,6 +378,212 @@ export default function AdminDashboardPage() {
                 </ul>
               </div>
             </section>
+
+            <section
+              style={{
+                padding: "1rem 1.1rem",
+                borderRadius: "var(--card-radius)",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.6rem", marginBottom: "0.75rem" }}>
+                <h2 style={{ fontSize: "1.05rem", margin: 0 }}>
+                  Users{usersData ? <span style={{ fontSize: "0.8rem", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "0.5rem" }}>({usersData.total} total)</span> : null}
+                </h2>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setUsersPage(1);
+                    setUsersSearch(usersSearchInput);
+                  }}
+                  style={{ display: "flex", gap: "0.4rem" }}
+                >
+                  <input
+                    type="search"
+                    placeholder="Search email or name…"
+                    value={usersSearchInput}
+                    onChange={(e) => setUsersSearchInput(e.target.value)}
+                    style={{
+                      padding: "0.3rem 0.6rem",
+                      borderRadius: 6,
+                      border: "1px solid var(--border-default)",
+                      background: "var(--bg-primary)",
+                      color: "var(--text-primary)",
+                      fontSize: "0.85rem",
+                      width: 200,
+                    }}
+                  />
+                  <button type="submit" className="bd-btn" style={{ fontSize: "0.85rem", padding: "0.3rem 0.7rem" }}>
+                    Search
+                  </button>
+                  {usersSearch && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      style={{ fontSize: "0.85rem", padding: "0.3rem 0.7rem" }}
+                      onClick={() => { setUsersSearch(""); setUsersSearchInput(""); setUsersPage(1); }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </form>
+              </div>
+
+              {usersLoading && !usersData && (
+                <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: 0 }}>Loading…</p>
+              )}
+
+              {usersData && (
+                <>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border-subtle)", textAlign: "left" }}>
+                          {["Email", "Name", "Joined", "Auth", "Dumps", "Items", ""].map((h) => (
+                            <th key={h} style={{ padding: "0.4rem 0.6rem", color: "var(--text-tertiary)", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usersData.users.map((u) => (
+                          <tr
+                            key={u.id}
+                            style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                          >
+                            <td style={{ padding: "0.45rem 0.6rem", color: "var(--text-primary)", wordBreak: "break-all" }}>{u.email ?? "—"}</td>
+                            <td style={{ padding: "0.45rem 0.6rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{u.name ?? "—"}</td>
+                            <td style={{ padding: "0.45rem 0.6rem", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                              {new Date(u.createdAt).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: "0.45rem 0.6rem", whiteSpace: "nowrap" }}>
+                              <span style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+                                {u.hasPassword && (
+                                  <span style={{ fontSize: "0.75rem", padding: "0.1rem 0.45rem", borderRadius: 999, background: "color-mix(in srgb, var(--border-default) 60%, transparent)", color: "var(--text-secondary)" }}>
+                                    password
+                                  </span>
+                                )}
+                                {u.providers.map((p) => (
+                                  <span key={p} style={{ fontSize: "0.75rem", padding: "0.1rem 0.45rem", borderRadius: 999, background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: "var(--text-primary)" }}>
+                                    {p}
+                                  </span>
+                                ))}
+                              </span>
+                            </td>
+                            <td style={{ padding: "0.45rem 0.6rem", color: "var(--text-secondary)", textAlign: "right" }}>{u.dumpCount}</td>
+                            <td style={{ padding: "0.45rem 0.6rem", color: "var(--text-secondary)", textAlign: "right" }}>{u.itemCount}</td>
+                            <td style={{ padding: "0.45rem 0.6rem", textAlign: "right" }}>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirm(u)}
+                                style={{
+                                  padding: "0.2rem 0.55rem",
+                                  borderRadius: 6,
+                                  border: "1px solid color-mix(in srgb, var(--accent) 50%, transparent)",
+                                  background: "transparent",
+                                  color: "var(--accent)",
+                                  fontSize: "0.8rem",
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {usersData.users.length === 0 && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: "1rem 0.6rem", color: "var(--text-tertiary)", textAlign: "center" }}>
+                              No users found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {usersData.pages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", fontSize: "0.85rem" }}>
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        disabled={usersPage <= 1}
+                        onClick={() => setUsersPage((p) => p - 1)}
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "0.82rem" }}
+                      >
+                        ← Prev
+                      </button>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Page {usersPage} of {usersData.pages}
+                      </span>
+                      <button
+                        type="button"
+                        className="bd-btn"
+                        disabled={usersPage >= usersData.pages}
+                        onClick={() => setUsersPage((p) => p + 1)}
+                        style={{ padding: "0.25rem 0.6rem", fontSize: "0.82rem" }}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            {/* Delete confirmation modal */}
+            {deleteConfirm && (
+              <div
+                style={{
+                  position: "fixed", inset: 0, zIndex: 1000,
+                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)",
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+                }}
+                onClick={() => !deleteLoading && setDeleteConfirm(null)}
+              >
+                <div
+                  style={{
+                    background: "var(--bg-elevated)", borderRadius: "var(--card-radius)",
+                    border: "1px solid var(--border-default)", padding: "1.5rem",
+                    maxWidth: 420, width: "100%", boxShadow: "var(--shadow-lg)",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 style={{ margin: "0 0 0.5rem", fontSize: "1.05rem" }}>Delete account?</h3>
+                  <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", margin: "0 0 0.35rem" }}>
+                    This will permanently delete:
+                  </p>
+                  <p style={{ fontWeight: 600, margin: "0 0 0.25rem", wordBreak: "break-all" }}>{deleteConfirm.email ?? deleteConfirm.id}</p>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-tertiary)", margin: "0 0 1.25rem" }}>
+                    Including all their dumps ({deleteConfirm.dumpCount}), organized items ({deleteConfirm.itemCount}), projects, and sessions. This cannot be undone.
+                  </p>
+                  <div style={{ display: "flex", gap: "0.6rem", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      disabled={deleteLoading}
+                      onClick={() => setDeleteConfirm(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleteLoading}
+                      onClick={() => void deleteUser(deleteConfirm)}
+                      style={{
+                        padding: "0.4rem 1rem", borderRadius: 8,
+                        border: "none", background: "var(--accent)",
+                        color: "var(--accent-text)", fontWeight: 600,
+                        fontSize: "0.9rem", cursor: deleteLoading ? "wait" : "pointer",
+                      }}
+                    >
+                      {deleteLoading ? "Deleting…" : "Delete permanently"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <section
               style={{

@@ -88,7 +88,7 @@ export async function DELETE(request: Request) {
   }
 
   // Prevent admin from deleting their own account via the dashboard
-  const adminId = (session.user as { id?: string } | undefined)?.id;
+  const adminId = (session?.user as { id?: string } | undefined)?.id;
   if (adminId && adminId === userId) {
     return NextResponse.json({ error: "Cannot delete your own admin account" }, { status: 400 });
   }
