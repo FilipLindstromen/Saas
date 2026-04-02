@@ -165,8 +165,40 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 ) {
   const { t, locale } = useI18n();
   const rc = useRevenueCatOptional();
-  /** True when RC is active (enabled + API key + signed in + SDK ready) and user has no subscription. */
-  const paywallActive = Boolean(rc?.ready && rc?.disabledReason === null && !rc?.isPro);
+  /** Always holds the latest RC context so async callbacks read fresh state. */
+  const rcRef = useRef(rc);
+  rcRef.current = rc;
+
+  /**
+   * If RC is supposed to be active (disabledReason === null) but the SDK hasn't
+   * finished loading yet, wait up to 4 s before proceeding.
+   */
+  const waitForRCReady = useCallback((): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      if (rcRef.current?.disabledReason !== null || rcRef.current?.ready) {
+        resolve();
+        return;
+      }
+      const deadline = Date.now() + 4000;
+      const poll = () => {
+        if (rcRef.current?.ready || rcRef.current?.disabledReason !== null || Date.now() >= deadline) {
+          resolve();
+        } else {
+          setTimeout(poll, 100);
+        }
+      };
+      poll();
+    });
+  }, []);
+
+  /**
+   * Returns true if the paywall should be shown (RC active, loaded, user not subscribed).
+   * Must be called after waitForRCReady().
+   */
+  const shouldShowPaywall = useCallback((): boolean => {
+    const r = rcRef.current;
+    return Boolean(r?.ready && r?.disabledReason === null && !r?.isPro);
+  }, []);
 
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [transcript, setTranscript] = useState("");
@@ -846,8 +878,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
   const openTypedDumpSheet = useCallback(async () => {
     if (isDumpProcessing || photoOrganizeFlow) return;
-    if (paywallActive) {
-      const result = await rc?.presentPaywall();
+    await waitForRCReady();
+    if (shouldShowPaywall()) {
+      const result = await rcRef.current?.presentPaywall();
       if (!result?.isPro) {
         if (result?.error) setError(result.error);
         return;
@@ -856,7 +889,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     leaveVoiceDumpSessionForOtherInput();
     setTypedDumpText("");
     setShowTypedDumpSheet(true);
-  }, [isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, paywallActive, rc]);
+  }, [isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, waitForRCReady, shouldShowPaywall]);
 
   const closeTypedDumpSheet = useCallback(() => {
     setShowTypedDumpSheet(false);
@@ -985,15 +1018,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       return;
     }
     if (showDumpOverlay) return;
-    if (paywallActive) {
-      const result = await rc?.presentPaywall();
+    await waitForRCReady();
+    if (shouldShowPaywall()) {
+      const result = await rcRef.current?.presentPaywall();
       if (!result?.isPro) {
         if (result?.error) setError(result.error);
         return;
       }
     }
     openDumpOverlay();
-  }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay, paywallActive, rc]);
+  }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay, waitForRCReady, shouldShowPaywall]);
 
   useImperativeHandle(
     ref,
@@ -1002,8 +1036,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       openTypedDumpSheet,
       openPhotoCaptureMenu: async () => {
         if (isDumpProcessing || photoOrganizeFlow) return;
-        if (paywallActive) {
-          const result = await rc?.presentPaywall();
+        await waitForRCReady();
+        if (shouldShowPaywall()) {
+          const result = await rcRef.current?.presentPaywall();
           if (!result?.isPro) return;
         }
         leaveVoiceDumpSessionForOtherInput();
@@ -1013,7 +1048,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
         onDumpFabClick();
       },
     }),
-    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick, isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, paywallActive, rc]
+    [processImageForOrganize, openTypedDumpSheet, onDumpFabClick, isDumpProcessing, photoOrganizeFlow, leaveVoiceDumpSessionForOtherInput, waitForRCReady, shouldShowPaywall]
   );
 
   const dumpPanelContent = (
