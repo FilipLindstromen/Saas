@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useRevenueCat } from "@/components/RevenueCatProvider";
 
@@ -9,6 +9,10 @@ export function ProfileRevenueCatSection() {
   const { t } = useI18n();
   const rc = useRevenueCat();
   const [busy, setBusy] = useState<"action" | null>(null);
+  const [noPortalHint, setNoPortalHint] = useState(false);
+
+  // Clear the hint whenever subscription status changes.
+  useEffect(() => { setNoPortalHint(false); }, [rc.isPro]);
 
   if (rc.disabledReason === "no_api_key") {
     if (process.env.NODE_ENV === "production") return null;
@@ -60,17 +64,36 @@ export function ProfileRevenueCatSection() {
         </p>
       ) : null}
 
+      {noPortalHint ? (
+        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+          No billing portal is available for this subscription (e.g. it was granted manually or via a sandbox test). Real purchases made through the app will show a management link here.
+        </p>
+      ) : null}
+
       <button
         type="button"
         className="bd-btn bd-btn--primary"
         disabled={!rc.ready || busy !== null}
         style={{ width: "100%" }}
-        onClick={() => {
+        onClick={async () => {
           setBusy("action");
-          const action = rc.isPro
-            ? rc.openSubscriptionManagement()
-            : rc.presentPaywall().then(() => {});
-          void action.finally(() => setBusy(null));
+          setNoPortalHint(false);
+          try {
+            if (rc.isPro) {
+              const infoBefore = rc.customerInfo;
+              await rc.openSubscriptionManagement();
+              // If managementURL was absent the window won't open; show a hint.
+              if (!infoBefore?.managementURL) {
+                // Re-fetch to check the latest customerInfo
+                await rc.refreshCustomerInfo();
+                if (!rc.customerInfo?.managementURL) setNoPortalHint(true);
+              }
+            } else {
+              await rc.presentPaywall();
+            }
+          } finally {
+            setBusy(null);
+          }
         }}
       >
         {busy === "action"

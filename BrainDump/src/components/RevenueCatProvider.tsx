@@ -213,9 +213,9 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
       setCustomerInfo(info);
       if (info.managementURL) {
         window.open(info.managementURL, "_blank", "noopener,noreferrer");
-      } else {
-        setLastError("No active subscription to manage on the web yet.");
       }
+      // No managementURL means the subscription was granted outside of web billing
+      // (e.g. sandbox / promotional). Silently do nothing — not an error.
     } catch (e) {
       const msg = purchasesErrorMessage(e);
       if (msg) setLastError(msg);

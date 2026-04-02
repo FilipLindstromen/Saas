@@ -304,6 +304,13 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     loadDevices(true);
   }, [showDumpOverlay, loadDevices]);
 
+  // Auto-refresh mic list every 3 s on desktop while the dump overlay is open.
+  useEffect(() => {
+    if (!showDumpOverlay || isMobile) return;
+    const id = window.setInterval(() => { void loadDevices(); }, 3000);
+    return () => window.clearInterval(id);
+  }, [showDumpOverlay, isMobile, loadDevices]);
+
   useEffect(() => {
     if (recordState !== "recording" || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -1066,9 +1073,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       <section className="bd-dump-overlay-body">
         {!isMobile && audioDevices.length > 0 && (
           <div className="bd-dump-mic-row">
-            <label htmlFor="bd-mic-select" style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem", textAlign: "center" }}>
-              {t("center.microphone")}
-            </label>
             <select
               id="bd-mic-select"
               className="bd-input"
@@ -1093,7 +1097,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           {recordState === "recording" ? (
             <>
               <div className="bd-dump-canvas-wrap">
-                <div className="bd-dump-input-label">{t("center.inputLevel")}</div>
                 <canvas
                   ref={canvasRef}
                   width={320}
@@ -1138,13 +1141,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             </>
           )}
         </div>
-        {!isMobile && (
-          <div className="bd-dump-refresh-row">
-            <button type="button" className="bd-btn" onClick={() => loadDevices(true)} title={t("center.refreshMics")}>
-              {t("center.refreshMics")}
-            </button>
-          </div>
-        )}
       </section>
       {organizeSuccess && <div className="bd-banner-success">{organizeSuccess}</div>}
       {error && (
@@ -1212,8 +1208,18 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
                 {t("center.newDump")}
               </h2>
-              <button type="button" className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-help-btn" onClick={() => setShowHelpOverlay(true)}>
-                {t("center.help")}
+              <button
+                type="button"
+                className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-help-btn"
+                onClick={() => setShowHelpOverlay(true)}
+                aria-label={t("center.help")}
+                title={t("center.help")}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
               </button>
             </header>
             <div className="bd-dump-sheet-content">
