@@ -253,34 +253,7 @@ export function UserProfilePanel({
 
       <ProfileRevenueCatSection />
 
-      {saveError ? (
-        <p role="alert" style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "var(--danger, #c0392b)" }}>
-          {saveError}
-        </p>
-      ) : null}
-      {saveOk ? (
-        <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "var(--accent)" }}>{t("profile.saved")}</p>
-      ) : null}
-
-      <button type="button" className="bd-btn bd-btn--primary" onClick={() => void save()} disabled={saving} style={{ width: "100%", marginBottom: "1.25rem" }}>
-        {saving ? t("profile.saving") : t("profile.save")}
-      </button>
-
       <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem", marginBottom: "1rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-        {variant === "modal" ? (
-          <Link href="/profile" className="bd-btn" style={{ textAlign: "center", textDecoration: "none" }} onClick={() => onClose?.()}>
-            {t("profile.openFullPage")}
-          </Link>
-        ) : (
-          <Link href="/" className="bd-btn" style={{ textAlign: "center", textDecoration: "none" }}>
-            {t("profile.backToApp")}
-          </Link>
-        )}
-        {onOpenSettings ? (
-          <button type="button" className="bd-btn" onClick={openSettings} style={{ width: "100%" }}>
-            {t("profile.openSettings")}
-          </button>
-        ) : null}
         <button type="button" className="bd-btn" onClick={openPrivacy} style={{ width: "100%" }}>
           {t("profile.openPrivacy")}
         </button>

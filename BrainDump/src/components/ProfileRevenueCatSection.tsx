@@ -8,7 +8,7 @@ import { useRevenueCat } from "@/components/RevenueCatProvider";
 export function ProfileRevenueCatSection() {
   const { t } = useI18n();
   const rc = useRevenueCat();
-  const [busy, setBusy] = useState<"paywall" | "manage" | "sync" | null>(null);
+  const [busy, setBusy] = useState<"action" | null>(null);
 
   if (rc.disabledReason === "no_api_key") {
     if (process.env.NODE_ENV === "production") return null;
@@ -60,52 +60,25 @@ export function ProfileRevenueCatSection() {
         </p>
       ) : null}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-        <button
-          type="button"
-          className="bd-btn bd-btn--primary"
-          disabled={!rc.ready || busy !== null}
-          style={{ width: "100%" }}
-          onClick={() => {
-            setBusy("paywall");
-            void rc
-              .presentPaywall()
-              .finally(() => setBusy(null));
-          }}
-        >
-          {busy === "paywall" ? t("revenueCat.openingPaywall") : t("revenueCat.upgrade")}
-        </button>
-
-        <button
-          type="button"
-          className="bd-btn"
-          disabled={!rc.ready || busy !== null}
-          style={{ width: "100%" }}
-          onClick={() => {
-            setBusy("manage");
-            void rc.openSubscriptionManagement().finally(() => setBusy(null));
-          }}
-        >
-          {busy === "manage" ? t("revenueCat.openingManage") : t("revenueCat.manageSubscription")}
-        </button>
-
-        <button
-          type="button"
-          className="bd-btn"
-          disabled={!rc.ready || busy !== null}
-          style={{ width: "100%" }}
-          onClick={() => {
-            setBusy("sync");
-            void rc.refreshCustomerInfo().finally(() => setBusy(null));
-          }}
-        >
-          {busy === "sync" ? t("revenueCat.syncing") : t("revenueCat.refreshStatus")}
-        </button>
-      </div>
-
-      <p style={{ margin: "0.65rem 0 0", fontSize: "0.72rem", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-        {t("revenueCat.footerHint")}
-      </p>
+      <button
+        type="button"
+        className="bd-btn bd-btn--primary"
+        disabled={!rc.ready || busy !== null}
+        style={{ width: "100%" }}
+        onClick={() => {
+          setBusy("action");
+          const action = rc.isPro
+            ? rc.openSubscriptionManagement()
+            : rc.presentPaywall().then(() => {});
+          void action.finally(() => setBusy(null));
+        }}
+      >
+        {busy === "action"
+          ? t("revenueCat.openingManage")
+          : rc.isPro
+            ? t("revenueCat.manageSubscription")
+            : t("revenueCat.upgrade")}
+      </button>
     </div>
   );
 }
