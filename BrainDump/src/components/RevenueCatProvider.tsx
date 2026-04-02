@@ -27,8 +27,10 @@ type RevenueCatContextValue = {
   customerInfo: CustomerInfo | null;
   lastError: string | null;
   refreshCustomerInfo: () => Promise<void>;
-  /** RevenueCat-hosted paywall (full-screen if no htmlTarget). Resolves after flow completes. */
-  presentPaywall: (options?: { htmlTarget?: HTMLElement | null }) => Promise<void>;
+  /** RevenueCat-hosted paywall (full-screen if no htmlTarget). Resolves after flow completes.
+   *  Returns `isPro: true` if the user has an active entitlement after the flow (purchased or already had one).
+   *  Returns `error` when the SDK could not show the paywall (misconfiguration, network, etc.). */
+  presentPaywall: (options?: { htmlTarget?: HTMLElement | null }) => Promise<{ isPro: boolean; error?: string }>;
   /** Opens subscription management (Stripe portal / store) when available. */
   openSubscriptionManagement: () => Promise<void>;
 };
@@ -142,14 +144,15 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
   }, [apiKey, disabledReason, siteConfigLoading, userId]);
 
   const presentPaywall = useCallback(
-    async (options?: { htmlTarget?: HTMLElement | null }) => {
-      if (disabledReason) return;
+    async (options?: { htmlTarget?: HTMLElement | null }): Promise<{ isPro: boolean; error?: string }> => {
+      if (disabledReason) return { isPro: false };
       setLastError(null);
       try {
         const { Purchases } = await import("@revenuecat/purchases-js");
         if (!Purchases.isConfigured()) {
-          setLastError("Subscription system not ready");
-          return;
+          const msg = "Subscription system not ready";
+          setLastError(msg);
+          return { isPro: false, error: msg };
         }
         const inst = Purchases.getSharedInstance();
 
@@ -175,14 +178,18 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
           },
         });
 
+        // Compute isPro synchronously from the fresh CustomerInfo before any React re-render.
+        const nowPro = entitlementActive(result.customerInfo, entitlementId);
         setCustomerInfo(result.customerInfo);
+        return { isPro: nowPro };
       } catch (e) {
-        if (isUserCancelledPurchasesError(e)) return;
+        if (isUserCancelledPurchasesError(e)) return { isPro: false };
         const msg = purchasesErrorMessage(e);
         if (msg) setLastError(msg);
+        return { isPro: false, error: msg ?? undefined };
       }
     },
-    [disabledReason, userEmail]
+    [disabledReason, entitlementId, userEmail]
   );
 
   const openSubscriptionManagement = useCallback(async () => {

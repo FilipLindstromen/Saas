@@ -165,9 +165,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 ) {
   const { t, locale } = useI18n();
   const rc = useRevenueCatOptional();
-  /** Always reflects the latest isPro so we can read it after async presentPaywall resolves. */
-  const isProRef = useRef(false);
-  isProRef.current = rc?.isPro ?? false;
   /** True when RC is active (enabled + API key + signed in + SDK ready) and user has no subscription. */
   const paywallActive = Boolean(rc?.ready && rc?.disabledReason === null && !rc?.isPro);
 
@@ -850,8 +847,11 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const openTypedDumpSheet = useCallback(async () => {
     if (isDumpProcessing || photoOrganizeFlow) return;
     if (paywallActive) {
-      await rc?.presentPaywall();
-      if (!isProRef.current) return;
+      const result = await rc?.presentPaywall();
+      if (!result?.isPro) {
+        if (result?.error) setError(result.error);
+        return;
+      }
     }
     leaveVoiceDumpSessionForOtherInput();
     setTypedDumpText("");
@@ -986,8 +986,11 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     }
     if (showDumpOverlay) return;
     if (paywallActive) {
-      await rc?.presentPaywall();
-      if (!isProRef.current) return;
+      const result = await rc?.presentPaywall();
+      if (!result?.isPro) {
+        if (result?.error) setError(result.error);
+        return;
+      }
     }
     openDumpOverlay();
   }, [isDumpProcessing, photoOrganizeFlow, recordState, showDumpOverlay, handleStopAndProcess, openDumpOverlay, paywallActive, rc]);
@@ -1000,8 +1003,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       openPhotoCaptureMenu: async () => {
         if (isDumpProcessing || photoOrganizeFlow) return;
         if (paywallActive) {
-          await rc?.presentPaywall();
-          if (!isProRef.current) return;
+          const result = await rc?.presentPaywall();
+          if (!result?.isPro) return;
         }
         leaveVoiceDumpSessionForOtherInput();
         requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
