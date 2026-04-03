@@ -14,6 +14,7 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { TodayView } from "@/components/TodayView";
 import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { WelcomeOverlay } from "@/components/WelcomeOverlay";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { useHabitRemindersTick } from "@/hooks/useHabitRemindersTick";
@@ -699,6 +700,7 @@ export default function BrainDumpPage() {
         }}
       />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <WelcomeOverlay />
     </div>
     </ErrorBoundary>
   );

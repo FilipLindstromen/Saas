@@ -1115,13 +1115,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 <div className="bd-dump-actions-row">
                   <button
                     type="button"
-                    className="bd-btn bd-btn-danger bd-dump-btn-wide"
-                    onClick={closeDumpOverlay}
+                    className="bd-btn bd-btn-primary bd-dump-btn-wide"
+                    onClick={() => void handleStopAndProcess()}
                     disabled={transcribeLoading || organizeLoading}
-                    title={t("center.cancelRecording")}
-                    aria-label={t("center.cancelRecording")}
+                    title={t("center.stopOrganize")}
+                    aria-label={t("center.stopOrganize")}
                   >
-                    {t("center.cancelRecording")}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                    {t("center.stopOrganize")}
                   </button>
                 </div>
               </div>
@@ -1133,11 +1136,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   {t("center.startingMic")}
                 </p>
               )}
-              <div className="bd-dump-actions-row">
-                <button type="button" className="bd-btn bd-btn-danger bd-dump-btn-wide" onClick={closeDumpOverlay} disabled={isDumpProcessing}>
-                  {t("center.cancelDump")}
-                </button>
-              </div>
             </>
           )}
         </div>
@@ -1205,6 +1203,19 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             onClick={(e) => e.stopPropagation()}
           >
             <header className="bd-dump-sheet-header">
+              <button
+                type="button"
+                className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-close-btn"
+                onClick={closeDumpOverlay}
+                disabled={isDumpProcessing}
+                aria-label={t("center.cancelDump")}
+                title={t("center.cancelDump")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
               <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
                 {t("center.newDump")}
               </h2>
@@ -1222,6 +1233,42 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 </svg>
               </button>
             </header>
+
+            {/* Switch input type — skip paywall since user already passed it */}
+            <div className="bd-dump-switch-row">
+              <button
+                type="button"
+                className="bd-btn bd-dump-switch-btn"
+                disabled={isDumpProcessing}
+                onClick={() => {
+                  leaveVoiceDumpSessionForOtherInput();
+                  setTypedDumpText("");
+                  setShowTypedDumpSheet(true);
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="M7 9h4M7 13h8" />
+                </svg>
+                {t("center.typeDump")}
+              </button>
+              <button
+                type="button"
+                className="bd-btn bd-dump-switch-btn"
+                disabled={isDumpProcessing}
+                onClick={() => {
+                  leaveVoiceDumpSessionForOtherInput();
+                  requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                {t("bottom.photoFromCamera")}
+              </button>
+            </div>
+
             <div className="bd-dump-sheet-content">
               {showDumpFace && <DumpListeningFace variant="sheet" />}
               {dumpPanelContent}
@@ -1240,9 +1287,22 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             onClick={closeTypedDumpSheet}
           >
             <div className="bd-panel bd-modal-panel bd-typed-dump-panel" onClick={(e) => e.stopPropagation()}>
-              <h2 id="bd-typed-dump-title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)", flexShrink: 0 }}>
-                {t("center.typeDumpTitle")}
-              </h2>
+              <div className="bd-typed-dump-header">
+                <h2 id="bd-typed-dump-title" style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                  {t("center.typeDumpTitle")}
+                </h2>
+                <button
+                  type="button"
+                  className="bd-typed-dump-close"
+                  onClick={closeTypedDumpSheet}
+                  aria-label={t("center.cancelDump")}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
               <textarea
                 className="bd-input bd-typed-dump-textarea"
                 value={typedDumpText}
@@ -1252,16 +1312,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 aria-label={t("center.transcript")}
                 rows={8}
               />
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "stretch",
-                  gap: "0.75rem",
-                  flexShrink: 0,
-                  marginTop: "auto",
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "0.6rem", flexShrink: 0 }}>
                 <button
                   type="button"
                   className="bd-btn bd-btn-primary"
@@ -1271,11 +1322,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 >
                   {t("center.typeDumpOrganize")}
                 </button>
-                <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-                  <button type="button" className="bd-btn" onClick={closeTypedDumpSheet}>
-                    {t("center.cancelDump")}
-                  </button>
-                </div>
+                <button type="button" className="bd-btn" style={{ width: "100%" }} onClick={closeTypedDumpSheet}>
+                  {t("center.cancelDump")}
+                </button>
               </div>
             </div>
           </div>,

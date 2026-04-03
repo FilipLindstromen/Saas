@@ -965,48 +965,76 @@ select.bd-input::-ms-expand {
 
 /*
  * Typed text dump: portaled to document.body (see CenterPanel) so z-index sits above
- * .bd-topbar / .bd-bottom-bar. Full viewport, top-aligned, covers bottom pill bar.
+ * .bd-topbar / .bd-bottom-bar. Centered card modal matching the rest of the app.
  */
 .bd-modal-backdrop.bd-typed-dump-backdrop {
   z-index: var(--bd-z-blocking);
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
-    env(safe-area-inset-left, 0px);
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .bd-typed-dump-panel {
-  flex: 1 1 auto;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-height: 0;
   width: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-  border-radius: 0;
+  max-width: 520px;
+  max-height: min(80dvh, calc(100dvh - 3rem));
+  margin: auto;
+  padding: 1.5rem;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  box-shadow: var(--bd-shadow-panel);
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .bd-typed-dump-panel.bd-modal-panel {
-  transform-origin: 50% 0;
+  transform-origin: 50% 50%;
+}
+
+.bd-typed-dump-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.bd-typed-dump-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--button-radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--bd-duration-fast) var(--bd-ease-soft), color var(--bd-duration-fast) var(--bd-ease-soft);
+}
+.bd-typed-dump-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .bd-typed-dump-textarea {
   flex: 1 1 auto;
-  min-height: 12rem;
+  min-height: 10rem;
   min-width: 0;
   width: 100%;
   resize: none;
   font-size: max(1rem, 16px);
   line-height: 1.45;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .bd-dump-sheet-inner {
@@ -1045,6 +1073,13 @@ select.bd-input::-ms-expand {
   min-width: max-content;
 }
 
+.bd-dump-sheet-close-btn {
+  color: var(--text-secondary);
+}
+.bd-dump-sheet-close-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
 .bd-dump-sheet-title {
   margin: 0;
   font-size: 1.0625rem;
@@ -1054,6 +1089,30 @@ select.bd-input::-ms-expand {
   line-height: 1.35;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.bd-dump-switch-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: var(--bd-space-4);
+  flex-shrink: 0;
+}
+
+.bd-dump-switch-btn {
+  flex: 1 1 0;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4em 0.75em;
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+  background: var(--bg-primary);
+  justify-content: center;
+}
+.bd-dump-switch-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-default);
 }
 
 .bd-dump-sheet-content {
