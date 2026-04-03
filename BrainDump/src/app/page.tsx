@@ -635,7 +635,7 @@ export default function BrainDumpPage() {
           </div>
           {todayViewActive ? (
             <div className="bd-page-content-padding bd-main-scroll" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-              <TodayView onGoToWorkspace={goToTodayItemWorkspace} />
+              <TodayView onGoToWorkspace={goToTodayItemWorkspace} isMobile={isMobileLayout} />
             </div>
           ) : null}
           {mode === "inbox" && !todayViewActive && (

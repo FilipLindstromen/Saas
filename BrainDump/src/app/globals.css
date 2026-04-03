@@ -3575,6 +3575,92 @@ input.bd-todo-checkbox:checked {
   padding-top: 1px;
 }
 
+/* Shopping item: icon acts as a toggle button */
+button.bd-shopping-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity var(--bd-duration-fast) var(--bd-ease-soft), transform var(--bd-duration-fast) var(--bd-ease-soft);
+}
+button.bd-shopping-toggle:hover {
+  opacity: 1;
+}
+button.bd-shopping-toggle:active {
+  transform: scale(0.88);
+}
+button.bd-shopping-toggle[aria-pressed="true"] {
+  opacity: 0.45;
+}
+
+/* ── Recurring task badge ──────────────────────────────────────────── */
+.bd-task-recur-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--accent);
+  opacity: 0.8;
+  margin-top: 0.1rem;
+  line-height: 1;
+}
+
+/* ── Recurring task edit section ───────────────────────────────────── */
+.bd-task-recur-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.bd-task-recur-pattern-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  flex-wrap: wrap;
+}
+
+/* Day-of-week pill buttons */
+.bd-task-recur-days {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.bd-task-recur-day-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.4rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--bd-duration-fast) var(--bd-ease-soft),
+              color var(--bd-duration-fast) var(--bd-ease-soft),
+              border-color var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-task-recur-day-btn--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bd-btn-primary-fg, #fff);
+}
+
+.bd-task-recur-day-btn:hover:not(.bd-task-recur-day-btn--on) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .bd-todo-row-body {
   flex: 1;
   min-width: 0;

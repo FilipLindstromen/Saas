@@ -53,6 +53,15 @@ import {
   scheduledAtToDateKey,
   type DueDateFilterPreset,
 } from "@/lib/due-date-filter";
+import {
+  buildTaskRecurrenceString,
+  clearTaskRecurrenceCompleted,
+  isRecurringTaskActiveToday,
+  isRecurringTaskDoneToday,
+  markTaskRecurrenceCompleted,
+  parseTaskRecurrence,
+  type TaskRecurrencePattern,
+} from "@/lib/task-recurrence";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -270,7 +279,7 @@ const TYPE_BAR_COLORS: Record<string, string> = {
 };
 
 /** Icon for each entry type (work & personal). Use on every entry and in type filters. */
-function EntryTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
+export function EntryTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
   const t = type || "note";
   const iconProps = { width: size, height: size, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (t) {
@@ -527,6 +536,8 @@ export function ItemsViewArea({
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
+  const itemsRef = useRef<ViewItem[]>([]);
+  itemsRef.current = items;
   const [loading, setLoading] = useState(true);
   const [newBatchTick, setNewBatchTick] = useState(0);
   useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
@@ -1037,16 +1048,41 @@ export function ItemsViewArea({
   }, [itemContextMenu, isMobile]);
 
   const setTaskCompleted = useCallback((id: string, completed: boolean) => {
-    const itemType = completed ? "task_completed" : "task";
+    const currentItem = itemsRef.current.find((i) => i.id === id);
+    const isShopping = currentItem?.itemType === "shopping";
+    const taskRec = parseTaskRecurrence(currentItem?.recurrence);
+    const isRecurring = taskRec.isRecurring;
+
+    const itemType = isShopping ? "shopping" : completed ? "task_completed" : "task";
     const progress = completed ? "completed" : "todo";
     const kanbanColumn = completed ? "completed" : "todo";
+
+    // For recurring tasks, track the completion date in the recurrence field
+    let newRecurrence: string | undefined;
+    if (isRecurring && taskRec.pattern && currentItem?.recurrence) {
+      newRecurrence = completed
+        ? markTaskRecurrenceCompleted(currentItem.recurrence)
+        : clearTaskRecurrenceCompleted(currentItem.recurrence);
+    }
+
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, itemType, progress, kanbanColumn } : it))
+      prev.map((it) =>
+        it.id === id
+          ? { ...it, itemType, progress, kanbanColumn, ...(newRecurrence !== undefined && { recurrence: newRecurrence }) }
+          : it
+      )
     );
+
+    // For shopping items, don't change itemType in the patch
+    const patch: Record<string, unknown> = isShopping
+      ? { progress, kanbanColumn }
+      : { itemType, progress, kanbanColumn };
+    if (newRecurrence !== undefined) patch.recurrence = newRecurrence;
+
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemType, progress, kanbanColumn }),
+      body: JSON.stringify(patch),
     })
       .then(async (r) => {
         if (!r.ok) return;
@@ -1584,9 +1620,22 @@ export function ItemsViewArea({
           const eventDt = localDateTimeToDate(due, timeStr || undefined);
           reminderAtIso = eventDt ? eventDt.toISOString() : null;
         }
+
+        // For tasks: save the clean recurrence string (strip any completion date suffix)
+        let taskRecurrenceValue: string | null | undefined;
+        if (isTaskRow(currentItem)) {
+          const parsed = parseTaskRecurrence(ed.recurrence);
+          if (parsed.isRecurring && parsed.pattern) {
+            taskRecurrenceValue = buildTaskRecurrenceString(parsed.pattern, parsed.days);
+          } else {
+            taskRecurrenceValue = null;
+          }
+        }
+
         updateSchedule(ed.id, {
           scheduledAt: dt ? dt.toISOString() : null,
           scheduledTime: timeStr || null,
+          ...(taskRecurrenceValue !== undefined && { recurrence: taskRecurrenceValue }),
           sendNotification: due ? (ed.sendNotification ?? false) : false,
           reminderAt: due && ed.sendNotification && reminderAtIso ? reminderAtIso : null,
           reminderMinutesBefore: due && ed.sendNotification && reminderAtIso ? rMin : null,
@@ -2003,6 +2052,8 @@ export function ItemsViewArea({
               onSchedule={updateSchedule}
               onEdit={(it) => setEditingEntry(toEditEntry(it))}
               onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              onSetTaskCompleted={setTaskCompleted}
+              onDelete={deleteItem}
               isMobile={isMobile}
             />
           ) : viewType === "flowchart" ? (
@@ -2474,6 +2525,82 @@ export function ItemsViewArea({
                           ) : null}
                         </>
                       ) : null}
+                      {isTaskRow(ei) && (() => {
+                        const taskRec = parseTaskRecurrence(editingEntry.recurrence);
+                        const isRecurring = taskRec.isRecurring;
+                        const isDays = taskRec.pattern === "days";
+                        return (
+                          <div className="bd-task-recur-edit">
+                            <label className="bd-edit-entry-inline-check">
+                              <input
+                                type="checkbox"
+                                checked={isRecurring}
+                                onChange={(e) => {
+                                  setEditingEntry((prev) => prev && {
+                                    ...prev,
+                                    recurrence: e.target.checked ? "task:daily" : "none",
+                                  });
+                                }}
+                              />
+                              {t("items.taskRepeat")}
+                            </label>
+                            {isRecurring && (
+                              <>
+                                <div className="bd-task-recur-pattern-row">
+                                  <label className="bd-edit-entry-inline-check">
+                                    <input
+                                      type="radio"
+                                      name="bd-task-recur-m"
+                                      checked={taskRec.pattern === "daily"}
+                                      onChange={() => setEditingEntry((prev) => prev && { ...prev, recurrence: "task:daily" })}
+                                    />
+                                    {t("items.taskRepeatEveryDay")}
+                                  </label>
+                                  <label className="bd-edit-entry-inline-check">
+                                    <input
+                                      type="radio"
+                                      name="bd-task-recur-m"
+                                      checked={isDays}
+                                      onChange={() => {
+                                        const days = taskRec.days.length > 0 ? taskRec.days : [1, 2, 3, 4, 5];
+                                        setEditingEntry((prev) => prev && { ...prev, recurrence: buildTaskRecurrenceString("days", days) });
+                                      }}
+                                    />
+                                    {t("items.taskRepeatSpecificDays")}
+                                  </label>
+                                </div>
+                                {isDays && (
+                                  <div className="bd-task-recur-days">
+                                    {([1,2,3,4,5,6,7] as const).map((iso) => {
+                                      const key = ["","mon","tue","wed","thu","fri","sat","sun"][iso] as string;
+                                      const active = taskRec.days.includes(iso);
+                                      return (
+                                        <button
+                                          key={iso}
+                                          type="button"
+                                          className={`bd-task-recur-day-btn${active ? " bd-task-recur-day-btn--on" : ""}`}
+                                          onClick={() => {
+                                            const newDays = active
+                                              ? taskRec.days.filter((d) => d !== iso)
+                                              : [...taskRec.days, iso];
+                                            const safe = newDays.length > 0 ? newDays : [iso];
+                                            setEditingEntry((prev) => prev && {
+                                              ...prev,
+                                              recurrence: buildTaskRecurrenceString("days", safe),
+                                            });
+                                          }}
+                                        >
+                                          {t(`habitReminder.dayShort.${key}`)}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : null}
                   {editEntryScheduleOpen && ei?.itemType === "calendar" ? (
@@ -2756,6 +2883,82 @@ export function ItemsViewArea({
                       ) : null}
                     </div>
                   ) : null}
+                  {isTaskRow(ei) && (() => {
+                    const taskRec = parseTaskRecurrence(editingEntry.recurrence);
+                    const isRecurring = taskRec.isRecurring;
+                    const isDays = taskRec.pattern === "days";
+                    return (
+                      <div className="bd-task-recur-edit" style={{ marginTop: "0.75rem" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-tertiary)", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={isRecurring}
+                            onChange={(e) => {
+                              setEditingEntry((prev) => prev && {
+                                ...prev,
+                                recurrence: e.target.checked ? "task:daily" : "none",
+                              });
+                            }}
+                          />
+                          {t("items.taskRepeat")}
+                        </label>
+                        {isRecurring && (
+                          <>
+                            <div className="bd-task-recur-pattern-row" style={{ marginTop: "0.35rem" }}>
+                              <label style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", color: "var(--text-tertiary)", cursor: "pointer" }}>
+                                <input
+                                  type="radio"
+                                  name="bd-task-recur-d"
+                                  checked={taskRec.pattern === "daily"}
+                                  onChange={() => setEditingEntry((prev) => prev && { ...prev, recurrence: "task:daily" })}
+                                />
+                                {t("items.taskRepeatEveryDay")}
+                              </label>
+                              <label style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", color: "var(--text-tertiary)", cursor: "pointer" }}>
+                                <input
+                                  type="radio"
+                                  name="bd-task-recur-d"
+                                  checked={isDays}
+                                  onChange={() => {
+                                    const days = taskRec.days.length > 0 ? taskRec.days : [1, 2, 3, 4, 5];
+                                    setEditingEntry((prev) => prev && { ...prev, recurrence: buildTaskRecurrenceString("days" as TaskRecurrencePattern, days) });
+                                  }}
+                                />
+                                {t("items.taskRepeatSpecificDays")}
+                              </label>
+                            </div>
+                            {isDays && (
+                              <div className="bd-task-recur-days" style={{ marginTop: "0.35rem" }}>
+                                {([1,2,3,4,5,6,7] as const).map((iso) => {
+                                  const key = ["","mon","tue","wed","thu","fri","sat","sun"][iso] as string;
+                                  const active = taskRec.days.includes(iso);
+                                  return (
+                                    <button
+                                      key={iso}
+                                      type="button"
+                                      className={`bd-task-recur-day-btn${active ? " bd-task-recur-day-btn--on" : ""}`}
+                                      onClick={() => {
+                                        const newDays = active
+                                          ? taskRec.days.filter((d) => d !== iso)
+                                          : [...taskRec.days, iso];
+                                        const safe = newDays.length > 0 ? newDays : [iso];
+                                        setEditingEntry((prev) => prev && {
+                                          ...prev,
+                                          recurrence: buildTaskRecurrenceString("days" as TaskRecurrencePattern, safe),
+                                        });
+                                      }}
+                                    >
+                                      {t(`habitReminder.dayShort.${key}`)}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
@@ -3404,6 +3607,8 @@ function CalendarView({
   onSchedule: _onSchedule,
   onEdit,
   onItemContextMenu,
+  onSetTaskCompleted,
+  onDelete,
   isMobile = false,
 }: {
   items: ViewItem[];
@@ -3411,10 +3616,13 @@ function CalendarView({
   onSchedule: (id: string, schedule: { scheduledAt?: string | null; scheduledTime?: string | null; recurrence?: string | null; sendNotification?: boolean }) => void;
   onEdit: (item: ViewItem) => void;
   onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
+  onSetTaskCompleted?: (id: string, completed: boolean) => void;
+  onDelete?: (id: string, skipConfirm?: boolean) => void;
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
   const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   /** Increment + direction drives slide-in animation when changing weeks. */
@@ -3653,81 +3861,108 @@ function CalendarView({
             <p style={{ margin: "0.45rem 0 0", fontSize: "0.875rem", color: "var(--text-tertiary)" }}>{t("items.calendarFreeDayHint")}</p>
           </div>
         ) : (
-          dayItems.map((it) => {
-            const schedKey = scheduledAtToDateKey(it.scheduledAt);
-            const todayKey = `${todayNorm.getFullYear()}-${String(todayNorm.getMonth() + 1).padStart(2, "0")}-${String(todayNorm.getDate()).padStart(2, "0")}`;
-            const past = schedKey != null && schedKey < todayKey;
-            const completed = isCompletedInCalendarView(it);
-            const taskDeadline = isTaskRow(it);
-            const typeColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
-            return (
-              <button
-                key={it.id}
-                type="button"
-                data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
-                onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
-                {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
-                onDoubleClick={() => onEdit(it)}
-                onContextMenu={
-                  onItemContextMenu && !isMobile
-                    ? (e) => {
-                        e.preventDefault();
-                        onItemContextMenu(e, it.id, it.domain, it.itemType);
-                      }
-                    : undefined
-                }
-                style={{
-                  textAlign: "left",
-                  fontSize: isMobile ? "0.875rem" : "0.9rem",
-                  padding: isMobile ? "0.65rem 0.75rem" : "0.7rem 0.85rem",
-                  background: past ? "var(--bg-tertiary)" : "var(--bd-chrome-selected-bg)",
-                  color: past ? "var(--text-tertiary)" : "var(--bd-chrome-selected-text)",
-                  border: past ? "1px solid var(--border-subtle)" : "1px solid var(--border-default)",
-                  borderRadius: 12,
-                  cursor: "pointer",
-                }}
-                title={`${entryTypeLabel(it.itemType || "note", t)} · ${it.title}${
-                  it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content) ? ` — ${it.content.trim().slice(0, 200)}` : ""
-                }${it.scheduledTime ? ` ${it.scheduledTime}` : ""}${it.recurrence && it.recurrence !== "none" ? ` (${it.recurrence})` : ""}${taskDeadline ? ` · ${t("items.taskDeadline")}` : ""}`}
-              >
-                <span style={{ display: "flex", alignItems: "flex-start", gap: isMobile ? "0.5rem" : "0.55rem" }}>
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      color: past ? "var(--text-quaternary)" : typeColor,
-                      display: "flex",
-                      alignItems: "center",
-                      marginTop: "0.08em",
-                    }}
-                    title={entryTypeLabel(it.itemType || "note", t)}
-                    aria-hidden
+          <div className="bd-todo-list-card">
+            {dayItems.map((it) => {
+              const schedKey = scheduledAtToDateKey(it.scheduledAt);
+              const todayKey = `${todayNorm.getFullYear()}-${String(todayNorm.getMonth() + 1).padStart(2, "0")}-${String(todayNorm.getDate()).padStart(2, "0")}`;
+              const past = schedKey != null && schedKey < todayKey;
+              const calTaskRec = parseTaskRecurrence(it.recurrence);
+              const completed = isTaskRow(it) && calTaskRec.isRecurring
+                ? isRecurringTaskDoneToday(it.recurrence)
+                : isCompletedInCalendarView(it);
+              const isTask = isTaskRow(it);
+              const shoppingDone =
+                it.itemType === "shopping" &&
+                (it.progress === "completed" || it.kanbanColumn === "completed");
+              const typeColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
+              return (
+                <SwipeDeleteRow
+                  key={it.id}
+                  entryId={it.id}
+                  swipeOpenId={swipeOpenId}
+                  setSwipeOpenId={setSwipeOpenId}
+                  onDelete={() => onDelete?.(it.id, true)}
+                  disabled={!onDelete}
+                  slideSurface="elevated"
+                >
+                  <div
+                    className="bd-todo-row bd-todo-row--single-line"
+                    data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
+                    onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
+                    {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
+                    onDoubleClick={() => onEdit(it)}
+                    onContextMenu={
+                      onItemContextMenu && !isMobile
+                        ? (e) => { e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); }
+                        : undefined
+                    }
+                    style={{ cursor: "pointer", opacity: past ? 0.65 : 1 }}
                   >
-                    <EntryTypeIcon type={it.itemType || "note"} size={isMobile ? 18 : 20} />
-                  </span>
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      lineHeight: 1.35,
-                      ...(completed
-                        ? {
-                            textDecoration: "line-through",
-                            textDecorationThickness: "0.08em",
-                            textUnderlineOffset: "0.12em",
-                            opacity: 0.9,
-                          }
-                        : {}),
-                    }}
-                  >
-                    {it.scheduledTime && (
-                      <span style={{ marginRight: "0.35rem", opacity: completed ? 0.85 : 0.9, fontWeight: 600 }}>{it.scheduledTime}</span>
-                    )}
-                    {entryPrimaryLine(it, showEntryTitles)}
-                  </span>
-                </span>
-              </button>
-            );
-          })
+                    <div className="bd-todo-row-lead">
+                      {isTask ? (
+                        <label
+                          className="bd-todo-checkbox-wrap"
+                          data-bd-no-swipe
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            className="bd-todo-checkbox"
+                            data-bd-no-swipe
+                            checked={completed}
+                            onChange={(e) => { e.stopPropagation(); onSetTaskCompleted?.(it.id, e.target.checked); }}
+                            aria-label={completed ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                          />
+                        </label>
+                      ) : it.itemType === "shopping" ? (
+                        <button
+                          type="button"
+                          className="bd-todo-row-type-lead bd-shopping-toggle"
+                          data-bd-no-swipe
+                          onClick={(e) => { e.stopPropagation(); onSetTaskCompleted?.(it.id, !shoppingDone); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          aria-pressed={shoppingDone}
+                          aria-label={shoppingDone ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                          title={shoppingDone ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                          style={{ color: past ? "var(--text-quaternary)" : typeColor }}
+                        >
+                          <EntryTypeIcon type="shopping" size={20} />
+                        </button>
+                      ) : (
+                        <span
+                          className="bd-todo-row-type-lead"
+                          style={{ color: past ? "var(--text-quaternary)" : typeColor }}
+                          title={entryTypeLabel(it.itemType || "note", t)}
+                          aria-hidden
+                        >
+                          <EntryTypeIcon type={it.itemType || "note"} size={20} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="bd-todo-row-body">
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.9rem",
+                          color: past ? "var(--text-tertiary)" : "var(--text-primary)",
+                          textDecoration: (completed || shoppingDone) ? "line-through" : undefined,
+                          opacity: (completed || shoppingDone) ? 0.52 : 1,
+                          wordBreak: "break-word",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {it.scheduledTime && (
+                          <span style={{ marginRight: "0.4rem", opacity: 0.72, fontWeight: 500, fontSize: "0.8rem" }}>{it.scheduledTime}</span>
+                        )}
+                        {entryPrimaryLine(it, showEntryTitles)}
+                      </div>
+                    </div>
+                  </div>
+                </SwipeDeleteRow>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
@@ -4391,7 +4626,7 @@ type SwipeDeleteRowProps = {
   children: ReactNode;
 };
 
-function SwipeDeleteRow({
+export function SwipeDeleteRow({
   entryId,
   swipeOpenId,
   setSwipeOpenId,
@@ -4661,7 +4896,15 @@ function ListView({
 
   const renderEntry = (it: ViewItem, index: number) => {
     const ep = enterStaggerProps(index);
-    const taskCompleted = isTaskRow(it) && isTaskCompleted(it);
+    const taskRec = parseTaskRecurrence(it.recurrence);
+    // For recurring tasks, only show as completed if done specifically today
+    const taskCompleted = isTaskRow(it) && (
+      taskRec.isRecurring ? isRecurringTaskDoneToday(it.recurrence) : isTaskCompleted(it)
+    );
+    const shoppingDone =
+      it.itemType === "shopping" &&
+      (it.progress === "completed" || it.kanbanColumn === "completed");
+    const struckThrough = taskCompleted || shoppingDone;
     let scheduleLabel: string | null = null;
     if (it.itemType === "shopping" && it.scheduledAt) {
       const sk = scheduledAtToDateKey(it.scheduledAt);
@@ -4689,8 +4932,8 @@ function ListView({
       wordBreak: "break-word",
       overflowWrap: "anywhere",
       cursor: onUpdate ? "text" : undefined,
-      textDecoration: taskCompleted ? "line-through" : undefined,
-      opacity: taskCompleted ? 0.52 : 1,
+      textDecoration: struckThrough ? "line-through" : undefined,
+      opacity: struckThrough ? 0.52 : 1,
     };
 
     const isDraggingRow = reorderPreview?.draggedId === it.id;
@@ -4797,14 +5040,27 @@ function ListView({
                 type="checkbox"
                 className="bd-todo-checkbox"
                 data-bd-no-swipe
-                checked={isTaskCompleted(it)}
+                checked={taskCompleted}
                 onChange={(e) => {
                   e.stopPropagation();
                   onSetTaskCompleted(it.id, e.target.checked);
                 }}
-                aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                aria-label={taskCompleted ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
               />
             </label>
+          ) : it.itemType === "shopping" ? (
+            <button
+              type="button"
+              className="bd-todo-row-type-lead bd-shopping-toggle"
+              data-bd-no-swipe
+              onClick={(e) => { e.stopPropagation(); onSetTaskCompleted(it.id, !shoppingDone); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-pressed={shoppingDone}
+              aria-label={shoppingDone ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+              title={shoppingDone ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+            >
+              <EntryTypeIcon type="shopping" size={20} />
+            </button>
           ) : (
             <span className="bd-todo-row-type-lead" title={formatTypeLabel(it.itemType || "note", t)}>
               <EntryTypeIcon type={it.itemType} size={20} />
@@ -4987,6 +5243,21 @@ function ListView({
             )}
           {scheduleLabel && (
             <div style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>{scheduleLabel}</div>
+          )}
+          {isTask && taskRec.isRecurring && (
+            <div className="bd-task-recur-badge">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M8 16H3v5" />
+              </svg>
+              {taskRec.pattern === "daily"
+                ? t("items.taskRepeatEveryDay")
+                : taskRec.days.length > 0
+                  ? taskRec.days.map((d) => t(`habitReminder.dayShort.${["", "mon","tue","wed","thu","fri","sat","sun"][d]}`)).join(" · ")
+                  : t("items.taskRepeatBadge")}
+            </div>
           )}
         </div>
       </div>
