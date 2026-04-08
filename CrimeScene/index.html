@@ -198,10 +198,11 @@
     document.body.appendChild(renderer.domElement);
 
     // ───────────────────────────────────────────────
-    //  Sky sphere (inside-out)
+    //  Sky sphere (equirectangular 360)
     // ───────────────────────────────────────────────
-    const geo = new THREE.SphereGeometry(500, 64, 48);
-    geo.scale(-1, 1, 1); // flip normals so texture faces inward
+    // Use BackSide so the texture is visible from inside without flipping
+    // geometry (geo.scale(-1,1,1) would mirror UVs and distort the mapping).
+    const geo = new THREE.SphereGeometry(500, 128, 64);
 
     const loader  = new THREE.TextureLoader();
     const loadBar = document.getElementById('loading-bar');
@@ -210,9 +211,15 @@
     loader.load(
       'sphere_map.png',
       (texture) => {
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        const mat  = new THREE.MeshBasicMaterial({ map: texture });
+        texture.minFilter    = THREE.LinearMipmapLinearFilter;
+        texture.magFilter    = THREE.LinearFilter;
+        texture.generateMipmaps = true;
+        texture.encoding     = THREE.sRGBEncoding;
+        // Equirectangular panoramas start at the 180° seam; shift half a turn
+        // so the default view faces "into" the scene rather than the seam.
+        texture.offset.set(0.5, 0);
+        texture.wrapS = THREE.RepeatWrapping;
+        const mat  = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
         const mesh = new THREE.Mesh(geo, mat);
         scene.add(mesh);
         loadBar.style.width = '100%';
@@ -252,7 +259,7 @@
     });
     window.addEventListener('mousemove', (e) => {
       if (!dragging) return;
-      targetLon = startLon - (e.clientX - startX) * 0.15;
+      targetLon = startLon - (e.clientX - startX) * 0.18;
       targetLat = startLat + (e.clientY - startY) * 0.15;
     });
     window.addEventListener('mouseup', () => dragging = false);
