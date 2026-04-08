@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="cs-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <radialGradient id="cs-sphere" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#4caaff;stop-opacity:0.9"/>
+      <stop offset="60%" style="stop-color:#1a6eb5;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#0a2540;stop-opacity:0.3"/>
+    </radialGradient>
+  </defs>
+  <rect width="100" height="100" fill="url(#cs-grad)" rx="16"/>
+  <!-- Globe sphere -->
+  <circle cx="50" cy="48" r="26" fill="url(#cs-sphere)" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+  <!-- Longitude lines -->
+  <ellipse cx="50" cy="48" rx="10" ry="26" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+  <ellipse cx="50" cy="48" rx="22" ry="26" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.2"/>
+  <!-- Latitude lines -->
+  <ellipse cx="50" cy="39" rx="24" ry="7" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+  <ellipse cx="50" cy="57" rx="24" ry="7" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+  <!-- Eye / view indicator -->
+  <circle cx="50" cy="48" r="5" fill="rgba(76,170,255,0.9)" stroke="white" stroke-width="1.5"/>
+  <circle cx="50" cy="48" r="2.5" fill="white" opacity="0.9"/>
+  <!-- 360 label arc -->
+  <text x="50" y="84" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="rgba(255,255,255,0.7)" letter-spacing="2">360°</text>
+</svg>

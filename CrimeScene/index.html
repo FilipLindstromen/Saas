@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Sphere Map Explorer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      touch-action: none;
+    }
+
+    canvas { display: block; }
+
+    /* ── HUD overlay ── */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding-top: 24px;
+    }
+
+    #title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
+      text-shadow: 0 0 20px rgba(100,200,255,0.6);
+    }
+
+    #hint {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 1px;
+    }
+
+    /* ── Gyro permission button ── */
+    #gyro-btn {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: white;
+      border: 1.5px solid rgba(255,255,255,0.3);
+      padding: 14px 32px;
+      border-radius: 50px;
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      cursor: pointer;
+      z-index: 20;
+      transition: background 0.2s, border-color 0.2s, opacity 0.4s;
+    }
+    #gyro-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.6); }
+    #gyro-btn.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── Gyro active pill ── */
+    #gyro-status {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+    #gyro-status.visible { opacity: 1; }
+    #gyro-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4cff91;
+      box-shadow: 0 0 8px #4cff91;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Crosshair ── */
+    #crosshair {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px; height: 24px;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0.4;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: white;
+      border-radius: 2px;
+    }
+    #crosshair::before { width: 100%; height: 1.5px; top: 50%; left: 0; transform: translateY(-50%); }
+    #crosshair::after  { height: 100%; width: 1.5px; left: 50%; top: 0; transform: translateX(-50%); }
+
+    /* ── Loading screen ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 100;
+      transition: opacity 0.6s;
+    }
+    #loading.fade-out { opacity: 0; pointer-events: none; }
+    #loading-text {
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    #loading-bar-wrap {
+      width: 160px;
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #loading-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4caaff, #a78bfa);
+      width: 0%;
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loading">
+    <div id="loading-text">Loading Scene</div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="title">Crime Scene</div>
+    <div id="hint">Drag to explore &nbsp;·&nbsp; Tilt phone to look around</div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <!-- Gyro permission button (visible on mobile) -->
+  <button id="gyro-btn">Enable Gyroscope</button>
+
+  <!-- Gyro active status -->
+  <div id="gyro-status">
+    <div id="gyro-dot"></div>
+    Gyroscope Active
+  </div>
+
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    // ───────────────────────────────────────────────
+    //  Renderer & Scene
+    // ───────────────────────────────────────────────
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // ───────────────────────────────────────────────
+    //  Sky sphere (inside-out)
+    // ───────────────────────────────────────────────
+    const geo = new THREE.SphereGeometry(500, 64, 48);
+    geo.scale(-1, 1, 1); // flip normals so texture faces inward
+
+    const loader  = new THREE.TextureLoader();
+    const loadBar = document.getElementById('loading-bar');
+    const loadDiv = document.getElementById('loading');
+
+    loader.load(
+      'sphere_map.png',
+      (texture) => {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        const mat  = new THREE.MeshBasicMaterial({ map: texture });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+        loadBar.style.width = '100%';
+        setTimeout(() => loadDiv.classList.add('fade-out'), 300);
+        setTimeout(() => loadDiv.remove(), 900);
+      },
+      (xhr) => {
+        if (xhr.total) loadBar.style.width = (xhr.loaded / xhr.total * 100) + '%';
+      },
+      (err) => {
+        console.error('Texture load error', err);
+        document.getElementById('loading-text').textContent = 'Error loading image';
+      }
+    );
+
+    camera.position.set(0, 0, 0);
+
+    // ───────────────────────────────────────────────
+    //  View state
+    // ───────────────────────────────────────────────
+    let lon = 0, lat = 0;          // current view angles (degrees)
+    let targetLon = 0, targetLat = 0; // smooth target
+    const LAT_CLAMP = 85;
+    const SMOOTH = 0.08;
+
+    // ───────────────────────────────────────────────
+    //  Mouse drag
+    // ───────────────────────────────────────────────
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let startLon = 0, startLat = 0;
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLon = targetLon; startLat = targetLat;
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      targetLon = startLon - (e.clientX - startX) * 0.15;
+      targetLat = startLat + (e.clientY - startY) * 0.15;
+    });
+    window.addEventListener('mouseup', () => dragging = false);
+
+    // ───────────────────────────────────────────────
+    //  Touch drag
+    // ───────────────────────────────────────────────
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      dragging = true;
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      startLon = targetLon; startLat = targetLat;
+    }, { passive: true });
+    window.addEventListener('touchmove', (e) => {
+      if (!dragging || e.touches.length !== 1) return;
+      targetLon = startLon - (e.touches[0].clientX - startX) * 0.2;
+      targetLat = startLat + (e.touches[0].clientY - startY) * 0.2;
+    }, { passive: true });
+    window.addEventListener('touchend', () => dragging = false);
+
+    // ───────────────────────────────────────────────
+    //  Gyroscope
+    // ───────────────────────────────────────────────
+    let gyroEnabled  = false;
+    let alphaRef     = null;   // calibration baseline
+
+    const gyroBtn    = document.getElementById('gyro-btn');
+    const gyroStatus = document.getElementById('gyro-status');
+    const hint       = document.getElementById('hint');
+
+    // Hide gyro button on desktop (no orientation API)
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (!isMobile) gyroBtn.classList.add('hidden');
+
+    gyroBtn.addEventListener('click', async () => {
+      // iOS 13+ requires explicit permission
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const result = await DeviceOrientationEvent.requestPermission();
+          if (result === 'granted') activateGyro();
+          else hint.textContent = 'Gyroscope permission denied';
+        } catch (err) {
+          console.warn('Gyro permission error', err);
+        }
+      } else {
+        activateGyro();
+      }
+    });
+
+    function activateGyro() {
+      gyroEnabled = true;
+      alphaRef    = null; // reset calibration
+      gyroBtn.classList.add('hidden');
+      gyroStatus.classList.add('visible');
+      hint.textContent = 'Tilt your phone to look around';
+      window.addEventListener('deviceorientation', onOrientation);
+    }
+
+    function onOrientation(e) {
+      if (dragging) return; // let manual drag override gyro
+
+      const alpha = e.alpha ?? 0; // [0, 360) — compass heading
+      const beta  = e.beta  ?? 0; // [-180, 180] — tilt front/back
+      const gamma = e.gamma ?? 0; // [-90, 90]  — tilt left/right
+
+      // Calibrate: store first alpha as reference so we start looking "forward"
+      if (alphaRef === null) alphaRef = alpha;
+
+      // Map device orientation → sphere view angles
+      targetLon = -(alpha - alphaRef);
+      // beta=90 means phone held upright → lat=0; beta=0 means flat → lat=-90
+      targetLat = beta - 90;
+    }
+
+    // ───────────────────────────────────────────────
+    //  Scroll-to-zoom (desktop)
+    // ───────────────────────────────────────────────
+    let fov = 75;
+    window.addEventListener('wheel', (e) => {
+      fov = Math.max(30, Math.min(100, fov + e.deltaY * 0.05));
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }, { passive: true });
+
+    // Pinch-to-zoom (mobile)
+    let lastPinchDist = null;
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) lastPinchDist = null;
+    }, { passive: true });
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 2) return;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      if (lastPinchDist !== null) {
+        fov = Math.max(30, Math.min(100, fov - (dist - lastPinchDist) * 0.1));
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+      lastPinchDist = dist;
+    }, { passive: true });
+
+    // ───────────────────────────────────────────────
+    //  Resize
+    // ───────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // ───────────────────────────────────────────────
+    //  Render loop
+    // ───────────────────────────────────────────────
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Smooth interpolation
+      lon = lon + (targetLon - lon) * SMOOTH;
+      lat = lat + (targetLat - lat) * SMOOTH;
+      lat = Math.max(-LAT_CLAMP, Math.min(LAT_CLAMP, lat));
+
+      // Convert to Cartesian look-at point
+      const phi   = THREE.MathUtils.degToRad(90 - lat);
+      const theta = THREE.MathUtils.degToRad(lon);
+
+      camera.lookAt(
+        500 * Math.sin(phi) * Math.cos(theta),
+        500 * Math.cos(phi),
+        500 * Math.sin(phi) * Math.sin(theta)
+      );
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
