@@ -665,7 +665,7 @@ export default function App() {
                         {(['youtube', 'instagram', 'tiktok'] as Platform[]).map((p) => {
                           const meta = PLATFORM_META[p]
                           const acc  = accounts[p]
-                          const busy = connectingPlatform === p
+                          const busy = connecting === p
                           return (
                             <div key={p} className={`${styles.platformCard} ${acc ? styles.platformCardConnected : ''}`}
                               style={{ '--p-color': meta.color } as React.CSSProperties}>

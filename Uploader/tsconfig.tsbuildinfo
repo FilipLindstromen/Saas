@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/constants.ts","./src/main.tsx","./src/types.ts","./src/components/captionvideopreview.tsx","./src/services/instagram.ts","./src/services/tiktok.ts","./src/services/transcription.ts","./src/services/youtube.ts","./src/utils/captionexport.ts","./src/utils/captionrenderer.ts"],"errors":true,"version":"5.9.3"}
