@@ -3,12 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff6b35'/><path d='M10 22V10l12 6-12 6z' fill='%23fff'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff6b35'/><path d='M16 8 L16 20 M10 14 L16 8 L22 14' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='10' cy='24' r='2.5' fill='%23fff'/><circle cx='16' cy='24' r='2.5' fill='%23fff'/><circle cx='22' cy='24' r='2.5' fill='%23fff'/></svg>" />
     <title>Uploader</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,600&family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Montserrat:wght@400;700&family=Lato:wght@400;700&family=Poppins:wght@400;700&family=Source+Sans+3:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+      /* CSS variable aliases so AutoCaptions-derived components work with Uploader theme */
+      :root, [data-theme="dark"] {
+        --card-radius: var(--radius-lg);
+        --button-radius: var(--radius);
+        --border-default: var(--border);
+        --border-strong: rgba(255,255,255,0.14);
+        --bg-active: #2a2a2a;
+        --text-on-accent: #fff;
+        --accent-hover: #ff8555;
+      }
+      [data-theme="light"] {
+        --card-radius: var(--radius-lg);
+        --button-radius: var(--radius);
+        --border-default: var(--border);
+        --border-strong: rgba(0,0,0,0.12);
+        --bg-active: #d8d8d8;
+        --text-on-accent: #fff;
+        --accent-hover: #e55a2b;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

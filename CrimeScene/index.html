@@ -209,15 +209,12 @@
     const loadDiv = document.getElementById('loading');
 
     loader.load(
-      'sphere_map.png',
+      'panorama.png',
       (texture) => {
         texture.minFilter    = THREE.LinearMipmapLinearFilter;
         texture.magFilter    = THREE.LinearFilter;
         texture.generateMipmaps = true;
         texture.encoding     = THREE.sRGBEncoding;
-        // Equirectangular panoramas start at the 180° seam; shift half a turn
-        // so the default view faces "into" the scene rather than the seam.
-        texture.offset.set(0.5, 0);
         texture.wrapS = THREE.RepeatWrapping;
         const mat  = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
         const mesh = new THREE.Mesh(geo, mat);
