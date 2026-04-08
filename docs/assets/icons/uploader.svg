@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#ff6b35" rx="12"/>
+  <!-- Upload arrow -->
+  <path d="M50 28 L50 58" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <path d="M36 42 L50 28 L64 42" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Platform dots: YouTube, Instagram, TikTok -->
+  <circle cx="34" cy="72" r="7" fill="white" opacity="0.9"/>
+  <circle cx="50" cy="72" r="7" fill="white" opacity="0.9"/>
+  <circle cx="66" cy="72" r="7" fill="white" opacity="0.9"/>
+  <!-- YouTube play icon -->
+  <polygon points="31,70 31,74 37,72" fill="#ff6b35"/>
+  <!-- Instagram circle -->
+  <circle cx="50" cy="72" r="3.5" fill="none" stroke="#ff6b35" stroke-width="1.5"/>
+  <circle cx="53" cy="69" r="1" fill="#ff6b35"/>
+  <!-- TikTok note -->
+  <path d="M64 68.5 L64 74.5 Q64 76 66 76 Q68 76 68 74.5 Q68 73 66 73 L66 70 L69 69.5" stroke="#ff6b35" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
