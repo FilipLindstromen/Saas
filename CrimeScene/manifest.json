@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "slug": "city-plaza",
+      "type": "watch",
+      "title": "City Plaza at Night",
+      "body": "An illuminated European plaza captured in immersive 360°.",
+      "file": "../panorama.png",
+      "created": "2026-04-08"
+    }
+  ]
+}

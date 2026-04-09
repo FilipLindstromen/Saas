@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Crime Scene</title>
+  <style>
+    :root {
+      --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c; --surface3: #222;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.13);
+      --text: rgba(255,255,255,0.92); --muted: rgba(255,255,255,0.45);
+      --accent: #ff6b35;
+      --watch-c: #4caaff; --video-c: #a78bfa; --rec-c: #4cff91;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky; top: 0;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 1.5rem; height: 52px;
+      background: rgba(10,10,10,0.9); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border); z-index: 50;
+    }
+    .topbar-logo { font-size: 12px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--text); text-decoration: none; }
+    .topbar-logo span { color: var(--accent); }
+    .topbar-sep { width: 1px; height: 16px; background: var(--border2); }
+    .topbar-sub { font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+    .topbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; text-decoration: none; transition: all 0.15s; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #ff8555; }
+    .btn-icon { padding: 7px; width: 34px; height: 34px; }
+    .btn-danger { background: transparent; border: 1px solid rgba(255,80,80,0.3); color: rgba(255,80,80,0.8); }
+    .btn-danger:hover { background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.5); color: #ff5050; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+    /* ── Layout ── */
+    .layout { display: flex; gap: 0; }
+    .sidebar {
+      width: 200px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      height: calc(100vh - 52px); position: sticky; top: 52px;
+      display: flex; flex-direction: column;
+      padding: 1rem 0;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 1.25rem; font-size: 13px; color: var(--muted);
+      cursor: pointer; border-radius: 0; transition: background 0.15s, color 0.15s;
+      text-decoration: none; border: none; background: none; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .nav-item.active { color: var(--text); background: rgba(255,255,255,0.06); }
+    .nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .nav-count { margin-left: auto; font-size: 11px; color: var(--muted); background: var(--surface2); padding: 1px 6px; border-radius: 10px; }
+
+    .main { flex: 1; padding: 2rem; min-height: calc(100vh - 52px); }
+
+    /* ── Section header ── */
+    .section-header { display: flex; align-items: center; margin-bottom: 1.5rem; }
+    .section-title { font-size: 16px; font-weight: 600; }
+    .section-actions { margin-left: auto; display: flex; gap: 8px; }
+
+    /* ── Cards grid ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .item-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .item-card-header { padding: 1rem 1.125rem 0.75rem; flex: 1; }
+    .item-card-slug { font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px; }
+    .item-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .item-card-body { font-size: 12px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .item-card-footer {
+      padding: 0.75rem 1.125rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 6px; align-items: center;
+    }
+    .item-link { font-size: 11px; color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .item-link:hover { color: var(--accent); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1/-1; padding: 3rem 2rem;
+      text-align: center; border: 1px dashed var(--border);
+      border-radius: var(--radius); color: var(--muted);
+      font-size: 14px; line-height: 2;
+    }
+
+    /* ── Modal backdrop ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 200; display: flex; align-items: center; justify-content: center;
+      padding: 1rem; backdrop-filter: blur(4px);
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 16px; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+    }
+    .modal-header {
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; background: var(--surface); z-index: 1;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 1.4rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+    .modal-close:hover { color: var(--text); background: var(--surface2); }
+    .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* ── Form fields ── */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 13px; font-weight: 500; color: var(--text); }
+    .field-hint { font-size: 12px; color: var(--muted); }
+    .input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px;
+      padding: 9px 12px; outline: none; width: 100%;
+      transition: border-color 0.15s;
+    }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,107,53,0.15); }
+    .input::placeholder { color: var(--muted); }
+    textarea.input { resize: vertical; min-height: 80px; font-family: inherit; }
+
+    /* ── Radio source selector ── */
+    .source-tabs { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .source-tab {
+      flex: 1; padding: 8px; font-size: 12px; font-weight: 500;
+      text-align: center; cursor: pointer;
+      background: transparent; border: none; color: var(--muted);
+      transition: background 0.15s, color 0.15s;
+    }
+    .source-tab.active { background: var(--surface3); color: var(--text); }
+
+    /* ── File upload zone ── */
+    .upload-zone {
+      border: 1.5px dashed var(--border2); border-radius: 8px;
+      padding: 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(255,107,53,0.05); }
+    .upload-zone input { display: none; }
+    .upload-zone-label { font-size: 13px; color: var(--muted); line-height: 1.8; }
+    .upload-zone-label strong { color: var(--text); }
+    #upload-filename { font-size: 12px; color: var(--accent); margin-top: 6px; }
+    .size-warning { font-size: 12px; color: #f59e0b; margin-top: 4px; }
+
+    /* ── Success panel ── */
+    .success-box {
+      background: rgba(76,255,145,0.06); border: 1px solid rgba(76,255,145,0.2);
+      border-radius: 8px; padding: 1rem;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .success-box-title { font-size: 13px; font-weight: 600; color: #4cff91; }
+    .success-link-row { display: flex; align-items: center; gap: 6px; }
+    .success-link { font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .copy-btn { font-size: 11px; padding: 4px 10px; }
+
+    /* ── Settings panel ── */
+    #settings-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+      display: flex; flex-direction: column; gap: 1.25rem;
+      max-width: 520px;
+    }
+    .settings-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .settings-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    #gh-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #666; }
+    .status-dot.ok { background: #4cff91; box-shadow: 0 0 6px #4cff91; }
+    .status-dot.err { background: #ff5050; box-shadow: 0 0 6px #ff5050; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface3); border: 1px solid var(--border2);
+      color: var(--text); padding: 10px 20px; border-radius: 50px;
+      font-size: 13px; z-index: 300; transition: transform 0.3s;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Progress overlay ── */
+    #upload-progress-bar {
+      position: fixed; top: 0; left: 0; height: 2px;
+      background: var(--accent); z-index: 400;
+      transition: width 0.3s; width: 0%;
+    }
+  </style>
+</head>
+<body>
+
+<div id="upload-progress-bar"></div>
+<div id="toast"></div>
+
+<!-- Modal: Add / Edit item -->
+<div class="modal-backdrop hidden" id="item-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Add Item</span>
+      <button class="modal-close" id="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="f-title">Title <span style="color:var(--accent)">*</span></label>
+        <input id="f-title" class="input" placeholder="e.g. London Bridge at Night" />
+      </div>
+      <div class="field">
+        <label for="f-slug">Slug <span style="color:var(--accent)">*</span></label>
+        <input id="f-slug" class="input" placeholder="e.g. london-bridge" pattern="[a-z0-9_-]+" />
+        <span class="field-hint">URL-safe identifier (a-z, 0-9, hyphens). Auto-generated from title.</span>
+      </div>
+      <div class="field">
+        <label for="f-body">Description</label>
+        <textarea id="f-body" class="input" placeholder="Optional description shown in the viewer…"></textarea>
+      </div>
+      <div class="field">
+        <label>Media Source</label>
+        <div class="source-tabs">
+          <button class="source-tab active" data-tab="url">External URL</button>
+          <button class="source-tab" data-tab="upload">Upload File</button>
+        </div>
+      </div>
+      <div id="source-url-panel" class="field">
+        <input id="f-url" class="input" placeholder="https://example.com/media/file.mp4" />
+        <span class="field-hint">Link to a file hosted elsewhere (YouTube embed for videos, CDN URL, etc.).</span>
+      </div>
+      <div id="source-upload-panel" class="field" style="display:none">
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="f-file" />
+          <label for="f-file" class="upload-zone-label">
+            <strong>Click to choose a file</strong> or drag & drop
+          </label>
+          <div id="upload-filename"></div>
+          <div id="upload-size-warning" class="size-warning" style="display:none"></div>
+        </div>
+        <span class="field-hint">Uploads via GitHub API. Requires GitHub settings configured. Max ~25 MB recommended.</span>
+      </div>
+      <div id="modal-success" class="success-box" style="display:none">
+        <div class="success-box-title">✓ Published successfully</div>
+        <div class="success-link-row">
+          <span class="success-link" id="success-link-text"></span>
+          <button class="btn btn-ghost btn-sm copy-btn" id="copy-link-btn">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="modal-save-btn">Save & Publish</button>
+    </div>
+  </div>
+</div>
+
+<!-- Top bar -->
+<nav class="topbar">
+  <a class="topbar-logo" href="../"><span>Crime</span> Scene</a>
+  <span class="topbar-sep"></span>
+  <span class="topbar-sub">Admin</span>
+  <div class="topbar-right">
+    <a href="../" class="btn btn-ghost btn-sm">View Site</a>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <button class="nav-item active" data-section="watch">
+      <span class="nav-dot" style="background:var(--watch-c)"></span>
+      360° Watch
+      <span class="nav-count" id="nav-count-watch">0</span>
+    </button>
+    <button class="nav-item" data-section="video">
+      <span class="nav-dot" style="background:var(--video-c)"></span>
+      Video
+      <span class="nav-count" id="nav-count-video">0</span>
+    </button>
+    <button class="nav-item" data-section="recording">
+      <span class="nav-dot" style="background:var(--rec-c)"></span>
+      Recording
+      <span class="nav-count" id="nav-count-recording">0</span>
+    </button>
+    <div style="margin-top:auto; border-top:1px solid var(--border); padding-top:8px;">
+      <button class="nav-item" data-section="settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        GitHub Settings
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Watch section -->
+    <div id="section-watch" class="content-section">
+      <div class="section-header">
+        <span class="section-title">360° Sphere Maps</span>
+        <div class="section-actions">
+          <button class="btn btn-primary" data-add="watch">+ Add Scene</button>
+        </div>
+      </div>
+      <div class="grid" id="grid-watch"></div>
+    </div>
+
+    <!-- Video section -->
+    <div id="section-video" class="content-section" style="display:none">
+      <div class="section-header">
+        <span class="section-title">Videos</span>
+        <div class="section-actions">
+          <button class="btn btn-primary" data-add="video">+ Add Video</button>
+        </div>
+      </div>
+      <div class="grid" id="grid-video"></div>
+    </div>
+
+    <!-- Recording section -->
+    <div id="section-recording" class="content-section" style="display:none">
+      <div class="section-header">
+        <span class="section-title">Recordings</span>
+        <div class="section-actions">
+          <button class="btn btn-primary" data-add="recording">+ Add Recording</button>
+        </div>
+      </div>
+      <div class="grid" id="grid-recording"></div>
+    </div>
+
+    <!-- Settings section -->
+    <div id="section-settings" class="content-section" style="display:none">
+      <div class="section-header"><span class="section-title">GitHub Settings</span></div>
+      <div id="settings-panel">
+        <div>
+          <div class="settings-title">GitHub API Integration</div>
+          <div class="settings-desc" style="margin-top:6px">
+            Publishing to GitHub pushes <code>manifest.json</code> and uploaded media files directly to your repo.
+            GitHub Pages then deploys them automatically (usually within 1–2 min).<br><br>
+            Create a <strong>Personal Access Token</strong> at github.com → Settings → Developer settings → Fine-grained tokens.
+            Grant <em>Contents: Read &amp; Write</em> on this repository.
+          </div>
+        </div>
+        <div class="field">
+          <label>Personal Access Token</label>
+          <input id="gh-token" class="input" type="password" placeholder="github_pat_..." autocomplete="off" />
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="field" style="flex:1">
+            <label>Owner</label>
+            <input id="gh-owner" class="input" placeholder="username" />
+          </div>
+          <div class="field" style="flex:1">
+            <label>Repository</label>
+            <input id="gh-repo" class="input" placeholder="Saas" />
+          </div>
+          <div class="field" style="flex:0 0 100px">
+            <label>Branch</label>
+            <input id="gh-branch" class="input" placeholder="main" />
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-ghost" id="gh-test-btn">Test Connection</button>
+          <button class="btn btn-primary" id="gh-save-btn">Save Settings</button>
+          <div id="gh-status"><span class="status-dot" id="status-dot"></span><span id="status-text">Not configured</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────
+  let manifest  = { items: [] };
+  let ghSettings = { token: '', owner: '', repo: '', branch: 'main' };
+  let editingSlug = null;    // null = adding new
+  let currentType = 'watch';
+  let currentFile = null;    // File object from upload input
+
+  const TYPE_LABELS = { watch: '360° Scene', video: 'Video', recording: 'Recording' };
+  const FILE_ACCEPT = { watch: 'image/*', video: 'video/*', recording: 'audio/*' };
+
+  // ── Storage helpers ────────────────────────────────────────────────
+  function saveLocal() {
+    localStorage.setItem('crimescene-manifest', JSON.stringify(manifest));
+  }
+  function loadLocal() {
+    const m = localStorage.getItem('crimescene-manifest');
+    if (m) manifest = JSON.parse(m);
+    const g = localStorage.getItem('crimescene-gh');
+    if (g) ghSettings = JSON.parse(g);
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // ── Progress bar ───────────────────────────────────────────────────
+  const progressBar = document.getElementById('upload-progress-bar');
+  function setProgress(pct) {
+    progressBar.style.width = pct + '%';
+    if (pct >= 100) setTimeout(() => { progressBar.style.width = '0%'; }, 600);
+  }
+
+  // ── Base URL helpers ───────────────────────────────────────────────
+  function getSiteBase() {
+    // Detect base path from current URL: /Saas/CrimeScene/admin/ → /Saas/CrimeScene
+    const parts = location.pathname.replace(/\/admin\/?$/, '').replace(/\/$/, '');
+    return location.origin + parts;
+  }
+  function getItemUrl(type, slug) {
+    return `${getSiteBase()}/${type}/?${slug}`;
+  }
+
+  // ── Render grids ───────────────────────────────────────────────────
+  function renderGrid(type) {
+    const grid  = document.getElementById(`grid-${type}`);
+    const items = manifest.items.filter(i => i.type === type);
+    document.getElementById(`nav-count-${type}`).textContent = items.length;
+    grid.innerHTML = '';
+
+    if (!items.length) {
+      grid.innerHTML = `<div class="empty-state">No ${TYPE_LABELS[type].toLowerCase()}s yet.<br>Click <strong>+ Add</strong> to create one.</div>`;
+      return;
+    }
+
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      const url = getItemUrl(item.type, item.slug);
+      card.innerHTML = `
+        <div class="item-card-header">
+          <div class="item-card-slug">?${item.slug}</div>
+          <div class="item-card-title">${item.title || item.slug}</div>
+          ${item.body ? `<div class="item-card-body">${item.body}</div>` : ''}
+        </div>
+        <div class="item-card-footer">
+          <a class="item-link" href="${url}" target="_blank">${url}</a>
+          <button class="btn btn-ghost btn-sm copy-btn" data-copy="${url}">Copy</button>
+          <button class="btn btn-ghost btn-sm" data-edit="${item.slug}" data-type="${type}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-delete="${item.slug}" data-type="${type}">×</button>
+        </div>`;
+      grid.appendChild(card);
+    });
+  }
+  function renderAll() {
+    ['watch','video','recording'].forEach(renderGrid);
+  }
+
+  // ── Section nav ───────────────────────────────────────────────────
+  function showSection(name) {
+    document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById(`section-${name}`).style.display = '';
+    document.querySelector(`.nav-item[data-section="${name}"]`).classList.add('active');
+  }
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => showSection(btn.dataset.section));
+  });
+
+  // ── Slug auto-generation ───────────────────────────────────────────
+  document.getElementById('f-title').addEventListener('input', e => {
+    if (editingSlug) return; // don't clobber when editing
+    document.getElementById('f-slug').value = e.target.value
+      .toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  });
+
+  // ── Source tabs ───────────────────────────────────────────────────
+  document.querySelectorAll('.source-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('source-url-panel').style.display    = tab.dataset.tab === 'url'    ? '' : 'none';
+      document.getElementById('source-upload-panel').style.display = tab.dataset.tab === 'upload' ? '' : 'none';
+    });
+  });
+
+  // ── File picker ───────────────────────────────────────────────────
+  document.getElementById('f-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) { currentFile = null; return; }
+    currentFile = file;
+    document.getElementById('upload-filename').textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+    const warn = document.getElementById('upload-size-warning');
+    if (file.size > 25 * 1024 * 1024) {
+      warn.textContent = '⚠ File is over 25 MB. GitHub API may reject it. Consider using an external URL instead.';
+      warn.style.display = '';
+    } else { warn.style.display = 'none'; }
+  });
+  // Drag & drop
+  const uploadZone = document.getElementById('upload-zone');
+  uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+  uploadZone.addEventListener('dragleave', ()  => uploadZone.classList.remove('drag'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) { document.getElementById('f-file').files = e.dataTransfer.files; document.getElementById('f-file').dispatchEvent(new Event('change')); }
+  });
+
+  // ── Modal open/close ───────────────────────────────────────────────
+  function openModal(type, existingSlug = null) {
+    currentType  = type;
+    editingSlug  = existingSlug;
+    currentFile  = null;
+    document.getElementById('modal-title').textContent = existingSlug ? `Edit ${TYPE_LABELS[type]}` : `Add ${TYPE_LABELS[type]}`;
+    document.getElementById('modal-success').style.display = 'none';
+    document.getElementById('modal-save-btn').textContent  = 'Save & Publish';
+    document.getElementById('modal-save-btn').disabled     = false;
+
+    // Reset form
+    document.getElementById('f-title').value = '';
+    document.getElementById('f-slug').value  = '';
+    document.getElementById('f-body').value  = '';
+    document.getElementById('f-url').value   = '';
+    document.getElementById('upload-filename').textContent = '';
+    document.getElementById('f-file').value  = '';
+    document.getElementById('upload-size-warning').style.display = 'none';
+
+    // Set file accept type
+    document.getElementById('f-file').accept = FILE_ACCEPT[type] || '*/*';
+
+    if (existingSlug) {
+      const item = manifest.items.find(i => i.slug === existingSlug && i.type === type);
+      if (item) {
+        document.getElementById('f-title').value = item.title || '';
+        document.getElementById('f-slug').value  = item.slug;
+        document.getElementById('f-body').value  = item.body || '';
+        document.getElementById('f-url').value   = item.file || '';
+        // Default to URL tab when editing
+        document.querySelectorAll('.source-tab')[0].click();
+      }
+    }
+
+    document.getElementById('item-modal').classList.remove('hidden');
+  }
+  function closeModal() {
+    document.getElementById('item-modal').classList.add('hidden');
+  }
+  document.getElementById('modal-close-btn').addEventListener('click',  closeModal);
+  document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+  document.getElementById('item-modal').addEventListener('click', e => { if (e.target === document.getElementById('item-modal')) closeModal(); });
+
+  // ── GitHub API helpers ─────────────────────────────────────────────
+  function ghHeaders() {
+    return { Authorization: `Bearer ${ghSettings.token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+  }
+
+  async function ghGet(path) {
+    const res = await fetch(`https://api.github.com/repos/${ghSettings.owner}/${ghSettings.repo}/contents/${path}`, { headers: ghHeaders() });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`GitHub API ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  async function ghPut(path, base64Content, message, sha = null) {
+    const body = { message, content: base64Content, branch: ghSettings.branch || 'main' };
+    if (sha) body.sha = sha;
+    const res = await fetch(`https://api.github.com/repos/${ghSettings.owner}/${ghSettings.repo}/contents/${path}`, {
+      method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  function strToBase64(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  async function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => {
+        const dataUrl = reader.result;
+        resolve(dataUrl.split(',')[1]); // strip the data:...;base64, prefix
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function fileExt(filename) {
+    return filename.includes('.') ? '.' + filename.split('.').pop().toLowerCase() : '';
+  }
+
+  // ── Save & publish ─────────────────────────────────────────────────
+  async function saveItem() {
+    const title = document.getElementById('f-title').value.trim();
+    const slug  = document.getElementById('f-slug').value.trim().replace(/[^a-z0-9_-]/gi, '-');
+    const body  = document.getElementById('f-body').value.trim();
+    const isUploadTab = document.querySelector('.source-tab[data-tab="upload"]').classList.contains('active');
+    const urlInput    = document.getElementById('f-url').value.trim();
+
+    if (!title) { toast('Title is required.'); return; }
+    if (!slug)  { toast('Slug is required.'); return; }
+    if (!urlInput && !currentFile) { toast('Please provide a media URL or upload a file.'); return; }
+
+    // Check slug collision (only for new items)
+    if (!editingSlug && manifest.items.some(i => i.slug === slug && i.type === currentType)) {
+      toast(`Slug "${slug}" already exists for this type.`); return;
+    }
+
+    const saveBtn = document.getElementById('modal-save-btn');
+    saveBtn.disabled = true; saveBtn.textContent = 'Publishing…';
+    setProgress(10);
+
+    const ghReady = ghSettings.token && ghSettings.owner && ghSettings.repo;
+    let mediaPath = urlInput; // default to external URL
+
+    try {
+      // 1. Upload file to GitHub if needed
+      if (isUploadTab && currentFile && ghReady) {
+        setProgress(20);
+        const ext      = fileExt(currentFile.name);
+        const repoPath = `CrimeScene/media/${currentType}/${slug}${ext}`;
+        const b64      = await fileToBase64(currentFile);
+        setProgress(50);
+        const existing = await ghGet(repoPath);
+        await ghPut(repoPath, b64, `Add media: ${repoPath}`, existing?.sha);
+        setProgress(70);
+        // Path relative to viewer page (CrimeScene/watch/ → ../media/...)
+        mediaPath = `../media/${currentType}/${slug}${ext}`;
+      } else if (!isUploadTab) {
+        mediaPath = urlInput;
+      } else if (isUploadTab && currentFile && !ghReady) {
+        toast('GitHub not configured — cannot upload file. Set up GitHub Settings first, or use an external URL.');
+        saveBtn.disabled = false; saveBtn.textContent = 'Save & Publish'; setProgress(0); return;
+      }
+
+      // 2. Update manifest
+      const newItem = { slug, type: currentType, title, file: mediaPath, ...(body && { body }), created: new Date().toISOString().split('T')[0] };
+
+      if (editingSlug) {
+        const idx = manifest.items.findIndex(i => i.slug === editingSlug && i.type === currentType);
+        if (idx >= 0) manifest.items[idx] = newItem; else manifest.items.push(newItem);
+      } else {
+        manifest.items.push(newItem);
+      }
+
+      saveLocal(); // always save locally
+      setProgress(80);
+
+      // 3. Push manifest to GitHub
+      if (ghReady) {
+        const manifestStr = JSON.stringify(manifest, null, 2) + '\n';
+        const existing    = await ghGet('CrimeScene/manifest.json');
+        await ghPut('CrimeScene/manifest.json', strToBase64(manifestStr), `Update manifest: ${currentType}/${slug}`, existing?.sha);
+      }
+      setProgress(100);
+
+      renderAll();
+      const itemUrl = getItemUrl(currentType, slug);
+      document.getElementById('success-link-text').textContent = itemUrl;
+      document.getElementById('modal-success').style.display = '';
+      saveBtn.textContent = 'Done';
+      toast(ghReady ? 'Published to GitHub ✓' : 'Saved locally (GitHub not configured)');
+
+    } catch(err) {
+      console.error(err);
+      toast('Error: ' + err.message);
+      saveBtn.disabled = false; saveBtn.textContent = 'Save & Publish';
+      setProgress(0);
+    }
+  }
+
+  document.getElementById('modal-save-btn').addEventListener('click', saveItem);
+
+  // Copy link
+  document.getElementById('copy-link-btn').addEventListener('click', () => {
+    const url = document.getElementById('success-link-text').textContent;
+    navigator.clipboard.writeText(url).then(() => toast('Link copied!')).catch(() => {
+      const ta = document.createElement('textarea'); ta.value = url;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta); toast('Link copied!');
+    });
+  });
+
+  // ── Grid event delegation ──────────────────────────────────────────
+  document.addEventListener('click', e => {
+    const addBtn    = e.target.closest('[data-add]');
+    const editBtn   = e.target.closest('[data-edit]');
+    const deleteBtn = e.target.closest('[data-delete]');
+    const copyBtn   = e.target.closest('[data-copy]');
+
+    if (addBtn)    { openModal(addBtn.dataset.add); }
+    if (copyBtn)   {
+      navigator.clipboard.writeText(copyBtn.dataset.copy).then(() => toast('Link copied!')).catch(() => toast('Copy failed'));
+    }
+    if (editBtn)   { openModal(editBtn.dataset.type, editBtn.dataset.edit); }
+    if (deleteBtn) {
+      const { delete: slug, type } = deleteBtn.dataset;
+      if (!confirm(`Delete "${slug}"?`)) return;
+      manifest.items = manifest.items.filter(i => !(i.slug === slug && i.type === type));
+      saveLocal();
+      renderAll();
+      // Optionally push manifest to GitHub silently
+      if (ghSettings.token && ghSettings.owner && ghSettings.repo) {
+        ghGet('CrimeScene/manifest.json').then(existing => {
+          const str = JSON.stringify(manifest, null, 2) + '\n';
+          return ghPut('CrimeScene/manifest.json', strToBase64(str), `Remove ${type}/${slug}`, existing?.sha);
+        }).then(() => toast('Deleted & published ✓')).catch(() => toast('Deleted locally (GitHub push failed)'));
+      } else { toast('Deleted locally'); }
+    }
+  });
+
+  // ── GitHub Settings ────────────────────────────────────────────────
+  function loadGhForm() {
+    document.getElementById('gh-token').value  = ghSettings.token  || '';
+    document.getElementById('gh-owner').value  = ghSettings.owner  || '';
+    document.getElementById('gh-repo').value   = ghSettings.repo   || '';
+    document.getElementById('gh-branch').value = ghSettings.branch || 'main';
+  }
+
+  document.getElementById('gh-save-btn').addEventListener('click', () => {
+    ghSettings = {
+      token:  document.getElementById('gh-token').value.trim(),
+      owner:  document.getElementById('gh-owner').value.trim(),
+      repo:   document.getElementById('gh-repo').value.trim(),
+      branch: document.getElementById('gh-branch').value.trim() || 'main',
+    };
+    localStorage.setItem('crimescene-gh', JSON.stringify(ghSettings));
+    toast('Settings saved');
+  });
+
+  document.getElementById('gh-test-btn').addEventListener('click', async () => {
+    ghSettings.token  = document.getElementById('gh-token').value.trim();
+    ghSettings.owner  = document.getElementById('gh-owner').value.trim();
+    ghSettings.repo   = document.getElementById('gh-repo').value.trim();
+    ghSettings.branch = document.getElementById('gh-branch').value.trim() || 'main';
+
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    dot.className = 'status-dot'; text.textContent = 'Testing…';
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${ghSettings.owner}/${ghSettings.repo}`, { headers: ghHeaders() });
+      if (res.ok) { dot.className = 'status-dot ok'; text.textContent = 'Connected ✓'; toast('Connection successful!'); }
+      else        { dot.className = 'status-dot err'; text.textContent = `Error ${res.status}`; toast(`Connection failed: ${res.status}`); }
+    } catch(e) {
+      dot.className = 'status-dot err'; text.textContent = 'Network error';
+    }
+  });
+
+  // Auto-detect owner/repo from the current page URL
+  function autoDetectGh() {
+    if (ghSettings.owner) return;
+    const host = location.hostname; // e.g. filiplindstromen.github.io
+    if (host.endsWith('.github.io')) {
+      ghSettings.owner = host.replace('.github.io', '');
+      const parts = location.pathname.split('/').filter(Boolean);
+      if (parts.length >= 1) ghSettings.repo = parts[0];
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────
+  loadLocal();
+  autoDetectGh();
+  loadGhForm();
+  renderAll();
+  showSection('watch');
+</script>
+</body>
+</html>

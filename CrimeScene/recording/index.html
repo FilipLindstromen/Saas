@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recording — Crime Scene</title>
+  <style>
+    :root {
+      --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c;
+      --border: rgba(255,255,255,0.08); --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.45); --accent: #4cff91;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+
+    #back-btn {
+      position: fixed; top: 18px; left: 18px; z-index: 20;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); color: var(--muted);
+      padding: 8px 14px; border-radius: 8px; font-size: 13px;
+      cursor: pointer; text-decoration: none;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s, color 0.2s;
+    }
+    #back-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+
+    /* ── Player card ── */
+    .player-card {
+      width: 100%; max-width: 520px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      display: flex; flex-direction: column; gap: 2rem;
+    }
+
+    /* ── Waveform visualiser ── */
+    #waveform {
+      display: flex; align-items: center; justify-content: center;
+      gap: 3px; height: 64px;
+    }
+    .bar {
+      width: 3px; border-radius: 2px;
+      background: var(--accent);
+      opacity: 0.3;
+      transition: height 0.1s ease, opacity 0.1s;
+      transform-origin: bottom;
+    }
+    .bar.active { opacity: 1; }
+
+    /* ── Meta ── */
+    .meta { text-align: center; }
+    .badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid rgba(76,255,145,0.3);
+      padding: 3px 10px; border-radius: 4px;
+      margin-bottom: 14px;
+    }
+    #scene-title { font-size: 1.5rem; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+    #scene-body  { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── Time + progress ── */
+    .progress-section { display: flex; flex-direction: column; gap: 8px; }
+    #progress-wrap {
+      position: relative; height: 4px; background: rgba(255,255,255,0.1);
+      border-radius: 2px; cursor: pointer;
+    }
+    #progress-wrap:hover { height: 6px; }
+    #progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.1s linear; }
+    .time-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex; align-items: center; justify-content: center; gap: 20px;
+    }
+    .ctrl-btn {
+      background: none; border: none; color: var(--text);
+      cursor: pointer; padding: 8px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.08); }
+    .ctrl-btn svg { pointer-events: none; }
+
+    #play-btn {
+      width: 56px; height: 56px;
+      background: var(--accent);
+      border-radius: 50%; border: none;
+      color: #000; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, background 0.15s;
+      box-shadow: 0 0 24px rgba(76,255,145,0.25);
+    }
+    #play-btn:hover { transform: scale(1.06); }
+    #play-btn svg { width: 22px; height: 22px; }
+
+    /* ── Volume ── */
+    .volume-row { display: flex; align-items: center; gap: 10px; }
+    .volume-row svg { opacity: 0.5; flex-shrink: 0; }
+    #volume-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 3px; background: rgba(255,255,255,0.15);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    #volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      background: white; border-radius: 50%;
+    }
+
+    /* ── Loading / Error ── */
+    #loading, #error-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; z-index: 100;
+    }
+    #loading.gone, #error-screen { display: none; }
+    #error-screen.show { display: flex; }
+    .spinner { width: 28px; height: 28px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .msg { font-size: 12px; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; }
+    .err-link { font-size: 13px; color: var(--accent); text-decoration: none; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div class="msg">Loading</div></div>
+<div id="error-screen">
+  <div class="msg" id="error-title">Not Found</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.3)" id="error-msg"></div>
+  <a class="err-link" href="../">← Back to Crime Scene</a>
+</div>
+
+<a id="back-btn" href="../">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+  Back
+</a>
+
+<div class="player-card" id="player-card" style="display:none">
+  <div id="waveform"></div>
+
+  <div class="meta">
+    <div class="badge">Recording</div>
+    <div id="scene-title"></div>
+    <div id="scene-body"></div>
+  </div>
+
+  <div class="progress-section">
+    <div id="progress-wrap"><div id="progress-fill"></div></div>
+    <div class="time-row">
+      <span id="time-current">0:00</span>
+      <span id="time-total">0:00</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="skip-back-btn" title="−10s">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.45"/>
+        <text x="7" y="15" style="font-size:6px;fill:currentColor;stroke:none">10</text>
+      </svg>
+    </button>
+
+    <button id="play-btn">
+      <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
+
+    <button class="ctrl-btn" id="skip-fwd-btn" title="+10s">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.45"/>
+        <text x="7" y="15" style="font-size:6px;fill:currentColor;stroke:none">10</text>
+      </svg>
+    </button>
+  </div>
+
+  <div class="volume-row">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    </svg>
+    <input type="range" id="volume-slider" min="0" max="1" step="0.02" value="1">
+  </div>
+</div>
+
+<audio id="audio-el" preload="metadata"></audio>
+
+<script>
+  const audio     = document.getElementById('audio-el');
+  const playBtn   = document.getElementById('play-btn');
+  const playIcon  = document.getElementById('play-icon');
+  const progFill  = document.getElementById('progress-fill');
+  const progWrap  = document.getElementById('progress-wrap');
+  const timeCur   = document.getElementById('time-current');
+  const timeTot   = document.getElementById('time-total');
+  const volSlider = document.getElementById('volume-slider');
+  const waveform  = document.getElementById('waveform');
+
+  const PLAY_SVG  = '<polygon points="5,3 19,12 5,21"/>';
+  const PAUSE_SVG = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+  }
+
+  // Build waveform bars
+  const BAR_COUNT = 48;
+  const heights   = Array.from({ length: BAR_COUNT }, (_, i) => {
+    const wave = Math.sin(i * 0.4) * 0.4 + Math.sin(i * 0.15) * 0.4 + Math.random() * 0.2;
+    return Math.max(0.08, (wave + 1) / 2);
+  });
+  heights.forEach(h => {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (h * 60 + 4) + 'px';
+    waveform.appendChild(bar);
+  });
+  const bars = waveform.querySelectorAll('.bar');
+
+  function updateBars() {
+    if (!audio.duration) return;
+    const pct = audio.currentTime / audio.duration;
+    const active = Math.floor(pct * BAR_COUNT);
+    bars.forEach((b, i) => b.classList.toggle('active', i <= active));
+  }
+
+  // Animate bars when playing
+  let animBars = false;
+  function animateWave() {
+    if (!animBars) return;
+    updateBars();
+    requestAnimationFrame(animateWave);
+  }
+
+  playBtn.addEventListener('click', () => audio.paused ? audio.play() : audio.pause());
+  audio.addEventListener('play',  () => { playIcon.innerHTML = PAUSE_SVG; animBars = true; animateWave(); });
+  audio.addEventListener('pause', () => { playIcon.innerHTML = PLAY_SVG; animBars = false; });
+  audio.addEventListener('ended', () => { playIcon.innerHTML = PLAY_SVG; animBars = false; updateBars(); });
+
+  audio.addEventListener('timeupdate', () => {
+    if (!audio.duration) return;
+    const pct = audio.currentTime / audio.duration * 100;
+    progFill.style.width = pct + '%';
+    timeCur.textContent  = fmt(audio.currentTime);
+    if (!animBars) updateBars();
+  });
+
+  progWrap.addEventListener('click', e => {
+    const rect = progWrap.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+  });
+
+  volSlider.addEventListener('input', () => { audio.volume = volSlider.value; });
+
+  document.getElementById('skip-back-btn').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
+  document.getElementById('skip-fwd-btn').addEventListener('click',  () => { audio.currentTime = Math.min(audio.duration, audio.currentTime + 10); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); audio.paused ? audio.play() : audio.pause(); }
+    if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+    if (e.key === 'ArrowLeft')  audio.currentTime = Math.max(0, audio.currentTime - 5);
+  });
+
+  function showError(title, msg) {
+    document.getElementById('loading').classList.add('gone');
+    document.getElementById('error-title').textContent = title;
+    document.getElementById('error-msg').textContent   = msg || '';
+    document.getElementById('error-screen').classList.add('show');
+  }
+
+  async function init() {
+    const slug = location.search.slice(1);
+    if (!slug) { showError('No Recording Specified', 'Add a ?slug to the URL.'); return; }
+
+    let manifest;
+    try {
+      const res = await fetch('../manifest.json');
+      if (!res.ok) throw new Error();
+      manifest  = await res.json();
+    } catch {
+      const s = localStorage.getItem('crimescene-manifest');
+      if (s) manifest = JSON.parse(s);
+      else { showError('Manifest Not Found'); return; }
+    }
+
+    const item = (manifest.items || []).find(i => i.slug === slug && i.type === 'recording');
+    if (!item) { showError('Recording Not Found', `No recording named "${slug}".`); return; }
+
+    document.title = `${item.title} — Crime Scene`;
+    document.getElementById('scene-title').textContent = item.title;
+    if (item.body) document.getElementById('scene-body').textContent = item.body;
+
+    audio.src = item.file;
+    audio.load();
+    audio.addEventListener('loadedmetadata', () => {
+      timeTot.textContent = fmt(audio.duration);
+      document.getElementById('loading').classList.add('gone');
+      document.getElementById('player-card').style.display = '';
+    });
+    audio.addEventListener('error', () => showError('Load Error', 'Could not load the audio file.'));
+  }
+
+  init();
+</script>
+</body>
+</html>

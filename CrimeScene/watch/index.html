@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>360° Watch — Crime Scene</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: none; }
+    canvas { display: block; }
+
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0;
+      pointer-events: none; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; padding-top: 22px;
+    }
+    #scene-title {
+      font-size: 17px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: rgba(255,255,255,0.92);
+      text-shadow: 0 0 20px rgba(76,170,255,0.5);
+    }
+    #scene-body {
+      font-size: 13px; color: rgba(255,255,255,0.5);
+      letter-spacing: 0.5px; max-width: 400px; text-align: center;
+      padding: 0 1rem;
+      transition: opacity 1s;
+    }
+    #scene-body.fade { opacity: 0; }
+
+    #back-btn {
+      position: fixed; top: 18px; left: 18px; z-index: 20;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.7); padding: 8px 14px;
+      border-radius: 8px; font-size: 13px; cursor: pointer;
+      text-decoration: none; display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s;
+    }
+    #back-btn:hover { background: rgba(255,255,255,0.1); }
+
+    #gyro-btn {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,255,255,0.08); backdrop-filter: blur(12px);
+      color: white; border: 1.5px solid rgba(255,255,255,0.25);
+      padding: 13px 28px; border-radius: 50px; font-size: 14px;
+      font-weight: 500; cursor: pointer; z-index: 20;
+      transition: background 0.2s, opacity 0.4s;
+    }
+    #gyro-btn:hover { background: rgba(255,255,255,0.15); }
+    #gyro-btn.hidden { opacity: 0; pointer-events: none; }
+
+    #gyro-status {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6); padding: 9px 18px;
+      border-radius: 50px; font-size: 12px; letter-spacing: 1px;
+      z-index: 20; opacity: 0; transition: opacity 0.4s; pointer-events: none;
+    }
+    #gyro-status.visible { opacity: 1; }
+    #gyro-dot { width: 7px; height: 7px; border-radius: 50%; background: #4cff91; box-shadow: 0 0 6px #4cff91; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    #crosshair {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 22px; height: 22px; pointer-events: none; z-index: 5; opacity: 0.35;
+    }
+    #crosshair::before, #crosshair::after { content: ''; position: absolute; background: white; border-radius: 2px; }
+    #crosshair::before { width:100%; height:1.5px; top:50%; left:0; transform:translateY(-50%); }
+    #crosshair::after  { height:100%; width:1.5px; left:50%; top:0; transform:translateX(-50%); }
+
+    #loading {
+      position: fixed; inset: 0; background: #000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; z-index: 100; transition: opacity 0.6s;
+    }
+    #loading.fade-out { opacity: 0; pointer-events: none; }
+    #loading-text { color: rgba(255,255,255,0.5); font-size: 13px; letter-spacing: 3px; text-transform: uppercase; }
+    #loading-bar-wrap { width: 140px; height: 2px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    #loading-bar { height: 100%; background: linear-gradient(90deg,#4caaff,#a78bfa); width: 0%; border-radius: 2px; transition: width 0.3s; }
+
+    #error-screen {
+      position: fixed; inset: 0; background: #000;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; z-index: 100;
+    }
+    #error-screen.show { display: flex; }
+    .error-title { font-size: 16px; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
+    .error-msg { font-size: 13px; color: rgba(255,255,255,0.35); }
+    .error-link { font-size: 13px; color: #4caaff; text-decoration: none; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-text">Loading Scene</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+</div>
+
+<div id="error-screen">
+  <div class="error-title" id="error-title">Scene Not Found</div>
+  <div class="error-msg" id="error-msg">The requested scene could not be loaded.</div>
+  <a class="error-link" href="../">← Back to Crime Scene</a>
+</div>
+
+<div id="hud">
+  <div id="scene-title">Crime Scene</div>
+  <div id="scene-body">Drag to explore · Scroll to zoom</div>
+</div>
+
+<div id="crosshair"></div>
+
+<a id="back-btn" href="../">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+  Back
+</a>
+
+<button id="gyro-btn">Enable Gyroscope</button>
+<div id="gyro-status"><div id="gyro-dot"></div>Gyroscope Active</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  const scene    = new THREE.Scene();
+  const camera   = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  document.body.appendChild(renderer.domElement);
+
+  const geo = new THREE.SphereGeometry(500, 128, 64);
+
+  function showError(title, msg) {
+    document.getElementById('loading').classList.add('fade-out');
+    const err = document.getElementById('error-screen');
+    document.getElementById('error-title').textContent = title;
+    document.getElementById('error-msg').textContent   = msg || '';
+    err.classList.add('show');
+  }
+
+  async function init() {
+    const slug = location.search.slice(1);
+    if (!slug) { showError('No Scene Specified', 'Add a ?slug to the URL.'); return; }
+
+    let manifest;
+    try {
+      const res = await fetch('../manifest.json');
+      if (!res.ok) throw new Error();
+      manifest  = await res.json();
+    } catch {
+      const s = localStorage.getItem('crimescene-manifest');
+      if (s) manifest = JSON.parse(s);
+      else { showError('Manifest Not Found', 'Could not load scene list.'); return; }
+    }
+
+    const item = (manifest.items || []).find(i => i.slug === slug && i.type === 'watch');
+    if (!item) { showError('Scene Not Found', `No 360° scene named "${slug}".`); return; }
+
+    document.title = `${item.title} — Crime Scene`;
+    document.getElementById('scene-title').textContent = item.title;
+    if (item.body) {
+      const bodyEl = document.getElementById('scene-body');
+      bodyEl.textContent = item.body;
+      setTimeout(() => bodyEl.classList.add('fade'), 5000);
+    }
+
+    const loader  = new THREE.TextureLoader();
+    const loadBar = document.getElementById('loading-bar');
+    const loadDiv = document.getElementById('loading');
+
+    loader.load(
+      item.file,
+      (texture) => {
+        texture.minFilter      = THREE.LinearMipmapLinearFilter;
+        texture.magFilter      = THREE.LinearFilter;
+        texture.generateMipmaps = true;
+        texture.encoding       = THREE.sRGBEncoding;
+        texture.wrapS          = THREE.RepeatWrapping;
+        const mat  = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+        loadBar.style.width = '100%';
+        setTimeout(() => loadDiv.classList.add('fade-out'), 300);
+        setTimeout(() => loadDiv.remove(), 900);
+      },
+      (xhr) => { if (xhr.total) loadBar.style.width = (xhr.loaded / xhr.total * 90) + '%'; },
+      (err) => { showError('Load Error', 'Could not load the 360° image.'); console.error(err); }
+    );
+  }
+
+  camera.position.set(0, 0, 0);
+
+  let lon = 0, lat = 0, targetLon = 0, targetLat = 0;
+  const SMOOTH = 0.08;
+
+  let dragging = false, startX = 0, startY = 0, startLon = 0, startLat = 0;
+
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startY = e.clientY;
+    startLon = targetLon; startLat = targetLat;
+    renderer.domElement.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    targetLon = startLon - (e.clientX - startX) * 0.18;
+    targetLat = startLat + (e.clientY - startY) * 0.18;
+  });
+  window.addEventListener('mouseup', () => { dragging = false; renderer.domElement.style.cursor = 'grab'; });
+  renderer.domElement.style.cursor = 'grab';
+
+  renderer.domElement.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    dragging = true; startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    startLon = targetLon; startLat = targetLat;
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (!dragging || e.touches.length !== 1) return;
+    targetLon = startLon - (e.touches[0].clientX - startX) * 0.22;
+    targetLat = startLat + (e.touches[0].clientY - startY) * 0.22;
+  }, { passive: true });
+  window.addEventListener('touchend', () => dragging = false);
+
+  let gyroEnabled = false, alphaRef = null;
+  const gyroBtn = document.getElementById('gyro-btn');
+  const gyroStatus = document.getElementById('gyro-status');
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (!isMobile) gyroBtn.classList.add('hidden');
+
+  gyroBtn.addEventListener('click', async () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r === 'granted') activateGyro();
+      } catch(e) {}
+    } else { activateGyro(); }
+  });
+
+  function activateGyro() {
+    gyroEnabled = true; alphaRef = null;
+    gyroBtn.classList.add('hidden');
+    gyroStatus.classList.add('visible');
+    window.addEventListener('deviceorientation', e => {
+      if (dragging) return;
+      if (alphaRef === null) alphaRef = e.alpha ?? 0;
+      targetLon = -((e.alpha ?? 0) - alphaRef);
+      targetLat = (e.beta ?? 90) - 90;
+    });
+  }
+
+  let fov = 75;
+  window.addEventListener('wheel', e => {
+    fov = Math.max(30, Math.min(100, fov + e.deltaY * 0.05));
+    camera.fov = fov; camera.updateProjectionMatrix();
+  }, { passive: true });
+
+  let lastPinch = null;
+  window.addEventListener('touchstart', e => { if (e.touches.length === 2) lastPinch = null; }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2) return;
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (lastPinch !== null) { fov = Math.max(30, Math.min(100, fov - (d - lastPinch) * 0.1)); camera.fov = fov; camera.updateProjectionMatrix(); }
+    lastPinch = d;
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    lon = lon + (targetLon - lon) * SMOOTH;
+    lat = lat + (targetLat - lat) * SMOOTH;
+    lat = Math.max(-85, Math.min(85, lat));
+    const phi   = THREE.MathUtils.degToRad(90 - lat);
+    const theta = THREE.MathUtils.degToRad(lon);
+    camera.lookAt(500 * Math.sin(phi) * Math.cos(theta), 500 * Math.cos(phi), 500 * Math.sin(phi) * Math.sin(theta));
+    renderer.render(scene, camera);
+  }
+
+  animate();
+  init();
+</script>
+</body>
+</html>

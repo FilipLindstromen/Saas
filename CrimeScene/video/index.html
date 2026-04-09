@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video — Crime Scene</title>
+  <style>
+    :root {
+      --bg: #0a0a0a; --surface: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.1); --text: rgba(255,255,255,0.9);
+      --muted: rgba(255,255,255,0.45); --accent: #a78bfa;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    #back-btn {
+      position: fixed; top: 18px; left: 18px; z-index: 30;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); color: var(--muted);
+      padding: 8px 14px; border-radius: 8px; font-size: 13px;
+      cursor: pointer; text-decoration: none;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s, color 0.2s;
+    }
+    #back-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+    /* ── Video area ── */
+    #video-wrap {
+      flex: 1; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      background: #000;
+    }
+    #player {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+
+    /* ── Top info overlay ── */
+    #info-overlay {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 22px 120px 40px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%);
+      pointer-events: none; z-index: 20;
+      transition: opacity 0.4s;
+    }
+    #info-overlay.hidden { opacity: 0; }
+    #scene-title {
+      font-size: 17px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
+    #scene-body {
+      font-size: 13px; color: var(--muted); margin-top: 5px;
+      max-width: 500px; line-height: 1.5;
+    }
+
+    /* ── Controls ── */
+    #controls-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 40px 2rem 1.5rem;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+      z-index: 20; transition: opacity 0.4s;
+    }
+    #controls-bar.hidden { opacity: 0; pointer-events: none; }
+
+    #progress-wrap {
+      position: relative; height: 4px; background: rgba(255,255,255,0.15);
+      border-radius: 2px; cursor: pointer; margin-bottom: 14px;
+    }
+    #progress-wrap:hover { height: 6px; margin-bottom: 12px; }
+    #progress-fill {
+      height: 100%; background: var(--accent); border-radius: 2px;
+      width: 0%; pointer-events: none; transition: width 0.1s linear;
+    }
+    #progress-wrap::after {
+      content: ''; position: absolute; top: 50%; right: auto;
+      width: 12px; height: 12px; background: white;
+      border-radius: 50%; transform: translate(-50%, -50%);
+      left: 0%; opacity: 0; transition: opacity 0.15s;
+    }
+    #progress-wrap:hover::after { opacity: 1; }
+
+    #controls-row {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .ctrl-btn {
+      background: none; border: none; color: var(--text);
+      cursor: pointer; padding: 6px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+    .ctrl-btn svg { width: 20px; height: 20px; }
+    #play-btn svg { width: 26px; height: 26px; }
+
+    #time-display { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    #volume-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    #volume-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 70px; height: 3px; background: rgba(255,255,255,0.2);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    #volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      background: white; border-radius: 50%;
+    }
+    #fullscreen-btn { margin-left: 4px; }
+
+    /* ── Error / Loading ── */
+    #loading, #error-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; z-index: 100;
+    }
+    #error-screen { display: none; }
+    #error-screen.show { display: flex; }
+    #loading.gone { display: none; }
+    .spinner { width: 28px; height: 28px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .msg { font-size: 13px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+    .err-link { font-size: 13px; color: var(--accent); text-decoration: none; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div class="msg">Loading</div></div>
+<div id="error-screen">
+  <div class="msg" id="error-title">Not Found</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.3)" id="error-msg"></div>
+  <a class="err-link" href="../">← Back to Crime Scene</a>
+</div>
+
+<a id="back-btn" href="../">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+  Back
+</a>
+
+<div id="video-wrap">
+  <video id="player" preload="metadata" playsinline></video>
+</div>
+
+<div id="info-overlay">
+  <div id="scene-title"></div>
+  <div id="scene-body"></div>
+</div>
+
+<div id="controls-bar">
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+  <div id="controls-row">
+    <button class="ctrl-btn" id="play-btn" title="Play/Pause">
+      <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
+    <span id="time-display">0:00 / 0:00</span>
+    <div id="volume-wrap">
+      <button class="ctrl-btn" id="mute-btn" title="Mute">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+      </button>
+      <input type="range" id="volume-slider" min="0" max="1" step="0.02" value="1">
+    </div>
+    <button class="ctrl-btn" id="fullscreen-btn" title="Fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+        <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const video      = document.getElementById('player');
+  const playBtn    = document.getElementById('play-btn');
+  const playIcon   = document.getElementById('play-icon');
+  const progressFill = document.getElementById('progress-fill');
+  const progressWrap = document.getElementById('progress-wrap');
+  const timeDisplay  = document.getElementById('time-display');
+  const volumeSlider = document.getElementById('volume-slider');
+  const muteBtn    = document.getElementById('mute-btn');
+  const fsBtn      = document.getElementById('fullscreen-btn');
+  const infoOverlay  = document.getElementById('info-overlay');
+  const controlsBar  = document.getElementById('controls-bar');
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+  }
+
+  const PLAY_SVG  = '<polygon points="5,3 19,12 5,21"/>';
+  const PAUSE_SVG = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+
+  playBtn.addEventListener('click', () => video.paused ? video.play() : video.pause());
+  video.addEventListener('play',  () => { playIcon.innerHTML = PAUSE_SVG; });
+  video.addEventListener('pause', () => { playIcon.innerHTML = PLAY_SVG; });
+  video.addEventListener('ended', () => { playIcon.innerHTML = PLAY_SVG; });
+
+  video.addEventListener('timeupdate', () => {
+    if (!video.duration) return;
+    const pct = video.currentTime / video.duration * 100;
+    progressFill.style.width = pct + '%';
+    progressWrap.style.setProperty('--thumb', pct + '%');
+    timeDisplay.textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+  });
+
+  progressWrap.addEventListener('click', e => {
+    const rect = progressWrap.getBoundingClientRect();
+    video.currentTime = ((e.clientX - rect.left) / rect.width) * video.duration;
+  });
+
+  volumeSlider.addEventListener('input', () => { video.volume = volumeSlider.value; });
+  muteBtn.addEventListener('click', () => {
+    video.muted = !video.muted;
+    muteBtn.style.opacity = video.muted ? '0.4' : '1';
+  });
+
+  fsBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  });
+
+  // Auto-hide controls
+  let hideTimer;
+  function showControls() {
+    infoOverlay.classList.remove('hidden');
+    controlsBar.classList.remove('hidden');
+    clearTimeout(hideTimer);
+    if (!video.paused) hideTimer = setTimeout(() => {
+      infoOverlay.classList.add('hidden');
+      controlsBar.classList.add('hidden');
+    }, 3000);
+  }
+  document.addEventListener('mousemove', showControls);
+  document.addEventListener('touchstart', showControls, { passive: true });
+  video.addEventListener('play', () => hideTimer = setTimeout(() => {
+    infoOverlay.classList.add('hidden');
+    controlsBar.classList.add('hidden');
+  }, 3000));
+  video.addEventListener('pause', showControls);
+  video.addEventListener('click', () => video.paused ? video.play() : video.pause());
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+    if (e.key === 'ArrowRight') video.currentTime = Math.min(video.duration, video.currentTime + 5);
+    if (e.key === 'ArrowLeft')  video.currentTime = Math.max(0, video.currentTime - 5);
+    if (e.key === 'm') { video.muted = !video.muted; }
+    if (e.key === 'f') fsBtn.click();
+  });
+
+  function showError(title, msg) {
+    document.getElementById('loading').classList.add('gone');
+    document.getElementById('error-title').textContent = title;
+    document.getElementById('error-msg').textContent   = msg || '';
+    document.getElementById('error-screen').classList.add('show');
+  }
+
+  async function init() {
+    const slug = location.search.slice(1);
+    if (!slug) { showError('No Video Specified', 'Add a ?slug to the URL.'); return; }
+
+    let manifest;
+    try {
+      const res = await fetch('../manifest.json');
+      if (!res.ok) throw new Error();
+      manifest  = await res.json();
+    } catch {
+      const s = localStorage.getItem('crimescene-manifest');
+      if (s) manifest = JSON.parse(s);
+      else { showError('Manifest Not Found'); return; }
+    }
+
+    const item = (manifest.items || []).find(i => i.slug === slug && i.type === 'video');
+    if (!item) { showError('Video Not Found', `No video named "${slug}".`); return; }
+
+    document.title = `${item.title} — Crime Scene`;
+    document.getElementById('scene-title').textContent = item.title;
+    if (item.body) document.getElementById('scene-body').textContent = item.body;
+
+    video.src = item.file;
+    video.load();
+    video.addEventListener('loadedmetadata', () => {
+      document.getElementById('loading').classList.add('gone');
+      timeDisplay.textContent = `0:00 / ${fmt(video.duration)}`;
+    });
+    video.addEventListener('error', () => showError('Load Error', 'Could not load the video file.'));
+  }
+
+  init();
+</script>
+</body>
+</html>
