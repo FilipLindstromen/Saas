@@ -31,6 +31,7 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
   const [selectedLabel, setSelectedLabel] = useState<string>("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [deletingEmptyProjects, setDeletingEmptyProjects] = useState(false);
 
   useEffect(() => {
@@ -113,6 +114,40 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
       setDeleting(false);
     }
   }, [onClose, selectedKey, selectedLabel, t]);
+
+  const runDeleteAll = useCallback(async () => {
+    setDeletingAll(true);
+    setActionError(null);
+    try {
+      const dry = await fetch("/api/organized-items/delete-scoped", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: true, scope: { type: "everything" } }),
+      });
+      const dryData = (await dry.json()) as { count?: number; error?: string };
+      if (!dry.ok) throw new Error(dryData.error || "Failed");
+      const count = dryData.count ?? 0;
+      const ok = confirm(t("settings.deleteEntriesConfirm", { count, label: t("settings.deleteAllEntries") }));
+      if (!ok) {
+        setDeletingAll(false);
+        return;
+      }
+      const del = await fetch("/api/organized-items/delete-scoped", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: false, scope: { type: "everything" } }),
+      });
+      const delData = (await del.json()) as { deleted?: number; error?: string };
+      if (!del.ok) throw new Error(delData.error || "Failed");
+      window.dispatchEvent(new Event("braindump-reload-items"));
+      alert(t("settings.deleteAllDone"));
+      onClose();
+    } catch {
+      setActionError(t("settings.deleteAllError"));
+    } finally {
+      setDeletingAll(false);
+    }
+  }, [onClose, t]);
 
   const runDeleteEmptyProjects = useCallback(async () => {
     const n = catalog?.emptyProjectCount ?? 0;
@@ -312,17 +347,27 @@ export function DeleteEntriesOverlay({ isOpen, onClose }: DeleteEntriesOverlayPr
             <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--accent)" }}>{actionError}</p>
           )}
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button type="button" className="bd-btn" onClick={onClose} disabled={deleting || deletingEmptyProjects}>
+            <button type="button" className="bd-btn" onClick={onClose} disabled={deleting || deletingAll || deletingEmptyProjects}>
               {t("settings.deleteEntriesClose")}
             </button>
             <button
               type="button"
               className="bd-btn bd-btn-danger"
               onClick={() => void runDelete()}
-              disabled={deleting || deletingEmptyProjects || !selectedKey || loading || !!loadError || !hasBulkRows}
+              disabled={deleting || deletingAll || deletingEmptyProjects || !selectedKey || loading || !!loadError || !hasBulkRows}
             >
               {deleting ? t("settings.deleteAllDeleting") : t("settings.deleteEntriesSelect")}
             </button>
+            {hasBulkRows && (
+              <button
+                type="button"
+                className="bd-btn bd-btn-danger"
+                onClick={() => void runDeleteAll()}
+                disabled={deleting || deletingAll || deletingEmptyProjects || loading || !!loadError}
+              >
+                {deletingAll ? t("settings.deleteAllDeleting") : t("settings.deleteAllEntries")}
+              </button>
+            )}
           </div>
         </div>
       </div>
