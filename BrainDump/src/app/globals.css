@@ -1120,6 +1120,46 @@ select.bd-input::-ms-expand {
   border-color: var(--border-default);
 }
 
+/* Wrapper that stacks floating action buttons + panel vertically inside the backdrop */
+.bd-dump-overlay-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+
+/* Floating buttons above the panel — stacked vertically */
+.bd-dump-switch-row--floating {
+  flex-direction: column;
+  margin-bottom: 0;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.bd-dump-switch-btn--floating {
+  background: rgba(255, 255, 255, 0.95);
+  color: #111;
+  border-color: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.22);
+}
+.bd-dump-switch-btn--floating:hover:not(:disabled) {
+  background: #fff;
+  color: #000;
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+}
+.bd-dump-switch-btn--floating:disabled {
+  background: rgba(255, 255, 255, 0.6);
+  color: #555;
+}
+
 .bd-dump-sheet-content {
   display: flex;
   flex-direction: column;
@@ -4861,8 +4901,13 @@ button.bd-shopping-toggle[aria-pressed="true"] {
       max(0.65rem, env(safe-area-inset-left)) !important;
   }
 
+  .bd-dump-overlay-wrapper {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
   .bd-dump-sheet-inner {
-    max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1.25rem)) !important;
+    max-height: min(78dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 7rem)) !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;

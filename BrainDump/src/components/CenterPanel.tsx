@@ -1202,47 +1202,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           aria-labelledby="bd-voice-dump-title"
           onClick={closeDumpOverlay}
         >
-          <div
-            className="bd-panel bd-modal-panel bd-dump-sheet-inner"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="bd-dump-sheet-header">
+          <div className="bd-dump-overlay-wrapper">
+            {/* Switch buttons float above the panel, stacked vertically */}
+            <div className="bd-dump-switch-row bd-dump-switch-row--floating" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
-                className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-close-btn"
-                onClick={closeDumpOverlay}
-                disabled={isDumpProcessing}
-                aria-label={t("center.cancelDump")}
-                title={t("center.cancelDump")}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-              <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
-                {t("center.newDump")}
-              </h2>
-              <button
-                type="button"
-                className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-help-btn"
-                onClick={() => setShowHelpOverlay(true)}
-                aria-label={t("center.help")}
-                title={t("center.help")}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </button>
-            </header>
-
-            {/* Switch input type — skip paywall since user already passed it */}
-            <div className="bd-dump-switch-row">
-              <button
-                type="button"
-                className="bd-btn bd-dump-switch-btn"
+                className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
                 disabled={isDumpProcessing}
                 onClick={() => {
                   leaveVoiceDumpSessionForOtherInput();
@@ -1258,7 +1223,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               </button>
               <button
                 type="button"
-                className="bd-btn bd-dump-switch-btn"
+                className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
                 disabled={isDumpProcessing}
                 onClick={() => {
                   leaveVoiceDumpSessionForOtherInput();
@@ -1273,9 +1238,46 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               </button>
             </div>
 
-            <div className="bd-dump-sheet-content">
-              {showDumpFace && <DumpListeningFace variant="sheet" />}
-              {dumpPanelContent}
+            <div
+              className="bd-panel bd-modal-panel bd-dump-sheet-inner"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className="bd-dump-sheet-header">
+                <button
+                  type="button"
+                  className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-close-btn"
+                  onClick={closeDumpOverlay}
+                  disabled={isDumpProcessing}
+                  aria-label={t("center.cancelDump")}
+                  title={t("center.cancelDump")}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+                <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
+                  {t("center.newDump")}
+                </h2>
+                <button
+                  type="button"
+                  className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-help-btn"
+                  onClick={() => setShowHelpOverlay(true)}
+                  aria-label={t("center.help")}
+                  title={t("center.help")}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </button>
+              </header>
+
+              <div className="bd-dump-sheet-content">
+                {showDumpFace && <DumpListeningFace variant="sheet" />}
+                {dumpPanelContent}
+              </div>
             </div>
           </div>
         </div>
