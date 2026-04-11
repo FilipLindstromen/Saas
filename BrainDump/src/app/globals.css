@@ -3559,8 +3559,8 @@ input.bd-todo-checkbox {
 
 .bd-todo-checkbox-wrap input.bd-todo-checkbox:checked,
 input.bd-todo-checkbox:checked {
-  background-color: var(--accent);
-  border-color: var(--accent);
+  background-color: #d64d22;
+  border-color: #d64d22;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   background-size: 14px 14px;
   background-position: center;
