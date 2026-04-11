@@ -1778,7 +1778,6 @@ export function ItemsViewArea({
   );
 
   return (
-    <>
     <div className="bd-items-view-root">
       {showUnifiedMobileChrome && (
         <div className="bd-mobile-unified-chrome">
@@ -3618,6 +3617,11 @@ export function ItemsViewArea({
           </div>
         </div>
       )}
+      <LuckyTaskOverlay
+        isOpen={luckyOpen}
+        task={luckyTask}
+        onClose={() => setLuckyOpen(false)}
+      />
     </div>
   );
 }
@@ -6412,12 +6416,5 @@ function PostitsView({
         })}
       </div>
     </div>
-
-    <LuckyTaskOverlay
-      isOpen={luckyOpen}
-      task={luckyTask}
-      onClose={() => setLuckyOpen(false)}
-    />
-    </>
   );
 }
