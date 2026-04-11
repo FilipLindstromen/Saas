@@ -947,7 +947,7 @@ export function ScopeBar({
                 padding: "1rem 1rem 1.15rem",
                 overflow: "auto",
                 WebkitOverflowScrolling: "touch",
-                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+                boxShadow: "var(--shadow-lg)",
               }}
               onClick={(e) => e.stopPropagation()}
               role="listbox"
@@ -1097,7 +1097,9 @@ export function ScopeBar({
                     position: "fixed",
                     inset: 0,
                     zIndex: "var(--bd-z-scope-sheet)",
-                    background: "rgba(0,0,0,0.35)",
+                    background: "var(--bd-overlay-sheet)",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
                     display: "flex",
                     alignItems: "flex-end",
                     justifyContent: "center",
@@ -1647,7 +1649,7 @@ export function ScopeBar({
                 padding: "1rem 1rem 1.15rem",
                 overflow: "auto",
                 WebkitOverflowScrolling: "touch",
-                boxShadow: "0 -12px 48px rgba(0,0,0,0.35)",
+                boxShadow: "var(--shadow-lg)",
               }}
               onClick={(e) => e.stopPropagation()}
               role="listbox"
@@ -1803,7 +1805,9 @@ export function ScopeBar({
                     position: "fixed",
                     inset: 0,
                     zIndex: "var(--bd-z-scope-sheet)",
-                    background: "rgba(0,0,0,0.35)",
+                    background: "var(--bd-overlay-sheet)",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
                     display: "flex",
                     alignItems: "flex-end",
                     justifyContent: "center",

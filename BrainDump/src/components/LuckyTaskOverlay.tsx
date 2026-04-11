@@ -18,7 +18,6 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
   const [count, setCount] = useState(COUNTDOWN_START);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset to task phase whenever the overlay opens with a new task.
   useEffect(() => {
     if (isOpen) {
       setPhase("task");
@@ -49,17 +48,17 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
 
   if (!isOpen || !task) return null;
 
-  const domainLabel = task.domain === "work" ? "Work" : task.domain === "personal" ? "Personal" : task.domain;
+  const domainLabel =
+    task.domain === "work" ? "Work" : task.domain === "personal" ? "Personal" : task.domain;
   const categoryLabel = task.category
     ? task.category.charAt(0).toUpperCase() + task.category.slice(1).replace(/_/g, " ")
     : null;
 
-  // ── Counting phase ───────────────────────────────────────────────
+  // ── Counting / GO phase ───────────────────────────────────────────
   if (phase === "counting" || phase === "go") {
     const isGo = phase === "go";
     return (
       <>
-        {/* Inject keyframe inline — self-contained, no globals.css required */}
         <style>{`
           @keyframes _bd_lucky_pop {
             0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.55); }
@@ -76,7 +75,11 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
           }
           @keyframes _bd_lucky_bg_pulse {
             0%, 100% { opacity: 1; }
-            50%       { opacity: 0.85; }
+            50%       { opacity: 0.88; }
+          }
+          @keyframes _bd_lucky_task_hint {
+            from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
           }
         `}</style>
 
@@ -88,7 +91,9 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
             position: "fixed",
             inset: 0,
             zIndex: "var(--bd-z-modal)" as never,
-            background: isGo ? "var(--accent)" : "#000",
+            background: isGo
+              ? "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)"
+              : "linear-gradient(160deg, #0c0c10 0%, #111116 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -103,32 +108,34 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
               left: "50%",
               userSelect: "none",
               fontWeight: 900,
-              letterSpacing: "-0.03em",
+              letterSpacing: "-0.04em",
               lineHeight: 1,
-              color: isGo ? "#000" : "#fff",
+              color: isGo ? "#fff" : "#fff",
               fontSize: isGo ? "clamp(5rem, 22vmin, 16rem)" : "clamp(6rem, 28vmin, 20rem)",
               animation: isGo
                 ? "_bd_lucky_go_pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both"
                 : "_bd_lucky_pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
+              textShadow: isGo
+                ? "0 4px 32px rgba(0,0,0,0.2)"
+                : "0 0 80px rgba(255,120,60,0.4), 0 4px 32px rgba(0,0,0,0.6)",
             }}
           >
             {isGo ? "GO!" : count}
           </span>
 
-          {/* Subtle task title reminder during countdown */}
           {!isGo && (
             <p
               style={{
                 position: "absolute",
                 bottom: "clamp(2rem, 6vh, 4rem)",
                 left: "50%",
-                transform: "translateX(-50%)",
+                animation: "_bd_lucky_task_hint 0.4s 0.1s cubic-bezier(0.22,1,0.36,1) both",
                 width: "min(480px, 88vw)",
                 textAlign: "center",
-                fontSize: "clamp(0.9rem, 2.5vw, 1.15rem)",
-                color: "rgba(255,255,255,0.45)",
+                fontSize: "clamp(0.9rem, 2.5vw, 1.1rem)",
+                color: "rgba(255,255,255,0.5)",
                 fontWeight: 500,
-                lineHeight: 1.4,
+                lineHeight: 1.45,
                 margin: 0,
               }}
             >
@@ -142,129 +149,231 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
 
   // ── Task display phase ───────────────────────────────────────────
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="bd-lucky-title"
-      className="bd-modal-backdrop"
-      onClick={onClose}
-    >
+    <>
+      <style>{`
+        @keyframes _bd_lucky_modal_in {
+          from { opacity: 0; transform: translateY(12px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes _bd_lucky_backdrop_in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
+
       <div
-        className="bd-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bd-lucky-title"
         style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          borderRadius: "var(--card-radius)",
-          maxWidth: "min(520px, 100%)",
-          width: "100%",
-          boxShadow: "var(--shadow-xl)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close */}
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0.75rem 0.875rem 0" }}>
-          <button
-            type="button"
-            className="bd-btn"
-            onClick={onClose}
-            aria-label="Close"
-            style={{ padding: "0.2rem 0.5rem", border: "none", background: "none", fontSize: "1.25rem", color: "var(--text-secondary)" }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Badge row */}
-        <div style={{ padding: "0 1.5rem 0.5rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: "0.3rem",
-            fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.07em",
-            textTransform: "uppercase", color: "var(--text-secondary)",
-            background: "var(--bg-tertiary)", border: "1px solid var(--border-default)",
-            borderRadius: "4px", padding: "0.2rem 0.55rem",
-          }}>
-            {domainLabel}
-            {categoryLabel ? ` · ${categoryLabel}` : ""}
-          </span>
-          {task.project?.name && (
-            <span style={{
-              display: "inline-flex", alignItems: "center",
-              fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.07em",
-              textTransform: "uppercase", color: "var(--text-secondary)",
-              background: "var(--bg-tertiary)", border: "1px solid var(--border-default)",
-              borderRadius: "4px", padding: "0.2rem 0.55rem",
-            }}>
-              {task.project.name}
-            </span>
-          )}
-        </div>
-
-        {/* Task title */}
-        <div style={{ padding: "0.25rem 1.5rem 1.25rem" }}>
-          <p
-            id="bd-lucky-title"
-            style={{
-              margin: 0,
-              fontSize: "clamp(1.35rem, 4vw, 1.9rem)",
-              fontWeight: 700,
-              lineHeight: 1.25,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {task.title}
-          </p>
-          {task.content && task.content !== task.title && (
-            <p style={{
-              margin: "0.65rem 0 0",
-              fontSize: "0.9375rem",
-              color: "var(--text-secondary)",
-              lineHeight: 1.55,
-            }}>
-              {task.content}
-            </p>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: "var(--border-subtle)", margin: "0 1.5rem" }} />
-
-        {/* Footer: dice label + Start button */}
-        <div style={{
-          padding: "1rem 1.5rem 1.5rem",
+          position: "fixed",
+          inset: 0,
+          zIndex: "var(--bd-z-modal)" as never,
+          background: "var(--bd-overlay-modal)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: "1rem",
-        }}>
-          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-            Ready to tackle this?<br />
-            <span style={{ color: "var(--text-secondary)", opacity: 0.65 }}>Press Start when you are.</span>
-          </span>
-
-          <button
-            type="button"
-            className="bd-btn"
-            onClick={startCountdown}
+          justifyContent: "center",
+          padding: "1rem",
+          animation: "_bd_lucky_backdrop_in 0.25s ease both",
+        }}
+        onClick={onClose}
+      >
+        <div
+          style={{
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--card-radius)",
+            maxWidth: "min(520px, 100%)",
+            width: "100%",
+            boxShadow: "var(--shadow-lg), 0 0 0 1px var(--border-subtle)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            animation: "_bd_lucky_modal_in 0.35s cubic-bezier(0.22,1,0.36,1) both",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header: gradient banner with dice icon */}
+          <div
             style={{
-              flexShrink: 0,
-              fontWeight: 700,
-              fontSize: "1rem",
-              padding: "0.75rem 2rem",
-              background: "var(--accent)",
-              color: "#000",
-              border: "none",
-              borderRadius: "var(--button-radius)",
-              letterSpacing: "0.02em",
+              background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 50%, #d64d22 100%)",
+              padding: "1.25rem 1.5rem 1rem",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "1rem",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            Start
-          </button>
+            {/* Subtle texture circles */}
+            <div style={{
+              position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", opacity: 0.12,
+            }}>
+              <div style={{ position: "absolute", top: "-30%", right: "-10%", width: 180, height: 180, borderRadius: "50%", background: "#fff" }} />
+              <div style={{ position: "absolute", bottom: "-40%", left: "5%", width: 120, height: 120, borderRadius: "50%", background: "#fff" }} />
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", position: "relative" }}>
+              {/* Dice icon */}
+              <div style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="8" cy="8" r="1.2" fill="#fff" stroke="none" />
+                  <circle cx="16" cy="8" r="1.2" fill="#fff" stroke="none" />
+                  <circle cx="8" cy="16" r="1.2" fill="#fff" stroke="none" />
+                  <circle cx="16" cy="16" r="1.2" fill="#fff" stroke="none" />
+                  <circle cx="12" cy="12" r="1.2" fill="#fff" stroke="none" />
+                </svg>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.75)" }}>
+                  Your lucky task
+                </p>
+                <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 600, color: "#fff" }}>
+                  Let&apos;s get it done!
+                </p>
+              </div>
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                position: "relative",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 32, height: 32, padding: 0, flexShrink: 0,
+                background: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                color: "#fff",
+                cursor: "pointer",
+                transition: "background 0.15s ease",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Meta badges */}
+          <div style={{ padding: "0.85rem 1.5rem 0.4rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center",
+              fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.06em",
+              textTransform: "uppercase", color: "var(--text-tertiary)",
+              background: "var(--bg-tertiary)", border: "1px solid var(--border-default)",
+              borderRadius: "6px", padding: "0.2rem 0.55rem",
+            }}>
+              {domainLabel}{categoryLabel ? ` · ${categoryLabel}` : ""}
+            </span>
+            {task.project?.name && (
+              <span style={{
+                display: "inline-flex", alignItems: "center",
+                fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.06em",
+                textTransform: "uppercase", color: "var(--text-tertiary)",
+                background: "var(--bg-tertiary)", border: "1px solid var(--border-default)",
+                borderRadius: "6px", padding: "0.2rem 0.55rem",
+              }}>
+                {task.project.name}
+              </span>
+            )}
+          </div>
+
+          {/* Task title */}
+          <div style={{ padding: "0.35rem 1.5rem 1.35rem" }}>
+            <p
+              id="bd-lucky-title"
+              style={{
+                margin: 0,
+                fontSize: "clamp(1.2rem, 4vw, 1.75rem)",
+                fontWeight: 700,
+                lineHeight: 1.25,
+                color: "var(--text-primary)",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {task.title}
+            </p>
+            {task.content && task.content !== task.title && (
+              <p style={{
+                margin: "0.6rem 0 0",
+                fontSize: "0.9375rem",
+                color: "var(--text-secondary)",
+                lineHeight: 1.55,
+              }}>
+                {task.content}
+              </p>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ height: 1, background: "var(--border-subtle)" }} />
+          <div style={{
+            padding: "0.875rem 1.5rem 1.25rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+          }}>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+              Ready to tackle this?
+            </span>
+
+            <button
+              type="button"
+              onClick={startCountdown}
+              style={{
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                fontWeight: 700,
+                fontSize: "0.9375rem",
+                padding: "0.625rem 1.5rem",
+                background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "999px",
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(232,93,45,0.35)",
+                transition: "filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
+                letterSpacing: "0.01em",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.filter = "brightness(1.08)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(232,93,45,0.5)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.filter = "";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(232,93,45,0.35)";
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.97)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "";
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Start
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

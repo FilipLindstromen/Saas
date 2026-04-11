@@ -45,6 +45,7 @@
   --bd-danger-bg: color-mix(in srgb, var(--bd-danger) 14%, transparent);
   --bd-danger-border: color-mix(in srgb, var(--bd-danger) 32%, transparent);
   --bd-danger-text: #ffb0b8;
+  --text-danger: var(--bd-danger-text);
   --bd-success: #4ade80;
   --bd-success-bg: color-mix(in srgb, var(--bd-success) 11%, transparent);
   --bd-success-border: color-mix(in srgb, var(--bd-success) 26%, transparent);
@@ -108,6 +109,7 @@
   --bd-danger-bg: color-mix(in srgb, var(--bd-danger) 10%, transparent);
   --bd-danger-border: color-mix(in srgb, var(--bd-danger) 28%, transparent);
   --bd-danger-text: #b91c1c;
+  --text-danger: var(--bd-danger-text);
   --bd-success: #16a34a;
   --bd-success-bg: color-mix(in srgb, var(--bd-success) 10%, transparent);
   --bd-success-border: color-mix(in srgb, var(--bd-success) 22%, transparent);
@@ -686,19 +688,22 @@ textarea {
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-  border-radius: 6px;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 6px;
+  background: var(--border-default);
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--bg-hover);
+  background: var(--border-strong);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
 }
 
 .bd-panel {
@@ -2871,18 +2876,22 @@ select.bd-input::-ms-expand {
   padding-bottom: var(--bd-space-3);
   padding-left: max(var(--bd-space-4), env(safe-area-inset-left));
   padding-right: max(var(--bd-space-4), env(safe-area-inset-right));
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--bg-primary) 85%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
   border-bottom: 1px solid var(--bd-chrome-edge);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
   animation: bd-topbar-enter var(--bd-duration-slow) var(--bd-ease-soft) both;
 }
 
 :root[data-theme="light"] .bd-topbar {
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 :root[data-theme="dark"] .bd-topbar {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 20px rgba(0, 0, 0, 0.18);
 }
 
 .bd-topbar-row {
@@ -2903,13 +2912,33 @@ select.bd-input::-ms-expand {
 }
 
 .bd-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-weight: 700;
   font-size: 1.125rem;
-  letter-spacing: 0.08em;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1;
   flex-shrink: 0;
+  user-select: none;
+}
+
+.bd-topbar-brand-text {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ff9e7a 0%, #e85d2d 60%, #c2410c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 480px) {
+  .bd-topbar-brand-text {
+    display: none;
+  }
 }
 
 /* Workspace dropdown: don’t stretch full width (bd-input is width:100% by default) */
@@ -3452,17 +3481,27 @@ select.bd-input::-ms-expand {
   border-radius: 20px;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-todo-list-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .bd-todo-row {
   display: flex;
   align-items: flex-start;
   gap: 1.125rem;
-  padding: 0.85rem 1rem;
+  padding: 0.875rem 1rem;
   min-height: 52px;
   box-sizing: border-box;
   border-bottom: 1px solid var(--border-subtle);
   cursor: default;
+  transition: background var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-todo-row:hover {
+  background: var(--bg-hover);
 }
 
 .bd-todo-row:last-child {

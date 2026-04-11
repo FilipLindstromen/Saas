@@ -195,8 +195,46 @@ export function TopBar({
     <header className="bd-topbar">
       <div className="bd-topbar-row">
         <div className="bd-topbar-pinned">
-          <span className="bd-topbar-brand" aria-hidden>
-            BD
+          <span className="bd-topbar-brand" aria-label="BrainDump">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
+              fill="none"
+              aria-hidden="true"
+              style={{ display: "block", flexShrink: 0 }}
+            >
+              {/* Outer glow ring */}
+              <circle cx="14" cy="14" r="13" fill="url(#bd-logo-bg)" opacity="0.15" />
+              {/* Brain outline */}
+              <path
+                d="M14 5.5C11.5 5.5 9.5 7 9 9c-1.2.3-2.5 1.4-2.5 3 0 1 .5 2 1.2 2.5C7.25 15.3 7 16.2 7 17c0 2.5 1.8 4 3.5 4 .6 0 1.2-.2 1.7-.5.5.3 1.1.5 1.8.5s1.3-.2 1.8-.5c.5.3 1.1.5 1.7.5 1.7 0 3.5-1.5 3.5-4 0-.8-.25-1.7-.7-2.5.7-.5 1.2-1.5 1.2-2.5 0-1.6-1.3-2.7-2.5-3-.5-2-2.5-3.5-5-3.5z"
+                fill="url(#bd-logo-fill)"
+                stroke="url(#bd-logo-stroke)"
+                strokeWidth="0.75"
+              />
+              {/* Neural highlight lines */}
+              <path d="M14 9v4m-2.5-2h5m-4 2.5 1.5 2.5 1.5-2.5" stroke="url(#bd-logo-lines)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+              <defs>
+                <linearGradient id="bd-logo-bg" x1="1" y1="1" x2="27" y2="27" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ff8f6b" />
+                  <stop offset="1" stopColor="#e85d2d" />
+                </linearGradient>
+                <linearGradient id="bd-logo-fill" x1="7" y1="5.5" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ff9e7a" />
+                  <stop offset="1" stopColor="#e85d2d" />
+                </linearGradient>
+                <linearGradient id="bd-logo-stroke" x1="7" y1="5.5" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#ffb89a" />
+                  <stop offset="1" stopColor="#c2410c" />
+                </linearGradient>
+                <linearGradient id="bd-logo-lines" x1="11.5" y1="9" x2="14" y2="16" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#fff5f0" />
+                  <stop offset="1" stopColor="#fff0ea" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span className="bd-topbar-brand-text">BrainDump</span>
           </span>
           {isMobile ? (
             <button
