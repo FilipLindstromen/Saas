@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/lib/i18n";
-import { loadFormState, saveFormState } from "@/lib/form-storage";
+import { loadFormState, saveFormState, saveDebugSnapshot } from "@/lib/form-storage";
 import { fetchWithTimeout, postJsonWithTimeout } from "@/lib/safe-fetch-json";
 import { UnclearOverlay } from "./UnclearOverlay";
 import { ItemsViewArea, type ItemsViewType } from "./ItemsViewArea";
@@ -709,6 +709,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
   const applyOrganizeResult = useCallback(
     async (items: OrganizedItemPreview[], text: string) => {
+      saveDebugSnapshot(text, items);
       emitSuggestedItemTypesFromOrganize(items);
       const n = items.length;
       if (onAutoSave) {

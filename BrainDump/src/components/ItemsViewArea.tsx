@@ -62,6 +62,7 @@ import {
   parseTaskRecurrence,
   type TaskRecurrencePattern,
 } from "@/lib/task-recurrence";
+import { LuckyTaskOverlay } from "./LuckyTaskOverlay";
 
 /** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
@@ -639,6 +640,8 @@ export function ItemsViewArea({
   }), []);
   const [lineToolActive, setLineToolActive] = useState(false);
   const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
+  const [luckyOpen, setLuckyOpen] = useState(false);
+  const [luckyTask, setLuckyTask] = useState<ViewItem | null>(null);
   const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
   const [aiSuggestError, setAiSuggestError] = useState<string | null>(null);
@@ -1678,6 +1681,16 @@ export function ItemsViewArea({
     return () => document.removeEventListener("pointerdown", onChromePointerDown, true);
   }, [editingEntry, flushEditingEntry]);
 
+  function handleLucky() {
+    const activeTasks = items.filter(
+      (it) => isTaskRow(it) && !isTaskCompleted(it),
+    );
+    if (activeTasks.length === 0) return;
+    const pick = activeTasks[Math.floor(Math.random() * activeTasks.length)];
+    setLuckyTask(pick);
+    setLuckyOpen(true);
+  }
+
   const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
@@ -1846,6 +1859,31 @@ export function ItemsViewArea({
             >
               {isMobile ? (
                 <>
+                  {viewType === "list" && items.some((it) => isTaskRow(it) && !isTaskCompleted(it)) && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      title="I'm Feeling Lucky"
+                      aria-label="I'm Feeling Lucky"
+                      style={{
+                        padding: "0.4rem",
+                        minWidth: 44,
+                        minHeight: 44,
+                        flexShrink: 0,
+                      }}
+                      onClick={handleLucky}
+                    >
+                      {/* Dice icon */}
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
+                        <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                        <circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none" />
+                        <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+                        <circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none" />
+                        <circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none" />
+                      </svg>
+                    </button>
+                  )}
                   {viewType === "postits" && (
                     <button
                       type="button"
@@ -1871,6 +1909,36 @@ export function ItemsViewArea({
                 </>
               ) : (
                 <>
+                  {viewType === "list" && items.some((it) => isTaskRow(it) && !isTaskCompleted(it)) && (
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      title="I'm Feeling Lucky"
+                      aria-label="I'm Feeling Lucky"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        padding: "0.3rem 0.75rem",
+                        flexShrink: 0,
+                        fontSize: "0.8125rem",
+                        fontWeight: 600,
+                        marginRight: "0.35rem",
+                      }}
+                      onClick={handleLucky}
+                    >
+                      {/* Dice icon */}
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
+                        <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
+                        <circle cx="16" cy="8" r="1.3" fill="currentColor" stroke="none" />
+                        <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+                        <circle cx="8" cy="16" r="1.3" fill="currentColor" stroke="none" />
+                        <circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none" />
+                      </svg>
+                      I&#39;m Feeling Lucky
+                    </button>
+                  )}
                   {viewButtons.map(({ value, label, icon }, i) => {
                     const vc = viewChipProps(i);
                     return (
@@ -6343,5 +6411,11 @@ function PostitsView({
         })}
       </div>
     </div>
+
+    <LuckyTaskOverlay
+      isOpen={luckyOpen}
+      task={luckyTask}
+      onClose={() => setLuckyOpen(false)}
+    />
   );
 }

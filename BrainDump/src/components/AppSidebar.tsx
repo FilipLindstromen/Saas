@@ -73,6 +73,7 @@ type AppSidebarProps = {
   onCapturePhoto?: () => void;
   onCaptureText?: () => void;
   onOpenCoach?: () => void;
+  onOpenDebug?: () => void;
 };
 
 function useIsMobile() {
@@ -99,6 +100,7 @@ export function AppSidebar({
   onCapturePhoto,
   onCaptureText,
   onOpenCoach,
+  onOpenDebug,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { data: session } = useSession();
@@ -460,6 +462,28 @@ export function AppSidebar({
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("settings.deleteEntriesOpen")}</span> : null}
         </button>
+
+        {onOpenDebug ? (
+          <button
+            type="button"
+            className="bd-app-sidebar-nav-btn"
+            data-collapsed={!showLabels ? "true" : "false"}
+            onClick={() => {
+              onOpenDebug();
+              if (isMobile) closeMobileDrawerAnimated();
+            }}
+            title="Debug — last organize"
+            aria-label="Debug — last organize"
+          >
+            <span className="bd-app-sidebar-nav-icon">
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 22c1.1 0 2-.9 2-2H10c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                <circle cx="18" cy="8" r="4" fill="var(--accent)" stroke="none" />
+              </svg>
+            </span>
+            {showLabels ? <span className="bd-app-sidebar-nav-label">Debug</span> : null}
+          </button>
+        ) : null}
 
         <button
           type="button"

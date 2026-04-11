@@ -51,3 +51,35 @@ export function clearFormState(): void {
     localStorage.removeItem(STORAGE_KEY);
   } catch {}
 }
+
+// ── Debug: last organize snapshot ────────────────────────────────────────────
+
+const DEBUG_KEY = "braindump-debug-last-organize";
+
+export interface DebugOrganizeSnapshot {
+  rawTranscript: string;
+  organizedItems: unknown[];
+  organizedAt: string;
+}
+
+export function saveDebugSnapshot(raw: string, items: unknown[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const snapshot: DebugOrganizeSnapshot = {
+      rawTranscript: raw,
+      organizedItems: items,
+      organizedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(DEBUG_KEY, JSON.stringify(snapshot));
+  } catch {}
+}
+
+export function loadDebugSnapshot(): DebugOrganizeSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DEBUG_KEY);
+    return raw ? (JSON.parse(raw) as DebugOrganizeSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
