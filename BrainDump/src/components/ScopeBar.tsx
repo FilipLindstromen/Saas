@@ -358,6 +358,195 @@ function DueDateQuickPresets({
   );
 }
 
+// ── Desktop scope dropdown (replaces horizontal chip row on desktop) ─────────
+function ScopeDropdown({
+  ariaLabel,
+  selectedLabel,
+  isSelected,
+  portalMount,
+  children,
+}: {
+  ariaLabel: string;
+  selectedLabel: string;
+  isSelected: boolean;
+  portalMount: HTMLElement | null;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const openDropdown = () => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    // Clamp so the dropdown never clips the right edge of the viewport
+    const left = Math.min(r.left, window.innerWidth - 224);
+    setDropdownPos({ top: r.bottom + 4, left });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (dropdownRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onScroll = () => setOpen(false);
+    document.addEventListener("click", onDoc, true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("click", onDoc, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  const dropdown =
+    open && dropdownPos && portalMount
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            role="listbox"
+            aria-label={ariaLabel}
+            style={{
+              position: "fixed",
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              minWidth: "12rem",
+              maxWidth: "20rem",
+              maxHeight: "min(360px, 60vh)",
+              overflowY: "auto",
+              zIndex: 5000,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-default)",
+              borderRadius: "16px",
+              boxShadow: "var(--shadow-lg)",
+              padding: "0.3rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1px",
+              animation: "bd-desktop-sheet-in 0.18s var(--bd-ease-soft) both",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children(() => setOpen(false))}
+          </div>,
+          portalMount
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        className="bd-btn"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={(e) => {
+          e.stopPropagation();
+          open ? setOpen(false) : openDropdown();
+        }}
+        style={{
+          padding: "0.4rem 0.65rem 0.4rem 0.75rem",
+          fontSize: "0.8125rem",
+          borderRadius: "var(--button-radius)",
+          gap: "0.25rem",
+          display: "inline-flex",
+          alignItems: "center",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          background: isSelected ? "var(--bd-chrome-selected-bg)" : "var(--bd-chrome-muted-bg)",
+          borderColor: isSelected ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
+          color: isSelected ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "12rem" }}>
+          {selectedLabel}
+        </span>
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+          style={{ flexShrink: 0, opacity: 0.7, transform: open ? "rotate(180deg)" : undefined, transition: "transform 0.18s ease" }}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {dropdown}
+    </>
+  );
+}
+
+function ScopeDropdownOption({
+  label,
+  selected,
+  onClick,
+  onContextMenu,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onContextMenu={onContextMenu}
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "0.5rem",
+        width: "100%",
+        padding: "0.5rem 0.65rem",
+        borderRadius: "10px",
+        border: "none",
+        background: selected ? "var(--bd-chrome-selected-bg)" : "transparent",
+        color: selected ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+        fontWeight: selected ? 600 : 400,
+        fontSize: "0.8125rem",
+        textAlign: "left",
+        cursor: "pointer",
+        transition: "background 0.12s ease",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) (e.currentTarget as HTMLElement).style.background = "transparent";
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+        {label}
+      </span>
+      {selected ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <span style={{ width: 14, flexShrink: 0 }} aria-hidden />
+      )}
+    </button>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function ScopeFilterSearchBlock({
   isMobile,
   searchFilter,
@@ -858,52 +1047,71 @@ export function ScopeBar({
             ) : (
               <>
                 <span className="bd-scope-label">{t("scope.project")}</span>
-                <div
-                  className="bd-scope-area-chips-scroll"
-                  style={{
-                    display: "flex",
-                    gap: "0.35rem",
-                    flexWrap: "nowrap",
-                    alignItems: "center",
-                    flex: 1,
-                    minWidth: 0,
-                    overflowX: "auto",
-                    overflowY: "visible",
-                    WebkitOverflowScrolling: "touch",
-                    position: "relative",
-                    zIndex: 2,
-                    paddingBottom: 2,
-                  }}
-                >
-                  <ScopeChip
-                    label={t("scope.all")}
-                    selected={!selectedProjectId}
-                    onClick={() => onProjectSelect(null)}
-                  />
-                  {visibleProjects.map((p) => (
-                    <ScopeChip
-                      key={p.id}
-                      label={p.name}
-                      selected={selectedProjectId === p.id}
-                      onClick={() => onProjectSelect(p.id)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({ x: e.clientX, y: e.clientY, project: p });
-                      }}
-                    />
-                  ))}
-                  {showAddProject ? addProjectInline : (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      onClick={() => setShowAddProject(true)}
-                      title={t("scope.addProject")}
-                      style={{ padding: "0.4rem 0.5rem", minWidth: 32, flexShrink: 0 }}
-                    >
-                      +
-                    </button>
-                  )}
-                </div>
+                {showAddProject ? (
+                  addProjectInline
+                ) : (
+                  <ScopeDropdown
+                    ariaLabel={t("scope.chooseProject")}
+                    selectedLabel={selectedProjectLabel}
+                    isSelected={!!selectedProjectId}
+                    portalMount={scopeSheetMount}
+                  >
+                    {(close) => (
+                      <>
+                        <ScopeDropdownOption
+                          label={t("scope.all")}
+                          selected={!selectedProjectId}
+                          onClick={() => { onProjectSelect(null); close(); }}
+                        />
+                        {visibleProjects.map((p) => (
+                          <ScopeDropdownOption
+                            key={p.id}
+                            label={p.name}
+                            selected={selectedProjectId === p.id}
+                            onClick={() => { onProjectSelect(p.id); close(); }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setContextMenu({ x: e.clientX, y: e.clientY, project: p });
+                              close();
+                            }}
+                          />
+                        ))}
+                        <div style={{ height: 1, background: "var(--border-subtle)", margin: "0.2rem 0.4rem" }} />
+                        <button
+                          type="button"
+                          onClick={() => { close(); setShowAddProject(true); }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                            width: "100%",
+                            padding: "0.5rem 0.65rem",
+                            borderRadius: "10px",
+                            border: "none",
+                            background: "transparent",
+                            color: "var(--text-tertiary)",
+                            fontSize: "0.8125rem",
+                            cursor: "pointer",
+                            transition: "background 0.12s ease, color 0.12s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)";
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                          {t("scope.addProject")}
+                        </button>
+                      </>
+                    )}
+                  </ScopeDropdown>
+                )}
               </>
             )}
           </div>
@@ -1512,101 +1720,107 @@ export function ScopeBar({
                 <span className="bd-scope-label">
                   {t("scope.area")}
                 </span>
-                <div
-                  className="bd-scope-area-chips-scroll"
-                  style={{
-                    display: "flex",
-                    gap: "0.35rem",
-                    flexWrap: "nowrap",
-                    alignItems: "center",
-                    flex: 1,
-                    minWidth: 0,
-                    overflowX: "auto",
-                    overflowY: "visible",
-                    WebkitOverflowScrolling: "touch",
-                    position: "relative",
-                    zIndex: 2,
-                    paddingBottom: 2,
-                  }}
-                >
-                  <ScopeChip
-                    label={t("scope.all")}
-                    selected={!selectedCategory}
-                    onClick={() => onCategorySelect(null)}
-                  />
-                  {allAreas.map((value) => (
-                    <ScopeChip
-                      key={value}
-                      label={formatCategoryLabel(value)}
-                      selected={selectedCategory === value}
-                      onClick={() => onCategorySelect(value)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setAreaContextMenu({
-                          value,
-                          x: e.clientX,
-                          y: e.clientY,
-                          isCustom: storedCustomAreas.includes(value),
-                        });
-                      }}
-                      onMore={
-                        isMobile && storedCustomAreas.includes(value)
-                          ? () =>
-                              setAreaContextMenu({
-                                value,
-                                x: window.innerWidth / 2,
-                                y: window.innerHeight,
-                                isCustom: true,
-                              })
-                          : undefined
-                      }
-                    />
-                  ))}
-                  {showAddArea ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                      <input
-                        className="bd-input"
-                        value={addAreaValue}
-                        onChange={(e) => setAddAreaValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const v = addAreaValue.trim().toLowerCase().replace(/\s+/g, "_");
-                            if (v) {
-                              const current = loadCustomAreas();
-                              if (!current.includes(v)) {
-                                const next = [...current, v];
-                                saveCustomAreas(next);
-                                setCustomAreasState(next);
-                                onCategorySelect(v);
-                              }
-                              setAddAreaValue("");
-                              setShowAddArea(false);
+                {showAddArea ? (
+                  <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                    <input
+                      className="bd-input"
+                      value={addAreaValue}
+                      onChange={(e) => setAddAreaValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const v = addAreaValue.trim().toLowerCase().replace(/\s+/g, "_");
+                          if (v) {
+                            const current = loadCustomAreas();
+                            if (!current.includes(v)) {
+                              const next = [...current, v];
+                              saveCustomAreas(next);
+                              setCustomAreasState(next);
+                              onCategorySelect(v);
                             }
-                          } else if (e.key === "Escape") {
                             setAddAreaValue("");
                             setShowAddArea(false);
                           }
-                        }}
-                        placeholder={t("scope.newArea")}
-                        autoFocus
-                        style={{ width: 100, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
-                      />
-                      <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.3rem 0.5rem" }}>
-                        {t("scope.cancel")}
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      onClick={() => setShowAddArea(true)}
-                      title={t("scope.addArea")}
-                      style={{ padding: "0.4rem 0.5rem", minWidth: 32 }}
-                    >
-                      +
+                        } else if (e.key === "Escape") {
+                          setAddAreaValue("");
+                          setShowAddArea(false);
+                        }
+                      }}
+                      placeholder={t("scope.newArea")}
+                      autoFocus
+                      style={{ width: 100, padding: "0.3rem 0.5rem", fontSize: "0.8125rem" }}
+                    />
+                    <button type="button" className="bd-btn" onClick={() => { setAddAreaValue(""); setShowAddArea(false); }} style={{ padding: "0.3rem 0.5rem" }}>
+                      {t("scope.cancel")}
                     </button>
-                  )}
-                </div>
+                  </span>
+                ) : (
+                  <ScopeDropdown
+                    ariaLabel={t("scope.chooseArea")}
+                    selectedLabel={selectedCategory ? formatCategoryLabel(selectedCategory) : t("scope.all")}
+                    isSelected={!!selectedCategory}
+                    portalMount={scopeSheetMount}
+                  >
+                    {(close) => (
+                      <>
+                        <ScopeDropdownOption
+                          label={t("scope.all")}
+                          selected={!selectedCategory}
+                          onClick={() => { onCategorySelect(null); close(); }}
+                        />
+                        {allAreas.map((value) => (
+                          <ScopeDropdownOption
+                            key={value}
+                            label={formatCategoryLabel(value)}
+                            selected={selectedCategory === value}
+                            onClick={() => { onCategorySelect(value); close(); }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setAreaContextMenu({
+                                value,
+                                x: e.clientX,
+                                y: e.clientY,
+                                isCustom: storedCustomAreas.includes(value),
+                              });
+                              close();
+                            }}
+                          />
+                        ))}
+                        <div style={{ height: 1, background: "var(--border-subtle)", margin: "0.2rem 0.4rem" }} />
+                        <button
+                          type="button"
+                          onClick={() => { close(); setShowAddArea(true); }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                            width: "100%",
+                            padding: "0.5rem 0.65rem",
+                            borderRadius: "10px",
+                            border: "none",
+                            background: "transparent",
+                            color: "var(--text-tertiary)",
+                            fontSize: "0.8125rem",
+                            cursor: "pointer",
+                            transition: "background 0.12s ease, color 0.12s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)";
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                          {t("scope.addArea")}
+                        </button>
+                      </>
+                    )}
+                  </ScopeDropdown>
+                )}
               </>
             )}
           </div>

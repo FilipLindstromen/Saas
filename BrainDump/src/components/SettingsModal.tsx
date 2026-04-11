@@ -46,30 +46,6 @@ function saveGoogleCalendarSync(enabled: boolean): void {
   }
 }
 
-function loadGoogleClientId(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    if (!raw) return "";
-    const parsed = JSON.parse(raw);
-    return (parsed.googleClientId ?? "").trim();
-  } catch {
-    return "";
-  }
-}
-
-function saveGoogleClientId(clientId: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem("saasApiKeys");
-    const current = raw ? JSON.parse(raw) : {};
-    const next = { ...current, googleClientId: clientId.trim() };
-    localStorage.setItem("saasApiKeys", JSON.stringify(next));
-    scheduleClientPreferencesUpload();
-  } catch (e) {
-    console.warn("Failed to save Google Client ID", e);
-  }
-}
 
 export function loadGoogleCalendarId(): string | null {
   if (typeof window === "undefined") return null;
@@ -113,10 +89,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { t, locale, setLocale } = useI18n();
   const [textSize, setTextSize] = useState("medium");
   const [googleCalendarSync, setGoogleCalendarSync] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState("");
+  const [serverClientId, setServerClientId] = useState<string | null>(null);
+  const [connectBusy, setConnectBusy] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [selectedCalendarSummary, setSelectedCalendarSummary] = useState("");
-  const [showClientIdOverlay, setShowClientIdOverlay] = useState(false);
   const [calendarList, setCalendarList] = useState<CalendarOption[]>([]);
   const [calendarListLoading, setCalendarListLoading] = useState(false);
   const [calendarListError, setCalendarListError] = useState<string | null>(null);
@@ -141,7 +117,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setShowDumpFace(loadShowDumpFace());
       setSoundEffects(loadSoundEffectsEnabled());
       setGoogleCalendarSync(loadGoogleCalendarSync());
-      setGoogleClientId(loadGoogleClientId());
       setSelectedCalendarId(loadGoogleCalendarId());
       setSelectedCalendarSummary(loadGoogleCalendarSummary());
       setCalendarList([]);
@@ -226,22 +201,29 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }, [t]);
 
-  const persistGoogleClientId = useCallback(() => {
-    saveGoogleClientId(googleClientId);
-  }, [googleClientId]);
-
-  const closeClientIdOverlay = useCallback(() => {
-    persistGoogleClientId();
-    setShowClientIdOverlay(false);
-  }, [persistGoogleClientId]);
-
-  const openGoogleOAuth = useCallback(() => {
-    const clientId = (googleClientId || loadGoogleClientId()).trim();
+  const openGoogleOAuth = useCallback(async () => {
+    setCalendarListError(null);
+    let clientId = serverClientId;
     if (!clientId) {
-      setShowClientIdOverlay(true);
+      setConnectBusy(true);
+      try {
+        const res = await fetch("/api/google-calendar-oauth-config");
+        const data = (await res.json()) as { configured: boolean; clientId: string | null };
+        if (data.configured && data.clientId) {
+          clientId = data.clientId;
+          setServerClientId(clientId);
+        }
+      } catch {
+        // ignore network error
+      } finally {
+        setConnectBusy(false);
+      }
+    }
+    if (!clientId) {
+      setCalendarListError("Google Calendar is not configured on this server.");
       return;
     }
-    const redirectUri = `${typeof window !== "undefined" ? window.location.origin : ""}/google-calendar-callback`;
+    const redirectUri = `${window.location.origin}/google-calendar-callback`;
     const state = "braindump-calendar-" + Date.now();
     sessionStorage.setItem("braindump_google_oauth_state", state);
     const params = new URLSearchParams({
@@ -252,15 +234,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       state,
     });
     const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-    const w = window.open(url, "braindump-google-oauth", "width=520,height=600,scrollbars=yes");
-    if (w) {
-      const checkClosed = setInterval(() => {
-        if (w.closed) {
-          clearInterval(checkClosed);
-        }
-      }, 300);
-    }
-  }, [googleClientId]);
+    window.open(url, "braindump-google-oauth", "width=520,height=600,scrollbars=yes");
+  }, [serverClientId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -270,6 +245,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           e.data.accessToken as string,
           typeof e.data.expiresIn === "number" ? e.data.expiresIn : undefined
         );
+        setGoogleCalendarSync(true);
+        saveGoogleCalendarSync(true);
         setCalendarListLoading(true);
         setCalendarListError(null);
         fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
@@ -408,58 +385,61 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             {t("settings.soundEffectsHelp")}
           </p>
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)" }}>
-              <input
-                type="checkbox"
-                checked={googleCalendarSync}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  setGoogleCalendarSync(on);
-                  saveGoogleCalendarSync(on);
-                  if (!on) clearGoogleCalendarAccessToken();
-                  if (on && !loadGoogleClientId()) setShowClientIdOverlay(true);
+            {/* Header row: label + connect button */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.35 }}>
+                  {t("settings.googleCalendarSync")}
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0.2rem 0 0", lineHeight: 1.45 }}>
+                  {t("settings.googleCalendarHelp")}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="bd-btn"
+                onClick={() => void openGoogleOAuth()}
+                disabled={connectBusy || calendarListLoading}
+                style={{
+                  flexShrink: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  padding: "0.45rem 0.85rem",
+                  whiteSpace: "nowrap",
                 }}
-                style={{ width: 18, height: 18, accentColor: "var(--accent)" }}
-              />
-              {t("settings.googleCalendarSync")}
-            </label>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0.25rem 0 0 1.75rem", lineHeight: 1.45 }}>
-              {t("settings.googleCalendarHelp")}
-            </p>
+              >
+                {/* Google "G" logo */}
+                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden fill="none">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z" fill="#EA4335" />
+                </svg>
+                {connectBusy || calendarListLoading
+                  ? "Connecting…"
+                  : googleCalendarSync
+                  ? "Reconnect"
+                  : "Connect"}
+              </button>
+            </div>
+
+            {/* Connected state */}
             {googleCalendarSync && (
-              <div style={{ marginTop: "0.75rem", marginLeft: "1.75rem" }}>
-                {!googleClientId.trim() ? (
-                  <div style={{ padding: "0.75rem", background: "var(--bg-tertiary)", borderRadius: 8, marginBottom: "0.5rem" }}>
-                    <label htmlFor="bd-google-client-inline" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
-                      Google Client ID
-                    </label>
-                    <input
-                      id="bd-google-client-inline"
-                      type="text"
-                      className="bd-input"
-                      value={googleClientId}
-                      onChange={(e) => setGoogleClientId(e.target.value)}
-                      onBlur={persistGoogleClientId}
-                      placeholder="xxxxx.apps.googleusercontent.com"
-                      style={{ width: "100%", marginBottom: "0.5rem" }}
-                      autoComplete="off"
-                    />
-                  </div>
-                ) : null}
-                <button type="button" className="bd-btn" onClick={openGoogleOAuth} disabled={!googleClientId.trim()} style={{ marginBottom: "0.5rem" }}>
-                  {calendarListLoading ? "Loading…" : calendarList.length ? "Reconnect & change calendar" : "Connect and choose calendar"}
-                </button>
+              <div style={{ marginTop: "0.75rem" }}>
                 {calendarListError && (
-                  <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginTop: "0.25rem" }}>{calendarListError}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--bd-danger)", margin: "0 0 0.35rem" }}>{calendarListError}</p>
                 )}
                 {selectedCalendarId && selectedCalendarSummary && calendarList.length === 0 && (
-                  <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.35rem", marginBottom: 0, fontWeight: 500 }}>
+                  <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 0.35rem", fontWeight: 500 }}>
                     {selectedCalendarSummary}
                   </p>
                 )}
                 {calendarList.length > 0 && (
                   <>
-                    <label htmlFor="bd-google-calendar" style={{ display: "block", fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-secondary)", marginTop: "0.5rem", marginBottom: "0.25rem" }}>
+                    <label htmlFor="bd-google-calendar" style={{ display: "block", fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
                       Calendar to sync with
                     </label>
                     <select
@@ -474,7 +454,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         setSelectedCalendarSummary(summary);
                         if (id && summary) saveGoogleCalendarSelection(id, summary);
                       }}
-                      style={{ width: "100%" }}
+                      style={{ width: "100%", marginBottom: "0.5rem" }}
                     >
                       {calendarList.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -485,18 +465,35 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </>
                 )}
                 {(selectedCalendarId || calendarList.length > 0) && (
-                  <div style={{ marginTop: "0.65rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                     <button
                       type="button"
                       className="bd-btn bd-btn-primary"
-                      disabled={calendarImportBusy || !googleClientId.trim()}
+                      disabled={calendarImportBusy}
                       onClick={() => void runGoogleImportIntoBrainDump()}
                     >
                       {calendarImportBusy ? t("settings.googleCalendarImporting") : t("settings.googleCalendarImportButton")}
                     </button>
+                    <button
+                      type="button"
+                      className="bd-btn"
+                      onClick={() => {
+                        clearGoogleCalendarAccessToken();
+                        setGoogleCalendarSync(false);
+                        saveGoogleCalendarSync(false);
+                        setCalendarList([]);
+                        setSelectedCalendarId(null);
+                        setSelectedCalendarSummary("");
+                      }}
+                    >
+                      Disconnect
+                    </button>
                   </div>
                 )}
               </div>
+            )}
+            {calendarListError && !googleCalendarSync && (
+              <p style={{ fontSize: "0.75rem", color: "var(--bd-danger)", margin: "0.35rem 0 0" }}>{calendarListError}</p>
             )}
           </div>
           <div
@@ -704,59 +701,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {t("settings.privacyHelp")}
             </p>
           </div>
-          {showClientIdOverlay && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 1001,
-                padding: "1rem",
-              }}
-              onClick={closeClientIdOverlay}
-            >
-              <div
-                style={{
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-default)",
-                  borderRadius: "var(--card-radius)",
-                  maxWidth: "400px",
-                  width: "100%",
-                  padding: "1.25rem",
-                  boxShadow: "var(--shadow-xl)",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
-                  Google Client ID
-                </h3>
-                <label htmlFor="bd-google-client-id" style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
-                  Client ID
-                </label>
-                <input
-                  id="bd-google-client-id"
-                  type="text"
-                  className="bd-input"
-                  value={googleClientId}
-                  onChange={(e) => setGoogleClientId(e.target.value)}
-                  onBlur={persistGoogleClientId}
-                  placeholder="xxxxx.apps.googleusercontent.com"
-                  style={{ width: "100%", marginBottom: "1rem" }}
-                  autoComplete="off"
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button type="button" className="bd-btn bd-btn-primary" onClick={closeClientIdOverlay}>
-                    {t("settings.done")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         </div>
       </div>
