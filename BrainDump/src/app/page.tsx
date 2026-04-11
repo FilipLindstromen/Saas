@@ -73,6 +73,7 @@ export default function BrainDumpPage() {
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
   const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
   const [desktopScopeBeforeFilter, setDesktopScopeBeforeFilter] = useState<ReactNode>(null);
+  const [topBarEnd, setTopBarEnd] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
   const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
@@ -575,6 +576,7 @@ export default function BrainDumpPage() {
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
           beforeMenuSlot={mobileTopBarBeforeMenu}
+          endSlot={topBarEnd}
           scopeSlot={isMobileLayout || todayViewActive ? null : scopeBarSlot}
         />
 
@@ -628,6 +630,7 @@ export default function BrainDumpPage() {
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
               onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
               onDesktopScopeBeforeFilterSlot={setDesktopScopeBeforeFilter}
+              onTopBarEndSlot={setTopBarEnd}
               onDumpRecordingChange={setDumpRecordingActive}
               onDumpEmptyHintChange={setDumpEmptyHintActive}
               dumpHintSuppressed={todayViewActive}

@@ -107,6 +107,8 @@ interface CenterPanelProps {
   onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
   /** Desktop: items view registers controls left of the scope filter field (see ScopeBar.beforeFilterSlot). */
   onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
+  /** Top bar end slot: lucky button (both mobile and desktop). */
+  onTopBarEndSlot?: (slot: ReactNode | null) => void;
   /** After organizing creates new work projects — refetch project list for ScopeBar / prompts. */
   onWorkProjectsChanged?: () => void;
   /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
@@ -155,6 +157,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     scopeSlot = null,
     onMobileTopBarBeforeMenuSlot,
     onDesktopScopeBeforeFilterSlot,
+    onTopBarEndSlot,
     onWorkProjectsChanged,
     onDumpRecordingChange,
     onItemMovedToTrash,
@@ -1407,6 +1410,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           scopeSlot={scopeSlot}
           onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
           onDesktopScopeBeforeFilterSlot={onDesktopScopeBeforeFilterSlot}
+          onTopBarEndSlot={onTopBarEndSlot}
           onItemMovedToTrash={onItemMovedToTrash}
           onDumpEmptyListTextHintChange={setDumpEmptyListHint}
           dumpEmptyHintSuppressed={dumpHintSuppressed}

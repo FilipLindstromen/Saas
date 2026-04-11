@@ -255,7 +255,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
               fontSize: "1rem",
               padding: "0.75rem 2rem",
               background: "var(--accent)",
-              color: "#fff",
+              color: "#000",
               border: "none",
               borderRadius: "var(--button-radius)",
               letterSpacing: "0.02em",

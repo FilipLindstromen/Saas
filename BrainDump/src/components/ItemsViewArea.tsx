@@ -138,6 +138,8 @@ interface ItemsViewAreaProps {
   onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
   /** Desktop: register content immediately left of the scope search filter (e.g. AI next-actions). */
   onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
+  /** Top bar end slot: orange lucky button (both mobile and desktop). */
+  onTopBarEndSlot?: (slot: ReactNode | null) => void;
   /** After a successful soft-delete (trash); parent may show undo. */
   onItemMovedToTrash?: (id: string, title: string) => void;
   /** List or text view has no items (workspace empty); parent may show dump FAB hint. */
@@ -531,6 +533,7 @@ export function ItemsViewArea({
   scopeSlot,
   onMobileTopBarBeforeMenuSlot,
   onDesktopScopeBeforeFilterSlot,
+  onTopBarEndSlot,
   onItemMovedToTrash,
   onDumpEmptyListTextHintChange,
   dumpEmptyHintSuppressed = false,
@@ -789,6 +792,50 @@ export function ItemsViewArea({
     runAiSuggest,
     t,
   ]);
+
+  useEffect(() => {
+    if (!onTopBarEndSlot) return;
+    const hasActiveTasks = items.some((it) => isTaskRow(it) && !isTaskCompleted(it));
+    if (!hasActiveTasks) {
+      onTopBarEndSlot(null);
+      return;
+    }
+    onTopBarEndSlot(
+      <button
+        key="bd-topbar-lucky"
+        type="button"
+        className="bd-btn"
+        title="I'm Feeling Lucky"
+        aria-label="I'm Feeling Lucky"
+        style={{
+          width: 44,
+          height: 44,
+          minWidth: 44,
+          minHeight: 44,
+          padding: 0,
+          flexShrink: 0,
+          borderRadius: "50%",
+          background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)",
+          border: "none",
+          color: "#fff",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onClick={handleLucky}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
+          <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="16" cy="8" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="8" cy="16" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none" />
+        </svg>
+      </button>,
+    );
+    return () => onTopBarEndSlot(null);
+  }, [onTopBarEndSlot, items, handleLucky]);
 
   useEffect(() => {
     if (!isMobile) setTypePickerOpen(false);
@@ -1859,31 +1906,6 @@ export function ItemsViewArea({
             >
               {isMobile ? (
                 <>
-                  {viewType === "list" && items.some((it) => isTaskRow(it) && !isTaskCompleted(it)) && (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      title="I'm Feeling Lucky"
-                      aria-label="I'm Feeling Lucky"
-                      style={{
-                        padding: "0.4rem",
-                        minWidth: 44,
-                        minHeight: 44,
-                        flexShrink: 0,
-                      }}
-                      onClick={handleLucky}
-                    >
-                      {/* Dice icon */}
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
-                        <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" />
-                        <circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none" />
-                        <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
-                        <circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none" />
-                        <circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none" />
-                      </svg>
-                    </button>
-                  )}
                   {viewType === "postits" && (
                     <button
                       type="button"
@@ -1909,36 +1931,6 @@ export function ItemsViewArea({
                 </>
               ) : (
                 <>
-                  {viewType === "list" && items.some((it) => isTaskRow(it) && !isTaskCompleted(it)) && (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      title="I'm Feeling Lucky"
-                      aria-label="I'm Feeling Lucky"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                        padding: "0.3rem 0.75rem",
-                        flexShrink: 0,
-                        fontSize: "0.8125rem",
-                        fontWeight: 600,
-                        marginRight: "0.35rem",
-                      }}
-                      onClick={handleLucky}
-                    >
-                      {/* Dice icon */}
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
-                        <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
-                        <circle cx="16" cy="8" r="1.3" fill="currentColor" stroke="none" />
-                        <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-                        <circle cx="8" cy="16" r="1.3" fill="currentColor" stroke="none" />
-                        <circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none" />
-                      </svg>
-                      I&#39;m Feeling Lucky
-                    </button>
-                  )}
                   {viewButtons.map(({ value, label, icon }, i) => {
                     const vc = viewChipProps(i);
                     return (

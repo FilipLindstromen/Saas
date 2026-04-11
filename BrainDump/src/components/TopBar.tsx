@@ -16,6 +16,8 @@ interface TopBarProps {
   onOpenMobileNav?: () => void;
   /** Placed just left of the hamburger on small screens (e.g. AI next-actions). */
   beforeMenuSlot?: ReactNode;
+  /** Placed on the right end of the top bar (both mobile and desktop). */
+  endSlot?: ReactNode;
   /** Project / area scope controls (ScopeBar); omit in inbox mode. Desktop only — mobile uses the items strip. */
   scopeSlot?: ReactNode;
 }
@@ -71,6 +73,7 @@ export function TopBar({
   showUncategorizedWorkspace = true,
   onOpenMobileNav,
   beforeMenuSlot = null,
+  endSlot = null,
   scopeSlot = null,
 }: TopBarProps) {
   const { t } = useI18n();
@@ -244,6 +247,7 @@ export function TopBar({
         )}
         {onOpenMobileNav && isMobile ? (
           <div className="bd-topbar-end">
+            {endSlot}
             {beforeMenuSlot}
             <button
               type="button"
@@ -258,6 +262,11 @@ export function TopBar({
                 <line x1="4" y1="18" x2="20" y2="18" />
               </svg>
             </button>
+          </div>
+        ) : null}
+        {!isMobile && endSlot ? (
+          <div className="bd-topbar-end" style={{ display: "flex", alignItems: "center" }}>
+            {endSlot}
           </div>
         ) : null}
       </div>

@@ -484,18 +484,12 @@ function ScopeFilterSearchBlock({
           </div>
           {onDueDateFilterChange ? (
             <>
-              <DueDateQuickPresets
-                value={dueDateFilter}
-                onChange={onDueDateFilterChange}
-                isMobile={isMobile}
-                t={t}
-              />
               <DueDateFilterMenuButton
                 value={dueDateFilter}
                 onChange={onDueDateFilterChange}
                 isMobile={isMobile}
                 t={t}
-                menuMode="overflow"
+                menuMode="full"
               />
             </>
           ) : null}
