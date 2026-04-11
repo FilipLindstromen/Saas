@@ -5330,6 +5330,27 @@ function ListView({
     );
   };
 
+  const TYPE_GROUP_ORDER = [
+    "calendar", "task", "shopping", "reflection", "emotion", "idea", "note", "task_completed",
+  ];
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ViewItem[]>();
+    for (const it of listItemsOrdered) {
+      const key = it.itemType || "note";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+    return [...map.entries()].sort(([a], [b]) => {
+      const ai = TYPE_GROUP_ORDER.indexOf(a);
+      const bi = TYPE_GROUP_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listItemsOrdered]);
+
+  const showGroupHeaders = grouped.length > 1;
+
   return (
     <div
       className="bd-list-view bd-list-view--stacked"
@@ -5345,7 +5366,39 @@ function ListView({
         boxSizing: "border-box",
       }}
     >
-      <div className="bd-todo-list-card">{listItemsOrdered.map((it, idx) => renderEntry(it, idx))}</div>
+      <div className="bd-todo-list-card">
+        {(() => {
+          let globalIdx = 0;
+          return grouped.map(([type, groupItems]) => {
+            const groupStart = globalIdx;
+            globalIdx += groupItems.length;
+            return (
+              <div key={type}>
+                {showGroupHeaders && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      padding: "0.65rem 0.75rem 0.3rem",
+                      color: "var(--text-tertiary)",
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.07em",
+                      textTransform: "uppercase",
+                      userSelect: "none",
+                    }}
+                  >
+                    <EntryTypeIcon type={type} size={13} />
+                    {formatTypeLabel(type, t)}
+                  </div>
+                )}
+                {groupItems.map((it, localIdx) => renderEntry(it, groupStart + localIdx))}
+              </div>
+            );
+          });
+        })()}
+      </div>
     </div>
   );
 }
