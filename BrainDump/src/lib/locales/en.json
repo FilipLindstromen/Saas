@@ -236,7 +236,7 @@
   "center.gotIt": "Got it",
   "center.closeHelp": "Close",
   "center.recordNewDump": "Record a new dump",
-  "center.dumpEmptyHint": "Click the Dump Button To Create A Dump (enable your microphone)",
+  "center.dumpEmptyHint": "Click the Dump Button To Create A Dump",
   "center.dumpUsePhoto": "Use photo instead",
   "center.dumpUseText": "Type text instead",
   "center.typeDump": "Type a dump",

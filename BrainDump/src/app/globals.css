@@ -1415,9 +1415,10 @@ select.bd-input::-ms-expand {
   text-align: center;
   padding: 0.4rem 0.75rem 0.25rem;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
-  border: 1px solid color-mix(in srgb, var(--border-default) 85%, var(--accent) 15%);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  margin-bottom: 200px;
 }
 
 .bd-dump-empty-hint-text {

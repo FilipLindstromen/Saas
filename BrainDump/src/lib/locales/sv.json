@@ -236,7 +236,7 @@
   "center.gotIt": "Okej",
   "center.closeHelp": "Stäng",
   "center.recordNewDump": "Spela in en ny dump",
-  "center.dumpEmptyHint": "Tryck på Dump-knappen för att skapa en dump (aktivera mikrofonen)",
+  "center.dumpEmptyHint": "Tryck på Dump-knappen för att skapa en dump",
   "center.dumpUsePhoto": "Använd foto i stället",
   "center.dumpUseText": "Skriv text i stället",
   "center.typeDump": "Skriv en dump",
