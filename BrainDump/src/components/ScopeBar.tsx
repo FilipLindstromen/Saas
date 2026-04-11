@@ -23,10 +23,10 @@ interface ScopeBarProps {
   onCategorySelect: (category: string | null) => void;
   searchFilter?: string;
   onSearchFilterChange?: (value: string) => void;
-  /** Filter entries by due date (tasks, calendar) — shown with search when filter is open. */
+  /** Filter entries by due date (tasks, calendar) â€” shown with search when filter is open. */
   dueDateFilter?: DueDateFilterPreset;
   onDueDateFilterChange?: (preset: DueDateFilterPreset) => void;
-  /** Desktop: content immediately left of the filter field (e.g. “Next 5 — coach (AI)”). */
+  /** Desktop: content immediately left of the filter field (e.g. â€œNext 5 â€” coach (AI)â€). */
   beforeFilterSlot?: ReactNode;
 }
 
@@ -97,7 +97,7 @@ function ScopeChip({
           aria-label={`More actions for ${label}`}
           style={{ minWidth: 32, padding: "0.4rem 0.45rem", fontSize: "0.9rem", lineHeight: 1 }}
         >
-          ⋮
+          â‹®
         </button>
       )}
     </div>
@@ -137,7 +137,6 @@ function DueDateFilterMenuButton({
   onChange,
   isMobile,
   t,
-  /** Presets today/this_week/tomorrow are shown elsewhere; menu only lists “all” and “no date”. */
   menuMode = "full",
 }: {
   value: DueDateFilterPreset;
@@ -147,38 +146,127 @@ function DueDateFilterMenuButton({
   menuMode?: "full" | "overflow";
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [portalMount, setPortalMount] = useState<HTMLElement | null>(null);
+
+  useEffect(() => { setPortalMount(document.body); }, []);
+
+  const openDropdown = () => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setDropdownPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (rootRef.current?.contains(e.target as Node)) return;
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (dropdownRef.current?.contains(e.target as Node)) return;
       setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onScroll = () => setOpen(false);
     document.addEventListener("click", onDoc, true);
-    return () => document.removeEventListener("click", onDoc, true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("click", onDoc, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
   }, [open]);
 
-  const selected =
-    menuMode === "overflow" ? value === "no_date" : value !== "all";
-  const chromeActive =
-    menuMode === "full" ? value !== "all" : value === "no_date";
+  const selected = menuMode === "overflow" ? value === "no_date" : value !== "all";
+
+  const dropdown =
+    open && dropdownPos && portalMount
+      ? createPortal(
+          <div
+            ref={dropdownRef}
+            role="listbox"
+            aria-label={t("scope.dateFilterMenuAria")}
+            style={{
+              position: "fixed",
+              top: dropdownPos.top,
+              right: dropdownPos.right,
+              minWidth: "13rem",
+              zIndex: 5000,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-default)",
+              borderRadius: 12,
+              boxShadow: "var(--shadow-md)",
+              padding: "0.35rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.15rem",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(["today", "tomorrow", "this_week"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                role="option"
+                aria-selected={value === p}
+                className="bd-btn"
+                onClick={() => { onChange(p); setOpen(false); }}
+                style={{
+                  justifyContent: "flex-start",
+                  minHeight: 40,
+                  fontWeight: 600,
+                  fontSize: "0.8125rem",
+                  background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
+                  color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
+                  borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
+                }}
+              >
+                {t(DUE_DATE_LABEL_KEY[p])}
+              </button>
+            ))}
+            <div style={{ height: 1, background: "var(--border-subtle)", margin: "0.2rem 0" }} aria-hidden />
+            {(["all", "no_date"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                role="option"
+                aria-selected={value === p}
+                className="bd-btn"
+                onClick={() => { onChange(p); setOpen(false); }}
+                style={{
+                  justifyContent: "flex-start",
+                  minHeight: 40,
+                  fontWeight: 500,
+                  fontSize: "0.8125rem",
+                  background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
+                  color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-secondary)",
+                  borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
+                }}
+              >
+                {t(DUE_DATE_LABEL_KEY[p])}
+              </button>
+            ))}
+          </div>,
+          portalMount
+        )
+      : null;
 
   return (
-    <div ref={rootRef} style={{ position: "relative", flexShrink: 0 }}>
+    <>
       <button
+        ref={btnRef}
         type="button"
         className={isMobile ? "bd-btn bd-scope-filter-circle" : "bd-btn"}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-pressed={isMobile ? selected : undefined}
-        aria-label={
-          menuMode === "overflow" ? t("scope.dateFilterMoreAria") : t("scope.dateFilterMenuAria")
-        }
-        title={menuMode === "overflow" ? t("scope.dateFilterMoreAria") : t("scope.dateFilterMenuAria")}
+        aria-label={t("scope.dateFilterMenuAria")}
+        title={t("scope.dateFilterMenuAria")}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((o) => !o);
+          open ? setOpen(false) : openDropdown();
         }}
         style={{
           minWidth: isMobile ? 44 : 40,
@@ -205,113 +293,16 @@ function DueDateFilterMenuButton({
           <line x1="8" y1="2" x2="8" y2="6" />
           <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
-        {!isMobile && menuMode === "full" && selected ? (
-          <span
-            style={{
-              maxWidth: "5.5rem",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+        {!isMobile && selected ? (
+          <span style={{ maxWidth: "5.5rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {t(DUE_DATE_LABEL_KEY[value])}
           </span>
         ) : null}
-        {!isMobile && menuMode === "overflow" && value === "no_date" ? (
-          <span
-            style={{
-              maxWidth: "5.5rem",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {t(DUE_DATE_LABEL_KEY.no_date)}
-          </span>
-        ) : null}
       </button>
-      {open ? (
-        <div
-          role="listbox"
-          aria-label={
-            menuMode === "overflow" ? t("scope.dateFilterMoreAria") : t("scope.dateFilterMenuAria")
-          }
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 4px)",
-            minWidth: "12rem",
-            zIndex: "var(--bd-z-dropdown)",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-default)",
-            borderRadius: 12,
-            boxShadow: "var(--shadow-md)",
-            padding: "0.35rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.15rem",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menuMode === "full" ? (
-            <>
-              {(["today", "tomorrow", "this_week"] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  role="option"
-                  aria-selected={value === p}
-                  className="bd-btn"
-                  onClick={() => {
-                    onChange(p);
-                    setOpen(false);
-                  }}
-                  style={{
-                    justifyContent: "flex-start",
-                    minHeight: 40,
-                    fontWeight: 600,
-                    fontSize: "0.8125rem",
-                    background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
-                    color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
-                    borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
-                  }}
-                >
-                  {t(DUE_DATE_LABEL_KEY[p])}
-                </button>
-              ))}
-              <div style={{ height: 1, background: "var(--border-subtle)", margin: "0.2rem 0" }} aria-hidden />
-            </>
-          ) : null}
-          {(["all", "no_date"] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              role="option"
-              aria-selected={value === p}
-              className="bd-btn"
-              onClick={() => {
-                onChange(p);
-                setOpen(false);
-              }}
-              style={{
-                justifyContent: "flex-start",
-                minHeight: 40,
-                fontWeight: 500,
-                fontSize: "0.8125rem",
-                background: value === p ? "var(--bd-chrome-selected-bg)" : "transparent",
-                color: value === p ? "var(--bd-chrome-selected-text)" : "var(--text-secondary)",
-                borderColor: value === p ? "var(--bd-chrome-selected-border)" : "transparent",
-              }}
-            >
-              {t(DUE_DATE_LABEL_KEY[p])}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+      {dropdown}
+    </>
   );
 }
-
 function DueDateQuickPresets({
   value,
   onChange,
@@ -478,7 +469,7 @@ function ScopeFilterSearchBlock({
                   padding: 0,
                 }}
               >
-                ×
+                Ã—
               </button>
             ) : null}
           </div>
@@ -1075,7 +1066,7 @@ export function ScopeBar({
                           color: "var(--text-tertiary)",
                         }}
                       >
-                        ⋮
+                        â‹®
                       </button>
                     </div>
                   );
@@ -1781,7 +1772,7 @@ export function ScopeBar({
                             color: "var(--text-tertiary)",
                           }}
                         >
-                          ⋮
+                          â‹®
                         </button>
                       )}
                     </div>
