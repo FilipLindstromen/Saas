@@ -381,6 +381,13 @@ const IconTrash = createIcon(
     <line x1="14" y1="11" x2="14" y2="17" />
   </>
 );
+/** Sparkles — for Generate actions */
+const IconSparkles = createIcon(
+  <>
+    <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+    <path d="M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12" />
+  </>
+);
 
 const VARIANT_ICONS: Partial<Record<VariantMode, (props: IconProps) => JSX.Element>> = {
   simplify: IconSimplify,
@@ -4283,53 +4290,60 @@ export default function App() {
                       Completed
                     </label>
                   ) : null}
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={handleGenerateForDocument}
-                    disabled={
-                      loadingSelection || !documentDetails || isDocGenerating
-                    }
-                  >
-                    {isDocGenerating ? "Generating…" : "Generate Draft"}
-                  </button>
                 </div>
               </div>
-              <div className="panel-body">
-                {documentBodyView === "source" ? (
-                  <textarea
-                    value={currentDocumentContent}
-                    onChange={(event) => {
-                      if (documentDetails) {
-                        setDocumentDetails({
-                          ...documentDetails,
-                          content: event.target.value
-                        });
+              <div className="panel-body document-panel-body">
+                {documentDetails ? (
+                  <div className="document-generate-row">
+                    <button
+                      type="button"
+                      className="primary document-generate-btn"
+                      onClick={() => void handleGenerateForDocument()}
+                      disabled={
+                        loadingSelection || !documentDetails || isDocGenerating
                       }
-                    }}
-                    onMouseUp={handleDocumentMouseUp}
-                    onScroll={() => setSelectionMenu(null)}
-                    onBlur={() => setSelectionMenu(null)}
-                    placeholder="Start writing your meditation script…"
-                  />
-                ) : (
-                  <div
-                    className="document-body-preview"
-                    onScroll={() => setSelectionMenu(null)}
-                    aria-label="Formatted document preview"
-                  >
-                    {currentDocumentContent.trim() ? (
-                      <div className="formatted-text document-formatted">
-                        {renderFormattedText(currentDocumentContent)}
-                      </div>
-                    ) : (
-                      <p className="document-body-placeholder">
-                        No content yet. Switch to <strong>Source</strong> to
-                        write, or generate a draft.
-                      </p>
-                    )}
+                    >
+                      <IconSparkles size={18} />
+                      {isDocGenerating ? "Generating…" : "Generate"}
+                    </button>
                   </div>
-                )}
+                ) : null}
+                <div className="document-body-editor">
+                  {documentBodyView === "source" ? (
+                    <textarea
+                      value={currentDocumentContent}
+                      onChange={(event) => {
+                        if (documentDetails) {
+                          setDocumentDetails({
+                            ...documentDetails,
+                            content: event.target.value
+                          });
+                        }
+                      }}
+                      onMouseUp={handleDocumentMouseUp}
+                      onScroll={() => setSelectionMenu(null)}
+                      onBlur={() => setSelectionMenu(null)}
+                      placeholder="Start writing your meditation script…"
+                    />
+                  ) : (
+                    <div
+                      className="document-body-preview"
+                      onScroll={() => setSelectionMenu(null)}
+                      aria-label="Formatted document preview"
+                    >
+                      {currentDocumentContent.trim() ? (
+                        <div className="formatted-text document-formatted">
+                          {renderFormattedText(currentDocumentContent)}
+                        </div>
+                      ) : (
+                        <p className="document-body-placeholder">
+                          No content yet. Switch to <strong>Source</strong> to
+                          write, or generate a draft.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           ) : documentVisible ? (
