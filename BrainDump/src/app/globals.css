@@ -64,6 +64,8 @@
   /* Area/project pickers & scope menus — above item sheets (.bd-z-dropdown), below dialogs */
   --bd-z-scope-sheet: 5500;
   --bd-z-modal: 6000;
+  /* Photo capture popover (anchor-only) — must sit above .bd-bottom-bar, voice-dump scrim, and other modals */
+  --bd-z-photo-capture: 6500;
   --bd-z-blocking: 7000;
 }
 
@@ -1599,7 +1601,7 @@ select.bd-input::-ms-expand {
   height: 1px;
   overflow: visible;
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--bd-z-photo-capture);
 }
 
 .bd-photo-capture-wrap--anchor-only .bd-photo-capture-menu {

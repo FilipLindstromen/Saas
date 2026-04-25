@@ -48,11 +48,11 @@ export const PhotoCaptureTrigger = forwardRef<PhotoCaptureTriggerHandle, PhotoCa
 
   useEffect(() => {
     if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
+    const close = (e: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, [menuOpen]);
 
   useEffect(() => {

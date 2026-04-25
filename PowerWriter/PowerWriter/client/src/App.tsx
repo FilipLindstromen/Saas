@@ -97,16 +97,83 @@ const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
 const AUTO_SAVE_DELAY_MS = 1200;
 
+/** Renders a single line's inline **bold** and *italic* (not raw markers). */
+const renderInlineSegments = (line: string, keyPrefix: string): ReactNode[] => {
+  if (!line) {
+    return [];
+  }
+  const afterBold = line.split(/(\*\*[^*]*\*\*)/g).filter((s) => s !== "");
+  const out: ReactNode[] = [];
+  let n = 0;
+  for (const chunk of afterBold) {
+    const boldM = chunk.match(/^\*\*([\s\S]*?)\*\*$/);
+    if (boldM) {
+      out.push(
+        <strong key={`${keyPrefix}-b${n++}`}>
+          {boldM[1]}
+        </strong>
+      );
+      continue;
+    }
+    const italicPass = chunk.split(/(\*[^*]*\*)/g).filter((s) => s !== "");
+    for (const seg of italicPass) {
+      const itM = seg.match(/^\*([^*]+)\*$/);
+      if (itM) {
+        out.push(
+          <em key={`${keyPrefix}-i${n++}`}>
+            {itM[1]}
+          </em>
+        );
+      } else {
+        out.push(
+          <span key={`${keyPrefix}-t${n++}`}>
+            {seg}
+          </span>
+        );
+      }
+    }
+  }
+  return out;
+};
+
 const renderFormattedText = (value: string): ReactNode[] => {
   return value.split("\n").map((line, lineIndex) => {
     if (!line.trim()) {
       return <div className="formatted-text-spacer" key={`line-${lineIndex}`} />;
     }
 
+    const hr = line.match(/^(?:---|\*\*\*|___)\s*$/);
+    if (hr) {
+      return <hr className="formatted-text-hr" key={`line-${lineIndex}`} />;
+    }
+
+    const listMatch = line.match(/^\s{0,3}[-*+]\s+(.+)$/);
+    if (listMatch) {
+      return (
+        <p
+          className="formatted-text-line formatted-text-list-item"
+          key={`line-${lineIndex}`}
+        >
+          {renderInlineSegments(listMatch[1], `L${lineIndex}`)}
+        </p>
+      );
+    }
+
+    const bq = line.match(/^>\s{0,1}(.+)$/);
+    if (bq) {
+      return (
+        <p
+          className="formatted-text-line formatted-text-blockquote"
+          key={`line-${lineIndex}`}
+        >
+          {renderInlineSegments(bq[1], `B${lineIndex}`)}
+        </p>
+      );
+    }
+
     const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
     const headingLevel = headingMatch ? headingMatch[1].length : null;
-    const content = headingMatch ? headingMatch[2] : line;
-    const segments = content.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    const content = headingMatch && headingMatch[2] != null ? headingMatch[2] : line;
 
     return (
       <p
@@ -116,19 +183,7 @@ const renderFormattedText = (value: string): ReactNode[] => {
         )}
         key={`line-${lineIndex}`}
       >
-        {segments.map((segment, segmentIndex) => {
-          const strongMatch = segment.match(/^\*\*(.+)\*\*$/);
-          if (strongMatch) {
-            return (
-              <strong key={`line-${lineIndex}-part-${segmentIndex}`}>
-                {strongMatch[1]}
-              </strong>
-            );
-          }
-          return (
-            <span key={`line-${lineIndex}-part-${segmentIndex}`}>{segment}</span>
-          );
-        })}
+        {renderInlineSegments(content, `H${lineIndex}`)}
       </p>
     );
   });
@@ -875,6 +930,10 @@ export default function App() {
   );
   const [documentDetails, setDocumentDetails] =
     useState<DocumentDetails | null>(null);
+  /** Document main body: formatted preview vs raw markdown source. */
+  const [documentBodyView, setDocumentBodyView] = useState<"preview" | "source">(
+    "preview"
+  );
   const [loadingSelection, setLoadingSelection] = useState(false);
 
   const [chatPrompt, setChatPrompt] = useState("");
@@ -1966,6 +2025,10 @@ export default function App() {
   useEffect(() => {
     setSelectionMenu(null);
   }, [selected?.path]);
+
+  useEffect(() => {
+    setDocumentBodyView("preview");
+  }, [selected?.path, selected?.type]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4179,6 +4242,36 @@ export default function App() {
                 </div>
                 <div className="toolbar document-header-actions">
                   {documentDetails ? (
+                    <div
+                      className="document-view-toggle"
+                      role="group"
+                      aria-label="Document view"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          documentBodyView === "preview"
+                            ? "toggle-active"
+                            : "toggle-off"
+                        }
+                        onClick={() => setDocumentBodyView("preview")}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          documentBodyView === "source"
+                            ? "toggle-active"
+                            : "toggle-off"
+                        }
+                        onClick={() => setDocumentBodyView("source")}
+                      >
+                        Source
+                      </button>
+                    </div>
+                  ) : null}
+                  {documentDetails ? (
                     <label className="toolbar-checkbox">
                       <input
                         type="checkbox"
@@ -4203,21 +4296,40 @@ export default function App() {
                 </div>
               </div>
               <div className="panel-body">
-                <textarea
-                  value={currentDocumentContent}
-                  onChange={(event) => {
-                    if (documentDetails) {
-                      setDocumentDetails({
-                        ...documentDetails,
-                        content: event.target.value
-                      });
-                    }
-                  }}
-                  onMouseUp={handleDocumentMouseUp}
-                  onScroll={() => setSelectionMenu(null)}
-                  onBlur={() => setSelectionMenu(null)}
-                  placeholder="Start writing your meditation script..."
-                />
+                {documentBodyView === "source" ? (
+                  <textarea
+                    value={currentDocumentContent}
+                    onChange={(event) => {
+                      if (documentDetails) {
+                        setDocumentDetails({
+                          ...documentDetails,
+                          content: event.target.value
+                        });
+                      }
+                    }}
+                    onMouseUp={handleDocumentMouseUp}
+                    onScroll={() => setSelectionMenu(null)}
+                    onBlur={() => setSelectionMenu(null)}
+                    placeholder="Start writing your meditation script…"
+                  />
+                ) : (
+                  <div
+                    className="document-body-preview"
+                    onScroll={() => setSelectionMenu(null)}
+                    aria-label="Formatted document preview"
+                  >
+                    {currentDocumentContent.trim() ? (
+                      <div className="formatted-text document-formatted">
+                        {renderFormattedText(currentDocumentContent)}
+                      </div>
+                    ) : (
+                      <p className="document-body-placeholder">
+                        No content yet. Switch to <strong>Source</strong> to
+                        write, or generate a draft.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </section>
           ) : documentVisible ? (
