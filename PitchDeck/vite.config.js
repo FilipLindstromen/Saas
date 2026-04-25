@@ -2,7 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Default for local `vite build` (relative assets). GitHub Actions uses
+// `vite build --base=/<repo>/PitchDeck/`, which overrides this.
 export default defineConfig({
+  base: './',
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
@@ -37,24 +40,11 @@ export default defineConfig({
     },
   },
   build: {
-    // Single chunk + avoid const TDZ in Rollup wrappers; Terser instead of esbuild minify — fixes
-    // "Cannot access 'X' before initialization" on some production hosts (e.g. GitHub Pages).
+    // Single chunk: avoids cross-chunk init order issues on static hosts.
     modulePreload: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        passes: 1,
-        hoist_funs: false,
-        hoist_props: false,
-        reduce_vars: false,
-        reduce_funcs: false,
-        collapse_vars: false,
-        sequences: false,
-      },
-      format: {
-        safari10: true,
-      },
-    },
+    // esbuild minify is the Vite default; Terser has caused TDZ ("Cannot access 'X' before
+    // initialization") in a single large bundle for some React trees on production hosts.
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         inlineDynamicImports: true,
