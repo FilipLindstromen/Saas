@@ -1566,6 +1566,12 @@
   box-shadow: var(--field-shadow);
 }
 
+.formatted-text-scroll {
+  min-height: 200px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .panel-label {
   margin: 0 0 0;
   font-weight: 600;
@@ -1671,6 +1677,39 @@
   font-family: inherit;
   white-space: pre-wrap;
   color: var(--text-secondary);
+}
+
+.formatted-text {
+  color: var(--text-secondary);
+}
+
+.formatted-text-line {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.formatted-text-spacer {
+  height: 0.7rem;
+}
+
+.formatted-text-heading-1,
+.formatted-text-heading-2,
+.formatted-text-heading-3 {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.formatted-text-heading-1 {
+  font-size: 1.08rem;
+}
+
+.formatted-text-heading-2 {
+  font-size: 1.02rem;
+}
+
+.formatted-text-heading-3 {
+  font-size: 0.98rem;
 }
 
 .variant-card button {
@@ -1942,6 +1981,51 @@
 .toolbar button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.document-editor-header {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.document-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.document-name-form {
+  width: 100%;
+}
+
+.document-header-actions {
+  flex: 0 0 auto;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.document-header-actions button.primary {
+  font-weight: 600;
+  padding: 10px 16px;
+}
+
+.document-autosave-indicator {
+  padding-top: 0;
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .document-editor-header {
+    flex-wrap: wrap;
+  }
+
+  .document-header-actions {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 0;
+  }
 }
 
 .inline-editor-body {

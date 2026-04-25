@@ -97,6 +97,43 @@ const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
 const AUTO_SAVE_DELAY_MS = 1200;
 
+const renderFormattedText = (value: string): ReactNode[] => {
+  return value.split("\n").map((line, lineIndex) => {
+    if (!line.trim()) {
+      return <div className="formatted-text-spacer" key={`line-${lineIndex}`} />;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    const headingLevel = headingMatch ? headingMatch[1].length : null;
+    const content = headingMatch ? headingMatch[2] : line;
+    const segments = content.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+
+    return (
+      <p
+        className={clsx(
+          "formatted-text-line",
+          headingLevel ? `formatted-text-heading-${headingLevel}` : null
+        )}
+        key={`line-${lineIndex}`}
+      >
+        {segments.map((segment, segmentIndex) => {
+          const strongMatch = segment.match(/^\*\*(.+)\*\*$/);
+          if (strongMatch) {
+            return (
+              <strong key={`line-${lineIndex}-part-${segmentIndex}`}>
+                {strongMatch[1]}
+              </strong>
+            );
+          }
+          return (
+            <span key={`line-${lineIndex}-part-${segmentIndex}`}>{segment}</span>
+          );
+        })}
+      </p>
+    );
+  });
+};
+
 const inferBlobExtension = (mimeType: string): string => {
   if (mimeType.includes("audio/mpeg")) return "mp3";
   if (mimeType.includes("audio/wav")) return "wav";
@@ -4105,30 +4142,42 @@ export default function App() {
                 order: currentMode === "recording" ? 1 : (inlineBeforeDocument ? 4 : 2)
               }}
             >
-              <div className="panel-header">
-                {selected?.type === "document" ? (
-                  <form
-                    className="name-input-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void handleDocumentNameSubmit();
-                    }}
-                  >
-                    <input
-                      className="name-input"
-                      value={documentNameInput}
-                      onChange={(event) =>
-                        setDocumentNameInput(event.target.value)
-                      }
-                      onBlur={() => void handleDocumentNameSubmit()}
-                      onKeyDown={handleDocumentNameKeyDown}
-                      placeholder="Document name"
-                    />
-                  </form>
-                ) : (
-                  <h2>{selectedName}</h2>
-                )}
-                <div className="toolbar">
+              <div className="panel-header document-editor-header">
+                <div className="document-header-main">
+                  {selected?.type === "document" ? (
+                    <form
+                      className="name-input-form document-name-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleDocumentNameSubmit();
+                      }}
+                    >
+                      <input
+                        className="name-input"
+                        value={documentNameInput}
+                        onChange={(event) =>
+                          setDocumentNameInput(event.target.value)
+                        }
+                        onBlur={() => void handleDocumentNameSubmit()}
+                        onKeyDown={handleDocumentNameKeyDown}
+                        placeholder="Document name"
+                      />
+                    </form>
+                  ) : (
+                    <h2>{selectedName}</h2>
+                  )}
+                  {documentDetails ? (
+                    <span
+                      className={clsx(
+                        "autosave-indicator document-autosave-indicator",
+                        documentAutosaveClass
+                      )}
+                    >
+                      {documentAutosaveLabel}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="toolbar document-header-actions">
                   {documentDetails ? (
                     <label className="toolbar-checkbox">
                       <input
@@ -4143,6 +4192,7 @@ export default function App() {
                   ) : null}
                   <button
                     type="button"
+                    className="primary"
                     onClick={handleGenerateForDocument}
                     disabled={
                       loadingSelection || !documentDetails || isDocGenerating
@@ -4150,13 +4200,6 @@ export default function App() {
                   >
                     {isDocGenerating ? "Generating…" : "Generate Draft"}
                   </button>
-                  {documentDetails ? (
-                    <span
-                      className={clsx("autosave-indicator", documentAutosaveClass)}
-                    >
-                      {documentAutosaveLabel}
-                    </span>
-                  ) : null}
                 </div>
               </div>
               <div className="panel-body">
@@ -4366,9 +4409,11 @@ export default function App() {
                     chatResponses.map((item) => (
                       <article
                         key={item.id}
-                        style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
+                        style={{ marginBottom: 12 }}
                       >
-                        {item.message}
+                        <div className="formatted-text">
+                          {renderFormattedText(item.message)}
+                        </div>
                       </article>
                     ))
                   )}
@@ -4463,7 +4508,9 @@ export default function App() {
                           Copy
                         </button>
                       </div>
-                      <pre>{variant}</pre>
+                      <div className="formatted-text">
+                        {renderFormattedText(variant)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -4495,11 +4542,11 @@ export default function App() {
               </div>
             </div>
             <div className="panel-body">
-              <textarea
-                className="readonly"
-                value={aggregatedPreview}
-                readOnly
-              />
+              <div className="readonly formatted-text-scroll">
+                <div className="formatted-text">
+                  {renderFormattedText(aggregatedPreview)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
