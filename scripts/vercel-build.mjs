@@ -34,8 +34,8 @@ const VITE_APPS = [
   ["PowerWriter/PowerWriter/client", "/PowerWriter/"],
 ];
 
-function run(cmd, cwd = ROOT) {
-  execSync(cmd, { cwd, stdio: "inherit", shell: true });
+function run(cmd, cwd = ROOT, envExtra = {}) {
+  execSync(cmd, { cwd, stdio: "inherit", shell: true, env: { ...process.env, ...envExtra } });
 }
 
 function copyRecursive(src, dest) {
@@ -112,6 +112,21 @@ for (const [projectPath, basePath] of VITE_APPS) {
   const deploySub = path.join(DEPLOY, basePath.replace(/^\/|\/$/g, ""));
   copyRecursive(dist, deploySub);
   console.log("  →", deploySub);
+}
+
+// Build ContentCreator (Next.js static export)
+const contentCreatorPath = path.join(ROOT, "ContentCreator");
+if (existsSync(path.join(contentCreatorPath, "package.json"))) {
+  console.log("Building ContentCreator with base /ContentCreator/");
+  run("npm install", contentCreatorPath);
+  run("npm run build", contentCreatorPath, { NEXT_PUBLIC_BASE_PATH: "/ContentCreator" });
+  const outDir = path.join(contentCreatorPath, "out");
+  if (existsSync(outDir)) {
+    copyRecursive(outDir, path.join(DEPLOY, "ContentCreator"));
+    console.log("  →", path.join(DEPLOY, "ContentCreator"));
+  } else {
+    console.warn("No out folder after ContentCreator build");
+  }
 }
 
 console.log("Done. Output in ./deploy");
