@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "@/lib/constants";
 import { useAppState } from "@/lib/app-state";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -29,7 +30,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Reset Seed Data
           </button>
         </aside>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col p-6">
+          <div className="mb-4 flex shrink-0 justify-end">
+            <ThemeToggle />
+          </div>
+          <div className="min-h-0 flex-1">{children}</div>
+        </main>
       </div>
     </div>
   );
@@ -46,5 +52,16 @@ export function Card({ title, subtitle, children }: { title: string; subtitle?: 
 }
 
 export function V1Badge() {
-  return <span className="rounded-full border border-amber-300/40 bg-amber-500/20 px-2 py-1 text-[11px] text-amber-200">v1 manual/mock mode</span>;
+  return (
+    <span
+      className="rounded-full border px-2 py-1 text-[11px]"
+      style={{
+        borderColor: "color-mix(in srgb, var(--accent) 40%, var(--border-default))",
+        background: "color-mix(in srgb, var(--accent) 12%, var(--bg-tertiary))",
+        color: "var(--text-secondary)",
+      }}
+    >
+      v1 manual/mock mode
+    </span>
+  );
 }

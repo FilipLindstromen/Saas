@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { Card, V1Badge } from "@/components/app-shell";
@@ -43,11 +43,12 @@ export default function CompetitorAnalysisPage() {
       <Card title="Manual competitor profile" subtitle="Instagram and YouTube supported as manual inputs in v1.">
         <div className="grid gap-2 md:grid-cols-2">
           {fields.map((key) => (
-            <input key={key} className="rounded bg-zinc-950 p-2" placeholder={key} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} />
+            <input key={key} className="cc-input" placeholder={key} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} />
           ))}
         </div>
         <button
-          className="mt-2 rounded bg-emerald-500 px-3 py-2 text-sm text-black"
+          type="button"
+          className="cc-btn-primary mt-2"
           onClick={() => {
             const profile: CompetitorProfile = { id: Math.random().toString(36).slice(2, 10), ...form };
             const analysis = generateCompetitorAnalysis(profile);
@@ -65,7 +66,7 @@ export default function CompetitorAnalysisPage() {
             <p>Format patterns: {analysis.formatPatterns.join(", ")}</p>
             <p className="mt-1">What they do well: {analysis.whatTheyDoWell.join(", ")}</p>
             <p>Gaps I can exploit: {analysis.exploitGaps.join(", ")}</p>
-            <p className="mt-2 text-xs text-zinc-400">Inspired ideas: {analysis.inspiredIdeas.slice(0, 5).join(" | ")}</p>
+            <p className="cc-muted mt-2 text-xs">Inspired ideas: {analysis.inspiredIdeas.slice(0, 5).join(" | ")}</p>
           </Card>
         ))}
       </div>

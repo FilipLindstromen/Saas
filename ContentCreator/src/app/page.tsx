@@ -52,22 +52,22 @@ export default function DashboardPage() {
       <Card title="Ideas by stage" subtitle="Move cards in Pipeline to advance stages.">
         <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(byStage).map(([stage, count]) => (
-            <span key={stage} className="rounded bg-zinc-800 px-2 py-1">{stage}: {count}</span>
+            <span key={stage} className="cc-badge">{stage}: {count}</span>
           ))}
         </div>
       </Card>
       <Card title="Workflow actions" subtitle="Reusable skill-style actions (mock in v1).">
         <div className="grid gap-3 md:grid-cols-2">
           {WORKFLOW_ACTIONS.map((action) => (
-            <div key={action.id} className="rounded border border-zinc-800 p-3">
+            <div key={action.id} className="cc-panel">
               <p className="font-medium">{action.name}</p>
-              <p className="text-xs text-zinc-400">{action.description}</p>
-              <p className="mt-1 text-xs text-zinc-500">Inputs: {action.inputs.join(", ")} | Output: {action.outputFormat}</p>
-              <button className="mt-2 rounded bg-zinc-800 px-3 py-1 text-xs" onClick={() => setWorkflowOutput(runWorkflowAction(action))}>Run workflow</button>
+              <p className="cc-muted mt-1 text-xs">{action.description}</p>
+              <p className="cc-muted mt-1 text-xs">Inputs: {action.inputs.join(", ")} | Output: {action.outputFormat}</p>
+              <button type="button" className="cc-btn-secondary mt-2 !text-xs" onClick={() => setWorkflowOutput(runWorkflowAction(action))}>Run workflow</button>
             </div>
           ))}
         </div>
-        {workflowOutput ? <p className="mt-3 text-sm text-emerald-300">{workflowOutput}</p> : null}
+        {workflowOutput ? <p className="mt-3 text-sm" style={{ color: "var(--accent)" }}>{workflowOutput}</p> : null}
       </Card>
     </div>
   );

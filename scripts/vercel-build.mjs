@@ -129,4 +129,19 @@ if (existsSync(path.join(contentCreatorPath, "package.json"))) {
   }
 }
 
+// Build HookTransformer (Next.js static export)
+const hookTransformerPath = path.join(ROOT, "HookTransformer");
+if (existsSync(path.join(hookTransformerPath, "package.json"))) {
+  console.log("Building HookTransformer with base /HookTransformer/");
+  run("npm install", hookTransformerPath);
+  run("npm run build", hookTransformerPath, { NEXT_PUBLIC_BASE_PATH: "/HookTransformer" });
+  const outDirHt = path.join(hookTransformerPath, "out");
+  if (existsSync(outDirHt)) {
+    copyRecursive(outDirHt, path.join(DEPLOY, "HookTransformer"));
+    console.log("  →", path.join(DEPLOY, "HookTransformer"));
+  } else {
+    console.warn("No out folder after HookTransformer build");
+  }
+}
+
 console.log("Done. Output in ./deploy");

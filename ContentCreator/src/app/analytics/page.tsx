@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { Card } from "@/components/app-shell";
@@ -38,18 +38,18 @@ export default function AnalyticsPage() {
             <input
               key={key}
               type="number"
-              className="rounded bg-zinc-950 p-2"
+              className="cc-input"
               placeholder={key}
               value={form[key]}
               onChange={(e) => setForm((f) => ({ ...f, [key]: Number(e.target.value) }))}
             />
           ))}
-          <input className="rounded bg-zinc-950 p-2" placeholder="platform" value={form.platform} onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value as Platform }))} />
-          <input type="date" className="rounded bg-zinc-950 p-2" value={form.postedDate} onChange={(e) => setForm((f) => ({ ...f, postedDate: e.target.value }))} />
-          <input className="rounded bg-zinc-950 p-2" placeholder="hook used" value={form.hookUsed} onChange={(e) => setForm((f) => ({ ...f, hookUsed: e.target.value }))} />
-          <input className="rounded bg-zinc-950 p-2 md:col-span-2" placeholder="format used" value={form.formatUsed} onChange={(e) => setForm((f) => ({ ...f, formatUsed: e.target.value }))} />
+          <input className="cc-input" placeholder="platform" value={form.platform} onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value as Platform }))} />
+          <input type="date" className="cc-input" value={form.postedDate} onChange={(e) => setForm((f) => ({ ...f, postedDate: e.target.value }))} />
+          <input className="cc-input" placeholder="hook used" value={form.hookUsed} onChange={(e) => setForm((f) => ({ ...f, hookUsed: e.target.value }))} />
+          <input className="cc-input md:col-span-2" placeholder="format used" value={form.formatUsed} onChange={(e) => setForm((f) => ({ ...f, formatUsed: e.target.value }))} />
         </div>
-        <button className="mt-2 rounded bg-emerald-500 px-3 py-2 text-sm text-black" onClick={() => addAnalytics({ id: Math.random().toString(36).slice(2, 10), ...form })}>
+        <button type="button" className="cc-btn-primary mt-2" onClick={() => addAnalytics({ id: Math.random().toString(36).slice(2, 10), ...form })}>
           Save entry
         </button>
       </Card>
@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
         <p>Top-performing formats: {summary.topFormat}</p>
         <p>Best platforms: {summary.bestPlatform}</p>
         <p>Average engagement rate: {summary.avg.toFixed(2)}%</p>
-        <p className="mt-2 text-sm text-zinc-400">Suggestions: make more of top hooks, revisit high-watch-time topics, stop low-engagement formats after 5 tests.</p>
+        <p className="cc-muted mt-2 text-sm">Suggestions: make more of top hooks, revisit high-watch-time topics, stop low-engagement formats after 5 tests.</p>
       </Card>
     </div>
   );

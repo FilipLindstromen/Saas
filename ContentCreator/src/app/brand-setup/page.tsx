@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useAppState } from "@/lib/app-state";
 import { Card, V1Badge } from "@/components/app-shell";
@@ -19,8 +19,8 @@ export default function BrandSetupPage() {
         <div className="grid gap-3 md:grid-cols-2">
           {fields.map(([key, label]) => (
             <label key={key} className="text-sm">
-              <span className="mb-1 block text-zinc-400">{label}</span>
-              <textarea className="min-h-24 w-full rounded border border-zinc-700 bg-zinc-950 p-2" value={data.brandProfile[key]} onChange={(e) => setData((prev) => ({ ...prev, brandProfile: { ...prev.brandProfile, [key]: e.target.value } }))} />
+              <span className="cc-muted mb-1 block">{label}</span>
+              <textarea className="cc-textarea min-h-24" value={data.brandProfile[key]} onChange={(e) => setData((prev) => ({ ...prev, brandProfile: { ...prev.brandProfile, [key]: e.target.value } }))} />
             </label>
           ))}
         </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { Card } from "@/components/app-shell";
@@ -11,10 +11,10 @@ export default function ScriptPage() {
   const idea = useMemo(() => data.ideas.find((i) => i.id === ideaId), [ideaId, data.ideas]);
   return <div className="space-y-4"><h2 className="text-2xl font-semibold">Script</h2>
     <Card title="Generate filming card" subtitle="Bullet-point style with platform caption variants.">
-      <select className="w-full rounded bg-zinc-950 p-2" value={ideaId} onChange={(e)=>setIdeaId(e.target.value)}>{data.ideas.map((i)=><option key={i.id} value={i.id}>{i.title}</option>)}</select>
-      <button className="mt-2 rounded bg-emerald-500 px-3 py-2 text-sm text-black disabled:opacity-50" disabled={!idea} onClick={()=> idea && saveScript(generateScript(idea, data.references))}>Generate script card</button>
+      <select className="cc-select w-full" value={ideaId} onChange={(e)=>setIdeaId(e.target.value)}>{data.ideas.map((i)=><option key={i.id} value={i.id}>{i.title}</option>)}</select>
+      <button type="button" className="cc-btn-primary mt-2" disabled={!idea} onClick={()=> idea && saveScript(generateScript(idea, data.references))}>Generate script card</button>
     </Card>
-    <div className="space-y-3">{data.scripts.map((s)=><Card key={s.id} title={data.ideas.find((i)=>i.id===s.ideaId)?.title ?? 'Script card'}><p className="text-sm text-zinc-300">Best hook: {s.bestHookRecommendation}</p><p className="mt-1 text-sm">Talking points: {s.talkingPoints.join(' • ')}</p><p className="mt-1 text-sm">CTA: {s.cta}</p><p className="mt-1 text-xs text-zinc-500">Caption variants: {s.platformCaptions.map((c)=>c.platform).join(', ')}</p></Card>)}</div>
+    <div className="space-y-3">{data.scripts.map((s)=><Card key={s.id} title={data.ideas.find((i)=>i.id===s.ideaId)?.title ?? 'Script card'}><p className="cc-subtle text-sm">Best hook: {s.bestHookRecommendation}</p><p className="mt-1 text-sm">Talking points: {s.talkingPoints.join(' • ')}</p><p className="mt-1 text-sm">CTA: {s.cta}</p><p className="cc-muted mt-1 text-xs">Caption variants: {s.platformCaptions.map((c)=>c.platform).join(', ')}</p></Card>)}</div>
   </div>
 }
 

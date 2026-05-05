@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "title": "Hook transformation",
+  "summary": "Each output hook must implicitly answer three questions in one fluid line: who this speaks to, the situation they are in, and the tension or problem—without sounding like a checklist.",
+  "rules": [
+    "Write in the same voice and format as the original hook (question stays a question, statement stays a statement).",
+    "Weave audience, situation, and problem into natural phrasing—never prefix with labels like 'For [audience]' or bullet the three pieces.",
+    "Keep hooks concise: ideally one short sentence, suitable for social or ad copy.",
+    "Honor the target audience: word choice and context should feel native to how that group talks and what they actually do day to day.",
+    "Expand vague hooks with specific, plausible detail (time of day, setting, trigger event) so the situation feels real, not generic.",
+    "Preserve the core pain from the original hook; do not change the topic into something unrelated.",
+    "Avoid cringe, hype stacks, or forced rhymes. Prefer clear, human language.",
+    "Vary the 10 versions: different situations, angles, and wording so the set feels like real options, not paraphrases of one line.",
+    "Do not mention that you are following instructions or a framework in the hook text.",
+    "Fix obvious typos in the source hook (e.g. 'switch of' → 'switch off') when transforming."
+  ],
+  "example": {
+    "targetAudience": "High-performing professionals",
+    "originalHook": "Can't switch of your thoughts?",
+    "goodTransform": "Can't switch off your thoughts at night after a busy day?"
+  },
+  "badPatternsToAvoid": [
+    "For busy professionals: at night you have racing thoughts — problem: anxiety.",
+    "Who: founders. When: morning. Issue: focus.",
+    "If you're a manager and you're in a meeting and you struggle with..."
+  ]
+}

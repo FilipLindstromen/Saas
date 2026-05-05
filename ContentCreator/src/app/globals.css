@@ -1,38 +1,167 @@
 @import "tailwindcss";
 
-:root,
-:root[data-theme="dark"] {
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #141414;
-  --bg-tertiary: #1a1a1a;
-  --bg-elevated: #1f1f1f;
-  --bg-hover: #252525;
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.9);
-  --text-tertiary: rgba(255, 255, 255, 0.65);
-  --accent: #ff6b35;
-  --accent-hover: #ff8555;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
+/* Light is default until ThemeSync / toggle sets data-theme */
+:root:not([data-theme]),
 :root[data-theme="light"] {
   --bg-primary: #f8f9fa;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f1f3f5;
   --bg-elevated: #ffffff;
   --bg-hover: #e9ecef;
-  --border-subtle: rgba(0, 0, 0, 0.05);
-  --border-default: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.12);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.18);
   --text-primary: #1a1a1a;
   --text-secondary: rgba(0, 0, 0, 0.85);
-  --text-tertiary: rgba(0, 0, 0, 0.6);
+  --text-tertiary: rgba(0, 0, 0, 0.55);
+  --accent: #ff6b35;
+  --accent-hover: #e85d2d;
+  --accent-contrast: #ffffff;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --chip-active-bg: color-mix(in srgb, var(--accent) 18%, transparent);
+  --chip-active-border: color-mix(in srgb, var(--accent) 45%, var(--border-default));
+  --focus-ring: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #1f1f1f;
+  --bg-hover: #2a2a2a;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text-primary: #f4f4f5;
+  --text-secondary: rgba(255, 255, 255, 0.88);
+  --text-tertiary: rgba(255, 255, 255, 0.55);
   --accent: #ff6b35;
   --accent-hover: #ff8555;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --accent-contrast: #ffffff;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --chip-active-bg: color-mix(in srgb, var(--accent) 22%, transparent);
+  --chip-active-border: color-mix(in srgb, var(--accent) 50%, transparent);
+  --focus-ring: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+:root:not([data-theme]),
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Shared form / button primitives (theme-aware) */
+.cc-input,
+.cc-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.cc-select,
+.cc-textarea {
+  width: 100%;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.cc-input:focus,
+.cc-select:focus,
+.cc-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.cc-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cc-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.cc-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cc-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.cc-btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.cc-chip {
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.cc-chip[data-active="true"] {
+  background: var(--chip-active-bg);
+  border-color: var(--chip-active-border);
+}
+
+.cc-muted {
+  color: var(--text-tertiary);
+}
+
+.cc-subtle {
+  color: var(--text-secondary);
+}
+
+.cc-panel {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  padding: 0.75rem;
+}
+
+.cc-badge {
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
 }
 
 :root {
