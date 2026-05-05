@@ -178,6 +178,7 @@ export async function generateContentIdeas(input: {
   targetAudience: string;
   platform: string;
   hook: string;
+  uniquePerspective?: string;
 }): Promise<string[]> {
   const trimmedKey = input.apiKey.trim();
   if (!trimmedKey) {
@@ -188,7 +189,7 @@ export async function generateContentIdeas(input: {
     {
       role: "system",
       content:
-        "You create practical short-form content ideas. Use plain language, no buzzwords, no fancy phrases. Be concrete and specific.",
+        "You create aha-moment and conclusion lines for short-form content. Use plain language, no buzzwords, no fancy phrases. Be concrete and specific.",
     },
     {
       role: "user",
@@ -196,9 +197,12 @@ export async function generateContentIdeas(input: {
         `Platform: ${input.platform}`,
         `Target audience: ${input.targetAudience}`,
         `Hook: ${input.hook}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
         "",
-        "Generate exactly 5 content ideas that could be made from this hook.",
-        "Each idea should mention what to show or say.",
+        "Generate exactly 5 examples.",
+        "Each example should be a short 'Aha + Conclusion' statement.",
+        "Focus on the insight and ending takeaway, not on shots, filming, or structure.",
+        "Format each line like: Aha: ... Conclusion: ...",
         "Return JSON: {\"ideas\":[\"...\",\"...\",\"...\",\"...\",\"...\"]}",
       ].join("\n"),
     },

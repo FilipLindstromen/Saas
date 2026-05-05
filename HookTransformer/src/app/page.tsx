@@ -398,6 +398,7 @@ export default function HomePage() {
           targetAudience,
           platform,
           hook: item.text,
+          uniquePerspective,
         });
         const nextBatch: IdeaBatch = {
           id: makeId(),
@@ -415,7 +416,7 @@ export default function HomePage() {
         setIdeasLoadingId(null);
       }
     },
-    [platform, targetAudience],
+    [platform, targetAudience, uniquePerspective],
   );
 
   const onExpandWinningHook = useCallback(
@@ -802,8 +803,8 @@ export default function HomePage() {
                       disabled={ideasLoadingId === item.id}
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-                      title="Generate 5 content ideas"
-                      aria-label="Generate 5 content ideas"
+                      title="Generate 5 aha and conclusion examples"
+                      aria-label="Generate 5 aha and conclusion examples"
                       onClick={() => void onGenerateIdeas(item)}
                     >
                       {ideasLoadingId === item.id ? "⏳" : "💡"}
@@ -897,9 +898,9 @@ export default function HomePage() {
             boxShadow: "var(--shadow-sm)",
           }}
         >
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Content ideas</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Aha + conclusion</h2>
           <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-            Click <span className="font-medium text-[var(--text-secondary)]">Create 5 content ideas</span> on any hook to load ideas here.
+            Click <span className="font-medium text-[var(--text-secondary)]">💡</span> on any hook to load 5 aha + conclusion examples here.
           </p>
 
           <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
@@ -921,7 +922,7 @@ export default function HomePage() {
           <div className="mt-4 space-y-3 pr-1">
             {ideaBatches.length === 0 ? (
               <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
-                Ideas will appear here in separate cards so you can favorite each one.
+                Aha + conclusion examples appear here in separate cards so you can favorite each one.
               </div>
             ) : (
               ideaBatches.map((batch) => (
