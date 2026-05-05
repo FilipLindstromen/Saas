@@ -6,7 +6,7 @@ import { runWorkflowAction } from "@/lib/mock-ai";
 import { calcEngagementRate } from "@/lib/scoring";
 import { useAppState } from "@/lib/app-state";
 import { usePersistedState } from "@/lib/use-persisted-state";
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 
 type StoredWorkflowResult = {
   actionId: string;
@@ -47,6 +47,21 @@ export default function DashboardPage() {
 
   const selectedResult = selectedResultActionId ? workflowResults[selectedResultActionId] : undefined;
 
+  const renderInlineMarkdown = (line: string): ReactNode[] => {
+    const parts = line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    return parts.map((part, idx) => {
+      const bold = part.match(/^\*\*([^*]+)\*\*$/);
+      if (bold) {
+        return (
+          <strong key={`${part}-${idx}`} className="font-semibold">
+            {bold[1]}
+          </strong>
+        );
+      }
+      return <span key={`${part}-${idx}`}>{part}</span>;
+    });
+  };
+
   const formatOutput = (text: string) => {
     const lines = text
       .split("\n")
@@ -56,12 +71,35 @@ export default function DashboardPage() {
     return (
       <div className="space-y-2">
         {lines.map((line, index) => {
+          const isDivider = /^(-{3,}|_{3,}|\*{3,})$/.test(line);
+          if (isDivider) return <hr key={`hr-${index}`} className="my-3 border-[var(--border-default)]" />;
+
+          const heading = line.match(/^#{1,3}\s*(.+)$/);
+          if (heading) {
+            return (
+              <h4 key={`h-${index}`} className="pt-1 text-base font-semibold">
+                {renderInlineMarkdown(heading[1])}
+              </h4>
+            );
+          }
+
           const cleaned = line.replace(/^[-*]\s*/, "").replace(/^\d+[\.\)]\s*/, "");
           const isBullet = /^[-*]\s+/.test(line) || /^\d+[\.\)]\s+/.test(line);
+          const looksLikeSectionTitle = /^\*\*[^*]+\*\*\s*(?:[-–—:]\s*.*)?$/.test(line);
+
+          if (looksLikeSectionTitle && !isBullet) {
+            return (
+              <div key={`section-${index}`} className="pt-2">
+                <p className="text-sm leading-6">{renderInlineMarkdown(line)}</p>
+                <hr className="mt-2 border-[var(--border-subtle)]" />
+              </div>
+            );
+          }
+
           return (
-            <p key={`${line}-${index}`} className={`text-sm leading-6 ${isBullet ? "pl-3" : ""}`}>
+            <p key={`${line}-${index}`} className={`text-sm leading-7 ${isBullet ? "pl-3" : ""}`}>
               {isBullet ? "• " : ""}
-              {cleaned}
+              {renderInlineMarkdown(cleaned)}
             </p>
           );
         })}
