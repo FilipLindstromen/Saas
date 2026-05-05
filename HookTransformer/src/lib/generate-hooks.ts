@@ -7,6 +7,7 @@ export type HookVariation = {
   score: number;
   reasons: string[];
   improveTip: string;
+  source?: string;
 };
 
 export type GenerateHooksInput = {
@@ -70,15 +71,21 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
   if (!Array.isArray(hooks)) return [];
   return hooks
     .map((item) => {
-      const row = item as { text?: unknown; score?: unknown; reasons?: unknown; improveTip?: unknown };
+      const row = item as { text?: unknown; score?: unknown; reasons?: unknown; improveTip?: unknown; source?: unknown };
       const reasons = Array.isArray(row.reasons) ? row.reasons.map((v) => String(v).trim()).filter(Boolean) : [];
       const scoreNumber = Number(row.score);
       const improveTip = String(row.improveTip ?? "").trim();
+      const rawText = String(row.text ?? "").trim();
+      const match = rawText.match(/^\[([^\]]+)\]\s*/);
+      const parsedSource = typeof row.source === "string" ? row.source.trim() : "";
+      const source = parsedSource || (match ? match[1].trim() : "");
+      const text = match ? rawText.replace(/^\[[^\]]+\]\s*/, "").trim() : rawText;
       return {
-        text: String(row.text ?? "").trim(),
+        text,
         score: Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 0,
         reasons: reasons.slice(0, 3),
         improveTip: improveTip || "Add a more specific situation detail to make it feel even more real.",
+        source: source || undefined,
       };
     })
     .filter((item) => item.text.length > 0);
@@ -234,8 +241,7 @@ export async function generateTrendingHooks(input: {
         "Create exactly 12 hooks total (3 per platform).",
         "Each hook must stay relevant to the seed hook topic and audience.",
         "Return JSON only:",
-        "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
-        "In each hook text, include a short platform marker at the start like [TikTok], [Reddit], [Instagram], or [YouTube].",
+        "{\"hooks\":[{\"source\":\"Instagram|Reddit|YouTube|TikTok\",\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
       ].join("\n"),
     },
   ]);
@@ -245,4 +251,162 @@ export async function generateTrendingHooks(input: {
     throw new Error(`Expected trend hooks, got ${hooks.length}. Try again.`);
   }
   return hooks;
+}
+
+export type ExpansionPack = {
+  rewrites: HookVariation[];
+  painHooks: HookVariation[];
+  curiosityHooks: HookVariation[];
+};
+
+export async function generateWinningHookExpansion(input: {
+  apiKey: string;
+  targetAudience: string;
+  platform: string;
+  stylePreset: string;
+  baseHook: string;
+  uniquePerspective?: string;
+}): Promise<ExpansionPack> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+
+  const parsed = await requestJson<{
+    rewrites?: unknown;
+    painHooks?: unknown;
+    curiosityHooks?: unknown;
+  }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You expand winning social hooks. Use plain language and natural spoken tone. No buzzwords, no fancy language.",
+    },
+    {
+      role: "user",
+      content: [
+        `Target audience: ${input.targetAudience}`,
+        `Platform: ${input.platform}`,
+        `Style preset: ${input.stylePreset}`,
+        `Winning hook: ${input.baseHook}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        "",
+        "Generate 3 sets with exactly 10 hooks each:",
+        "1) rewrites: same core idea, fresh wording",
+        "2) painHooks: stronger pain/tension angle",
+        "3) curiosityHooks: stronger curiosity/open-loop angle",
+        "Return JSON only with this shape:",
+        "{\"rewrites\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"...\"],\"improveTip\":\"...\"}],\"painHooks\":[...],\"curiosityHooks\":[...]}",
+      ].join("\n"),
+    },
+  ]);
+
+  const rewrites = normalizeHooks(parsed.rewrites);
+  const painHooks = normalizeHooks(parsed.painHooks);
+  const curiosityHooks = normalizeHooks(parsed.curiosityHooks);
+  if (rewrites.length !== 10 || painHooks.length !== 10 || curiosityHooks.length !== 10) {
+    throw new Error("Expected 10 hooks in each expansion set. Try again.");
+  }
+  return { rewrites, painHooks, curiosityHooks };
+}
+
+export type ScriptStoryboard = {
+  title: string;
+  script: string;
+  storyboard: string[];
+  ctaOptions: string[];
+};
+
+export async function generateScriptStoryboard(input: {
+  apiKey: string;
+  targetAudience: string;
+  platform: string;
+  hook: string;
+  uniquePerspective?: string;
+}): Promise<ScriptStoryboard> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+
+  const parsed = await requestJson<{
+    title?: unknown;
+    script?: unknown;
+    storyboard?: unknown;
+    ctaOptions?: unknown;
+  }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You are a short-form content strategist. Write practical, simple scripts and shot lists in plain everyday language.",
+    },
+    {
+      role: "user",
+      content: [
+        `Platform: ${input.platform}`,
+        `Target audience: ${input.targetAudience}`,
+        `Hook: ${input.hook}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        "",
+        "Create a 30-45 second content blueprint.",
+        "Return JSON with this shape:",
+        "{\"title\":\"...\",\"script\":\"...\",\"storyboard\":[\"shot 1 ...\",\"shot 2 ...\"],\"ctaOptions\":[\"cta1\",\"cta2\",\"cta3\"]}",
+        "Rules:",
+        "- storyboard: exactly 6 steps",
+        "- ctaOptions: exactly 3 options",
+        "- script: one cohesive read-out script",
+      ].join("\n"),
+    },
+  ]);
+
+  const storyboard = Array.isArray(parsed.storyboard) ? parsed.storyboard.map((s) => String(s).trim()).filter(Boolean) : [];
+  const ctaOptions = Array.isArray(parsed.ctaOptions) ? parsed.ctaOptions.map((s) => String(s).trim()).filter(Boolean) : [];
+  const title = String(parsed.title ?? "").trim();
+  const script = String(parsed.script ?? "").trim();
+  if (!title || !script || storyboard.length !== 6 || ctaOptions.length !== 3) {
+    throw new Error("Failed to generate a complete script/storyboard package. Try again.");
+  }
+  return { title, script, storyboard, ctaOptions };
+}
+
+export async function recalculateHookScores(input: {
+  apiKey: string;
+  targetAudience: string;
+  platform: string;
+  hooks: string[];
+}): Promise<HookVariation[]> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+  const cleanedHooks = input.hooks.map((hook) => hook.trim()).filter(Boolean);
+  if (cleanedHooks.length === 0) return [];
+
+  const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You score social media hooks. Never rewrite, rephrase, or alter hook text. Only evaluate and score exactly what you receive.",
+    },
+    {
+      role: "user",
+      content: [
+        `Target audience: ${input.targetAudience}`,
+        `Platform: ${input.platform}`,
+        "",
+        "Score these hooks exactly as written. Do not change any hook text.",
+        "Return JSON only with shape:",
+        "{\"hooks\":[{\"text\":\"original exact hook text\",\"score\":0-100,\"reasons\":[\"...\",\"...\"],\"improveTip\":\"...\"}]}",
+        "",
+        "Hooks:",
+        ...cleanedHooks.map((hook, i) => `${i + 1}. ${hook}`),
+      ].join("\n"),
+    },
+  ]);
+
+  const variations = normalizeHooks(parsed.hooks);
+  if (variations.length !== cleanedHooks.length) {
+    throw new Error("Could not rescore all hooks. Try again.");
+  }
+  return variations;
 }

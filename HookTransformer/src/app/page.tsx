@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
 import {
+  type ExpansionPack,
+  type ScriptStoryboard,
   generateContentIdeas,
   generateHookVariations,
+  recalculateHookScores,
+  generateScriptStoryboard,
   generateTrendingHooks,
+  generateWinningHookExpansion,
   rewriteWinningHook,
   type HookVariation,
 } from "@/lib/generate-hooks";
@@ -14,7 +19,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEFAULT_AUDIENCE = "High-performing professionals";
 const STORAGE_KEY = "hook-transformer-state-v2";
-const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "TikTok", "YouTube Shorts"] as const;
+const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "Instagram AD (lead magnet / low ticket)", "TikTok", "YouTube Shorts"] as const;
 const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as const;
 
 type ResultItem = HookVariation & {
@@ -59,6 +64,26 @@ type FavoriteIdea = {
   savedAt: string;
 };
 
+type ExpansionBatch = {
+  id: string;
+  hookText: string;
+  createdAt: string;
+  groups: {
+    rewrites: ResultItem[];
+    painHooks: ResultItem[];
+    curiosityHooks: ResultItem[];
+  };
+};
+
+type ScriptBoardEntry = {
+  id: string;
+  hookText: string;
+  platform: string;
+  targetAudience: string;
+  createdAt: string;
+  package: ScriptStoryboard;
+};
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -76,6 +101,14 @@ function toResultItems(hooks: HookVariation[]): ResultItem[] {
     }));
 }
 
+function toExpansionGroups(pack: ExpansionPack) {
+  return {
+    rewrites: toResultItems(pack.rewrites),
+    painHooks: toResultItems(pack.painHooks),
+    curiosityHooks: toResultItems(pack.curiosityHooks),
+  };
+}
+
 export default function HomePage() {
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
   const [hook, setHook] = useState("");
@@ -89,11 +122,15 @@ export default function HomePage() {
   const [collectionNameInput, setCollectionNameInput] = useState("");
   const [ideaBatches, setIdeaBatches] = useState<IdeaBatch[]>([]);
   const [favoriteIdeas, setFavoriteIdeas] = useState<FavoriteIdea[]>([]);
+  const [expansionBatches, setExpansionBatches] = useState<ExpansionBatch[]>([]);
+  const [scriptBoards, setScriptBoards] = useState<ScriptBoardEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState("Generating...");
   const [rewritingId, setRewritingId] = useState<string | null>(null);
   const [ideasLoadingId, setIdeasLoadingId] = useState<string | null>(null);
+  const [expandingId, setExpandingId] = useState<string | null>(null);
+  const [scriptLoadingId, setScriptLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -111,6 +148,8 @@ export default function HomePage() {
         activeCollectionId: string;
         ideaBatches: IdeaBatch[];
         favoriteIdeas: FavoriteIdea[];
+        expansionBatches: ExpansionBatch[];
+        scriptBoards: ScriptBoardEntry[];
       }>;
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
@@ -129,6 +168,8 @@ export default function HomePage() {
       if (typeof parsed.activeCollectionId === "string") setActiveCollectionId(parsed.activeCollectionId);
       if (Array.isArray(parsed.ideaBatches)) setIdeaBatches(parsed.ideaBatches);
       if (Array.isArray(parsed.favoriteIdeas)) setFavoriteIdeas(parsed.favoriteIdeas);
+      if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
+      if (Array.isArray(parsed.scriptBoards)) setScriptBoards(parsed.scriptBoards);
     } catch {
       // ignore invalid local storage payload
     }
@@ -147,9 +188,25 @@ export default function HomePage() {
       activeCollectionId,
       ideaBatches,
       favoriteIdeas,
+      expansionBatches,
+      scriptBoards,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [targetAudience, hook, uniquePerspective, platform, stylePreset, results, favorites, collections, activeCollectionId, ideaBatches, favoriteIdeas]);
+  }, [
+    targetAudience,
+    hook,
+    uniquePerspective,
+    platform,
+    stylePreset,
+    results,
+    favorites,
+    collections,
+    activeCollectionId,
+    ideaBatches,
+    favoriteIdeas,
+    expansionBatches,
+    scriptBoards,
+  ]);
 
   const onGenerate = useCallback(async () => {
     setError(null);
@@ -178,6 +235,46 @@ export default function HomePage() {
       setLoading(false);
     }
   }, [hook, platform, stylePreset, targetAudience, uniquePerspective]);
+
+  const onRecalculateScores = useCallback(async () => {
+    setError(null);
+    if (results.length === 0) {
+      setError("Generate hooks first, then recalculate scores.");
+      return;
+    }
+    const apiKey = loadSharedOpenAiKey();
+    setLoading(true);
+    setLoadingLabel("Recalculating scores...");
+    try {
+      const rescored = await recalculateHookScores({
+        apiKey,
+        targetAudience,
+        platform,
+        hooks: results.map((item) => item.text),
+      });
+      const byText = new Map(rescored.map((item) => [item.text, item]));
+      const next = results
+        .map((item) => {
+          const scoreData = byText.get(item.text);
+          return scoreData
+            ? {
+                ...item,
+                score: scoreData.score,
+                reasons: scoreData.reasons,
+                improveTip: scoreData.improveTip,
+              }
+            : item;
+        })
+        .slice()
+        .sort((a, b) => b.score - a.score);
+      setResults(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to recalculate scores.");
+    } finally {
+      setLoading(false);
+      setLoadingLabel("Generating...");
+    }
+  }, [platform, results, targetAudience]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
@@ -321,6 +418,71 @@ export default function HomePage() {
     [platform, targetAudience],
   );
 
+  const onExpandWinningHook = useCallback(
+    async (item: ResultItem) => {
+      setError(null);
+      setExpandingId(item.id);
+      const apiKey = loadSharedOpenAiKey();
+      try {
+        const pack = await generateWinningHookExpansion({
+          apiKey,
+          targetAudience,
+          platform,
+          stylePreset,
+          uniquePerspective,
+          baseHook: item.text,
+        });
+        const batch: ExpansionBatch = {
+          id: makeId(),
+          hookText: item.text,
+          createdAt: new Date().toISOString(),
+          groups: toExpansionGroups(pack),
+        };
+        setExpansionBatches((prev) => [batch, ...prev]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to expand winning hook.");
+      } finally {
+        setExpandingId(null);
+      }
+    },
+    [platform, stylePreset, targetAudience, uniquePerspective],
+  );
+
+  const onCreateScriptStoryboard = useCallback(
+    async (item: ResultItem) => {
+      setError(null);
+      setScriptLoadingId(item.id);
+      const apiKey = loadSharedOpenAiKey();
+      try {
+        const pkg = await generateScriptStoryboard({
+          apiKey,
+          platform,
+          targetAudience,
+          uniquePerspective,
+          hook: item.text,
+        });
+        const entry: ScriptBoardEntry = {
+          id: makeId(),
+          hookText: item.text,
+          platform,
+          targetAudience,
+          createdAt: new Date().toISOString(),
+          package: pkg,
+        };
+        setScriptBoards((prev) => [entry, ...prev]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create script/storyboard.");
+      } finally {
+        setScriptLoadingId(null);
+      }
+    },
+    [platform, targetAudience, uniquePerspective],
+  );
+
+  const onUpdateHookText = useCallback((id: string, text: string) => {
+    setResults((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
+  }, []);
+
   const activeCollection = useMemo(
     () => collections.find((collection) => collection.id === activeCollectionId),
     [activeCollectionId, collections],
@@ -358,9 +520,9 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <header
-        className="border-b px-4 py-4 sm:px-6"
+        className="sticky top-0 z-30 border-b px-4 py-4 sm:px-6"
         style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
       >
         <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-3">
@@ -387,9 +549,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[1800px] gap-6 p-4 xl:grid-cols-[340px_minmax(0,1fr)_380px]">
+      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1800px] gap-6 overflow-hidden p-4 xl:grid-cols-[340px_minmax(0,1fr)_380px]">
         <aside
-          className="h-fit rounded-2xl border p-5 sm:sticky sm:top-6"
+          className="h-full overflow-hidden rounded-2xl border p-5"
           style={{
             borderColor: "var(--border-subtle)",
             background: "var(--bg-elevated)",
@@ -502,6 +664,19 @@ export default function HomePage() {
           >
             {loading && loadingLabel === "Finding trends..." ? "Finding trends..." : "Find trending hooks"}
           </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void onRecalculateScores()}
+            className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: "var(--border-default)",
+              background: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {loading && loadingLabel === "Recalculating scores..." ? "Recalculating scores..." : "Recalculate hook scores"}
+          </button>
           <p className="mt-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
             Uses your shared OpenAI key from the hub (local <code className="rounded bg-[var(--bg-hover)] px-1">saasApiKeys</code>). Add
             it via the gear icon on the SaaS Apps page if needed.
@@ -511,7 +686,7 @@ export default function HomePage() {
           ) : null}
         </aside>
 
-        <section>
+        <section className="h-full overflow-y-auto pr-1">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Variations</h2>
           {results.length === 0 && !loading ? (
             <div
@@ -547,8 +722,23 @@ export default function HomePage() {
                 >
                   <span className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                     #{i + 1}
+                    {item.source ? (
+                      <span className="ml-2 rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--border-default)" }}>
+                        {item.source}
+                      </span>
+                    ) : null}
                   </span>
-                  <p className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">{item.text}</p>
+                  <textarea
+                    value={item.text}
+                    onChange={(e) => onUpdateHookText(item.id, e.target.value)}
+                    rows={3}
+                    className="flex-1 w-full resize-y rounded-lg border px-2.5 py-2 text-sm leading-relaxed outline-none"
+                    style={{
+                      borderColor: "var(--border-default)",
+                      background: "var(--bg-tertiary)",
+                      color: "var(--text-secondary)",
+                    }}
+                  />
                   <div
                     className="group mt-3 rounded-lg border px-3 py-2 text-xs"
                     style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}
@@ -568,45 +758,77 @@ export default function HomePage() {
                       type="button"
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Copy hook"
+                      aria-label="Copy hook"
                       onClick={() => {
                         void navigator.clipboard.writeText(item.text);
                       }}
                     >
-                      Copy
+                      📋
                     </button>
                     <button
                       type="button"
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Save hook to favorites"
+                      aria-label="Save hook to favorites"
                       onClick={() => addToFavorites(item)}
                     >
-                      Favorite
+                      ⭐
                     </button>
                     <button
                       type="button"
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Add hook to selected collection"
+                      aria-label="Add hook to selected collection"
                       onClick={() => addToCollection(item)}
                     >
-                      Add to collection
+                      🗂️
                     </button>
                     <button
                       type="button"
                       disabled={rewritingId === item.id}
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Rewrite from this winning hook"
+                      aria-label="Rewrite from this winning hook"
                       onClick={() => void onRewriteFromWinner(item)}
                     >
-                      {rewritingId === item.id ? "Rewriting..." : "Rewrite from winner"}
+                      {rewritingId === item.id ? "⏳" : "🔁"}
                     </button>
                     <button
                       type="button"
                       disabled={ideasLoadingId === item.id}
                       className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
                       style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Generate 5 content ideas"
+                      aria-label="Generate 5 content ideas"
                       onClick={() => void onGenerateIdeas(item)}
                     >
-                      {ideasLoadingId === item.id ? "Generating ideas..." : "Create 5 content ideas"}
+                      {ideasLoadingId === item.id ? "⏳" : "💡"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={expandingId === item.id}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Generate winning hook expansion sets"
+                      aria-label="Generate winning hook expansion sets"
+                      onClick={() => void onExpandWinningHook(item)}
+                    >
+                      {expandingId === item.id ? "⏳" : "🚀"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={scriptLoadingId === item.id}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                      title="Create script and storyboard from hook"
+                      aria-label="Create script and storyboard from hook"
+                      onClick={() => void onCreateScriptStoryboard(item)}
+                    >
+                      {scriptLoadingId === item.id ? "⏳" : "🎬"}
                     </button>
                   </div>
                 </li>
@@ -668,7 +890,7 @@ export default function HomePage() {
         </section>
 
         <aside
-          className="h-fit rounded-2xl border p-4 xl:sticky xl:top-6"
+          className="h-full overflow-hidden rounded-2xl border p-4"
           style={{
             borderColor: "var(--border-subtle)",
             background: "var(--bg-elevated)",
@@ -682,7 +904,7 @@ export default function HomePage() {
 
           <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
             <h3 className="text-xs font-semibold text-[var(--text-primary)]">Favorite ideas ({favoriteIdeas.length})</h3>
-            <div className="mt-2 max-h-44 space-y-2 overflow-auto">
+            <div className="mt-2 space-y-2">
               {favoriteIdeas.length === 0 ? (
                 <p className="text-xs text-[var(--text-tertiary)]">No favorite ideas saved yet.</p>
               ) : (
@@ -696,7 +918,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-4 max-h-[70vh] space-y-3 overflow-auto pr-1">
+          <div className="mt-4 space-y-3 pr-1">
             {ideaBatches.length === 0 ? (
               <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
                 Ideas will appear here in separate cards so you can favorite each one.
@@ -742,6 +964,68 @@ export default function HomePage() {
                 </section>
               ))
             )}
+          </div>
+
+          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+            <h3 className="text-xs font-semibold text-[var(--text-primary)]">Winning hook expansions ({expansionBatches.length})</h3>
+            <div className="mt-2 space-y-3">
+              {expansionBatches.length === 0 ? (
+                <p className="text-xs text-[var(--text-tertiary)]">Run "Winning hook expansion" on a result to generate rewrite/pain/curiosity sets.</p>
+              ) : (
+                expansionBatches.map((batch) => (
+                  <div key={batch.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                    <p className="font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
+                    <div className="mt-2 space-y-2 text-[11px] text-[var(--text-tertiary)]">
+                      <div>
+                        <p className="font-semibold text-[var(--text-secondary)]">Rewrites</p>
+                        <p>{batch.groups.rewrites.slice(0, 3).map((h) => h.text).join(" · ")}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[var(--text-secondary)]">Pain hooks</p>
+                        <p>{batch.groups.painHooks.slice(0, 3).map((h) => h.text).join(" · ")}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[var(--text-secondary)]">Curiosity hooks</p>
+                        <p>{batch.groups.curiosityHooks.slice(0, 3).map((h) => h.text).join(" · ")}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+            <h3 className="text-xs font-semibold text-[var(--text-primary)]">Scripts & storyboards ({scriptBoards.length})</h3>
+            <div className="mt-2 space-y-3">
+              {scriptBoards.length === 0 ? (
+                <p className="text-xs text-[var(--text-tertiary)]">Run "1-click script/storyboard" on any hook to create a ready-to-record plan.</p>
+              ) : (
+                scriptBoards.map((entry) => (
+                  <div key={entry.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                    <p className="font-semibold text-[var(--text-secondary)]">{entry.package.title}</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">{entry.platform} · {entry.hookText}</p>
+                    <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{entry.package.script}</p>
+                    <div className="mt-2">
+                      <p className="font-semibold text-[var(--text-secondary)]">Storyboard</p>
+                      <ul className="list-disc pl-4 text-[11px] text-[var(--text-tertiary)]">
+                        {entry.package.storyboard.map((step, idx) => (
+                          <li key={`${entry.id}-step-${idx}`}>{step}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <p className="font-semibold text-[var(--text-secondary)]">CTA options</p>
+                      <ul className="list-disc pl-4 text-[11px] text-[var(--text-tertiary)]">
+                        {entry.package.ctaOptions.map((cta, idx) => (
+                          <li key={`${entry.id}-cta-${idx}`}>{cta}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </aside>
       </div>
