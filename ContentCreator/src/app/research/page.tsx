@@ -6,18 +6,19 @@ import { useAppState } from "@/lib/app-state";
 import { RESEARCH_SOURCES } from "@/lib/constants";
 import { generateResearchIdeas } from "@/lib/mock-ai";
 import { ContentIdea, Platform } from "@/lib/types";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 const platforms: Platform[] = ["LinkedIn", "Instagram", "YouTube Shorts", "TikTok", "X", "Threads"];
 
 export default function ResearchPage() {
   const { data, addIdeas } = useAppState();
-  const [topic, setTopic] = useState("AI-assisted content systems");
-  const [audience, setAudience] = useState("Coaches and creator-educators");
-  const [trendNotes, setTrendNotes] = useState("");
-  const [count, setCount] = useState(10);
-  const [selectedSources, setSelectedSources] = useState(RESEARCH_SOURCES.slice(0, 4));
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(platforms);
-  const [results, setResults] = useState<ContentIdea[]>([]);
+  const [topic, setTopic] = usePersistedState("content-creator:research:topic", "AI-assisted content systems");
+  const [audience, setAudience] = usePersistedState("content-creator:research:audience", "Coaches and creator-educators");
+  const [trendNotes, setTrendNotes] = usePersistedState("content-creator:research:trendNotes", "");
+  const [count, setCount] = usePersistedState("content-creator:research:count", 10);
+  const [selectedSources, setSelectedSources] = usePersistedState("content-creator:research:sources", RESEARCH_SOURCES.slice(0, 4));
+  const [selectedPlatforms, setSelectedPlatforms] = usePersistedState<Platform[]>("content-creator:research:platforms", platforms);
+  const [results, setResults] = usePersistedState<ContentIdea[]>("content-creator:research:results", []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

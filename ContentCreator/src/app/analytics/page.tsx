@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { calcEngagementRate } from "@/lib/scoring";
 import { Platform } from "@/lib/types";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 export default function AnalyticsPage() {
   const { data, addAnalytics } = useAppState();
-  const [form, setForm] = useState({
+  const [form, setForm] = usePersistedState("content-creator:analytics:form", {
     views: 0,
     likes: 0,
     comments: 0,

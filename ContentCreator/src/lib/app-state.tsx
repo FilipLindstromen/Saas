@@ -19,6 +19,7 @@ type AppState = {
   setData: React.Dispatch<React.SetStateAction<AppData>>;
   resetData: () => void;
   addIdeas: (ideas: ContentIdea[]) => void;
+  removeIdea: (id: string) => void;
   updateIdeaStatus: (id: string, status: ContentIdea["status"]) => void;
   saveVariationAsIdea: (variation: ContentVariation) => void;
   saveScript: (script: ScriptCard) => void;
@@ -50,6 +51,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         persistAndSetData(defaultData);
       },
       addIdeas: (ideas) => persistAndSetData((prev) => ({ ...prev, ideas: [...ideas, ...prev.ideas] })),
+      removeIdea: (id) =>
+        persistAndSetData((prev) => ({
+          ...prev,
+          ideas: prev.ideas.filter((idea) => idea.id !== id),
+          scripts: prev.scripts.filter((script) => script.ideaId !== id),
+          variations: prev.variations.filter((variation) => variation.ideaId !== id),
+          analytics: prev.analytics.filter((entry) => entry.contentIdeaId !== id),
+        })),
       updateIdeaStatus: (id, status) =>
         persistAndSetData((prev) => ({ ...prev, ideas: prev.ideas.map((idea) => (idea.id === id ? { ...idea, status } : idea)) })),
       saveVariationAsIdea: (variation) =>

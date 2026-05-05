@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { generateVariations } from "@/lib/mock-ai";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 export default function MultiplyPage() {
   const { data, setData, saveVariationAsIdea } = useAppState();
-  const [ideaId, setIdeaId] = useState(data.ideas[0]?.id ?? "");
+  const [ideaId, setIdeaId] = usePersistedState("content-creator:multiply:ideaId", data.ideas[0]?.id ?? "");
   const selectedIdea = useMemo(() => data.ideas.find((i) => i.id === ideaId), [data.ideas, ideaId]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

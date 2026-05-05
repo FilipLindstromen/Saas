@@ -7,7 +7,7 @@ import { calcIdeaScore } from "@/lib/scoring";
 import { PipelineStatus } from "@/lib/types";
 
 export default function PipelinePage() {
-  const { data, updateIdeaStatus } = useAppState();
+  const { data, updateIdeaStatus, removeIdea } = useAppState();
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-semibold">Pipeline</h2>
@@ -29,6 +29,17 @@ export default function PipelinePage() {
                       <option key={s}>{s}</option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="cc-btn-secondary mt-2 w-full"
+                    onClick={() => {
+                      if (window.confirm(`Remove "${idea.title}" from pipeline?`)) {
+                        removeIdea(idea.id);
+                      }
+                    }}
+                  >
+                    Remove item
+                  </button>
                 </div>
               ))}
             </div>

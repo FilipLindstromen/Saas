@@ -5,13 +5,14 @@ import { Card, V1Badge } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { generateCompetitorAnalysis } from "@/lib/mock-ai";
 import { CompetitorProfile } from "@/lib/types";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 export default function CompetitorAnalysisPage() {
   const { data, saveCompetitor } = useAppState();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const apiKey = data.apiKeys.openai ?? "";
-  const [form, setForm] = useState<Omit<CompetitorProfile, "id">>({
+  const [form, setForm] = usePersistedState<Omit<CompetitorProfile, "id">>("content-creator:competitor:form", {
     creatorName: "",
     platform: "Instagram",
     profileUrl: "",

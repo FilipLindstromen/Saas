@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { generateScript } from "@/lib/mock-ai";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 export default function ScriptPage() {
   const { data, saveScript } = useAppState();
-  const [ideaId, setIdeaId] = useState(data.ideas[0]?.id ?? "");
+  const [ideaId, setIdeaId] = usePersistedState("content-creator:script:ideaId", data.ideas[0]?.id ?? "");
   const idea = useMemo(() => data.ideas.find((i) => i.id === ideaId), [ideaId, data.ideas]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

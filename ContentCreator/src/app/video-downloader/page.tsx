@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { Card, V1Badge } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { SavedVideoReference } from "@/lib/types";
+import { usePersistedState } from "@/lib/use-persisted-state";
 
 export default function VideoDownloaderPage() {
   const { data, saveVideoReference } = useAppState();
-  const [form, setForm] = useState<Omit<SavedVideoReference, "id" | "createdAt">>({
+  const [form, setForm] = usePersistedState<Omit<SavedVideoReference, "id" | "createdAt">>("content-creator:video:form", {
     url: "",
     platform: "",
     creator: "",
