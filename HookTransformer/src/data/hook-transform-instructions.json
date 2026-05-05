@@ -1,15 +1,19 @@
 {
-  "version": 1,
+  "version": 2,
   "title": "Hook transformation",
-  "summary": "Each output hook must implicitly answer three questions in one fluid line: who this speaks to, the situation they are in, and the tension or problem—without sounding like a checklist.",
+  "summary": "Each output hook must naturally cover who this is for, the situation they are in, and the problem they feel, in plain everyday language that sounds like real people talking.",
   "rules": [
     "Write in the same voice and format as the original hook (question stays a question, statement stays a statement).",
+    "Use simple, everyday words. If a normal person would not say it out loud, do not use it.",
+    "Keep it conversational and direct, like spoken language, not polished ad copy.",
     "Weave audience, situation, and problem into natural phrasing—never prefix with labels like 'For [audience]' or bullet the three pieces.",
     "Keep hooks concise: ideally one short sentence, suitable for social or ad copy.",
     "Honor the target audience: word choice and context should feel native to how that group talks and what they actually do day to day.",
     "Expand vague hooks with specific, plausible detail (time of day, setting, trigger event) so the situation feels real, not generic.",
     "Preserve the core pain from the original hook; do not change the topic into something unrelated.",
-    "Avoid cringe, hype stacks, or forced rhymes. Prefer clear, human language.",
+    "Avoid cringe, hype stacks, forced rhymes, and formal wording. Prefer clear, human language.",
+    "Do not use fancy words or phrases like 'taxing day', 'optimize', 'leverage', 'elevate', 'unlock', or 'transform your life'.",
+    "Write at about 6th-8th grade reading level.",
     "Vary the 10 versions: different situations, angles, and wording so the set feels like real options, not paraphrases of one line.",
     "Do not mention that you are following instructions or a framework in the hook text.",
     "Fix obvious typos in the source hook (e.g. 'switch of' → 'switch off') when transforming."
@@ -22,6 +26,8 @@
   "badPatternsToAvoid": [
     "For busy professionals: at night you have racing thoughts — problem: anxiety.",
     "Who: founders. When: morning. Issue: focus.",
-    "If you're a manager and you're in a meeting and you struggle with..."
+    "If you're a manager and you're in a meeting and you struggle with...",
+    "After a taxing day, does meditation still leave your mind spinning?",
+    "Leverage mindfulness to optimize your cognitive recovery."
   ]
 }
