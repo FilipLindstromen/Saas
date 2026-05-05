@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "saas-apps-theme";
 
@@ -15,6 +15,23 @@ function readTheme(): "light" | "dark" {
   return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
 }
 
+function getThemeSnapshot(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  const attr = document.documentElement.getAttribute("data-theme");
+  if (attr === "light" || attr === "dark") return attr;
+  return readTheme();
+}
+
+function subscribe(onChange: () => void) {
+  const handler = () => onChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener("saas-theme-change", handler as EventListener);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener("saas-theme-change", handler as EventListener);
+  };
+}
+
 function applyTheme(theme: "light" | "dark") {
   document.documentElement.setAttribute("data-theme", theme);
   try {
@@ -26,29 +43,10 @@ function applyTheme(theme: "light" | "dark") {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    setTheme(readTheme());
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && (e.newValue === "light" || e.newValue === "dark")) setTheme(e.newValue);
-    };
-    const onCustom = (e: Event) => {
-      const d = (e as CustomEvent<string>).detail;
-      if (d === "light" || d === "dark") setTheme(d);
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("saas-theme-change", onCustom as EventListener);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("saas-theme-change", onCustom as EventListener);
-    };
-  }, []);
+  const theme = useSyncExternalStore(subscribe, getThemeSnapshot, () => "light");
 
   const toggle = useCallback(() => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    applyTheme(next);
+    applyTheme(theme === "dark" ? "light" : "dark");
   }, [theme]);
 
   return (
