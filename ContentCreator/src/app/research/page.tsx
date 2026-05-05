@@ -5,7 +5,6 @@ import { Card, V1Badge } from "@/components/app-shell";
 import { useAppState } from "@/lib/app-state";
 import { RESEARCH_SOURCES } from "@/lib/constants";
 import { generateResearchIdeas } from "@/lib/mock-ai";
-import { fetchSignalsForSources } from "@/lib/source-fetch";
 import { ContentIdea, Platform } from "@/lib/types";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
@@ -22,7 +21,6 @@ export default function ResearchPage() {
   const [results, setResults] = usePersistedState<ContentIdea[]>("content-creator:research:results", []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [sourceStatus, setSourceStatus] = useState("");
 
   const apiKey = data.apiKeys.openai ?? "";
 
@@ -34,7 +32,7 @@ export default function ResearchPage() {
       </div>
       <Card
         title="Research Inputs"
-        subtitle="Attempts live pull from selected sources where technically available, then uses those signals in OpenAI research generation."
+        subtitle="Uses OpenAI synthesis from your brief, selected source chips, and brand context to generate opportunities."
       >
         <div className="grid gap-3 md:grid-cols-2">
           <input className="cc-input" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic or niche" />
@@ -58,7 +56,6 @@ export default function ResearchPage() {
             </button>
           ))}
         </div>
-        {sourceStatus ? <p className="cc-muted mt-3 text-xs">{sourceStatus}</p> : null}
         {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
         <button
           type="button"
@@ -66,16 +63,8 @@ export default function ResearchPage() {
           disabled={loading || !apiKey}
           onClick={async () => {
             setError("");
-            setSourceStatus("");
             setLoading(true);
             try {
-              const pulled = await fetchSignalsForSources(selectedSources);
-              const statusBits: string[] = [];
-              statusBits.push(`Fetched ${pulled.signals.length} live snippets.`);
-              if (pulled.unavailable.length) statusBits.push(`Unavailable without official API auth: ${pulled.unavailable.join(", ")}.`);
-              if (pulled.errors.length) statusBits.push(`Fetch issues: ${pulled.errors.join(" | ")}.`);
-              setSourceStatus(statusBits.join(" "));
-
               const ideas = await generateResearchIdeas(
                 {
                   topic,
@@ -84,7 +73,6 @@ export default function ResearchPage() {
                   selectedSources,
                   trendNotes,
                   count,
-                  sourceSignals: pulled.signals,
                 },
                 data.brandProfile,
                 apiKey,
