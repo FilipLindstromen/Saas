@@ -54,7 +54,7 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-2">
             <a
-              href="/"
+              href=".."
               className="rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
               style={{
                 borderColor: "var(--border-default)",
