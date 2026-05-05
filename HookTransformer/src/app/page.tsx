@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
-import { generateContentIdeas, generateHookVariations, rewriteWinningHook, type HookVariation } from "@/lib/generate-hooks";
+import {
+  generateContentIdeas,
+  generateHookVariations,
+  generateTrendingHooks,
+  rewriteWinningHook,
+  type HookVariation,
+} from "@/lib/generate-hooks";
 import { loadSharedOpenAiKey } from "@/lib/saas-api-keys";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -57,6 +63,7 @@ export default function HomePage() {
   const [collectionNameInput, setCollectionNameInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Generating...");
   const [rewritingId, setRewritingId] = useState<string | null>(null);
   const [ideasLoadingId, setIdeasLoadingId] = useState<string | null>(null);
 
@@ -110,6 +117,7 @@ export default function HomePage() {
       return;
     }
     setLoading(true);
+    setLoadingLabel("Generating...");
     try {
       const hooks = await generateHookVariations({
         apiKey,
@@ -126,6 +134,31 @@ export default function HomePage() {
       setLoading(false);
     }
   }, [hook, platform, stylePreset, targetAudience]);
+
+  const onFindTrendingHooks = useCallback(async () => {
+    setError(null);
+    const apiKey = loadSharedOpenAiKey();
+    if (!hook.trim()) {
+      setError("Enter a hook first so I can find matching trend hooks.");
+      return;
+    }
+    setLoading(true);
+    setLoadingLabel("Finding trends...");
+    try {
+      const hooks = await generateTrendingHooks({
+        apiKey,
+        targetAudience,
+        hook,
+        stylePreset,
+      });
+      setResults(toResultItems(hooks));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to find trending hooks.");
+    } finally {
+      setLoading(false);
+      setLoadingLabel("Generating...");
+    }
+  }, [hook, stylePreset, targetAudience]);
 
   const addToFavorites = useCallback(
     (item: ResultItem) => {
@@ -353,7 +386,20 @@ export default function HomePage() {
             className="mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: "var(--accent-gradient)", boxShadow: "var(--shadow-sm)" }}
           >
-            {loading ? "Generating..." : "Generate 10 versions"}
+            {loading ? loadingLabel : "Generate 10 versions"}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void onFindTrendingHooks()}
+            className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: "var(--border-default)",
+              background: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {loading && loadingLabel === "Finding trends..." ? "Finding trends..." : "Find trending hooks"}
           </button>
           <p className="mt-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
             Uses your shared OpenAI key from the hub (local <code className="rounded bg-[var(--bg-hover)] px-1">saasApiKeys</code>). Add

@@ -195,3 +195,44 @@ export async function generateContentIdeas(input: {
   }
   return ideas;
 }
+
+export async function generateTrendingHooks(input: {
+  apiKey: string;
+  targetAudience: string;
+  hook: string;
+  stylePreset: string;
+}): Promise<HookVariation[]> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+
+  const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You create trend-inspired social hooks in plain language. Avoid fancy words and buzzwords. Generate hooks that sound like how people actually talk.",
+    },
+    {
+      role: "user",
+      content: [
+        `Target audience: ${input.targetAudience}`,
+        `Seed hook: ${input.hook}`,
+        `Style preset: ${input.stylePreset}`,
+        "",
+        "Generate trend-inspired hooks for these platforms: Instagram, Reddit, YouTube Shorts, TikTok.",
+        "Create exactly 12 hooks total (3 per platform).",
+        "Each hook must stay relevant to the seed hook topic and audience.",
+        "Return JSON only:",
+        "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"]}]}",
+        "In each hook text, include a short platform marker at the start like [TikTok], [Reddit], [Instagram], or [YouTube].",
+      ].join("\n"),
+    },
+  ]);
+
+  const hooks = normalizeHooks(parsed.hooks);
+  if (hooks.length < 8) {
+    throw new Error(`Expected trend hooks, got ${hooks.length}. Try again.`);
+  }
+  return hooks;
+}
