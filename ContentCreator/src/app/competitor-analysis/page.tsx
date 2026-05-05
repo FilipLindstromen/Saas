@@ -8,6 +8,9 @@ import { CompetitorProfile } from "@/lib/types";
 
 export default function CompetitorAnalysisPage() {
   const { data, saveCompetitor } = useAppState();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const apiKey = data.apiKeys.openai ?? "";
   const [form, setForm] = useState<Omit<CompetitorProfile, "id">>({
     creatorName: "",
     platform: "Instagram",
@@ -46,17 +49,28 @@ export default function CompetitorAnalysisPage() {
             <input key={key} className="cc-input" placeholder={key} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} />
           ))}
         </div>
+        {error ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
         <button
           type="button"
           className="cc-btn-primary mt-2"
-          onClick={() => {
-            const profile: CompetitorProfile = { id: Math.random().toString(36).slice(2, 10), ...form };
-            const analysis = generateCompetitorAnalysis(profile);
-            saveCompetitor(profile, analysis);
+          disabled={loading || !apiKey}
+          onClick={async () => {
+            setError("");
+            setLoading(true);
+            try {
+              const profile: CompetitorProfile = { id: Math.random().toString(36).slice(2, 10), ...form };
+              const analysis = await generateCompetitorAnalysis(profile, apiKey);
+              saveCompetitor(profile, analysis);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Analysis failed.");
+            } finally {
+              setLoading(false);
+            }
           }}
         >
-          Generate analysis
+          {loading ? "Generating…" : "Generate analysis"}
         </button>
+        {!apiKey ? <p className="cc-muted mt-2 text-xs">Add an OpenAI key in the SaaS hub settings.</p> : null}
       </Card>
       <div className="space-y-3">
         {data.competitorAnalyses.map((analysis) => (

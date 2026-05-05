@@ -61,7 +61,7 @@ export function V1Badge() {
         color: "var(--text-secondary)",
       }}
     >
-      v1 manual/mock mode
+      Local-first · OpenAI generation
     </span>
   );
 }

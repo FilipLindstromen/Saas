@@ -10,6 +10,9 @@ import { useMemo, useState } from "react";
 export default function DashboardPage() {
   const { data } = useAppState();
   const [workflowOutput, setWorkflowOutput] = useState("");
+  const [workflowError, setWorkflowError] = useState("");
+  const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
+  const apiKey = data.apiKeys.openai ?? "";
 
   const byStage = useMemo(() => {
     const map: Record<string, number> = {};
@@ -56,14 +59,42 @@ export default function DashboardPage() {
           ))}
         </div>
       </Card>
-      <Card title="Workflow actions" subtitle="Reusable skill-style actions (mock in v1).">
+      <Card title="Workflow actions" subtitle="Reusable skill-style actions powered by OpenAI from your brand profile and pipeline.">
+        {!apiKey ? <p className="cc-muted mb-3 text-sm">Add an OpenAI key in the SaaS hub settings to run workflows.</p> : null}
+        {workflowError ? <p className="mb-3 text-sm text-red-600 dark:text-red-400">{workflowError}</p> : null}
         <div className="grid gap-3 md:grid-cols-2">
           {WORKFLOW_ACTIONS.map((action) => (
             <div key={action.id} className="cc-panel">
               <p className="font-medium">{action.name}</p>
               <p className="cc-muted mt-1 text-xs">{action.description}</p>
               <p className="cc-muted mt-1 text-xs">Inputs: {action.inputs.join(", ")} | Output: {action.outputFormat}</p>
-              <button type="button" className="cc-btn-secondary mt-2 !text-xs" onClick={() => setWorkflowOutput(runWorkflowAction(action))}>Run workflow</button>
+              <button
+                type="button"
+                className="cc-btn-secondary mt-2 !text-xs"
+                disabled={!apiKey || workflowLoading !== null}
+                onClick={async () => {
+                  setWorkflowError("");
+                  setWorkflowLoading(action.id);
+                  try {
+                    const ideaTitles = data.ideas.slice(0, 8).map((i) => i.title);
+                    const analyticsSummary =
+                      data.analytics.length === 0
+                        ? ""
+                        : data.analytics
+                            .slice(0, 5)
+                            .map((a) => `${a.platform} ${a.formatUsed} views ${a.views} ER ~${calcEngagementRate(a).toFixed(2)}%`)
+                            .join("; ");
+                    const out = await runWorkflowAction(action, { brand: data.brandProfile, ideaTitles, analyticsSummary }, apiKey);
+                    setWorkflowOutput(out);
+                  } catch (e) {
+                    setWorkflowError(e instanceof Error ? e.message : "Workflow failed.");
+                  } finally {
+                    setWorkflowLoading(null);
+                  }
+                }}
+              >
+                {workflowLoading === action.id ? "Running…" : "Run workflow"}
+              </button>
             </div>
           ))}
         </div>
