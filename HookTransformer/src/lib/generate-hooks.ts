@@ -6,6 +6,7 @@ export type HookVariation = {
   text: string;
   score: number;
   reasons: string[];
+  improveTip: string;
 };
 
 export type GenerateHooksInput = {
@@ -14,6 +15,7 @@ export type GenerateHooksInput = {
   hook: string;
   platform: string;
   stylePreset: string;
+  uniquePerspective?: string;
   instructions: Instructions;
 };
 
@@ -68,13 +70,15 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
   if (!Array.isArray(hooks)) return [];
   return hooks
     .map((item) => {
-      const row = item as { text?: unknown; score?: unknown; reasons?: unknown };
+      const row = item as { text?: unknown; score?: unknown; reasons?: unknown; improveTip?: unknown };
       const reasons = Array.isArray(row.reasons) ? row.reasons.map((v) => String(v).trim()).filter(Boolean) : [];
       const scoreNumber = Number(row.score);
+      const improveTip = String(row.improveTip ?? "").trim();
       return {
         text: String(row.text ?? "").trim(),
         score: Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 0,
         reasons: reasons.slice(0, 3),
+        improveTip: improveTip || "Add a more specific situation detail to make it feel even more real.",
       };
     })
     .filter((item) => item.text.length > 0);
@@ -86,6 +90,7 @@ export async function generateHookVariations({
   hook,
   platform,
   stylePreset,
+  uniquePerspective,
   instructions: data,
 }: GenerateHooksInput): Promise<HookVariation[]> {
   const trimmedKey = apiKey.trim();
@@ -100,11 +105,13 @@ export async function generateHookVariations({
     `Style preset: ${stylePreset.trim()}`,
     `Target audience: ${targetAudience.trim()}`,
     `Original hook: ${hook.trim()}`,
+    ...(uniquePerspective?.trim() ? [`Unique perspective: ${uniquePerspective.trim()}`] : []),
     "",
     "Return exactly 10 transformed hooks as JSON with shape:",
-    "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"short reason 1\",\"short reason 2\"]}]}",
+    "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
     "Reasons must be short and plain-language.",
+    "improveTip must be one short, concrete suggestion to make the hook stronger.",
   ].join("\n");
 
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
@@ -137,10 +144,11 @@ export async function rewriteWinningHook(
     `Style preset: ${input.stylePreset.trim()}`,
     `Target audience: ${input.targetAudience.trim()}`,
     `Original hook: ${input.hook.trim()}`,
+    ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
     `Winning hook to use as base pattern: ${input.winningHook.trim()}`,
     "",
     "Create 10 NEW hooks inspired by the winning hook's angle/structure but not duplicates.",
-    "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"...\",\"...\"]}]}",
+    "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"...\",\"...\"],\"improveTip\":\"one short suggestion\"}]}",
   ].join("\n");
 
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
@@ -201,6 +209,7 @@ export async function generateTrendingHooks(input: {
   targetAudience: string;
   hook: string;
   stylePreset: string;
+  uniquePerspective?: string;
 }): Promise<HookVariation[]> {
   const trimmedKey = input.apiKey.trim();
   if (!trimmedKey) {
@@ -219,12 +228,13 @@ export async function generateTrendingHooks(input: {
         `Target audience: ${input.targetAudience}`,
         `Seed hook: ${input.hook}`,
         `Style preset: ${input.stylePreset}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
         "",
         "Generate trend-inspired hooks for these platforms: Instagram, Reddit, YouTube Shorts, TikTok.",
         "Create exactly 12 hooks total (3 per platform).",
         "Each hook must stay relevant to the seed hook topic and audience.",
         "Return JSON only:",
-        "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"]}]}",
+        "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
         "In each hook text, include a short platform marker at the start like [TikTok], [Reddit], [Instagram], or [YouTube].",
       ].join("\n"),
     },

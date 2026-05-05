@@ -19,7 +19,6 @@ const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as c
 
 type ResultItem = HookVariation & {
   id: string;
-  contentIdeas: string[];
 };
 
 type SavedItem = ResultItem & {
@@ -36,6 +35,30 @@ type Collection = {
   items: SavedItem[];
 };
 
+type IdeaItem = {
+  id: string;
+  text: string;
+};
+
+type IdeaBatch = {
+  id: string;
+  hookId: string;
+  hookText: string;
+  platform: string;
+  targetAudience: string;
+  createdAt: string;
+  ideas: IdeaItem[];
+};
+
+type FavoriteIdea = {
+  id: string;
+  text: string;
+  hookText: string;
+  platform: string;
+  targetAudience: string;
+  savedAt: string;
+};
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -44,16 +67,19 @@ function makeId(): string {
 }
 
 function toResultItems(hooks: HookVariation[]): ResultItem[] {
-  return hooks.map((item) => ({
-    ...item,
-    id: makeId(),
-    contentIdeas: [],
-  }));
+  return hooks
+    .slice()
+    .sort((a, b) => b.score - a.score)
+    .map((item) => ({
+      ...item,
+      id: makeId(),
+    }));
 }
 
 export default function HomePage() {
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
   const [hook, setHook] = useState("");
+  const [uniquePerspective, setUniquePerspective] = useState("");
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>("Instagram Reel");
   const [stylePreset, setStylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
   const [results, setResults] = useState<ResultItem[]>([]);
@@ -61,6 +87,8 @@ export default function HomePage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [activeCollectionId, setActiveCollectionId] = useState<string>("");
   const [collectionNameInput, setCollectionNameInput] = useState("");
+  const [ideaBatches, setIdeaBatches] = useState<IdeaBatch[]>([]);
+  const [favoriteIdeas, setFavoriteIdeas] = useState<FavoriteIdea[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState("Generating...");
@@ -74,21 +102,33 @@ export default function HomePage() {
       const parsed = JSON.parse(raw) as Partial<{
         targetAudience: string;
         hook: string;
+        uniquePerspective: string;
         platform: (typeof PLATFORMS)[number];
         stylePreset: (typeof STYLE_PRESETS)[number];
         results: ResultItem[];
         favorites: SavedItem[];
         collections: Collection[];
         activeCollectionId: string;
+        ideaBatches: IdeaBatch[];
+        favoriteIdeas: FavoriteIdea[];
       }>;
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
+      if (typeof parsed.uniquePerspective === "string") setUniquePerspective(parsed.uniquePerspective);
       if (parsed.platform && PLATFORMS.includes(parsed.platform)) setPlatform(parsed.platform);
       if (parsed.stylePreset && STYLE_PRESETS.includes(parsed.stylePreset)) setStylePreset(parsed.stylePreset);
-      if (Array.isArray(parsed.results)) setResults(parsed.results);
+      if (Array.isArray(parsed.results)) {
+        const normalized = parsed.results.map((item) => ({
+          ...item,
+          improveTip: item.improveTip || "Add a more specific situation detail to make it feel even more real.",
+        }));
+        setResults(normalized.slice().sort((a, b) => b.score - a.score));
+      }
       if (Array.isArray(parsed.favorites)) setFavorites(parsed.favorites);
       if (Array.isArray(parsed.collections)) setCollections(parsed.collections);
       if (typeof parsed.activeCollectionId === "string") setActiveCollectionId(parsed.activeCollectionId);
+      if (Array.isArray(parsed.ideaBatches)) setIdeaBatches(parsed.ideaBatches);
+      if (Array.isArray(parsed.favoriteIdeas)) setFavoriteIdeas(parsed.favoriteIdeas);
     } catch {
       // ignore invalid local storage payload
     }
@@ -98,15 +138,18 @@ export default function HomePage() {
     const payload = {
       targetAudience,
       hook,
+      uniquePerspective,
       platform,
       stylePreset,
       results,
       favorites,
       collections,
       activeCollectionId,
+      ideaBatches,
+      favoriteIdeas,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [targetAudience, hook, platform, stylePreset, results, favorites, collections, activeCollectionId]);
+  }, [targetAudience, hook, uniquePerspective, platform, stylePreset, results, favorites, collections, activeCollectionId, ideaBatches, favoriteIdeas]);
 
   const onGenerate = useCallback(async () => {
     setError(null);
@@ -125,6 +168,7 @@ export default function HomePage() {
         hook,
         platform,
         stylePreset,
+        uniquePerspective,
         instructions: hookTransformInstructions,
       });
       setResults(toResultItems(hooks));
@@ -133,7 +177,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [hook, platform, stylePreset, targetAudience]);
+  }, [hook, platform, stylePreset, targetAudience, uniquePerspective]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
@@ -150,6 +194,7 @@ export default function HomePage() {
         targetAudience,
         hook,
         stylePreset,
+        uniquePerspective,
       });
       setResults(toResultItems(hooks));
     } catch (e) {
@@ -158,7 +203,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [hook, stylePreset, targetAudience]);
+  }, [hook, stylePreset, targetAudience, uniquePerspective]);
 
   const addToFavorites = useCallback(
     (item: ResultItem) => {
@@ -232,6 +277,7 @@ export default function HomePage() {
           winningHook: item.text,
           platform,
           stylePreset,
+          uniquePerspective,
           instructions: hookTransformInstructions,
         });
         setResults(toResultItems(hooks));
@@ -241,7 +287,7 @@ export default function HomePage() {
         setRewritingId(null);
       }
     },
-    [hook, platform, stylePreset, targetAudience],
+    [hook, platform, stylePreset, targetAudience, uniquePerspective],
   );
 
   const onGenerateIdeas = useCallback(
@@ -256,7 +302,16 @@ export default function HomePage() {
           platform,
           hook: item.text,
         });
-        setResults((prev) => prev.map((row) => (row.id === item.id ? { ...row, contentIdeas: ideas } : row)));
+        const nextBatch: IdeaBatch = {
+          id: makeId(),
+          hookId: item.id,
+          hookText: item.text,
+          platform,
+          targetAudience,
+          createdAt: new Date().toISOString(),
+          ideas: ideas.map((idea) => ({ id: makeId(), text: idea })),
+        };
+        setIdeaBatches((prev) => [nextBatch, ...prev]);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to generate content ideas.");
       } finally {
@@ -270,6 +325,37 @@ export default function HomePage() {
     () => collections.find((collection) => collection.id === activeCollectionId),
     [activeCollectionId, collections],
   );
+  const isIdeaFavorited = useCallback(
+    (idea: IdeaItem, batch: IdeaBatch) =>
+      favoriteIdeas.some(
+        (fav) =>
+          fav.text.toLowerCase() === idea.text.toLowerCase() &&
+          fav.hookText.toLowerCase() === batch.hookText.toLowerCase(),
+      ),
+    [favoriteIdeas],
+  );
+
+  const saveIdeaToFavorites = useCallback((idea: IdeaItem, batch: IdeaBatch) => {
+    setFavoriteIdeas((prev) => {
+      const exists = prev.some(
+        (fav) =>
+          fav.text.toLowerCase() === idea.text.toLowerCase() &&
+          fav.hookText.toLowerCase() === batch.hookText.toLowerCase(),
+      );
+      if (exists) return prev;
+      return [
+        {
+          id: makeId(),
+          text: idea.text,
+          hookText: batch.hookText,
+          platform: batch.platform,
+          targetAudience: batch.targetAudience,
+          savedAt: new Date().toISOString(),
+        },
+        ...prev,
+      ];
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -277,7 +363,7 @@ export default function HomePage() {
         className="border-b px-4 py-4 sm:px-6"
         style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
       >
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold sm:text-xl">Hook Transformer</h1>
             <p className="mt-0.5 max-w-xl text-xs text-[var(--text-tertiary)]">
@@ -301,7 +387,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-6 p-4 sm:grid-cols-[minmax(280px,360px)_1fr] sm:gap-8 sm:p-6">
+      <div className="mx-auto grid w-full max-w-[1800px] gap-6 p-4 xl:grid-cols-[340px_minmax(0,1fr)_380px]">
         <aside
           className="h-fit rounded-2xl border p-5 sm:sticky sm:top-6"
           style={{
@@ -379,6 +465,21 @@ export default function HomePage() {
               }}
             />
           </label>
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Unique perspective</span>
+            <textarea
+              value={uniquePerspective}
+              onChange={(e) => setUniquePerspective(e.target.value)}
+              rows={3}
+              placeholder="Optional: Contrarian angle, uncommon insight, or specific belief"
+              className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
+              style={{
+                borderColor: "var(--border-default)",
+                background: "var(--bg-tertiary)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </label>
           <button
             type="button"
             disabled={loading}
@@ -422,7 +523,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {loading ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 2xl:grid-cols-3">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
@@ -433,7 +534,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {!loading && results.length > 0 ? (
-            <ul className="grid list-none gap-3 p-0 sm:grid-cols-2">
+            <ul className="grid list-none gap-3 p-0 2xl:grid-cols-2">
               {results.map((item, i) => (
                 <li
                   key={item.id}
@@ -448,13 +549,19 @@ export default function HomePage() {
                     #{i + 1}
                   </span>
                   <p className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">{item.text}</p>
-                  <div className="mt-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                  <div
+                    className="group mt-3 rounded-lg border px-3 py-2 text-xs"
+                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}
+                  >
                     <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
                     <ul className="mt-1 list-disc pl-4 text-[var(--text-secondary)]">
                       {item.reasons.map((reason, idx) => (
                         <li key={`${item.id}-reason-${idx}`}>{reason}</li>
                       ))}
                     </ul>
+                    <p className="mt-2 hidden rounded-md border px-2 py-1 text-[11px] text-[var(--text-tertiary)] group-hover:block" style={{ borderColor: "var(--border-default)" }}>
+                      To score higher: {item.improveTip}
+                    </p>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
@@ -502,16 +609,6 @@ export default function HomePage() {
                       {ideasLoadingId === item.id ? "Generating ideas..." : "Create 5 content ideas"}
                     </button>
                   </div>
-                  {item.contentIdeas.length > 0 ? (
-                    <div className="mt-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                      <p className="font-semibold text-[var(--text-primary)]">Content ideas</p>
-                      <ul className="mt-1 list-disc pl-4 text-[var(--text-secondary)]">
-                        {item.contentIdeas.map((idea, idx) => (
-                          <li key={`${item.id}-idea-${idx}`}>{idea}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
                 </li>
               ))}
             </ul>
@@ -569,6 +666,84 @@ export default function HomePage() {
             </section>
           </div>
         </section>
+
+        <aside
+          className="h-fit rounded-2xl border p-4 xl:sticky xl:top-6"
+          style={{
+            borderColor: "var(--border-subtle)",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Content ideas</h2>
+          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+            Click <span className="font-medium text-[var(--text-secondary)]">Create 5 content ideas</span> on any hook to load ideas here.
+          </p>
+
+          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+            <h3 className="text-xs font-semibold text-[var(--text-primary)]">Favorite ideas ({favoriteIdeas.length})</h3>
+            <div className="mt-2 max-h-44 space-y-2 overflow-auto">
+              {favoriteIdeas.length === 0 ? (
+                <p className="text-xs text-[var(--text-tertiary)]">No favorite ideas saved yet.</p>
+              ) : (
+                favoriteIdeas.map((idea) => (
+                  <div key={idea.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                    <p className="text-[var(--text-secondary)]">{idea.text}</p>
+                    <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{idea.platform} · {idea.hookText}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 max-h-[70vh] space-y-3 overflow-auto pr-1">
+            {ideaBatches.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
+                Ideas will appear here in separate cards so you can favorite each one.
+              </div>
+            ) : (
+              ideaBatches.map((batch) => (
+                <section key={batch.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">
+                    {batch.platform} · {batch.targetAudience}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
+                  <div className="mt-2 space-y-2">
+                    {batch.ideas.map((idea) => {
+                      const saved = isIdeaFavorited(idea, batch);
+                      return (
+                        <div key={idea.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                          <p className="text-[var(--text-secondary)]">{idea.text}</p>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              className="rounded-md border px-2 py-1 text-[11px]"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                              onClick={() => {
+                                void navigator.clipboard.writeText(idea.text);
+                              }}
+                            >
+                              Copy
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saved}
+                              className="rounded-md border px-2 py-1 text-[11px] disabled:opacity-60"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                              onClick={() => saveIdeaToFavorites(idea, batch)}
+                            >
+                              {saved ? "Saved" : "Save idea"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
