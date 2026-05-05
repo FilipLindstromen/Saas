@@ -69,18 +69,27 @@ export async function generateResearchIdeas(
     audience: string;
     platforms: Platform[];
     selectedSources: ResearchSource[];
+    sourceSignals?: { source: ResearchSource; title: string; detail: string; url?: string }[];
     trendNotes?: string;
     count: number;
   },
   brand: BrandProfile,
   apiKey: string,
 ): Promise<ContentIdea[]> {
-  const system = `You are a short-form content strategist. You cannot browse the web or access live social APIs. You synthesize plausible, high-value content opportunities from the user's topic, audience, and source *hints* only.
+  const system = `You are a short-form content strategist. Use any provided live source snippets as evidence for trends and angles.
 Return ONLY valid JSON with shape: {"ideas":[...]}.
-Each idea must include: title, whyTrending, source (one sentence: insight type + disclaimer that it is AI-synthesized from the brief, not live platform data), selectedSource, audienceSizeScore, demoAbilityScore, hookPotentialScore (integers 1-10), suggestedAngle, suggestedFormat, recommendedPlatform, hook, status (always "Researched").
+Each idea must include: title, whyTrending, source (one sentence naming whether it used live snippets or strategic synthesis), selectedSource, audienceSizeScore, demoAbilityScore, hookPotentialScore (integers 1-10), suggestedAngle, suggestedFormat, recommendedPlatform, hook, status (always "Researched").
 selectedSource must be one of: ${SOURCES.join(", ")}.
 recommendedPlatform must be one of: ${PLATFORMS.join(", ")}.
 Generate exactly ${input.count} ideas. Make them specific and actionable.`;
+
+  const liveSignalsText =
+    input.sourceSignals && input.sourceSignals.length
+      ? input.sourceSignals
+          .slice(0, 30)
+          .map((s, i) => `${i + 1}. [${s.source}] ${s.title} — ${s.detail}${s.url ? ` (${s.url})` : ""}`)
+          .join("\n")
+      : "(none)";
 
   const user = `${brandContext(brand)}
 
@@ -88,7 +97,9 @@ Topic / niche: ${input.topic}
 Target audience: ${input.audience}
 Platforms to prioritize: ${input.platforms.join(", ")}
 Source hints (for thematic variety only): ${input.selectedSources.join(", ")}
-Optional trend notes: ${input.trendNotes || "(none)"}`;
+Optional trend notes: ${input.trendNotes || "(none)"}
+Live source snippets:
+${liveSignalsText}`;
 
   const raw = await chatCompletion({
     apiKey,
@@ -116,7 +127,7 @@ Optional trend notes: ${input.trendNotes || "(none)"}`;
       id: uid(),
       title: String(row.title ?? `Idea ${idx + 1}`),
       whyTrending: String(row.whyTrending ?? ""),
-      source: String(row.source ?? "AI-synthesized angle from your brief (not live platform data)."),
+      source: String(row.source ?? "Strategic synthesis from your brief."),
       selectedSource: src,
       audienceSizeScore: clampScore(row.audienceSizeScore),
       demoAbilityScore: clampScore(row.demoAbilityScore),

@@ -2,6 +2,7 @@ import { defaultData } from "./constants";
 import { AppData } from "./types";
 
 const APP_KEY = "ai-content-machine-v1";
+const BRAND_PROFILE_KEY = "ai-content-machine-v1:brand-profile";
 const SHARED_KEYS_KEY = "saasApiKeys";
 
 function loadSharedApiKeys(): Record<string, string> {
@@ -21,22 +22,25 @@ function loadSharedApiKeys(): Record<string, string> {
 export function loadAppData(): AppData {
   if (typeof window === "undefined") return defaultData;
   const sharedKeys = loadSharedApiKeys();
+  const brandProfileRaw = localStorage.getItem(BRAND_PROFILE_KEY);
+  const brandProfile = brandProfileRaw ? { ...defaultData.brandProfile, ...JSON.parse(brandProfileRaw) } : defaultData.brandProfile;
   const raw = localStorage.getItem(APP_KEY);
   if (!raw) {
-    return { ...defaultData, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
+    return { ...defaultData, brandProfile, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
   }
   try {
     const parsed = { ...defaultData, ...JSON.parse(raw) } as AppData;
     // Shared SaaS hub keys (`saasApiKeys`, e.g. `openai`) override stale copies in app JSON.
-    return { ...parsed, apiKeys: { ...parsed.apiKeys, ...sharedKeys } };
+    return { ...parsed, brandProfile: { ...brandProfile, ...parsed.brandProfile }, apiKeys: { ...parsed.apiKeys, ...sharedKeys } };
   } catch {
-    return { ...defaultData, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
+    return { ...defaultData, brandProfile, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
   }
 }
 
 export function saveAppData(data: AppData) {
   if (typeof window === "undefined") return;
   localStorage.setItem(APP_KEY, JSON.stringify(data));
+  localStorage.setItem(BRAND_PROFILE_KEY, JSON.stringify(data.brandProfile));
 }
 
 export function resetSeedData() {
