@@ -18,33 +18,25 @@ function loadSharedApiKeys(): Record<string, string> {
   }
 }
 
-function saveSharedApiKeys(keys: Record<string, string>) {
-  if (typeof window === "undefined") return;
-  try {
-    const existing = loadSharedApiKeys();
-    localStorage.setItem(SHARED_KEYS_KEY, JSON.stringify({ ...existing, ...keys }));
-  } catch {
-    // best effort only
-  }
-}
-
 export function loadAppData(): AppData {
   if (typeof window === "undefined") return defaultData;
   const sharedKeys = loadSharedApiKeys();
   const raw = localStorage.getItem(APP_KEY);
-  if (!raw) return { ...defaultData, apiKeys: { ...sharedKeys, ...defaultData.apiKeys } };
+  if (!raw) {
+    return { ...defaultData, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
+  }
   try {
     const parsed = { ...defaultData, ...JSON.parse(raw) } as AppData;
-    return { ...parsed, apiKeys: { ...sharedKeys, ...parsed.apiKeys } };
+    // Shared SaaS hub keys (`saasApiKeys`, e.g. `openai`) override stale copies in app JSON.
+    return { ...parsed, apiKeys: { ...parsed.apiKeys, ...sharedKeys } };
   } catch {
-    return { ...defaultData, apiKeys: { ...sharedKeys, ...defaultData.apiKeys } };
+    return { ...defaultData, apiKeys: { ...defaultData.apiKeys, ...sharedKeys } };
   }
 }
 
 export function saveAppData(data: AppData) {
   if (typeof window === "undefined") return;
   localStorage.setItem(APP_KEY, JSON.stringify(data));
-  saveSharedApiKeys(data.apiKeys);
 }
 
 export function resetSeedData() {
