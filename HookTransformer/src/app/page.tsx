@@ -126,6 +126,13 @@ export default function HomePage() {
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
   const [hook, setHook] = useState("");
   const [uniquePerspective, setUniquePerspective] = useState("");
+  const [curiosityLevel, setCuriosityLevel] = useState(0.5);
+  const [useContrarianHook, setUseContrarianHook] = useState(false);
+  const [useBrandVoiceLock, setUseBrandVoiceLock] = useState(false);
+  const [brandVoiceSample, setBrandVoiceSample] = useState("");
+  const [netflixConflictLevel, setNetflixConflictLevel] = useState(0.7);
+  const [netflixDramaLevel, setNetflixDramaLevel] = useState(0.7);
+  const [netflixEndingStyle, setNetflixEndingStyle] = useState<"hopeful" | "urgent" | "reflective">("reflective");
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>("Instagram Reel");
   const [stylePreset, setStylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
   const [results, setResults] = useState<ResultItem[]>([]);
@@ -156,6 +163,13 @@ export default function HomePage() {
         targetAudience: string;
         hook: string;
         uniquePerspective: string;
+        curiosityLevel: number;
+        useContrarianHook: boolean;
+        useBrandVoiceLock: boolean;
+        brandVoiceSample: string;
+        netflixConflictLevel: number;
+        netflixDramaLevel: number;
+        netflixEndingStyle: "hopeful" | "urgent" | "reflective";
         platform: (typeof PLATFORMS)[number];
         stylePreset: (typeof STYLE_PRESETS)[number];
         results: ResultItem[];
@@ -168,14 +182,36 @@ export default function HomePage() {
         scriptBoards: ScriptBoardEntry[];
         netflixifyBatches: NetflixifyBatch[];
       }>;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
       if (typeof parsed.uniquePerspective === "string") setUniquePerspective(parsed.uniquePerspective);
+      if (typeof parsed.curiosityLevel === "number") setCuriosityLevel(Math.max(0, Math.min(1, parsed.curiosityLevel)));
+      if (typeof parsed.useContrarianHook === "boolean") setUseContrarianHook(parsed.useContrarianHook);
+      if (typeof parsed.useBrandVoiceLock === "boolean") setUseBrandVoiceLock(parsed.useBrandVoiceLock);
+      if (typeof parsed.brandVoiceSample === "string") setBrandVoiceSample(parsed.brandVoiceSample);
+      if (typeof parsed.netflixConflictLevel === "number") setNetflixConflictLevel(Math.max(0, Math.min(1, parsed.netflixConflictLevel)));
+      if (typeof parsed.netflixDramaLevel === "number") setNetflixDramaLevel(Math.max(0, Math.min(1, parsed.netflixDramaLevel)));
+      if (
+        parsed.netflixEndingStyle === "hopeful" ||
+        parsed.netflixEndingStyle === "urgent" ||
+        parsed.netflixEndingStyle === "reflective"
+      ) {
+        setNetflixEndingStyle(parsed.netflixEndingStyle);
+      }
       if (parsed.platform && PLATFORMS.includes(parsed.platform)) setPlatform(parsed.platform);
       if (parsed.stylePreset && STYLE_PRESETS.includes(parsed.stylePreset)) setStylePreset(parsed.stylePreset);
       if (Array.isArray(parsed.results)) {
         const normalized = parsed.results.map((item) => ({
           ...item,
+          performanceScore:
+            typeof item.performanceScore === "number"
+              ? Math.max(0, Math.min(100, Math.round(item.performanceScore)))
+              : Math.max(0, Math.min(100, Math.round(item.score ?? 0))),
+          performanceReason:
+            typeof item.performanceReason === "string" && item.performanceReason.trim().length > 0
+              ? item.performanceReason
+              : "Strong situational relevance and clear emotional payoff can improve retention.",
           improveTip: item.improveTip || "Add a more specific situation detail to make it feel even more real.",
         }));
         setResults(normalized.slice().sort((a, b) => b.score - a.score));
@@ -198,6 +234,13 @@ export default function HomePage() {
       targetAudience,
       hook,
       uniquePerspective,
+      curiosityLevel,
+      useContrarianHook,
+      useBrandVoiceLock,
+      brandVoiceSample,
+      netflixConflictLevel,
+      netflixDramaLevel,
+      netflixEndingStyle,
       platform,
       stylePreset,
       results,
@@ -215,6 +258,13 @@ export default function HomePage() {
     targetAudience,
     hook,
     uniquePerspective,
+    curiosityLevel,
+    useContrarianHook,
+    useBrandVoiceLock,
+    brandVoiceSample,
+    netflixConflictLevel,
+    netflixDramaLevel,
+    netflixEndingStyle,
     platform,
     stylePreset,
     results,
@@ -245,6 +295,10 @@ export default function HomePage() {
         hook,
         platform,
         stylePreset,
+        curiosityLevel,
+        useContrarianHook,
+        useBrandVoiceLock,
+        brandVoiceSample,
         uniquePerspective,
         instructions: hookTransformInstructions,
       });
@@ -254,7 +308,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [hook, platform, stylePreset, targetAudience, uniquePerspective]);
+  }, [brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const onRecalculateScores = useCallback(async () => {
     setError(null);
@@ -270,6 +324,8 @@ export default function HomePage() {
         apiKey,
         targetAudience,
         platform,
+        useBrandVoiceLock,
+        brandVoiceSample,
         hooks: results.map((item) => item.text),
       });
       const byText = new Map(rescored.map((item) => [item.text, item]));
@@ -294,7 +350,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [platform, results, targetAudience]);
+  }, [brandVoiceSample, platform, results, targetAudience, useBrandVoiceLock]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
@@ -311,6 +367,10 @@ export default function HomePage() {
         targetAudience,
         hook,
         stylePreset,
+        curiosityLevel,
+        useContrarianHook,
+        useBrandVoiceLock,
+        brandVoiceSample,
         uniquePerspective,
       });
       setResults(toResultItems(hooks));
@@ -320,7 +380,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [hook, stylePreset, targetAudience, uniquePerspective]);
+  }, [brandVoiceSample, curiosityLevel, hook, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const addToFavorites = useCallback(
     (item: ResultItem) => {
@@ -394,6 +454,10 @@ export default function HomePage() {
           winningHook: item.text,
           platform,
           stylePreset,
+          curiosityLevel,
+          useContrarianHook,
+          useBrandVoiceLock,
+          brandVoiceSample,
           uniquePerspective,
           instructions: hookTransformInstructions,
         });
@@ -404,7 +468,7 @@ export default function HomePage() {
         setRewritingId(null);
       }
     },
-    [hook, platform, stylePreset, targetAudience, uniquePerspective],
+    [brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook],
   );
 
   const onGenerateIdeas = useCallback(
@@ -479,6 +543,8 @@ export default function HomePage() {
           apiKey,
           platform,
           targetAudience,
+          useBrandVoiceLock,
+          brandVoiceSample,
           uniquePerspective,
           hook: item.text,
         });
@@ -497,7 +563,7 @@ export default function HomePage() {
         setScriptLoadingId(null);
       }
     },
-    [platform, targetAudience, uniquePerspective],
+    [brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
   );
 
   const onNetflixify = useCallback(
@@ -517,6 +583,13 @@ export default function HomePage() {
           apiKey,
           platform,
           targetAudience,
+          curiosityLevel,
+          useContrarianHook,
+          conflictLevel: netflixConflictLevel,
+          dramaLevel: netflixDramaLevel,
+          endingStyle: netflixEndingStyle,
+          useBrandVoiceLock,
+          brandVoiceSample,
           uniquePerspective,
           hook: seedHook,
         });
@@ -535,7 +608,18 @@ export default function HomePage() {
         setNetflixifyLoadingId(null);
       }
     },
-    [platform, targetAudience, uniquePerspective],
+    [
+      brandVoiceSample,
+      curiosityLevel,
+      netflixConflictLevel,
+      netflixDramaLevel,
+      netflixEndingStyle,
+      platform,
+      targetAudience,
+      uniquePerspective,
+      useBrandVoiceLock,
+      useContrarianHook,
+    ],
   );
 
   const onUpdateHookText = useCallback((id: string, text: string) => {
@@ -701,6 +785,93 @@ export default function HomePage() {
               }}
             />
           </label>
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
+              Curiosity level: {curiosityLevel.toFixed(2)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={curiosityLevel}
+              onChange={(e) => setCuriosityLevel(Number(e.target.value))}
+              className="w-full"
+            />
+          </label>
+          <label className="mt-3 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              checked={useContrarianHook}
+              onChange={(e) => setUseContrarianHook(e.target.checked)}
+            />
+            Use contrarian hook
+          </label>
+          <label className="mt-4 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              checked={useBrandVoiceLock}
+              onChange={(e) => setUseBrandVoiceLock(e.target.checked)}
+            />
+            Brand voice lock
+          </label>
+          {useBrandVoiceLock ? (
+            <label className="mt-2 block">
+              <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Brand voice sample</span>
+              <textarea
+                value={brandVoiceSample}
+                onChange={(e) => setBrandVoiceSample(e.target.value)}
+                rows={4}
+                placeholder="Paste examples of your brand tone. The generator will try to match this voice."
+                className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
+                style={{
+                  borderColor: "var(--border-default)",
+                  background: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </label>
+          ) : null}
+          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+            <p className="text-sm font-medium text-[var(--text-secondary)]">Netflixify controls</p>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">Conflict: {netflixConflictLevel.toFixed(2)}</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={netflixConflictLevel}
+                onChange={(e) => setNetflixConflictLevel(Number(e.target.value))}
+                className="w-full"
+              />
+            </label>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">Drama: {netflixDramaLevel.toFixed(2)}</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={netflixDramaLevel}
+                onChange={(e) => setNetflixDramaLevel(Number(e.target.value))}
+                className="w-full"
+              />
+            </label>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">Ending style</span>
+              <select
+                value={netflixEndingStyle}
+                onChange={(e) => setNetflixEndingStyle(e.target.value as "hopeful" | "urgent" | "reflective")}
+                className="w-full rounded-lg border px-2 py-2 text-xs"
+                style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+              >
+                <option value="reflective">Reflective</option>
+                <option value="hopeful">Hopeful</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+          </div>
           <button
             type="button"
             disabled={loading}
@@ -845,6 +1016,8 @@ export default function HomePage() {
                       />
                       <div className="group mt-3 px-1 py-1 text-xs">
                         <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
+                        <p className="mt-1 font-semibold text-[var(--text-primary)]">Performance prediction: {item.performanceScore}/100</p>
+                        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">{item.performanceReason}</p>
                         <ul className="mt-1 list-disc pl-4 text-[var(--text-secondary)]">
                           {item.reasons.map((reason, idx) => (
                             <li key={`${item.id}-reason-${idx}`}>{reason}</li>

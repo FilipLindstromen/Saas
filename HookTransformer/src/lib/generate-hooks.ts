@@ -5,6 +5,8 @@ type Instructions = typeof hookTransformInstructions;
 export type HookVariation = {
   text: string;
   score: number;
+  performanceScore: number;
+  performanceReason: string;
   reasons: string[];
   improveTip: string;
   source?: string;
@@ -16,6 +18,10 @@ export type GenerateHooksInput = {
   hook: string;
   platform: string;
   stylePreset: string;
+  curiosityLevel?: number;
+  useContrarianHook?: boolean;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
   uniquePerspective?: string;
   instructions: Instructions;
 };
@@ -74,7 +80,9 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
       const row = item as { text?: unknown; score?: unknown; reasons?: unknown; improveTip?: unknown; source?: unknown };
       const reasons = Array.isArray(row.reasons) ? row.reasons.map((v) => String(v).trim()).filter(Boolean) : [];
       const scoreNumber = Number(row.score);
+      const performanceScoreNumber = Number((item as { performanceScore?: unknown }).performanceScore);
       const improveTip = String(row.improveTip ?? "").trim();
+      const performanceReason = String((item as { performanceReason?: unknown }).performanceReason ?? "").trim();
       const rawText = String(row.text ?? "").trim();
       const match = rawText.match(/^\[([^\]]+)\]\s*/);
       const parsedSource = typeof row.source === "string" ? row.source.trim() : "";
@@ -83,6 +91,10 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
       return {
         text,
         score: Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 0,
+        performanceScore: Number.isFinite(performanceScoreNumber)
+          ? Math.max(0, Math.min(100, Math.round(performanceScoreNumber)))
+          : (Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 0),
+        performanceReason: performanceReason || "Strong situational relevance and clear emotional payoff can improve retention.",
         reasons: reasons.slice(0, 3),
         improveTip: improveTip || "Add a more specific situation detail to make it feel even more real.",
         source: source || undefined,
@@ -113,10 +125,15 @@ export async function generateHookVariations({
     `Target audience: ${targetAudience.trim()}`,
     `Original hook: ${hook.trim()}`,
     ...(uniquePerspective?.trim() ? [`Unique perspective: ${uniquePerspective.trim()}`] : []),
+    `Curiosity level (0-1): ${Math.max(0, Math.min(1, curiosityLevel ?? 0.5))}`,
+    `Use contrarian hook angle: ${useContrarianHook ? "yes" : "no"}`,
+    ...(useBrandVoiceLock && brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${brandVoiceSample.trim()}`] : []),
     "",
     "Return exactly 10 transformed hooks as JSON with shape:",
-    "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
+    "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"one short reason\",\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
+    "performanceScore should estimate expected watch-through potential.",
+    "performanceReason must explain the performance score in one short sentence.",
     "Reasons must be short and plain-language.",
     "improveTip must be one short, concrete suggestion to make the hook stronger.",
   ].join("\n");
@@ -152,10 +169,13 @@ export async function rewriteWinningHook(
     `Target audience: ${input.targetAudience.trim()}`,
     `Original hook: ${input.hook.trim()}`,
     ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+    `Curiosity level (0-1): ${Math.max(0, Math.min(1, input.curiosityLevel ?? 0.5))}`,
+    `Use contrarian hook angle: ${input.useContrarianHook ? "yes" : "no"}`,
+    ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
     `Winning hook to use as base pattern: ${input.winningHook.trim()}`,
     "",
     "Create 10 NEW hooks inspired by the winning hook's angle/structure but not duplicates.",
-    "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"...\",\"...\"],\"improveTip\":\"one short suggestion\"}]}",
+    "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"...\",\"...\"],\"improveTip\":\"one short suggestion\"}]}",
   ].join("\n");
 
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
@@ -220,6 +240,10 @@ export async function generateTrendingHooks(input: {
   targetAudience: string;
   hook: string;
   stylePreset: string;
+  curiosityLevel?: number;
+  useContrarianHook?: boolean;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
   uniquePerspective?: string;
 }): Promise<HookVariation[]> {
   const trimmedKey = input.apiKey.trim();
@@ -240,12 +264,15 @@ export async function generateTrendingHooks(input: {
         `Seed hook: ${input.hook}`,
         `Style preset: ${input.stylePreset}`,
         ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        `Curiosity level (0-1): ${Math.max(0, Math.min(1, input.curiosityLevel ?? 0.5))}`,
+        `Use contrarian hook angle: ${input.useContrarianHook ? "yes" : "no"}`,
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
         "",
         "Generate trend-inspired hooks for these platforms: Instagram, Reddit, YouTube Shorts, TikTok.",
         "Create exactly 12 hooks total (3 per platform).",
         "Each hook must stay relevant to the seed hook topic and audience.",
         "Return JSON only:",
-        "{\"hooks\":[{\"source\":\"Instagram|Reddit|YouTube|TikTok\",\"text\":\"...\",\"score\":0-100,\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
+        "{\"hooks\":[{\"source\":\"Instagram|Reddit|YouTube|TikTok\",\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
       ].join("\n"),
     },
   ]);
@@ -326,6 +353,13 @@ export async function generateNetflixifyScripts(input: {
   targetAudience: string;
   platform: string;
   hook: string;
+  curiosityLevel?: number;
+  useContrarianHook?: boolean;
+  conflictLevel?: number;
+  dramaLevel?: number;
+  endingStyle?: "hopeful" | "urgent" | "reflective";
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
   uniquePerspective?: string;
 }): Promise<ScriptStoryboard[]> {
   const trimmedKey = input.apiKey.trim();
@@ -348,6 +382,12 @@ export async function generateNetflixifyScripts(input: {
         `Target audience: ${input.targetAudience}`,
         `Seed hook: ${input.hook}`,
         ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        `Curiosity level (0-1): ${Math.max(0, Math.min(1, input.curiosityLevel ?? 0.5))}`,
+        `Use contrarian hook angle: ${input.useContrarianHook ? "yes" : "no"}`,
+        `Conflict level (0-1): ${Math.max(0, Math.min(1, input.conflictLevel ?? 0.7))}`,
+        `Drama level (0-1): ${Math.max(0, Math.min(1, input.dramaLevel ?? 0.7))}`,
+        `Ending style: ${(input.endingStyle ?? "reflective").trim()}`,
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
         "",
         "Create exactly 5 distinct 'Netflixified' script ideas.",
         "Each idea must follow this structure in the script itself:",
@@ -392,6 +432,8 @@ export async function generateScriptStoryboard(input: {
   targetAudience: string;
   platform: string;
   hook: string;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
   uniquePerspective?: string;
 }): Promise<ScriptStoryboard> {
   const trimmedKey = input.apiKey.trim();
@@ -417,6 +459,7 @@ export async function generateScriptStoryboard(input: {
         `Target audience: ${input.targetAudience}`,
         `Hook: ${input.hook}`,
         ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
         "",
         "Create a 30-45 second content blueprint.",
         "Return JSON with this shape:",
@@ -443,6 +486,8 @@ export async function recalculateHookScores(input: {
   apiKey: string;
   targetAudience: string;
   platform: string;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
   hooks: string[];
 }): Promise<HookVariation[]> {
   const trimmedKey = input.apiKey.trim();
@@ -463,10 +508,11 @@ export async function recalculateHookScores(input: {
       content: [
         `Target audience: ${input.targetAudience}`,
         `Platform: ${input.platform}`,
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
         "",
         "Score these hooks exactly as written. Do not change any hook text.",
         "Return JSON only with shape:",
-        "{\"hooks\":[{\"text\":\"original exact hook text\",\"score\":0-100,\"reasons\":[\"...\",\"...\"],\"improveTip\":\"...\"}]}",
+        "{\"hooks\":[{\"text\":\"original exact hook text\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"...\",\"...\"],\"improveTip\":\"...\"}]}",
         "",
         "Hooks:",
         ...cleanedHooks.map((hook, i) => `${i + 1}. ${hook}`),
