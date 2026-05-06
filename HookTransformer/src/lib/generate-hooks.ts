@@ -109,6 +109,10 @@ export async function generateHookVariations({
   hook,
   platform,
   stylePreset,
+  curiosityLevel,
+  useContrarianHook,
+  useBrandVoiceLock,
+  brandVoiceSample,
   uniquePerspective,
   instructions: data,
 }: GenerateHooksInput): Promise<HookVariation[]> {
