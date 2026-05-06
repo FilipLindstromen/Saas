@@ -234,7 +234,7 @@ export async function generateContentIdeas(input: {
     {
       role: "system",
       content:
-        "You create aha-moment and conclusion lines for short-form content. Use plain language, no buzzwords, no fancy phrases. Be concrete and specific.",
+        "You create aha-moment and conclusion lines for short-form content. Use symptom-first everyday language, no buzzwords, no fancy phrases, no expert talk. Be concrete and specific.",
     },
     {
       role: "user",
@@ -247,6 +247,7 @@ export async function generateContentIdeas(input: {
         "",
         "Generate exactly 5 examples.",
         "Each example should be a short 'Aha + Conclusion' statement.",
+        "Start from a relatable symptom/problem first, then give the insight/conclusion.",
         "Focus on the insight and ending takeaway, not on shots, filming, or structure.",
         "Format each line like: Aha: ... Conclusion: ...",
         "Return JSON: {\"ideas\":[\"...\",\"...\",\"...\",\"...\",\"...\"]}",
@@ -418,7 +419,7 @@ export async function generateNetflixifyScripts(input: {
     {
       role: "system",
       content:
-        "You are a short-form script strategist. Create clear, practical scripts with a cinematic story arc in plain language.",
+        "You are a short-form script strategist. Create clear, practical symptom-first scripts in plain language. Avoid expert talk, jargon, and lecture tone.",
     },
     {
       role: "user",
@@ -441,6 +442,7 @@ export async function generateNetflixifyScripts(input: {
         "2) conflict",
         "3) drama/escalation",
         "4) conclusion",
+        "The opening must be symptom-first and relatable in everyday life.",
         "Write final content only. Do not include planning commentary, analysis notes, or meta lines.",
         "Never write lines like: 'Who is this for?', 'Here's the twist', 'Step 1', or similar instruction-style phrasing.",
         "Do not ask questions to the creator. Write direct audience-facing content.",
@@ -506,7 +508,7 @@ export async function generateScriptStoryboard(input: {
     {
       role: "system",
       content:
-        "You are a short-form content strategist. Write practical, simple scripts and shot lists in plain everyday language.",
+        "You are a short-form content strategist. Write practical, simple symptom-first scripts and shot lists in plain everyday language. Avoid expert talk and jargon.",
     },
     {
       role: "user",

@@ -1,8 +1,9 @@
 {
   "version": 2,
   "title": "Hook transformation",
-  "summary": "Each output hook must naturally cover who this is for, the situation they are in, and the problem they feel, in plain everyday language that sounds like real people talking.",
+  "summary": "Each output hook must be symptom-first: lead with a relatable symptom/problem in a real situation, then naturally imply who it is for, in plain everyday language that sounds like real people talking.",
   "rules": [
+    "Use symptom-first framing: start from what the person feels/struggles with in daily life before any explanation.",
     "Write in the same voice and format as the original hook (question stays a question, statement stays a statement).",
     "Use simple, everyday words. If a normal person would not say it out loud, do not use it.",
     "Keep it conversational and direct, like spoken language, not polished ad copy.",
@@ -11,7 +12,7 @@
     "Honor the target audience: word choice and context should feel native to how that group talks and what they actually do day to day.",
     "Expand vague hooks with specific, plausible detail (time of day, setting, trigger event) so the situation feels real, not generic.",
     "Preserve the core pain from the original hook; do not change the topic into something unrelated.",
-    "Avoid cringe, hype stacks, forced rhymes, and formal wording. Prefer clear, human language.",
+    "Avoid expert talk, jargon, clinical wording, or lecture tone. Prefer clear, human language.",
     "Do not use fancy words or phrases like 'taxing day', 'optimize', 'leverage', 'elevate', 'unlock', or 'transform your life'.",
     "Write at about 6th-8th grade reading level.",
     "Vary the 10 versions: different situations, angles, and wording so the set feels like real options, not paraphrases of one line.",
