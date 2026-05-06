@@ -112,6 +112,8 @@ type CarouselSlide = {
   layoutId: string;
   textAlign?: "left" | "center";
   tone?: "soft" | "dark" | "accent";
+  headlineSize?: number;
+  bodySize?: number;
 };
 
 type CarouselDraft = {
@@ -175,6 +177,8 @@ function buildSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
     layoutId,
     textAlign: "left",
     tone: "soft",
+    headlineSize: idx === 0 ? 72 : 42,
+    bodySize: idx === 0 ? 38 : 30,
   }));
 }
 
@@ -768,6 +772,8 @@ export default function HomePage() {
           layoutId: primaryLayoutId,
           textAlign: "left",
           tone: "soft",
+          headlineSize: 72,
+          bodySize: 38,
         },
       ],
     };
@@ -792,6 +798,8 @@ export default function HomePage() {
                     layoutId: primaryLayoutId,
                     textAlign: "left",
                     tone: "soft",
+                    headlineSize: 72,
+                    bodySize: 38,
                   },
                 ],
               }
@@ -821,6 +829,29 @@ export default function HomePage() {
 
   const updateCarouselLayout = useCallback((layoutId: string, patch: Partial<CarouselLayout>) => {
     setCarouselLayouts((prev) => prev.map((layout) => (layout.id === layoutId ? { ...layout, ...patch } : layout)));
+  }, []);
+
+  const applyReferencePreset = useCallback((draftId: string) => {
+    setCarouselDrafts((prev) =>
+      prev.map((draft) => {
+        if (draft.id !== draftId || draft.slides.length === 0) return draft;
+        return {
+          ...draft,
+          slides: draft.slides.map((slide, idx) =>
+            idx === 0
+              ? {
+                  ...slide,
+                  layoutId: "layout-minimal",
+                  textAlign: "left",
+                  tone: "soft",
+                  headlineSize: 72,
+                  bodySize: 38,
+                }
+              : slide,
+          ),
+        };
+      }),
+    );
   }, []);
 
   const onDesignCarouselFromText = useCallback(
@@ -1637,6 +1668,40 @@ export default function HomePage() {
                               className="mt-1 w-full resize-y rounded-md border px-2 py-1 text-xs"
                               style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                             />
+                            <div className="mt-1 grid grid-cols-2 gap-1.5">
+                              <label className="text-[10px] text-[var(--text-tertiary)]">
+                                Top size
+                                <input
+                                  type="number"
+                                  min={24}
+                                  max={140}
+                                  value={slide.headlineSize ?? 72}
+                                  onChange={(e) =>
+                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                      headlineSize: Math.max(24, Math.min(140, Number(e.target.value) || 72)),
+                                    })
+                                  }
+                                  className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                />
+                              </label>
+                              <label className="text-[10px] text-[var(--text-tertiary)]">
+                                Bottom size
+                                <input
+                                  type="number"
+                                  min={18}
+                                  max={96}
+                                  value={slide.bodySize ?? 38}
+                                  onChange={(e) =>
+                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                      bodySize: Math.max(18, Math.min(96, Number(e.target.value) || 38)),
+                                    })
+                                  }
+                                  className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                />
+                              </label>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1662,6 +1727,14 @@ export default function HomePage() {
                         >
                           Add slide
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => applyReferencePreset(activeCarouselDraft.id)}
+                          className="rounded-lg border px-3 py-2 text-xs"
+                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                        >
+                          Match reference
+                        </button>
                       </div>
 
                       <div className="mt-4 space-y-3">
@@ -1678,6 +1751,8 @@ export default function HomePage() {
                               : tone === "accent"
                                 ? "#fff6d8"
                                 : "#ffffff";
+                          const headlineSize = slide.headlineSize ?? (isFirstSlide ? 72 : 42);
+                          const bodySize = slide.bodySize ?? (isFirstSlide ? 38 : 30);
                           return (
                             <div key={slide.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Slide #{idx + 1}</p>
@@ -1733,33 +1808,74 @@ export default function HomePage() {
                                     className="aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl border shadow-sm"
                                     style={{ borderColor: "var(--border-default)", background: toneBackground }}
                                   >
-                                    <div className={`flex h-full w-full flex-col p-8 ${selectedLayout.cardClass} ${alignClass}`}>
-                                      <p
-                                        className={`${isFirstSlide ? "font-caveat text-[72px] leading-[0.9] text-[#111111]" : selectedLayout.titleClass} cursor-text`}
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        style={isFirstSlide ? { transform: "rotate(-6deg)", transformOrigin: "left top", marginTop: "34%", maxWidth: "88%" } : undefined}
-                                        onBlur={(e) =>
-                                          updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                            headline: e.currentTarget.innerText.trim(),
-                                          })
-                                        }
-                                      >
-                                        {slide.headline || "Headline preview"}
-                                      </p>
-                                      <p
-                                        className={`${isFirstSlide ? "font-nourd mt-24 max-w-[88%] text-[38px] font-semibold leading-[1.12] text-[#222222]" : selectedLayout.bodyClass} cursor-text`}
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        onBlur={(e) =>
-                                          updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                            body: e.currentTarget.innerText.trim(),
-                                          })
-                                        }
-                                      >
-                                        {slide.body || "Body preview"}
-                                      </p>
-                                    </div>
+                                    {isFirstSlide ? (
+                                      <div className="flex h-full w-full flex-col px-[11%] pt-[8%] pb-[10%]">
+                                        <div className="flex h-[57%] items-end">
+                                          <p
+                                            className="font-caveat cursor-text leading-[0.9] text-[#111111]"
+                                            contentEditable
+                                            suppressContentEditableWarning
+                                            style={{
+                                              fontSize: `${headlineSize}px`,
+                                              transform: "rotate(-6deg)",
+                                              transformOrigin: "left bottom",
+                                              maxWidth: "86%",
+                                            }}
+                                            onBlur={(e) =>
+                                              updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                                headline: e.currentTarget.innerText.trim(),
+                                              })
+                                            }
+                                          >
+                                            {slide.headline || "Headline preview"}
+                                          </p>
+                                        </div>
+                                        <div className="h-[43%] pt-[7%]">
+                                          <p
+                                            className="font-nourd cursor-text font-semibold leading-[1.12] text-[#222222]"
+                                            contentEditable
+                                            suppressContentEditableWarning
+                                            style={{ fontSize: `${bodySize}px`, maxWidth: "88%" }}
+                                            onBlur={(e) =>
+                                              updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                                body: e.currentTarget.innerText.trim(),
+                                              })
+                                            }
+                                          >
+                                            {slide.body || "Body preview"}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className={`flex h-full w-full flex-col p-8 ${selectedLayout.cardClass} ${alignClass}`}>
+                                        <p
+                                          className={`${selectedLayout.titleClass} cursor-text`}
+                                          contentEditable
+                                          suppressContentEditableWarning
+                                          style={{ fontSize: `${headlineSize}px` }}
+                                          onBlur={(e) =>
+                                            updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                              headline: e.currentTarget.innerText.trim(),
+                                            })
+                                          }
+                                        >
+                                          {slide.headline || "Headline preview"}
+                                        </p>
+                                        <p
+                                          className={`${selectedLayout.bodyClass} cursor-text`}
+                                          contentEditable
+                                          suppressContentEditableWarning
+                                          style={{ fontSize: `${bodySize}px` }}
+                                          onBlur={(e) =>
+                                            updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                              body: e.currentTarget.innerText.trim(),
+                                            })
+                                          }
+                                        >
+                                          {slide.body || "Body preview"}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
