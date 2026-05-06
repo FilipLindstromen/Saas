@@ -25,6 +25,16 @@ const DEFAULT_LANGUAGE: AppLanguage = "English";
 const STORAGE_KEY = "hook-transformer-state-v2";
 const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "Instagram AD (lead magnet / low ticket)", "TikTok", "YouTube Shorts"] as const;
 const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as const;
+const REFERENCE_CAROUSEL = {
+  // Percent-based geometry on a 1080x1440 artboard
+  leftInset: "12%",
+  textWidth: "76%",
+  topAnchor: "57%",
+  bottomTop: "71%",
+  headlineRotationDeg: -6,
+  headlineSize: 72,
+  bodySize: 38,
+} as const;
 
 type ResultItem = HookVariation & {
   id: string;
@@ -844,8 +854,8 @@ export default function HomePage() {
                   layoutId: "layout-minimal",
                   textAlign: "left",
                   tone: "soft",
-                  headlineSize: 72,
-                  bodySize: 38,
+                  headlineSize: REFERENCE_CAROUSEL.headlineSize,
+                  bodySize: REFERENCE_CAROUSEL.bodySize,
                 }
               : slide,
           ),
@@ -1809,17 +1819,24 @@ export default function HomePage() {
                                     style={{ borderColor: "var(--border-default)", background: toneBackground }}
                                   >
                                     {isFirstSlide ? (
-                                      <div className="flex h-full w-full flex-col px-[11%] pt-[8%] pb-[10%]">
-                                        <div className="flex h-[57%] items-end">
+                                      <div className="relative h-full w-full">
+                                        <div
+                                          className="absolute flex items-end"
+                                          style={{
+                                            left: REFERENCE_CAROUSEL.leftInset,
+                                            width: REFERENCE_CAROUSEL.textWidth,
+                                            bottom: REFERENCE_CAROUSEL.topAnchor,
+                                          }}
+                                        >
                                           <p
                                             className="font-caveat cursor-text leading-[0.9] text-[#111111]"
                                             contentEditable
                                             suppressContentEditableWarning
                                             style={{
                                               fontSize: `${headlineSize}px`,
-                                              transform: "rotate(-6deg)",
+                                              transform: `rotate(${REFERENCE_CAROUSEL.headlineRotationDeg}deg)`,
                                               transformOrigin: "left bottom",
-                                              maxWidth: "86%",
+                                              maxWidth: "100%",
                                             }}
                                             onBlur={(e) =>
                                               updateCarouselSlide(activeCarouselDraft.id, slide.id, {
@@ -1830,12 +1847,19 @@ export default function HomePage() {
                                             {slide.headline || "Headline preview"}
                                           </p>
                                         </div>
-                                        <div className="h-[43%] pt-[7%]">
+                                        <div
+                                          className="absolute"
+                                          style={{
+                                            left: REFERENCE_CAROUSEL.leftInset,
+                                            width: REFERENCE_CAROUSEL.textWidth,
+                                            top: REFERENCE_CAROUSEL.bottomTop,
+                                          }}
+                                        >
                                           <p
                                             className="font-nourd cursor-text font-semibold leading-[1.12] text-[#222222]"
                                             contentEditable
                                             suppressContentEditableWarning
-                                            style={{ fontSize: `${bodySize}px`, maxWidth: "88%" }}
+                                            style={{ fontSize: `${bodySize}px`, maxWidth: "100%" }}
                                             onBlur={(e) =>
                                               updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                                 body: e.currentTarget.innerText.trim(),
