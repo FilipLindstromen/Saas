@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
 import {
+  type AppLanguage,
   type ExpansionPack,
   type ScriptStoryboard,
   generateContentIdeas,
@@ -20,6 +21,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEFAULT_AUDIENCE = "High-performing professionals";
 const DEFAULT_LIGHTHOUSE = "Your problems aren't in your head, they are in your body.";
+const DEFAULT_LANGUAGE: AppLanguage = "English";
 const STORAGE_KEY = "hook-transformer-state-v2";
 const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "Instagram AD (lead magnet / low ticket)", "TikTok", "YouTube Shorts"] as const;
 const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as const;
@@ -206,6 +208,7 @@ export default function HomePage() {
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(DEFAULT_LANGUAGE);
   const [lighthouseHeadline, setLighthouseHeadline] = useState(DEFAULT_LIGHTHOUSE);
   const [hook, setHook] = useState("");
   const [uniquePerspective, setUniquePerspective] = useState("");
@@ -247,6 +250,7 @@ export default function HomePage() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
         targetAudience: string;
+        appLanguage: AppLanguage;
         lighthouseHeadline: string;
         hook: string;
         uniquePerspective: string;
@@ -274,6 +278,7 @@ export default function HomePage() {
       }>;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
+      if (parsed.appLanguage === "English" || parsed.appLanguage === "Swedish") setAppLanguage(parsed.appLanguage);
       if (typeof parsed.lighthouseHeadline === "string") setLighthouseHeadline(parsed.lighthouseHeadline);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
       if (typeof parsed.uniquePerspective === "string") setUniquePerspective(parsed.uniquePerspective);
@@ -328,6 +333,7 @@ export default function HomePage() {
   useEffect(() => {
     const payload = {
       targetAudience,
+      appLanguage,
       lighthouseHeadline,
       hook,
       uniquePerspective,
@@ -356,6 +362,7 @@ export default function HomePage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [
     targetAudience,
+    appLanguage,
     lighthouseHeadline,
     hook,
     uniquePerspective,
@@ -402,6 +409,7 @@ export default function HomePage() {
     try {
       const hooks = await generateHookVariations({
         apiKey,
+        language: appLanguage,
         targetAudience,
         hook,
         platform,
@@ -419,7 +427,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
+  }, [appLanguage, brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const onRecalculateScores = useCallback(async () => {
     setError(null);
@@ -433,6 +441,7 @@ export default function HomePage() {
     try {
       const rescored = await recalculateHookScores({
         apiKey,
+        language: appLanguage,
         targetAudience,
         platform,
         useBrandVoiceLock,
@@ -461,7 +470,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [brandVoiceSample, platform, results, targetAudience, useBrandVoiceLock]);
+  }, [appLanguage, brandVoiceSample, platform, results, targetAudience, useBrandVoiceLock]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
@@ -475,6 +484,7 @@ export default function HomePage() {
     try {
       const hooks = await generateTrendingHooks({
         apiKey,
+        language: appLanguage,
         targetAudience,
         hook,
         stylePreset,
@@ -491,7 +501,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [brandVoiceSample, curiosityLevel, hook, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
+  }, [appLanguage, brandVoiceSample, curiosityLevel, hook, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const addToFavorites = useCallback(
     (item: ResultItem) => {
@@ -560,6 +570,7 @@ export default function HomePage() {
       try {
         const hooks = await rewriteWinningHook({
           apiKey,
+          language: appLanguage,
           targetAudience,
           hook,
           winningHook: item.text,
@@ -579,7 +590,7 @@ export default function HomePage() {
         setRewritingId(null);
       }
     },
-    [brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook],
+    [appLanguage, brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook],
   );
 
   const onGenerateIdeas = useCallback(
@@ -591,6 +602,7 @@ export default function HomePage() {
       try {
         const ideas = await generateContentIdeas({
           apiKey,
+          language: appLanguage,
           targetAudience,
           platform,
           hook: item.text,
@@ -612,7 +624,7 @@ export default function HomePage() {
         setIdeasLoadingId(null);
       }
     },
-    [platform, targetAudience, uniquePerspective],
+    [appLanguage, platform, targetAudience, uniquePerspective],
   );
 
   const onExpandWinningHook = useCallback(
@@ -623,6 +635,7 @@ export default function HomePage() {
       try {
         const pack = await generateWinningHookExpansion({
           apiKey,
+          language: appLanguage,
           targetAudience,
           platform,
           stylePreset,
@@ -642,7 +655,7 @@ export default function HomePage() {
         setExpandingId(null);
       }
     },
-    [platform, stylePreset, targetAudience, uniquePerspective],
+    [appLanguage, platform, stylePreset, targetAudience, uniquePerspective],
   );
 
   const onCreateScriptStoryboard = useCallback(
@@ -653,6 +666,7 @@ export default function HomePage() {
       try {
         const pkg = await generateScriptStoryboard({
           apiKey,
+          language: appLanguage,
           platform,
           targetAudience,
           useBrandVoiceLock,
@@ -675,7 +689,7 @@ export default function HomePage() {
         setScriptLoadingId(null);
       }
     },
-    [brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
+    [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
   );
 
   const onNetflixify = useCallback(
@@ -693,6 +707,7 @@ export default function HomePage() {
       try {
         const scripts = await generateNetflixifyScripts({
           apiKey,
+          language: appLanguage,
           platform,
           targetAudience,
           curiosityLevel,
@@ -721,6 +736,7 @@ export default function HomePage() {
       }
     },
     [
+      appLanguage,
       brandVoiceSample,
       curiosityLevel,
       netflixConflictLevel,
@@ -882,6 +898,20 @@ export default function HomePage() {
             />
           </div>
           <div className="flex items-center justify-end gap-2">
+            <select
+              value={appLanguage}
+              onChange={(e) => setAppLanguage(e.target.value as AppLanguage)}
+              className="rounded-xl border px-3 py-2 text-sm"
+              style={{
+                borderColor: "var(--border-default)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-secondary)",
+              }}
+              aria-label="Language"
+            >
+              <option value="English">English</option>
+              <option value="Swedish">Svenska</option>
+            </select>
             <a
               href=".."
               className="rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
@@ -907,7 +937,7 @@ export default function HomePage() {
             boxShadow: "var(--shadow-sm)",
           }}
         >
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Inputs</h2>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Inmatning" : "Inputs"}</h2>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Platform</span>
             <select
@@ -993,7 +1023,7 @@ export default function HomePage() {
           </label>
           <label className="mt-4 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
-              Curiosity level: {curiosityLevel.toFixed(2)}
+              {appLanguage === "Swedish" ? "Nyfikenhetsniva" : "Curiosity level"}: {curiosityLevel.toFixed(2)}
             </span>
             <input
               type="range"
@@ -1011,7 +1041,7 @@ export default function HomePage() {
               checked={useContrarianHook}
               onChange={(e) => setUseContrarianHook(e.target.checked)}
             />
-            Use contrarian hook
+            {appLanguage === "Swedish" ? "Anvand kontrarian hook" : "Use contrarian hook"}
           </label>
           <label className="mt-4 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
             <input
@@ -1019,11 +1049,11 @@ export default function HomePage() {
               checked={useBrandVoiceLock}
               onChange={(e) => setUseBrandVoiceLock(e.target.checked)}
             />
-            Brand voice lock
+            {appLanguage === "Swedish" ? "Las varumarkesrost" : "Brand voice lock"}
           </label>
           {useBrandVoiceLock ? (
             <label className="mt-2 block">
-              <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Brand voice sample</span>
+              <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">{appLanguage === "Swedish" ? "Exempel pa varumarkesrost" : "Brand voice sample"}</span>
               <textarea
                 value={brandVoiceSample}
                 onChange={(e) => setBrandVoiceSample(e.target.value)}
@@ -1039,7 +1069,7 @@ export default function HomePage() {
             </label>
           ) : null}
           <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-            <p className="text-sm font-medium text-[var(--text-secondary)]">Netflixify controls</p>
+            <p className="text-sm font-medium text-[var(--text-secondary)]">{appLanguage === "Swedish" ? "Netflixify-kontroller" : "Netflixify controls"}</p>
             <label className="mt-2 block">
               <span className="mb-1 block text-xs text-[var(--text-secondary)]">Conflict: {netflixConflictLevel.toFixed(2)}</span>
               <input
@@ -1085,7 +1115,7 @@ export default function HomePage() {
             className="mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: "var(--accent-gradient)", boxShadow: "var(--shadow-sm)" }}
           >
-            {loading ? loadingLabel : "Generate 10 versions"}
+            {loading ? loadingLabel : appLanguage === "Swedish" ? "Generera 10 varianter" : "Generate 10 versions"}
           </button>
           <button
             type="button"
@@ -1098,7 +1128,7 @@ export default function HomePage() {
               color: "var(--text-secondary)",
             }}
           >
-            {loading && loadingLabel === "Finding trends..." ? "Finding trends..." : "Find trending hooks"}
+            {loading && loadingLabel === "Finding trends..." ? (appLanguage === "Swedish" ? "Hittar trender..." : "Finding trends...") : appLanguage === "Swedish" ? "Hitta trendande hooks" : "Find trending hooks"}
           </button>
           <button
             type="button"
@@ -1111,7 +1141,7 @@ export default function HomePage() {
               color: "var(--text-secondary)",
             }}
           >
-            {loading && loadingLabel === "Recalculating scores..." ? "Recalculating scores..." : "Recalculate hook scores"}
+            {loading && loadingLabel === "Recalculating scores..." ? (appLanguage === "Swedish" ? "Raknar om poang..." : "Recalculating scores...") : appLanguage === "Swedish" ? "Rakna om hook-poang" : "Recalculate hook scores"}
           </button>
           <button
             type="button"
@@ -1124,7 +1154,7 @@ export default function HomePage() {
               color: "var(--text-secondary)",
             }}
           >
-            {netflixifyLoadingId === "input-hook" ? "Netflixifying..." : "Netflixify"}
+            {netflixifyLoadingId === "input-hook" ? (appLanguage === "Swedish" ? "Netflixifierar..." : "Netflixifying...") : "Netflixify"}
           </button>
           <p className="mt-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
             Uses your shared OpenAI key from the hub (local <code className="rounded bg-[var(--bg-hover)] px-1">saasApiKeys</code>). Add
@@ -1143,12 +1173,12 @@ export default function HomePage() {
             {VIEWS.map((view) => {
               const label =
                 view === "variants"
-                  ? "Variants"
+                  ? appLanguage === "Swedish" ? "Varianter" : "Variants"
                   : view === "aha"
-                    ? "Aha + conclusion"
+                    ? appLanguage === "Swedish" ? "Aha + slutsats" : "Aha + conclusion"
                     : view === "script"
-                      ? "Script"
-                      : "Carousel";
+                      ? appLanguage === "Swedish" ? "Manus" : "Script"
+                      : appLanguage === "Swedish" ? "Karusell" : "Carousel";
               const isActive = activeView === view;
               return (
                 <button
@@ -1170,7 +1200,7 @@ export default function HomePage() {
 
           {activeView === "variants" ? (
             <>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Variations</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Varianter" : "Variations"}</h2>
               {results.length === 0 && !loading ? (
                 <div
                   className="rounded-2xl border border-dashed p-8 text-center text-sm text-[var(--text-tertiary)]"
@@ -1393,7 +1423,7 @@ export default function HomePage() {
 
           {activeView === "aha" ? (
             <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Aha + conclusion</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Aha + slutsats" : "Aha + conclusion"}</h2>
               <p className="mt-2 text-sm text-[var(--text-tertiary)]">
                 Click <span className="font-medium text-[var(--text-secondary)]">💡</span> on any hook to load 5 aha + conclusion examples here.
               </p>
@@ -1466,7 +1496,7 @@ export default function HomePage() {
 
           {activeView === "script" ? (
             <>
-              <h2 className="text-base font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Script</h2>
+              <h2 className="text-base font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Manus" : "Script"}</h2>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">Netflixified scripts ({netflixifyBatches.length})</h3>
                 <div className="mt-2 space-y-3">
@@ -1549,7 +1579,7 @@ export default function HomePage() {
 
           {activeView === "carousel" ? (
             <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Carousel</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Karusell" : "Carousel"}</h2>
               <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
                 <section className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
                   <div className="flex items-center justify-between">
@@ -1609,6 +1639,7 @@ export default function HomePage() {
 
                       <div className="mt-4 space-y-3">
                         {activeCarouselDraft.slides.map((slide, idx) => {
+                          const isFirstSlide = idx === 0;
                           const selectedLayout =
                             carouselLayouts.find((layout) => layout.id === slide.layoutId) ?? carouselLayouts[0] ?? getDefaultCarouselLayouts()[0];
                           const tone = slide.tone ?? "soft";
@@ -1675,11 +1706,12 @@ export default function HomePage() {
                                     className="aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl border shadow-sm"
                                     style={{ borderColor: "var(--border-default)", background: toneBackground }}
                                   >
-                                    <div className={`flex h-full w-full flex-col justify-center p-8 ${selectedLayout.cardClass} ${alignClass}`}>
+                                    <div className={`flex h-full w-full flex-col p-8 ${selectedLayout.cardClass} ${alignClass}`}>
                                       <p
-                                        className={`${selectedLayout.titleClass} cursor-text`}
+                                        className={`${isFirstSlide ? "font-caveat text-[72px] leading-[0.9] text-[#111111]" : selectedLayout.titleClass} cursor-text`}
                                         contentEditable
                                         suppressContentEditableWarning
+                                        style={isFirstSlide ? { transform: "rotate(-6deg)", transformOrigin: "left top", marginTop: "34%", maxWidth: "88%" } : undefined}
                                         onBlur={(e) =>
                                           updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                             headline: e.currentTarget.innerText.trim(),
@@ -1689,7 +1721,7 @@ export default function HomePage() {
                                         {slide.headline || "Headline preview"}
                                       </p>
                                       <p
-                                        className={`${selectedLayout.bodyClass} cursor-text`}
+                                        className={`${isFirstSlide ? "font-nourd mt-24 max-w-[88%] text-[38px] font-semibold leading-[1.12] text-[#222222]" : selectedLayout.bodyClass} cursor-text`}
                                         contentEditable
                                         suppressContentEditableWarning
                                         onBlur={(e) =>

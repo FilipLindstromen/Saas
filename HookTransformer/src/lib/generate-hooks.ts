@@ -1,6 +1,7 @@
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
 
 type Instructions = typeof hookTransformInstructions;
+export type AppLanguage = "English" | "Swedish";
 
 export type HookVariation = {
   text: string;
@@ -14,6 +15,7 @@ export type HookVariation = {
 
 export type GenerateHooksInput = {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   hook: string;
   platform: string;
@@ -54,6 +56,10 @@ async function requestJson<T>(apiKey: string, messages: { role: "system" | "user
   } catch {
     throw new Error("Could not parse model response as JSON.");
   }
+}
+
+function languageDirective(language?: AppLanguage): string {
+  return `Output language: ${language ?? "English"}. Write all generated text in this language.`;
 }
 
 function buildInstructionBlock(data: Instructions): string {
@@ -105,6 +111,7 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
 
 export async function generateHookVariations({
   apiKey,
+  language,
   targetAudience,
   hook,
   platform,
@@ -124,6 +131,7 @@ export async function generateHookVariations({
   const instructionBlock = buildInstructionBlock(data);
 
   const userPayload = [
+    languageDirective(language),
     `Platform: ${platform.trim()}`,
     `Style preset: ${stylePreset.trim()}`,
     `Target audience: ${targetAudience.trim()}`,
@@ -174,6 +182,7 @@ export async function rewriteWinningHook(
   }
   const instructionBlock = buildInstructionBlock(input.instructions);
   const userPayload = [
+    languageDirective(input.language),
     `Platform: ${input.platform.trim()}`,
     `Style preset: ${input.stylePreset.trim()}`,
     `Target audience: ${input.targetAudience.trim()}`,
@@ -210,6 +219,7 @@ export async function rewriteWinningHook(
 
 export async function generateContentIdeas(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   platform: string;
   hook: string;
@@ -229,6 +239,7 @@ export async function generateContentIdeas(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Platform: ${input.platform}`,
         `Target audience: ${input.targetAudience}`,
         `Hook: ${input.hook}`,
@@ -252,6 +263,7 @@ export async function generateContentIdeas(input: {
 
 export async function generateTrendingHooks(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   hook: string;
   stylePreset: string;
@@ -275,6 +287,7 @@ export async function generateTrendingHooks(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Target audience: ${input.targetAudience}`,
         `Seed hook: ${input.hook}`,
         `Style preset: ${input.stylePreset}`,
@@ -312,6 +325,7 @@ export type ExpansionPack = {
 
 export async function generateWinningHookExpansion(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   platform: string;
   stylePreset: string;
@@ -336,6 +350,7 @@ export async function generateWinningHookExpansion(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Target audience: ${input.targetAudience}`,
         `Platform: ${input.platform}`,
         `Style preset: ${input.stylePreset}`,
@@ -379,6 +394,7 @@ function cleanStoryboardLine(line: string): string {
 
 export async function generateNetflixifyScripts(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   platform: string;
   hook: string;
@@ -407,6 +423,7 @@ export async function generateNetflixifyScripts(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Platform: ${input.platform}`,
         `Target audience: ${input.targetAudience}`,
         `Seed hook: ${input.hook}`,
@@ -467,6 +484,7 @@ export async function generateNetflixifyScripts(input: {
 
 export async function generateScriptStoryboard(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   platform: string;
   hook: string;
@@ -493,6 +511,7 @@ export async function generateScriptStoryboard(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Platform: ${input.platform}`,
         `Target audience: ${input.targetAudience}`,
         `Hook: ${input.hook}`,
@@ -522,6 +541,7 @@ export async function generateScriptStoryboard(input: {
 
 export async function recalculateHookScores(input: {
   apiKey: string;
+  language?: AppLanguage;
   targetAudience: string;
   platform: string;
   useBrandVoiceLock?: boolean;
@@ -544,6 +564,7 @@ export async function recalculateHookScores(input: {
     {
       role: "user",
       content: [
+        languageDirective(input.language),
         `Target audience: ${input.targetAudience}`,
         `Platform: ${input.platform}`,
         ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
