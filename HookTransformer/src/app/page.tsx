@@ -107,6 +107,8 @@ type CarouselSlide = {
   headline: string;
   body: string;
   layoutId: string;
+  textAlign?: "left" | "center";
+  tone?: "soft" | "dark" | "accent";
 };
 
 type CarouselDraft = {
@@ -140,6 +142,23 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
       cardClass: "rounded-3xl border p-6",
     },
   ];
+}
+
+function buildSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
+  const parts = text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const chunks = parts.length > 0 ? parts : [text.trim()].filter(Boolean);
+  const limited = chunks.slice(0, 8);
+  return limited.map((chunk, idx) => ({
+    id: makeId(),
+    headline: idx === 0 ? "Hook" : `Slide ${idx + 1}`,
+    body: chunk,
+    layoutId,
+    textAlign: idx === 0 ? "center" : "left",
+    tone: idx === 0 ? "accent" : "soft",
+  }));
 }
 
 function makeId(): string {
@@ -709,6 +728,8 @@ export default function HomePage() {
           headline: "Slide headline",
           body: "Add your message here.",
           layoutId: primaryLayoutId,
+          textAlign: "left",
+          tone: "soft",
         },
       ],
     };
@@ -731,6 +752,8 @@ export default function HomePage() {
                     headline: `Slide ${draft.slides.length + 1}`,
                     body: "",
                     layoutId: primaryLayoutId,
+                    textAlign: "left",
+                    tone: "soft",
                   },
                 ],
               }
@@ -761,6 +784,24 @@ export default function HomePage() {
   const updateCarouselLayout = useCallback((layoutId: string, patch: Partial<CarouselLayout>) => {
     setCarouselLayouts((prev) => prev.map((layout) => (layout.id === layoutId ? { ...layout, ...patch } : layout)));
   }, []);
+
+  const onDesignCarouselFromText = useCallback(
+    (sourceText: string, namePrefix: string) => {
+      const baseText = sourceText.trim();
+      if (!baseText) return;
+      const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
+      const draft: CarouselDraft = {
+        id: makeId(),
+        name: `${namePrefix} ${new Date().toLocaleTimeString()}`,
+        createdAt: new Date().toISOString(),
+        slides: buildSlidesFromText(baseText, primaryLayoutId),
+      };
+      setCarouselDrafts((prev) => [draft, ...prev]);
+      setActiveCarouselId(draft.id);
+      setActiveView("carousel");
+    },
+    [carouselLayouts],
+  );
 
   const activeCollection = useMemo(
     () => collections.find((collection) => collection.id === activeCollectionId),
@@ -1255,6 +1296,16 @@ export default function HomePage() {
                         >
                           {netflixifyLoadingId === item.id ? "⏳" : "🍿"}
                         </button>
+                        <button
+                          type="button"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
+                          style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                          title="Design carousel from this hook"
+                          aria-label="Design carousel from this hook"
+                          onClick={() => onDesignCarouselFromText(item.text, "Hook carousel")}
+                        >
+                          Design carousel
+                        </button>
                       </div>
                     </li>
                   ))}
@@ -1406,13 +1457,18 @@ export default function HomePage() {
                         <div className="mt-2 space-y-2">
                           {batch.scripts.map((item, idx) => (
                             <div key={`${batch.id}-netflix-script-${idx}`} className="rounded-lg border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                              <p className="text-base font-semibold text-[var(--text-secondary)]">{idx + 1}. {item.title}</p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-base font-semibold text-[var(--text-secondary)]">{idx + 1}. {item.title}</p>
+                                <button
+                                  type="button"
+                                  className="rounded-md border px-2 py-1 text-xs"
+                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                                  onClick={() => onDesignCarouselFromText(`${item.title}. ${item.script}`, "Script carousel")}
+                                >
+                                  Design carousel
+                                </button>
+                              </div>
                               <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{item.script}</p>
-                              <ul className="mt-3 list-disc pl-5 text-sm leading-relaxed text-[var(--text-tertiary)]">
-                                {item.storyboard.map((step, stepIdx) => (
-                                  <li key={`${batch.id}-netflix-step-${idx}-${stepIdx}`}>{step}</li>
-                                ))}
-                              </ul>
                             </div>
                           ))}
                         </div>
@@ -1429,7 +1485,17 @@ export default function HomePage() {
                   ) : (
                     scriptBoards.map((entry) => (
                       <div key={entry.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                        <p className="text-base font-semibold text-[var(--text-secondary)]">{entry.package.title}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-base font-semibold text-[var(--text-secondary)]">{entry.package.title}</p>
+                          <button
+                            type="button"
+                            className="rounded-md border px-2 py-1 text-xs"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                            onClick={() => onDesignCarouselFromText(`${entry.package.title}. ${entry.package.script}`, "Storyboard carousel")}
+                          >
+                            Design carousel
+                          </button>
+                        </div>
                         <p className="mt-1 text-sm text-[var(--text-tertiary)]">{entry.platform} · {entry.hookText}</p>
                         <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{entry.package.script}</p>
                         <div className="mt-2">
@@ -1520,6 +1586,15 @@ export default function HomePage() {
                         {activeCarouselDraft.slides.map((slide, idx) => {
                           const selectedLayout =
                             carouselLayouts.find((layout) => layout.id === slide.layoutId) ?? carouselLayouts[0] ?? getDefaultCarouselLayouts()[0];
+                          const tone = slide.tone ?? "soft";
+                          const textAlign = slide.textAlign ?? "left";
+                          const alignClass = textAlign === "center" ? "text-center" : "text-left";
+                          const toneBackground =
+                            tone === "dark"
+                              ? "var(--bg-primary)"
+                              : tone === "accent"
+                                ? "var(--bg-hover)"
+                                : "var(--bg-secondary)";
                           return (
                             <div key={slide.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Slide #{idx + 1}</p>
@@ -1550,13 +1625,49 @@ export default function HomePage() {
                                   </option>
                                 ))}
                               </select>
+                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                <select
+                                  value={textAlign}
+                                  onChange={(e) =>
+                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                      textAlign: e.target.value as "left" | "center",
+                                    })
+                                  }
+                                  className="w-full rounded-lg border px-3 py-2 text-xs"
+                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                >
+                                  <option value="left">Left align</option>
+                                  <option value="center">Center align</option>
+                                </select>
+                                <select
+                                  value={tone}
+                                  onChange={(e) =>
+                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                      tone: e.target.value as "soft" | "dark" | "accent",
+                                    })
+                                  }
+                                  className="w-full rounded-lg border px-3 py-2 text-xs"
+                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                >
+                                  <option value="soft">Soft tone</option>
+                                  <option value="accent">Accent tone</option>
+                                  <option value="dark">Dark tone</option>
+                                </select>
+                              </div>
 
-                              <div
-                                className={`mt-3 ${selectedLayout.cardClass}`}
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)" }}
-                              >
-                                <p className={selectedLayout.titleClass}>{slide.headline || "Headline preview"}</p>
-                                <p className={selectedLayout.bodyClass}>{slide.body || "Body preview"}</p>
+                              <div className="mt-3 rounded-xl border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                                <p className="text-[11px] text-[var(--text-tertiary)]">Canvas size: 1080 x 1440</p>
+                                <div className="mt-2 flex justify-center">
+                                  <div
+                                    className="aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl border shadow-sm"
+                                    style={{ borderColor: "var(--border-default)", background: toneBackground }}
+                                  >
+                                    <div className={`flex h-full w-full flex-col justify-center p-8 ${selectedLayout.cardClass} ${alignClass}`}>
+                                      <p className={selectedLayout.titleClass}>{slide.headline || "Headline preview"}</p>
+                                      <p className={selectedLayout.bodyClass}>{slide.body || "Body preview"}</p>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           );

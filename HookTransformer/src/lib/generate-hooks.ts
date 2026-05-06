@@ -366,6 +366,13 @@ export type ScriptStoryboard = {
   ctaOptions: string[];
 };
 
+function cleanStoryboardLine(line: string): string {
+  return line
+    .replace(/^shot\s*\d+\s*[:.-]?\s*/i, "")
+    .replace(/^scene\s*\d+\s*[:.-]?\s*/i, "")
+    .trim();
+}
+
 export async function generateNetflixifyScripts(input: {
   apiKey: string;
   targetAudience: string;
@@ -413,6 +420,9 @@ export async function generateNetflixifyScripts(input: {
         "2) conflict",
         "3) drama/escalation",
         "4) conclusion",
+        "Write final content only. Do not include planning commentary, analysis notes, or meta lines.",
+        "Never write lines like: 'Who is this for?', 'Here's the twist', 'Step 1', or similar instruction-style phrasing.",
+        "Do not ask questions to the creator. Write direct audience-facing content.",
         "Do not use person names (no named characters).",
         "Describe relatable everyday situations instead of cinematic fictional scenes.",
         "Base each script directly on the provided seed hook and unique perspective.",
@@ -434,7 +444,9 @@ export async function generateNetflixifyScripts(input: {
       const row = entry as { title?: unknown; script?: unknown; storyboard?: unknown; ctaOptions?: unknown };
       const title = String(row.title ?? "").trim();
       const script = String(row.script ?? "").trim();
-      const storyboard = Array.isArray(row.storyboard) ? row.storyboard.map((s) => String(s).trim()).filter(Boolean) : [];
+      const storyboard = Array.isArray(row.storyboard)
+        ? row.storyboard.map((s) => cleanStoryboardLine(String(s))).filter(Boolean)
+        : [];
       const ctaOptions = Array.isArray(row.ctaOptions) ? row.ctaOptions.map((s) => String(s).trim()).filter(Boolean) : [];
       if (!title || !script || storyboard.length !== 6 || ctaOptions.length !== 3) {
         return null;
