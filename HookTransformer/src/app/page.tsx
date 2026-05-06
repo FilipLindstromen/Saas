@@ -544,6 +544,7 @@ export default function HomePage() {
   const onGenerateIdeas = useCallback(
     async (item: ResultItem) => {
       setError(null);
+      setActiveView("aha");
       setIdeasLoadingId(item.id);
       const apiKey = loadSharedOpenAiKey();
       try {
@@ -1068,7 +1069,7 @@ export default function HomePage() {
           ) : null}
         </aside>
 
-        <section className="h-full overflow-y-auto pr-1 text-sm">
+        <section className="h-full overflow-y-auto pr-1 text-base">
           <div
             className="sticky top-0 z-20 mb-3 flex flex-wrap gap-2 border-b pb-2"
             style={{ borderColor: "var(--border-subtle)", background: "var(--bg-primary)" }}
@@ -1125,18 +1126,18 @@ export default function HomePage() {
                 </div>
               ) : null}
               {!loading && results.length > 0 ? (
-                <ul className="grid list-none gap-3 p-0">
+                <ul className="grid list-none gap-2 p-0">
                   {results.map((item, i) => (
                     <li
                       key={item.id}
-                      className="flex flex-col rounded-2xl border p-3"
+                      className="flex flex-col rounded-xl border p-2.5"
                       style={{
                         borderColor: "var(--border-subtle)",
                         background: "var(--bg-elevated)",
                         boxShadow: "var(--shadow-sm)",
                       }}
                     >
-                      <span className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
+                      <span className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
                         #{i + 1}
                         {item.source ? (
                           <span className="ml-2 rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--border-default)" }}>
@@ -1147,29 +1148,29 @@ export default function HomePage() {
                       <textarea
                         value={item.text}
                         onChange={(e) => onUpdateHookText(item.id, e.target.value)}
-                        rows={2}
-                        className="flex-1 w-full resize-y px-1 py-1 text-lg font-medium leading-snug outline-none sm:text-xl"
+                        rows={1}
+                        className="flex-1 w-full resize-y px-0.5 py-0.5 text-lg font-medium leading-snug outline-none sm:text-xl"
                         style={{
                           color: "var(--text-secondary)",
                         }}
                       />
-                      <div className="group mt-3 px-1 py-1 text-xs">
+                      <div className="group mt-1.5 px-0.5 py-0.5 text-xs">
                         <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
-                        <p className="mt-1 font-semibold text-[var(--text-primary)]">Performance prediction: {item.performanceScore}/100</p>
-                        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">{item.performanceReason}</p>
-                        <ul className="mt-1 list-disc pl-4 text-[var(--text-secondary)]">
+                        <p className="mt-0.5 font-semibold text-[var(--text-primary)]">Performance prediction: {item.performanceScore}/100</p>
+                        <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">{item.performanceReason}</p>
+                        <ul className="mt-0.5 list-disc pl-4 text-xs text-[var(--text-secondary)]">
                           {item.reasons.map((reason, idx) => (
                             <li key={`${item.id}-reason-${idx}`}>{reason}</li>
                           ))}
                         </ul>
-                        <p className="mt-2 hidden px-2 py-1 text-[11px] text-[var(--text-tertiary)] group-hover:block">
+                        <p className="mt-1 hidden px-1 py-0.5 text-[11px] text-[var(--text-tertiary)] group-hover:block">
                           To score higher: {item.improveTip}
                         </p>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <div className="mt-1.5 flex flex-wrap gap-1">
                         <button
                           type="button"
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Copy hook"
                           aria-label="Copy hook"
@@ -1181,7 +1182,7 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Save hook to favorites"
                           aria-label="Save hook to favorites"
@@ -1191,7 +1192,7 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Add hook to selected collection"
                           aria-label="Add hook to selected collection"
@@ -1202,7 +1203,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={rewritingId === item.id}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Rewrite from this winning hook"
                           aria-label="Rewrite from this winning hook"
@@ -1213,7 +1214,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={ideasLoadingId === item.id}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Generate 5 aha and conclusion examples"
                           aria-label="Generate 5 aha and conclusion examples"
@@ -1224,7 +1225,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={expandingId === item.id}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Generate winning hook expansion sets"
                           aria-label="Generate winning hook expansion sets"
@@ -1235,7 +1236,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={scriptLoadingId === item.id}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Create script and storyboard from hook"
                           aria-label="Create script and storyboard from hook"
@@ -1246,7 +1247,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={netflixifyLoadingId === item.id}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Netflixify this hook into 5 script ideas"
                           aria-label="Netflixify this hook into 5 script ideas"
@@ -1317,20 +1318,20 @@ export default function HomePage() {
           {activeView === "aha" ? (
             <>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Aha + conclusion</h2>
-              <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+              <p className="mt-2 text-sm text-[var(--text-tertiary)]">
                 Click <span className="font-medium text-[var(--text-secondary)]">💡</span> on any hook to load 5 aha + conclusion examples here.
               </p>
 
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                <h3 className="text-xs font-semibold text-[var(--text-primary)]">Favorite ideas ({favoriteIdeas.length})</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Favorite ideas ({favoriteIdeas.length})</h3>
                 <div className="mt-2 space-y-2">
                   {favoriteIdeas.length === 0 ? (
-                    <p className="text-xs text-[var(--text-tertiary)]">No favorite ideas saved yet.</p>
+                    <p className="text-sm text-[var(--text-tertiary)]">No favorite ideas saved yet.</p>
                   ) : (
                     favoriteIdeas.map((idea) => (
-                      <div key={idea.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                      <div key={idea.id} className="rounded-lg border p-2 text-sm" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
                         <p className="text-[var(--text-secondary)]">{idea.text}</p>
-                        <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{idea.platform} · {idea.hookText}</p>
+                        <p className="mt-1 text-xs text-[var(--text-tertiary)]">{idea.platform} · {idea.hookText}</p>
                       </div>
                     ))
                   )}
@@ -1339,22 +1340,22 @@ export default function HomePage() {
 
               <div className="mt-4 space-y-3 pr-1">
                 {ideaBatches.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
                     Aha + conclusion examples appear here in separate cards so you can favorite each one.
                   </div>
                 ) : (
                   ideaBatches.map((batch) => (
                     <section key={batch.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                      <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">
+                      <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
                         {batch.platform} · {batch.targetAudience}
                       </p>
-                      <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
                       <div className="mt-2 space-y-2">
                         {batch.ideas.map((idea) => {
                           const saved = isIdeaFavorited(idea, batch);
                           return (
-                            <div key={idea.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                              <p className="text-[var(--text-secondary)]">{idea.text}</p>
+                            <div key={idea.id} className="rounded-lg border p-2 text-sm" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                              <p className="leading-relaxed text-[var(--text-secondary)]">{idea.text}</p>
                               <div className="mt-2 flex gap-2">
                                 <button
                                   type="button"
