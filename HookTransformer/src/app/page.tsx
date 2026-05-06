@@ -710,7 +710,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {!loading && results.length > 0 ? (
-            <ul className="grid list-none gap-3 p-0 2xl:grid-cols-2">
+            <ul className="grid list-none gap-4 p-0">
               {results.map((item, i) => (
                 <li
                   key={item.id}
@@ -733,16 +733,13 @@ export default function HomePage() {
                     value={item.text}
                     onChange={(e) => onUpdateHookText(item.id, e.target.value)}
                     rows={3}
-                    className="flex-1 w-full resize-y rounded-lg border px-2.5 py-2 text-sm leading-relaxed outline-none"
+                    className="flex-1 w-full resize-y px-1 py-1 text-xl font-medium leading-relaxed outline-none sm:text-2xl"
                     style={{
-                      borderColor: "var(--border-default)",
-                      background: "var(--bg-tertiary)",
                       color: "var(--text-secondary)",
                     }}
                   />
                   <div
-                    className="group mt-3 rounded-lg border px-3 py-2 text-xs"
-                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}
+                    className="group mt-3 px-1 py-1 text-xs"
                   >
                     <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
                     <ul className="mt-1 list-disc pl-4 text-[var(--text-secondary)]">
@@ -750,7 +747,7 @@ export default function HomePage() {
                         <li key={`${item.id}-reason-${idx}`}>{reason}</li>
                       ))}
                     </ul>
-                    <p className="mt-2 hidden rounded-md border px-2 py-1 text-[11px] text-[var(--text-tertiary)] group-hover:block" style={{ borderColor: "var(--border-default)" }}>
+                    <p className="mt-2 hidden px-2 py-1 text-[11px] text-[var(--text-tertiary)] group-hover:block">
                       To score higher: {item.improveTip}
                     </p>
                   </div>
