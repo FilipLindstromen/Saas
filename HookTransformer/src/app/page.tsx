@@ -94,6 +94,54 @@ type NetflixifyBatch = {
   scripts: ScriptStoryboard[];
 };
 
+type CarouselLayout = {
+  id: string;
+  name: string;
+  titleClass: string;
+  bodyClass: string;
+  cardClass: string;
+};
+
+type CarouselSlide = {
+  id: string;
+  headline: string;
+  body: string;
+  layoutId: string;
+};
+
+type CarouselDraft = {
+  id: string;
+  name: string;
+  createdAt: string;
+  slides: CarouselSlide[];
+};
+
+function getDefaultCarouselLayouts(): CarouselLayout[] {
+  return [
+    {
+      id: "layout-minimal",
+      name: "Minimal",
+      titleClass: "text-xl font-semibold text-[var(--text-primary)]",
+      bodyClass: "mt-2 text-sm text-[var(--text-secondary)]",
+      cardClass: "rounded-2xl border p-5",
+    },
+    {
+      id: "layout-bold",
+      name: "Bold contrast",
+      titleClass: "text-2xl font-extrabold uppercase tracking-wide text-[var(--text-primary)]",
+      bodyClass: "mt-3 text-sm leading-relaxed text-[var(--text-secondary)]",
+      cardClass: "rounded-2xl border-2 p-5",
+    },
+    {
+      id: "layout-story",
+      name: "Story card",
+      titleClass: "text-lg font-semibold italic text-[var(--text-primary)]",
+      bodyClass: "mt-2 text-sm leading-relaxed text-[var(--text-secondary)]",
+      cardClass: "rounded-3xl border p-6",
+    },
+  ];
+}
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -145,6 +193,9 @@ export default function HomePage() {
   const [expansionBatches, setExpansionBatches] = useState<ExpansionBatch[]>([]);
   const [scriptBoards, setScriptBoards] = useState<ScriptBoardEntry[]>([]);
   const [netflixifyBatches, setNetflixifyBatches] = useState<NetflixifyBatch[]>([]);
+  const [carouselLayouts, setCarouselLayouts] = useState<CarouselLayout[]>(getDefaultCarouselLayouts);
+  const [carouselDrafts, setCarouselDrafts] = useState<CarouselDraft[]>([]);
+  const [activeCarouselId, setActiveCarouselId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState("Generating...");
@@ -181,6 +232,9 @@ export default function HomePage() {
         expansionBatches: ExpansionBatch[];
         scriptBoards: ScriptBoardEntry[];
         netflixifyBatches: NetflixifyBatch[];
+        carouselLayouts: CarouselLayout[];
+        carouselDrafts: CarouselDraft[];
+        activeCarouselId: string;
       }>;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
@@ -224,6 +278,9 @@ export default function HomePage() {
       if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
       if (Array.isArray(parsed.scriptBoards)) setScriptBoards(parsed.scriptBoards);
       if (Array.isArray(parsed.netflixifyBatches)) setNetflixifyBatches(parsed.netflixifyBatches);
+      if (Array.isArray(parsed.carouselLayouts) && parsed.carouselLayouts.length > 0) setCarouselLayouts(parsed.carouselLayouts);
+      if (Array.isArray(parsed.carouselDrafts)) setCarouselDrafts(parsed.carouselDrafts);
+      if (typeof parsed.activeCarouselId === "string") setActiveCarouselId(parsed.activeCarouselId);
     } catch {
       // ignore invalid local storage payload
     }
@@ -252,6 +309,9 @@ export default function HomePage() {
       expansionBatches,
       scriptBoards,
       netflixifyBatches,
+      carouselLayouts,
+      carouselDrafts,
+      activeCarouselId,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [
@@ -276,7 +336,17 @@ export default function HomePage() {
     expansionBatches,
     scriptBoards,
     netflixifyBatches,
+    carouselLayouts,
+    carouselDrafts,
+    activeCarouselId,
   ]);
+
+  useEffect(() => {
+    if (!activeCarouselId && carouselDrafts.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveCarouselId(carouselDrafts[0].id);
+    }
+  }, [activeCarouselId, carouselDrafts]);
 
   const onGenerate = useCallback(async () => {
     setError(null);
@@ -626,9 +696,78 @@ export default function HomePage() {
     setResults((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
   }, []);
 
+  const createCarouselDraft = useCallback(() => {
+    const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
+    const draft: CarouselDraft = {
+      id: makeId(),
+      name: `Carousel ${carouselDrafts.length + 1}`,
+      createdAt: new Date().toISOString(),
+      slides: [
+        {
+          id: makeId(),
+          headline: "Slide headline",
+          body: "Add your message here.",
+          layoutId: primaryLayoutId,
+        },
+      ],
+    };
+    setCarouselDrafts((prev) => [draft, ...prev]);
+    setActiveCarouselId(draft.id);
+  }, [carouselDrafts.length, carouselLayouts]);
+
+  const addCarouselSlide = useCallback(
+    (draftId: string) => {
+      const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
+      setCarouselDrafts((prev) =>
+        prev.map((draft) =>
+          draft.id === draftId
+            ? {
+                ...draft,
+                slides: [
+                  ...draft.slides,
+                  {
+                    id: makeId(),
+                    headline: `Slide ${draft.slides.length + 1}`,
+                    body: "",
+                    layoutId: primaryLayoutId,
+                  },
+                ],
+              }
+            : draft,
+        ),
+      );
+    },
+    [carouselLayouts],
+  );
+
+  const updateCarouselSlide = useCallback((draftId: string, slideId: string, patch: Partial<CarouselSlide>) => {
+    setCarouselDrafts((prev) =>
+      prev.map((draft) =>
+        draft.id === draftId
+          ? {
+              ...draft,
+              slides: draft.slides.map((slide) => (slide.id === slideId ? { ...slide, ...patch } : slide)),
+            }
+          : draft,
+      ),
+    );
+  }, []);
+
+  const updateCarouselDraftName = useCallback((draftId: string, name: string) => {
+    setCarouselDrafts((prev) => prev.map((draft) => (draft.id === draftId ? { ...draft, name } : draft)));
+  }, []);
+
+  const updateCarouselLayout = useCallback((layoutId: string, patch: Partial<CarouselLayout>) => {
+    setCarouselLayouts((prev) => prev.map((layout) => (layout.id === layoutId ? { ...layout, ...patch } : layout)));
+  }, []);
+
   const activeCollection = useMemo(
     () => collections.find((collection) => collection.id === activeCollectionId),
     [activeCollectionId, collections],
+  );
+  const activeCarouselDraft = useMemo(
+    () => carouselDrafts.find((draft) => draft.id === activeCarouselId) ?? carouselDrafts[0],
+    [activeCarouselId, carouselDrafts],
   );
   const isIdeaFavorited = useCallback(
     (idea: IdeaItem, batch: IdeaBatch) =>
@@ -692,9 +831,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1800px] gap-6 overflow-hidden p-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1600px] gap-4 overflow-hidden p-3 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside
-          className="h-full overflow-hidden rounded-2xl border p-5"
+          className="h-full overflow-hidden rounded-2xl border p-4"
           style={{
             borderColor: "var(--border-subtle)",
             background: "var(--bg-elevated)",
@@ -929,9 +1068,9 @@ export default function HomePage() {
           ) : null}
         </aside>
 
-        <section className="h-full overflow-y-auto pr-1">
+        <section className="h-full overflow-y-auto pr-1 text-sm">
           <div
-            className="sticky top-0 z-20 mb-4 flex flex-wrap gap-2 border-b pb-3"
+            className="sticky top-0 z-20 mb-3 flex flex-wrap gap-2 border-b pb-2"
             style={{ borderColor: "var(--border-subtle)", background: "var(--bg-primary)" }}
           >
             {VIEWS.map((view) => {
@@ -949,7 +1088,7 @@ export default function HomePage() {
                   key={view}
                   type="button"
                   onClick={() => setActiveView(view)}
-                  className="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
+                  className="rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors"
                   style={{
                     borderColor: "var(--border-default)",
                     background: isActive ? "var(--bg-elevated)" : "var(--bg-tertiary)",
@@ -964,10 +1103,10 @@ export default function HomePage() {
 
           {activeView === "variants" ? (
             <>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Variations</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Variations</h2>
               {results.length === 0 && !loading ? (
                 <div
-                  className="rounded-2xl border border-dashed p-10 text-center text-sm text-[var(--text-tertiary)]"
+                  className="rounded-2xl border border-dashed p-8 text-center text-sm text-[var(--text-tertiary)]"
                   style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)" }}
                 >
                   Generated hooks appear here. Instructions live in{" "}
@@ -975,22 +1114,22 @@ export default function HomePage() {
                 </div>
               ) : null}
               {loading ? (
-                <div className="grid gap-3 2xl:grid-cols-3">
+                <div className="grid gap-2 2xl:grid-cols-3">
                   {Array.from({ length: 10 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-24 animate-pulse rounded-2xl border"
+                      className="h-20 animate-pulse rounded-2xl border"
                       style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elevated)" }}
                     />
                   ))}
                 </div>
               ) : null}
               {!loading && results.length > 0 ? (
-                <ul className="grid list-none gap-4 p-0">
+                <ul className="grid list-none gap-3 p-0">
                   {results.map((item, i) => (
                     <li
                       key={item.id}
-                      className="flex flex-col rounded-2xl border p-4"
+                      className="flex flex-col rounded-2xl border p-3"
                       style={{
                         borderColor: "var(--border-subtle)",
                         background: "var(--bg-elevated)",
@@ -1008,8 +1147,8 @@ export default function HomePage() {
                       <textarea
                         value={item.text}
                         onChange={(e) => onUpdateHookText(item.id, e.target.value)}
-                        rows={3}
-                        className="flex-1 w-full resize-y px-1 py-1 text-xl font-medium leading-relaxed outline-none sm:text-2xl"
+                        rows={2}
+                        className="flex-1 w-full resize-y px-1 py-1 text-lg font-medium leading-snug outline-none sm:text-xl"
                         style={{
                           color: "var(--text-secondary)",
                         }}
@@ -1027,10 +1166,10 @@ export default function HomePage() {
                           To score higher: {item.improveTip}
                         </p>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         <button
                           type="button"
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Copy hook"
                           aria-label="Copy hook"
@@ -1042,7 +1181,7 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Save hook to favorites"
                           aria-label="Save hook to favorites"
@@ -1052,7 +1191,7 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Add hook to selected collection"
                           aria-label="Add hook to selected collection"
@@ -1063,7 +1202,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={rewritingId === item.id}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Rewrite from this winning hook"
                           aria-label="Rewrite from this winning hook"
@@ -1074,7 +1213,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={ideasLoadingId === item.id}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Generate 5 aha and conclusion examples"
                           aria-label="Generate 5 aha and conclusion examples"
@@ -1085,7 +1224,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={expandingId === item.id}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Generate winning hook expansion sets"
                           aria-label="Generate winning hook expansion sets"
@@ -1096,7 +1235,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={scriptLoadingId === item.id}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Create script and storyboard from hook"
                           aria-label="Create script and storyboard from hook"
@@ -1107,7 +1246,7 @@ export default function HomePage() {
                         <button
                           type="button"
                           disabled={netflixifyLoadingId === item.id}
-                          className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                          className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Netflixify this hook into 5 script ideas"
                           aria-label="Netflixify this hook into 5 script ideas"
@@ -1121,7 +1260,7 @@ export default function HomePage() {
                 </ul>
               ) : null}
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <section className="rounded-2xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elevated)" }}>
                   <h3 className="text-sm font-semibold">Favorites ({favorites.length})</h3>
                   <div className="mt-2 max-h-48 space-y-2 overflow-auto text-xs text-[var(--text-secondary)]">
@@ -1250,25 +1389,25 @@ export default function HomePage() {
 
           {activeView === "script" ? (
             <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Script</h2>
+              <h2 className="text-base font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Script</h2>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                <h3 className="text-xs font-semibold text-[var(--text-primary)]">Netflixified scripts ({netflixifyBatches.length})</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Netflixified scripts ({netflixifyBatches.length})</h3>
                 <div className="mt-2 space-y-3">
                   {netflixifyBatches.length === 0 ? (
-                    <p className="text-xs text-[var(--text-tertiary)]">
+                    <p className="text-sm text-[var(--text-tertiary)]">
                       Click <span className="font-medium text-[var(--text-secondary)]">Netflixify</span> from the left panel or any hook to generate 5 script ideas.
                     </p>
                   ) : (
                     netflixifyBatches.map((batch) => (
-                      <div key={batch.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                      <div key={batch.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
                         <p className="font-semibold text-[var(--text-secondary)]">{batch.platform} · {batch.targetAudience}</p>
-                        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">Hook: {batch.hookText}</p>
+                        <p className="mt-1 text-sm text-[var(--text-tertiary)]">Hook: {batch.hookText}</p>
                         <div className="mt-2 space-y-2">
                           {batch.scripts.map((item, idx) => (
-                            <div key={`${batch.id}-netflix-script-${idx}`} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                              <p className="font-semibold text-[var(--text-secondary)]">{idx + 1}. {item.title}</p>
-                              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">{item.script}</p>
-                              <ul className="mt-2 list-disc pl-4 text-[11px] text-[var(--text-tertiary)]">
+                            <div key={`${batch.id}-netflix-script-${idx}`} className="rounded-lg border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                              <p className="text-base font-semibold text-[var(--text-secondary)]">{idx + 1}. {item.title}</p>
+                              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{item.script}</p>
+                              <ul className="mt-3 list-disc pl-5 text-sm leading-relaxed text-[var(--text-tertiary)]">
                                 {item.storyboard.map((step, stepIdx) => (
                                   <li key={`${batch.id}-netflix-step-${idx}-${stepIdx}`}>{step}</li>
                                 ))}
@@ -1282,19 +1421,19 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                <h3 className="text-xs font-semibold text-[var(--text-primary)]">Scripts & storyboards ({scriptBoards.length})</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Scripts & storyboards ({scriptBoards.length})</h3>
                 <div className="mt-2 space-y-3">
                   {scriptBoards.length === 0 ? (
-                    <p className="text-xs text-[var(--text-tertiary)]">Run the 1-click script/storyboard action on any hook to create a ready-to-record plan.</p>
+                    <p className="text-sm text-[var(--text-tertiary)]">Run the 1-click script/storyboard action on any hook to create a ready-to-record plan.</p>
                   ) : (
                     scriptBoards.map((entry) => (
-                      <div key={entry.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                        <p className="font-semibold text-[var(--text-secondary)]">{entry.package.title}</p>
-                        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">{entry.platform} · {entry.hookText}</p>
-                        <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{entry.package.script}</p>
+                      <div key={entry.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                        <p className="text-base font-semibold text-[var(--text-secondary)]">{entry.package.title}</p>
+                        <p className="mt-1 text-sm text-[var(--text-tertiary)]">{entry.platform} · {entry.hookText}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{entry.package.script}</p>
                         <div className="mt-2">
                           <p className="font-semibold text-[var(--text-secondary)]">Storyboard</p>
-                          <ul className="list-disc pl-4 text-[11px] text-[var(--text-tertiary)]">
+                          <ul className="list-disc pl-5 text-sm text-[var(--text-tertiary)]">
                             {entry.package.storyboard.map((step, idx) => (
                               <li key={`${entry.id}-step-${idx}`}>{step}</li>
                             ))}
@@ -1302,7 +1441,7 @@ export default function HomePage() {
                         </div>
                         <div className="mt-2">
                           <p className="font-semibold text-[var(--text-secondary)]">CTA options</p>
-                          <ul className="list-disc pl-4 text-[11px] text-[var(--text-tertiary)]">
+                          <ul className="list-disc pl-5 text-sm text-[var(--text-tertiary)]">
                             {entry.package.ctaOptions.map((cta, idx) => (
                               <li key={`${entry.id}-cta-${idx}`}>{cta}</li>
                             ))}
@@ -1319,33 +1458,153 @@ export default function HomePage() {
           {activeView === "carousel" ? (
             <>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Carousel</h2>
-              <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                <h3 className="text-xs font-semibold text-[var(--text-primary)]">Winning hook expansions ({expansionBatches.length})</h3>
-                <div className="mt-2 space-y-3">
-                  {expansionBatches.length === 0 ? (
-                    <p className="text-xs text-[var(--text-tertiary)]">Run the Winning hook expansion action on a result to generate rewrite/pain/curiosity sets.</p>
-                  ) : (
-                    expansionBatches.map((batch) => (
-                      <div key={batch.id} className="rounded-lg border p-2 text-xs" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                        <p className="font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
-                        <div className="mt-2 space-y-2 text-[11px] text-[var(--text-tertiary)]">
-                          <div>
-                            <p className="font-semibold text-[var(--text-secondary)]">Rewrites</p>
-                            <p>{batch.groups.rewrites.slice(0, 3).map((h) => h.text).join(" · ")}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-[var(--text-secondary)]">Pain hooks</p>
-                            <p>{batch.groups.painHooks.slice(0, 3).map((h) => h.text).join(" · ")}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-[var(--text-secondary)]">Curiosity hooks</p>
-                            <p>{batch.groups.curiosityHooks.slice(0, 3).map((h) => h.text).join(" · ")}</p>
-                          </div>
-                        </div>
+              <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <section className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)]">Carousels ({carouselDrafts.length})</h3>
+                    <button
+                      type="button"
+                      className="rounded-md border px-2 py-1 text-[11px]"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                      onClick={createCarouselDraft}
+                    >
+                      New
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {carouselDrafts.length === 0 ? (
+                      <p className="text-xs text-[var(--text-tertiary)]">Create a carousel, add slides, then edit text and layout.</p>
+                    ) : (
+                      carouselDrafts.map((draft) => (
+                        <button
+                          key={draft.id}
+                          type="button"
+                          onClick={() => setActiveCarouselId(draft.id)}
+                          className="w-full rounded-lg border px-2 py-2 text-left text-xs"
+                          style={{
+                            borderColor: "var(--border-default)",
+                            background: activeCarouselDraft?.id === draft.id ? "var(--bg-elevated)" : "var(--bg-tertiary)",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          <p className="font-semibold text-[var(--text-primary)]">{draft.name}</p>
+                          <p>{draft.slides.length} slides</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  {activeCarouselDraft ? (
+                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={activeCarouselDraft.name}
+                          onChange={(e) => updateCarouselDraftName(activeCarouselDraft.id, e.target.value)}
+                          className="min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-sm"
+                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addCarouselSlide(activeCarouselDraft.id)}
+                          className="rounded-lg border px-3 py-2 text-xs"
+                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                        >
+                          Add slide
+                        </button>
                       </div>
-                    ))
+
+                      <div className="mt-4 space-y-3">
+                        {activeCarouselDraft.slides.map((slide, idx) => {
+                          const selectedLayout =
+                            carouselLayouts.find((layout) => layout.id === slide.layoutId) ?? carouselLayouts[0] ?? getDefaultCarouselLayouts()[0];
+                          return (
+                            <div key={slide.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Slide #{idx + 1}</p>
+                              <input
+                                value={slide.headline}
+                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { headline: e.target.value })}
+                                placeholder="Headline"
+                                className="mt-2 w-full rounded-lg border px-3 py-2 text-sm"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                              <textarea
+                                value={slide.body}
+                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { body: e.target.value })}
+                                placeholder="Body text"
+                                rows={3}
+                                className="mt-2 w-full resize-y rounded-lg border px-3 py-2 text-sm"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                              <select
+                                value={slide.layoutId}
+                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { layoutId: e.target.value })}
+                                className="mt-2 w-full rounded-lg border px-3 py-2 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              >
+                                {carouselLayouts.map((layout) => (
+                                  <option key={layout.id} value={layout.id}>
+                                    {layout.name}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <div
+                                className={`mt-3 ${selectedLayout.cardClass}`}
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)" }}
+                              >
+                                <p className={selectedLayout.titleClass}>{slide.headline || "Headline preview"}</p>
+                                <p className={selectedLayout.bodyClass}>{slide.body || "Body preview"}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
+                      No carousel selected. Create one from the panel on the left.
+                    </div>
                   )}
-                </div>
+
+                  <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)]">Layout library</h3>
+                    <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                      Editing layouts updates all slides that use those layouts, including future carousels.
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {carouselLayouts.map((layout) => (
+                        <div key={layout.id} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                          <input
+                            value={layout.name}
+                            onChange={(e) => updateCarouselLayout(layout.id, { name: e.target.value })}
+                            className="w-full rounded-md border px-2 py-1 text-xs"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                          />
+                          <input
+                            value={layout.titleClass}
+                            onChange={(e) => updateCarouselLayout(layout.id, { titleClass: e.target.value })}
+                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                          />
+                          <input
+                            value={layout.bodyClass}
+                            onChange={(e) => updateCarouselLayout(layout.id, { bodyClass: e.target.value })}
+                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                          />
+                          <input
+                            value={layout.cardClass}
+                            onChange={(e) => updateCarouselLayout(layout.id, { cardClass: e.target.value })}
+                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
               </div>
             </>
           ) : null}
