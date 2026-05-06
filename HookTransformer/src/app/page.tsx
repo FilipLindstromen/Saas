@@ -116,12 +116,22 @@ type CarouselLayout = {
   titleClass: string;
   bodyClass: string;
   cardClass: string;
+  headlineX?: number;
+  headlineY?: number;
+  headlineWidth?: number;
+  bodyX?: number;
+  bodyY?: number;
+  bodyWidth?: number;
+  headlineFontSize?: number;
+  bodyFontSize?: number;
 };
 
 type CarouselSlide = {
   id: string;
   headline: string;
   body: string;
+  headlineHtml?: string;
+  bodyHtml?: string;
   layoutId: string;
   textAlign?: "left" | "center";
   tone?: "soft" | "dark" | "accent";
@@ -144,6 +154,14 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
       titleClass: "font-caveat inline-block border-b-4 border-black/80 pb-2 text-5xl leading-[0.95] text-[#111111] sm:text-6xl",
       bodyClass: "font-nourd mt-14 max-w-[86%] text-2xl font-semibold leading-tight text-[#222222] sm:text-3xl",
       cardClass: "rounded-none border-0 px-8 py-16 sm:px-12",
+      headlineX: 10,
+      headlineY: 16,
+      headlineWidth: 76,
+      bodyX: 10,
+      bodyY: 66,
+      bodyWidth: 66,
+      headlineFontSize: 50,
+      bodyFontSize: 28,
     },
     {
       id: "layout-bold",
@@ -151,6 +169,14 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
       titleClass: "text-2xl font-extrabold uppercase tracking-wide text-[var(--text-primary)]",
       bodyClass: "mt-3 text-sm leading-relaxed text-[var(--text-secondary)]",
       cardClass: "rounded-2xl border-2 p-5",
+      headlineX: 8,
+      headlineY: 12,
+      headlineWidth: 84,
+      bodyX: 8,
+      bodyY: 58,
+      bodyWidth: 84,
+      headlineFontSize: 44,
+      bodyFontSize: 24,
     },
     {
       id: "layout-story",
@@ -158,6 +184,14 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
       titleClass: "text-lg font-semibold italic text-[var(--text-primary)]",
       bodyClass: "mt-2 text-sm leading-relaxed text-[var(--text-secondary)]",
       cardClass: "rounded-3xl border p-6",
+      headlineX: 10,
+      headlineY: 14,
+      headlineWidth: 80,
+      bodyX: 10,
+      bodyY: 60,
+      bodyWidth: 80,
+      headlineFontSize: 40,
+      bodyFontSize: 24,
     },
   ];
 }
@@ -193,6 +227,63 @@ function buildSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
     headlineSize: idx === 0 ? 72 : 42,
     bodySize: idx === 0 ? 38 : 30,
   }));
+}
+
+function toHeadlineAndSubheadline(raw: string): { headline: string; subheadline: string } {
+  const cleaned = raw.replace(/^\d+[\).\-\s]*/, "").replace(/^[-•]\s*/, "").trim();
+  if (!cleaned) {
+    return { headline: "Slide", subheadline: "" };
+  }
+  const colonSplit = cleaned.split(/:\s+/);
+  if (colonSplit.length > 1) {
+    const headline = colonSplit[0].trim();
+    const subheadline = colonSplit.slice(1).join(": ").trim();
+    return { headline: headline || "Slide", subheadline };
+  }
+  const words = cleaned.split(/\s+/);
+  const headlineWords = words.slice(0, Math.min(6, words.length));
+  const subWords = words.slice(headlineWords.length);
+  return {
+    headline: headlineWords.join(" "),
+    subheadline: subWords.join(" "),
+  };
+}
+
+function buildHeadlineSubheadlineSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
+  const chunks = text
+    .split(/\n+/)
+    .flatMap((block) => block.split(/(?<=[.!?])\s+/))
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  return chunks.map((chunk, idx) => {
+    const pair = toHeadlineAndSubheadline(chunk);
+    return {
+      id: makeId(),
+      headline: pair.headline || `Slide ${idx + 1}`,
+      body: pair.subheadline || "",
+      headlineHtml: textToHtml(pair.headline || `Slide ${idx + 1}`),
+      bodyHtml: textToHtml(pair.subheadline || ""),
+      layoutId,
+      textAlign: "left",
+      tone: idx === 0 ? "soft" : "soft",
+      headlineSize: idx === 0 ? 72 : 42,
+      bodySize: idx === 0 ? 38 : 30,
+    };
+  });
+}
+
+function textToHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+function clampPercent(value: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function makeId(): string {
@@ -260,6 +351,7 @@ export default function HomePage() {
   const [scriptLoadingId, setScriptLoadingId] = useState<string | null>(null);
   const [netflixifyLoadingId, setNetflixifyLoadingId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<View>("variants");
+  const [layoutDrag, setLayoutDrag] = useState<{ layoutId: string; target: "headline" | "body" } | null>(null);
 
   useEffect(() => {
     try {
@@ -872,17 +964,20 @@ export default function HomePage() {
       const baseText = sourceText.trim();
       if (!baseText) return;
       const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
+      const isCarouselPlatform = platform.toLowerCase().includes("carousel");
       const draft: CarouselDraft = {
         id: makeId(),
         name: `${namePrefix} ${new Date().toLocaleTimeString()}`,
         createdAt: new Date().toISOString(),
-        slides: buildSlidesFromText(baseText, primaryLayoutId),
+        slides: isCarouselPlatform
+          ? buildHeadlineSubheadlineSlidesFromText(baseText, primaryLayoutId)
+          : buildSlidesFromText(baseText, primaryLayoutId),
       };
       setCarouselDrafts((prev) => [draft, ...prev]);
       setActiveCarouselId(draft.id);
       setActiveView("carousel");
     },
-    [carouselLayouts],
+    [carouselLayouts, platform],
   );
 
   const activeCollection = useMemo(
@@ -1668,14 +1763,24 @@ export default function HomePage() {
                             <p className="text-[11px] font-semibold text-[var(--text-tertiary)]">Slide {idx + 1}</p>
                             <input
                               value={slide.headline}
-                              onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { headline: e.target.value })}
+                              onChange={(e) =>
+                                updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                  headline: e.target.value,
+                                  headlineHtml: textToHtml(e.target.value),
+                                })
+                              }
                               placeholder="Headline"
                               className="mt-1 w-full rounded-md border px-2 py-1 text-xs"
                               style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                             />
                             <textarea
                               value={slide.body}
-                              onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { body: e.target.value })}
+                              onChange={(e) =>
+                                updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                  body: e.target.value,
+                                  bodyHtml: textToHtml(e.target.value),
+                                })
+                              }
                               placeholder="Body"
                               rows={3}
                               className="mt-1 w-full resize-y rounded-md border px-2 py-1 text-xs"
@@ -1715,6 +1820,17 @@ export default function HomePage() {
                                 />
                               </label>
                             </div>
+                            <button
+                              type="button"
+                              className="mt-1 w-full rounded-md border px-2 py-1 text-xs font-medium"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                              onClick={() => {
+                                document.execCommand("styleWithCSS", false, "true");
+                                document.execCommand("hiliteColor", false, "#f6d74f");
+                              }}
+                            >
+                              Highlight selected text
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1835,6 +1951,7 @@ export default function HomePage() {
                                             className="font-caveat cursor-text leading-[0.9] text-[#111111]"
                                             contentEditable
                                             suppressContentEditableWarning
+                                            dangerouslySetInnerHTML={{ __html: slide.headlineHtml || textToHtml(slide.headline || "Headline preview") }}
                                             style={{
                                               fontSize: `${headlineSize}px`,
                                               transform: `rotate(${REFERENCE_CAROUSEL.headlineRotationDeg}deg)`,
@@ -1844,11 +1961,10 @@ export default function HomePage() {
                                             onBlur={(e) =>
                                               updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                                 headline: e.currentTarget.innerText.trim(),
+                                                headlineHtml: e.currentTarget.innerHTML,
                                               })
                                             }
-                                          >
-                                            {slide.headline || "Headline preview"}
-                                          </p>
+                                          />
                                         </div>
                                         <div
                                           className="absolute h-[6px] rounded-full bg-black/85"
@@ -1872,45 +1988,57 @@ export default function HomePage() {
                                             className="font-nourd cursor-text font-semibold leading-[1.12] text-[#222222]"
                                             contentEditable
                                             suppressContentEditableWarning
+                                            dangerouslySetInnerHTML={{ __html: slide.bodyHtml || textToHtml(slide.body || "Body preview") }}
                                             style={{ fontSize: `${bodySize}px`, maxWidth: "100%" }}
                                             onBlur={(e) =>
                                               updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                                 body: e.currentTarget.innerText.trim(),
+                                                bodyHtml: e.currentTarget.innerHTML,
                                               })
                                             }
-                                          >
-                                            {slide.body || "Body preview"}
-                                          </p>
+                                          />
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className={`flex h-full w-full flex-col p-8 ${selectedLayout.cardClass} ${alignClass}`}>
+                                      <div className={`relative h-full w-full ${selectedLayout.cardClass} ${alignClass}`}>
                                         <p
                                           className={`${selectedLayout.titleClass} cursor-text`}
                                           contentEditable
                                           suppressContentEditableWarning
-                                          style={{ fontSize: `${headlineSize}px` }}
+                                          dangerouslySetInnerHTML={{ __html: slide.headlineHtml || textToHtml(slide.headline || "Headline preview") }}
+                                          style={{
+                                            position: "absolute",
+                                            left: `${selectedLayout.headlineX ?? 10}%`,
+                                            top: `${selectedLayout.headlineY ?? 14}%`,
+                                            width: `${selectedLayout.headlineWidth ?? 80}%`,
+                                            fontSize: `${selectedLayout.headlineFontSize ?? headlineSize}px`,
+                                          }}
                                           onBlur={(e) =>
                                             updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                               headline: e.currentTarget.innerText.trim(),
+                                              headlineHtml: e.currentTarget.innerHTML,
                                             })
                                           }
-                                        >
-                                          {slide.headline || "Headline preview"}
-                                        </p>
+                                        />
                                         <p
                                           className={`${selectedLayout.bodyClass} cursor-text`}
                                           contentEditable
                                           suppressContentEditableWarning
-                                          style={{ fontSize: `${bodySize}px` }}
+                                          dangerouslySetInnerHTML={{ __html: slide.bodyHtml || textToHtml(slide.body || "Body preview") }}
+                                          style={{
+                                            position: "absolute",
+                                            left: `${selectedLayout.bodyX ?? 10}%`,
+                                            top: `${selectedLayout.bodyY ?? 60}%`,
+                                            width: `${selectedLayout.bodyWidth ?? 80}%`,
+                                            fontSize: `${selectedLayout.bodyFontSize ?? bodySize}px`,
+                                          }}
                                           onBlur={(e) =>
                                             updateCarouselSlide(activeCarouselDraft.id, slide.id, {
                                               body: e.currentTarget.innerText.trim(),
+                                              bodyHtml: e.currentTarget.innerHTML,
                                             })
                                           }
-                                        >
-                                          {slide.body || "Body preview"}
-                                        </p>
+                                        />
                                       </div>
                                     )}
                                   </div>
@@ -1930,7 +2058,7 @@ export default function HomePage() {
                   <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
                     <h3 className="text-xs font-semibold text-[var(--text-primary)]">Layout library</h3>
                     <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
-                      Editing layouts updates all slides that use those layouts, including future carousels.
+                      Drag headline/body blocks to move them. Updates apply to all slides using the layout.
                     </p>
                     <div className="mt-3 space-y-3">
                       {carouselLayouts.map((layout) => (
@@ -1941,24 +2069,74 @@ export default function HomePage() {
                             className="w-full rounded-md border px-2 py-1 text-xs"
                             style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                           />
-                          <input
-                            value={layout.titleClass}
-                            onChange={(e) => updateCarouselLayout(layout.id, { titleClass: e.target.value })}
-                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
-                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                          />
-                          <input
-                            value={layout.bodyClass}
-                            onChange={(e) => updateCarouselLayout(layout.id, { bodyClass: e.target.value })}
-                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
-                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                          />
-                          <input
-                            value={layout.cardClass}
-                            onChange={(e) => updateCarouselLayout(layout.id, { cardClass: e.target.value })}
-                            className="mt-2 w-full rounded-md border px-2 py-1 text-[11px]"
-                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                          />
+                          <div
+                            className="relative mt-2 aspect-[3/4] w-full max-w-[220px] overflow-hidden rounded-lg border bg-white"
+                            style={{ borderColor: "var(--border-default)", userSelect: "none" }}
+                            onMouseMove={(e) => {
+                              if (!layoutDrag || layoutDrag.layoutId !== layout.id) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const x = clampPercent(((e.clientX - rect.left) / rect.width) * 100, 0, 90);
+                              const y = clampPercent(((e.clientY - rect.top) / rect.height) * 100, 0, 95);
+                              if (layoutDrag.target === "headline") {
+                                updateCarouselLayout(layout.id, { headlineX: x, headlineY: y });
+                              } else {
+                                updateCarouselLayout(layout.id, { bodyX: x, bodyY: y });
+                              }
+                            }}
+                            onMouseUp={() => setLayoutDrag(null)}
+                            onMouseLeave={() => setLayoutDrag(null)}
+                          >
+                            <div
+                              className={`${layout.titleClass} absolute cursor-move border border-dashed border-black/20 p-1`}
+                              style={{
+                                left: `${layout.headlineX ?? 10}%`,
+                                top: `${layout.headlineY ?? 14}%`,
+                                width: `${layout.headlineWidth ?? 80}%`,
+                                fontSize: `${layout.headlineFontSize ?? 40}px`,
+                              }}
+                              onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "headline" })}
+                            >
+                              Headline
+                            </div>
+                            <div
+                              className={`${layout.bodyClass} absolute cursor-move border border-dashed border-black/20 p-1`}
+                              style={{
+                                left: `${layout.bodyX ?? 10}%`,
+                                top: `${layout.bodyY ?? 60}%`,
+                                width: `${layout.bodyWidth ?? 80}%`,
+                                fontSize: `${layout.bodyFontSize ?? 24}px`,
+                              }}
+                              onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "body" })}
+                            >
+                              Body text
+                            </div>
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-1.5">
+                            <label className="text-[10px] text-[var(--text-tertiary)]">
+                              Headline size
+                              <input
+                                type="number"
+                                value={layout.headlineFontSize ?? 40}
+                                min={18}
+                                max={120}
+                                onChange={(e) => updateCarouselLayout(layout.id, { headlineFontSize: Number(e.target.value) || 40 })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                            </label>
+                            <label className="text-[10px] text-[var(--text-tertiary)]">
+                              Body size
+                              <input
+                                type="number"
+                                value={layout.bodyFontSize ?? 24}
+                                min={14}
+                                max={80}
+                                onChange={(e) => updateCarouselLayout(layout.id, { bodyFontSize: Number(e.target.value) || 24 })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                            </label>
+                          </div>
                         </div>
                       ))}
                     </div>

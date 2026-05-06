@@ -499,6 +499,8 @@ export async function generateScriptStoryboard(input: {
     throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
   }
 
+  const isCarousel = input.platform.toLowerCase().includes("carousel");
+
   const parsed = await requestJson<{
     title?: unknown;
     script?: unknown;
@@ -519,6 +521,13 @@ export async function generateScriptStoryboard(input: {
         `Hook: ${input.hook}`,
         ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
         ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
+        ...(isCarousel
+          ? [
+              "Platform note: This is for a carousel post.",
+              "Write the script in a slide-friendly way where each beat can be turned into: headline + subheadline.",
+              "Keep each beat concise and punchy.",
+            ]
+          : []),
         "",
         "Create a 30-45 second content blueprint.",
         "Return JSON with this shape:",
