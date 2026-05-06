@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap");
 
 :root,
 :root[data-theme="dark"] {
@@ -53,6 +54,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+.font-caveat {
+  font-family: "Caveat", cursive;
+}
+
+.font-nourd {
+  font-family: "Nourd", "Avenir Next", "Nunito Sans", "Inter", system-ui, sans-serif;
 }
 
 .sr-only {

@@ -19,6 +19,7 @@ import { loadSharedOpenAiKey } from "@/lib/saas-api-keys";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEFAULT_AUDIENCE = "High-performing professionals";
+const DEFAULT_LIGHTHOUSE = "Your problems aren't in your head, they are in your body.";
 const STORAGE_KEY = "hook-transformer-state-v2";
 const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "Instagram AD (lead magnet / low ticket)", "TikTok", "YouTube Shorts"] as const;
 const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as const;
@@ -122,10 +123,10 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
   return [
     {
       id: "layout-minimal",
-      name: "Minimal",
-      titleClass: "text-xl font-semibold text-[var(--text-primary)]",
-      bodyClass: "mt-2 text-sm text-[var(--text-secondary)]",
-      cardClass: "rounded-2xl border p-5",
+      name: "Hook poster",
+      titleClass: "font-caveat text-5xl leading-[0.95] text-[#111111] sm:text-6xl",
+      bodyClass: "font-nourd mt-14 text-2xl font-semibold leading-tight text-[#222222] sm:text-3xl",
+      cardClass: "rounded-none border-0 px-8 py-16 sm:px-12",
     },
     {
       id: "layout-bold",
@@ -153,11 +154,11 @@ function buildSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
   const limited = chunks.slice(0, 8);
   return limited.map((chunk, idx) => ({
     id: makeId(),
-    headline: idx === 0 ? "Hook" : `Slide ${idx + 1}`,
-    body: chunk,
+    headline: idx === 0 ? chunk : `Slide ${idx + 1}`,
+    body: idx === 0 ? "Add the supporting line here." : chunk,
     layoutId,
-    textAlign: idx === 0 ? "center" : "left",
-    tone: idx === 0 ? "accent" : "soft",
+    textAlign: "left",
+    tone: "soft",
   }));
 }
 
@@ -191,6 +192,7 @@ export default function HomePage() {
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
+  const [lighthouseHeadline, setLighthouseHeadline] = useState(DEFAULT_LIGHTHOUSE);
   const [hook, setHook] = useState("");
   const [uniquePerspective, setUniquePerspective] = useState("");
   const [curiosityLevel, setCuriosityLevel] = useState(0.5);
@@ -231,6 +233,7 @@ export default function HomePage() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
         targetAudience: string;
+        lighthouseHeadline: string;
         hook: string;
         uniquePerspective: string;
         curiosityLevel: number;
@@ -257,6 +260,7 @@ export default function HomePage() {
       }>;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
+      if (typeof parsed.lighthouseHeadline === "string") setLighthouseHeadline(parsed.lighthouseHeadline);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
       if (typeof parsed.uniquePerspective === "string") setUniquePerspective(parsed.uniquePerspective);
       if (typeof parsed.curiosityLevel === "number") setCuriosityLevel(Math.max(0, Math.min(1, parsed.curiosityLevel)));
@@ -308,6 +312,7 @@ export default function HomePage() {
   useEffect(() => {
     const payload = {
       targetAudience,
+      lighthouseHeadline,
       hook,
       uniquePerspective,
       curiosityLevel,
@@ -335,6 +340,7 @@ export default function HomePage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [
     targetAudience,
+    lighthouseHeadline,
     hook,
     uniquePerspective,
     curiosityLevel,
@@ -851,7 +857,12 @@ export default function HomePage() {
       >
         <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold sm:text-xl">Hook Transformer</h1>
+            <input
+              value={lighthouseHeadline}
+              onChange={(e) => setLighthouseHeadline(e.target.value)}
+              className="w-full max-w-4xl border-none bg-transparent text-2xl font-semibold leading-tight outline-none sm:text-3xl"
+              style={{ color: "var(--text-primary)" }}
+            />
             <p className="mt-0.5 max-w-xl text-xs text-[var(--text-tertiary)]">
               Ten variations that weave in who it is for, their situation, and the problem without sounding mechanical.
             </p>
@@ -1593,26 +1604,14 @@ export default function HomePage() {
                             tone === "dark"
                               ? "var(--bg-primary)"
                               : tone === "accent"
-                                ? "var(--bg-hover)"
-                                : "var(--bg-secondary)";
+                                ? "#fff6d8"
+                                : "#ffffff";
                           return (
                             <div key={slide.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Slide #{idx + 1}</p>
-                              <input
-                                value={slide.headline}
-                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { headline: e.target.value })}
-                                placeholder="Headline"
-                                className="mt-2 w-full rounded-lg border px-3 py-2 text-sm"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
-                              <textarea
-                                value={slide.body}
-                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { body: e.target.value })}
-                                placeholder="Body text"
-                                rows={3}
-                                className="mt-2 w-full resize-y rounded-lg border px-3 py-2 text-sm"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
+                              <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                                Click text inside the slide canvas to edit it directly.
+                              </p>
                               <select
                                 value={slide.layoutId}
                                 onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { layoutId: e.target.value })}
@@ -1663,8 +1662,30 @@ export default function HomePage() {
                                     style={{ borderColor: "var(--border-default)", background: toneBackground }}
                                   >
                                     <div className={`flex h-full w-full flex-col justify-center p-8 ${selectedLayout.cardClass} ${alignClass}`}>
-                                      <p className={selectedLayout.titleClass}>{slide.headline || "Headline preview"}</p>
-                                      <p className={selectedLayout.bodyClass}>{slide.body || "Body preview"}</p>
+                                      <p
+                                        className={`${selectedLayout.titleClass} cursor-text`}
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        onBlur={(e) =>
+                                          updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                            headline: e.currentTarget.innerText.trim(),
+                                          })
+                                        }
+                                      >
+                                        {slide.headline || "Headline preview"}
+                                      </p>
+                                      <p
+                                        className={`${selectedLayout.bodyClass} cursor-text`}
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        onBlur={(e) =>
+                                          updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                            body: e.currentTarget.innerText.trim(),
+                                          })
+                                        }
+                                      >
+                                        {slide.body || "Body preview"}
+                                      </p>
                                     </div>
                                   </div>
                                 </div>
