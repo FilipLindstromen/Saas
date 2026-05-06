@@ -1520,7 +1520,7 @@ export default function HomePage() {
                                   style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
                                   onClick={() => onDesignCarouselFromText(`${item.title}. ${item.script}`, "Script carousel")}
                                 >
-                                  Design carousel
+                                  Generate a carousel
                                 </button>
                               </div>
                               <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{item.script}</p>
@@ -1548,7 +1548,7 @@ export default function HomePage() {
                             style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                             onClick={() => onDesignCarouselFromText(`${entry.package.title}. ${entry.package.script}`, "Storyboard carousel")}
                           >
-                            Design carousel
+                            Generate a carousel
                           </button>
                         </div>
                         <p className="mt-1 text-sm text-[var(--text-tertiary)]">{entry.platform} · {entry.hookText}</p>
@@ -1615,6 +1615,33 @@ export default function HomePage() {
                       ))
                     )}
                   </div>
+                  {activeCarouselDraft ? (
+                    <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border-default)" }}>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">Slide text editor</p>
+                      <div className="mt-2 space-y-2 max-h-[45vh] overflow-auto pr-1">
+                        {activeCarouselDraft.slides.map((slide, idx) => (
+                          <div key={`${activeCarouselDraft.id}-editor-${slide.id}`} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                            <p className="text-[11px] font-semibold text-[var(--text-tertiary)]">Slide {idx + 1}</p>
+                            <input
+                              value={slide.headline}
+                              onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { headline: e.target.value })}
+                              placeholder="Headline"
+                              className="mt-1 w-full rounded-md border px-2 py-1 text-xs"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                            />
+                            <textarea
+                              value={slide.body}
+                              onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { body: e.target.value })}
+                              placeholder="Body"
+                              rows={3}
+                              className="mt-1 w-full resize-y rounded-md border px-2 py-1 text-xs"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="space-y-4">
