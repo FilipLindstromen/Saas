@@ -321,6 +321,72 @@ export type ScriptStoryboard = {
   ctaOptions: string[];
 };
 
+export async function generateNetflixifyScripts(input: {
+  apiKey: string;
+  targetAudience: string;
+  platform: string;
+  hook: string;
+  uniquePerspective?: string;
+}): Promise<ScriptStoryboard[]> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+
+  const parsed = await requestJson<{
+    scripts?: unknown;
+  }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You are a short-form script strategist. Create clear, practical scripts with a cinematic story arc in plain language.",
+    },
+    {
+      role: "user",
+      content: [
+        `Platform: ${input.platform}`,
+        `Target audience: ${input.targetAudience}`,
+        `Seed hook: ${input.hook}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        "",
+        "Create exactly 5 distinct 'Netflixified' script ideas.",
+        "Each idea must follow this structure in the script itself:",
+        "1) opening hook that sets situation + who it is for",
+        "2) conflict",
+        "3) drama/escalation",
+        "4) conclusion",
+        "",
+        "Return JSON with shape:",
+        "{\"scripts\":[{\"title\":\"...\",\"script\":\"...\",\"storyboard\":[\"shot 1 ...\",\"shot 2 ...\",\"shot 3 ...\",\"shot 4 ...\",\"shot 5 ...\",\"shot 6 ...\"],\"ctaOptions\":[\"cta1\",\"cta2\",\"cta3\"]}]}",
+        "Rules:",
+        "- scripts array: exactly 5 items",
+        "- storyboard: exactly 6 steps per script",
+        "- ctaOptions: exactly 3 options per script",
+      ].join("\n"),
+    },
+  ]);
+
+  const scripts = Array.isArray(parsed.scripts) ? parsed.scripts : [];
+  const normalized = scripts
+    .map((entry) => {
+      const row = entry as { title?: unknown; script?: unknown; storyboard?: unknown; ctaOptions?: unknown };
+      const title = String(row.title ?? "").trim();
+      const script = String(row.script ?? "").trim();
+      const storyboard = Array.isArray(row.storyboard) ? row.storyboard.map((s) => String(s).trim()).filter(Boolean) : [];
+      const ctaOptions = Array.isArray(row.ctaOptions) ? row.ctaOptions.map((s) => String(s).trim()).filter(Boolean) : [];
+      if (!title || !script || storyboard.length !== 6 || ctaOptions.length !== 3) {
+        return null;
+      }
+      return { title, script, storyboard, ctaOptions };
+    })
+    .filter((item): item is ScriptStoryboard => item !== null);
+
+  if (normalized.length !== 5) {
+    throw new Error(`Expected 5 Netflixified scripts, got ${normalized.length}. Try again.`);
+  }
+  return normalized;
+}
+
 export async function generateScriptStoryboard(input: {
   apiKey: string;
   targetAudience: string;
