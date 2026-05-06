@@ -124,8 +124,8 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
     {
       id: "layout-minimal",
       name: "Hook poster",
-      titleClass: "font-caveat text-5xl leading-[0.95] text-[#111111] sm:text-6xl",
-      bodyClass: "font-nourd mt-14 text-2xl font-semibold leading-tight text-[#222222] sm:text-3xl",
+      titleClass: "font-caveat inline-block border-b-4 border-black/80 pb-2 text-5xl leading-[0.95] text-[#111111] sm:text-6xl",
+      bodyClass: "font-nourd mt-14 max-w-[86%] text-2xl font-semibold leading-tight text-[#222222] sm:text-3xl",
       cardClass: "rounded-none border-0 px-8 py-16 sm:px-12",
     },
     {
@@ -143,6 +143,20 @@ function getDefaultCarouselLayouts(): CarouselLayout[] {
       cardClass: "rounded-3xl border p-6",
     },
   ];
+}
+
+function mergeWithDefaultCarouselLayouts(existing: CarouselLayout[]): CarouselLayout[] {
+  const defaults = getDefaultCarouselLayouts();
+  const byId = new Map(existing.map((layout) => [layout.id, layout]));
+  return defaults.map((base) => {
+    const custom = byId.get(base.id);
+    if (!custom) return base;
+    return {
+      ...base,
+      // Keep custom name, but keep the updated style classes so the visual system stays consistent.
+      name: custom.name || base.name,
+    };
+  });
 }
 
 function buildSlidesFromText(text: string, layoutId: string): CarouselSlide[] {
@@ -301,7 +315,9 @@ export default function HomePage() {
       if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
       if (Array.isArray(parsed.scriptBoards)) setScriptBoards(parsed.scriptBoards);
       if (Array.isArray(parsed.netflixifyBatches)) setNetflixifyBatches(parsed.netflixifyBatches);
-      if (Array.isArray(parsed.carouselLayouts) && parsed.carouselLayouts.length > 0) setCarouselLayouts(parsed.carouselLayouts);
+      if (Array.isArray(parsed.carouselLayouts) && parsed.carouselLayouts.length > 0) {
+        setCarouselLayouts(mergeWithDefaultCarouselLayouts(parsed.carouselLayouts));
+      }
       if (Array.isArray(parsed.carouselDrafts)) setCarouselDrafts(parsed.carouselDrafts);
       if (typeof parsed.activeCarouselId === "string") setActiveCarouselId(parsed.activeCarouselId);
     } catch {
@@ -855,19 +871,17 @@ export default function HomePage() {
         className="sticky top-0 z-30 border-b px-4 py-4 sm:px-6"
         style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
       >
-        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="mx-auto grid w-full max-w-[1800px] grid-cols-[1fr_minmax(0,900px)_1fr] items-center gap-3">
+          <div />
+          <div className="flex justify-center">
             <input
               value={lighthouseHeadline}
               onChange={(e) => setLighthouseHeadline(e.target.value)}
-              className="w-full max-w-4xl border-none bg-transparent text-2xl font-semibold leading-tight outline-none sm:text-3xl"
+              className="w-full border-none bg-transparent text-center text-2xl font-semibold leading-tight outline-none sm:text-3xl"
               style={{ color: "var(--text-primary)" }}
             />
-            <p className="mt-0.5 max-w-xl text-xs text-[var(--text-tertiary)]">
-              Ten variations that weave in who it is for, their situation, and the problem without sounding mechanical.
-            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <a
               href=".."
               className="rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
