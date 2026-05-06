@@ -134,6 +134,10 @@ export async function generateHookVariations({
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
     "performanceScore should estimate expected watch-through potential.",
     "performanceReason must explain the performance score in one short sentence.",
+    "Every hook must naturally include these three elements:",
+    "1) who it is for, 2) the specific situation/context, 3) the concrete problem/tension.",
+    "Do this in conversational everyday language, not labels or rigid template wording.",
+    "Avoid robotic phrasing such as 'for [audience], in [situation], with [problem]'.",
     "Reasons must be short and plain-language.",
     "improveTip must be one short, concrete suggestion to make the hook stronger.",
   ].join("\n");
@@ -176,6 +180,8 @@ export async function rewriteWinningHook(
     "",
     "Create 10 NEW hooks inspired by the winning hook's angle/structure but not duplicates.",
     "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"...\",\"...\"],\"improveTip\":\"one short suggestion\"}]}",
+    "Each hook must clearly but naturally include who it is for, situation, and problem.",
+    "Write like real spoken language; avoid formulaic or robotic phrasing.",
   ].join("\n");
 
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
@@ -271,6 +277,8 @@ export async function generateTrendingHooks(input: {
         "Generate trend-inspired hooks for these platforms: Instagram, Reddit, YouTube Shorts, TikTok.",
         "Create exactly 12 hooks total (3 per platform).",
         "Each hook must stay relevant to the seed hook topic and audience.",
+        "Each hook must naturally include who it is for, the situation, and the specific problem.",
+        "Keep wording conversational and non-robotic.",
         "Return JSON only:",
         "{\"hooks\":[{\"source\":\"Instagram|Reddit|YouTube|TikTok\",\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
       ].join("\n"),
