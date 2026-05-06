@@ -27,10 +27,13 @@ const PLATFORMS = ["Instagram Reel", "Instagram Carousel", "Instagram AD (lead m
 const STYLE_PRESETS = ["Casual", "Direct", "Curious", "Bold", "Empathetic"] as const;
 const REFERENCE_CAROUSEL = {
   // Percent-based geometry on a 1080x1440 artboard
-  leftInset: "12%",
-  textWidth: "76%",
-  topAnchor: "57%",
-  bottomTop: "71%",
+  leftInset: "10%",
+  headlineWidth: "74%",
+  bodyWidth: "66%",
+  topAnchor: "44%",
+  bottomTop: "73%",
+  underlineTop: "63%",
+  underlineWidth: "56%",
   headlineRotationDeg: -6,
   headlineSize: 72,
   bodySize: 38,
@@ -1824,7 +1827,7 @@ export default function HomePage() {
                                           className="absolute flex items-end"
                                           style={{
                                             left: REFERENCE_CAROUSEL.leftInset,
-                                            width: REFERENCE_CAROUSEL.textWidth,
+                                            width: REFERENCE_CAROUSEL.headlineWidth,
                                             bottom: REFERENCE_CAROUSEL.topAnchor,
                                           }}
                                         >
@@ -1848,10 +1851,20 @@ export default function HomePage() {
                                           </p>
                                         </div>
                                         <div
+                                          className="absolute h-[6px] rounded-full bg-black/85"
+                                          style={{
+                                            left: REFERENCE_CAROUSEL.leftInset,
+                                            width: REFERENCE_CAROUSEL.underlineWidth,
+                                            top: REFERENCE_CAROUSEL.underlineTop,
+                                            transform: "rotate(-6deg)",
+                                            transformOrigin: "left center",
+                                          }}
+                                        />
+                                        <div
                                           className="absolute"
                                           style={{
                                             left: REFERENCE_CAROUSEL.leftInset,
-                                            width: REFERENCE_CAROUSEL.textWidth,
+                                            width: REFERENCE_CAROUSEL.bodyWidth,
                                             top: REFERENCE_CAROUSEL.bottomTop,
                                           }}
                                         >
