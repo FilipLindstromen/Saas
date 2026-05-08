@@ -386,6 +386,64 @@ export type ScriptStoryboard = {
   ctaOptions: string[];
 };
 
+export async function generateSymptomStoryBlocks(input: {
+  apiKey: string;
+  language?: AppLanguage;
+  targetAudience: string;
+  platform: string;
+  hook: string;
+  stylePreset: string;
+  uniquePerspective?: string;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
+}): Promise<string[]> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+
+  const parsed = await requestJson<{ blocks?: unknown }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You write short-form social content in a symptom-first narrative style. Avoid expert talk, jargon, and clinical phrasing.",
+    },
+    {
+      role: "user",
+      content: [
+        languageDirective(input.language),
+        `Platform: ${input.platform}`,
+        `Style preset: ${input.stylePreset}`,
+        `Target audience: ${input.targetAudience}`,
+        `Hook: ${input.hook}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
+        "",
+        "Generate exactly 5 content blocks in this structure:",
+        "- 3 to 5 short punchy symptom/situation lines",
+        "- then a contrast turn (like: But..., Then..., So...)",
+        "- then a clear reframe/conclusion line",
+        "",
+        "Rules:",
+        "- everyday spoken language only",
+        "- no names and no cinematic character storytelling",
+        "- no list numbers, no bullet markers",
+        "- each line should be short and readable as separate line breaks",
+        "- keep the output ready to post (no commentary)",
+        "",
+        "Return JSON only:",
+        "{\"blocks\":[\"line1\\nline2\\nline3\\n\\nBut ...\\n...\",\"...\"]}",
+      ].join("\n"),
+    },
+  ]);
+
+  const blocks = Array.isArray(parsed.blocks) ? parsed.blocks.map((b) => String(b).trim()).filter(Boolean) : [];
+  if (blocks.length !== 5) {
+    throw new Error(`Expected 5 symptom story blocks, got ${blocks.length}. Try again.`);
+  }
+  return blocks;
+}
+
 function cleanStoryboardLine(line: string): string {
   return line
     .replace(/^shot\s*\d+\s*[:.-]?\s*/i, "")

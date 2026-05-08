@@ -9,6 +9,7 @@ import {
   generateContentIdeas,
   generateHookVariations,
   generateNetflixifyScripts,
+  generateSymptomStoryBlocks,
   recalculateHookScores,
   generateScriptStoryboard,
   generateTrendingHooks,
@@ -108,6 +109,15 @@ type NetflixifyBatch = {
   targetAudience: string;
   createdAt: string;
   scripts: ScriptStoryboard[];
+};
+
+type SymptomStoryBatch = {
+  id: string;
+  hookText: string;
+  platform: string;
+  targetAudience: string;
+  createdAt: string;
+  blocks: string[];
 };
 
 type CarouselLayout = {
@@ -312,7 +322,7 @@ function toExpansionGroups(pack: ExpansionPack) {
 }
 
 export default function HomePage() {
-  const VIEWS = ["variants", "aha", "script", "carousel"] as const;
+  const VIEWS = ["variants", "aha", "script", "carousel", "symptom"] as const;
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
@@ -328,7 +338,7 @@ export default function HomePage() {
   const [netflixDramaLevel, setNetflixDramaLevel] = useState(0.7);
   const [netflixEndingStyle, setNetflixEndingStyle] = useState<"hopeful" | "urgent" | "reflective">("reflective");
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>("Instagram Reel");
-  const [stylePreset, setStylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
+  const [stylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [favorites, setFavorites] = useState<SavedItem[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -339,6 +349,7 @@ export default function HomePage() {
   const [expansionBatches, setExpansionBatches] = useState<ExpansionBatch[]>([]);
   const [scriptBoards, setScriptBoards] = useState<ScriptBoardEntry[]>([]);
   const [netflixifyBatches, setNetflixifyBatches] = useState<NetflixifyBatch[]>([]);
+  const [symptomStoryBatches, setSymptomStoryBatches] = useState<SymptomStoryBatch[]>([]);
   const [carouselLayouts, setCarouselLayouts] = useState<CarouselLayout[]>(getDefaultCarouselLayouts);
   const [carouselDrafts, setCarouselDrafts] = useState<CarouselDraft[]>([]);
   const [activeCarouselId, setActiveCarouselId] = useState<string>("");
@@ -350,6 +361,7 @@ export default function HomePage() {
   const [expandingId, setExpandingId] = useState<string | null>(null);
   const [scriptLoadingId, setScriptLoadingId] = useState<string | null>(null);
   const [netflixifyLoadingId, setNetflixifyLoadingId] = useState<string | null>(null);
+  const [symptomStoryLoading, setSymptomStoryLoading] = useState(false);
   const [activeView, setActiveView] = useState<View>("variants");
   const [layoutDrag, setLayoutDrag] = useState<{ layoutId: string; target: "headline" | "body" } | null>(null);
 
@@ -381,6 +393,7 @@ export default function HomePage() {
         expansionBatches: ExpansionBatch[];
         scriptBoards: ScriptBoardEntry[];
         netflixifyBatches: NetflixifyBatch[];
+        symptomStoryBatches: SymptomStoryBatch[];
         carouselLayouts: CarouselLayout[];
         carouselDrafts: CarouselDraft[];
         activeCarouselId: string;
@@ -429,6 +442,7 @@ export default function HomePage() {
       if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
       if (Array.isArray(parsed.scriptBoards)) setScriptBoards(parsed.scriptBoards);
       if (Array.isArray(parsed.netflixifyBatches)) setNetflixifyBatches(parsed.netflixifyBatches);
+      if (Array.isArray(parsed.symptomStoryBatches)) setSymptomStoryBatches(parsed.symptomStoryBatches);
       if (Array.isArray(parsed.carouselLayouts) && parsed.carouselLayouts.length > 0) {
         setCarouselLayouts(mergeWithDefaultCarouselLayouts(parsed.carouselLayouts));
       }
@@ -464,6 +478,7 @@ export default function HomePage() {
       expansionBatches,
       scriptBoards,
       netflixifyBatches,
+      symptomStoryBatches,
       carouselLayouts,
       carouselDrafts,
       activeCarouselId,
@@ -493,6 +508,7 @@ export default function HomePage() {
     expansionBatches,
     scriptBoards,
     netflixifyBatches,
+    symptomStoryBatches,
     carouselLayouts,
     carouselDrafts,
     activeCarouselId,
@@ -863,6 +879,43 @@ export default function HomePage() {
     setResults((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
   }, []);
 
+  const onGenerateSymptomStory = useCallback(async () => {
+    setError(null);
+    const apiKey = loadSharedOpenAiKey();
+    if (!hook.trim()) {
+      setError("Enter a hook first.");
+      return;
+    }
+    setSymptomStoryLoading(true);
+    setActiveView("symptom");
+    try {
+      const blocks = await generateSymptomStoryBlocks({
+        apiKey,
+        language: appLanguage,
+        targetAudience,
+        platform,
+        hook,
+        stylePreset,
+        uniquePerspective,
+        useBrandVoiceLock,
+        brandVoiceSample,
+      });
+      const batch: SymptomStoryBatch = {
+        id: makeId(),
+        hookText: hook,
+        platform,
+        targetAudience,
+        createdAt: new Date().toISOString(),
+        blocks,
+      };
+      setSymptomStoryBatches((prev) => [batch, ...prev]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate symptom stories.");
+    } finally {
+      setSymptomStoryLoading(false);
+    }
+  }, [appLanguage, brandVoiceSample, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock]);
+
   const createCarouselDraft = useCallback(() => {
     const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
     const draft: CarouselDraft = {
@@ -1067,16 +1120,16 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1600px] gap-4 overflow-hidden p-3 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1600px] gap-3 overflow-hidden p-2 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside
-          className="h-full overflow-hidden rounded-2xl border p-4"
+          className="h-full overflow-y-auto rounded-2xl border p-3"
           style={{
             borderColor: "var(--border-subtle)",
             background: "var(--bg-elevated)",
             boxShadow: "var(--shadow-sm)",
           }}
         >
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Inmatning" : "Inputs"}</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Inmatning" : "Inputs"}</h2>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Platform</span>
             <select
@@ -1096,26 +1149,7 @@ export default function HomePage() {
               ))}
             </select>
           </label>
-          <label className="mt-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Style preset</span>
-            <select
-              value={stylePreset}
-              onChange={(e) => setStylePreset(e.target.value as (typeof STYLE_PRESETS)[number])}
-              className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
-              style={{
-                borderColor: "var(--border-default)",
-                background: "var(--bg-tertiary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {STYLE_PRESETS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="mt-4 block">
+          <label className="mt-3 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Target audience</span>
             <textarea
               value={targetAudience}
@@ -1130,12 +1164,12 @@ export default function HomePage() {
               }}
             />
           </label>
-          <label className="mt-4 block">
+          <label className="mt-3 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Hook</span>
             <textarea
               value={hook}
               onChange={(e) => setHook(e.target.value)}
-              rows={5}
+              rows={4}
               placeholder="Can't switch off your thoughts?"
               className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
               style={{
@@ -1145,7 +1179,7 @@ export default function HomePage() {
               }}
             />
           </label>
-          <label className="mt-4 block">
+          <label className="mt-3 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Unique perspective</span>
             <textarea
               value={uniquePerspective}
@@ -1160,7 +1194,7 @@ export default function HomePage() {
               }}
             />
           </label>
-          <label className="mt-4 block">
+          <label className="mt-3 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
               {appLanguage === "Swedish" ? "Nyfikenhetsniva" : "Curiosity level"}: {curiosityLevel.toFixed(2)}
             </span>
@@ -1182,7 +1216,7 @@ export default function HomePage() {
             />
             {appLanguage === "Swedish" ? "Anvand kontrarian hook" : "Use contrarian hook"}
           </label>
-          <label className="mt-4 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <label className="mt-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
             <input
               type="checkbox"
               checked={useBrandVoiceLock}
@@ -1207,7 +1241,7 @@ export default function HomePage() {
               />
             </label>
           ) : null}
-          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+          <div className="mt-3 rounded-xl border p-2.5" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
             <p className="text-sm font-medium text-[var(--text-secondary)]">{appLanguage === "Swedish" ? "Netflixify-kontroller" : "Netflixify controls"}</p>
             <label className="mt-2 block">
               <span className="mb-1 block text-xs text-[var(--text-secondary)]">Conflict: {netflixConflictLevel.toFixed(2)}</span>
@@ -1251,7 +1285,7 @@ export default function HomePage() {
             type="button"
             disabled={loading}
             onClick={onGenerate}
-            className="mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: "var(--accent-gradient)", boxShadow: "var(--shadow-sm)" }}
           >
             {loading ? loadingLabel : appLanguage === "Swedish" ? "Generera 10 varianter" : "Generate 10 versions"}
@@ -1260,7 +1294,7 @@ export default function HomePage() {
             type="button"
             disabled={loading}
             onClick={() => void onFindTrendingHooks()}
-            className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: "var(--border-default)",
               background: "var(--bg-tertiary)",
@@ -1273,7 +1307,7 @@ export default function HomePage() {
             type="button"
             disabled={loading}
             onClick={() => void onRecalculateScores()}
-            className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: "var(--border-default)",
               background: "var(--bg-tertiary)",
@@ -1286,7 +1320,7 @@ export default function HomePage() {
             type="button"
             disabled={netflixifyLoadingId === "input-hook"}
             onClick={() => void onNetflixify(hook, "input-hook")}
-            className="mt-3 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: "var(--border-default)",
               background: "var(--bg-tertiary)",
@@ -1295,7 +1329,22 @@ export default function HomePage() {
           >
             {netflixifyLoadingId === "input-hook" ? (appLanguage === "Swedish" ? "Netflixifierar..." : "Netflixifying...") : "Netflixify"}
           </button>
-          <p className="mt-3 text-xs leading-relaxed text-[var(--text-tertiary)]">
+          <button
+            type="button"
+            disabled={symptomStoryLoading}
+            onClick={() => void onGenerateSymptomStory()}
+            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: "var(--border-default)",
+              background: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {symptomStoryLoading
+              ? appLanguage === "Swedish" ? "Genererar symtomstory..." : "Generating symptom story..."
+              : appLanguage === "Swedish" ? "Generera symtomstory" : "Generate symptom story"}
+          </button>
+          <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-tertiary)]">
             Uses your shared OpenAI key from the hub (local <code className="rounded bg-[var(--bg-hover)] px-1">saasApiKeys</code>). Add
             it via the gear icon on the SaaS Apps page if needed.
           </p>
@@ -1317,7 +1366,9 @@ export default function HomePage() {
                     ? appLanguage === "Swedish" ? "Aha + slutsats" : "Aha + conclusion"
                     : view === "script"
                       ? appLanguage === "Swedish" ? "Manus" : "Script"
-                      : appLanguage === "Swedish" ? "Karusell" : "Carousel";
+                      : view === "carousel"
+                        ? appLanguage === "Swedish" ? "Karusell" : "Carousel"
+                        : appLanguage === "Swedish" ? "Symtomstory" : "Symptom story";
               const isActive = activeView === view;
               return (
                 <button
@@ -1389,18 +1440,8 @@ export default function HomePage() {
                           color: "var(--text-secondary)",
                         }}
                       />
-                      <div className="group mt-1.5 px-0.5 py-0.5 text-xs">
+                      <div className="mt-1.5 px-0.5 py-0.5 text-xs">
                         <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
-                        <p className="mt-0.5 font-semibold text-[var(--text-primary)]">Performance prediction: {item.performanceScore}/100</p>
-                        <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">{item.performanceReason}</p>
-                        <ul className="mt-0.5 list-disc pl-4 text-xs text-[var(--text-secondary)]">
-                          {item.reasons.map((reason, idx) => (
-                            <li key={`${item.id}-reason-${idx}`}>{reason}</li>
-                          ))}
-                        </ul>
-                        <p className="mt-1 hidden px-1 py-0.5 text-[11px] text-[var(--text-tertiary)] group-hover:block">
-                          To score higher: {item.improveTip}
-                        </p>
                       </div>
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         <button
@@ -2142,6 +2183,39 @@ export default function HomePage() {
                     </div>
                   </div>
                 </section>
+              </div>
+            </>
+          ) : null}
+
+          {activeView === "symptom" ? (
+            <>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                {appLanguage === "Swedish" ? "Symtomstory" : "Symptom story"}
+              </h2>
+              <div className="mt-4 space-y-3">
+                {symptomStoryBatches.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
+                    {appLanguage === "Swedish"
+                      ? "Klicka pa 'Generera symtomstory' i vansterpanelen for att skapa 5 innehallsblock."
+                      : "Click 'Generate symptom story' in the left panel to create 5 content blocks."}
+                  </div>
+                ) : (
+                  symptomStoryBatches.map((batch) => (
+                    <section key={batch.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                      <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
+                        {batch.platform} · {batch.targetAudience}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
+                      <div className="mt-3 space-y-2">
+                        {batch.blocks.map((block, idx) => (
+                          <div key={`${batch.id}-block-${idx}`} className="rounded-lg border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                            <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{block}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                )}
               </div>
             </>
           ) : null}
