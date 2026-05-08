@@ -40,18 +40,6 @@ export default defineConfig({
     },
   },
   build: {
-    // Single chunk: avoids cross-chunk init order issues on static hosts.
-    modulePreload: false,
-    // esbuild minify is the Vite default; Terser has caused TDZ ("Cannot access 'X' before
-    // initialization") in a single large bundle for some React trees on production hosts.
     minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        inlineDynamicImports: true,
-        generatedCode: {
-          constBindings: false,
-        },
-      },
-    },
   },
 })
