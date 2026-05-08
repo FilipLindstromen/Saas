@@ -338,7 +338,7 @@ export default function HomePage() {
   const [netflixDramaLevel, setNetflixDramaLevel] = useState(0.7);
   const [netflixEndingStyle, setNetflixEndingStyle] = useState<"hopeful" | "urgent" | "reflective">("reflective");
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>("Instagram Reel");
-  const [stylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
+  const [stylePreset, setStylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [favorites, setFavorites] = useState<SavedItem[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);

@@ -35,7 +35,12 @@ const VITE_APPS = [
 ];
 
 function run(cmd, cwd = ROOT, envExtra = {}) {
-  execSync(cmd, { cwd, stdio: "inherit", shell: true, env: { ...process.env, ...envExtra } });
+  execSync(cmd, {
+    cwd,
+    stdio: "inherit",
+    shell: true,
+    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", ...envExtra },
+  });
 }
 
 function copyRecursive(src, dest) {
