@@ -63,12 +63,22 @@ function languageDirective(language?: AppLanguage): string {
 }
 
 function buildInstructionBlock(data: Instructions): string {
+  const spokenExamples = Array.isArray(data.spokenStyleExamples)
+    ? data.spokenStyleExamples.filter((s): s is string => typeof s === "string")
+    : [];
   return [
     `Framework title: ${data.title}`,
     `Goal: ${data.summary}`,
     "Rules:",
     ...data.rules.map((r, i) => `${i + 1}. ${r}`),
     "",
+    ...(spokenExamples.length
+      ? [
+          "Reference tone (spoken, believable—match this rhythm and plainness; do not copy lines unless they fit the user's topic):",
+          ...spokenExamples.map((line) => `- ${line}`),
+          "",
+        ]
+      : []),
     "Illustrative example (tone and density only—do not repeat this hook unless the user supplied it):",
     `Target audience: ${data.example.targetAudience}`,
     `Original: ${data.example.originalHook}`,
@@ -102,7 +112,7 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
           : (Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, Math.round(scoreNumber))) : 0),
         performanceReason: performanceReason || "Strong situational relevance and clear emotional payoff can improve retention.",
         reasons: reasons.slice(0, 3),
-        improveTip: improveTip || "Add a more specific situation detail to make it feel even more real.",
+        improveTip: improveTip || "Say it out loud—if it sounds like an ad, add one concrete detail or a looser, spoken phrase.",
         source: source || undefined,
       };
     })
@@ -119,28 +129,28 @@ export const HOOK_COLUMN_LABELS = [
 ] as const;
 
 const HOOK_BUILD_GUIDANCE = [
-  "Hook quality rules (must follow):",
+  "Hook quality (must feel spoken, not scripted):",
   "- Open a curiosity gap without closing it in the same sentence.",
-  "- Be immediate: the tension must land in the first sentence.",
-  "- Speak to what the audience already feels in their real day-to-day context.",
-  "- Do not be vague, generic, or broad. Be specific to the provided audience, topic, and situation.",
+  "- First words must hit like real speech—no throat-clearing ('In today's world…', 'As a [role]…').",
+  "- Be specific enough to feel true; avoid vague poster slogans.",
+  "- Never stack three parallel phrases that each 'check a box' (audience + situation + problem as separate clauses). Weave one flowing line.",
   "",
-  "Type-specific build rules:",
-  "- Ask a question Hook: Ask a specific high-tension question the viewer feels compelled to mentally answer.",
-  "  Bad pattern: broad beginner question like 'How do you grow...?'",
-  "  Good pattern: specific contrast/oddity question like 'How can X happen when Y is true?'",
-  "- Story hook: Start with a strong story premise or provocative observation, not rambling setup.",
-  "  Bad pattern: 'So basically I was...' / meandering preamble.",
-  "  Good pattern: immediate claim that implies a story resolution is coming.",
-  "- Negative hook: Use loss-avoidance and urgency with 'don't / never / before you...' framing.",
-  "  Bad pattern: weak moral phrasing like 'why you shouldn't be inconsistent'.",
-  "  Good pattern: concrete downside + unresolved fix, e.g. 'Never do X before Y'.",
-  "- Contrarian view: State the opposite of common belief in a way that forces agreement/disagreement.",
-  "  Bad pattern: soft generic contrarian line with no stakes.",
-  "  Good pattern: sharp conflict against common advice with clear stakes.",
-  "- Numbered list: Promise a specific transformation/outcome and imply high-value items are inside.",
-  "  Bad pattern: generic list title like '5 ways to...'.",
-  "  Good pattern: curiosity-first payoff line that naturally leads into a numbered breakdown.",
+  "Type-specific build rules (still sound like a person talking):",
+  "- Ask a question Hook: one tight question someone would actually ask out loud—or question + one short real follow-up.",
+  "  Bad: corporate survey tone ('How do you navigate stress as a leader?').",
+  "  Good: 'Think it's all in your head?' or 'Can't shut your brain off after work?'",
+  "- Story hook: drop into a moment or claim like you're mid-conversation, not pitching.",
+  "  Bad: 'So basically I was sitting there and then what happened was…'",
+  "  Good: short premise that makes you want the next line.",
+  "- Negative hook: warn like a friend, not a manual ('don't / never / stop' + concrete stakes).",
+  "  Bad: moralizing label ('Why you shouldn't ignore self-care').",
+  "  Good: 'Never [specific thing] before [specific situation].'",
+  "- Contrarian view: plain-language pushback people argue about in real life.",
+  "  Bad: vague 'what if everything you knew was wrong' fluff.",
+  "  Good: one sharp contrast that sounds debatable on a walk.",
+  "- Numbered list: tease the payoff in spoken words; avoid 'X ways to Y' stock titles.",
+  "  Bad: '5 tips to improve your mindset.'",
+  "  Good: line that makes the list feel like insider specifics, not a blog headline.",
 ].join("\n");
 
 function normalizeHookTypeLabel(raw: string | undefined): string {
@@ -239,15 +249,12 @@ export async function generateHookVariations({
     "- Negative hook",
     "- Contrarian view",
     "- Numbered list",
-    "Each hook must clearly and naturally include:",
-    "- who it is for",
-    "- a real-life situation/context",
-    "- the core problem",
-    "Every hook must create a clear curiosity gap (open loop) without sounding clickbait.",
+    "Each hook must IMPLY who it is for, a real situation, and the core tension—woven into one believable spoken line (never a labeled checklist).",
+    "Every hook must create a clear curiosity gap (open loop) without sounding clickbait or corporate.",
     "",
     HOOK_BUILD_GUIDANCE,
-    "Write like everyday speech, not formal or robotic copy.",
-    "Prefer phrasing similar to: If your mind won't stop after work, it's not a thinking problem.",
+    "Write like everyday speech: contractions OK, fragments OK if natural, no polished slogan voice.",
+    "Prefer energy like: 'Think stress lives in your mind? Your body holds the real culprit.'—plain words, oral rhythm.",
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
     "performanceScore should estimate expected watch-through potential.",
     "performanceReason must explain the performance score in one short sentence.",
@@ -258,7 +265,7 @@ export async function generateHookVariations({
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
     {
       role: "system",
-      content: `You transform marketing hooks. Follow this instruction pack exactly:\n\n${instructionBlock}`,
+      content: `You write short-form social hooks that sound like real people—not ads, not AI, not LinkedIn. Follow this instruction pack exactly:\n\n${instructionBlock}`,
     },
     { role: "user", content: userPayload },
   ]);
@@ -293,18 +300,15 @@ export async function rewriteWinningHook(
     `Winning hook to use as base pattern: ${input.winningHook.trim()}`,
     "",
     "Create 10 NEW hooks inspired by the winning hook's angle/structure but not duplicates.",
-    "Each hook must clearly and naturally include:",
-    "- who it is for",
-    "- a real-life situation/context",
-    "- the core problem",
-    "Write like everyday speech, not formal or robotic copy.",
+    "Each hook must IMPLY audience, situation, and tension in one flowing spoken line—never a three-part checklist.",
+    "Write like everyday speech: believable, slightly imperfect oral rhythm is better than slick copy.",
     "Return JSON: {\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"...\",\"...\"],\"improveTip\":\"one short suggestion\"}]}",
   ].join("\n");
 
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
     {
       role: "system",
-      content: `You rewrite from winning hooks. Follow this instruction pack exactly:\n\n${instructionBlock}`,
+      content: `You rewrite and riff from winning hooks in a believable, spoken voice—not corporate polish. Follow this instruction pack exactly:\n\n${instructionBlock}`,
     },
     { role: "user", content: userPayload },
   ]);
@@ -333,7 +337,7 @@ export async function generateContentIdeas(input: {
     {
       role: "system",
       content:
-        "You create aha-moment and conclusion lines for short-form content. Use symptom-first everyday language, no buzzwords, no fancy phrases, no expert talk. Be concrete and specific.",
+        "You create aha-moment and conclusion lines for short-form content. Sound like how people actually talk after they get it—symptom-first, plain words, no buzzwords, no therapy-brand voice, no expert lecture. Short clauses, conversational.",
     },
     {
       role: "user",
@@ -381,8 +385,7 @@ export async function generateTrendingHooks(input: {
   const parsed = await requestJson<{ hooks?: unknown }>(trimmedKey, [
     {
       role: "system",
-      content:
-        "You create trend-inspired social hooks in plain language. Avoid fancy words and buzzwords. Generate hooks that sound like how people actually talk.",
+      content: `You create trend-inspired social hooks. Sound like real captions and spoken openers—not slogans.\n\n${buildInstructionBlock(hookTransformInstructions)}`,
     },
     {
       role: "user",
@@ -399,11 +402,8 @@ export async function generateTrendingHooks(input: {
         "Generate trend-inspired hooks for these platforms: Instagram, Reddit, YouTube Shorts, TikTok.",
         "Create exactly 12 hooks total (3 per platform).",
         "Each hook must stay relevant to the seed hook topic and audience.",
-        "Each hook must clearly and naturally include:",
-        "- who it is for",
-        "- a real-life situation/context",
-        "- the core problem",
-        "Write like everyday speech, not formal or robotic copy.",
+        "Each hook must IMPLY who, situation, and problem in one oral line—never a stiff checklist.",
+        "Write like everyday speech: contractions and fragments OK if they sound human.",
         "Return JSON only:",
         "{\"hooks\":[{\"source\":\"Instagram|Reddit|YouTube|TikTok\",\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"...\",\"reasons\":[\"starts with a common TikTok style\",\"clear pain for the audience\"],\"improveTip\":\"one short suggestion\"}]}",
       ].join("\n"),
@@ -445,7 +445,7 @@ export async function generateWinningHookExpansion(input: {
     {
       role: "system",
       content:
-        "You expand winning social hooks. Use plain language and natural spoken tone. No buzzwords, no fancy language.",
+        "You expand winning social hooks. Plain language, natural spoken tone—like a creator talking to camera, not a deck. No buzzwords, no fancy language, no three-part formula crammed into one line.",
     },
     {
       role: "user",
@@ -461,8 +461,8 @@ export async function generateWinningHookExpansion(input: {
         "1) rewrites: same core idea, fresh wording",
         "2) painHooks: stronger pain/tension angle",
         "3) curiosityHooks: stronger curiosity/open-loop angle",
-        "For every hook: clearly and naturally include who it is for, the situation, and the core problem.",
-        "Keep phrasing conversational and everyday, never robotic.",
+        "For every hook: weave who it's for, situation, and problem into one believable line—implied, not listed.",
+        "Keep phrasing conversational and everyday; slightly rough oral rhythm beats perfect symmetry.",
         "Return JSON only with this shape:",
         "{\"rewrites\":[{\"text\":\"...\",\"score\":0-100,\"reasons\":[\"...\"],\"improveTip\":\"...\"}],\"painHooks\":[...],\"curiosityHooks\":[...]}",
       ].join("\n"),
@@ -514,8 +514,7 @@ export async function generateCalendarHooks(input: {
   const parsed = await requestJson<{ days?: unknown }>(trimmedKey, [
     {
       role: "system",
-      content:
-        "You create social media hooks for a content calendar. Write plain, everyday language and always include a curiosity gap. No buzzwords, no robotic tone.",
+      content: `You create social media hooks for a content calendar—spoken, believable openers someone would actually post or say. Follow this instruction pack:\n\n${buildInstructionBlock(hookTransformInstructions)}`,
     },
     {
       role: "user",
@@ -529,8 +528,8 @@ export async function generateCalendarHooks(input: {
         "",
         "Generate one hook per calendar day listed below.",
         "Each hook must follow the requested hook type and be compatible with the requested format.",
-        "Every hook must include a curiosity gap and naturally imply: who this is for, the situation, and the core problem.",
-        "Keep each hook concise (around 1 sentence).",
+        "Every hook must include a curiosity gap; imply who, situation, and tension in one oral line—no checklist phrasing.",
+        "Keep each hook concise (one sentence or two very short ones). Sound human, not like a template.",
         "",
         HOOK_BUILD_GUIDANCE,
         "Return JSON only with this exact shape:",

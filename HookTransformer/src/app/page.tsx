@@ -215,6 +215,9 @@ const CALENDAR_REFERENCE_GRID: CalendarCellRef[][] = [
 
 const CALENDAR_LAYOUT_VERSION = 2;
 
+const calendarAhaLoadingKey = (entryId: string) => `cal-aha-${entryId}`;
+const calendarScriptLoadingKey = (entryId: string) => `cal-script-${entryId}`;
+
 function getDefaultCarouselLayouts(): CarouselLayout[] {
   return [
     {
@@ -492,7 +495,7 @@ function CalendarHookAutosizeTextarea({
         ...style,
         resize: "none",
         overflow: "hidden",
-        minHeight: "2.75rem",
+        minHeight: "3.25rem",
       }}
     />
   );
@@ -542,6 +545,8 @@ export default function HomePage() {
   const [activeView, setActiveView] = useState<View>("variants");
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>(getDefaultCalendarEntries);
   const [layoutDrag, setLayoutDrag] = useState<{ layoutId: string; target: "headline" | "body" } | null>(null);
+  const [carouselStudioSlideIdx, setCarouselStudioSlideIdx] = useState(0);
+  const prevActiveCarouselIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -928,9 +933,6 @@ export default function HomePage() {
     [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
   );
 
-  const calendarAhaLoadingKey = (entryId: string) => `cal-aha-${entryId}`;
-  const calendarScriptLoadingKey = (entryId: string) => `cal-script-${entryId}`;
-
   const onGenerateAhaFromCalendarDay = useCallback(
     async (entry: CalendarEntry) => {
       const hookText = entry.hookText.trim();
@@ -1307,6 +1309,18 @@ export default function HomePage() {
     () => carouselDrafts.find((draft) => draft.id === activeCarouselId) ?? carouselDrafts[0],
     [activeCarouselId, carouselDrafts],
   );
+
+  useEffect(() => {
+    const id = activeCarouselId;
+    const n = activeCarouselDraft?.slides.length ?? 0;
+    if (prevActiveCarouselIdRef.current !== id) {
+      prevActiveCarouselIdRef.current = id;
+      setCarouselStudioSlideIdx(0);
+    } else if (n > 0) {
+      setCarouselStudioSlideIdx((i) => Math.min(Math.max(0, i), n - 1));
+    }
+  }, [activeCarouselId, activeCarouselDraft?.slides.length, activeCarouselDraft?.id]);
+
   const isIdeaFavorited = useCallback(
     (idea: IdeaItem, batch: IdeaBatch) =>
       favoriteIdeas.some(
@@ -1998,156 +2012,269 @@ export default function HomePage() {
 
           {activeView === "carousel" ? (
             <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Karusell" : "Carousel"}</h2>
-              <div className="mt-4 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <section className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold text-[var(--text-primary)]">Carousels ({carouselDrafts.length})</h3>
-                    <button
-                      type="button"
-                      className="rounded-md border px-2 py-1 text-[11px]"
-                      style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
-                      onClick={createCarouselDraft}
+              <header className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                    {appLanguage === "Swedish" ? "Karusellstudio" : "Carousel studio"}
+                  </h2>
+                  <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-[var(--text-tertiary)]">
+                    {appLanguage === "Swedish"
+                      ? "Redigera text i sidopanelen eller direkt i canvas. 1080 x 1440 for Instagram-karuseller."
+                      : "Edit copy in the side panel or directly on the canvas. 1080×1440 for Instagram carousels."}
+                  </p>
+                </div>
+              </header>
+
+              <div className="mt-5 grid min-h-0 gap-5 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
+                <aside className="flex min-h-0 flex-col gap-4">
+                  <div
+                    className="flex max-h-[40vh] flex-col overflow-hidden rounded-2xl border shadow-[var(--shadow-sm)]"
+                    style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}
+                  >
+                    <div
+                      className="flex shrink-0 items-center justify-between border-b px-4 py-3"
+                      style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
                     >
-                      New
-                    </button>
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {carouselDrafts.length === 0 ? (
-                      <p className="text-xs text-[var(--text-tertiary)]">Create a carousel, add slides, then edit text and layout.</p>
-                    ) : (
-                      carouselDrafts.map((draft) => (
-                        <button
-                          key={draft.id}
-                          type="button"
-                          onClick={() => setActiveCarouselId(draft.id)}
-                          className="w-full rounded-lg border px-2 py-2 text-left text-xs"
-                          style={{
-                            borderColor: "var(--border-default)",
-                            background: activeCarouselDraft?.id === draft.id ? "var(--bg-elevated)" : "var(--bg-tertiary)",
-                            color: "var(--text-secondary)",
-                          }}
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                        {appLanguage === "Swedish" ? "Projekt" : "Projects"} · {carouselDrafts.length}
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                        style={{ background: "var(--accent-gradient)" }}
+                        onClick={createCarouselDraft}
+                      >
+                        {appLanguage === "Swedish" ? "+ Ny" : "+ New"}
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                      {carouselDrafts.length === 0 ? (
+                        <div
+                          className="rounded-xl border border-dashed px-3 py-6 text-center text-xs leading-relaxed"
+                          style={{ borderColor: "var(--border-default)", color: "var(--text-tertiary)" }}
                         >
-                          <p className="font-semibold text-[var(--text-primary)]">{draft.name}</p>
-                          <p>{draft.slides.length} slides</p>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  {activeCarouselDraft ? (
-                    <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--border-default)" }}>
-                      <p className="text-xs font-semibold text-[var(--text-primary)]">Slide text editor</p>
-                      <div className="mt-2 space-y-2 max-h-[45vh] overflow-auto pr-1">
-                        {activeCarouselDraft.slides.map((slide, idx) => (
-                          <div key={`${activeCarouselDraft.id}-editor-${slide.id}`} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                            <p className="text-[11px] font-semibold text-[var(--text-tertiary)]">Slide {idx + 1}</p>
-                            <input
-                              value={slide.headline}
-                              onChange={(e) =>
-                                updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                  headline: e.target.value,
-                                  headlineHtml: textToHtml(e.target.value),
-                                })
-                              }
-                              placeholder="Headline"
-                              className="mt-1 w-full rounded-md border px-2 py-1 text-xs"
-                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                            />
-                            <textarea
-                              value={slide.body}
-                              onChange={(e) =>
-                                updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                  body: e.target.value,
-                                  bodyHtml: textToHtml(e.target.value),
-                                })
-                              }
-                              placeholder="Body"
-                              rows={3}
-                              className="mt-1 w-full resize-y rounded-md border px-2 py-1 text-xs"
-                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                            />
-                            <div className="mt-1 grid grid-cols-2 gap-1.5">
-                              <label className="text-[10px] text-[var(--text-tertiary)]">
-                                Top size
-                                <input
-                                  type="number"
-                                  min={24}
-                                  max={140}
-                                  value={slide.headlineSize ?? 72}
-                                  onChange={(e) =>
-                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                      headlineSize: Math.max(24, Math.min(140, Number(e.target.value) || 72)),
-                                    })
-                                  }
-                                  className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                                />
-                              </label>
-                              <label className="text-[10px] text-[var(--text-tertiary)]">
-                                Bottom size
-                                <input
-                                  type="number"
-                                  min={18}
-                                  max={96}
-                                  value={slide.bodySize ?? 38}
-                                  onChange={(e) =>
-                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                      bodySize: Math.max(18, Math.min(96, Number(e.target.value) || 38)),
-                                    })
-                                  }
-                                  className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                                />
-                              </label>
-                            </div>
+                          {appLanguage === "Swedish"
+                            ? "Skapa en karusell for att borja. Lagg till slides och finjustera layout."
+                            : "Create a carousel to get started. Add slides and refine the layout."}
+                        </div>
+                      ) : (
+                        carouselDrafts.map((draft) => {
+                          const active = activeCarouselDraft?.id === draft.id;
+                          return (
                             <button
+                              key={draft.id}
                               type="button"
-                              className="mt-1 w-full rounded-md border px-2 py-1 text-xs font-medium"
-                              style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-                              onClick={() => {
-                                document.execCommand("styleWithCSS", false, "true");
-                                document.execCommand("hiliteColor", false, "#f6d74f");
+                              onClick={() => setActiveCarouselId(draft.id)}
+                              className="w-full rounded-xl border px-3 py-2.5 text-left transition-[box-shadow,transform] hover:translate-y-[-1px]"
+                              style={{
+                                borderColor: active ? "var(--accent)" : "var(--border-default)",
+                                background: active ? "var(--bg-tertiary)" : "var(--bg-secondary)",
+                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent)" : undefined,
                               }}
                             >
-                              Highlight selected text
+                              <p className="text-sm font-semibold text-[var(--text-primary)]">{draft.name}</p>
+                              <p className="mt-0.5 text-[11px] text-[var(--text-tertiary)]">
+                                {draft.slides.length} slides
+                              </p>
                             </button>
-                          </div>
-                        ))}
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {activeCarouselDraft ? (
+                    <div
+                      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border shadow-[var(--shadow-sm)]"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", maxHeight: "min(52vh, 640px)" }}
+                    >
+                      <div
+                        className="shrink-0 border-b px-4 py-3"
+                        style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                          {appLanguage === "Swedish" ? "Slide-innehall" : "Slide content"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                          {appLanguage === "Swedish" ? "Klicka pa en slide nedan for att visa den i canvas." : "Click a slide below to show it on the canvas."}
+                        </p>
+                      </div>
+                      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                        {activeCarouselDraft.slides.map((slide, idx) => {
+                          const isStudioSlide = idx === carouselStudioSlideIdx;
+                          return (
+                            <div
+                              key={`${activeCarouselDraft.id}-editor-${slide.id}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setCarouselStudioSlideIdx(idx)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setCarouselStudioSlideIdx(idx);
+                                }
+                              }}
+                              className="cursor-pointer rounded-xl border p-3 outline-none transition-[box-shadow,border-color]"
+                              style={{
+                                borderColor: isStudioSlide ? "var(--accent)" : "var(--border-default)",
+                                background: "var(--bg-secondary)",
+                                boxShadow: isStudioSlide ? "0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent)" : undefined,
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                                  {appLanguage === "Swedish" ? "Slide" : "Slide"} {idx + 1}
+                                </p>
+                                {isStudioSlide ? (
+                                  <span className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style={{ background: "var(--accent)" }}>
+                                    {appLanguage === "Swedish" ? "Aktiv" : "Active"}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <input
+                                value={slide.headline}
+                                onChange={(e) =>
+                                  updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                    headline: e.target.value,
+                                    headlineHtml: textToHtml(e.target.value),
+                                  })
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder={appLanguage === "Swedish" ? "Rubrik" : "Headline"}
+                                className="mt-2 w-full rounded-lg border px-2.5 py-1.5 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                              <textarea
+                                value={slide.body}
+                                onChange={(e) =>
+                                  updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                    body: e.target.value,
+                                    bodyHtml: textToHtml(e.target.value),
+                                  })
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder={appLanguage === "Swedish" ? "Brodtext" : "Body"}
+                                rows={3}
+                                className="mt-2 w-full resize-y rounded-lg border px-2.5 py-1.5 text-xs leading-relaxed"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Rubrik storlek" : "Headline size"}
+                                  <input
+                                    type="number"
+                                    min={24}
+                                    max={140}
+                                    value={slide.headlineSize ?? 72}
+                                    onChange={(e) =>
+                                      updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                        headlineSize: Math.max(24, Math.min(140, Number(e.target.value) || 72)),
+                                      })
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                  />
+                                </label>
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Brod storlek" : "Body size"}
+                                  <input
+                                    type="number"
+                                    min={18}
+                                    max={96}
+                                    value={slide.bodySize ?? 38}
+                                    onChange={(e) =>
+                                      updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                        bodySize: Math.max(18, Math.min(96, Number(e.target.value) || 38)),
+                                      })
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                  />
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                className="mt-2 w-full rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors hover:opacity-90"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  document.execCommand("styleWithCSS", false, "true");
+                                  document.execCommand("hiliteColor", false, "#f6d74f");
+                                }}
+                              >
+                                {appLanguage === "Swedish" ? "Markera vald text" : "Highlight selected text"}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
-                </section>
+                </aside>
 
-                <section className="space-y-4">
+                <section className="flex min-w-0 flex-col gap-5">
                   {activeCarouselDraft ? (
-                    <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          value={activeCarouselDraft.name}
-                          onChange={(e) => updateCarouselDraftName(activeCarouselDraft.id, e.target.value)}
-                          className="min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-sm"
-                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => addCarouselSlide(activeCarouselDraft.id)}
-                          className="rounded-lg border px-3 py-2 text-xs"
-                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
-                        >
-                          Add slide
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyReferencePreset(activeCarouselDraft.id)}
-                          className="rounded-lg border px-3 py-2 text-xs"
-                          style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
-                        >
-                          Match reference
-                        </button>
-                      </div>
+                    <>
+                      <div
+                        className="rounded-2xl border p-4 shadow-[var(--shadow-sm)] sm:p-5"
+                        style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}
+                      >
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                          <input
+                            value={activeCarouselDraft.name}
+                            onChange={(e) => updateCarouselDraftName(activeCarouselDraft.id, e.target.value)}
+                            className="min-w-0 flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium"
+                            style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+                            placeholder={appLanguage === "Swedish" ? "Karusellnamn" : "Carousel name"}
+                          />
+                          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                            <button
+                              type="button"
+                              onClick={() => applyReferencePreset(activeCarouselDraft.id)}
+                              className="rounded-xl border px-4 py-2 text-xs font-semibold transition-colors hover:bg-[var(--bg-hover)]"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+                            >
+                              {appLanguage === "Swedish" ? "Matcha referens" : "Match reference"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => addCarouselSlide(activeCarouselDraft.id)}
+                              className="rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                              style={{ background: "var(--accent-gradient)" }}
+                            >
+                              {appLanguage === "Swedish" ? "Lagg till slide" : "Add slide"}
+                            </button>
+                          </div>
+                        </div>
 
-                      <div className="mt-4 space-y-3">
-                        {activeCarouselDraft.slides.map((slide, idx) => {
+                        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:thin]">
+                          {activeCarouselDraft.slides.map((s, idx) => {
+                            const on = idx === carouselStudioSlideIdx;
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => setCarouselStudioSlideIdx(idx)}
+                                className="flex h-10 min-w-[2.75rem] shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition-all"
+                                style={{
+                                  borderColor: on ? "var(--accent)" : "var(--border-default)",
+                                  background: on ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "var(--bg-secondary)",
+                                  color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                                  boxShadow: on ? "0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)" : undefined,
+                                }}
+                              >
+                                {idx + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {(() => {
+                          const idx = carouselStudioSlideIdx;
+                          const slide = activeCarouselDraft.slides[idx];
+                          if (!slide) return null;
                           const isFirstSlide = idx === 0;
                           const selectedLayout =
                             carouselLayouts.find((layout) => layout.id === slide.layoutId) ?? carouselLayouts[0] ?? getDefaultCarouselLayouts()[0];
@@ -2155,66 +2282,92 @@ export default function HomePage() {
                           const textAlign = slide.textAlign ?? "left";
                           const alignClass = textAlign === "center" ? "text-center" : "text-left";
                           const toneBackground =
-                            tone === "dark"
-                              ? "var(--bg-primary)"
-                              : tone === "accent"
-                                ? "#fff6d8"
-                                : "#ffffff";
+                            tone === "dark" ? "var(--bg-primary)" : tone === "accent" ? "#fff6d8" : "#ffffff";
                           const headlineSize = slide.headlineSize ?? (isFirstSlide ? 72 : 42);
                           const bodySize = slide.bodySize ?? (isFirstSlide ? 38 : 30);
                           return (
-                            <div key={slide.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Slide #{idx + 1}</p>
-                              <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                                Click text inside the slide canvas to edit it directly.
-                              </p>
-                              <select
-                                value={slide.layoutId}
-                                onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { layoutId: e.target.value })}
-                                className="mt-2 w-full rounded-lg border px-3 py-2 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              >
-                                {carouselLayouts.map((layout) => (
-                                  <option key={layout.id} value={layout.id}>
-                                    {layout.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                <select
-                                  value={textAlign}
-                                  onChange={(e) =>
-                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                      textAlign: e.target.value as "left" | "center",
-                                    })
-                                  }
-                                  className="w-full rounded-lg border px-3 py-2 text-xs"
-                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                                >
-                                  <option value="left">Left align</option>
-                                  <option value="center">Center align</option>
-                                </select>
-                                <select
-                                  value={tone}
-                                  onChange={(e) =>
-                                    updateCarouselSlide(activeCarouselDraft.id, slide.id, {
-                                      tone: e.target.value as "soft" | "dark" | "accent",
-                                    })
-                                  }
-                                  className="w-full rounded-lg border px-3 py-2 text-xs"
-                                  style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                                >
-                                  <option value="soft">Soft tone</option>
-                                  <option value="accent">Accent tone</option>
-                                  <option value="dark">Dark tone</option>
-                                </select>
+                            <div className="mt-5" key={slide.id}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Slide" : "Slide"} {idx + 1}
+                                  {isFirstSlide ? (
+                                    <span className="ml-2 font-normal normal-case text-[var(--text-tertiary)]">
+                                      · {appLanguage === "Swedish" ? "Cover" : "Cover"}
+                                    </span>
+                                  ) : null}
+                                </p>
+                                <p className="text-[11px] text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish"
+                                    ? "Klicka i canvas for att redigera text direkt."
+                                    : "Click the canvas to edit text in place."}
+                                </p>
+                              </div>
+                              <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                                <label className="block text-[10px] font-medium text-[var(--text-tertiary)] lg:col-span-1">
+                                  {appLanguage === "Swedish" ? "Layout" : "Layout"}
+                                  <select
+                                    value={slide.layoutId}
+                                    onChange={(e) => updateCarouselSlide(activeCarouselDraft.id, slide.id, { layoutId: e.target.value })}
+                                    className="mt-1 w-full rounded-xl border px-3 py-2 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+                                  >
+                                    {carouselLayouts.map((layout) => (
+                                      <option key={layout.id} value={layout.id}>
+                                        {layout.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="block text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Justering" : "Alignment"}
+                                  <select
+                                    value={textAlign}
+                                    onChange={(e) =>
+                                      updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                        textAlign: e.target.value as "left" | "center",
+                                      })
+                                    }
+                                    className="mt-1 w-full rounded-xl border px-3 py-2 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+                                  >
+                                    <option value="left">{appLanguage === "Swedish" ? "Vanster" : "Left"}</option>
+                                    <option value="center">{appLanguage === "Swedish" ? "Centrerat" : "Center"}</option>
+                                  </select>
+                                </label>
+                                <label className="block text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Ton" : "Tone"}
+                                  <select
+                                    value={tone}
+                                    onChange={(e) =>
+                                      updateCarouselSlide(activeCarouselDraft.id, slide.id, {
+                                        tone: e.target.value as "soft" | "dark" | "accent",
+                                      })
+                                    }
+                                    className="mt-1 w-full rounded-xl border px-3 py-2 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}
+                                  >
+                                    <option value="soft">{appLanguage === "Swedish" ? "Mjuk" : "Soft"}</option>
+                                    <option value="accent">{appLanguage === "Swedish" ? "Accent" : "Accent"}</option>
+                                    <option value="dark">{appLanguage === "Swedish" ? "Mork" : "Dark"}</option>
+                                  </select>
+                                </label>
                               </div>
 
-                              <div className="mt-3 rounded-xl border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                                <p className="text-[11px] text-[var(--text-tertiary)]">Canvas size: 1080 x 1440</p>
-                                <div className="mt-2 flex justify-center">
+                              <div
+                                className="mt-5 rounded-2xl border p-4 sm:p-6"
+                                style={{
+                                  borderColor: "var(--border-subtle)",
+                                  background: "linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%)",
+                                }}
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                                    {appLanguage === "Swedish" ? "Forhandsvisning" : "Preview"} · 1080 × 1440
+                                  </span>
+                                </div>
+                                <div className="mt-4 flex justify-center">
                                   <div
-                                    className="aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl border shadow-sm"
+                                    className="aspect-[3/4] w-full max-w-[min(100%,360px)] overflow-hidden rounded-2xl border shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5"
                                     style={{ borderColor: "var(--border-default)", background: toneBackground }}
                                   >
                                     {isFirstSlide ? (
@@ -2326,101 +2479,134 @@ export default function HomePage() {
                               </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed p-4 text-xs text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
-                      No carousel selected. Create one from the panel on the left.
-                    </div>
-                  )}
 
-                  <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                    <h3 className="text-xs font-semibold text-[var(--text-primary)]">Layout library</h3>
-                    <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
-                      Drag headline/body blocks to move them. Updates apply to all slides using the layout.
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {carouselLayouts.map((layout) => (
-                        <div key={layout.id} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                          <input
-                            value={layout.name}
-                            onChange={(e) => updateCarouselLayout(layout.id, { name: e.target.value })}
-                            className="w-full rounded-md border px-2 py-1 text-xs"
-                            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                          />
-                          <div
-                            className="relative mt-2 aspect-[3/4] w-full max-w-[220px] overflow-hidden rounded-lg border bg-white"
-                            style={{ borderColor: "var(--border-default)", userSelect: "none" }}
-                            onMouseMove={(e) => {
-                              if (!layoutDrag || layoutDrag.layoutId !== layout.id) return;
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              const x = clampPercent(((e.clientX - rect.left) / rect.width) * 100, 0, 90);
-                              const y = clampPercent(((e.clientY - rect.top) / rect.height) * 100, 0, 95);
-                              if (layoutDrag.target === "headline") {
-                                updateCarouselLayout(layout.id, { headlineX: x, headlineY: y });
-                              } else {
-                                updateCarouselLayout(layout.id, { bodyX: x, bodyY: y });
-                              }
-                            }}
-                            onMouseUp={() => setLayoutDrag(null)}
-                            onMouseLeave={() => setLayoutDrag(null)}
-                          >
-                            <div
-                              className={`${layout.titleClass} absolute cursor-move border border-dashed border-black/20 p-1`}
-                              style={{
-                                left: `${layout.headlineX ?? 10}%`,
-                                top: `${layout.headlineY ?? 14}%`,
-                                width: `${layout.headlineWidth ?? 80}%`,
-                                fontSize: `${layout.headlineFontSize ?? 40}px`,
-                              }}
-                              onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "headline" })}
-                            >
-                              Headline
-                            </div>
-                            <div
-                              className={`${layout.bodyClass} absolute cursor-move border border-dashed border-black/20 p-1`}
-                              style={{
-                                left: `${layout.bodyX ?? 10}%`,
-                                top: `${layout.bodyY ?? 60}%`,
-                                width: `${layout.bodyWidth ?? 80}%`,
-                                fontSize: `${layout.bodyFontSize ?? 24}px`,
-                              }}
-                              onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "body" })}
-                            >
-                              Body text
-                            </div>
-                          </div>
-                          <div className="mt-2 grid grid-cols-2 gap-1.5">
-                            <label className="text-[10px] text-[var(--text-tertiary)]">
-                              Headline size
-                              <input
-                                type="number"
-                                value={layout.headlineFontSize ?? 40}
-                                min={18}
-                                max={120}
-                                onChange={(e) => updateCarouselLayout(layout.id, { headlineFontSize: Number(e.target.value) || 40 })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
-                            </label>
-                            <label className="text-[10px] text-[var(--text-tertiary)]">
-                              Body size
-                              <input
-                                type="number"
-                                value={layout.bodyFontSize ?? 24}
-                                min={14}
-                                max={80}
-                                onChange={(e) => updateCarouselLayout(layout.id, { bodyFontSize: Number(e.target.value) || 24 })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
-                            </label>
+                      <div
+                        className="rounded-2xl border p-4 shadow-[var(--shadow-sm)] sm:p-5"
+                        style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}
+                      >
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                              {appLanguage === "Swedish" ? "Layoutsmallar" : "Layout templates"}
+                            </h3>
+                            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[var(--text-tertiary)]">
+                              {appLanguage === "Swedish"
+                                ? "Dra rubrik- och brodtextblock i miniatyrerna. Andringar galler alla slides som anvander samma layout."
+                                : "Drag headline and body blocks in the thumbnails. Changes apply to every slide that uses that layout."}
+                            </p>
                           </div>
                         </div>
-                      ))}
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                          {carouselLayouts.map((layout) => (
+                            <div
+                              key={layout.id}
+                              className="flex flex-col rounded-xl border p-3 transition-shadow hover:shadow-md"
+                              style={{ borderColor: "var(--border-default)", background: "var(--bg-secondary)" }}
+                            >
+                              <input
+                                value={layout.name}
+                                onChange={(e) => updateCarouselLayout(layout.id, { name: e.target.value })}
+                                className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                              <div
+                                className="relative mx-auto mt-3 aspect-[3/4] w-full max-w-[200px] overflow-hidden rounded-xl border bg-white shadow-inner"
+                                style={{ borderColor: "var(--border-default)", userSelect: "none" }}
+                                onMouseMove={(e) => {
+                                  if (!layoutDrag || layoutDrag.layoutId !== layout.id) return;
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const x = clampPercent(((e.clientX - rect.left) / rect.width) * 100, 0, 90);
+                                  const y = clampPercent(((e.clientY - rect.top) / rect.height) * 100, 0, 95);
+                                  if (layoutDrag.target === "headline") {
+                                    updateCarouselLayout(layout.id, { headlineX: x, headlineY: y });
+                                  } else {
+                                    updateCarouselLayout(layout.id, { bodyX: x, bodyY: y });
+                                  }
+                                }}
+                                onMouseUp={() => setLayoutDrag(null)}
+                                onMouseLeave={() => setLayoutDrag(null)}
+                              >
+                                <div
+                                  className={`${layout.titleClass} absolute cursor-grab active:cursor-grabbing border border-dashed border-black/25 bg-white/90 p-1 shadow-sm`}
+                                  style={{
+                                    left: `${layout.headlineX ?? 10}%`,
+                                    top: `${layout.headlineY ?? 14}%`,
+                                    width: `${layout.headlineWidth ?? 80}%`,
+                                    fontSize: `${layout.headlineFontSize ?? 40}px`,
+                                  }}
+                                  onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "headline" })}
+                                >
+                                  Headline
+                                </div>
+                                <div
+                                  className={`${layout.bodyClass} absolute cursor-grab active:cursor-grabbing border border-dashed border-black/25 bg-white/90 p-1 shadow-sm`}
+                                  style={{
+                                    left: `${layout.bodyX ?? 10}%`,
+                                    top: `${layout.bodyY ?? 60}%`,
+                                    width: `${layout.bodyWidth ?? 80}%`,
+                                    fontSize: `${layout.bodyFontSize ?? 24}px`,
+                                  }}
+                                  onMouseDown={() => setLayoutDrag({ layoutId: layout.id, target: "body" })}
+                                >
+                                  Body
+                                </div>
+                              </div>
+                              <div className="mt-3 grid grid-cols-2 gap-2">
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Rubrik px" : "Headline px"}
+                                  <input
+                                    type="number"
+                                    value={layout.headlineFontSize ?? 40}
+                                    min={18}
+                                    max={120}
+                                    onChange={(e) => updateCarouselLayout(layout.id, { headlineFontSize: Number(e.target.value) || 40 })}
+                                    className="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                  />
+                                </label>
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)]">
+                                  {appLanguage === "Swedish" ? "Brod px" : "Body px"}
+                                  <input
+                                    type="number"
+                                    value={layout.bodyFontSize ?? 24}
+                                    min={14}
+                                    max={80}
+                                    onChange={(e) => updateCarouselLayout(layout.id, { bodyFontSize: Number(e.target.value) || 24 })}
+                                    className="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs"
+                                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-12 text-center"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}
+                    >
+                      <p className="text-sm font-medium text-[var(--text-secondary)]">
+                        {appLanguage === "Swedish" ? "Ingen karusell vald" : "No carousel selected"}
+                      </p>
+                      <p className="mt-2 max-w-sm text-xs leading-relaxed text-[var(--text-tertiary)]">
+                        {appLanguage === "Swedish"
+                          ? "Skapa ett nytt projekt i sidopanelen eller valj en befintlig karusell."
+                          : "Create a new project in the sidebar or pick an existing carousel."}
+                      </p>
+                      <button
+                        type="button"
+                        className="mt-5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm"
+                        style={{ background: "var(--accent-gradient)" }}
+                        onClick={createCarouselDraft}
+                      >
+                        {appLanguage === "Swedish" ? "Skapa karusell" : "Create carousel"}
+                      </button>
                     </div>
-                  </div>
+                  )}
                 </section>
               </div>
             </>
@@ -2448,8 +2634,8 @@ export default function HomePage() {
                         {weekEntries.map((entry) => {
                           const entryTopicBg =
                             entry.topicSlot === "topic1"
-                              ? "rgba(236, 72, 153, 0.12)"
-                              : "rgba(59, 130, 246, 0.12)";
+                              ? "var(--bg-elevated)"
+                              : "color-mix(in srgb, var(--bg-elevated) 68%, var(--bg-tertiary) 32%)";
                           let cardBackground = entryTopicBg;
                           let cardBorder: string = "var(--border-default)";
                           let cardBoxShadow: string | undefined;
@@ -2561,7 +2747,7 @@ export default function HomePage() {
                               <CalendarHookAutosizeTextarea
                                 value={entry.hookText}
                                 onChange={(next) => updateCalendarEntry(entry.id, { hookText: next })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs leading-relaxed"
+                                className="mt-0.5 w-full rounded-md border px-3 py-2 text-base leading-relaxed"
                                 style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                               />
                             </label>
@@ -2580,9 +2766,7 @@ export default function HomePage() {
                                 }}
                               >
                                 {ideasLoadingId === calendarAhaLoadingKey(entry.id)
-                                  ? appLanguage === "Swedish"
-                                    ? "Aha…"
-                                    : "Aha…"
+                                  ? "Aha…"
                                   : appLanguage === "Swedish"
                                     ? "Generera Aha"
                                     : "Generate Aha"}

@@ -1,23 +1,31 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "Hook transformation",
-  "summary": "Each output hook must be symptom-first: lead with a relatable symptom/problem in a real situation, then naturally imply who it is for, in plain everyday language that sounds like real people talking.",
+  "summary": "Each hook must sound like something a real person would actually say out loud or type in a caption—symptom-first, plain words, oral rhythm. Not a slogan, not a framework, not a mini-essay.",
   "rules": [
-    "Use symptom-first framing: start from what the person feels/struggles with in daily life before any explanation.",
+    "Use symptom-first framing: start from what the person feels or notices in daily life before any explanation.",
     "Write in the same voice and format as the original hook (question stays a question, statement stays a statement).",
-    "Use simple, everyday words. If a normal person would not say it out loud, do not use it.",
-    "Keep it conversational and direct, like spoken language, not polished ad copy.",
-    "Weave audience, situation, and problem into natural phrasing—never prefix with labels like 'For [audience]' or bullet the three pieces.",
-    "Keep hooks concise: ideally one short sentence, suitable for social or ad copy.",
-    "Honor the target audience: word choice and context should feel native to how that group talks and what they actually do day to day.",
-    "Expand vague hooks with specific, plausible detail (time of day, setting, trigger event) so the situation feels real, not generic.",
+    "Use simple, everyday words. If a normal person would not say it out loud to a friend, do not use it.",
+    "Sound human: short clauses, natural contractions where they fit (English: you're, it's, don't, can't), occasional fragments are fine if people talk that way.",
+    "Read-aloud test: if it sounds like a billboard, a LinkedIn guru, or a customer-support script, rewrite until it sounds like a person.",
+    "Keep it conversational and direct—spoken language, not polished ad copy or balanced 'marketing sentences'.",
+    "Who it's for, situation, and problem must be IMPLIED in the flow of the line—not packed in like a checklist or three labeled ingredients.",
+    "Prefer one clear beat; sometimes two short beats work (e.g. a question, then a plain follow-up)—like natural short-form, not a paragraph.",
+    "Keep hooks concise: usually one sentence, or two very short ones; suitable for Reels/TikTok/Shorts.",
+    "Honor the target audience: word choice and context should match how that group actually talks and what they do day to day.",
+    "Add specific, plausible detail (time, place, trigger) only when it helps it feel real—avoid generic 'busy' or 'stressed' with no scene.",
     "Preserve the core pain from the original hook; do not change the topic into something unrelated.",
-    "Avoid expert talk, jargon, clinical wording, or lecture tone. Prefer clear, human language.",
-    "Do not use fancy words or phrases like 'taxing day', 'optimize', 'leverage', 'elevate', 'unlock', or 'transform your life'.",
+    "Avoid expert talk, jargon, clinical wording, therapy-speak, or lecture tone.",
+    "Do not use fancy words or phrases like 'taxing day', 'optimize', 'leverage', 'elevate', 'unlock', 'transform your life', 'game-changer', 'deep dive', 'navigate'.",
     "Write at about 6th-8th grade reading level.",
-    "Vary the 10 versions: different situations, angles, and wording so the set feels like real options, not paraphrases of one line.",
-    "Do not mention that you are following instructions or a framework in the hook text.",
+    "Vary outputs: different situations, angles, and wording so the set feels like real options a creator might try—not paraphrases of one polished line.",
+    "Do not mention instructions, frameworks, or that you are writing a hook.",
     "Fix obvious typos in the source hook (e.g. 'switch of' → 'switch off') when transforming."
+  ],
+  "spokenStyleExamples": [
+    "Ever feel like your thoughts are controlling you? It might be your body's stress signals talking.",
+    "Think stress lives in your mind? Your body holds the real culprit.",
+    "Can't switch off your thoughts at night after a busy day?"
   ],
   "example": {
     "targetAudience": "High-performing professionals",
@@ -29,6 +37,9 @@
     "Who: founders. When: morning. Issue: focus.",
     "If you're a manager and you're in a meeting and you struggle with...",
     "After a taxing day, does meditation still leave your mind spinning?",
-    "Leverage mindfulness to optimize your cognitive recovery."
+    "Leverage mindfulness to optimize your cognitive recovery.",
+    "Discover the three key reasons why high-performers experience cognitive overload in today's fast-paced environment.",
+    "Are you ready to unlock proven strategies to transform your relationship with stress?",
+    "This is your sign to prioritize self-care and elevate your mindset."
   ]
 }
