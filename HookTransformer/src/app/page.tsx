@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
 import {
   type AppLanguage,
@@ -161,30 +161,59 @@ type CalendarEntry = {
   format: string;
   hookText: string;
   locked: boolean;
+  completed: boolean;
 };
 
 const CALENDAR_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-function getDefaultCalendarEntries(): CalendarEntry[] {
-  const hookTypes = ["Question hook", "Story hook", "Negative hook", "Contrarian hook", "Number hook"];
-  const formats = ["Direct to camera", "Carousel", "Broll + Text"];
-  const entries: CalendarEntry[] = [];
-  for (let week = 1; week <= 4; week += 1) {
-    CALENDAR_DAYS.forEach((day, dayIndex) => {
-      entries.push({
-        id: makeId(),
-        week,
-        day,
-        topicSlot: (week + dayIndex) % 2 === 0 ? "topic1" : "topic2",
-        hookType: hookTypes[(week + dayIndex) % hookTypes.length],
-        format: formats[(week * 2 + dayIndex) % formats.length],
-        hookText: "",
-        locked: false,
-      });
-    });
-  }
-  return entries;
-}
+/** Hook types shown in calendar (matches reference content calendar). */
+const CALENDAR_HOOK_TYPES = ["Question hook", "Story hook", "Negative hook", "Contrarian hook", "Number hook"] as const;
+
+const CALENDAR_FORMAT_OPTIONS = ["Direct to camera", "Broll + Text", "Carousel"] as const;
+
+/** Topic / hook-type / format distribution from the reference 4-week grid (Mon→Sun). */
+type CalendarCellRef = { topic: "topic1" | "topic2"; hookType: (typeof CALENDAR_HOOK_TYPES)[number]; format: (typeof CALENDAR_FORMAT_OPTIONS)[number] };
+
+const CALENDAR_REFERENCE_GRID: CalendarCellRef[][] = [
+  [
+    { topic: "topic1", hookType: "Question hook", format: "Direct to camera" },
+    { topic: "topic2", hookType: "Number hook", format: "Broll + Text" },
+    { topic: "topic1", hookType: "Negative hook", format: "Carousel" },
+    { topic: "topic1", hookType: "Contrarian hook", format: "Direct to camera" },
+    { topic: "topic2", hookType: "Question hook", format: "Carousel" },
+    { topic: "topic1", hookType: "Story hook", format: "Broll + Text" },
+    { topic: "topic2", hookType: "Story hook", format: "Carousel" },
+  ],
+  [
+    { topic: "topic2", hookType: "Question hook", format: "Broll + Text" },
+    { topic: "topic1", hookType: "Negative hook", format: "Direct to camera" },
+    { topic: "topic2", hookType: "Question hook", format: "Direct to camera" },
+    { topic: "topic1", hookType: "Question hook", format: "Carousel" },
+    { topic: "topic1", hookType: "Contrarian hook", format: "Broll + Text" },
+    { topic: "topic2", hookType: "Contrarian hook", format: "Direct to camera" },
+    { topic: "topic1", hookType: "Number hook", format: "Direct to camera" },
+  ],
+  [
+    { topic: "topic1", hookType: "Number hook", format: "Broll + Text" },
+    { topic: "topic1", hookType: "Story hook", format: "Carousel" },
+    { topic: "topic2", hookType: "Negative hook", format: "Broll + Text" },
+    { topic: "topic2", hookType: "Contrarian hook", format: "Carousel" },
+    { topic: "topic1", hookType: "Question hook", format: "Broll + Text" },
+    { topic: "topic1", hookType: "Contrarian hook", format: "Carousel" },
+    { topic: "topic2", hookType: "Contrarian hook", format: "Broll + Text" },
+  ],
+  [
+    { topic: "topic2", hookType: "Story hook", format: "Broll + Text" },
+    { topic: "topic1", hookType: "Story hook", format: "Direct to camera" },
+    { topic: "topic2", hookType: "Negative hook", format: "Direct to camera" },
+    { topic: "topic1", hookType: "Number hook", format: "Carousel" },
+    { topic: "topic2", hookType: "Negative hook", format: "Carousel" },
+    { topic: "topic2", hookType: "Number hook", format: "Direct to camera" },
+    { topic: "topic1", hookType: "Negative hook", format: "Broll + Text" },
+  ],
+];
+
+const CALENDAR_LAYOUT_VERSION = 2;
 
 function getDefaultCarouselLayouts(): CarouselLayout[] {
   return [
@@ -333,6 +362,72 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function getDefaultCalendarEntries(): CalendarEntry[] {
+  const entries: CalendarEntry[] = [];
+  for (let w = 0; w < 4; w += 1) {
+    for (let d = 0; d < 7; d += 1) {
+      const cell = CALENDAR_REFERENCE_GRID[w][d];
+      entries.push({
+        id: makeId(),
+        week: w + 1,
+        day: CALENDAR_DAYS[d],
+        topicSlot: cell.topic,
+        hookType: cell.hookType,
+        format: cell.format,
+        hookText: "",
+        locked: false,
+        completed: false,
+      });
+    }
+  }
+  return entries;
+}
+
+function normalizeCalendarEntries(entries: CalendarEntry[]): CalendarEntry[] {
+  return entries.map((e) => ({
+    ...e,
+    completed: typeof e.completed === "boolean" ? e.completed : false,
+  }));
+}
+
+/** Re-apply reference topic / hook-type / format while preserving ids, hook text, and locks. */
+function mergeCalendarWithReferenceGrid(existing: CalendarEntry[]): CalendarEntry[] {
+  const byWeekDay = new Map<string, CalendarEntry>();
+  for (const e of existing) {
+    byWeekDay.set(`${e.week}-${e.day}`, e);
+  }
+  const next: CalendarEntry[] = [];
+  for (let w = 0; w < 4; w += 1) {
+    for (let d = 0; d < 7; d += 1) {
+      const week = w + 1;
+      const day = CALENDAR_DAYS[d];
+      const ref = CALENDAR_REFERENCE_GRID[w][d];
+      const prev = byWeekDay.get(`${week}-${day}`);
+      if (prev) {
+        next.push({
+          ...prev,
+          topicSlot: ref.topic,
+          hookType: ref.hookType,
+          format: ref.format,
+        });
+      } else {
+        next.push({
+          id: makeId(),
+          week,
+          day,
+          topicSlot: ref.topic,
+          hookType: ref.hookType,
+          format: ref.format,
+          hookText: "",
+          locked: false,
+          completed: false,
+        });
+      }
+    }
+  }
+  return normalizeCalendarEntries(next);
+}
+
 function toResultItems(hooks: HookVariation[]): ResultItem[] {
   return hooks.map((item) => ({
     ...item,
@@ -348,8 +443,63 @@ function toExpansionGroups(pack: ExpansionPack) {
   };
 }
 
+function CalendarLockGlyph({ locked }: { locked: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      {locked ? <path d="M7 11V7a5 5 0 0 1 10 0v4" /> : <path d="M7 11V7a5 5 0 0 1 9.9-1" />}
+    </svg>
+  );
+}
+
+function CalendarHookAutosizeTextarea({
+  value,
+  onChange,
+  className,
+  style,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const syncHeight = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncHeight();
+  }, [value, syncHeight]);
+
+  useEffect(() => {
+    window.addEventListener("resize", syncHeight);
+    return () => window.removeEventListener("resize", syncHeight);
+  }, [syncHeight]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+      style={{
+        ...style,
+        resize: "none",
+        overflow: "hidden",
+        minHeight: "2.75rem",
+      }}
+    />
+  );
+}
+
 export default function HomePage() {
-  const VIEWS = ["variants", "aha", "script", "carousel", "symptom", "calendar"] as const;
+  const VIEWS = ["variants", "calendar", "aha", "script", "carousel", "symptom"] as const;
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
@@ -427,6 +577,7 @@ export default function HomePage() {
         carouselDrafts: CarouselDraft[];
         activeCarouselId: string;
         calendarEntries: CalendarEntry[];
+        calendarLayoutVersion?: number;
       }>;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
@@ -480,7 +631,13 @@ export default function HomePage() {
       if (Array.isArray(parsed.carouselDrafts)) setCarouselDrafts(parsed.carouselDrafts);
       if (typeof parsed.activeCarouselId === "string") setActiveCarouselId(parsed.activeCarouselId);
       if (Array.isArray(parsed.calendarEntries) && parsed.calendarEntries.length > 0) {
-        setCalendarEntries(parsed.calendarEntries);
+        const layoutVer = typeof parsed.calendarLayoutVersion === "number" ? parsed.calendarLayoutVersion : 0;
+        const raw = parsed.calendarEntries as CalendarEntry[];
+        if (parsed.calendarEntries.length === 28 && layoutVer < CALENDAR_LAYOUT_VERSION) {
+          setCalendarEntries(mergeCalendarWithReferenceGrid(raw));
+        } else {
+          setCalendarEntries(normalizeCalendarEntries(raw));
+        }
       }
     } catch {
       // ignore invalid local storage payload
@@ -518,6 +675,7 @@ export default function HomePage() {
       carouselDrafts,
       activeCarouselId,
       calendarEntries,
+      calendarLayoutVersion: CALENDAR_LAYOUT_VERSION,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [
@@ -770,6 +928,88 @@ export default function HomePage() {
     [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
   );
 
+  const calendarAhaLoadingKey = (entryId: string) => `cal-aha-${entryId}`;
+  const calendarScriptLoadingKey = (entryId: string) => `cal-script-${entryId}`;
+
+  const onGenerateAhaFromCalendarDay = useCallback(
+    async (entry: CalendarEntry) => {
+      const hookText = entry.hookText.trim();
+      if (!hookText) {
+        setError(appLanguage === "Swedish" ? "Lagg till hook-text for den har dagen forst." : "Add hook text for this day first.");
+        return;
+      }
+      setError(null);
+      setActiveView("aha");
+      setIdeasLoadingId(calendarAhaLoadingKey(entry.id));
+      const apiKey = loadSharedOpenAiKey();
+      try {
+        const ideas = await generateContentIdeas({
+          apiKey,
+          language: appLanguage,
+          targetAudience,
+          platform,
+          hook: hookText,
+          uniquePerspective,
+        });
+        const nextBatch: IdeaBatch = {
+          id: makeId(),
+          hookId: entry.id,
+          hookText,
+          platform,
+          targetAudience,
+          createdAt: new Date().toISOString(),
+          ideas: ideas.map((idea) => ({ id: makeId(), text: idea })),
+        };
+        setIdeaBatches((prev) => [nextBatch, ...prev]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to generate content ideas.");
+      } finally {
+        setIdeasLoadingId(null);
+      }
+    },
+    [appLanguage, platform, targetAudience, uniquePerspective],
+  );
+
+  const onGenerateScriptFromCalendarDay = useCallback(
+    async (entry: CalendarEntry) => {
+      const hookText = entry.hookText.trim();
+      if (!hookText) {
+        setError(appLanguage === "Swedish" ? "Lagg till hook-text for den har dagen forst." : "Add hook text for this day first.");
+        return;
+      }
+      setError(null);
+      setActiveView("script");
+      setScriptLoadingId(calendarScriptLoadingKey(entry.id));
+      const apiKey = loadSharedOpenAiKey();
+      try {
+        const pkg = await generateScriptStoryboard({
+          apiKey,
+          language: appLanguage,
+          platform,
+          targetAudience,
+          useBrandVoiceLock,
+          brandVoiceSample,
+          uniquePerspective,
+          hook: hookText,
+        });
+        const board: ScriptBoardEntry = {
+          id: makeId(),
+          hookText,
+          platform,
+          targetAudience,
+          createdAt: new Date().toISOString(),
+          package: pkg,
+        };
+        setScriptBoards((prev) => [board, ...prev]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create script/storyboard.");
+      } finally {
+        setScriptLoadingId(null);
+      }
+    },
+    [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
+  );
+
   const onNetflixify = useCallback(
     async (hookText: string, loadingId: string) => {
       setError(null);
@@ -839,9 +1079,13 @@ export default function HomePage() {
   const onFillCalendar = useCallback(async () => {
     setError(null);
     const apiKey = loadSharedOpenAiKey();
-    const unlocked = calendarEntries.filter((entry) => !entry.locked);
+    const unlocked = calendarEntries.filter((entry) => !entry.locked && !entry.completed);
     if (unlocked.length === 0) {
-      setError("All days are locked. Unlock at least one day to regenerate.");
+      setError(
+        appLanguage === "Swedish"
+          ? "Alla dagar ar lasta eller markerade som klara. Las upp eller avmarkera Klar pa minst en dag."
+          : "All days are locked or marked done. Unlock or clear Done on at least one day to regenerate.",
+      );
       setActiveView("calendar");
       return;
     }
@@ -877,7 +1121,7 @@ export default function HomePage() {
       const byId = new Map(generated.map((row) => [row.id, row.hook]));
       setCalendarEntries((prev) =>
         prev.map((entry) =>
-          entry.locked ? entry : { ...entry, hookText: byId.get(entry.id) ?? entry.hookText },
+          entry.locked || entry.completed ? entry : { ...entry, hookText: byId.get(entry.id) ?? entry.hookText },
         ),
       );
     } catch (e) {
@@ -1101,7 +1345,7 @@ export default function HomePage() {
         className="sticky top-0 z-30 border-b px-4 py-4 sm:px-6"
         style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}
       >
-        <div className="mx-auto grid w-full max-w-[1800px] grid-cols-[1fr_minmax(0,900px)_1fr] items-center gap-3">
+        <div className="grid w-full grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-3">
           <div />
           <div className="flex justify-center">
             <input
@@ -1142,7 +1386,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid h-[calc(100vh-86px)] w-full max-w-[1600px] gap-3 overflow-hidden p-2 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="grid h-[calc(100vh-86px)] w-full min-w-0 gap-3 overflow-hidden p-2 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside
           className="h-full overflow-y-auto rounded-2xl border p-3"
           style={{
@@ -1381,15 +1625,16 @@ export default function HomePage() {
           ) : null}
         </aside>
 
-        <section className="h-full overflow-y-auto pr-1 text-base">
-          <div
-            className="sticky top-0 z-20 mb-3 flex flex-wrap gap-2 border-b pb-2"
-            style={{ borderColor: "var(--border-subtle)", background: "var(--bg-primary)" }}
+        <section className="h-full min-w-0 overflow-y-auto pr-1 text-base">
+          <nav
+            className="sticky top-0 z-20 mb-3 flex flex-wrap items-end gap-0 border-b px-0 pt-1"
+            style={{ borderColor: "var(--border-default)", background: "var(--bg-primary)" }}
+            aria-label={appLanguage === "Swedish" ? "Vyflikar" : "Main views"}
           >
             {VIEWS.map((view) => {
               const label =
                 view === "variants"
-                  ? appLanguage === "Swedish" ? "Varianter" : "Variants"
+                  ? appLanguage === "Swedish" ? "Hookvarianter" : "Hook Variants"
                   : view === "aha"
                     ? appLanguage === "Swedish" ? "Aha + slutsats" : "Aha + conclusion"
                     : view === "script"
@@ -1405,22 +1650,38 @@ export default function HomePage() {
                   key={view}
                   type="button"
                   onClick={() => setActiveView(view)}
-                  className="rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors"
-                  style={{
-                    borderColor: "var(--border-default)",
-                    background: isActive ? "var(--bg-elevated)" : "var(--bg-tertiary)",
-                    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                  }}
+                  role="tab"
+                  aria-selected={isActive}
+                  className={
+                    isActive
+                      ? "relative z-10 -mb-px rounded-t-lg border border-b-0 px-3 py-2 text-sm font-semibold transition-colors"
+                      : "rounded-t-lg border border-transparent px-3 py-2 text-sm font-medium transition-colors hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                  }
+                  style={
+                    isActive
+                      ? {
+                          borderColor: "var(--border-default)",
+                          borderBottomColor: "var(--bg-primary)",
+                          background: "var(--bg-primary)",
+                          color: "var(--text-primary)",
+                          boxShadow: "0 1px 0 0 var(--bg-primary)",
+                        }
+                      : {
+                          color: "var(--text-secondary)",
+                        }
+                  }
                 >
                   {label}
                 </button>
               );
             })}
-          </div>
+          </nav>
 
           {activeView === "variants" ? (
             <>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Varianter" : "Variations"}</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                {appLanguage === "Swedish" ? "Hookvarianter" : "Hook Variants"}
+              </h2>
               {results.length === 0 && !loading ? (
                 <div
                   className="rounded-2xl border border-dashed p-8 text-center text-sm text-[var(--text-tertiary)]"
@@ -2173,23 +2434,81 @@ export default function HomePage() {
               <div className="mt-3 space-y-3">
                 {Array.from({ length: 4 }).map((_, weekIdx) => {
                   const week = weekIdx + 1;
-                  const weekEntries = calendarEntries.filter((entry) => entry.week === week);
+                  const weekEntries = calendarEntries
+                    .filter((entry) => entry.week === week)
+                    .sort(
+                      (a, b) =>
+                        CALENDAR_DAYS.indexOf(a.day as (typeof CALENDAR_DAYS)[number]) -
+                        CALENDAR_DAYS.indexOf(b.day as (typeof CALENDAR_DAYS)[number]),
+                    );
                   return (
                     <section key={`week-${week}`} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
                       <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">{`Week ${week}`}</h3>
                       <div className="grid gap-2 xl:grid-cols-4 2xl:grid-cols-7">
-                        {weekEntries.map((entry) => (
-                          <div key={entry.id} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                            <div className="mb-1.5 flex items-center justify-between">
+                        {weekEntries.map((entry) => {
+                          const entryTopicBg =
+                            entry.topicSlot === "topic1"
+                              ? "rgba(236, 72, 153, 0.12)"
+                              : "rgba(59, 130, 246, 0.12)";
+                          let cardBackground = entryTopicBg;
+                          let cardBorder: string = "var(--border-default)";
+                          let cardBoxShadow: string | undefined;
+
+                          if (entry.completed) {
+                            cardBackground = "rgba(34, 197, 94, 0.26)";
+                            cardBorder = "rgba(21, 128, 61, 0.5)";
+                          } else if (entry.locked) {
+                            cardBackground = entryTopicBg;
+                            cardBorder = "rgba(217, 119, 6, 0.75)";
+                            cardBoxShadow = "inset 3px 0 0 0 rgba(245, 158, 11, 0.95)";
+                          }
+
+                          return (
+                          <div
+                            key={entry.id}
+                            className="rounded-lg border p-2"
+                            style={{
+                              borderColor: cardBorder,
+                              background: cardBackground,
+                              boxShadow: cardBoxShadow,
+                            }}
+                          >
+                            <div className="mb-1.5 flex items-center justify-between gap-1">
                               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{entry.day}</p>
-                              <button
-                                type="button"
-                                className="rounded-md border px-1.5 py-0.5 text-[10px]"
-                                style={{ borderColor: "var(--border-default)", color: entry.locked ? "#facc15" : "var(--text-tertiary)" }}
-                                onClick={() => updateCalendarEntry(entry.id, { locked: !entry.locked })}
-                              >
-                                {entry.locked ? "Locked" : "Lock"}
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <label className="flex cursor-pointer select-none items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
+                                  <input
+                                    type="checkbox"
+                                    checked={entry.completed}
+                                    onChange={(e) => updateCalendarEntry(entry.id, { completed: e.target.checked })}
+                                    className="h-3.5 w-3.5 shrink-0 rounded border"
+                                    style={{ borderColor: "var(--border-default)", accentColor: "rgb(22, 163, 74)" }}
+                                  />
+                                  <span>{appLanguage === "Swedish" ? "Klar" : "Done"}</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-[background-color,border-color,color]"
+                                  style={{
+                                    borderColor: entry.locked ? "rgb(180, 83, 9)" : "var(--border-default)",
+                                    background: entry.locked ? "rgba(254, 243, 199, 0.45)" : "var(--bg-elevated)",
+                                    color: entry.locked ? "rgb(146, 64, 14)" : "var(--text-tertiary)",
+                                  }}
+                                  aria-label={
+                                    entry.locked
+                                      ? appLanguage === "Swedish"
+                                        ? "Las upp dag"
+                                        : "Unlock day"
+                                      : appLanguage === "Swedish"
+                                        ? "Las dag"
+                                        : "Lock day"
+                                  }
+                                  aria-pressed={entry.locked}
+                                  onClick={() => updateCalendarEntry(entry.id, { locked: !entry.locked })}
+                                >
+                                  <CalendarLockGlyph locked={entry.locked} />
+                                </button>
+                              </div>
                             </div>
                             <label className="block text-[10px] text-[var(--text-tertiary)]">
                               Topic
@@ -2205,34 +2524,94 @@ export default function HomePage() {
                             </label>
                             <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
                               Hook type
-                              <input
-                                value={entry.hookType}
+                              <select
+                                value={CALENDAR_HOOK_TYPES.includes(entry.hookType as (typeof CALENDAR_HOOK_TYPES)[number]) ? entry.hookType : CALENDAR_HOOK_TYPES[0]}
                                 onChange={(e) => updateCalendarEntry(entry.id, { hookType: e.target.value })}
                                 className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
                                 style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
+                              >
+                                {CALENDAR_HOOK_TYPES.map((ht) => (
+                                  <option key={ht} value={ht}>
+                                    {ht}
+                                  </option>
+                                ))}
+                              </select>
                             </label>
                             <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
                               Format
-                              <input
-                                value={entry.format}
+                              <select
+                                value={
+                                  CALENDAR_FORMAT_OPTIONS.includes(entry.format as (typeof CALENDAR_FORMAT_OPTIONS)[number])
+                                    ? entry.format
+                                    : CALENDAR_FORMAT_OPTIONS[0]
+                                }
                                 onChange={(e) => updateCalendarEntry(entry.id, { format: e.target.value })}
                                 className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
                                 style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              />
+                              >
+                                {CALENDAR_FORMAT_OPTIONS.map((fmt) => (
+                                  <option key={fmt} value={fmt}>
+                                    {fmt}
+                                  </option>
+                                ))}
+                              </select>
                             </label>
                             <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
                               Hook
-                              <textarea
+                              <CalendarHookAutosizeTextarea
                                 value={entry.hookText}
-                                onChange={(e) => updateCalendarEntry(entry.id, { hookText: e.target.value })}
-                                rows={4}
-                                className="mt-0.5 w-full resize-y rounded-md border px-2 py-1 text-xs leading-relaxed"
+                                onChange={(next) => updateCalendarEntry(entry.id, { hookText: next })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs leading-relaxed"
                                 style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                               />
                             </label>
+                            <div className="mt-2 flex flex-col gap-1">
+                              <button
+                                type="button"
+                                disabled={
+                                  !entry.hookText.trim() || ideasLoadingId === calendarAhaLoadingKey(entry.id)
+                                }
+                                onClick={() => void onGenerateAhaFromCalendarDay(entry)}
+                                className="w-full rounded-md border px-2 py-1.5 text-[11px] font-medium transition-opacity disabled:opacity-40"
+                                style={{
+                                  borderColor: "var(--border-default)",
+                                  background: "var(--bg-secondary)",
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {ideasLoadingId === calendarAhaLoadingKey(entry.id)
+                                  ? appLanguage === "Swedish"
+                                    ? "Aha…"
+                                    : "Aha…"
+                                  : appLanguage === "Swedish"
+                                    ? "Generera Aha"
+                                    : "Generate Aha"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={
+                                  !entry.hookText.trim() || scriptLoadingId === calendarScriptLoadingKey(entry.id)
+                                }
+                                onClick={() => void onGenerateScriptFromCalendarDay(entry)}
+                                className="w-full rounded-md border px-2 py-1.5 text-[11px] font-medium transition-opacity disabled:opacity-40"
+                                style={{
+                                  borderColor: "var(--border-default)",
+                                  background: "var(--bg-secondary)",
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {scriptLoadingId === calendarScriptLoadingKey(entry.id)
+                                  ? appLanguage === "Swedish"
+                                    ? "Manus…"
+                                    : "Script…"
+                                  : appLanguage === "Swedish"
+                                    ? "Generera manus"
+                                    : "Generate script"}
+                              </button>
+                            </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </section>
                   );
