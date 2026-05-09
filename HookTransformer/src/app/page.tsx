@@ -962,7 +962,9 @@ export default function HomePage() {
       setActiveView("aha");
       setIdeasLoadingId(calendarAhaLoadingKey(entry.id));
       const apiKey = loadSharedOpenAiKey();
-      const dayPerspective = (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim();
+      const calendarUsesTopic2 = topicTwo.trim().length > 0 && topicTwoHook.trim().length > 0;
+      const useTopic1PerspectiveOnly = entry.topicSlot === "topic1" || !calendarUsesTopic2;
+      const dayPerspective = (useTopic1PerspectiveOnly ? topicOnePerspective : topicTwoPerspective).trim();
       try {
         const ideas = await generateContentIdeas({
           apiKey,
@@ -988,7 +990,7 @@ export default function HomePage() {
         setIdeasLoadingId(null);
       }
     },
-    [appLanguage, platform, targetAudience, topicOnePerspective, topicTwoPerspective],
+    [appLanguage, platform, targetAudience, topicOnePerspective, topicTwoPerspective, topicTwo, topicTwoHook],
   );
 
   const onGenerateScriptFromCalendarDay = useCallback(
@@ -1002,7 +1004,9 @@ export default function HomePage() {
       setActiveView("script");
       setScriptLoadingId(calendarScriptLoadingKey(entry.id));
       const apiKey = loadSharedOpenAiKey();
-      const dayPerspective = (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim();
+      const calendarUsesTopic2 = topicTwo.trim().length > 0 && topicTwoHook.trim().length > 0;
+      const useTopic1PerspectiveOnly = entry.topicSlot === "topic1" || !calendarUsesTopic2;
+      const dayPerspective = (useTopic1PerspectiveOnly ? topicOnePerspective : topicTwoPerspective).trim();
       try {
         const pkg = await generateScriptStoryboard({
           apiKey,
@@ -1029,7 +1033,7 @@ export default function HomePage() {
         setScriptLoadingId(null);
       }
     },
-    [appLanguage, brandVoiceSample, platform, targetAudience, topicOnePerspective, topicTwoPerspective, useBrandVoiceLock],
+    [appLanguage, brandVoiceSample, platform, targetAudience, topicOnePerspective, topicTwoPerspective, topicTwo, topicTwoHook, useBrandVoiceLock],
   );
 
   const onNetflixify = useCallback(
@@ -1112,35 +1116,41 @@ export default function HomePage() {
       return;
     }
     const topicOneValue = topicOne.trim();
-    const topicTwoValue = topicTwo.trim();
-    if (!topicOneValue || !topicTwoValue) {
-      setError("Set both Topic 1 and Topic 2 in Settings first.");
-      return;
-    }
-    const topicOneHookValue = topicOneHook.trim();
-    const topicTwoHookValue = topicTwoHook.trim();
-    if (!topicOneHookValue || !topicTwoHookValue) {
+    if (!topicOneValue) {
       setError(
-        appLanguage === "Swedish"
-          ? "Fyll i bada amnes-hooks (Amne 1 och Amne 2) ovan."
-          : "Add both Topic 1 and Topic 2 seed hooks above.",
+        appLanguage === "Swedish" ? "Ange Amne 1 under Installningar forst." : "Set Topic 1 in Settings first.",
       );
       return;
     }
+    const topicOneHookValue = topicOneHook.trim();
+    if (!topicOneHookValue) {
+      setError(
+        appLanguage === "Swedish"
+          ? "Fyll i hook for Amne 1 ovan."
+          : "Add the Topic 1 seed hook above.",
+      );
+      return;
+    }
+    const topicTwoValue = topicTwo.trim();
+    const topicTwoHookValue = topicTwoHook.trim();
+    const calendarUsesTopic2 = topicTwoValue.length > 0 && topicTwoHookValue.length > 0;
     setLoading(true);
     setLoadingLabel("Filling calendar...");
     setActiveView("calendar");
     try {
-      const dayInputs: CalendarHookDayInput[] = unlocked.map((entry) => ({
-        id: entry.id,
-        weekLabel: `Week ${entry.week}`,
-        dayLabel: entry.day,
-        topic: entry.topicSlot === "topic1" ? topicOneValue : topicTwoValue,
-        seedHook: entry.topicSlot === "topic1" ? topicOneHookValue : topicTwoHookValue,
-        uniquePerspective: (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim(),
-        hookType: entry.hookType,
-        format: entry.format,
-      }));
+      const dayInputs: CalendarHookDayInput[] = unlocked.map((entry) => {
+        const useTopic1Only = entry.topicSlot === "topic1" || !calendarUsesTopic2;
+        return {
+          id: entry.id,
+          weekLabel: `Week ${entry.week}`,
+          dayLabel: entry.day,
+          topic: useTopic1Only ? topicOneValue : topicTwoValue,
+          seedHook: useTopic1Only ? topicOneHookValue : topicTwoHookValue,
+          uniquePerspective: (useTopic1Only ? topicOnePerspective : topicTwoPerspective).trim(),
+          hookType: entry.hookType,
+          format: entry.format,
+        };
+      });
       const generated = await generateCalendarHooks({
         apiKey,
         language: appLanguage,
