@@ -171,6 +171,23 @@ const CALENDAR_HOOK_TYPES = ["Question hook", "Story hook", "Negative hook", "Co
 
 const CALENDAR_FORMAT_OPTIONS = ["Direct to camera", "Broll + Text", "Carousel"] as const;
 
+/** Hook Variants column labels → calendar `hookType` (reference grid / dropdown values). */
+const VARIANT_COLUMN_TO_CALENDAR_HOOK: Record<
+  (typeof HOOK_COLUMN_LABELS)[number],
+  (typeof CALENDAR_HOOK_TYPES)[number]
+> = {
+  "Ask a question Hook": "Question hook",
+  "Story hook": "Story hook",
+  "Negative hook": "Negative hook",
+  "Contrarian view": "Contrarian hook",
+  "Numbered list": "Number hook",
+};
+
+function calendarDaySortIndex(day: string): number {
+  const i = CALENDAR_DAYS.indexOf(day as (typeof CALENDAR_DAYS)[number]);
+  return i >= 0 ? i : 0;
+}
+
 /** Topic / hook-type / format distribution from the reference 4-week grid (Mon→Sun). */
 type CalendarCellRef = { topic: "topic1" | "topic2"; hookType: (typeof CALENDAR_HOOK_TYPES)[number]; format: (typeof CALENDAR_FORMAT_OPTIONS)[number] };
 
@@ -1102,6 +1119,43 @@ export default function HomePage() {
     setCalendarEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
   }, []);
 
+  const onClearUnlockedCalendarHooks = useCallback(() => {
+    setError(null);
+    setCalendarEntries((prev) =>
+      prev.map((entry) => (entry.locked ? entry : { ...entry, hookText: "" })),
+    );
+  }, []);
+
+  const onSendHookToCalendar = useCallback(
+    (hookText: string, columnLabel: (typeof HOOK_COLUMN_LABELS)[number]) => {
+      const trimmed = hookText.trim();
+      if (!trimmed) return;
+      setError(null);
+      const calendarHookType = VARIANT_COLUMN_TO_CALENDAR_HOOK[columnLabel];
+      const candidates = calendarEntries.filter(
+        (e) => !e.locked && !e.completed && e.hookType === calendarHookType,
+      );
+      const sorted = [...candidates].sort((a, b) => {
+        const aEmpty = !a.hookText.trim();
+        const bEmpty = !b.hookText.trim();
+        if (aEmpty !== bEmpty) return aEmpty ? -1 : 1;
+        if (a.week !== b.week) return a.week - b.week;
+        return calendarDaySortIndex(a.day) - calendarDaySortIndex(b.day);
+      });
+      const pick = sorted[0];
+      if (!pick) {
+        setError(
+          appLanguage === "Swedish"
+            ? `Ingen ledig kalenderdag (olast, ej klar) med hook-typ "${calendarHookType}". Las upp en dag eller matcha hook-typen.`
+            : `No unlocked, active calendar day uses "${calendarHookType}". Unlock a day or set its hook type to match this column.`,
+        );
+        return;
+      }
+      updateCalendarEntry(pick.id, { hookText: trimmed });
+    },
+    [appLanguage, calendarEntries, updateCalendarEntry],
+  );
+
   const onFillCalendar = useCallback(async () => {
     setError(null);
     const apiKey = loadSharedOpenAiKey();
@@ -1904,6 +1958,23 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
+                          disabled={!item.text.trim()}
+                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-40"
+                          style={{
+                            borderColor: "var(--border-default)",
+                            background: "color-mix(in srgb, var(--bg-tertiary) 72%, rgb(45, 212, 191) 28%)",
+                            color: "var(--text-secondary)",
+                          }}
+                          title={appLanguage === "Swedish" ? "Skicka till kalender" : "Send to calendar"}
+                          aria-label={
+                            appLanguage === "Swedish" ? "Skicka hook till matchande kalenderdag" : "Send hook to matching calendar day"
+                          }
+                          onClick={() => onSendHookToCalendar(item.text, column.label)}
+                        >
+                          📅
+                        </button>
+                        <button
+                          type="button"
                           className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                           title="Design carousel from this hook"
@@ -2696,9 +2767,28 @@ export default function HomePage() {
 
           {activeView === "calendar" ? (
             <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                {appLanguage === "Swedish" ? "Innehallskalender" : "Content calendar"}
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                  {appLanguage === "Swedish" ? "Innehallskalender" : "Content calendar"}
+                </h2>
+                <button
+                  type="button"
+                  onClick={onClearUnlockedCalendarHooks}
+                  className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    borderColor: "var(--border-default)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-secondary)",
+                  }}
+                  title={
+                    appLanguage === "Swedish"
+                      ? "Tom hook-falt pa alla olasta dagar"
+                      : "Clear hook text on all days that are not locked"
+                  }
+                >
+                  {appLanguage === "Swedish" ? "Rensa kalender" : "Clear calendar"}
+                </button>
+              </div>
               <div className="mt-3 space-y-3">
                 {Array.from({ length: 4 }).map((_, weekIdx) => {
                   const week = weekIdx + 1;
@@ -2718,15 +2808,19 @@ export default function HomePage() {
                             entry.topicSlot === "topic1"
                               ? "color-mix(in srgb, var(--bg-elevated) 93%, var(--accent) 7%)"
                               : "color-mix(in srgb, var(--bg-elevated) 84%, var(--bg-tertiary) 16%)";
-                          let cardBackground = entryTopicBg;
+                          const completedGreen = "rgba(34, 197, 94, 0.26)";
+                          let cardBackground = "var(--bg-elevated)";
+                          let headerBackground = entryTopicBg;
                           let cardBorder: string = "var(--border-default)";
                           let cardBoxShadow: string | undefined;
 
                           if (entry.completed) {
-                            cardBackground = "rgba(34, 197, 94, 0.26)";
+                            cardBackground = completedGreen;
+                            headerBackground = completedGreen;
                             cardBorder = "rgba(21, 128, 61, 0.5)";
                           } else if (entry.locked) {
-                            cardBackground = entryTopicBg;
+                            cardBackground = "var(--bg-elevated)";
+                            headerBackground = entryTopicBg;
                             cardBorder = "rgba(217, 119, 6, 0.75)";
                             cardBoxShadow = "inset 3px 0 0 0 rgba(245, 158, 11, 0.95)";
                           }
@@ -2734,14 +2828,17 @@ export default function HomePage() {
                           return (
                           <div
                             key={entry.id}
-                            className="rounded-lg border p-2"
+                            className="overflow-hidden rounded-lg border"
                             style={{
                               borderColor: cardBorder,
                               background: cardBackground,
                               boxShadow: cardBoxShadow,
                             }}
                           >
-                            <div className="mb-1.5 flex items-center justify-between gap-1">
+                            <div
+                              className="flex items-center justify-between gap-1 px-2 py-1.5"
+                              style={{ background: headerBackground }}
+                            >
                               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{entry.day}</p>
                               <div className="flex items-center gap-1.5">
                                 <label className="flex cursor-pointer select-none items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
@@ -2778,6 +2875,7 @@ export default function HomePage() {
                                 </button>
                               </div>
                             </div>
+                            <div className="px-2 pb-2 pt-1.5">
                             <select
                               value={entry.topicSlot}
                               onChange={(e) => updateCalendarEntry(entry.id, { topicSlot: e.target.value as "topic1" | "topic2" })}
@@ -2827,25 +2925,31 @@ export default function HomePage() {
                                 style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
                               />
                             </label>
-                            <div className="mt-2 flex flex-col gap-1">
+                            <div className="mt-2 flex flex-wrap gap-1">
                               <button
                                 type="button"
                                 disabled={
                                   !entry.hookText.trim() || ideasLoadingId === calendarAhaLoadingKey(entry.id)
                                 }
                                 onClick={() => void onGenerateAhaFromCalendarDay(entry)}
-                                className="w-full rounded-md border px-2 py-1.5 text-[11px] font-medium transition-opacity disabled:opacity-40"
+                                className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                                 style={{
                                   borderColor: "var(--border-default)",
-                                  background: "var(--bg-secondary)",
+                                  background: "var(--bg-tertiary)",
                                   color: "var(--text-secondary)",
                                 }}
+                                title={
+                                  appLanguage === "Swedish"
+                                    ? "Generera Aha och slutsatser från dagens hook"
+                                    : "Generate Aha + conclusions from this day’s hook"
+                                }
+                                aria-label={
+                                  appLanguage === "Swedish"
+                                    ? "Generera Aha från dagens hook"
+                                    : "Generate Aha from this day’s hook"
+                                }
                               >
-                                {ideasLoadingId === calendarAhaLoadingKey(entry.id)
-                                  ? "Aha…"
-                                  : appLanguage === "Swedish"
-                                    ? "Generera Aha"
-                                    : "Generate Aha"}
+                                {ideasLoadingId === calendarAhaLoadingKey(entry.id) ? "⏳" : "💡"}
                               </button>
                               <button
                                 type="button"
@@ -2853,21 +2957,26 @@ export default function HomePage() {
                                   !entry.hookText.trim() || scriptLoadingId === calendarScriptLoadingKey(entry.id)
                                 }
                                 onClick={() => void onGenerateScriptFromCalendarDay(entry)}
-                                className="w-full rounded-md border px-2 py-1.5 text-[11px] font-medium transition-opacity disabled:opacity-40"
+                                className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                                 style={{
                                   borderColor: "var(--border-default)",
-                                  background: "var(--bg-secondary)",
+                                  background: "var(--bg-tertiary)",
                                   color: "var(--text-secondary)",
                                 }}
+                                title={
+                                  appLanguage === "Swedish"
+                                    ? "Generera manus och storyboard från dagens hook"
+                                    : "Generate script and storyboard from this day’s hook"
+                                }
+                                aria-label={
+                                  appLanguage === "Swedish"
+                                    ? "Generera manus från dagens hook"
+                                    : "Generate script from this day’s hook"
+                                }
                               >
-                                {scriptLoadingId === calendarScriptLoadingKey(entry.id)
-                                  ? appLanguage === "Swedish"
-                                    ? "Manus…"
-                                    : "Script…"
-                                  : appLanguage === "Swedish"
-                                    ? "Generera manus"
-                                    : "Generate script"}
+                                {scriptLoadingId === calendarScriptLoadingKey(entry.id) ? "⏳" : "🎬"}
                               </button>
+                            </div>
                             </div>
                           </div>
                           );
