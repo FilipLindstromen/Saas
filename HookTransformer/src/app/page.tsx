@@ -2706,8 +2706,8 @@ export default function HomePage() {
                         {weekEntries.map((entry) => {
                           const entryTopicBg =
                             entry.topicSlot === "topic1"
-                              ? "var(--bg-elevated)"
-                              : "color-mix(in srgb, var(--bg-elevated) 68%, var(--bg-tertiary) 32%)";
+                              ? "color-mix(in srgb, var(--bg-elevated) 93%, var(--accent) 7%)"
+                              : "color-mix(in srgb, var(--bg-elevated) 84%, var(--bg-tertiary) 16%)";
                           let cardBackground = entryTopicBg;
                           let cardBorder: string = "var(--border-default)";
                           let cardBoxShadow: string | undefined;
@@ -2768,52 +2768,46 @@ export default function HomePage() {
                                 </button>
                               </div>
                             </div>
-                            <label className="block text-[10px] text-[var(--text-tertiary)]">
-                              Topic
-                              <select
-                                value={entry.topicSlot}
-                                onChange={(e) => updateCalendarEntry(entry.id, { topicSlot: e.target.value as "topic1" | "topic2" })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              >
-                                <option value="topic1">{topicOne || "Topic 1"}</option>
-                                <option value="topic2">{topicTwo || "Topic 2"}</option>
-                              </select>
-                            </label>
-                            <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
-                              Hook type
-                              <select
-                                value={CALENDAR_HOOK_TYPES.includes(entry.hookType as (typeof CALENDAR_HOOK_TYPES)[number]) ? entry.hookType : CALENDAR_HOOK_TYPES[0]}
-                                onChange={(e) => updateCalendarEntry(entry.id, { hookType: e.target.value })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              >
-                                {CALENDAR_HOOK_TYPES.map((ht) => (
-                                  <option key={ht} value={ht}>
-                                    {ht}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
-                              Format
-                              <select
-                                value={
-                                  CALENDAR_FORMAT_OPTIONS.includes(entry.format as (typeof CALENDAR_FORMAT_OPTIONS)[number])
-                                    ? entry.format
-                                    : CALENDAR_FORMAT_OPTIONS[0]
-                                }
-                                onChange={(e) => updateCalendarEntry(entry.id, { format: e.target.value })}
-                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
-                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                              >
-                                {CALENDAR_FORMAT_OPTIONS.map((fmt) => (
-                                  <option key={fmt} value={fmt}>
-                                    {fmt}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <select
+                              value={entry.topicSlot}
+                              onChange={(e) => updateCalendarEntry(entry.id, { topicSlot: e.target.value as "topic1" | "topic2" })}
+                              aria-label={appLanguage === "Swedish" ? "Amne" : "Topic"}
+                              className="mt-1 w-full cursor-pointer border-0 bg-transparent py-1 text-xs outline-none focus:ring-0"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              <option value="topic1">{topicOne || "Topic 1"}</option>
+                              <option value="topic2">{topicTwo || "Topic 2"}</option>
+                            </select>
+                            <select
+                              value={CALENDAR_HOOK_TYPES.includes(entry.hookType as (typeof CALENDAR_HOOK_TYPES)[number]) ? entry.hookType : CALENDAR_HOOK_TYPES[0]}
+                              onChange={(e) => updateCalendarEntry(entry.id, { hookType: e.target.value })}
+                              aria-label={appLanguage === "Swedish" ? "Hook-typ" : "Hook type"}
+                              className="mt-1 w-full cursor-pointer border-0 bg-transparent py-1 text-xs outline-none focus:ring-0"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {CALENDAR_HOOK_TYPES.map((ht) => (
+                                <option key={ht} value={ht}>
+                                  {ht}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={
+                                CALENDAR_FORMAT_OPTIONS.includes(entry.format as (typeof CALENDAR_FORMAT_OPTIONS)[number])
+                                  ? entry.format
+                                  : CALENDAR_FORMAT_OPTIONS[0]
+                              }
+                              onChange={(e) => updateCalendarEntry(entry.id, { format: e.target.value })}
+                              aria-label={appLanguage === "Swedish" ? "Format" : "Format"}
+                              className="mt-1 w-full cursor-pointer border-0 bg-transparent py-1 text-xs outline-none focus:ring-0"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {CALENDAR_FORMAT_OPTIONS.map((fmt) => (
+                                <option key={fmt} value={fmt}>
+                                  {fmt}
+                                </option>
+                              ))}
+                            </select>
                             <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
                               Hook
                               <CalendarHookAutosizeTextarea
