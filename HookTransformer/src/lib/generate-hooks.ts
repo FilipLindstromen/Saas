@@ -109,6 +109,94 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
     .filter((item) => item.text.length > 0);
 }
 
+/** Labels match the Variants view columns (3 hooks each, 15 total). */
+export const HOOK_COLUMN_LABELS = [
+  "Ask a question Hook",
+  "Story hook",
+  "Negative hook",
+  "Contrarian view",
+  "Numbered list",
+] as const;
+
+const HOOK_BUILD_GUIDANCE = [
+  "Hook quality rules (must follow):",
+  "- Open a curiosity gap without closing it in the same sentence.",
+  "- Be immediate: the tension must land in the first sentence.",
+  "- Speak to what the audience already feels in their real day-to-day context.",
+  "- Do not be vague, generic, or broad. Be specific to the provided audience, topic, and situation.",
+  "",
+  "Type-specific build rules:",
+  "- Ask a question Hook: Ask a specific high-tension question the viewer feels compelled to mentally answer.",
+  "  Bad pattern: broad beginner question like 'How do you grow...?'",
+  "  Good pattern: specific contrast/oddity question like 'How can X happen when Y is true?'",
+  "- Story hook: Start with a strong story premise or provocative observation, not rambling setup.",
+  "  Bad pattern: 'So basically I was...' / meandering preamble.",
+  "  Good pattern: immediate claim that implies a story resolution is coming.",
+  "- Negative hook: Use loss-avoidance and urgency with 'don't / never / before you...' framing.",
+  "  Bad pattern: weak moral phrasing like 'why you shouldn't be inconsistent'.",
+  "  Good pattern: concrete downside + unresolved fix, e.g. 'Never do X before Y'.",
+  "- Contrarian view: State the opposite of common belief in a way that forces agreement/disagreement.",
+  "  Bad pattern: soft generic contrarian line with no stakes.",
+  "  Good pattern: sharp conflict against common advice with clear stakes.",
+  "- Numbered list: Promise a specific transformation/outcome and imply high-value items are inside.",
+  "  Bad pattern: generic list title like '5 ways to...'.",
+  "  Good pattern: curiosity-first payoff line that naturally leads into a numbered breakdown.",
+].join("\n");
+
+function normalizeHookTypeLabel(raw: string | undefined): string {
+  return (raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/g, "");
+}
+
+/**
+ * Ensures 15 hooks land in 5×3 columns. Models often omit or mislabel `source`;
+ * we match when possible, then place leftovers in the first column with free slots.
+ */
+export function distributeHooksToFiveColumns(hooks: HookVariation[]): HookVariation[] {
+  const labels = [...HOOK_COLUMN_LABELS];
+  const canon = labels.map((l) => normalizeHookTypeLabel(l));
+  const buckets: HookVariation[][] = labels.map(() => []);
+  const used = new Set<number>();
+
+  const matchColumn = (raw: string | undefined): number => {
+    const n = normalizeHookTypeLabel(raw);
+    if (!n) return -1;
+    for (let i = 0; i < canon.length; i++) {
+      if (n === canon[i]) return i;
+    }
+    for (let i = 0; i < canon.length; i++) {
+      if (canon[i].includes(n) || n.includes(canon[i])) return i;
+    }
+    if (n.includes("question") || n.startsWith("what if")) return 0;
+    if (n.includes("story")) return 1;
+    if (n.includes("negative")) return 2;
+    if (n.includes("contrarian")) return 3;
+    if (n.includes("number") || n.includes("numbered") || /reasons?\s+your/.test(n)) return 4;
+    return -1;
+  };
+
+  hooks.forEach((h, idx) => {
+    const col = matchColumn(h.source);
+    if (col >= 0 && buckets[col].length < 3) {
+      buckets[col].push({ ...h, source: labels[col] });
+      used.add(idx);
+    }
+  });
+
+  const orphans = hooks.filter((_, idx) => !used.has(idx));
+  for (const h of orphans) {
+    const emptyCol = buckets.findIndex((b) => b.length < 3);
+    if (emptyCol >= 0) {
+      buckets[emptyCol].push({ ...h, source: labels[emptyCol] });
+    }
+  }
+
+  return labels.flatMap((label, colIdx) => buckets[colIdx].map((item) => ({ ...item, source: label })));
+}
+
 export async function generateHookVariations({
   apiKey,
   language,
@@ -142,19 +230,22 @@ export async function generateHookVariations({
     ...(useBrandVoiceLock && brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${brandVoiceSample.trim()}`] : []),
     "",
     "Return exactly 15 transformed hooks as JSON with shape:",
-    "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"one short reason\",\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
-    "Use exactly these 5 hook types and generate exactly 3 hooks per type (15 total):",
+    "{\"hooks\":[{\"text\":\"...\",\"source\":\"Ask a question Hook|Story hook|Negative hook|Contrarian view|Numbered list\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"one short reason\",\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
+    "Use exactly these 5 hook types and generate exactly 3 hooks per type (15 total), in this order:",
+    "3 × Ask a question Hook, then 3 × Story hook, then 3 × Negative hook, then 3 × Contrarian view, then 3 × Numbered list.",
+    "Each hook MUST include a string field source set to exactly one of these labels (copy spelling):",
     "- Ask a question Hook",
     "- Story hook",
     "- Negative hook",
     "- Contrarian view",
     "- Numbered list",
-    "Set source to the exact type label for each hook.",
     "Each hook must clearly and naturally include:",
     "- who it is for",
     "- a real-life situation/context",
     "- the core problem",
     "Every hook must create a clear curiosity gap (open loop) without sounding clickbait.",
+    "",
+    HOOK_BUILD_GUIDANCE,
     "Write like everyday speech, not formal or robotic copy.",
     "Prefer phrasing similar to: If your mind won't stop after work, it's not a thinking problem.",
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
@@ -176,7 +267,7 @@ export async function generateHookVariations({
   if (hooks.length !== 15) {
     throw new Error(`Expected 15 hooks, got ${hooks.length}. Try again.`);
   }
-  return hooks;
+  return distributeHooksToFiveColumns(hooks);
 }
 
 export async function rewriteWinningHook(
@@ -440,6 +531,8 @@ export async function generateCalendarHooks(input: {
         "Each hook must follow the requested hook type and be compatible with the requested format.",
         "Every hook must include a curiosity gap and naturally imply: who this is for, the situation, and the core problem.",
         "Keep each hook concise (around 1 sentence).",
+        "",
+        HOOK_BUILD_GUIDANCE,
         "Return JSON only with this exact shape:",
         "{\"days\":[{\"id\":\"same id\",\"hook\":\"generated hook\"}]}",
         "",

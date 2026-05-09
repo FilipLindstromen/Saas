@@ -16,6 +16,7 @@ import {
   generateTrendingHooks,
   generateWinningHookExpansion,
   rewriteWinningHook,
+  HOOK_COLUMN_LABELS,
   type HookVariation,
 } from "@/lib/generate-hooks";
 import { loadSharedOpenAiKey } from "@/lib/saas-api-keys";
@@ -51,12 +52,6 @@ type SavedItem = ResultItem & {
   platform: string;
   stylePreset: string;
   savedAt: string;
-};
-
-type Collection = {
-  id: string;
-  name: string;
-  items: SavedItem[];
 };
 
 type IdeaItem = {
@@ -168,13 +163,6 @@ type CalendarEntry = {
   locked: boolean;
 };
 
-const HOOK_COLUMNS = [
-  "Ask a question Hook",
-  "Story hook",
-  "Negative hook",
-  "Contrarian view",
-  "Numbered list",
-] as const;
 const CALENDAR_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 function getDefaultCalendarEntries(): CalendarEntry[] {
@@ -383,9 +371,6 @@ export default function HomePage() {
   const [stylePreset, setStylePreset] = useState<(typeof STYLE_PRESETS)[number]>("Casual");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [favorites, setFavorites] = useState<SavedItem[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [activeCollectionId, setActiveCollectionId] = useState<string>("");
-  const [collectionNameInput, setCollectionNameInput] = useState("");
   const [ideaBatches, setIdeaBatches] = useState<IdeaBatch[]>([]);
   const [favoriteIdeas, setFavoriteIdeas] = useState<FavoriteIdea[]>([]);
   const [expansionBatches, setExpansionBatches] = useState<ExpansionBatch[]>([]);
@@ -432,8 +417,6 @@ export default function HomePage() {
         stylePreset: (typeof STYLE_PRESETS)[number];
         results: ResultItem[];
         favorites: SavedItem[];
-        collections: Collection[];
-        activeCollectionId: string;
         ideaBatches: IdeaBatch[];
         favoriteIdeas: FavoriteIdea[];
         expansionBatches: ExpansionBatch[];
@@ -485,8 +468,6 @@ export default function HomePage() {
         setResults(normalized);
       }
       if (Array.isArray(parsed.favorites)) setFavorites(parsed.favorites);
-      if (Array.isArray(parsed.collections)) setCollections(parsed.collections);
-      if (typeof parsed.activeCollectionId === "string") setActiveCollectionId(parsed.activeCollectionId);
       if (Array.isArray(parsed.ideaBatches)) setIdeaBatches(parsed.ideaBatches);
       if (Array.isArray(parsed.favoriteIdeas)) setFavoriteIdeas(parsed.favoriteIdeas);
       if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
@@ -527,8 +508,6 @@ export default function HomePage() {
       stylePreset,
       results,
       favorites,
-      collections,
-      activeCollectionId,
       ideaBatches,
       favoriteIdeas,
       expansionBatches,
@@ -561,8 +540,6 @@ export default function HomePage() {
     stylePreset,
     results,
     favorites,
-    collections,
-    activeCollectionId,
     ideaBatches,
     favoriteIdeas,
     expansionBatches,
@@ -661,48 +638,6 @@ export default function HomePage() {
       setFavorites((prev) => [entry, ...prev]);
     },
     [favorites, hook, platform, stylePreset, targetAudience],
-  );
-
-  const createCollection = useCallback(() => {
-    const name = collectionNameInput.trim();
-    if (!name) return;
-    const duplicate = collections.some((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (duplicate) {
-      setError("Collection with that name already exists.");
-      return;
-    }
-    const next: Collection = { id: makeId(), name, items: [] };
-    setCollections((prev) => [next, ...prev]);
-    setActiveCollectionId(next.id);
-    setCollectionNameInput("");
-    setError(null);
-  }, [collectionNameInput, collections]);
-
-  const addToCollection = useCallback(
-    (item: ResultItem) => {
-      if (!activeCollectionId) {
-        setError("Choose or create a collection first.");
-        return;
-      }
-      const payload: SavedItem = {
-        ...item,
-        sourceHook: hook,
-        targetAudience,
-        platform,
-        stylePreset,
-        savedAt: new Date().toISOString(),
-      };
-      setCollections((prev) =>
-        prev.map((collection) => {
-          if (collection.id !== activeCollectionId) return collection;
-          const exists = collection.items.some((entry) => entry.text.toLowerCase() === payload.text.toLowerCase());
-          if (exists) return collection;
-          return { ...collection, items: [payload, ...collection.items] };
-        }),
-      );
-      setError(null);
-    },
-    [activeCollectionId, hook, platform, stylePreset, targetAudience],
   );
 
   const onRewriteFromWinner = useCallback(
@@ -1118,25 +1053,10 @@ export default function HomePage() {
     [carouselLayouts, platform],
   );
 
-  const activeCollection = useMemo(
-    () => collections.find((collection) => collection.id === activeCollectionId),
-    [activeCollectionId, collections],
-  );
   const hookColumns = useMemo(() => {
-    const byColumn = new Map<string, ResultItem[]>();
-    for (const label of HOOK_COLUMNS) {
-      byColumn.set(label, []);
-    }
-    for (const item of results) {
-      const label = HOOK_COLUMNS.find((value) => value.toLowerCase() === (item.source ?? "").toLowerCase()) ?? HOOK_COLUMNS[0];
-      const bucket = byColumn.get(label);
-      if (bucket && bucket.length < 3) {
-        bucket.push(item);
-      }
-    }
-    return HOOK_COLUMNS.map((label) => ({
+    return HOOK_COLUMN_LABELS.map((label) => ({
       label,
-      items: byColumn.get(label) ?? [],
+      items: results.filter((item) => (item.source ?? "").toLowerCase() === label.toLowerCase()),
     }));
   }, [results]);
   const activeCarouselDraft = useMemo(
@@ -1572,16 +1492,6 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
-                          style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-                          title="Add hook to selected collection"
-                          aria-label="Add hook to selected collection"
-                          onClick={() => addToCollection(item)}
-                        >
-                          🗂️
-                        </button>
-                        <button
-                          type="button"
                           disabled={rewritingId === item.id}
                           className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
@@ -1657,57 +1567,15 @@ export default function HomePage() {
                 </div>
               ) : null}
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <section className="rounded-2xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elevated)" }}>
-                  <h3 className="text-sm font-semibold">Favorites ({favorites.length})</h3>
-                  <div className="mt-2 max-h-48 space-y-2 overflow-auto text-xs text-[var(--text-secondary)]">
-                    {favorites.length === 0 ? <p className="text-[var(--text-tertiary)]">No favorites yet.</p> : null}
-                    {favorites.map((item) => (
-                      <p key={item.id}>{item.text}</p>
-                    ))}
-                  </div>
-                </section>
-                <section className="rounded-2xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elevated)" }}>
-                  <h3 className="text-sm font-semibold">Collections</h3>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      value={collectionNameInput}
-                      onChange={(e) => setCollectionNameInput(e.target.value)}
-                      placeholder="New collection name"
-                      className="w-full rounded-lg border px-3 py-2 text-xs"
-                      style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={createCollection}
-                      className="rounded-lg border px-3 py-2 text-xs"
-                      style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-                    >
-                      Create
-                    </button>
-                  </div>
-                  <select
-                    value={activeCollectionId}
-                    onChange={(e) => setActiveCollectionId(e.target.value)}
-                    className="mt-2 w-full rounded-lg border px-3 py-2 text-xs"
-                    style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
-                  >
-                    <option value="">Select collection</option>
-                    {collections.map((collection) => (
-                      <option key={collection.id} value={collection.id}>
-                        {collection.name} ({collection.items.length})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-2 max-h-40 space-y-2 overflow-auto text-xs text-[var(--text-secondary)]">
-                    {activeCollection?.items.length ? (
-                      activeCollection.items.map((item) => <p key={item.id}>{item.text}</p>)
-                    ) : (
-                      <p className="text-[var(--text-tertiary)]">No saved hooks in this collection.</p>
-                    )}
-                  </div>
-                </section>
-              </div>
+              <section className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-elevated)" }}>
+                <h3 className="text-sm font-semibold">Favorites ({favorites.length})</h3>
+                <div className="mt-2 max-h-48 space-y-2 overflow-auto text-xs text-[var(--text-secondary)]">
+                  {favorites.length === 0 ? <p className="text-[var(--text-tertiary)]">No favorites yet.</p> : null}
+                  {favorites.map((item) => (
+                    <p key={item.id}>{item.text}</p>
+                  ))}
+                </div>
+              </section>
             </>
           ) : null}
 
