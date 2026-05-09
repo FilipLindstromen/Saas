@@ -511,8 +511,10 @@ export default function HomePage() {
   const [showInputSettings, setShowInputSettings] = useState(false);
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(DEFAULT_LANGUAGE);
   const [lighthouseHeadline, setLighthouseHeadline] = useState(DEFAULT_LIGHTHOUSE);
-  const [hook, setHook] = useState("");
-  const [uniquePerspective, setUniquePerspective] = useState("");
+  const [topicOneHook, setTopicOneHook] = useState("");
+  const [topicTwoHook, setTopicTwoHook] = useState("");
+  const [topicOnePerspective, setTopicOnePerspective] = useState("");
+  const [topicTwoPerspective, setTopicTwoPerspective] = useState("");
   const [curiosityLevel, setCuriosityLevel] = useState(0.5);
   const [useContrarianHook, setUseContrarianHook] = useState(false);
   const [useBrandVoiceLock, setUseBrandVoiceLock] = useState(false);
@@ -559,8 +561,12 @@ export default function HomePage() {
         showInputSettings: boolean;
         appLanguage: AppLanguage;
         lighthouseHeadline: string;
-        hook: string;
-        uniquePerspective: string;
+        hook?: string;
+        uniquePerspective?: string;
+        topicOneHook?: string;
+        topicTwoHook?: string;
+        topicOnePerspective?: string;
+        topicTwoPerspective?: string;
         curiosityLevel: number;
         useContrarianHook: boolean;
         useBrandVoiceLock: boolean;
@@ -591,8 +597,16 @@ export default function HomePage() {
       if (typeof parsed.showInputSettings === "boolean") setShowInputSettings(parsed.showInputSettings);
       if (parsed.appLanguage === "English" || parsed.appLanguage === "Swedish") setAppLanguage(parsed.appLanguage);
       if (typeof parsed.lighthouseHeadline === "string") setLighthouseHeadline(parsed.lighthouseHeadline);
-      if (typeof parsed.hook === "string") setHook(parsed.hook);
-      if (typeof parsed.uniquePerspective === "string") setUniquePerspective(parsed.uniquePerspective);
+      const legacyHook = typeof parsed.hook === "string" ? parsed.hook : "";
+      const legacyPerspective = typeof parsed.uniquePerspective === "string" ? parsed.uniquePerspective : "";
+      if (typeof parsed.topicOneHook === "string") setTopicOneHook(parsed.topicOneHook);
+      else if (legacyHook) setTopicOneHook(legacyHook);
+      if (typeof parsed.topicTwoHook === "string") setTopicTwoHook(parsed.topicTwoHook);
+      else if (legacyHook) setTopicTwoHook(legacyHook);
+      if (typeof parsed.topicOnePerspective === "string") setTopicOnePerspective(parsed.topicOnePerspective);
+      else if (legacyPerspective) setTopicOnePerspective(legacyPerspective);
+      if (typeof parsed.topicTwoPerspective === "string") setTopicTwoPerspective(parsed.topicTwoPerspective);
+      else if (legacyPerspective) setTopicTwoPerspective(legacyPerspective);
       if (typeof parsed.curiosityLevel === "number") setCuriosityLevel(Math.max(0, Math.min(1, parsed.curiosityLevel)));
       if (typeof parsed.useContrarianHook === "boolean") setUseContrarianHook(parsed.useContrarianHook);
       if (typeof parsed.useBrandVoiceLock === "boolean") setUseBrandVoiceLock(parsed.useBrandVoiceLock);
@@ -657,8 +671,10 @@ export default function HomePage() {
       showInputSettings,
       appLanguage,
       lighthouseHeadline,
-      hook,
-      uniquePerspective,
+      topicOneHook,
+      topicTwoHook,
+      topicOnePerspective,
+      topicTwoPerspective,
       curiosityLevel,
       useContrarianHook,
       useBrandVoiceLock,
@@ -690,8 +706,10 @@ export default function HomePage() {
     showInputSettings,
     appLanguage,
     lighthouseHeadline,
-    hook,
-    uniquePerspective,
+    topicOneHook,
+    topicTwoHook,
+    topicOnePerspective,
+    topicTwoPerspective,
     curiosityLevel,
     useContrarianHook,
     useBrandVoiceLock,
@@ -726,8 +744,8 @@ export default function HomePage() {
     setError(null);
     setResults([]);
     const apiKey = loadSharedOpenAiKey();
-    if (!hook.trim()) {
-      setError("Enter a hook to transform.");
+    if (!topicOneHook.trim()) {
+      setError("Enter a Topic 1 hook to transform.");
       return;
     }
     setLoading(true);
@@ -737,14 +755,14 @@ export default function HomePage() {
         apiKey,
         language: appLanguage,
         targetAudience,
-        hook,
+        hook: topicOneHook,
         platform,
         stylePreset,
         curiosityLevel,
         useContrarianHook,
         useBrandVoiceLock,
         brandVoiceSample,
-        uniquePerspective,
+        uniquePerspective: topicOnePerspective,
         instructions: hookTransformInstructions,
       });
       setResults(toResultItems(hooks));
@@ -753,13 +771,13 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [appLanguage, brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
+  }, [appLanguage, brandVoiceSample, curiosityLevel, topicOneHook, platform, stylePreset, targetAudience, topicOnePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
     const apiKey = loadSharedOpenAiKey();
-    if (!hook.trim()) {
-      setError("Enter a hook first so I can find matching trend hooks.");
+    if (!topicOneHook.trim()) {
+      setError("Enter a Topic 1 hook first so I can find matching trend hooks.");
       return;
     }
     setLoading(true);
@@ -769,13 +787,13 @@ export default function HomePage() {
         apiKey,
         language: appLanguage,
         targetAudience,
-        hook,
+        hook: topicOneHook,
         stylePreset,
         curiosityLevel,
         useContrarianHook,
         useBrandVoiceLock,
         brandVoiceSample,
-        uniquePerspective,
+        uniquePerspective: topicOnePerspective,
       });
       setResults(toResultItems(hooks));
     } catch (e) {
@@ -784,7 +802,7 @@ export default function HomePage() {
       setLoading(false);
       setLoadingLabel("Generating...");
     }
-  }, [appLanguage, brandVoiceSample, curiosityLevel, hook, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
+  }, [appLanguage, brandVoiceSample, curiosityLevel, topicOneHook, stylePreset, targetAudience, topicOnePerspective, useBrandVoiceLock, useContrarianHook]);
 
   const addToFavorites = useCallback(
     (item: ResultItem) => {
@@ -792,7 +810,7 @@ export default function HomePage() {
       if (exists) return;
       const entry: SavedItem = {
         ...item,
-        sourceHook: hook,
+        sourceHook: topicOneHook,
         targetAudience,
         platform,
         stylePreset,
@@ -800,7 +818,7 @@ export default function HomePage() {
       };
       setFavorites((prev) => [entry, ...prev]);
     },
-    [favorites, hook, platform, stylePreset, targetAudience],
+    [favorites, topicOneHook, platform, stylePreset, targetAudience],
   );
 
   const onRewriteFromWinner = useCallback(
@@ -813,7 +831,7 @@ export default function HomePage() {
           apiKey,
           language: appLanguage,
           targetAudience,
-          hook,
+          hook: topicOneHook,
           winningHook: item.text,
           platform,
           stylePreset,
@@ -821,7 +839,7 @@ export default function HomePage() {
           useContrarianHook,
           useBrandVoiceLock,
           brandVoiceSample,
-          uniquePerspective,
+          uniquePerspective: topicOnePerspective,
           instructions: hookTransformInstructions,
         });
         setResults(toResultItems(hooks));
@@ -831,7 +849,7 @@ export default function HomePage() {
         setRewritingId(null);
       }
     },
-    [appLanguage, brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook],
+    [appLanguage, brandVoiceSample, curiosityLevel, topicOneHook, platform, stylePreset, targetAudience, topicOnePerspective, useBrandVoiceLock, useContrarianHook],
   );
 
   const onGenerateIdeas = useCallback(
@@ -847,7 +865,7 @@ export default function HomePage() {
           targetAudience,
           platform,
           hook: item.text,
-          uniquePerspective,
+          uniquePerspective: topicOnePerspective,
         });
         const nextBatch: IdeaBatch = {
           id: makeId(),
@@ -865,7 +883,7 @@ export default function HomePage() {
         setIdeasLoadingId(null);
       }
     },
-    [appLanguage, platform, targetAudience, uniquePerspective],
+    [appLanguage, platform, targetAudience, topicOnePerspective],
   );
 
   const onExpandWinningHook = useCallback(
@@ -880,7 +898,7 @@ export default function HomePage() {
           targetAudience,
           platform,
           stylePreset,
-          uniquePerspective,
+          uniquePerspective: topicOnePerspective,
           baseHook: item.text,
         });
         const batch: ExpansionBatch = {
@@ -896,7 +914,7 @@ export default function HomePage() {
         setExpandingId(null);
       }
     },
-    [appLanguage, platform, stylePreset, targetAudience, uniquePerspective],
+    [appLanguage, platform, stylePreset, targetAudience, topicOnePerspective],
   );
 
   const onCreateScriptStoryboard = useCallback(
@@ -912,7 +930,7 @@ export default function HomePage() {
           targetAudience,
           useBrandVoiceLock,
           brandVoiceSample,
-          uniquePerspective,
+          uniquePerspective: topicOnePerspective,
           hook: item.text,
         });
         const entry: ScriptBoardEntry = {
@@ -930,7 +948,7 @@ export default function HomePage() {
         setScriptLoadingId(null);
       }
     },
-    [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
+    [appLanguage, brandVoiceSample, platform, targetAudience, topicOnePerspective, useBrandVoiceLock],
   );
 
   const onGenerateAhaFromCalendarDay = useCallback(
@@ -944,6 +962,7 @@ export default function HomePage() {
       setActiveView("aha");
       setIdeasLoadingId(calendarAhaLoadingKey(entry.id));
       const apiKey = loadSharedOpenAiKey();
+      const dayPerspective = (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim();
       try {
         const ideas = await generateContentIdeas({
           apiKey,
@@ -951,7 +970,7 @@ export default function HomePage() {
           targetAudience,
           platform,
           hook: hookText,
-          uniquePerspective,
+          uniquePerspective: dayPerspective,
         });
         const nextBatch: IdeaBatch = {
           id: makeId(),
@@ -969,7 +988,7 @@ export default function HomePage() {
         setIdeasLoadingId(null);
       }
     },
-    [appLanguage, platform, targetAudience, uniquePerspective],
+    [appLanguage, platform, targetAudience, topicOnePerspective, topicTwoPerspective],
   );
 
   const onGenerateScriptFromCalendarDay = useCallback(
@@ -983,6 +1002,7 @@ export default function HomePage() {
       setActiveView("script");
       setScriptLoadingId(calendarScriptLoadingKey(entry.id));
       const apiKey = loadSharedOpenAiKey();
+      const dayPerspective = (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim();
       try {
         const pkg = await generateScriptStoryboard({
           apiKey,
@@ -991,7 +1011,7 @@ export default function HomePage() {
           targetAudience,
           useBrandVoiceLock,
           brandVoiceSample,
-          uniquePerspective,
+          uniquePerspective: dayPerspective,
           hook: hookText,
         });
         const board: ScriptBoardEntry = {
@@ -1009,7 +1029,7 @@ export default function HomePage() {
         setScriptLoadingId(null);
       }
     },
-    [appLanguage, brandVoiceSample, platform, targetAudience, uniquePerspective, useBrandVoiceLock],
+    [appLanguage, brandVoiceSample, platform, targetAudience, topicOnePerspective, topicTwoPerspective, useBrandVoiceLock],
   );
 
   const onNetflixify = useCallback(
@@ -1020,7 +1040,7 @@ export default function HomePage() {
       const apiKey = loadSharedOpenAiKey();
       const seedHook = hookText.trim();
       if (!seedHook) {
-        setError("Enter a hook first to Netflixify.");
+        setError("Enter a Topic 1 hook first to Netflixify.");
         setNetflixifyLoadingId(null);
         return;
       }
@@ -1037,7 +1057,7 @@ export default function HomePage() {
           endingStyle: netflixEndingStyle,
           useBrandVoiceLock,
           brandVoiceSample,
-          uniquePerspective,
+          uniquePerspective: topicOnePerspective,
           hook: seedHook,
         });
         const batch: NetflixifyBatch = {
@@ -1064,7 +1084,7 @@ export default function HomePage() {
       netflixEndingStyle,
       platform,
       targetAudience,
-      uniquePerspective,
+      topicOnePerspective,
       useBrandVoiceLock,
       useContrarianHook,
     ],
@@ -1097,6 +1117,16 @@ export default function HomePage() {
       setError("Set both Topic 1 and Topic 2 in Settings first.");
       return;
     }
+    const topicOneHookValue = topicOneHook.trim();
+    const topicTwoHookValue = topicTwoHook.trim();
+    if (!topicOneHookValue || !topicTwoHookValue) {
+      setError(
+        appLanguage === "Swedish"
+          ? "Fyll i bada amnes-hooks (Amne 1 och Amne 2) ovan."
+          : "Add both Topic 1 and Topic 2 seed hooks above.",
+      );
+      return;
+    }
     setLoading(true);
     setLoadingLabel("Filling calendar...");
     setActiveView("calendar");
@@ -1106,6 +1136,8 @@ export default function HomePage() {
         weekLabel: `Week ${entry.week}`,
         dayLabel: entry.day,
         topic: entry.topicSlot === "topic1" ? topicOneValue : topicTwoValue,
+        seedHook: entry.topicSlot === "topic1" ? topicOneHookValue : topicTwoHookValue,
+        uniquePerspective: (entry.topicSlot === "topic1" ? topicOnePerspective : topicTwoPerspective).trim(),
         hookType: entry.hookType,
         format: entry.format,
       }));
@@ -1113,7 +1145,6 @@ export default function HomePage() {
         apiKey,
         language: appLanguage,
         targetAudience,
-        uniquePerspective,
         curiosityLevel,
         useContrarianHook,
         useBrandVoiceLock,
@@ -1140,7 +1171,10 @@ export default function HomePage() {
     targetAudience,
     topicOne,
     topicTwo,
-    uniquePerspective,
+    topicOneHook,
+    topicTwoHook,
+    topicOnePerspective,
+    topicTwoPerspective,
     useBrandVoiceLock,
     useContrarianHook,
   ]);
@@ -1148,8 +1182,8 @@ export default function HomePage() {
   const onGenerateSymptomStory = useCallback(async () => {
     setError(null);
     const apiKey = loadSharedOpenAiKey();
-    if (!hook.trim()) {
-      setError("Enter a hook first.");
+    if (!topicOneHook.trim()) {
+      setError("Enter a Topic 1 hook first.");
       return;
     }
     setSymptomStoryLoading(true);
@@ -1160,15 +1194,15 @@ export default function HomePage() {
         language: appLanguage,
         targetAudience,
         platform,
-        hook,
+        hook: topicOneHook,
         stylePreset,
-        uniquePerspective,
+        uniquePerspective: topicOnePerspective,
         useBrandVoiceLock,
         brandVoiceSample,
       });
       const batch: SymptomStoryBatch = {
         id: makeId(),
-        hookText: hook,
+        hookText: topicOneHook,
         platform,
         targetAudience,
         createdAt: new Date().toISOString(),
@@ -1180,7 +1214,7 @@ export default function HomePage() {
     } finally {
       setSymptomStoryLoading(false);
     }
-  }, [appLanguage, brandVoiceSample, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock]);
+  }, [appLanguage, brandVoiceSample, topicOneHook, platform, stylePreset, targetAudience, topicOnePerspective, useBrandVoiceLock]);
 
   const createCarouselDraft = useCallback(() => {
     const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
@@ -1451,11 +1485,13 @@ export default function HomePage() {
             </div>
           ) : null}
           <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Hook</span>
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
+              {appLanguage === "Swedish" ? "Hook · Amne 1 (Topic 1)" : "Hook · Topic 1"}
+            </span>
             <textarea
-              value={hook}
-              onChange={(e) => setHook(e.target.value)}
-              rows={4}
+              value={topicOneHook}
+              onChange={(e) => setTopicOneHook(e.target.value)}
+              rows={3}
               placeholder="Can't switch off your thoughts?"
               className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
               style={{
@@ -1466,12 +1502,48 @@ export default function HomePage() {
             />
           </label>
           <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Unique perspective</span>
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
+              {appLanguage === "Swedish" ? "Hook · Amne 2 (Topic 2)" : "Hook · Topic 2"}
+            </span>
             <textarea
-              value={uniquePerspective}
-              onChange={(e) => setUniquePerspective(e.target.value)}
+              value={topicTwoHook}
+              onChange={(e) => setTopicTwoHook(e.target.value)}
               rows={3}
-              placeholder="Optional: Contrarian angle, uncommon insight, or specific belief"
+              placeholder={appLanguage === "Swedish" ? "Andra amnets vinkel…" : "Second topic angle…"}
+              className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
+              style={{
+                borderColor: "var(--border-default)",
+                background: "var(--bg-tertiary)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </label>
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
+              {appLanguage === "Swedish" ? "Unikt perspektiv · Amne 1" : "Unique perspective · Topic 1"}
+            </span>
+            <textarea
+              value={topicOnePerspective}
+              onChange={(e) => setTopicOnePerspective(e.target.value)}
+              rows={2}
+              placeholder={appLanguage === "Swedish" ? "Valfritt vinkel for amne 1" : "Optional angle for topic 1"}
+              className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
+              style={{
+                borderColor: "var(--border-default)",
+                background: "var(--bg-tertiary)",
+                color: "var(--text-primary)",
+              }}
+            />
+          </label>
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">
+              {appLanguage === "Swedish" ? "Unikt perspektiv · Amne 2" : "Unique perspective · Topic 2"}
+            </span>
+            <textarea
+              value={topicTwoPerspective}
+              onChange={(e) => setTopicTwoPerspective(e.target.value)}
+              rows={2}
+              placeholder={appLanguage === "Swedish" ? "Valfritt vinkel for amne 2" : "Optional angle for topic 2"}
               className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
               style={{
                 borderColor: "var(--border-default)",
@@ -1605,7 +1677,7 @@ export default function HomePage() {
           <button
             type="button"
             disabled={netflixifyLoadingId === "input-hook"}
-            onClick={() => void onNetflixify(hook, "input-hook")}
+            onClick={() => void onNetflixify(topicOneHook, "input-hook")}
             className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: "var(--border-default)",

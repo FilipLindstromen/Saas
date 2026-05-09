@@ -490,6 +490,10 @@ export type CalendarHookDayInput = {
   weekLabel: string;
   dayLabel: string;
   topic: string;
+  /** Seed line / angle for this topic—model expands into the calendar hook, not copy-paste. */
+  seedHook: string;
+  /** Perspective for this topic only; optional. */
+  uniquePerspective?: string;
   hookType: string;
   format: string;
 };
@@ -498,7 +502,6 @@ export async function generateCalendarHooks(input: {
   apiKey: string;
   language?: AppLanguage;
   targetAudience: string;
-  uniquePerspective?: string;
   curiosityLevel?: number;
   useContrarianHook?: boolean;
   useBrandVoiceLock?: boolean;
@@ -521,13 +524,14 @@ export async function generateCalendarHooks(input: {
       content: [
         languageDirective(input.language),
         `Target audience: ${input.targetAudience}`,
-        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
         `Curiosity level (0-1): ${Math.max(0, Math.min(1, input.curiosityLevel ?? 0.5))}`,
         `Use contrarian hook angle: ${input.useContrarianHook ? "yes" : "no"}`,
         ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
         "",
         "Generate one hook per calendar day listed below.",
-        "Each hook must follow the requested hook type and be compatible with the requested format.",
+        "For each day: use seedHook as the core angle to riff from (same topic lane)—write a NEW hook; do not paste or lightly rephrase seedHook.",
+        "When uniquePerspective is non-empty for that day, fold it into the hook naturally. When it is empty, rely on topic label + seedHook only.",
+        "Each output hook must follow the requested hook type and be compatible with the requested format.",
         "Every hook must include a curiosity gap; imply who, situation, and tension in one oral line—no checklist phrasing.",
         "Keep each hook concise (one sentence or two very short ones). Sound human, not like a template.",
         "",
@@ -535,8 +539,11 @@ export async function generateCalendarHooks(input: {
         "Return JSON only with this exact shape:",
         "{\"days\":[{\"id\":\"same id\",\"hook\":\"generated hook\"}]}",
         "",
-        "Calendar day requests:",
-        ...input.days.map((day) => `- id=${day.id} | ${day.weekLabel} ${day.dayLabel} | topic=${day.topic} | hookType=${day.hookType} | format=${day.format}`),
+        "Calendar day requests (one block per line):",
+        ...input.days.map((day) => {
+          const pers = day.uniquePerspective?.trim() ? ` | perspective=${day.uniquePerspective.trim()}` : "";
+          return `- id=${day.id} | ${day.weekLabel} ${day.dayLabel} | topic=${day.topic} | seedHook=${day.seedHook.trim()}${pers} | hookType=${day.hookType} | format=${day.format}`;
+        }),
       ].join("\n"),
     },
   ]);
