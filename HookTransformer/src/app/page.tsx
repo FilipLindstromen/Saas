@@ -10,7 +10,6 @@ import {
   generateHookVariations,
   generateNetflixifyScripts,
   generateSymptomStoryBlocks,
-  recalculateHookScores,
   generateScriptStoryboard,
   generateTrendingHooks,
   generateWinningHookExpansion,
@@ -155,6 +154,14 @@ type CarouselDraft = {
   createdAt: string;
   slides: CarouselSlide[];
 };
+
+const HOOK_COLUMNS = [
+  "Ask a question Hook",
+  "Story hook",
+  "Negative hook",
+  "Contrarian view",
+  "Numbered list",
+] as const;
 
 function getDefaultCarouselLayouts(): CarouselLayout[] {
   return [
@@ -304,13 +311,10 @@ function makeId(): string {
 }
 
 function toResultItems(hooks: HookVariation[]): ResultItem[] {
-  return hooks
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .map((item) => ({
-      ...item,
-      id: makeId(),
-    }));
+  return hooks.map((item) => ({
+    ...item,
+    id: makeId(),
+  }));
 }
 
 function toExpansionGroups(pack: ExpansionPack) {
@@ -432,7 +436,7 @@ export default function HomePage() {
               : "Strong situational relevance and clear emotional payoff can improve retention.",
           improveTip: item.improveTip || "Add a more specific situation detail to make it feel even more real.",
         }));
-        setResults(normalized.slice().sort((a, b) => b.score - a.score));
+        setResults(normalized);
       }
       if (Array.isArray(parsed.favorites)) setFavorites(parsed.favorites);
       if (Array.isArray(parsed.collections)) setCollections(parsed.collections);
@@ -553,49 +557,6 @@ export default function HomePage() {
       setLoading(false);
     }
   }, [appLanguage, brandVoiceSample, curiosityLevel, hook, platform, stylePreset, targetAudience, uniquePerspective, useBrandVoiceLock, useContrarianHook]);
-
-  const onRecalculateScores = useCallback(async () => {
-    setError(null);
-    if (results.length === 0) {
-      setError("Generate hooks first, then recalculate scores.");
-      return;
-    }
-    const apiKey = loadSharedOpenAiKey();
-    setLoading(true);
-    setLoadingLabel("Recalculating scores...");
-    try {
-      const rescored = await recalculateHookScores({
-        apiKey,
-        language: appLanguage,
-        targetAudience,
-        platform,
-        useBrandVoiceLock,
-        brandVoiceSample,
-        hooks: results.map((item) => item.text),
-      });
-      const byText = new Map(rescored.map((item) => [item.text, item]));
-      const next = results
-        .map((item) => {
-          const scoreData = byText.get(item.text);
-          return scoreData
-            ? {
-                ...item,
-                score: scoreData.score,
-                reasons: scoreData.reasons,
-                improveTip: scoreData.improveTip,
-              }
-            : item;
-        })
-        .slice()
-        .sort((a, b) => b.score - a.score);
-      setResults(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to recalculate scores.");
-    } finally {
-      setLoading(false);
-      setLoadingLabel("Generating...");
-    }
-  }, [appLanguage, brandVoiceSample, platform, results, targetAudience, useBrandVoiceLock]);
 
   const onFindTrendingHooks = useCallback(async () => {
     setError(null);
@@ -1037,6 +998,23 @@ export default function HomePage() {
     () => collections.find((collection) => collection.id === activeCollectionId),
     [activeCollectionId, collections],
   );
+  const hookColumns = useMemo(() => {
+    const byColumn = new Map<string, ResultItem[]>();
+    for (const label of HOOK_COLUMNS) {
+      byColumn.set(label, []);
+    }
+    for (const item of results) {
+      const label = HOOK_COLUMNS.find((value) => value.toLowerCase() === (item.source ?? "").toLowerCase()) ?? HOOK_COLUMNS[0];
+      const bucket = byColumn.get(label);
+      if (bucket && bucket.length < 3) {
+        bucket.push(item);
+      }
+    }
+    return HOOK_COLUMNS.map((label) => ({
+      label,
+      items: byColumn.get(label) ?? [],
+    }));
+  }, [results]);
   const activeCarouselDraft = useMemo(
     () => carouselDrafts.find((draft) => draft.id === activeCarouselId) ?? carouselDrafts[0],
     [activeCarouselId, carouselDrafts],
@@ -1288,7 +1266,7 @@ export default function HomePage() {
             className="mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: "var(--accent-gradient)", boxShadow: "var(--shadow-sm)" }}
           >
-            {loading ? loadingLabel : appLanguage === "Swedish" ? "Generera 10 varianter" : "Generate 10 versions"}
+            {loading ? loadingLabel : appLanguage === "Swedish" ? "Generera 15 hooks" : "Generate 15 hooks"}
           </button>
           <button
             type="button"
@@ -1302,19 +1280,6 @@ export default function HomePage() {
             }}
           >
             {loading && loadingLabel === "Finding trends..." ? (appLanguage === "Swedish" ? "Hittar trender..." : "Finding trends...") : appLanguage === "Swedish" ? "Hitta trendande hooks" : "Find trending hooks"}
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void onRecalculateScores()}
-            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-            style={{
-              borderColor: "var(--border-default)",
-              background: "var(--bg-tertiary)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            {loading && loadingLabel === "Recalculating scores..." ? (appLanguage === "Swedish" ? "Raknar om poang..." : "Recalculating scores...") : appLanguage === "Swedish" ? "Rakna om hook-poang" : "Recalculate hook scores"}
           </button>
           <button
             type="button"
@@ -1401,8 +1366,8 @@ export default function HomePage() {
                 </div>
               ) : null}
               {loading ? (
-                <div className="grid gap-2 2xl:grid-cols-3">
-                  {Array.from({ length: 10 }).map((_, i) => (
+                <div className="grid gap-2 xl:grid-cols-3 2xl:grid-cols-5">
+                  {Array.from({ length: 15 }).map((_, i) => (
                     <div
                       key={i}
                       className="h-20 animate-pulse rounded-2xl border"
@@ -1412,38 +1377,32 @@ export default function HomePage() {
                 </div>
               ) : null}
               {!loading && results.length > 0 ? (
-                <ul className="grid list-none gap-2 p-0">
-                  {results.map((item, i) => (
-                    <li
-                      key={item.id}
-                      className="flex flex-col rounded-xl border p-2.5"
+                <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-5">
+                  {hookColumns.map((column) => (
+                    <section
+                      key={column.label}
+                      className="rounded-xl border p-2"
                       style={{
                         borderColor: "var(--border-subtle)",
                         background: "var(--bg-elevated)",
                         boxShadow: "var(--shadow-sm)",
                       }}
                     >
-                      <span className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
-                        #{i + 1}
-                        {item.source ? (
-                          <span className="ml-2 rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--border-default)" }}>
-                            {item.source}
-                          </span>
-                        ) : null}
-                      </span>
-                      <textarea
-                        value={item.text}
-                        onChange={(e) => onUpdateHookText(item.id, e.target.value)}
-                        rows={1}
-                        className="flex-1 w-full resize-y px-0.5 py-0.5 text-lg font-medium leading-snug outline-none sm:text-xl"
-                        style={{
-                          color: "var(--text-secondary)",
-                        }}
-                      />
-                      <div className="mt-1.5 px-0.5 py-0.5 text-xs">
-                        <p className="font-semibold text-[var(--text-primary)]">Hook score: {item.score}/100</p>
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-primary)]">{column.label}</h3>
+                      <ul className="list-none space-y-2 p-0">
+                        {column.items.map((item, i) => (
+                          <li key={item.id} className="rounded-lg border p-2" style={{ borderColor: "var(--border-subtle)", background: "var(--bg-secondary)" }}>
+                            <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">#{i + 1}</span>
+                            <textarea
+                              value={item.text}
+                              onChange={(e) => onUpdateHookText(item.id, e.target.value)}
+                              rows={3}
+                              className="flex-1 w-full resize-y px-0.5 py-0.5 text-base font-medium leading-snug outline-none"
+                              style={{
+                                color: "var(--text-secondary)",
+                              }}
+                            />
+                            <div className="mt-1.5 flex flex-wrap gap-1">
                         <button
                           type="button"
                           className="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
@@ -1541,10 +1500,16 @@ export default function HomePage() {
                         >
                           Design carousel
                         </button>
-                      </div>
-                    </li>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      {column.items.length === 0 ? (
+                        <p className="text-xs text-[var(--text-tertiary)]">No hooks yet in this column.</p>
+                      ) : null}
+                    </section>
                   ))}
-                </ul>
+                </div>
               ) : null}
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -28,6 +28,29 @@ const VideoEditingMode = lazy(() => import('./components/VideoEditingMode'))
 const getProjectFolderStorage = () => import('@shared/projectFolderStorage')
 
 function App() {
+  const makeDefaultSlides = () => ([
+    {
+      id: 1,
+      content: 'IF YOU WANT TO FEEL CALM & IN CONTROL',
+      subtitle: '',
+      imageUrl: '',
+      backgroundVideoUrl: '',
+      layout: 'default',
+      gradientStrength: 0.7,
+      flipHorizontal: false,
+      backgroundOpacity: 0.6,
+      gradientFlipped: false,
+      imageScale: 1.0,
+      imagePositionX: 50,
+      imagePositionY: 50,
+      textHeadingLevel: null,
+      subtitleHeadingLevel: null,
+      infographicProjectId: undefined,
+      infographicTabId: undefined,
+      graphicOverlays: [],
+    },
+  ])
+
   // Load slides and selectedSlideId from localStorage on initial mount
   const loadSavedData = () => {
     try {
@@ -66,10 +89,7 @@ function App() {
     }
     
     // Default template if no saved data
-    return {
-      slides: [{ id: 1, content: 'IF YOU WANT TO FEEL CALM & IN CONTROL', subtitle: '', imageUrl: '', backgroundVideoUrl: '', layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null, infographicProjectId: undefined, infographicTabId: undefined, graphicOverlays: [] }],
-      selectedId: 1
-    }
+    return { slides: makeDefaultSlides(), selectedId: 1 }
   }
 
   const initialData = loadSavedData()
@@ -82,7 +102,21 @@ function App() {
     const saved = localStorage.getItem('pitchDeckChapters')
     if (saved) {
       try {
-        return JSON.parse(saved)
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const normalized = parsed
+            .map((chapter, index) => {
+              const chapterId = Number(chapter?.id)
+              const chapterSlides = Array.isArray(chapter?.slides) ? chapter.slides : []
+              return {
+                id: Number.isFinite(chapterId) ? chapterId : index + 1,
+                name: typeof chapter?.name === 'string' && chapter.name.trim() ? chapter.name : `Chapter ${index + 1}`,
+                slides: chapterSlides,
+              }
+            })
+            .filter((chapter) => Array.isArray(chapter.slides) && chapter.slides.length > 0)
+          if (normalized.length > 0) return normalized
+        }
       } catch (e) {
         console.error('Error parsing chapters:', e)
       }
@@ -96,14 +130,20 @@ function App() {
   })
   const [currentChapterId, setCurrentChapterId] = useState(() => {
     const saved = localStorage.getItem('pitchDeckCurrentChapterId')
-    return saved ? parseInt(saved, 10) : 1
+    const parsed = saved ? parseInt(saved, 10) : NaN
+    return Number.isFinite(parsed) ? parsed : 1
   })
   const [slides, setSlides] = useState(() => {
     const currentChapter = chapters.find(c => c.id === currentChapterId) || chapters[0]
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState('edit') // 'plan', 'edit', 'present', 'record', 'video-editing'
+  const [mode, setMode] = useState(() => {
+    const saved = localStorage.getItem('pitchDeckMode')
+    return saved === 'edit' || saved === 'present' || saved === 'record' || saved === 'video-editing' || saved === 'plan'
+      ? saved
+      : 'plan'
+  }) // 'plan', 'edit', 'present', 'record', 'video-editing'
   const lastRecordingBlobRef = useRef(null)
   const analyzeVideoInputRef = useRef(null)
   const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
@@ -292,6 +332,11 @@ function App() {
       analyzeWithAI: false
     }
   })
+
+  useEffect(() => {
+    if (mode === 'present' || mode === 'record') return
+    localStorage.setItem('pitchDeckMode', mode)
+  }, [mode])
 
   // Preload FFmpeg after mount (dynamic import keeps ffmpeg out of the initial sync module graph)
   useEffect(() => {

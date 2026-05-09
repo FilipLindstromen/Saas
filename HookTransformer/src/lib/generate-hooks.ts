@@ -141,12 +141,20 @@ export async function generateHookVariations({
     `Use contrarian hook angle: ${useContrarianHook ? "yes" : "no"}`,
     ...(useBrandVoiceLock && brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${brandVoiceSample.trim()}`] : []),
     "",
-    "Return exactly 10 transformed hooks as JSON with shape:",
+    "Return exactly 15 transformed hooks as JSON with shape:",
     "{\"hooks\":[{\"text\":\"...\",\"score\":0-100,\"performanceScore\":0-100,\"performanceReason\":\"one short reason\",\"reasons\":[\"short reason 1\",\"short reason 2\"],\"improveTip\":\"one short suggestion\"}]}",
+    "Use exactly these 5 hook types and generate exactly 3 hooks per type (15 total):",
+    "- Ask a question Hook",
+    "- Story hook",
+    "- Negative hook",
+    "- Contrarian view",
+    "- Numbered list",
+    "Set source to the exact type label for each hook.",
     "Each hook must clearly and naturally include:",
     "- who it is for",
     "- a real-life situation/context",
     "- the core problem",
+    "Every hook must create a clear curiosity gap (open loop) without sounding clickbait.",
     "Write like everyday speech, not formal or robotic copy.",
     "Prefer phrasing similar to: If your mind won't stop after work, it's not a thinking problem.",
     "Score should reflect how strong and natural the hook feels for the given audience and platform.",
@@ -165,8 +173,8 @@ export async function generateHookVariations({
   ]);
 
   const hooks = normalizeHooks(parsed.hooks);
-  if (hooks.length !== 10) {
-    throw new Error(`Expected 10 hooks, got ${hooks.length}. Try again.`);
+  if (hooks.length !== 15) {
+    throw new Error(`Expected 15 hooks, got ${hooks.length}. Try again.`);
   }
   return hooks;
 }
