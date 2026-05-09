@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import hookTransformInstructions from "@/data/hook-transform-instructions.json";
 import {
   type AppLanguage,
+  type CalendarHookDayInput,
   type ExpansionPack,
   type ScriptStoryboard,
   generateContentIdeas,
+  generateCalendarHooks,
   generateHookVariations,
   generateNetflixifyScripts,
   generateSymptomStoryBlocks,
@@ -155,6 +157,17 @@ type CarouselDraft = {
   slides: CarouselSlide[];
 };
 
+type CalendarEntry = {
+  id: string;
+  week: number;
+  day: string;
+  topicSlot: "topic1" | "topic2";
+  hookType: string;
+  format: string;
+  hookText: string;
+  locked: boolean;
+};
+
 const HOOK_COLUMNS = [
   "Ask a question Hook",
   "Story hook",
@@ -162,6 +175,28 @@ const HOOK_COLUMNS = [
   "Contrarian view",
   "Numbered list",
 ] as const;
+const CALENDAR_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+function getDefaultCalendarEntries(): CalendarEntry[] {
+  const hookTypes = ["Question hook", "Story hook", "Negative hook", "Contrarian hook", "Number hook"];
+  const formats = ["Direct to camera", "Carousel", "Broll + Text"];
+  const entries: CalendarEntry[] = [];
+  for (let week = 1; week <= 4; week += 1) {
+    CALENDAR_DAYS.forEach((day, dayIndex) => {
+      entries.push({
+        id: makeId(),
+        week,
+        day,
+        topicSlot: (week + dayIndex) % 2 === 0 ? "topic1" : "topic2",
+        hookType: hookTypes[(week + dayIndex) % hookTypes.length],
+        format: formats[(week * 2 + dayIndex) % formats.length],
+        hookText: "",
+        locked: false,
+      });
+    });
+  }
+  return entries;
+}
 
 function getDefaultCarouselLayouts(): CarouselLayout[] {
   return [
@@ -326,10 +361,13 @@ function toExpansionGroups(pack: ExpansionPack) {
 }
 
 export default function HomePage() {
-  const VIEWS = ["variants", "aha", "script", "carousel", "symptom"] as const;
+  const VIEWS = ["variants", "aha", "script", "carousel", "symptom", "calendar"] as const;
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
+  const [topicOne, setTopicOne] = useState("Topic 1");
+  const [topicTwo, setTopicTwo] = useState("Topic 2");
+  const [showInputSettings, setShowInputSettings] = useState(false);
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(DEFAULT_LANGUAGE);
   const [lighthouseHeadline, setLighthouseHeadline] = useState(DEFAULT_LIGHTHOUSE);
   const [hook, setHook] = useState("");
@@ -367,6 +405,7 @@ export default function HomePage() {
   const [netflixifyLoadingId, setNetflixifyLoadingId] = useState<string | null>(null);
   const [symptomStoryLoading, setSymptomStoryLoading] = useState(false);
   const [activeView, setActiveView] = useState<View>("variants");
+  const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>(getDefaultCalendarEntries);
   const [layoutDrag, setLayoutDrag] = useState<{ layoutId: string; target: "headline" | "body" } | null>(null);
 
   useEffect(() => {
@@ -375,6 +414,9 @@ export default function HomePage() {
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
         targetAudience: string;
+        topicOne: string;
+        topicTwo: string;
+        showInputSettings: boolean;
         appLanguage: AppLanguage;
         lighthouseHeadline: string;
         hook: string;
@@ -401,9 +443,13 @@ export default function HomePage() {
         carouselLayouts: CarouselLayout[];
         carouselDrafts: CarouselDraft[];
         activeCarouselId: string;
+        calendarEntries: CalendarEntry[];
       }>;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (typeof parsed.targetAudience === "string") setTargetAudience(parsed.targetAudience);
+      if (typeof parsed.topicOne === "string") setTopicOne(parsed.topicOne);
+      if (typeof parsed.topicTwo === "string") setTopicTwo(parsed.topicTwo);
+      if (typeof parsed.showInputSettings === "boolean") setShowInputSettings(parsed.showInputSettings);
       if (parsed.appLanguage === "English" || parsed.appLanguage === "Swedish") setAppLanguage(parsed.appLanguage);
       if (typeof parsed.lighthouseHeadline === "string") setLighthouseHeadline(parsed.lighthouseHeadline);
       if (typeof parsed.hook === "string") setHook(parsed.hook);
@@ -452,6 +498,9 @@ export default function HomePage() {
       }
       if (Array.isArray(parsed.carouselDrafts)) setCarouselDrafts(parsed.carouselDrafts);
       if (typeof parsed.activeCarouselId === "string") setActiveCarouselId(parsed.activeCarouselId);
+      if (Array.isArray(parsed.calendarEntries) && parsed.calendarEntries.length > 0) {
+        setCalendarEntries(parsed.calendarEntries);
+      }
     } catch {
       // ignore invalid local storage payload
     }
@@ -460,6 +509,9 @@ export default function HomePage() {
   useEffect(() => {
     const payload = {
       targetAudience,
+      topicOne,
+      topicTwo,
+      showInputSettings,
       appLanguage,
       lighthouseHeadline,
       hook,
@@ -486,10 +538,14 @@ export default function HomePage() {
       carouselLayouts,
       carouselDrafts,
       activeCarouselId,
+      calendarEntries,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [
     targetAudience,
+    topicOne,
+    topicTwo,
+    showInputSettings,
     appLanguage,
     lighthouseHeadline,
     hook,
@@ -516,6 +572,7 @@ export default function HomePage() {
     carouselLayouts,
     carouselDrafts,
     activeCarouselId,
+    calendarEntries,
   ]);
 
   useEffect(() => {
@@ -840,6 +897,73 @@ export default function HomePage() {
     setResults((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
   }, []);
 
+  const updateCalendarEntry = useCallback((id: string, patch: Partial<CalendarEntry>) => {
+    setCalendarEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
+  }, []);
+
+  const onFillCalendar = useCallback(async () => {
+    setError(null);
+    const apiKey = loadSharedOpenAiKey();
+    const unlocked = calendarEntries.filter((entry) => !entry.locked);
+    if (unlocked.length === 0) {
+      setError("All days are locked. Unlock at least one day to regenerate.");
+      setActiveView("calendar");
+      return;
+    }
+    const topicOneValue = topicOne.trim();
+    const topicTwoValue = topicTwo.trim();
+    if (!topicOneValue || !topicTwoValue) {
+      setError("Set both Topic 1 and Topic 2 in Settings first.");
+      return;
+    }
+    setLoading(true);
+    setLoadingLabel("Filling calendar...");
+    setActiveView("calendar");
+    try {
+      const dayInputs: CalendarHookDayInput[] = unlocked.map((entry) => ({
+        id: entry.id,
+        weekLabel: `Week ${entry.week}`,
+        dayLabel: entry.day,
+        topic: entry.topicSlot === "topic1" ? topicOneValue : topicTwoValue,
+        hookType: entry.hookType,
+        format: entry.format,
+      }));
+      const generated = await generateCalendarHooks({
+        apiKey,
+        language: appLanguage,
+        targetAudience,
+        uniquePerspective,
+        curiosityLevel,
+        useContrarianHook,
+        useBrandVoiceLock,
+        brandVoiceSample,
+        days: dayInputs,
+      });
+      const byId = new Map(generated.map((row) => [row.id, row.hook]));
+      setCalendarEntries((prev) =>
+        prev.map((entry) =>
+          entry.locked ? entry : { ...entry, hookText: byId.get(entry.id) ?? entry.hookText },
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fill calendar.");
+    } finally {
+      setLoading(false);
+      setLoadingLabel("Generating...");
+    }
+  }, [
+    appLanguage,
+    brandVoiceSample,
+    calendarEntries,
+    curiosityLevel,
+    targetAudience,
+    topicOne,
+    topicTwo,
+    uniquePerspective,
+    useBrandVoiceLock,
+    useContrarianHook,
+  ]);
+
   const onGenerateSymptomStory = useCallback(async () => {
     setError(null);
     const apiKey = loadSharedOpenAiKey();
@@ -1108,40 +1232,46 @@ export default function HomePage() {
           }}
         >
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{appLanguage === "Swedish" ? "Inmatning" : "Inputs"}</h2>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Platform</span>
-            <select
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value as (typeof PLATFORMS)[number])}
-              className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
-              style={{
-                borderColor: "var(--border-default)",
-                background: "var(--bg-tertiary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {PLATFORMS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="mt-3 block">
-            <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Target audience</span>
-            <textarea
-              value={targetAudience}
-              onChange={(e) => setTargetAudience(e.target.value)}
-              rows={3}
-              className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2"
-              style={{
-                borderColor: "var(--border-default)",
-                background: "var(--bg-tertiary)",
-                color: "var(--text-primary)",
-                boxShadow: "none",
-              }}
-            />
-          </label>
+          <button
+            type="button"
+            onClick={() => setShowInputSettings((prev) => !prev)}
+            className="w-full rounded-xl border px-4 py-2.5 text-left text-sm font-semibold transition-colors"
+            style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+          >
+            {showInputSettings ? "Hide settings" : "Settings"}
+          </button>
+          {showInputSettings ? (
+            <div className="mt-2 rounded-xl border p-2.5" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Topic 1</span>
+                <input
+                  value={topicOne}
+                  onChange={(e) => setTopicOne(e.target.value)}
+                  className="w-full rounded-lg border px-2.5 py-2 text-xs outline-none"
+                  style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+                />
+              </label>
+              <label className="mt-2 block">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Topic 2</span>
+                <input
+                  value={topicTwo}
+                  onChange={(e) => setTopicTwo(e.target.value)}
+                  className="w-full rounded-lg border px-2.5 py-2 text-xs outline-none"
+                  style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+                />
+              </label>
+              <label className="mt-2 block">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Target audience</span>
+                <textarea
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  rows={3}
+                  className="w-full resize-y rounded-lg border px-2.5 py-2 text-xs outline-none"
+                  style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+                />
+              </label>
+            </div>
+          ) : null}
           <label className="mt-3 block">
             <span className="mb-1.5 block text-sm font-medium text-[var(--text-secondary)]">Hook</span>
             <textarea
@@ -1271,6 +1401,19 @@ export default function HomePage() {
           <button
             type="button"
             disabled={loading}
+            onClick={() => void onFillCalendar()}
+            className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: "var(--border-default)",
+              background: "var(--bg-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {loading && loadingLabel === "Filling calendar..." ? "Filling..." : "Fill the calendar"}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
             onClick={() => void onFindTrendingHooks()}
             className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
@@ -1333,7 +1476,9 @@ export default function HomePage() {
                       ? appLanguage === "Swedish" ? "Manus" : "Script"
                       : view === "carousel"
                         ? appLanguage === "Swedish" ? "Karusell" : "Carousel"
-                        : appLanguage === "Swedish" ? "Symtomstory" : "Symptom story";
+                        : view === "symptom"
+                          ? appLanguage === "Swedish" ? "Symtomstory" : "Symptom story"
+                          : appLanguage === "Swedish" ? "Kalender" : "Calendar";
               const isActive = activeView === view;
               return (
                 <button
@@ -2148,6 +2293,82 @@ export default function HomePage() {
                     </div>
                   </div>
                 </section>
+              </div>
+            </>
+          ) : null}
+
+          {activeView === "calendar" ? (
+            <>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                {appLanguage === "Swedish" ? "Innehallskalender" : "Content calendar"}
+              </h2>
+              <div className="mt-3 space-y-3">
+                {Array.from({ length: 4 }).map((_, weekIdx) => {
+                  const week = weekIdx + 1;
+                  const weekEntries = calendarEntries.filter((entry) => entry.week === week);
+                  return (
+                    <section key={`week-${week}`} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
+                      <h3 className="mb-2 text-sm font-semibold text-[var(--text-primary)]">{`Week ${week}`}</h3>
+                      <div className="grid gap-2 xl:grid-cols-4 2xl:grid-cols-7">
+                        {weekEntries.map((entry) => (
+                          <div key={entry.id} className="rounded-lg border p-2" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
+                            <div className="mb-1.5 flex items-center justify-between">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{entry.day}</p>
+                              <button
+                                type="button"
+                                className="rounded-md border px-1.5 py-0.5 text-[10px]"
+                                style={{ borderColor: "var(--border-default)", color: entry.locked ? "#facc15" : "var(--text-tertiary)" }}
+                                onClick={() => updateCalendarEntry(entry.id, { locked: !entry.locked })}
+                              >
+                                {entry.locked ? "Locked" : "Lock"}
+                              </button>
+                            </div>
+                            <label className="block text-[10px] text-[var(--text-tertiary)]">
+                              Topic
+                              <select
+                                value={entry.topicSlot}
+                                onChange={(e) => updateCalendarEntry(entry.id, { topicSlot: e.target.value as "topic1" | "topic2" })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              >
+                                <option value="topic1">{topicOne || "Topic 1"}</option>
+                                <option value="topic2">{topicTwo || "Topic 2"}</option>
+                              </select>
+                            </label>
+                            <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
+                              Hook type
+                              <input
+                                value={entry.hookType}
+                                onChange={(e) => updateCalendarEntry(entry.id, { hookType: e.target.value })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                            </label>
+                            <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
+                              Format
+                              <input
+                                value={entry.format}
+                                onChange={(e) => updateCalendarEntry(entry.id, { format: e.target.value })}
+                                className="mt-0.5 w-full rounded-md border px-2 py-1 text-xs"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                            </label>
+                            <label className="mt-1 block text-[10px] text-[var(--text-tertiary)]">
+                              Hook
+                              <textarea
+                                value={entry.hookText}
+                                onChange={(e) => updateCalendarEntry(entry.id, { hookText: e.target.value })}
+                                rows={4}
+                                className="mt-0.5 w-full resize-y rounded-md border px-2 py-1 text-xs leading-relaxed"
+                                style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
             </>
           ) : null}

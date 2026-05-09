@@ -394,6 +394,75 @@ export type ScriptStoryboard = {
   ctaOptions: string[];
 };
 
+export type CalendarHookDayInput = {
+  id: string;
+  weekLabel: string;
+  dayLabel: string;
+  topic: string;
+  hookType: string;
+  format: string;
+};
+
+export async function generateCalendarHooks(input: {
+  apiKey: string;
+  language?: AppLanguage;
+  targetAudience: string;
+  uniquePerspective?: string;
+  curiosityLevel?: number;
+  useContrarianHook?: boolean;
+  useBrandVoiceLock?: boolean;
+  brandVoiceSample?: string;
+  days: CalendarHookDayInput[];
+}): Promise<Array<{ id: string; hook: string }>> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+  if (!Array.isArray(input.days) || input.days.length === 0) return [];
+
+  const parsed = await requestJson<{ days?: unknown }>(trimmedKey, [
+    {
+      role: "system",
+      content:
+        "You create social media hooks for a content calendar. Write plain, everyday language and always include a curiosity gap. No buzzwords, no robotic tone.",
+    },
+    {
+      role: "user",
+      content: [
+        languageDirective(input.language),
+        `Target audience: ${input.targetAudience}`,
+        ...(input.uniquePerspective?.trim() ? [`Unique perspective: ${input.uniquePerspective.trim()}`] : []),
+        `Curiosity level (0-1): ${Math.max(0, Math.min(1, input.curiosityLevel ?? 0.5))}`,
+        `Use contrarian hook angle: ${input.useContrarianHook ? "yes" : "no"}`,
+        ...(input.useBrandVoiceLock && input.brandVoiceSample?.trim() ? [`Brand voice lock sample:\n${input.brandVoiceSample.trim()}`] : []),
+        "",
+        "Generate one hook per calendar day listed below.",
+        "Each hook must follow the requested hook type and be compatible with the requested format.",
+        "Every hook must include a curiosity gap and naturally imply: who this is for, the situation, and the core problem.",
+        "Keep each hook concise (around 1 sentence).",
+        "Return JSON only with this exact shape:",
+        "{\"days\":[{\"id\":\"same id\",\"hook\":\"generated hook\"}]}",
+        "",
+        "Calendar day requests:",
+        ...input.days.map((day) => `- id=${day.id} | ${day.weekLabel} ${day.dayLabel} | topic=${day.topic} | hookType=${day.hookType} | format=${day.format}`),
+      ].join("\n"),
+    },
+  ]);
+
+  const rows = Array.isArray(parsed.days) ? parsed.days : [];
+  const normalized = rows
+    .map((row) => {
+      const item = row as { id?: unknown; hook?: unknown };
+      const id = String(item.id ?? "").trim();
+      const hook = String(item.hook ?? "").trim();
+      if (!id || !hook) return null;
+      return { id, hook };
+    })
+    .filter((item): item is { id: string; hook: string } => item !== null);
+
+  return normalized;
+}
+
 export async function generateSymptomStoryBlocks(input: {
   apiKey: string;
   language?: AppLanguage;
