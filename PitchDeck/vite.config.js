@@ -40,6 +40,8 @@ export default defineConfig({
     },
   },
   build: {
-    minify: 'esbuild',
+    // Keep production bundle unminified to avoid rare TDZ/runtime
+    // regressions we've seen in static-hosted builds.
+    minify: false,
   },
 })
