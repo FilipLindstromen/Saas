@@ -3001,8 +3001,8 @@ export default function HomePage() {
               </h2>
               <p className="mt-2 text-sm text-[var(--text-tertiary)]">
                 {appLanguage === "Swedish"
-                  ? "OpenAI skapar 10 amnesrader i stil med r/Showerthoughts och r/Damnthatsinteresting utifrån dina hook-rader (inte riktiga inlagg fran Reddit). Klicka pa 'Hitta Reddit-amnen' i vansterpanelen."
-                  : "OpenAI generates 10 topic lines in the spirit of r/Showerthoughts and r/Damnthatsinteresting from your Topic 1 and Topic 2 hooks (not real Reddit posts). Click 'Find Reddit Topics' in the left panel."}
+                  ? "OpenAI soker fram riktiga citat och inlaggslankar fran r/Showerthoughts och r/Damnthatsinteresting utifrån dina hook-rader."
+                  : "OpenAI searches real quotes and source links from r/Showerthoughts and r/Damnthatsinteresting using your Topic 1 and Topic 2 hooks."}
               </p>
               <div className="mt-4 space-y-2">
                 {redditTopicPosts.length === 0 ? (
@@ -3024,34 +3024,38 @@ export default function HomePage() {
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                          #{idx + 1} · r/{post.subreddit} ·{" "}
-                          {appLanguage === "Swedish" ? "AI-forslag" : "AI suggestion"}
-                        </span>
-                        <span className="text-xs text-[var(--text-tertiary)]">
-                          {appLanguage === "Swedish" ? "intresse" : "interest"} · {post.score}
+                          #{idx + 1} · r/{post.subreddit}
                         </span>
                       </div>
-                      <h3 className="mt-1.5 font-medium leading-snug text-[var(--text-primary)]">{post.title}</h3>
-                      {post.url ? (
-                        <a
-                          href={post.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-block text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
-                          style={{ color: "var(--accent)" }}
-                        >
-                          {appLanguage === "Swedish" ? "Oppna pa Reddit" : "Open on Reddit"}
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          className="mt-2 text-left text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
-                          style={{ color: "var(--accent)" }}
-                          onClick={() => void navigator.clipboard.writeText(post.title)}
-                        >
-                          {appLanguage === "Swedish" ? "Kopiera titel" : "Copy title"}
-                        </button>
-                      )}
+                      <p className="mt-1.5 whitespace-pre-line font-medium leading-snug text-[var(--text-primary)]">
+                        "{post.exactQuote}"
+                      </p>
+                      {post.postTitle ? (
+                        <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+                          {appLanguage === "Swedish" ? "Post:" : "Post:"} {post.postTitle}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        <span className="font-semibold">{appLanguage === "Swedish" ? "Varfor det resonerar:" : "Why it resonates:"}</span>{" "}
+                        {post.whyResonates}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        <span className="font-semibold">{appLanguage === "Swedish" ? "Djupare spänning:" : "Deeper tension:"}</span>{" "}
+                        {post.deeperTension}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        <span className="font-semibold">{appLanguage === "Swedish" ? "Innehallsvinkel:" : "Content angle:"}</span>{" "}
+                        {post.contentAngle}
+                      </p>
+                      <a
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-block text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {appLanguage === "Swedish" ? "Oppna original pa Reddit" : "Open original on Reddit"}
+                      </a>
                     </article>
                   ))
                 )}

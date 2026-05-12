@@ -58,6 +58,55 @@ async function requestJson<T>(apiKey: string, messages: { role: "system" | "user
   }
 }
 
+function extractResponsesText(body: unknown): string {
+  const root = body as { output_text?: unknown; output?: unknown[] };
+  if (typeof root?.output_text === "string" && root.output_text.trim()) {
+    return root.output_text.trim();
+  }
+  if (Array.isArray(root?.output)) {
+    const parts: string[] = [];
+    for (const item of root.output) {
+      const content = (item as { content?: unknown }).content;
+      if (!Array.isArray(content)) continue;
+      for (const piece of content) {
+        const text = (piece as { text?: unknown }).text;
+        if (typeof text === "string" && text.trim()) parts.push(text.trim());
+      }
+    }
+    return parts.join("\n").trim();
+  }
+  return "";
+}
+
+async function requestResponsesJson<T>(apiKey: string, input: { role: "system" | "user"; content: string }[]): Promise<T> {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      tools: [{ type: "web_search_preview" }],
+      input,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? `OpenAI error: ${response.status}`);
+  }
+
+  const body = (await response.json()) as unknown;
+  const raw = extractResponsesText(body);
+  if (!raw) throw new Error("OpenAI returned no searchable output.");
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error("Could not parse OpenAI web-search output as JSON.");
+  }
+}
+
 function languageDirective(language?: AppLanguage): string {
   return `Output language: ${language ?? "English"}. Write all generated text in this language.`;
 }
@@ -119,22 +168,23 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
     .filter((item) => item.text.length > 0);
 }
 
-/** Display row for AI-suggested topic lines in the style of named subreddits (not live Reddit). */
+/** OpenAI-found Reddit quote + analysis row. */
 export type RedditTopicPost = {
   id: string;
-  title: string;
-  permalink: string;
-  score: number;
-  numComments: number;
+  exactQuote: string;
   subreddit: string;
+  whyResonates: string;
+  deeperTension: string;
+  contentAngle: string;
+  postTitle: string;
   url: string;
 };
 
 const REDDIT_STYLE_SUBREDDITS = ["Showerthoughts", "Damnthatsinteresting"] as const;
 
 /**
- * Uses OpenAI to invent 10 topic lines that feel at home on r/Showerthoughts or r/Damnthatsinteresting,
- * grounded in the user's Topic 1 / Topic 2 hook lines (not scraped from Reddit).
+ * Uses OpenAI web search to find verbatim Reddit quotes and links from
+ * r/Showerthoughts + r/Damnthatsinteresting.
  */
 export async function generateRedditStyleTopicsFromHooks(input: {
   apiKey: string;
@@ -151,22 +201,30 @@ export async function generateRedditStyleTopicsFromHooks(input: {
   const hookContext = [t1 && `Topic 1 hook: ${t1}`, t2 && `Topic 2 hook: ${t2}`].filter(Boolean).join("\n");
 
   type Parsed = { topics?: unknown };
-  const parsed = await requestJson<Parsed>(trimmedKey, [
+  const parsed = await requestResponsesJson<Parsed>(trimmedKey, [
     {
       role: "system",
       content: [
-        "You suggest short-form social topic ideas for a content creator.",
-        "Each idea must read like a plausible post title on exactly one of these subreddits:",
-        "- r/Showerthoughts: terse, surprising one-liners; witty; not preachy; no hashtags; no TIL prefix.",
-        "- r/Damnthatsinteresting: striking claims, odd facts, or mildly debate-sparking angles; still believable; not clickbait spam.",
-        "Ground every line in the user's hook themes (stress, sleep, work, health, etc. when relevant). Do not copy real Reddit posts.",
-        "Return JSON only with shape: {\"topics\":[{\"title\":\"...\",\"subreddit\":\"Showerthoughts\"|\"Damnthatsinteresting\"}]}",
-        "Exactly 10 topics. Mix both subreddits (not all one). Titles under 140 characters each.",
+        "You are researching Reddit language for emotionally resonant content hooks.",
+        "Use web search and cite only real Reddit discussions/comments from these two subreddits:",
+        "- r/Showerthoughts",
+        "- r/Damnthatsinteresting",
+        "Do not invent posts, quotes, links, scores, or users.",
+        "Find language related to mental chatter, overthinking, racing thoughts, being mentally always-on, hypervigilance, anxiety loops, burnout from self-improvement, and moments of silence/relief/presence.",
+        "Prefer emotionally charged comment phrasing and weird-but-true observations over advice.",
+        "Return JSON only with exact shape:",
+        "{\"topics\":[{\"exactQuote\":\"...\",\"subreddit\":\"Showerthoughts|Damnthatsinteresting\",\"whyResonates\":\"...\",\"deeperTension\":\"...\",\"contentAngle\":\"...\",\"postTitle\":\"...\",\"url\":\"https://www.reddit.com/...\"}]}",
+        "Return exactly 10 items, mixed across both subreddits.",
+        "Keep exactQuote verbatim from the source. Keep whyResonates/deeperTension/contentAngle concise (1-2 sentences each).",
       ].join("\n"),
     },
     {
       role: "user",
-      content: [languageDirective(input.language), hookContext].join("\n\n"),
+      content: [
+        languageDirective(input.language),
+        hookContext,
+        "Output must be useful for hooks, scripts, carousels, anti-self-help, nervous-system, reflective and existential content.",
+      ].join("\n\n"),
     },
   ]);
 
@@ -174,10 +232,19 @@ export async function generateRedditStyleTopicsFromHooks(input: {
   const normalized: RedditTopicPost[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < rawList.length && normalized.length < 10; i += 1) {
-    const row = rawList[i] as { title?: unknown; subreddit?: unknown };
-    const title = String(row.title ?? "").trim();
-    if (!title) continue;
-    const key = title.toLowerCase();
+    const row = rawList[i] as {
+      exactQuote?: unknown;
+      subreddit?: unknown;
+      whyResonates?: unknown;
+      deeperTension?: unknown;
+      contentAngle?: unknown;
+      postTitle?: unknown;
+      url?: unknown;
+    };
+    const exactQuote = String(row.exactQuote ?? "").trim();
+    const url = String(row.url ?? "").trim();
+    if (!exactQuote || !url) continue;
+    const key = `${exactQuote.toLowerCase()}|${url.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
     let sub = String(row.subreddit ?? "").replace(/^r\//i, "").trim();
@@ -187,17 +254,18 @@ export async function generateRedditStyleTopicsFromHooks(input: {
     const rank = normalized.length;
     normalized.push({
       id: `ai-${rank}-${Math.random().toString(36).slice(2, 9)}`,
-      title,
-      permalink: "",
-      score: Math.max(200, 12000 - rank * 900),
-      numComments: 40 + rank * 35,
+      exactQuote,
       subreddit: sub,
-      url: "",
+      whyResonates: String(row.whyResonates ?? "").trim(),
+      deeperTension: String(row.deeperTension ?? "").trim(),
+      contentAngle: String(row.contentAngle ?? "").trim(),
+      postTitle: String(row.postTitle ?? "").trim(),
+      url,
     });
   }
 
   if (normalized.length === 0) {
-    throw new Error("No topic ideas were returned. Try again or adjust your hook lines.");
+    throw new Error("No Reddit quotes were found. Try adjusting the hook wording and run it again.");
   }
   return normalized;
 }
