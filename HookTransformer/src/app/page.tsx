@@ -11,7 +11,6 @@ import {
   generateCalendarHooks,
   generateHookVariations,
   generateNetflixifyScripts,
-  generateSymptomStoryBlocks,
   generateScriptStoryboard,
   generateTrendingHooks,
   generateWinningHookExpansion,
@@ -107,13 +106,14 @@ type NetflixifyBatch = {
   scripts: ScriptStoryboard[];
 };
 
-type SymptomStoryBatch = {
+type RedditTopicPost = {
   id: string;
-  hookText: string;
-  platform: string;
-  targetAudience: string;
-  createdAt: string;
-  blocks: string[];
+  title: string;
+  permalink: string;
+  score: number;
+  numComments: number;
+  subreddit: string;
+  url: string;
 };
 
 type CarouselLayout = {
@@ -518,8 +518,28 @@ function CalendarHookAutosizeTextarea({
   );
 }
 
+const MAIN_VIEWS = ["variants", "calendar", "aha", "script", "carousel", "reddit"] as const;
+
+function mainViewTabLabel(view: (typeof MAIN_VIEWS)[number], appLanguage: AppLanguage): string {
+  const sv = appLanguage === "Swedish";
+  switch (view) {
+    case "variants":
+      return sv ? "Hookvarianter" : "Hook Variants";
+    case "calendar":
+      return sv ? "Kalender" : "Calendar";
+    case "aha":
+      return sv ? "Aha + slutsats" : "Aha + conclusion";
+    case "script":
+      return sv ? "Manus" : "Script";
+    case "carousel":
+      return sv ? "Karusell" : "Carousel";
+    case "reddit":
+      return sv ? "Reddit-ämnen" : "Reddit topics";
+  }
+}
+
 export default function HomePage() {
-  const VIEWS = ["variants", "calendar", "aha", "script", "carousel", "symptom"] as const;
+  const VIEWS = MAIN_VIEWS;
   type View = (typeof VIEWS)[number];
 
   const [targetAudience, setTargetAudience] = useState(DEFAULT_AUDIENCE);
@@ -548,7 +568,8 @@ export default function HomePage() {
   const [expansionBatches, setExpansionBatches] = useState<ExpansionBatch[]>([]);
   const [scriptBoards, setScriptBoards] = useState<ScriptBoardEntry[]>([]);
   const [netflixifyBatches, setNetflixifyBatches] = useState<NetflixifyBatch[]>([]);
-  const [symptomStoryBatches, setSymptomStoryBatches] = useState<SymptomStoryBatch[]>([]);
+  const [redditTopicPosts, setRedditTopicPosts] = useState<RedditTopicPost[]>([]);
+  const [redditTopicsLoading, setRedditTopicsLoading] = useState(false);
   const [carouselLayouts, setCarouselLayouts] = useState<CarouselLayout[]>(getDefaultCarouselLayouts);
   const [carouselDrafts, setCarouselDrafts] = useState<CarouselDraft[]>([]);
   const [activeCarouselId, setActiveCarouselId] = useState<string>("");
@@ -560,7 +581,6 @@ export default function HomePage() {
   const [expandingId, setExpandingId] = useState<string | null>(null);
   const [scriptLoadingId, setScriptLoadingId] = useState<string | null>(null);
   const [netflixifyLoadingId, setNetflixifyLoadingId] = useState<string | null>(null);
-  const [symptomStoryLoading, setSymptomStoryLoading] = useState(false);
   const [activeView, setActiveView] = useState<View>("variants");
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>(getDefaultCalendarEntries);
   const [layoutDrag, setLayoutDrag] = useState<{ layoutId: string; target: "headline" | "body" } | null>(null);
@@ -600,7 +620,6 @@ export default function HomePage() {
         expansionBatches: ExpansionBatch[];
         scriptBoards: ScriptBoardEntry[];
         netflixifyBatches: NetflixifyBatch[];
-        symptomStoryBatches: SymptomStoryBatch[];
         carouselLayouts: CarouselLayout[];
         carouselDrafts: CarouselDraft[];
         activeCarouselId: string;
@@ -660,7 +679,6 @@ export default function HomePage() {
       if (Array.isArray(parsed.expansionBatches)) setExpansionBatches(parsed.expansionBatches);
       if (Array.isArray(parsed.scriptBoards)) setScriptBoards(parsed.scriptBoards);
       if (Array.isArray(parsed.netflixifyBatches)) setNetflixifyBatches(parsed.netflixifyBatches);
-      if (Array.isArray(parsed.symptomStoryBatches)) setSymptomStoryBatches(parsed.symptomStoryBatches);
       if (Array.isArray(parsed.carouselLayouts) && parsed.carouselLayouts.length > 0) {
         setCarouselLayouts(mergeWithDefaultCarouselLayouts(parsed.carouselLayouts));
       }
@@ -708,7 +726,6 @@ export default function HomePage() {
       expansionBatches,
       scriptBoards,
       netflixifyBatches,
-      symptomStoryBatches,
       carouselLayouts,
       carouselDrafts,
       activeCarouselId,
@@ -743,7 +760,6 @@ export default function HomePage() {
     expansionBatches,
     scriptBoards,
     netflixifyBatches,
-    symptomStoryBatches,
     carouselLayouts,
     carouselDrafts,
     activeCarouselId,
@@ -1243,42 +1259,39 @@ export default function HomePage() {
     useContrarianHook,
   ]);
 
-  const onGenerateSymptomStory = useCallback(async () => {
+  const onFindRedditTopics = useCallback(async () => {
     setError(null);
-    const apiKey = loadSharedOpenAiKey();
-    if (!topicOneHook.trim()) {
-      setError("Enter a Topic 1 hook first.");
+    const t1 = topicOneHook.trim();
+    const t2 = topicTwoHook.trim();
+    if (!t1 && !t2) {
+      setError(
+        appLanguage === "Swedish"
+          ? "Skriv minst en hook i Amne 1 eller Amne 2 forst."
+          : "Enter at least one hook in Topic 1 or Topic 2 first.",
+      );
       return;
     }
-    setSymptomStoryLoading(true);
-    setActiveView("symptom");
+    setRedditTopicsLoading(true);
+    setActiveView("reddit");
     try {
-      const blocks = await generateSymptomStoryBlocks({
-        apiKey,
-        language: appLanguage,
-        targetAudience,
-        platform,
-        hook: topicOneHook,
-        stylePreset,
-        uniquePerspective: topicOnePerspective,
-        useBrandVoiceLock,
-        brandVoiceSample,
+      const apiPrefix = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+      const res = await fetch(`${apiPrefix}/api/reddit-topics`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicOneHook, topicTwoHook }),
       });
-      const batch: SymptomStoryBatch = {
-        id: makeId(),
-        hookText: topicOneHook,
-        platform,
-        targetAudience,
-        createdAt: new Date().toISOString(),
-        blocks,
-      };
-      setSymptomStoryBatches((prev) => [batch, ...prev]);
+      const data = (await res.json()) as { posts?: RedditTopicPost[]; error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? (appLanguage === "Swedish" ? "Reddit-sokning misslyckades." : "Reddit search failed."));
+      }
+      setRedditTopicPosts(Array.isArray(data.posts) ? data.posts : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate symptom stories.");
+      setRedditTopicPosts([]);
+      setError(e instanceof Error ? e.message : appLanguage === "Swedish" ? "Reddit-sokning misslyckades." : "Reddit search failed.");
     } finally {
-      setSymptomStoryLoading(false);
+      setRedditTopicsLoading(false);
     }
-  }, [appLanguage, brandVoiceSample, topicOneHook, platform, stylePreset, targetAudience, topicOnePerspective, useBrandVoiceLock]);
+  }, [appLanguage, topicOneHook, topicTwoHook]);
 
   const createCarouselDraft = useCallback(() => {
     const primaryLayoutId = carouselLayouts[0]?.id ?? "layout-minimal";
@@ -1753,8 +1766,8 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            disabled={symptomStoryLoading}
-            onClick={() => void onGenerateSymptomStory()}
+            disabled={redditTopicsLoading}
+            onClick={() => void onFindRedditTopics()}
             className="mt-2.5 w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               borderColor: "var(--border-default)",
@@ -1762,9 +1775,13 @@ export default function HomePage() {
               color: "var(--text-secondary)",
             }}
           >
-            {symptomStoryLoading
-              ? appLanguage === "Swedish" ? "Genererar symtomstory..." : "Generating symptom story..."
-              : appLanguage === "Swedish" ? "Generera symtomstory" : "Generate symptom story"}
+            {redditTopicsLoading
+              ? appLanguage === "Swedish"
+                ? "Soker Reddit..."
+                : "Searching Reddit..."
+              : appLanguage === "Swedish"
+                ? "Hitta Reddit-amnen"
+                : "Find Reddit Topics"}
           </button>
           <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-tertiary)]">
             Uses your shared OpenAI key from the hub (local <code className="rounded bg-[var(--bg-hover)] px-1">saasApiKeys</code>). Add
@@ -1782,18 +1799,7 @@ export default function HomePage() {
             aria-label={appLanguage === "Swedish" ? "Vyflikar" : "Main views"}
           >
             {VIEWS.map((view) => {
-              const label =
-                view === "variants"
-                  ? appLanguage === "Swedish" ? "Hookvarianter" : "Hook Variants"
-                  : view === "aha"
-                    ? appLanguage === "Swedish" ? "Aha + slutsats" : "Aha + conclusion"
-                    : view === "script"
-                      ? appLanguage === "Swedish" ? "Manus" : "Script"
-                      : view === "carousel"
-                        ? appLanguage === "Swedish" ? "Karusell" : "Carousel"
-                        : view === "symptom"
-                          ? appLanguage === "Swedish" ? "Symtomstory" : "Symptom story"
-                          : appLanguage === "Swedish" ? "Kalender" : "Calendar";
+              const label = mainViewTabLabel(view, appLanguage);
               const isActive = activeView === view;
               return (
                 <button
@@ -2989,33 +2995,54 @@ export default function HomePage() {
             </>
           ) : null}
 
-          {activeView === "symptom" ? (
+          {activeView === "reddit" ? (
             <>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
-                {appLanguage === "Swedish" ? "Symtomstory" : "Symptom story"}
+                {appLanguage === "Swedish" ? "Reddit-ämnen" : "Reddit topics"}
               </h2>
-              <div className="mt-4 space-y-3">
-                {symptomStoryBatches.length === 0 ? (
+              <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+                {appLanguage === "Swedish"
+                  ? "Soker i r/Showerthoughts och r/Damnthatsinteresting utifrån dina hook-rader (Amne 1 och Amne 2). Klicka pa 'Hitta Reddit-amnen' i vansterpanelen."
+                  : "Searches r/Showerthoughts and r/Damnthatsinteresting using your Topic 1 and Topic 2 hook lines. Click 'Find Reddit Topics' in the left panel."}
+              </p>
+              <div className="mt-4 space-y-2">
+                {redditTopicPosts.length === 0 ? (
                   <div className="rounded-xl border border-dashed p-4 text-sm text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
-                    {appLanguage === "Swedish"
-                      ? "Klicka pa 'Generera symtomstory' i vansterpanelen for att skapa 5 innehallsblock."
-                      : "Click 'Generate symptom story' in the left panel to create 5 content blocks."}
+                    {redditTopicsLoading
+                      ? appLanguage === "Swedish"
+                        ? "Hamtar inlagg..."
+                        : "Fetching posts..."
+                      : appLanguage === "Swedish"
+                        ? "Inga resultat annu. Klicka pa 'Hitta Reddit-amnen' for att hamta 10 inlagg."
+                        : "No results yet. Click 'Find Reddit Topics' to load 10 posts."}
                   </div>
                 ) : (
-                  symptomStoryBatches.map((batch) => (
-                    <section key={batch.id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}>
-                      <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
-                        {batch.platform} · {batch.targetAudience}
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-[var(--text-secondary)]">{batch.hookText}</p>
-                      <div className="mt-3 space-y-2">
-                        {batch.blocks.map((block, idx) => (
-                          <div key={`${batch.id}-block-${idx}`} className="rounded-lg border p-3" style={{ borderColor: "var(--border-default)", background: "var(--bg-elevated)" }}>
-                            <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{block}</p>
-                          </div>
-                        ))}
+                  redditTopicPosts.map((post, idx) => (
+                    <article
+                      key={post.id}
+                      className="rounded-xl border p-3 text-sm"
+                      style={{ borderColor: "var(--border-default)", background: "var(--bg-tertiary)" }}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                          #{idx + 1} · r/{post.subreddit}
+                        </span>
+                        <span className="text-xs text-[var(--text-tertiary)]">
+                          ↑ {post.score} · {post.numComments}{" "}
+                          {appLanguage === "Swedish" ? "kommentarer" : "comments"}
+                        </span>
                       </div>
-                    </section>
+                      <h3 className="mt-1.5 font-medium leading-snug text-[var(--text-primary)]">{post.title}</h3>
+                      <a
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-block text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {appLanguage === "Swedish" ? "Oppna pa Reddit" : "Open on Reddit"}
+                      </a>
+                    </article>
                   ))
                 )}
               </div>
