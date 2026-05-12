@@ -9,6 +9,32 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Runs before the app module: clears corrupt PitchDeck data when the UI cannot mount. -->
+    <script>
+      (function () {
+        try {
+          if (!/\bpitchDeckEmergencyReset=1\b/.test(location.search)) return
+          var toRemove = []
+          var i
+          for (i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i)
+            if (k && k.indexOf('pitchDeck') === 0) toRemove.push(k)
+          }
+          for (i = 0; i < toRemove.length; i++) localStorage.removeItem(toRemove[i])
+          try {
+            localStorage.removeItem('analysisFolded')
+          } catch (e2) {}
+          try {
+            indexedDB.deleteDatabase('PitchDeckProjectFolder')
+          } catch (e3) {}
+          var u = new URL(location.href)
+          u.searchParams.delete('pitchDeckEmergencyReset')
+          location.replace(u.pathname + u.search + u.hash)
+        } catch (e) {
+          console.warn('pitchDeckEmergencyReset:', e)
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

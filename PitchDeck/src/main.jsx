@@ -1,12 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { clearAllPitchDeckProjectData } from './clearPitchDeckBrowserState'
 import App from './App'
 import './index.css'
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, message: '' }
+    this.state = { hasError: false, message: '', clearing: false }
   }
 
   static getDerivedStateFromError(error) {
@@ -20,13 +21,27 @@ class AppErrorBoundary extends React.Component {
     console.error('PitchDeck render crashed:', error, errorInfo)
   }
 
-  handleReset = () => {
+  handleReset = async () => {
+    this.setState({ clearing: true })
     try {
-      localStorage.removeItem('pitchDeckChapters')
-      localStorage.removeItem('pitchDeckSlides')
-      localStorage.removeItem('pitchDeckSelectedId')
-      localStorage.removeItem('pitchDeckCurrentChapterId')
-      localStorage.removeItem('pitchDeckMode')
+      await clearAllPitchDeckProjectData()
+    } catch (error) {
+      console.warn('Could not clear PitchDeck storage:', error)
+    }
+    window.location.reload()
+  }
+
+  handleNuclearReset = async () => {
+    if (
+      !window.confirm(
+        'Delete ALL PitchDeck projects and workspace data from this browser? API keys in the shared hub store are not removed. This cannot be undone.',
+      )
+    ) {
+      return
+    }
+    this.setState({ clearing: true })
+    try {
+      await clearAllPitchDeckProjectData()
     } catch (error) {
       console.warn('Could not clear PitchDeck storage:', error)
     }
@@ -35,6 +50,7 @@ class AppErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const busy = this.state.clearing
       return (
         <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0b0b0b', color: '#fff', padding: '24px' }}>
           <div style={{ maxWidth: '560px', textAlign: 'center' }}>
@@ -45,13 +61,46 @@ class AppErrorBoundary extends React.Component {
             <p style={{ margin: '0 0 18px', opacity: 0.7, fontSize: '14px' }}>
               Error: {this.state.message}
             </p>
-            <button
-              type="button"
-              onClick={this.handleReset}
-              style={{ background: '#ff6b35', color: '#fff', border: 0, borderRadius: '10px', padding: '10px 16px', cursor: 'pointer', fontWeight: 600 }}
-            >
-              Reset local PitchDeck data
-            </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void this.handleReset()}
+                style={{
+                  background: '#ff6b35',
+                  color: '#fff',
+                  border: 0,
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  cursor: busy ? 'wait' : 'pointer',
+                  fontWeight: 600,
+                  opacity: busy ? 0.7 : 1,
+                }}
+              >
+                {busy ? 'Clearing…' : 'Reset saved projects'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void this.handleNuclearReset()}
+                style={{
+                  background: '#2d2d2d',
+                  color: '#fff',
+                  border: '1px solid #555',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  cursor: busy ? 'wait' : 'pointer',
+                  fontWeight: 600,
+                  opacity: busy ? 0.7 : 1,
+                }}
+              >
+                Delete all projects (confirm)
+              </button>
+            </div>
+            <p style={{ margin: '20px 0 0', opacity: 0.55, fontSize: '12px', lineHeight: 1.45 }}>
+              If buttons do nothing, open this app with{' '}
+              <code style={{ color: '#ccc' }}>?pitchDeckEmergencyReset=1</code> in the URL (runs before the app loads), then reload once.
+            </p>
           </div>
         </div>
       )

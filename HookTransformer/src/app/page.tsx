@@ -7,10 +7,12 @@ import {
   type CalendarHookDayInput,
   type ExpansionPack,
   type ScriptStoryboard,
+  type RedditTopicPost,
   generateContentIdeas,
   generateCalendarHooks,
   generateHookVariations,
   generateNetflixifyScripts,
+  generateRedditStyleTopicsFromHooks,
   generateScriptStoryboard,
   generateTrendingHooks,
   generateWinningHookExpansion,
@@ -19,7 +21,6 @@ import {
   type HookVariation,
 } from "@/lib/generate-hooks";
 import { loadSharedOpenAiKey } from "@/lib/saas-api-keys";
-import { fetchRedditTopicsFromHooks, type RedditTopicPost } from "@/lib/reddit-topics";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEFAULT_AUDIENCE = "High-performing professionals";

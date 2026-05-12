@@ -119,6 +119,89 @@ function normalizeHooks(hooks: unknown): HookVariation[] {
     .filter((item) => item.text.length > 0);
 }
 
+/** Display row for AI-suggested topic lines in the style of named subreddits (not live Reddit). */
+export type RedditTopicPost = {
+  id: string;
+  title: string;
+  permalink: string;
+  score: number;
+  numComments: number;
+  subreddit: string;
+  url: string;
+};
+
+const REDDIT_STYLE_SUBREDDITS = ["Showerthoughts", "Damnthatsinteresting"] as const;
+
+/**
+ * Uses OpenAI to invent 10 topic lines that feel at home on r/Showerthoughts or r/Damnthatsinteresting,
+ * grounded in the user's Topic 1 / Topic 2 hook lines (not scraped from Reddit).
+ */
+export async function generateRedditStyleTopicsFromHooks(input: {
+  apiKey: string;
+  language?: AppLanguage;
+  topicOneHook: string;
+  topicTwoHook: string;
+}): Promise<RedditTopicPost[]> {
+  const trimmedKey = input.apiKey.trim();
+  if (!trimmedKey) {
+    throw new Error("Add your OpenAI API key in the SaaS Apps hub settings (gear icon).");
+  }
+  const t1 = input.topicOneHook.replace(/\s+/g, " ").trim();
+  const t2 = input.topicTwoHook.replace(/\s+/g, " ").trim();
+  const hookContext = [t1 && `Topic 1 hook: ${t1}`, t2 && `Topic 2 hook: ${t2}`].filter(Boolean).join("\n");
+
+  type Parsed = { topics?: unknown };
+  const parsed = await requestJson<Parsed>(trimmedKey, [
+    {
+      role: "system",
+      content: [
+        "You suggest short-form social topic ideas for a content creator.",
+        "Each idea must read like a plausible post title on exactly one of these subreddits:",
+        "- r/Showerthoughts: terse, surprising one-liners; witty; not preachy; no hashtags; no TIL prefix.",
+        "- r/Damnthatsinteresting: striking claims, odd facts, or mildly debate-sparking angles; still believable; not clickbait spam.",
+        "Ground every line in the user's hook themes (stress, sleep, work, health, etc. when relevant). Do not copy real Reddit posts.",
+        "Return JSON only with shape: {\"topics\":[{\"title\":\"...\",\"subreddit\":\"Showerthoughts\"|\"Damnthatsinteresting\"}]}",
+        "Exactly 10 topics. Mix both subreddits (not all one). Titles under 140 characters each.",
+      ].join("\n"),
+    },
+    {
+      role: "user",
+      content: [languageDirective(input.language), hookContext].join("\n\n"),
+    },
+  ]);
+
+  const rawList = Array.isArray(parsed.topics) ? parsed.topics : [];
+  const normalized: RedditTopicPost[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < rawList.length && normalized.length < 10; i += 1) {
+    const row = rawList[i] as { title?: unknown; subreddit?: unknown };
+    const title = String(row.title ?? "").trim();
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let sub = String(row.subreddit ?? "").replace(/^r\//i, "").trim();
+    if (!REDDIT_STYLE_SUBREDDITS.includes(sub as (typeof REDDIT_STYLE_SUBREDDITS)[number])) {
+      sub = normalized.length % 2 === 0 ? "Showerthoughts" : "Damnthatsinteresting";
+    }
+    const rank = normalized.length;
+    normalized.push({
+      id: `ai-${rank}-${Math.random().toString(36).slice(2, 9)}`,
+      title,
+      permalink: "",
+      score: Math.max(200, 12000 - rank * 900),
+      numComments: 40 + rank * 35,
+      subreddit: sub,
+      url: "",
+    });
+  }
+
+  if (normalized.length === 0) {
+    throw new Error("No topic ideas were returned. Try again or adjust your hook lines.");
+  }
+  return normalized;
+}
+
 /** Labels match the Variants view columns (3 hooks each, 15 total). */
 export const HOOK_COLUMN_LABELS = [
   "Ask a question Hook",
