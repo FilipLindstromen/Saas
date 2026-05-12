@@ -181,7 +181,7 @@ export async function generateRedditStyleTopicsFromHooks(input: {
     if (seen.has(key)) continue;
     seen.add(key);
     let sub = String(row.subreddit ?? "").replace(/^r\//i, "").trim();
-    if (!REDDIT_STYLE_SUBREDDITS.includes(sub as (typeof REDDIT_STYLE_SUBREDDITS)[number])) {
+    if (!(REDDIT_STYLE_SUBREDDITS as readonly string[]).includes(sub)) {
       sub = normalized.length % 2 === 0 ? "Showerthoughts" : "Damnthatsinteresting";
     }
     const rank = normalized.length;

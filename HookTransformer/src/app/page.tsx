@@ -1263,14 +1263,30 @@ export default function HomePage() {
       );
       return;
     }
+    const apiKey = loadSharedOpenAiKey();
+    if (!apiKey.trim()) {
+      setError(
+        appLanguage === "Swedish"
+          ? "Lagg till OpenAI-nyckel i SaaS Apps (kugghjulsikonen) forst."
+          : "Add your OpenAI API key in the SaaS Apps hub (gear icon) first.",
+      );
+      return;
+    }
     setRedditTopicsLoading(true);
     setActiveView("reddit");
     try {
-      const posts = await fetchRedditTopicsFromHooks(topicOneHook, topicTwoHook);
+      const posts = await generateRedditStyleTopicsFromHooks({
+        apiKey,
+        language: appLanguage,
+        topicOneHook,
+        topicTwoHook,
+      });
       setRedditTopicPosts(posts);
     } catch (e) {
       setRedditTopicPosts([]);
-      setError(e instanceof Error ? e.message : appLanguage === "Swedish" ? "Reddit-sokning misslyckades." : "Reddit search failed.");
+      setError(
+        e instanceof Error ? e.message : appLanguage === "Swedish" ? "Kunde inte skapa amnen." : "Could not generate topic ideas.",
+      );
     } finally {
       setRedditTopicsLoading(false);
     }
@@ -1760,8 +1776,8 @@ export default function HomePage() {
           >
             {redditTopicsLoading
               ? appLanguage === "Swedish"
-                ? "Soker Reddit..."
-                : "Searching Reddit..."
+                ? "Skapar forslag..."
+                : "Generating ideas..."
               : appLanguage === "Swedish"
                 ? "Hitta Reddit-amnen"
                 : "Find Reddit Topics"}
@@ -2985,19 +3001,19 @@ export default function HomePage() {
               </h2>
               <p className="mt-2 text-sm text-[var(--text-tertiary)]">
                 {appLanguage === "Swedish"
-                  ? "Soker i r/Showerthoughts och r/Damnthatsinteresting utifrån dina hook-rader (Amne 1 och Amne 2). Klicka pa 'Hitta Reddit-amnen' i vansterpanelen."
-                  : "Searches r/Showerthoughts and r/Damnthatsinteresting using your Topic 1 and Topic 2 hook lines. Click 'Find Reddit Topics' in the left panel."}
+                  ? "OpenAI skapar 10 amnesrader i stil med r/Showerthoughts och r/Damnthatsinteresting utifrån dina hook-rader (inte riktiga inlagg fran Reddit). Klicka pa 'Hitta Reddit-amnen' i vansterpanelen."
+                  : "OpenAI generates 10 topic lines in the spirit of r/Showerthoughts and r/Damnthatsinteresting from your Topic 1 and Topic 2 hooks (not real Reddit posts). Click 'Find Reddit Topics' in the left panel."}
               </p>
               <div className="mt-4 space-y-2">
                 {redditTopicPosts.length === 0 ? (
                   <div className="rounded-xl border border-dashed p-4 text-sm text-[var(--text-tertiary)]" style={{ borderColor: "var(--border-default)" }}>
                     {redditTopicsLoading
                       ? appLanguage === "Swedish"
-                        ? "Hamtar inlagg..."
-                        : "Fetching posts..."
+                        ? "Skapar forslag med OpenAI..."
+                        : "Generating ideas with OpenAI..."
                       : appLanguage === "Swedish"
-                        ? "Inga resultat annu. Klicka pa 'Hitta Reddit-amnen' for att hamta 10 inlagg."
-                        : "No results yet. Click 'Find Reddit Topics' to load 10 posts."}
+                        ? "Inga forslag annu. Klicka pa 'Hitta Reddit-amnen' for att skapa 10 rader."
+                        : "No ideas yet. Click 'Find Reddit Topics' to generate 10 lines."}
                   </div>
                 ) : (
                   redditTopicPosts.map((post, idx) => (
@@ -3008,23 +3024,34 @@ export default function HomePage() {
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                          #{idx + 1} · r/{post.subreddit}
+                          #{idx + 1} · r/{post.subreddit} ·{" "}
+                          {appLanguage === "Swedish" ? "AI-forslag" : "AI suggestion"}
                         </span>
                         <span className="text-xs text-[var(--text-tertiary)]">
-                          ↑ {post.score} · {post.numComments}{" "}
-                          {appLanguage === "Swedish" ? "kommentarer" : "comments"}
+                          {appLanguage === "Swedish" ? "intresse" : "interest"} · {post.score}
                         </span>
                       </div>
                       <h3 className="mt-1.5 font-medium leading-snug text-[var(--text-primary)]">{post.title}</h3>
-                      <a
-                        href={post.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-block text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
-                        style={{ color: "var(--accent)" }}
-                      >
-                        {appLanguage === "Swedish" ? "Oppna pa Reddit" : "Open on Reddit"}
-                      </a>
+                      {post.url ? (
+                        <a
+                          href={post.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
+                          style={{ color: "var(--accent)" }}
+                        >
+                          {appLanguage === "Swedish" ? "Oppna pa Reddit" : "Open on Reddit"}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className="mt-2 text-left text-xs font-medium underline decoration-[var(--border-default)] underline-offset-2"
+                          style={{ color: "var(--accent)" }}
+                          onClick={() => void navigator.clipboard.writeText(post.title)}
+                        >
+                          {appLanguage === "Swedish" ? "Kopiera titel" : "Copy title"}
+                        </button>
+                      )}
                     </article>
                   ))
                 )}
