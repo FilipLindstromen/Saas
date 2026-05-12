@@ -19,6 +19,7 @@ import {
   type HookVariation,
 } from "@/lib/generate-hooks";
 import { loadSharedOpenAiKey } from "@/lib/saas-api-keys";
+import { fetchRedditTopicsFromHooks, type RedditTopicPost } from "@/lib/reddit-topics";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const DEFAULT_AUDIENCE = "High-performing professionals";
@@ -104,16 +105,6 @@ type NetflixifyBatch = {
   targetAudience: string;
   createdAt: string;
   scripts: ScriptStoryboard[];
-};
-
-type RedditTopicPost = {
-  id: string;
-  title: string;
-  permalink: string;
-  score: number;
-  numComments: number;
-  subreddit: string;
-  url: string;
 };
 
 type CarouselLayout = {
@@ -1274,17 +1265,8 @@ export default function HomePage() {
     setRedditTopicsLoading(true);
     setActiveView("reddit");
     try {
-      const apiPrefix = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
-      const res = await fetch(`${apiPrefix}/api/reddit-topics`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicOneHook, topicTwoHook }),
-      });
-      const data = (await res.json()) as { posts?: RedditTopicPost[]; error?: string };
-      if (!res.ok) {
-        throw new Error(data.error ?? (appLanguage === "Swedish" ? "Reddit-sokning misslyckades." : "Reddit search failed."));
-      }
-      setRedditTopicPosts(Array.isArray(data.posts) ? data.posts : []);
+      const posts = await fetchRedditTopicsFromHooks(topicOneHook, topicTwoHook);
+      setRedditTopicPosts(posts);
     } catch (e) {
       setRedditTopicPosts([]);
       setError(e instanceof Error ? e.message : appLanguage === "Swedish" ? "Reddit-sokning misslyckades." : "Reddit search failed.");
