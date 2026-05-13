@@ -199,6 +199,7 @@ export async function generateRedditStyleTopicsFromHooks(input: {
   const t1 = input.topicOneHook.replace(/\s+/g, " ").trim();
   const t2 = input.topicTwoHook.replace(/\s+/g, " ").trim();
   const hookContext = [t1 && `Topic 1 hook: ${t1}`, t2 && `Topic 2 hook: ${t2}`].filter(Boolean).join("\n");
+  const wantsSwedishOutput = input.language === "Swedish";
 
   type Parsed = { topics?: unknown };
   const parsed = await requestResponsesJson<Parsed>(trimmedKey, [
@@ -209,19 +210,24 @@ export async function generateRedditStyleTopicsFromHooks(input: {
         "Use web search and cite only real Reddit discussions/comments from these two subreddits:",
         "- r/Showerthoughts",
         "- r/Damnthatsinteresting",
+        "Always search for ENGLISH Reddit posts/comments only. Do not source Swedish posts.",
         "Do not invent posts, quotes, links, scores, or users.",
         "Find language related to mental chatter, overthinking, racing thoughts, being mentally always-on, hypervigilance, anxiety loops, burnout from self-improvement, and moments of silence/relief/presence.",
         "Prefer emotionally charged comment phrasing and weird-but-true observations over advice.",
         "Return JSON only with exact shape:",
         "{\"topics\":[{\"exactQuote\":\"...\",\"subreddit\":\"Showerthoughts|Damnthatsinteresting\",\"whyResonates\":\"...\",\"deeperTension\":\"...\",\"contentAngle\":\"...\",\"postTitle\":\"...\",\"url\":\"https://www.reddit.com/...\"}]}",
         "Return exactly 10 items, mixed across both subreddits.",
-        "Keep exactQuote verbatim from the source. Keep whyResonates/deeperTension/contentAngle concise (1-2 sentences each).",
+        "If output language is Swedish: translate the English quote/title/analysis fields to natural Swedish while preserving meaning and emotional tone.",
+        "If output language is English: keep exactQuote verbatim from source.",
+        "Keep whyResonates/deeperTension/contentAngle concise (1-2 sentences each).",
       ].join("\n"),
     },
     {
       role: "user",
       content: [
-        languageDirective(input.language),
+        wantsSwedishOutput
+          ? "Output language: Swedish. Source discovery language: English-only Reddit content."
+          : "Output language: English. Source discovery language: English-only Reddit content.",
         hookContext,
         "Output must be useful for hooks, scripts, carousels, anti-self-help, nervous-system, reflective and existential content.",
       ].join("\n\n"),
