@@ -20,7 +20,8 @@ defaults:
 
 jobs:
   beta:
-    if: ${{ github.event_name == 'push' && github.event.head_commit != null && toLower(split(github.event.head_commit.message, '\n')[0]) == 'ios' }}
+    # GitHub expressions have no split(); match exact "ios" or first line "ios" before a newline.
+    if: ${{ github.event_name == 'push' && github.event.head_commit != null && (toLower(github.event.head_commit.message) == 'ios' || startsWith(toLower(github.event.head_commit.message), concat('ios', '\n'))) }}
     runs-on: macos-latest
     steps:
       - name: Checkout
