@@ -20,12 +20,12 @@ export type WorkspaceScopePersisted = {
 };
 
 const DEFAULTS: WorkspaceScopePersisted = {
-  mode: "work",
+  mode: "all",
   projectId: null,
   category: null,
   itemType: null,
   dueDateFilter: "all",
-  todayViewActive: false,
+  todayViewActive: true,
 };
 
 const DUE: DueDateFilterPreset[] = ["all", "today", "tomorrow", "this_week", "no_date"];

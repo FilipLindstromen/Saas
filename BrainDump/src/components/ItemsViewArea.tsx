@@ -1826,6 +1826,9 @@ export function ItemsViewArea({
 
   return (
     <div className="bd-items-view-root">
+      {isMobile && (mode === "work" || mode === "personal" || mode === "all") ? (
+        <p className="bd-items-mobile-simplified-note">{t("items.mobileSimplifiedNote")}</p>
+      ) : null}
       {showUnifiedMobileChrome && (
         <div className="bd-mobile-unified-chrome">
           <div className="bd-mobile-unified-chrome__scope">{scopeSlot}</div>

@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { scheduleClientPreferencesUpload } from "@/lib/client-preferences-sync";
 import { CUSTOM_AREAS_KEY, PERSONAL_AREA_DEFAULTS } from "@/lib/personal-areas";
+import { ScopeActiveFilterPills } from "@/components/ScopeActiveFilterPills";
 
 interface Project {
   id: string;
@@ -1116,7 +1117,16 @@ export function ScopeBar({
             )}
           </div>
           {onSearchFilterChange && showScopeFilterInput && (
-            <ScopeFilterSearchBlock
+            <>
+              <ScopeActiveFilterPills
+                searchFilter={searchFilter}
+                dueDateFilter={dueDateFilter}
+                scopeLabel={selectedProjectId ? selectedProjectLabel : null}
+                onClearSearch={() => onSearchFilterChange("")}
+                onClearDueDate={() => onDueDateFilterChange?.("all")}
+                onClearScope={() => onProjectSelect(null)}
+              />
+              <ScopeFilterSearchBlock
               isMobile={isMobile}
               searchFilter={searchFilter}
               onSearchFilterChange={onSearchFilterChange}
@@ -1125,6 +1135,7 @@ export function ScopeBar({
               onDueDateFilterChange={onDueDateFilterChange}
               t={t}
             />
+            </>
           )}
         </div>
 
@@ -1559,6 +1570,8 @@ export function ScopeBar({
       a.localeCompare(b)
     );
 
+    const selectedAreaLabel = selectedCategory ? formatCategoryLabel(selectedCategory) : null;
+
     return (
       <>
         <div
@@ -1825,7 +1838,16 @@ export function ScopeBar({
             )}
           </div>
         {onSearchFilterChange && showScopeFilterInput && (
-          <ScopeFilterSearchBlock
+          <>
+            <ScopeActiveFilterPills
+              searchFilter={searchFilter}
+              dueDateFilter={dueDateFilter}
+              scopeLabel={selectedAreaLabel}
+              onClearSearch={() => onSearchFilterChange("")}
+              onClearDueDate={() => onDueDateFilterChange?.("all")}
+              onClearScope={() => onCategorySelect(null)}
+            />
+            <ScopeFilterSearchBlock
             isMobile={isMobile}
             searchFilter={searchFilter}
             onSearchFilterChange={onSearchFilterChange}
@@ -1834,6 +1856,7 @@ export function ScopeBar({
             onDueDateFilterChange={onDueDateFilterChange}
             t={t}
           />
+          </>
         )}
         </div>
         {isMobile && areaPickerOpen && scopeSheetMount

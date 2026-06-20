@@ -2,7 +2,8 @@
 
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useI18n } from "@/lib/i18n";
-import { DumpEmptyHintCallout, type BrainDumpCenterHandle } from "@/components/CenterPanel";
+import { type BrainDumpCenterHandle } from "@/components/CenterPanel";
+import { DumpCaptureActions } from "@/components/DumpCaptureActions";
 import type { ItemsViewType } from "@/components/ItemsViewArea";
 
 function bottomBarTarget(
@@ -154,7 +155,18 @@ export function MobileBottomBarPill({
         </svg>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
-        {showDumpEmptyHint ? <DumpEmptyHintCallout className="bd-dump-empty-hint--mobile" /> : null}
+        {showDumpEmptyHint ? (
+          <div className="bd-bottom-bar-capture-stack">
+            <p className="bd-dump-empty-hint-text bd-dump-empty-hint-text--mobile">{t("center.dumpEmptyHint")}</p>
+            <DumpCaptureActions
+              compact
+              disabled={dumpRecordingActive}
+              onRecord={() => centerPanelRef.current?.toggleDumpRecording()}
+              onType={() => centerPanelRef.current?.openTypedDumpSheet()}
+              onPhoto={() => centerPanelRef.current?.openPhotoCaptureMenu()}
+            />
+          </div>
+        ) : null}
         <button
           type="button"
           className={`bd-bottom-dump-mic${dumpRecordingActive ? " bd-bottom-dump-mic--recording" : ""}`}

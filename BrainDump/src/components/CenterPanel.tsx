@@ -21,6 +21,8 @@ import { transcribeAudioBlobs } from "@/lib/transcribe-audio-client";
 import { DUMP_FACE_CHANGED, loadShowDumpFace } from "@/lib/dump-face-settings";
 import { DumpListeningFace } from "./DumpListeningFace";
 import { PhotoCaptureTrigger, type PhotoCaptureTriggerHandle } from "./PhotoCaptureTrigger";
+import { DumpCaptureActions } from "./DumpCaptureActions";
+import { DumpProcessingSteps } from "./DumpProcessingSteps";
 import { useRevenueCatOptional } from "./RevenueCatProvider";
 
 const MIC_STORAGE_KEY = "braindump-selected-microphone";
@@ -90,6 +92,8 @@ interface CenterPanelProps {
   onAutoSave?: (items: OrganizedItemPreview[], transcript: string) => void | Promise<void>;
   /** After a successful auto-save from the dump flow: e.g. All (work+personal), no project/area, New batch, clear search */
   onDumpFinished?: () => void;
+  /** Fires after a successful auto-save from the dump flow with item count. */
+  onDumpSaved?: (itemCount: number) => void;
   transcriptFromOrganize?: string;
   onOpenSettings?: () => void;
   projectNames?: string[];
@@ -143,6 +147,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     onOrganized,
     onAutoSave,
     onDumpFinished,
+    onDumpSaved,
     transcriptFromOrganize,
     onOpenSettings,
     projectNames = [],
@@ -207,6 +212,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [transcript, setTranscript] = useState("");
   const [transcribeLoading, setTranscribeLoading] = useState(false);
   const [organizeLoading, setOrganizeLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioDevices, setAudioDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
@@ -242,7 +248,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [typedDumpText, setTypedDumpText] = useState("");
   const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
   const photoAnchorRef = useRef<PhotoCaptureTriggerHandle | null>(null);
-  const isDumpProcessing = transcribeLoading || organizeLoading;
+  const isDumpProcessing = transcribeLoading || organizeLoading || saveLoading;
+  const processingStep: "transcribe" | "organize" | "save" = saveLoading
+    ? "save"
+    : organizeLoading
+      ? "organize"
+      : "transcribe";
 
   const clearAudioRotationTimer = useCallback(() => {
     if (audioRotationTimerRef.current != null && typeof window !== "undefined") {
@@ -716,7 +727,13 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       emitSuggestedItemTypesFromOrganize(items);
       const n = items.length;
       if (onAutoSave) {
-        await Promise.resolve(onAutoSave(items, text));
+        setSaveLoading(true);
+        try {
+          await Promise.resolve(onAutoSave(items, text));
+          onDumpSaved?.(n);
+        } finally {
+          setSaveLoading(false);
+        }
         setOrganizeSuccess(null);
         showDumpOverlayRef.current = false;
         setShowDumpOverlay(false);
@@ -728,7 +745,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [onAutoSave, onOrganized, onDumpFinished, mode, t]
+    [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t]
   );
 
   const organize = useCallback(async (transcriptOverride?: string) => {
@@ -981,8 +998,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     return () => window.removeEventListener("keydown", onKey);
   }, [showTypedDumpSheet, closeTypedDumpSheet]);
 
-  const processingTitle =
-    transcribeLoading && !organizeLoading
+  const processingTitle = saveLoading
+    ? t("center.savingItems")
+    : transcribeLoading && !organizeLoading
       ? photoOrganizeFlow
         ? t("center.readingPhoto")
         : t("center.transcribing")
@@ -1162,7 +1180,28 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       )}
       {!isMobile && (
         <div className="bd-dump-fab-cluster">
-          {dumpEmptyListHint ? <DumpEmptyHintCallout /> : null}
+          {dumpEmptyListHint ? (
+            <>
+              <p className="bd-dump-empty-hint-text bd-dump-empty-hint-text--standalone">{t("center.dumpEmptyHint")}</p>
+              <DumpCaptureActions
+                disabled={isDumpProcessing || photoOrganizeFlow}
+                onRecord={() => void onDumpFabClick()}
+                onType={() => void openTypedDumpSheet()}
+                onPhoto={() => {
+                  void (async () => {
+                    if (isDumpProcessing || photoOrganizeFlow) return;
+                    await waitForRCReady();
+                    if (shouldShowPaywall()) {
+                      const result = await rcRef.current?.presentPaywall();
+                      if (!result?.isPro) return;
+                    }
+                    leaveVoiceDumpSessionForOtherInput();
+                    requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
+                  })();
+                }}
+              />
+            </>
+          ) : null}
           <div className="bd-dump-fab-row">
             <button
               id="bd-dump-fab"
@@ -1343,6 +1382,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
             <div className="bd-dump-processing-inner">
               {showDumpFace && <DumpListeningFace variant="overlay" />}
               <div className="bd-dump-spinner" aria-hidden />
+              <DumpProcessingSteps active={processingStep} />
               <p className="bd-dump-processing-title">{processingTitle}</p>
             </div>
           </div>,
@@ -1418,7 +1458,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           dumpEmptyHintSuppressed={dumpHintSuppressed}
         />
       )}
-      {isInbox && unclearItems && (
+      {unclearItems && (
         <UnclearOverlay
           items={unclearItems.items}
           projectNames={projectNames}

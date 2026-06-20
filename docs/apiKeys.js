@@ -12,7 +12,6 @@
     pexels: '',
     unsplash: '',
     googleClientId: '',
-    elevenlabs: '',
     googleDriveAccessToken: '',
     localFolderName: ''
   };

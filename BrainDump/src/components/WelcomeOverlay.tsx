@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useI18n, type Locale } from "@/lib/i18n";
 
 const WELCOME_DONE_KEY = "braindump-welcome-done";
+export const WELCOME_COMPLETE_EVENT = "braindump-welcome-complete";
 
 function hasSeenWelcome(): boolean {
   if (typeof window === "undefined") return true;
@@ -27,26 +28,50 @@ const LANGUAGES: { value: Locale; label: string; native: string }[] = [
   { value: "sv", label: "Svenska", native: "Swedish" },
 ];
 
+const STEPS = ["language", "howItWorks", "ready"] as const;
+type Step = (typeof STEPS)[number];
+
 export function WelcomeOverlay() {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const [visible, setVisible] = useState(false);
+  const [step, setStep] = useState<Step>("language");
   const [selected, setSelected] = useState<Locale>(locale);
 
   useEffect(() => {
     if (!hasSeenWelcome()) setVisible(true);
   }, []);
 
-  // Keep selected in sync if locale was loaded from storage after mount
   useEffect(() => {
     setSelected(locale);
   }, [locale]);
 
   if (!visible) return null;
 
-  const confirm = () => {
+  const finish = () => {
     setLocale(selected);
     markWelcomeDone();
     setVisible(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(WELCOME_COMPLETE_EVENT));
+    }
+  };
+
+  const next = () => {
+    if (step === "language") {
+      setLocale(selected);
+      setStep("howItWorks");
+      return;
+    }
+    if (step === "howItWorks") {
+      setStep("ready");
+      return;
+    }
+    finish();
+  };
+
+  const back = () => {
+    if (step === "howItWorks") setStep("language");
+    else if (step === "ready") setStep("howItWorks");
   };
 
   return (
@@ -65,107 +90,85 @@ export function WelcomeOverlay() {
       }}
     >
       <div
-        className="bd-panel"
-        style={{
-          width: "100%",
-          maxWidth: 400,
-          padding: "2rem 1.75rem",
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.25rem",
-          borderRadius: "var(--card-radius)",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          boxShadow: "var(--shadow-lg)",
-        }}
+        className="bd-panel bd-welcome-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="bd-welcome-title"
       >
-        {/* Logo / wordmark */}
+        <div className="bd-welcome-steps" aria-hidden>
+          {STEPS.map((s, i) => (
+            <span
+              key={s}
+              className={`bd-welcome-step-dot${STEPS.indexOf(step) >= i ? " bd-welcome-step-dot--active" : ""}`}
+            />
+          ))}
+        </div>
+
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 52,
-              height: 52,
-              borderRadius: "50%",
-              background: "var(--accent)",
-              marginBottom: "0.75rem",
-            }}
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text, #fff)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <div className="bd-welcome-logo" aria-hidden>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text, #fff)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="22" />
             </svg>
           </div>
-          <h1
-            id="bd-welcome-title"
-            style={{
-              margin: 0,
-              fontSize: "1.5rem",
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              color: "var(--text-primary)",
-            }}
-          >
-            Welcome
+          <h1 id="bd-welcome-title" className="bd-welcome-title">
+            {step === "language" && t("welcome.titleLanguage")}
+            {step === "howItWorks" && t("welcome.titleHow")}
+            {step === "ready" && t("welcome.titleReady")}
           </h1>
-          <p style={{ margin: "0.35rem 0 0", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-            Choose the language you&apos;d like to use.
+          <p className="bd-welcome-subtitle">
+            {step === "language" && t("welcome.subtitleLanguage")}
+            {step === "howItWorks" && t("welcome.subtitleHow")}
+            {step === "ready" && t("welcome.subtitleReady")}
           </p>
         </div>
 
-        {/* Language selector */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang.value}
-              type="button"
-              onClick={() => setSelected(lang.value)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0.7rem 1rem",
-                borderRadius: "var(--card-radius, 10px)",
-                border: selected === lang.value
-                  ? "2px solid var(--accent)"
-                  : "2px solid var(--border-default)",
-                background: selected === lang.value
-                  ? "color-mix(in srgb, var(--accent) 10%, var(--bg-primary))"
-                  : "var(--bg-primary)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-                fontSize: "0.95rem",
-                fontWeight: selected === lang.value ? 600 : 400,
-                transition: "border-color 0.15s, background 0.15s",
-                textAlign: "left",
-              }}
-              aria-pressed={selected === lang.value}
-            >
-              <span>{lang.native}</span>
-              {selected === lang.value && (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
+        {step === "language" && (
+          <div className="bd-welcome-lang-list">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.value}
+                type="button"
+                onClick={() => setSelected(lang.value)}
+                className={`bd-welcome-lang-btn${selected === lang.value ? " bd-welcome-lang-btn--selected" : ""}`}
+                aria-pressed={selected === lang.value}
+              >
+                <span>{lang.native}</span>
+                {selected === lang.value && (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Confirm button */}
-        <button
-          type="button"
-          className="bd-btn bd-btn-primary"
-          style={{ width: "100%", padding: "0.7rem", fontSize: "0.95rem", fontWeight: 600, color: "var(--accent-text)" }}
-          onClick={confirm}
-        >
-          Get started
-        </button>
+        {step === "howItWorks" && (
+          <ol className="bd-welcome-flow">
+            <li>{t("welcome.flow1")}</li>
+            <li>{t("welcome.flow2")}</li>
+            <li>{t("welcome.flow3")}</li>
+          </ol>
+        )}
+
+        {step === "ready" && (
+          <p className="bd-welcome-ready-note">{t("welcome.readyNote")}</p>
+        )}
+
+        <div className="bd-welcome-actions">
+          {step !== "language" ? (
+            <button type="button" className="bd-btn" onClick={back}>
+              {t("welcome.back")}
+            </button>
+          ) : (
+            <span />
+          )}
+          <button type="button" className="bd-btn bd-btn-primary" onClick={next}>
+            {step === "ready" ? t("welcome.getStarted") : t("welcome.next")}
+          </button>
+        </div>
       </div>
     </div>
   );

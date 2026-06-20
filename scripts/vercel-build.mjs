@@ -26,7 +26,6 @@ const VITE_APPS = [
   ["BulletGenerator", "/BulletGenerator/"],
   ["PitchDeck", "/PitchDeck/"],
   ["VIdeoRecorder", "/VIdeoRecorder/"],
-  ["SoundEffectsGenerator", "/SoundEffectsGenerator/"],
   ["ReelRecorder", "/ReelRecorder/"],
   ["InfoGraphics", "/InfoGraphics/"],
   ["AutoCaptions", "/AutoCaptions/"],

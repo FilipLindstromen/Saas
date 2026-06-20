@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   build:
+    # Skip full SaaS build when commit message is for iOS-only pipeline.
+    if: ${{ github.event_name != 'push' || github.event.head_commit == null || (github.event.head_commit.message != 'ios' && !startsWith(github.event.head_commit.message, concat('ios', '\n'))) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -112,13 +114,6 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/VIdeoRecorder/
           cp -r dist ../deploy/VIdeoRecorder
-
-      - name: Build Sound Effects Generator
-        run: |
-          cd SoundEffectsGenerator
-          npm install
-          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SoundEffectsGenerator/
-          cp -r dist ../deploy/SoundEffectsGenerator
 
       - name: Build Reel Recorder
         run: |

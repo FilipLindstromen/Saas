@@ -15,8 +15,7 @@ const DEFAULT_KEYS = {
   pixabay: '',
   pexels: '',
   unsplash: '',
-  googleClientId: '',
-  elevenlabs: ''
+  googleClientId: ''
 }
 
 /** Read API keys from environment (root .env on localhost). Only returns keys that are set. */
@@ -31,7 +30,6 @@ function getEnvKeys() {
       if (e.VITE_PIXABAY_API_KEY) out.pixabay = String(e.VITE_PIXABAY_API_KEY).trim()
       if (e.VITE_PEXELS_API_KEY) out.pexels = String(e.VITE_PEXELS_API_KEY).trim()
       if (e.VITE_UNSPLASH_ACCESS_KEY) out.unsplash = String(e.VITE_UNSPLASH_ACCESS_KEY).trim()
-      if (e.VITE_ELEVENLABS_API_KEY) out.elevenlabs = String(e.VITE_ELEVENLABS_API_KEY).trim()
       if (e.VITE_GOOGLE_CLIENT_ID) out.googleClientId = String(e.VITE_GOOGLE_CLIENT_ID).trim()
     }
     // Next.js client: process.env.NEXT_PUBLIC_*
@@ -42,7 +40,6 @@ function getEnvKeys() {
       if (e.NEXT_PUBLIC_PIXABAY_API_KEY) out.pixabay = out.pixabay || String(e.NEXT_PUBLIC_PIXABAY_API_KEY).trim()
       if (e.NEXT_PUBLIC_PEXELS_API_KEY) out.pexels = out.pexels || String(e.NEXT_PUBLIC_PEXELS_API_KEY).trim()
       if (e.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY) out.unsplash = out.unsplash || String(e.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY).trim()
-      if (e.NEXT_PUBLIC_ELEVENLABS_API_KEY) out.elevenlabs = out.elevenlabs || String(e.NEXT_PUBLIC_ELEVENLABS_API_KEY).trim()
       if (e.NEXT_PUBLIC_GOOGLE_CLIENT_ID) out.googleClientId = out.googleClientId || String(e.NEXT_PUBLIC_GOOGLE_CLIENT_ID).trim()
     }
   } catch (err) {
@@ -127,16 +124,6 @@ function migrateFromLegacy() {
     if (rrPixabay) merged.pixabay = merged.pixabay || rrPixabay
     if (rrGiphy) merged.giphy = merged.giphy || rrGiphy
 
-    // SoundEffectsGenerator
-    const seRaw = localStorage.getItem('soundeffects_settings')
-    if (seRaw) {
-      try {
-        const parsed = JSON.parse(seRaw)
-        if (parsed.openaiApiKey) merged.openai = merged.openai || parsed.openaiApiKey
-        if (parsed.elevenlabsApiKey) merged.elevenlabs = merged.elevenlabs || parsed.elevenlabsApiKey
-      } catch {}
-    }
-
     return merged
   } catch (e) {
     return merged
@@ -146,7 +133,7 @@ function migrateFromLegacy() {
 /**
  * Load all API keys. Env (root .env on localhost) overrides localStorage.
  * Migrates from legacy storage on first load when nothing in storage.
- * @returns {{ openai, giphy, pixabay, pexels, unsplash, googleClientId, elevenlabs }}
+ * @returns {{ openai, giphy, pixabay, pexels, unsplash, googleClientId }}
  */
 export function loadApiKeys() {
   try {

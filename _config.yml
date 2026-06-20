@@ -30,7 +30,6 @@ exclude:
   - PostIt
   - PitchDeck
   - VIdeoRecorder
-  - SoundEffectsGenerator
   - Typography
   - VSLWriter
   - PowerWriter

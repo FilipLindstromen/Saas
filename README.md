@@ -25,7 +25,6 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
 | Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |
-| Sound Effects Generator | `/SoundEffectsGenerator` | Sound effects creation |
 | Typography | `/Typography` | Typography tools |
 | VSL Writer | `/VSLWriter` | Video sales letter writer |
 | Content Generator | `/ContentGenerator` | Reddit pain points → video questions for personal development |
@@ -109,7 +108,6 @@ Use the default base path (`/`) for local development; only use the `--base` fla
 │       └── client/      # Power Writer app
 ├── VIdeoRecorder/
 ├── ReelRecorder/
-├── SoundEffectsGenerator/
 ├── Typography/
 ├── VSLWriter/
 ├── conversation-generator/

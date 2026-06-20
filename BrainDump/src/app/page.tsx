@@ -14,7 +14,8 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { TodayView } from "@/components/TodayView";
 import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WelcomeOverlay } from "@/components/WelcomeOverlay";
+import { DumpSuccessBar } from "@/components/DumpSuccessBar";
+import { WelcomeOverlay, WELCOME_COMPLETE_EVENT } from "@/components/WelcomeOverlay";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { useHabitRemindersTick } from "@/hooks/useHabitRemindersTick";
@@ -54,7 +55,7 @@ export default function BrainDumpPage() {
   const { t } = useI18n();
   useHabitRemindersTick(t);
   const { data: session, status } = useSession();
-  const [mode, setMode] = useState<Mode>("work");
+  const [mode, setMode] = useState<Mode>("all");
   const [organizedItems, setOrganizedItems] = useState<OrganizedItemPreview[]>([]);
   const [organizedTranscript, setOrganizedTranscript] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -76,6 +77,7 @@ export default function BrainDumpPage() {
   const [topBarEnd, setTopBarEnd] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
+  const [dumpSuccess, setDumpSuccess] = useState<{ count: number } | null>(null);
   const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
 
   useEffect(() => {
@@ -83,10 +85,20 @@ export default function BrainDumpPage() {
   }, []);
 
   useEffect(() => {
+    const onWelcomeComplete = () => {
+      setTodayViewActive(true);
+      setMode("all");
+    };
+    window.addEventListener(WELCOME_COMPLETE_EVENT, onWelcomeComplete);
+    return () => window.removeEventListener(WELCOME_COMPLETE_EVENT, onWelcomeComplete);
+  }, []);
+
+  useEffect(() => {
     if (status === "unauthenticated") {
       void getProviders().then(setAuthProviders);
     }
   }, [status]);
+
   const [isMobileLayout, setIsMobileLayout] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
@@ -477,6 +489,15 @@ export default function BrainDumpPage() {
     setSearchFilter("");
   }, []);
 
+  const handleDumpSaved = useCallback((count: number) => {
+    if (count > 0) setDumpSuccess({ count });
+  }, []);
+
+  const handleViewNewDumpItems = useCallback(() => {
+    setDumpSuccess(null);
+    handleDumpFinished();
+  }, [handleDumpFinished]);
+
   const handleSaveComplete = useCallback((createdIds?: string[]) => {
     setOrganizedItems([]);
     setOrganizedTranscript("");
@@ -527,6 +548,11 @@ export default function BrainDumpPage() {
             <p style={{ marginTop: "0.4rem", fontSize: "0.95rem", color: "var(--text-secondary)" }}>
               {t("auth.signInPrompt")}
             </p>
+            <ul className="bd-auth-gate-value-list">
+              <li>{t("auth.valueCapture")}</li>
+              <li>{t("auth.valueOrganize")}</li>
+              <li>{t("auth.valueToday")}</li>
+            </ul>
           </div>
           <nav className="bd-auth-gate-actions" aria-label={t("auth.gateNavAria")}>
             <Link href="/login" className="bd-btn bd-btn-primary">
@@ -613,6 +639,7 @@ export default function BrainDumpPage() {
               onOrganized={handleOrganized}
               onAutoSave={handleAutoSave}
               onDumpFinished={handleDumpFinished}
+              onDumpSaved={handleDumpSaved}
               onOpenSettings={() => setShowSettings(true)}
               onWorkProjectsChanged={refreshWorkProjectNames}
               projectNames={projectNames}
@@ -682,6 +709,14 @@ export default function BrainDumpPage() {
           />
         </div>
       </div>
+
+      {dumpSuccess ? (
+        <DumpSuccessBar
+          count={dumpSuccess.count}
+          onViewNewItems={handleViewNewDumpItems}
+          onDismiss={() => setDumpSuccess(null)}
+        />
+      ) : null}
 
       {trashUndo ? (
         <div className="bd-trash-undo-bar" role="status" aria-live="polite">

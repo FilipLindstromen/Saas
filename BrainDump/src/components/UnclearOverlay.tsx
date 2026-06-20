@@ -4,12 +4,6 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import type { OrganizedItemPreview } from "./CenterPanel";
 
-const DOMAINS = ["inbox", "work", "personal"] as const;
-const CATEGORIES_WORK = ["projects", "tasks", "notes", "ideas", "meetings", "decisions", "problems", "opportunities"];
-const CATEGORIES_PERSONAL = ["feeling", "thoughts", "hobbies", "goals", "health", "relationships", "shopping"];
-const CATEGORIES_INBOX = ["unprocessed", "needs_review"];
-const ITEM_TYPES = ["task", "task_completed", "shopping", "note", "idea", "emotion", "reflection", "calendar", "problem", "decision", "journal_entry", "project_update"];
-
 interface UnclearOverlayProps {
   items: OrganizedItemPreview[];
   projectNames: string[];
@@ -17,24 +11,62 @@ interface UnclearOverlayProps {
   onCancel: () => void;
 }
 
-const DOMAIN_LABEL: Record<string, string> = {
-  inbox: "mode.inbox",
-  work: "mode.work",
-  personal: "mode.personal",
-};
+const DOMAIN_OPTIONS = [
+  { value: "work", labelKey: "unclear.domainWork" },
+  { value: "personal", labelKey: "unclear.domainPersonal" },
+  { value: "inbox", labelKey: "unclear.domainInbox" },
+] as const;
+
+const KIND_OPTIONS: { value: string; labelKey: string; category: Record<string, string> }[] = [
+  { value: "task", labelKey: "unclear.kindTask", category: { work: "tasks", personal: "tasks", inbox: "unprocessed" } },
+  { value: "note", labelKey: "unclear.kindNote", category: { work: "notes", personal: "thoughts", inbox: "unprocessed" } },
+  { value: "calendar", labelKey: "unclear.kindCalendar", category: { work: "meetings", personal: "tasks", inbox: "unprocessed" } },
+  { value: "shopping", labelKey: "unclear.kindShopping", category: { work: "tasks", personal: "shopping", inbox: "unprocessed" } },
+  { value: "reflection", labelKey: "unclear.kindReflection", category: { work: "notes", personal: "feeling", inbox: "unprocessed" } },
+  { value: "idea", labelKey: "unclear.kindIdea", category: { work: "ideas", personal: "hobbies", inbox: "unprocessed" } },
+];
+
+function defaultCategory(domain: string, itemType: string): string {
+  const kind = KIND_OPTIONS.find((k) => k.value === itemType);
+  if (!kind) return domain === "work" ? "tasks" : domain === "personal" ? "thoughts" : "unprocessed";
+  return kind.category[domain as keyof typeof kind.category] ?? "unprocessed";
+}
 
 export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: UnclearOverlayProps) {
   const { t } = useI18n();
   const [edited, setEdited] = useState<OrganizedItemPreview[]>(() =>
-    items.map((it) => ({ ...it, domain: it.domain || "inbox", category: it.category || "unprocessed", item_type: it.item_type || "note" }))
+    items.map((it) => ({
+      ...it,
+      domain: it.domain || "personal",
+      category: it.category || defaultCategory(it.domain || "personal", it.item_type || "note"),
+      item_type: it.item_type || "note",
+    }))
   );
+  const [showAdvanced, setShowAdvanced] = useState<Record<number, boolean>>({});
 
   const update = (index: number, updates: Partial<OrganizedItemPreview>) => {
     setEdited((prev) => prev.map((it, i) => (i === index ? { ...it, ...updates } : it)));
   };
 
-  const categoriesForDomain = (domain: string) =>
-    domain === "work" ? CATEGORIES_WORK : domain === "personal" ? CATEGORIES_PERSONAL : CATEGORIES_INBOX;
+  const setDomain = (index: number, domain: string) => {
+    const item = edited[index];
+    if (!item) return;
+    update(index, {
+      domain,
+      category: defaultCategory(domain, item.item_type || "note"),
+      project_name: domain === "work" ? item.project_name : undefined,
+    });
+  };
+
+  const setKind = (index: number, itemType: string) => {
+    const item = edited[index];
+    if (!item) return;
+    const domain = item.domain || "personal";
+    update(index, {
+      item_type: itemType,
+      category: defaultCategory(domain, itemType),
+    });
+  };
 
   return (
     <div
@@ -44,105 +76,102 @@ export function UnclearOverlay({ items, projectNames, onConfirm, onCancel }: Unc
       className="bd-modal-backdrop"
       onClick={onCancel}
     >
-      <div
-        className="bd-modal-panel"
-        style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-default)",
-          borderRadius: "var(--card-radius)",
-          maxWidth: "560px",
-          width: "100%",
-          maxHeight: "85vh",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "var(--shadow-xl)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--border-subtle)" }}>
-          <h2 id="unclear-title" style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text-primary)" }}>
-            {t("unclear.heading")}
-          </h2>
-          <p style={{ margin: "0.25rem 0 0", fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>
-            {t("unclear.body")}
-          </p>
+      <div className="bd-modal-panel bd-unclear-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="bd-unclear-header">
+          <h2 id="unclear-title">{t("unclear.heading")}</h2>
+          <p>{t("unclear.body")}</p>
         </div>
-        <div style={{ overflow: "auto", flex: 1, padding: "1rem" }}>
+        <div className="bd-unclear-body">
           {edited.map((it, index) => (
-            <div
-              key={index}
-              style={{
-                padding: "0.75rem",
-                marginBottom: "0.75rem",
-                border: "1px solid var(--border-default)",
-                borderRadius: "var(--button-radius)",
-                background: "var(--bg-tertiary)",
-              }}
-            >
-              <div style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--text-primary)", marginBottom: "0.5rem" }}>
-                {it.title}
-              </div>
-              {it.content && (
-                <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.5rem", maxHeight: "2.5em", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {it.content}
+            <div key={index} className="bd-unclear-card">
+              <div className="bd-unclear-card-title">{it.title}</div>
+              {it.content ? <div className="bd-unclear-card-preview">{it.content}</div> : null}
+
+              <div className="bd-unclear-question">
+                <span className="bd-unclear-question-label">{t("unclear.questionDomain")}</span>
+                <div className="bd-unclear-chip-row" role="group" aria-label={t("unclear.questionDomain")}>
+                  {DOMAIN_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`bd-unclear-chip${it.domain === opt.value ? " bd-unclear-chip--active" : ""}`}
+                      aria-pressed={it.domain === opt.value}
+                      onClick={() => setDomain(index, opt.value)}
+                    >
+                      {t(opt.labelKey)}
+                    </button>
+                  ))}
                 </div>
-              )}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                <select
-                  className="bd-input"
-                  value={it.domain}
-                  onChange={(e) => {
-                    const d = e.target.value as "inbox" | "work" | "personal";
-                    const first = categoriesForDomain(d)[0];
-                    update(index, { domain: d, category: first });
-                  }}
-                  style={{ width: "auto", minWidth: "6rem" }}
-                >
-                  {DOMAINS.map((d) => (
-                    <option key={d} value={d}>{t(DOMAIN_LABEL[d] ?? `mode.${d}`)}</option>
-                  ))}
-                </select>
-                <select
-                  className="bd-input"
-                  value={it.category}
-                  onChange={(e) => update(index, { category: e.target.value })}
-                  style={{ width: "auto", minWidth: "7rem" }}
-                >
-                  {categoriesForDomain(it.domain).map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                <select
-                  className="bd-input"
-                  value={it.item_type}
-                  onChange={(e) => update(index, { item_type: e.target.value })}
-                  style={{ width: "auto", minWidth: "7rem" }}
-                >
-                  {ITEM_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-                {projectNames.length > 0 && (
-                  <select
-                    className="bd-input"
-                    value={it.project_name ?? ""}
-                    onChange={(e) => update(index, { project_name: e.target.value || undefined })}
-                    style={{ width: "auto", minWidth: "6rem" }}
-                  >
-                    <option value="">{t("menu.noProject")}</option>
-                    {projectNames.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                )}
               </div>
+
+              <div className="bd-unclear-question">
+                <span className="bd-unclear-question-label">{t("unclear.questionKind")}</span>
+                <div className="bd-unclear-chip-row" role="group" aria-label={t("unclear.questionKind")}>
+                  {KIND_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`bd-unclear-chip${it.item_type === opt.value ? " bd-unclear-chip--active" : ""}`}
+                      aria-pressed={it.item_type === opt.value}
+                      onClick={() => setKind(index, opt.value)}
+                    >
+                      {t(opt.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(it.domain === "work" && projectNames.length > 0) || showAdvanced[index] ? (
+                <div className="bd-unclear-advanced">
+                  {it.domain === "work" && projectNames.length > 0 ? (
+                    <label className="bd-unclear-field">
+                      <span>{t("unclear.projectOptional")}</span>
+                      <select
+                        className="bd-input"
+                        value={it.project_name ?? ""}
+                        onChange={(e) => update(index, { project_name: e.target.value || undefined })}
+                      >
+                        <option value="">{t("menu.noProject")}</option>
+                        {projectNames.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {showAdvanced[index] ? (
+                    <label className="bd-unclear-field">
+                      <span>{t("unclear.categoryAdvanced")}</span>
+                      <input
+                        className="bd-input"
+                        value={it.category}
+                        onChange={(e) => update(index, { category: e.target.value })}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {!showAdvanced[index] ? (
+                <button
+                  type="button"
+                  className="bd-unclear-advanced-toggle"
+                  onClick={() => setShowAdvanced((prev) => ({ ...prev, [index]: true }))}
+                >
+                  {t("unclear.showAdvanced")}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
-        <div style={{ padding: "1rem", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-          <button type="button" className="bd-btn" onClick={onCancel}>{t("menu.cancel")}</button>
-          <button type="button" className="bd-btn bd-btn-primary" onClick={() => onConfirm(edited)}>{t("unclear.applyContinue")}</button>
+        <div className="bd-unclear-footer">
+          <button type="button" className="bd-btn" onClick={onCancel}>
+            {t("unclear.useAiGuess")}
+          </button>
+          <button type="button" className="bd-btn bd-btn-primary" onClick={() => onConfirm(edited)}>
+            {t("unclear.applyContinue")}
+          </button>
         </div>
       </div>
     </div>
