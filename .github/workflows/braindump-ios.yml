@@ -1,6 +1,7 @@
 name: BrainDump iOS (TestFlight)
 
-# Runs only when the commit message is exactly "Build" (one line: `git commit -m "Build"`).
+# Runs only when the first line of the commit message is "ios" (case-insensitive).
+# Example: git commit -m "ios"
 on:
   push:
     branches:
@@ -19,7 +20,7 @@ defaults:
 
 jobs:
   beta:
-    if: ${{ github.event_name == 'push' && github.event.head_commit != null && github.event.head_commit.message == 'Build' }}
+    if: ${{ github.event_name == 'push' && github.event.head_commit != null && toLower(split(github.event.head_commit.message, '\n')[0]) == 'ios' }}
     runs-on: macos-latest
     steps:
       - name: Checkout
