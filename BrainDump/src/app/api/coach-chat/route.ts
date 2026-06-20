@@ -4,7 +4,11 @@ import { prisma } from "@/lib/db";
 import { getDbErrorMessage } from "@/lib/db-error";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
 import { coachModeStyleInstruction, parseCoachMode } from "@/lib/coach-modes";
-import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-list-order";
+import {
+  getAiInstructionOverrides,
+  resolveCoachSystemPromptBase,
+} from "@/lib/ai-instructions";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -141,16 +145,13 @@ export async function POST(request: NextRequest) {
       ? `\n\n### Recent brain-dump transcripts (may overlap with items)\n${dumpsBlock}`
       : "";
 
-    const system = `You are a supportive productivity and wellbeing coach. The user uses BrainDump: they capture voice or text dumps and organize them into tasks, notes, ideas, reflections, shopping, calendar entries, and work/personal areas.
+    const aiOverrides = await getAiInstructionOverrides();
+    const coachBase = resolveCoachSystemPromptBase(aiOverrides).replace(
+      /\{\{REPLY_LANG\}\}/g,
+      replyLang
+    );
 
-You have a snapshot of their saved workspace below (titles, types, areas, projects, schedules, tags). Use it to personalize advice — reference specific items or themes when helpful, without pasting the whole list back.
-
-Rules:
-- Be warm, direct, and concise. Prefer short paragraphs or tight bullet steps.
-- Help prioritize, reflect, plan, unblock, or notice patterns — avoid generic fluff.
-- If the workspace is empty or nearly empty, acknowledge that and suggest a gentle first step (one small capture or one tiny task).
-- You cannot edit the app; you only coach. If they want new tasks in the app, suggest clear wording they could add via BrainDump.
-- ${replyLang}
+    const system = `${coachBase}
 
 ${styleBlock}
 

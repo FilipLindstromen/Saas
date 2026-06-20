@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { SITE_CONFIG_CHANGED_EVENT } from "@/components/SiteConfigProvider";
+import { AdminAiInstructionsSection } from "@/components/AdminAiInstructionsSection";
 
 type AdminUser = {
   id: string;
@@ -22,6 +23,20 @@ type UsersPayload = {
   page: number;
   pages: number;
   pageSize: number;
+};
+
+type AiInstructionDefaults = {
+  organizeSystemPromptEn: string;
+  organizeSystemPromptSv: string;
+  coachSystemPrompt: string;
+};
+
+type AdminSettingsPayload = {
+  revenueCatEnabled?: boolean;
+  organizeSystemPromptEn?: string | null;
+  organizeSystemPromptSv?: string | null;
+  coachSystemPrompt?: string | null;
+  defaults?: AiInstructionDefaults;
 };
 
 type StatsPayload = {
@@ -110,6 +125,15 @@ export default function AdminDashboardPage() {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [rc, setRc] = useState<boolean | null>(null);
   const [rcSaving, setRcSaving] = useState(false);
+  const [organizeEn, setOrganizeEn] = useState("");
+  const [organizeSv, setOrganizeSv] = useState("");
+  const [coachPrompt, setCoachPrompt] = useState("");
+  const [aiDefaults, setAiDefaults] = useState<AiInstructionDefaults | null>(null);
+  const [aiUsingCustomEn, setAiUsingCustomEn] = useState(false);
+  const [aiUsingCustomSv, setAiUsingCustomSv] = useState(false);
+  const [aiUsingCustomCoach, setAiUsingCustomCoach] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
 
   const [usersData, setUsersData] = useState<UsersPayload | null>(null);
   const [usersPage, setUsersPage] = useState(1);
@@ -137,8 +161,17 @@ export default function AdminDashboardPage() {
   const loadSettings = useCallback(async () => {
     const res = await fetch("/api/admin/settings", { cache: "no-store" });
     if (!res.ok) return;
-    const d = (await res.json()) as { revenueCatEnabled?: boolean };
+    const d = (await res.json()) as AdminSettingsPayload;
     if (typeof d.revenueCatEnabled === "boolean") setRc(d.revenueCatEnabled);
+    if (d.defaults) {
+      setAiDefaults(d.defaults);
+      setOrganizeEn(d.organizeSystemPromptEn ?? d.defaults.organizeSystemPromptEn);
+      setOrganizeSv(d.organizeSystemPromptSv ?? d.defaults.organizeSystemPromptSv);
+      setCoachPrompt(d.coachSystemPrompt ?? d.defaults.coachSystemPrompt);
+      setAiUsingCustomEn(d.organizeSystemPromptEn != null);
+      setAiUsingCustomSv(d.organizeSystemPromptSv != null);
+      setAiUsingCustomCoach(d.coachSystemPrompt != null);
+    }
   }, []);
 
   const loadUsers = useCallback(async (page: number, search: string) => {
@@ -193,6 +226,68 @@ export default function AdminDashboardPage() {
       }
     } finally {
       setRcSaving(false);
+    }
+  };
+
+  const promptOverrideOrNull = (value: string, defaultValue: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed === defaultValue.trim() ? null : trimmed;
+  };
+
+  const saveAiInstructions = async () => {
+    if (!aiDefaults) return;
+    setAiSaving(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizeSystemPromptEn: promptOverrideOrNull(organizeEn, aiDefaults.organizeSystemPromptEn),
+          organizeSystemPromptSv: promptOverrideOrNull(organizeSv, aiDefaults.organizeSystemPromptSv),
+          coachSystemPrompt: promptOverrideOrNull(coachPrompt, aiDefaults.coachSystemPrompt),
+        }),
+      });
+      const data = (await res.json()) as AdminSettingsPayload & { error?: string };
+      if (!res.ok) {
+        setAiMessage(data.error ?? "Could not save AI instructions.");
+        return;
+      }
+      setAiUsingCustomEn(data.organizeSystemPromptEn != null);
+      setAiUsingCustomSv(data.organizeSystemPromptSv != null);
+      setAiUsingCustomCoach(data.coachSystemPrompt != null);
+      setAiMessage("Saved. All users will use these prompts for organize and coach.");
+    } finally {
+      setAiSaving(false);
+    }
+  };
+
+  const resetAiInstructions = async () => {
+    if (!aiDefaults) return;
+    setOrganizeEn(aiDefaults.organizeSystemPromptEn);
+    setOrganizeSv(aiDefaults.organizeSystemPromptSv);
+    setCoachPrompt(aiDefaults.coachSystemPrompt);
+    setAiSaving(true);
+    setAiMessage(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizeSystemPromptEn: null,
+          organizeSystemPromptSv: null,
+          coachSystemPrompt: null,
+        }),
+      });
+      if (res.ok) {
+        setAiUsingCustomEn(false);
+        setAiUsingCustomSv(false);
+        setAiUsingCustomCoach(false);
+        setAiMessage("Reset to built-in defaults.");
+      }
+    } finally {
+      setAiSaving(false);
     }
   };
 
@@ -267,6 +362,47 @@ export default function AdminDashboardPage() {
           <p style={{ color: "var(--accent)", margin: 0 }}>Could not load stats (database or schema issue?). Check server logs.</p>
         )}
 
+        <section
+          style={{
+            padding: "1rem 1.1rem",
+            borderRadius: "var(--card-radius)",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <h2 style={{ fontSize: "1.05rem", margin: "0 0 0.5rem" }}>RevenueCat (global)</h2>
+          <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", margin: "0 0 0.75rem", maxWidth: 640 }}>
+            Controlled server-side. Users no longer see this in Settings. Turning it off signals the app to skip paywall / SDK hooks that read this flag.
+          </p>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: rcSaving ? "wait" : "pointer" }}>
+            <input
+              type="checkbox"
+              checked={rc !== false}
+              disabled={rc === null || rcSaving}
+              onChange={(e) => void saveRc(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: "var(--accent)" }}
+            />
+            <span style={{ fontWeight: 600 }}>RevenueCat enabled</span>
+          </label>
+        </section>
+
+        <AdminAiInstructionsSection
+          organizeEn={organizeEn}
+          organizeSv={organizeSv}
+          coachPrompt={coachPrompt}
+          aiDefaultsLoaded={aiDefaults != null}
+          aiUsingCustomEn={aiUsingCustomEn}
+          aiUsingCustomSv={aiUsingCustomSv}
+          aiUsingCustomCoach={aiUsingCustomCoach}
+          aiSaving={aiSaving}
+          aiMessage={aiMessage}
+          onOrganizeEnChange={setOrganizeEn}
+          onOrganizeSvChange={setOrganizeSv}
+          onCoachPromptChange={setCoachPrompt}
+          onSave={() => void saveAiInstructions()}
+          onReset={() => void resetAiInstructions()}
+        />
+
         {stats && (
           <>
             <section>
@@ -316,30 +452,6 @@ export default function AdminDashboardPage() {
                   /api/auth/oauth-redirect-hints
                 </a>
               </p>
-            </section>
-
-            <section
-              style={{
-                padding: "1rem 1.1rem",
-                borderRadius: "var(--card-radius)",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
-              <h2 style={{ fontSize: "1.05rem", margin: "0 0 0.5rem" }}>RevenueCat (global)</h2>
-              <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", margin: "0 0 0.75rem", maxWidth: 640 }}>
-                Controlled server-side. Users no longer see this in Settings. Turning it off signals the app to skip paywall / SDK hooks that read this flag.
-              </p>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", cursor: rcSaving ? "wait" : "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={rc !== false}
-                  disabled={rc === null || rcSaving}
-                  onChange={(e) => void saveRc(e.target.checked)}
-                  style={{ width: 18, height: 18, accentColor: "var(--accent)" }}
-                />
-                <span style={{ fontWeight: 600 }}>RevenueCat enabled</span>
-              </label>
             </section>
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>

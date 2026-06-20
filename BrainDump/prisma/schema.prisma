@@ -154,9 +154,15 @@ model UserGamification {
 
 /// Singleton row with `id: "global"` for server-controlled feature flags (admin dashboard).
 model SiteSettings {
-  id                String   @id
-  revenueCatEnabled Boolean  @default(true)
-  updatedAt         DateTime @updatedAt
+  id                    String   @id
+  revenueCatEnabled       Boolean  @default(true)
+  /// When set, replaces the built-in English organize system prompt for all users.
+  organizeSystemPromptEn  String?  @db.Text
+  /// When set, replaces the built-in Swedish organize system prompt for all users.
+  organizeSystemPromptSv  String?  @db.Text
+  /// When set, replaces the built-in coach chat base prompt (use {{REPLY_LANG}} for language rule).
+  coachSystemPrompt       String?  @db.Text
+  updatedAt               DateTime @updatedAt
 }
 
 /// One-time token for email/password reset flow

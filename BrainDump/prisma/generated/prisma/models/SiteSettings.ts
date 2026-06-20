@@ -27,18 +27,27 @@ export type AggregateSiteSettings = {
 export type SiteSettingsMinAggregateOutputType = {
   id: string | null
   revenueCatEnabled: boolean | null
+  organizeSystemPromptEn: string | null
+  organizeSystemPromptSv: string | null
+  coachSystemPrompt: string | null
   updatedAt: Date | null
 }
 
 export type SiteSettingsMaxAggregateOutputType = {
   id: string | null
   revenueCatEnabled: boolean | null
+  organizeSystemPromptEn: string | null
+  organizeSystemPromptSv: string | null
+  coachSystemPrompt: string | null
   updatedAt: Date | null
 }
 
 export type SiteSettingsCountAggregateOutputType = {
   id: number
   revenueCatEnabled: number
+  organizeSystemPromptEn: number
+  organizeSystemPromptSv: number
+  coachSystemPrompt: number
   updatedAt: number
   _all: number
 }
@@ -47,18 +56,27 @@ export type SiteSettingsCountAggregateOutputType = {
 export type SiteSettingsMinAggregateInputType = {
   id?: true
   revenueCatEnabled?: true
+  organizeSystemPromptEn?: true
+  organizeSystemPromptSv?: true
+  coachSystemPrompt?: true
   updatedAt?: true
 }
 
 export type SiteSettingsMaxAggregateInputType = {
   id?: true
   revenueCatEnabled?: true
+  organizeSystemPromptEn?: true
+  organizeSystemPromptSv?: true
+  coachSystemPrompt?: true
   updatedAt?: true
 }
 
 export type SiteSettingsCountAggregateInputType = {
   id?: true
   revenueCatEnabled?: true
+  organizeSystemPromptEn?: true
+  organizeSystemPromptSv?: true
+  coachSystemPrompt?: true
   updatedAt?: true
   _all?: true
 }
@@ -138,6 +156,9 @@ export type SiteSettingsGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 export type SiteSettingsGroupByOutputType = {
   id: string
   revenueCatEnabled: boolean
+  organizeSystemPromptEn: string | null
+  organizeSystemPromptSv: string | null
+  coachSystemPrompt: string | null
   updatedAt: Date
   _count: SiteSettingsCountAggregateOutputType | null
   _min: SiteSettingsMinAggregateOutputType | null
@@ -165,12 +186,18 @@ export type SiteSettingsWhereInput = {
   NOT?: Prisma.SiteSettingsWhereInput | Prisma.SiteSettingsWhereInput[]
   id?: Prisma.StringFilter<"SiteSettings"> | string
   revenueCatEnabled?: Prisma.BoolFilter<"SiteSettings"> | boolean
+  organizeSystemPromptEn?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
+  organizeSystemPromptSv?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
+  coachSystemPrompt?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"SiteSettings"> | Date | string
 }
 
 export type SiteSettingsOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   revenueCatEnabled?: Prisma.SortOrder
+  organizeSystemPromptEn?: Prisma.SortOrderInput | Prisma.SortOrder
+  organizeSystemPromptSv?: Prisma.SortOrderInput | Prisma.SortOrder
+  coachSystemPrompt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -180,12 +207,18 @@ export type SiteSettingsWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.SiteSettingsWhereInput[]
   NOT?: Prisma.SiteSettingsWhereInput | Prisma.SiteSettingsWhereInput[]
   revenueCatEnabled?: Prisma.BoolFilter<"SiteSettings"> | boolean
+  organizeSystemPromptEn?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
+  organizeSystemPromptSv?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
+  coachSystemPrompt?: Prisma.StringNullableFilter<"SiteSettings"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"SiteSettings"> | Date | string
 }, "id">
 
 export type SiteSettingsOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   revenueCatEnabled?: Prisma.SortOrder
+  organizeSystemPromptEn?: Prisma.SortOrderInput | Prisma.SortOrder
+  organizeSystemPromptSv?: Prisma.SortOrderInput | Prisma.SortOrder
+  coachSystemPrompt?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SiteSettingsCountOrderByAggregateInput
   _max?: Prisma.SiteSettingsMaxOrderByAggregateInput
@@ -198,66 +231,99 @@ export type SiteSettingsScalarWhereWithAggregatesInput = {
   NOT?: Prisma.SiteSettingsScalarWhereWithAggregatesInput | Prisma.SiteSettingsScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"SiteSettings"> | string
   revenueCatEnabled?: Prisma.BoolWithAggregatesFilter<"SiteSettings"> | boolean
+  organizeSystemPromptEn?: Prisma.StringNullableWithAggregatesFilter<"SiteSettings"> | string | null
+  organizeSystemPromptSv?: Prisma.StringNullableWithAggregatesFilter<"SiteSettings"> | string | null
+  coachSystemPrompt?: Prisma.StringNullableWithAggregatesFilter<"SiteSettings"> | string | null
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"SiteSettings"> | Date | string
 }
 
 export type SiteSettingsCreateInput = {
   id: string
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: string | null
+  organizeSystemPromptSv?: string | null
+  coachSystemPrompt?: string | null
   updatedAt?: Date | string
 }
 
 export type SiteSettingsUncheckedCreateInput = {
   id: string
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: string | null
+  organizeSystemPromptSv?: string | null
+  coachSystemPrompt?: string | null
   updatedAt?: Date | string
 }
 
 export type SiteSettingsUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   revenueCatEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organizeSystemPromptEn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizeSystemPromptSv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coachSystemPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type SiteSettingsUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   revenueCatEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organizeSystemPromptEn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizeSystemPromptSv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coachSystemPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type SiteSettingsCreateManyInput = {
   id: string
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: string | null
+  organizeSystemPromptSv?: string | null
+  coachSystemPrompt?: string | null
   updatedAt?: Date | string
 }
 
 export type SiteSettingsUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   revenueCatEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organizeSystemPromptEn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizeSystemPromptSv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coachSystemPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type SiteSettingsUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   revenueCatEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  organizeSystemPromptEn?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizeSystemPromptSv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coachSystemPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type SiteSettingsCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   revenueCatEnabled?: Prisma.SortOrder
+  organizeSystemPromptEn?: Prisma.SortOrder
+  organizeSystemPromptSv?: Prisma.SortOrder
+  coachSystemPrompt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type SiteSettingsMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   revenueCatEnabled?: Prisma.SortOrder
+  organizeSystemPromptEn?: Prisma.SortOrder
+  organizeSystemPromptSv?: Prisma.SortOrder
+  coachSystemPrompt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type SiteSettingsMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   revenueCatEnabled?: Prisma.SortOrder
+  organizeSystemPromptEn?: Prisma.SortOrder
+  organizeSystemPromptSv?: Prisma.SortOrder
+  coachSystemPrompt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -270,28 +336,40 @@ export type BoolFieldUpdateOperationsInput = {
 export type SiteSettingsSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: boolean
+  organizeSystemPromptSv?: boolean
+  coachSystemPrompt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["siteSettings"]>
 
 export type SiteSettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: boolean
+  organizeSystemPromptSv?: boolean
+  coachSystemPrompt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["siteSettings"]>
 
 export type SiteSettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: boolean
+  organizeSystemPromptSv?: boolean
+  coachSystemPrompt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["siteSettings"]>
 
 export type SiteSettingsSelectScalar = {
   id?: boolean
   revenueCatEnabled?: boolean
+  organizeSystemPromptEn?: boolean
+  organizeSystemPromptSv?: boolean
+  coachSystemPrompt?: boolean
   updatedAt?: boolean
 }
 
-export type SiteSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "revenueCatEnabled" | "updatedAt", ExtArgs["result"]["siteSettings"]>
+export type SiteSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "revenueCatEnabled" | "organizeSystemPromptEn" | "organizeSystemPromptSv" | "coachSystemPrompt" | "updatedAt", ExtArgs["result"]["siteSettings"]>
 
 export type $SiteSettingsPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "SiteSettings"
@@ -299,6 +377,18 @@ export type $SiteSettingsPayload<ExtArgs extends runtime.Types.Extensions.Intern
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     revenueCatEnabled: boolean
+    /**
+     * When set, replaces the built-in English organize system prompt for all users.
+     */
+    organizeSystemPromptEn: string | null
+    /**
+     * When set, replaces the built-in Swedish organize system prompt for all users.
+     */
+    organizeSystemPromptSv: string | null
+    /**
+     * When set, replaces the built-in coach chat base prompt (use {{REPLY_LANG}} for language rule).
+     */
+    coachSystemPrompt: string | null
     updatedAt: Date
   }, ExtArgs["result"]["siteSettings"]>
   composites: {}
@@ -725,6 +815,9 @@ export interface Prisma__SiteSettingsClient<T, Null = never, ExtArgs extends run
 export interface SiteSettingsFieldRefs {
   readonly id: Prisma.FieldRef<"SiteSettings", 'String'>
   readonly revenueCatEnabled: Prisma.FieldRef<"SiteSettings", 'Boolean'>
+  readonly organizeSystemPromptEn: Prisma.FieldRef<"SiteSettings", 'String'>
+  readonly organizeSystemPromptSv: Prisma.FieldRef<"SiteSettings", 'String'>
+  readonly coachSystemPrompt: Prisma.FieldRef<"SiteSettings", 'String'>
   readonly updatedAt: Prisma.FieldRef<"SiteSettings", 'DateTime'>
 }
     

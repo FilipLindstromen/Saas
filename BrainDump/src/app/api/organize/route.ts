@@ -3,7 +3,11 @@ import { organizeTranscriptResilient } from "@/lib/organize-engine";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { resolveOpenAiApiKey } from "@/lib/resolve-openai-api-key";
-import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-schema";
+import { ensureOrganizedItemListOrderColumn } from "@/lib/ensure-organized-item-list-order";
+import {
+  getAiInstructionOverrides,
+  resolveOrganizeSystemPromptBase,
+} from "@/lib/ai-instructions";
 
 export const maxDuration = 120;
 
@@ -54,6 +58,9 @@ export async function POST(request: NextRequest) {
     const referenceLocalDateRaw = typeof body.referenceLocalDate === "string" ? body.referenceLocalDate.trim() : "";
     const referenceLocalDate = /^\d{4}-\d{2}-\d{2}$/.test(referenceLocalDateRaw) ? referenceLocalDateRaw : undefined;
 
+    const aiOverrides = await getAiInstructionOverrides();
+    const systemPromptBase = resolveOrganizeSystemPromptBase(locale, aiOverrides);
+
     let existingCategories: string[] | undefined;
     if (userId && (defaultDomain === "work" || defaultDomain === "personal")) {
       const rows = await prisma.organizedItem.groupBy({
@@ -69,6 +76,7 @@ export async function POST(request: NextRequest) {
       existingCategories,
       customCategories,
       locale,
+      systemPromptBase,
       ...(referenceIso ? { referenceIso } : {}),
       ...(referenceLocalDate ? { referenceLocalDate } : {}),
     };

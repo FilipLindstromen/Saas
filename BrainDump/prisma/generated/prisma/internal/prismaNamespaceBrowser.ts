@@ -192,6 +192,9 @@ export type UserGamificationScalarFieldEnum = (typeof UserGamificationScalarFiel
 export const SiteSettingsScalarFieldEnum = {
   id: 'id',
   revenueCatEnabled: 'revenueCatEnabled',
+  organizeSystemPromptEn: 'organizeSystemPromptEn',
+  organizeSystemPromptSv: 'organizeSystemPromptSv',
+  coachSystemPrompt: 'coachSystemPrompt',
   updatedAt: 'updatedAt'
 } as const
 

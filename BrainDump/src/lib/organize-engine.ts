@@ -241,6 +241,8 @@ export interface OrganizeOptions {
   referenceLocalDate?: string;
   /** When organizing a transcript in multiple API passes (long text). */
   chunkPart?: { index: number; total: number };
+  /** Admin override for the base system prompt (before project/category hints). */
+  systemPromptBase?: string;
 }
 
 const TRANSCRIPT_MAX_CHARS = 400_000;
@@ -284,7 +286,9 @@ function mergeCategoryHintList(defaults: string[], existing?: string[], custom?:
 
 function buildSystemPrompt(options: OrganizeOptions): string {
   const sv = options.locale === "sv";
-  const base = sv ? ORGANIZE_SYSTEM_PROMPT_SV : ORGANIZE_SYSTEM_PROMPT;
+  const base =
+    options.systemPromptBase?.trim() ||
+    (sv ? ORGANIZE_SYSTEM_PROMPT_SV : ORGANIZE_SYSTEM_PROMPT);
   let extra = "";
   if (options.projectNames?.length) {
     extra += sv
@@ -844,3 +848,6 @@ export async function organizeTranscriptResilient(
 
   return { items: allItems, standaloneProjectCreations: standaloneOut };
 }
+
+export const DEFAULT_ORGANIZE_SYSTEM_PROMPT_EN = ORGANIZE_SYSTEM_PROMPT;
+export const DEFAULT_ORGANIZE_SYSTEM_PROMPT_SV = ORGANIZE_SYSTEM_PROMPT_SV;

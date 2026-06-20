@@ -39,4 +39,4 @@ Test sign-in on a **device** or simulator: cookies must work over HTTPS with cor
 
 ## CI
 
-See [`.github/workflows/braindump-ios.yml`](../../../.github/workflows/braindump-ios.yml) — runs on **push** only when the commit message is exactly **`Build`** (see workflow `if` condition).
+See [`.github/workflows/braindump-ios.yml`](../../../.github/workflows/braindump-ios.yml) — runs on **push** only when the first line of the commit message is **`ios`** (case-insensitive; see workflow `if` condition).

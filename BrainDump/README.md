@@ -32,8 +32,12 @@ AI-powered voice capture and thought organization for personal development, jour
 
 The same Next.js app is loaded inside a native iOS shell (no duplicate UI code). See **[docs/ios/README.md](docs/ios/README.md)** for `cap sync`, **[docs/ios/APPLE_SETUP.md](docs/ios/APPLE_SETUP.md)** for Apple & signing, and **[ios/fastlane/README.md](ios/fastlane/README.md)** for local Fastlane.
 
-- **CI:** [`.github/workflows/braindump-ios.yml`](../.github/workflows/braindump-ios.yml) — runs when you **push** a commit whose message is exactly **`Build`**.
+- **CI:** [`.github/workflows/braindump-ios.yml`](../.github/workflows/braindump-ios.yml) — runs when you **push** a commit whose first line is **`ios`** (case-insensitive).
 - Before `cap sync`, set `CAPACITOR_SERVER_URL` to your **production** HTTPS URL.
+
+## Admin dashboard (`/admin`)
+
+Sign in with an email listed in `ADMIN_EMAILS`. The dashboard includes **AI instructions (global)** — edit the organize prompts (English/Swedish) and coach chat base prompt; saves go to the database and apply to **all users** on the next organize/coach request. Project lists and workspace context are still appended at runtime. Run `npm run db:migrate:vercel` (or `db:push:vercel`) after pulling so `SiteSettings` has the prompt columns.
 
 ## Tech
 

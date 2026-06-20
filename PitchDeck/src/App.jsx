@@ -138,12 +138,7 @@ function App() {
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState(() => {
-    const saved = localStorage.getItem('pitchDeckMode')
-    return saved === 'edit' || saved === 'present' || saved === 'record' || saved === 'video-editing' || saved === 'plan'
-      ? saved
-      : 'plan'
-  }) // 'plan', 'edit', 'present', 'record', 'video-editing'
+  const [mode, setMode] = useState('plan') // Always start in Plan; 'edit', 'present', 'record', 'video-editing' during session
   const lastRecordingBlobRef = useRef(null)
   const analyzeVideoInputRef = useRef(null)
   const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
@@ -2116,7 +2111,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
       <Suspense fallback={null}>
         <PlayMode 
           slides={slides} 
-          onExit={() => setMode('edit')} 
+          onExit={() => setMode('plan')} 
           backgroundColor={settings.backgroundColor} 
           textColor={settings.textColor} 
           fontFamily={settings.fontFamily}
@@ -2859,7 +2854,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
               key={lastRecordingBlobVersion}
               videoBlob={lastRecordingBlobRef.current}
               latestRecordingRef={lastRecordingBlobRef}
-              onExit={() => setMode('edit')}
+              onExit={() => setMode('plan')}
               openaiKey={settings.openaiKey}
             />
           </Suspense>
