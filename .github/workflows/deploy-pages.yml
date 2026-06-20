@@ -17,8 +17,7 @@ concurrency:
 jobs:
   build:
     # Skip full SaaS build when commit message is for iOS-only pipeline.
-    if: ${{ github.event_name != 'push' || github.event.head_commit == null || (github.event.head_commit.message != 'ios' && !startsWith(github.event.head_commit.message, 'ios
-') ) }}
+    if: ${{ github.event_name != 'push' || github.event.head_commit == null || !startsWith(github.event.head_commit.message, 'ios') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
