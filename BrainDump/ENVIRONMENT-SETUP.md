@@ -2,7 +2,7 @@
 
 All real API keys are set by the developer as environment variables and are **never committed to Git**.
 
-This app expects at least:
+This app expects at least: 
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
