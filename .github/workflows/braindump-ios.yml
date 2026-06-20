@@ -1,6 +1,6 @@
 name: BrainDump iOS (TestFlight)
 
-# Runs only when the first line of the commit message is exactly "ios".
+# Runs only when the commit message starts with "ios".
 # Example: git commit -m "ios"
 on:
   push:
@@ -20,8 +20,8 @@ defaults:
 
 jobs:
   beta:
-    # GitHub expressions have no split()/toLower(); match exact "ios" or first line "ios" before a newline.
-    if: ${{ github.event_name == 'push' && github.event.head_commit != null && (github.event.head_commit.message == 'ios' || startsWith(github.event.head_commit.message, concat('ios', '\n'))) }}
+    # GitHub expressions have no split()/toLower()/concat(); use startsWith for iOS-only trigger commits.
+    if: ${{ github.event_name == 'push' && github.event.head_commit != null && startsWith(github.event.head_commit.message, 'ios') }}
     runs-on: macos-latest
     steps:
       - name: Checkout
