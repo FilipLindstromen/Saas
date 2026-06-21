@@ -847,6 +847,72 @@ function App() {
     if (nextState.analysisFolded !== undefined) setAnalysisFolded(nextState.analysisFolded)
   }, [history, historyIndex, slides, chapters, currentChapterId, selectedSlideId])
 
+  const defaultSlideShape = useCallback(() => ({
+    content: '',
+    subtitle: '',
+    imageUrl: '',
+    backgroundVideoUrl: '',
+    infographicProjectId: undefined,
+    infographicTabId: undefined,
+    layout: 'default',
+    gradientStrength: 0.7,
+    flipHorizontal: false,
+    backgroundOpacity: 0.6,
+    gradientFlipped: false,
+    imageScale: 1.0,
+    imagePositionX: 50,
+    imagePositionY: 50,
+    textHeadingLevel: null,
+    subtitleHeadingLevel: null,
+    analysis: null,
+    backgroundColorOverride: false,
+    backgroundColorOverrideValue: undefined
+  }), [])
+
+  const getExportData = useCallback(() => {
+    const normalizeSlide = (slide) => ({
+      ...defaultSlideShape(),
+      ...slide,
+      id: slide.id,
+      content: slide.content ?? '',
+      subtitle: slide.subtitle ?? '',
+      imageUrl: slide.imageUrl ?? '',
+      backgroundVideoUrl: slide.backgroundVideoUrl ?? '',
+      infographicProjectId: slide.infographicProjectId ?? undefined,
+      infographicTabId: slide.infographicTabId ?? undefined,
+      layout: slide.layout ?? 'default',
+      gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
+      flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
+      backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
+      gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
+      imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
+      imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
+      imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
+      textHeadingLevel: slide.textHeadingLevel ?? null,
+      subtitleHeadingLevel: slide.subtitleHeadingLevel ?? null,
+      analysis: slide.analysis ?? null
+    })
+    const normalizedChapters = (chapters || []).map(ch => ({
+      id: ch.id,
+      name: ch.name ?? `Chapter ${ch.id}`,
+      slides: (ch.slides || []).map(normalizeSlide)
+    }))
+    return {
+      version: '1.0',
+      chapters: normalizedChapters,
+      currentChapterId,
+      slides: (slides || []).map(normalizeSlide),
+      selectedSlideId,
+      settings: { ...settings },
+      recordSettings: { ...recordSettings },
+      sidebarWidth,
+      inspectorWidth,
+      projectName,
+      analysisFolded,
+      exportedAt: new Date().toISOString()
+    }
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded, defaultSlideShape])
+
   // Save current project to connected folder (PitchDeck/[projectName]/project.json)
   const handleSaveToFolder = useCallback(async () => {
     const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
@@ -1276,72 +1342,6 @@ function App() {
     setChapters(updatedChapters)
     saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
   }
-
-  const defaultSlideShape = useCallback(() => ({
-    content: '',
-    subtitle: '',
-    imageUrl: '',
-    backgroundVideoUrl: '',
-    infographicProjectId: undefined,
-    infographicTabId: undefined,
-    layout: 'default',
-    gradientStrength: 0.7,
-    flipHorizontal: false,
-    backgroundOpacity: 0.6,
-    gradientFlipped: false,
-    imageScale: 1.0,
-    imagePositionX: 50,
-    imagePositionY: 50,
-    textHeadingLevel: null,
-    subtitleHeadingLevel: null,
-    analysis: null,
-    backgroundColorOverride: false,
-    backgroundColorOverrideValue: undefined
-  }), [])
-
-  const getExportData = useCallback(() => {
-    const normalizeSlide = (slide) => ({
-      ...defaultSlideShape(),
-      ...slide,
-      id: slide.id,
-      content: slide.content ?? '',
-      subtitle: slide.subtitle ?? '',
-      imageUrl: slide.imageUrl ?? '',
-      backgroundVideoUrl: slide.backgroundVideoUrl ?? '',
-      infographicProjectId: slide.infographicProjectId ?? undefined,
-      infographicTabId: slide.infographicTabId ?? undefined,
-      layout: slide.layout ?? 'default',
-      gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
-      flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-      backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
-      gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
-      imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
-      imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-      imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
-      textHeadingLevel: slide.textHeadingLevel ?? null,
-      subtitleHeadingLevel: slide.subtitleHeadingLevel ?? null,
-      analysis: slide.analysis ?? null
-    })
-    const normalizedChapters = (chapters || []).map(ch => ({
-      id: ch.id,
-      name: ch.name ?? `Chapter ${ch.id}`,
-      slides: (ch.slides || []).map(normalizeSlide)
-    }))
-    return {
-      version: '1.0',
-      chapters: normalizedChapters,
-      currentChapterId,
-      slides: (slides || []).map(normalizeSlide),
-      selectedSlideId,
-      settings: { ...settings },
-      recordSettings: { ...recordSettings },
-      sidebarWidth,
-      inspectorWidth,
-      projectName,
-      analysisFolded,
-      exportedAt: new Date().toISOString()
-    }
-  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded, defaultSlideShape])
 
   // Create a new presentation (clear all slides). If projectName is passed (from Projects modal), use it and skip confirm.
   const handleNewPresentation = (projectNameFromModal) => {
