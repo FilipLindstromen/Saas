@@ -31,6 +31,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Content Creator | `/ContentCreator` | AI content machine workflow for research → post |
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
+| MetaConnect | `/MetaConnect` | Meta (FB/IG) comment-to-DM automation + lead form sync to Systeme.io (requires server; deploy to Vercel or run locally) |
 
 ## Deploying to GitHub Pages (optional)
 

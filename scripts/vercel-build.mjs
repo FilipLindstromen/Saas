@@ -85,6 +85,14 @@ mkdirSync(path.join(DEPLOY, "BrainDump"), { recursive: true });
 writeFileSync(path.join(DEPLOY, "BrainDump", "index.html"), landing);
 console.log("BrainDump landing written (Open BrainDump →", braindumpUrl, ")");
 
+// MetaConnect landing (links to separate MetaConnect Vercel project)
+const metaconnectUrl = process.env.METACONNECT_APP_URL || "";
+let mcLanding = readFileSync(path.join(docs, "meta-connect-landing.html"), "utf8");
+mcLanding = mcLanding.replace(/__METACONNECT_APP_URL__/g, metaconnectUrl || "#");
+mkdirSync(path.join(DEPLOY, "MetaConnect"), { recursive: true });
+writeFileSync(path.join(DEPLOY, "MetaConnect", "index.html"), mcLanding);
+console.log("MetaConnect landing written (Open MetaConnect →", metaconnectUrl || "(set METACONNECT_APP_URL)", ")");
+
 // Build each Vite app with base path and copy dist to deploy
 for (const [projectPath, basePath] of VITE_APPS) {
   const absPath = path.join(ROOT, projectPath);
