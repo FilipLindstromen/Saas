@@ -52,6 +52,15 @@ jobs:
           ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''${REPO_URL}''', safe=''))")
           sed "s|REPO_URL_ENCODED|${ENCODED}|g" docs/brain-dump-landing.html > deploy/BrainDump/index.html
 
+      - name: Add MetaConnect landing page
+        env:
+          METACONNECT_APP_URL: ${{ secrets.METACONNECT_APP_URL }}
+        run: |
+          mkdir -p deploy/MetaConnect
+          URL="${METACONNECT_APP_URL:-}"
+          if [ -z "$URL" ]; then URL="#"; fi
+          sed "s|__METACONNECT_APP_URL__|${URL}|g" docs/meta-connect-landing.html > deploy/MetaConnect/index.html
+
       - name: Build Web Quiz Generator
         run: |
           cd webquizgenerator
