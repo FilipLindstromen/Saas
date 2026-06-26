@@ -18,7 +18,8 @@
       padding: 1.5rem;
     }
     .card {
-      max-width: 440px;
+      max-width: 460px;
+      width: 100%;
       background: #1a1a1a;
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 16px;
@@ -36,34 +37,12 @@
       justify-content: center;
     }
     h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
-    p { color: rgba(255,255,255,0.75); margin: 0 0 1.5rem; font-size: 0.9375rem; line-height: 1.6; }
-    a {
-      display: inline-block;
-      padding: 0.6rem 1.25rem;
-      border-radius: 12px;
-      font-weight: 600;
-      text-decoration: none;
-      margin: 0.25rem;
-      font-size: 0.9375rem;
-    }
-    .btn-primary {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-    }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-secondary {
-      background: transparent;
-      color: rgba(255,255,255,0.9);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-    .btn-secondary:hover { border-color: #2563eb; color: #fff; }
+    p.sub { color: rgba(255,255,255,0.7); margin: 0 0 1.25rem; font-size: 0.9375rem; line-height: 1.6; }
     .features {
-      text-align: left;
-      margin: 1rem 0 1.5rem;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.5rem;
+      margin-bottom: 1.5rem;
     }
     .feature {
       background: rgba(255,255,255,0.05);
@@ -71,6 +50,48 @@
       padding: 0.5rem 0.75rem;
       font-size: 0.8125rem;
       color: rgba(255,255,255,0.8);
+      text-align: left;
+    }
+    a, button {
+      display: inline-block;
+      padding: 0.6rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      margin: 0.25rem;
+      font-size: 0.9375rem;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary {
+      background: transparent;
+      color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.2) !important;
+    }
+    .btn-secondary:hover { border-color: #2563eb !important; color: #fff; }
+    .notice {
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(37,99,235,0.35);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      font-size: 0.8375rem;
+      color: rgba(255,255,255,0.75);
+      text-align: left;
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .notice strong { color: #93c5fd; }
+    code {
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-family: monospace;
     }
   </style>
 </head>
@@ -83,15 +104,42 @@
       </svg>
     </div>
     <h1>MetaConnect</h1>
-    <p>Automate Facebook &amp; Instagram comment-to-DM flows and sync lead form submissions to Systeme.io.</p>
+    <p class="sub">Automate Facebook &amp; Instagram comment-to-DM flows and sync lead form submissions to Systeme.io.</p>
+
     <div class="features">
       <div class="feature">💬 Comment keyword DMs</div>
       <div class="feature">📋 Lead form sync</div>
       <div class="feature">📘 Facebook &amp; Instagram</div>
       <div class="feature">🔗 Systeme.io CRM</div>
     </div>
-    <a href="__METACONNECT_APP_URL__" class="btn-primary" target="_blank" rel="noopener">Open MetaConnect</a>
-    <a href="../" class="btn-secondary">Back to Saas Apps</a>
+
+    <div id="app-section">
+      <!-- Injected by build: either open-btn or not-deployed notice -->
+    </div>
+
+    <a href="../" class="btn-secondary">← Back to Saas Apps</a>
   </div>
+
+  <script>
+    const url = "__METACONNECT_APP_URL__";
+    const section = document.getElementById("app-section");
+
+    if (url && url !== "#" && url !== "__METACONNECT_APP_URL__") {
+      section.innerHTML = `<a href="${url}" class="btn-primary" target="_blank" rel="noopener">Open MetaConnect →</a>`;
+    } else {
+      section.innerHTML = `
+        <div class="notice">
+          <strong>Not yet deployed.</strong> MetaConnect is a server-side Next.js app that needs its own Vercel deployment.<br><br>
+          To deploy:
+          <ol style="margin:0.5rem 0 0 1.1rem;padding:0;text-align:left">
+            <li>Import the <code>MetaConnect/</code> folder as a new Vercel project</li>
+            <li>Set env vars (see <code>MetaConnect/.env.example</code>)</li>
+            <li>After deploy, add a GitHub secret named <code>METACONNECT_APP_URL</code> with the Vercel URL</li>
+            <li>Re-run this GitHub Pages deployment — the button will appear automatically</li>
+          </ol>
+        </div>
+      `;
+    }
+  </script>
 </body>
 </html>
