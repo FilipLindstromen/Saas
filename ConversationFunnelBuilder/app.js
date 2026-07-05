@@ -18,14 +18,17 @@
 
   var DEFAULT_STYLES = {
     primaryColor: '#6366f1',
-    backgroundColor: '#f8fafc',
-    textColor: '#1e293b',
-    buttonColor: '#6366f1',
-    buttonTextColor: '#ffffff',
+    backgroundColor: '#ffffff',
+    textColor: '#334155',
+    buttonColor: '#ffffff',
+    buttonTextColor: '#334155',
+    userBubbleColor: '#dbeafe',
+    userBubbleTextColor: '#1e40af',
     borderRadius: '16',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     containerWidth: '420',
-    ctaButtonColor: '#10b981'
+    ctaButtonColor: '#6366f1',
+    typewriterSpeed: '28'
   };
 
   /** Preloaded anxiety offer sample funnel */
@@ -49,8 +52,9 @@
       },
       {
         id: 'step2',
-        message: 'When does anxiety usually show up?',
-        subtext: '',
+        userMessage: '',
+        message: "Good — that tells me you're ready to look at this honestly. Anxiety rarely shows up randomly. It usually follows a pattern.",
+        subtext: 'When does anxiety usually show up for you?',
         imageUrl: '',
         questionType: 'single',
         options: [
@@ -66,8 +70,9 @@
       },
       {
         id: 'step3',
-        message: 'What do you notice first?',
-        subtext: '',
+        userMessage: '',
+        message: "That's an important clue. Your body often signals stress before your mind fully catches up.",
+        subtext: 'What do you notice first when it hits?',
         imageUrl: '',
         questionType: 'single',
         options: [
@@ -83,6 +88,7 @@
       },
       {
         id: 'step4',
+        userMessage: '',
         message: 'Most people try to fight anxiety at the thought level. But for many people, anxiety starts before the thoughts — inside the body.',
         subtext: '',
         imageUrl: '',
@@ -105,8 +111,9 @@
       },
       {
         id: 'step6',
-        message: 'Which one feels most true for you?',
-        subtext: '',
+        userMessage: '',
+        message: "You're not broken — your system is doing its job a little too well. The real question is which part feels loudest for you right now.",
+        subtext: 'Which one feels most true for you?',
         imageUrl: '',
         questionType: 'single',
         options: [
@@ -158,6 +165,14 @@
   };
 
   // ─── Utilities ──────────────────────────────────────────────
+
+  function normalizeFunnel(data) {
+    data.styles = Object.assign({}, DEFAULT_STYLES, data.styles || {});
+    (data.steps || []).forEach(function (step) {
+      if (step.userMessage === undefined) step.userMessage = '';
+    });
+    return data;
+  }
 
   function deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));
@@ -277,247 +292,83 @@
       answers: {},
       selectedMultiple: [],
       visitedCount: 0,
-      completed: false
+      completed: false,
+      lastAnswerText: '',
+      _seq: 0
     };
   }
 
-  function applyStyleVars(el, styles) {
-    var s = styles || funnel.styles;
-    el.style.setProperty('--cfb-primary', s.primaryColor);
-    el.style.setProperty('--cfb-bg', s.backgroundColor);
-    el.style.setProperty('--cfb-text', s.textColor);
-    el.style.setProperty('--cfb-text-muted', hexToRgba(s.textColor, 0.65));
-    el.style.setProperty('--cfb-btn', s.buttonColor);
-    el.style.setProperty('--cfb-btn-text', s.buttonTextColor);
-    el.style.setProperty('--cfb-cta', s.ctaButtonColor);
-    el.style.setProperty('--cfb-radius', s.borderRadius + 'px');
-    el.style.setProperty('--cfb-font', s.fontFamily);
-    el.style.maxWidth = s.containerWidth + 'px';
+  function applyWidgetStyles(el, styles) {
+    var s = styles || {};
+    el.style.setProperty('--cfb-primary', s.primaryColor || '#6366f1');
+    el.style.setProperty('--cfb-bg', s.backgroundColor || '#ffffff');
+    el.style.setProperty('--cfb-text', s.textColor || '#334155');
+    el.style.setProperty('--cfb-btn', s.buttonColor || '#ffffff');
+    el.style.setProperty('--cfb-btn-text', s.buttonTextColor || '#334155');
+    el.style.setProperty('--cfb-btn-border', 'rgba(148, 163, 184, 0.45)');
+    el.style.setProperty('--cfb-cta', s.ctaButtonColor || '#6366f1');
+    el.style.setProperty('--cfb-cta-text', '#ffffff');
+    el.style.setProperty('--cfb-user-bg', s.userBubbleColor || '#dbeafe');
+    el.style.setProperty('--cfb-user-text', s.userBubbleTextColor || '#1e40af');
+    el.style.setProperty('--cfb-radius', (s.borderRadius || 16) + 'px');
+    el.style.setProperty('--cfb-font', s.fontFamily || 'system-ui, sans-serif');
+    el.style.maxWidth = (s.containerWidth || 420) + 'px';
   }
 
-  function hexToRgba(hex, alpha) {
-    var h = (hex || '#1e293b').replace('#', '');
-    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
-    var r = parseInt(h.substring(0, 2), 16) || 30;
-    var g = parseInt(h.substring(2, 4), 16) || 41;
-    var b = parseInt(h.substring(4, 6), 16) || 59;
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-  }
+  /** Self-contained chat widget engine (preview + embed). */
+  function runFunnelWidget(container, funnelData, runtime, onUpdate) {
+    runtime._seq = (runtime._seq || 0) + 1;
+    var seq = runtime._seq;
+    var styles = funnelData.styles || {};
 
-  // ─── Funnel widget renderer (preview + embed) ───────────────
-
-  /**
-   * Renders the conversational funnel into a container element.
-   * Used by both the live preview and the exported embed.
-   */
-  function renderFunnelWidget(container, funnelData, runtime, onUpdate) {
-    container.innerHTML = '';
-    var widget = document.createElement('div');
-    widget.className = 'cfb-widget';
-    applyStyleVars(widget, funnelData.styles);
-    container.appendChild(widget);
-
-    var step = getStepFromData(funnelData, runtime.currentStepId);
-    if (!step) {
-      widget.innerHTML = '<p class="cfb-message-text">No steps configured.</p>';
-      return;
+    function applyWidgetStyles(el, s) {
+      s = s || {};
+      el.style.setProperty('--cfb-primary', s.primaryColor || '#6366f1');
+      el.style.setProperty('--cfb-bg', s.backgroundColor || '#ffffff');
+      el.style.setProperty('--cfb-text', s.textColor || '#334155');
+      el.style.setProperty('--cfb-btn', s.buttonColor || '#ffffff');
+      el.style.setProperty('--cfb-btn-text', s.buttonTextColor || '#334155');
+      el.style.setProperty('--cfb-btn-border', 'rgba(148, 163, 184, 0.45)');
+      el.style.setProperty('--cfb-cta', s.ctaButtonColor || '#6366f1');
+      el.style.setProperty('--cfb-cta-text', '#ffffff');
+      el.style.setProperty('--cfb-user-bg', s.userBubbleColor || '#dbeafe');
+      el.style.setProperty('--cfb-user-text', s.userBubbleTextColor || '#1e40af');
+      el.style.setProperty('--cfb-radius', (s.borderRadius || 16) + 'px');
+      el.style.setProperty('--cfb-font', s.fontFamily || 'system-ui, sans-serif');
+      el.style.maxWidth = (s.containerWidth || 420) + 'px';
     }
 
-    // Progress indicator
-    if (funnelData.showProgress) {
-      var total = funnelData.steps.length;
-      var currentIndex = funnelData.steps.findIndex(function (s) { return s.id === runtime.currentStepId; });
-      var pct = Math.max(5, Math.round(((currentIndex + 1) / total) * 100));
-      var progress = document.createElement('div');
-      progress.className = 'cfb-progress';
-      progress.innerHTML =
-        '<div class="cfb-progress-bar"><div class="cfb-progress-fill" style="width:' + pct + '%"></div></div>' +
-        '<div class="cfb-progress-text">Step ' + (currentIndex + 1) + ' of ' + total + '</div>';
-      widget.appendChild(progress);
-    }
+    function alive() { return seq === runtime._seq; }
+    function getStep(id) { return funnelData.steps.find(function (s) { return s.id === id; }); }
+    function speed() { return parseInt(styles.typewriterSpeed, 10) || 28; }
 
-    var chatArea = document.createElement('div');
-    chatArea.className = 'cfb-chat-area';
-    widget.appendChild(chatArea);
-
-    function showStep() {
-      chatArea.innerHTML = '';
-      var current = getStepFromData(funnelData, runtime.currentStepId);
-      if (!current) return;
-
-      var renderContent = function () {
-        var msg = document.createElement('div');
-        msg.className = 'cfb-message';
-
-        if (current.imageUrl) {
-          var img = document.createElement('img');
-          img.className = 'cfb-message-image';
-          img.src = current.imageUrl;
-          img.alt = '';
-          msg.appendChild(img);
+    function typewriter(el, text, done) {
+      if (!alive()) return;
+      el.textContent = '';
+      var i = 0;
+      var ms = speed();
+      function tick() {
+        if (!alive()) return;
+        if (i >= text.length) {
+          if (done) done();
+          return;
         }
-
-        var text = document.createElement('p');
-        text.className = 'cfb-message-text';
-        text.textContent = current.message;
-        msg.appendChild(text);
-
-        if (current.subtext) {
-          var sub = document.createElement('p');
-          sub.className = 'cfb-message-subtext';
-          sub.textContent = current.subtext;
-          msg.appendChild(sub);
-        }
-
-        chatArea.appendChild(msg);
-        renderInputArea(current);
-      };
-
-      if (current.delay > 0) {
-        setTimeout(renderContent, current.delay);
-      } else {
-        renderContent();
+        el.textContent += text.charAt(i);
+        i++;
+        setTimeout(tick, ms);
       }
+      tick();
     }
 
-    function renderInputArea(current) {
-      var type = current.questionType;
-
-      if (type === 'text' || type === 'email') {
-        var inputArea = document.createElement('div');
-        inputArea.className = 'cfb-input-area';
-
-        var input = document.createElement('input');
-        input.className = 'cfb-input';
-        input.type = type === 'email' ? 'email' : 'text';
-        input.placeholder = type === 'email' ? 'Enter your email' : 'Type your answer…';
-
-        var submit = document.createElement('button');
-        submit.type = 'button';
-        submit.className = 'cfb-btn cfb-btn-submit';
-        submit.textContent = 'Continue';
-
-        submit.addEventListener('click', function () {
-          var value = input.value.trim();
-          if (!value) {
-            input.focus();
-            return;
-          }
-          if (type === 'email') {
-            runtime.email = value;
-          }
-          runtime.answers[current.id] = value;
-          goToNext(current.options[0] && current.options[0].nextStepId);
-        });
-
-        input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') submit.click();
-        });
-
-        inputArea.appendChild(input);
-        inputArea.appendChild(submit);
-        chatArea.appendChild(inputArea);
-        input.focus();
-        return;
-      }
-
-      if (type === 'multiple') {
-        runtime.selectedMultiple = runtime.selectedMultiple || [];
-        var multiWrap = document.createElement('div');
-        multiWrap.className = 'cfb-buttons';
-
-        current.options.forEach(function (opt, idx) {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'cfb-btn';
-          btn.textContent = opt.text;
-          if (runtime.selectedMultiple.indexOf(idx) !== -1) {
-            btn.classList.add('selected');
-          }
-          btn.addEventListener('click', function () {
-            var pos = runtime.selectedMultiple.indexOf(idx);
-            if (pos === -1) runtime.selectedMultiple.push(idx);
-            else runtime.selectedMultiple.splice(pos, 1);
-            btn.classList.toggle('selected');
-          });
-          multiWrap.appendChild(btn);
-        });
-
-        var continueBtn = document.createElement('button');
-        continueBtn.type = 'button';
-        continueBtn.className = 'cfb-btn cfb-btn-submit';
-        continueBtn.textContent = 'Continue';
-        continueBtn.addEventListener('click', function () {
-          if (!runtime.selectedMultiple.length) return;
-          runtime.selectedMultiple.forEach(function (idx) {
-            var opt = current.options[idx];
-            if (opt && opt.tag) runtime.tags.push(opt.tag);
-          });
-          runtime.answers[current.id] = runtime.selectedMultiple.map(function (i) {
-            return current.options[i].text;
-          });
-          var nextId = current.options[runtime.selectedMultiple[0]] &&
-            current.options[runtime.selectedMultiple[0]].nextStepId;
-          goToNext(nextId);
-        });
-
-        multiWrap.appendChild(continueBtn);
-        chatArea.appendChild(multiWrap);
-        return;
-      }
-
-      // single choice or statement
-      if (current.options && current.options.length) {
-        var btnWrap = document.createElement('div');
-        btnWrap.className = 'cfb-buttons';
-
-        current.options.forEach(function (opt) {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'cfb-btn';
-          btn.textContent = opt.text;
-          btn.addEventListener('click', function () {
-            if (opt.tag) runtime.tags.push(opt.tag);
-            runtime.answers[current.id] = opt.text;
-            goToNext(opt.nextStepId);
-          });
-          btnWrap.appendChild(btn);
-        });
-
-        chatArea.appendChild(btnWrap);
-      }
-
-      // CTA button (result / final step)
-      if (current.ctaText) {
-        var ctaWrap = document.createElement('div');
-        ctaWrap.className = 'cfb-buttons';
-        var ctaBtn = document.createElement('button');
-        ctaBtn.type = 'button';
-        ctaBtn.className = 'cfb-btn cfb-btn-cta';
-        ctaBtn.textContent = current.ctaText;
-        ctaBtn.addEventListener('click', function () {
-          if (current.ctaUrl) {
-            window.open(current.ctaUrl, '_blank');
-          }
-          completeFunnel();
-        });
-        ctaWrap.appendChild(ctaBtn);
-        chatArea.appendChild(ctaWrap);
-      }
+    function runSequence(steps, index) {
+      if (!alive()) return;
+      if (index >= steps.length) return;
+      steps[index](function () { runSequence(steps, index + 1); });
     }
 
-    function goToNext(nextStepId) {
-      runtime.selectedMultiple = [];
-      runtime.visitedCount++;
-
-      if (!nextStepId || !getStepFromData(funnelData, nextStepId)) {
-        completeFunnel();
-        return;
-      }
-
-      runtime.currentStepId = nextStepId;
-      if (onUpdate) onUpdate(runtime);
-      showStep();
+    function getUserText(step) {
+      if (step.userMessage && step.userMessage.trim()) return step.userMessage.trim();
+      return runtime.lastAnswerText || '';
     }
 
     function completeFunnel() {
@@ -525,16 +376,305 @@
       if (onUpdate) onUpdate(runtime);
       if (funnelData.redirectUrl) {
         setTimeout(function () {
-          window.location.href = funnelData.redirectUrl;
+          if (alive()) window.location.href = funnelData.redirectUrl;
         }, 600);
       }
     }
 
-    showStep();
+    function goToNext(nextStepId, answerText) {
+      runtime.selectedMultiple = [];
+      runtime.visitedCount++;
+      if (answerText) runtime.lastAnswerText = answerText;
+      if (!nextStepId || !getStep(nextStepId)) {
+        completeFunnel();
+        return;
+      }
+      runtime.currentStepId = nextStepId;
+      if (onUpdate) onUpdate(runtime);
+      paintStep();
+    }
+
+    function paintStep() {
+      container.innerHTML = '';
+      var step = getStep(runtime.currentStepId);
+      if (!step) {
+        container.innerHTML = '<p class="cfb-empty">No steps configured.</p>';
+        return;
+      }
+
+      var widget = document.createElement('div');
+      widget.className = 'cfb-widget';
+      applyWidgetStyles(widget, styles);
+      container.appendChild(widget);
+
+      if (funnelData.showProgress) {
+        var idx = funnelData.steps.findIndex(function (s) { return s.id === runtime.currentStepId; });
+        var pct = Math.max(5, Math.round(((idx + 1) / funnelData.steps.length) * 100));
+        var progress = document.createElement('div');
+        progress.className = 'cfb-progress';
+        progress.innerHTML =
+          '<div class="cfb-progress-bar"><div class="cfb-progress-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="cfb-progress-text">Step ' + (idx + 1) + ' of ' + funnelData.steps.length + '</div>';
+        widget.appendChild(progress);
+      }
+
+      var chat = document.createElement('div');
+      chat.className = 'cfb-chat-area';
+      widget.appendChild(chat);
+
+      var userText = getUserText(step);
+      var botWrap = document.createElement('div');
+      botWrap.className = 'cfb-bot-block';
+
+      if (step.imageUrl) {
+        var img = document.createElement('img');
+        img.className = 'cfb-message-image';
+        img.src = step.imageUrl;
+        img.alt = '';
+        botWrap.appendChild(img);
+      }
+
+      var responseEl = document.createElement('p');
+      responseEl.className = 'cfb-response';
+      botWrap.appendChild(responseEl);
+
+      var questionEl = document.createElement('p');
+      questionEl.className = 'cfb-question';
+      botWrap.appendChild(questionEl);
+
+      chat.appendChild(botWrap);
+
+      var actionsWrap = document.createElement('div');
+      actionsWrap.className = 'cfb-actions hidden';
+      chat.appendChild(actionsWrap);
+
+      function revealActions() {
+        actionsWrap.classList.remove('hidden');
+      }
+
+      function buildChoiceButtons(options, onPick) {
+        var index = 0;
+        function addNextButton() {
+          if (index >= options.length) return;
+          var opt = options[index];
+          var optIndex = index;
+          index++;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'cfb-choice-btn';
+          btn.disabled = true;
+          var label = document.createElement('span');
+          label.className = 'cfb-choice-label';
+          btn.appendChild(label);
+          btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            onPick(opt);
+          });
+          actionsWrap.appendChild(btn);
+          typewriter(label, opt.text, function () {
+            if (!alive()) return;
+            btn.disabled = false;
+            btn.classList.add('cfb-choice-ready');
+            addNextButton();
+          });
+        }
+        addNextButton();
+      }
+
+      function renderActions() {
+        revealActions();
+        var type = step.questionType;
+
+        if (type === 'text' || type === 'email') {
+          var inputArea = document.createElement('div');
+          inputArea.className = 'cfb-input-area';
+          var input = document.createElement('input');
+          input.className = 'cfb-input';
+          input.type = type === 'email' ? 'email' : 'text';
+          var placeholder = type === 'email' ? 'Enter your email' : 'Type your answer…';
+          var ph = document.createElement('span');
+          ph.className = 'cfb-input-placeholder';
+          inputArea.appendChild(input);
+          inputArea.appendChild(ph);
+          var submit = document.createElement('button');
+          submit.type = 'button';
+          submit.className = 'cfb-btn cfb-btn-submit';
+          submit.disabled = true;
+          var submitLabel = document.createElement('span');
+          submit.appendChild(submitLabel);
+          inputArea.appendChild(submit);
+          actionsWrap.appendChild(inputArea);
+
+          typewriter(ph, placeholder, function () {
+            input.placeholder = placeholder;
+            ph.remove();
+            typewriter(submitLabel, 'Continue', function () {
+              submit.disabled = false;
+              submit.addEventListener('click', function () {
+                var value = input.value.trim();
+                if (!value) { input.focus(); return; }
+                if (type === 'email') runtime.email = value;
+                runtime.answers[step.id] = value;
+                goToNext(step.options[0] && step.options[0].nextStepId, value);
+              });
+              input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') submit.click();
+              });
+              input.focus();
+            });
+          });
+          return;
+        }
+
+        if (type === 'multiple') {
+          runtime.selectedMultiple = runtime.selectedMultiple || [];
+          buildChoiceButtons(step.options, function (opt) {
+            var idx = step.options.indexOf(opt);
+            var pos = runtime.selectedMultiple.indexOf(idx);
+            if (pos === -1) runtime.selectedMultiple.push(idx);
+            else runtime.selectedMultiple.splice(pos, 1);
+            actionsWrap.querySelectorAll('.cfb-choice-btn').forEach(function (b, i) {
+              b.classList.toggle('selected', runtime.selectedMultiple.indexOf(i) !== -1);
+            });
+          });
+          var continueBtn = document.createElement('button');
+          continueBtn.type = 'button';
+          continueBtn.className = 'cfb-btn cfb-btn-submit';
+          continueBtn.disabled = true;
+          var continueLabel = document.createElement('span');
+          continueBtn.appendChild(continueLabel);
+          actionsWrap.appendChild(continueBtn);
+          typewriter(continueLabel, 'Continue', function () {
+            continueBtn.disabled = false;
+            continueBtn.addEventListener('click', function () {
+              if (!runtime.selectedMultiple.length) return;
+              runtime.selectedMultiple.forEach(function (i) {
+                if (step.options[i] && step.options[i].tag) runtime.tags.push(step.options[i].tag);
+              });
+              var texts = runtime.selectedMultiple.map(function (i) { return step.options[i].text; });
+              runtime.answers[step.id] = texts;
+              var nextId = step.options[runtime.selectedMultiple[0]] &&
+                step.options[runtime.selectedMultiple[0]].nextStepId;
+              goToNext(nextId, texts.join(', '));
+            });
+          });
+          return;
+        }
+
+        if (step.options && step.options.length) {
+          buildChoiceButtons(step.options, function (opt) {
+            if (opt.tag) runtime.tags.push(opt.tag);
+            runtime.answers[step.id] = opt.text;
+            goToNext(opt.nextStepId, opt.text);
+          });
+        }
+
+        if (step.ctaText) {
+          var ctaBtn = document.createElement('button');
+          ctaBtn.type = 'button';
+          ctaBtn.className = 'cfb-btn cfb-btn-cta';
+          ctaBtn.disabled = true;
+          var ctaLabel = document.createElement('span');
+          ctaBtn.appendChild(ctaLabel);
+          actionsWrap.appendChild(ctaBtn);
+          typewriter(ctaLabel, step.ctaText, function () {
+            ctaBtn.disabled = false;
+            ctaBtn.addEventListener('click', function () {
+              if (step.ctaUrl) window.open(step.ctaUrl, '_blank');
+              completeFunnel();
+            });
+          });
+        }
+      }
+
+      function startTyping() {
+        var sequence = [];
+
+        if (userText) {
+          sequence.push(function (next) {
+            var userRow = document.createElement('div');
+            userRow.className = 'cfb-user-row';
+            var bubble = document.createElement('div');
+            bubble.className = 'cfb-user-bubble';
+            userRow.appendChild(bubble);
+            chat.insertBefore(userRow, botWrap);
+            typewriter(bubble, userText, next);
+          });
+        }
+
+        if (step.message && step.message.trim()) {
+          sequence.push(function (next) {
+            typewriter(responseEl, step.message.trim(), next);
+          });
+        } else {
+          responseEl.style.display = 'none';
+        }
+
+        if (step.subtext && step.subtext.trim()) {
+          sequence.push(function (next) {
+            typewriter(questionEl, step.subtext.trim(), next);
+          });
+        } else {
+          questionEl.style.display = 'none';
+        }
+
+        sequence.push(function (next) {
+          renderActions();
+          next();
+        });
+
+        runSequence(sequence, 0);
+      }
+
+      if (step.delay > 0) {
+        setTimeout(function () { if (alive()) startTyping(); }, step.delay);
+      } else {
+        startTyping();
+      }
+    }
+
+    paintStep();
+  }
+
+  function renderFunnelWidget(container, funnelData, runtime, onUpdate) {
+    runFunnelWidget(container, funnelData, runtime, onUpdate);
   }
 
   function getStepFromData(funnelData, stepId) {
     return funnelData.steps.find(function (s) { return s.id === stepId; });
+  }
+
+  /** CSS string for exported embed */
+  function getEmbedCSS() {
+    return [
+      '.cfb-widget{font-family:var(--cfb-font,system-ui,sans-serif);background:var(--cfb-bg,#fff);color:var(--cfb-text,#334155);padding:1.25rem 1rem;min-height:320px;display:flex;flex-direction:column;max-width:100%;margin:0 auto;box-sizing:border-box}',
+      '.cfb-progress{margin-bottom:1rem}.cfb-progress-bar{height:4px;background:rgba(0,0,0,.06);border-radius:999px;overflow:hidden}',
+      '.cfb-progress-fill{height:100%;background:var(--cfb-primary,#6366f1);border-radius:999px;transition:width .4s ease}',
+      '.cfb-progress-text{font-size:.72rem;color:rgba(51,65,85,.55);margin-top:.35rem}',
+      '.cfb-chat-area{flex:1;display:flex;flex-direction:column;gap:1rem;padding-top:.25rem}',
+      '.cfb-user-row{display:flex;justify-content:flex-end}',
+      '.cfb-user-bubble{background:var(--cfb-user-bg,#dbeafe);color:var(--cfb-user-text,#1e40af);padding:.75rem 1rem;border-radius:18px 18px 4px 18px;max-width:88%;font-size:.9375rem;line-height:1.5;min-height:1.5em}',
+      '.cfb-bot-block{display:flex;flex-direction:column;gap:.85rem}',
+      '.cfb-response{margin:0;font-size:.9375rem;line-height:1.6;color:var(--cfb-text,#334155);min-height:1.5em}',
+      '.cfb-question{margin:0;font-size:.9375rem;line-height:1.55;font-weight:700;color:var(--cfb-text,#334155);min-height:1.5em}',
+      '.cfb-message-image{width:100%;border-radius:12px;display:block}',
+      '.cfb-actions{display:flex;flex-direction:column;gap:.55rem;margin-top:.25rem}',
+      '.cfb-actions.hidden{visibility:hidden;height:0;margin:0;overflow:hidden}',
+      '.cfb-choice-btn{display:flex;align-items:center;width:100%;padding:.85rem 1rem;border:1px solid var(--cfb-btn-border,rgba(148,163,184,.45));border-radius:12px;background:var(--cfb-btn,#fff);color:var(--cfb-btn-text,#334155);font-size:.9375rem;font-weight:500;font-family:inherit;cursor:pointer;text-align:left;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}',
+      '.cfb-choice-btn:disabled{cursor:default;opacity:.85}',
+      '.cfb-choice-btn.cfb-choice-ready:not(:disabled):hover{border-color:var(--cfb-primary,#6366f1);box-shadow:0 0 0 3px rgba(99,102,241,.12)}',
+      '.cfb-choice-btn.selected{border-color:var(--cfb-primary,#6366f1);background:rgba(99,102,241,.06)}',
+      '.cfb-choice-label{min-height:1.25em}',
+      '.cfb-input-area{display:flex;flex-direction:column;gap:.5rem}',
+      '.cfb-input{width:100%;padding:.875rem 1rem;border:1px solid var(--cfb-btn-border,rgba(148,163,184,.45));border-radius:12px;font-size:1rem;font-family:inherit;background:#fff;color:var(--cfb-text,#334155);box-sizing:border-box}',
+      '.cfb-input:focus{outline:none;border-color:var(--cfb-primary,#6366f1);box-shadow:0 0 0 3px rgba(99,102,241,.12)}',
+      '.cfb-input-placeholder{font-size:.8rem;color:rgba(51,65,85,.45);min-height:1em}',
+      '.cfb-btn{display:block;width:100%;padding:.9rem 1rem;border:1px solid transparent;border-radius:12px;background:var(--cfb-btn,#fff);color:var(--cfb-btn-text,#334155);font-size:.9375rem;font-weight:600;font-family:inherit;cursor:pointer;box-sizing:border-box}',
+      '.cfb-btn:disabled{opacity:.7;cursor:default}',
+      '.cfb-btn-submit{border-color:var(--cfb-btn-border,rgba(148,163,184,.45))}',
+      '.cfb-btn-cta{background:var(--cfb-cta,#6366f1);color:var(--cfb-cta-text,#fff);border-color:var(--cfb-cta,#6366f1)}',
+      '.cfb-empty{padding:1rem;color:#64748b;font-size:.875rem}'
+    ].join('');
   }
 
   // ─── Editor rendering ───────────────────────────────────────
@@ -572,7 +712,7 @@
       html += '<span class="step-list-number">' + (index + 1) + '</span>';
       html += '<span class="step-list-content">';
       html += '<span class="step-list-id">' + escapeHtml(step.id) + '</span>';
-      html += '<span class="step-list-message">' + escapeHtml(step.message || '(empty message)') + '</span>';
+      html += '<span class="step-list-message">' + escapeHtml(step.subtext || step.message || '(empty step)') + '</span>';
       html += '<span class="step-list-meta">';
       html += '<span class="step-list-type">' + escapeHtml(typeLabel) + '</span>';
       if (stepWarnings.length) {
@@ -633,8 +773,12 @@
     html += field('Delay (ms)', 'number', 'step-delay', step.delay || 0);
     html += '</div>';
 
-    html += field('Message', 'textarea', 'step-message', step.message);
-    html += field('Subtext (optional)', 'textarea', 'step-subtext', step.subtext);
+    html += field('User message (optional)', 'textarea', 'step-user-message', step.userMessage || '');
+    html += '<p class="field-hint">Shown as a user bubble. Leave empty to use the previous answer automatically.</p>';
+    html += field('Bot response', 'textarea', 'step-message', step.message);
+    html += '<p class="field-hint">Context delivered first — types out before the question and buttons.</p>';
+    html += field('Question', 'textarea', 'step-subtext', step.subtext);
+    html += '<p class="field-hint">Bold question shown after the response finishes. Buttons appear last.</p>';
     html += field('Image URL (optional)', 'url', 'step-image', step.imageUrl);
 
     html += '<div class="form-group"><label>Question type</label><select id="step-question-type">';
@@ -811,6 +955,9 @@
       if (newId && newId !== step.id) step.id = newId;
     }
 
+    var userEl = document.getElementById('step-user-message');
+    if (userEl) step.userMessage = userEl.value;
+
     var msgEl = document.getElementById('step-message');
     if (msgEl) step.message = msgEl.value;
 
@@ -855,9 +1002,12 @@
       { key: 'primaryColor', label: 'Primary color', type: 'color' },
       { key: 'backgroundColor', label: 'Background color', type: 'color' },
       { key: 'textColor', label: 'Text color', type: 'color' },
-      { key: 'buttonColor', label: 'Button color', type: 'color' },
-      { key: 'buttonTextColor', label: 'Button text color', type: 'color' },
+      { key: 'userBubbleColor', label: 'User bubble color', type: 'color' },
+      { key: 'userBubbleTextColor', label: 'User bubble text', type: 'color' },
+      { key: 'buttonColor', label: 'Choice button bg', type: 'color' },
+      { key: 'buttonTextColor', label: 'Choice button text', type: 'color' },
       { key: 'ctaButtonColor', label: 'CTA button color', type: 'color' },
+      { key: 'typewriterSpeed', label: 'Typewriter speed (ms/char)', type: 'number' },
       { key: 'borderRadius', label: 'Border radius (px)', type: 'number' },
       { key: 'containerWidth', label: 'Container width (px)', type: 'number' },
       { key: 'fontFamily', label: 'Font family', type: 'text' }
@@ -927,8 +1077,9 @@
     var newId = generateStepId();
     funnel.steps.push({
       id: newId,
-      message: 'New message',
-      subtext: '',
+      userMessage: '',
+      message: 'Thanks — here is a helpful response before the next question.',
+      subtext: 'What would you like to do next?',
       imageUrl: '',
       questionType: 'single',
       options: [
@@ -966,8 +1117,7 @@
       return;
     }
     try {
-      funnel = JSON.parse(raw);
-      if (!funnel.styles) funnel.styles = deepClone(DEFAULT_STYLES);
+      funnel = normalizeFunnel(JSON.parse(raw));
       selectedStepIndex = 0;
       renderEditor();
       restartPreview();
@@ -993,9 +1143,8 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       try {
-        funnel = JSON.parse(e.target.result);
+        funnel = normalizeFunnel(JSON.parse(e.target.result));
         if (!funnel.steps || !funnel.steps.length) throw new Error('Invalid funnel');
-        if (!funnel.styles) funnel.styles = deepClone(DEFAULT_STYLES);
         selectedStepIndex = 0;
         renderEditor();
         restartPreview();
@@ -1016,92 +1165,15 @@
     syncEditorToFunnel();
     var dataJson = JSON.stringify(funnel);
     var widgetId = 'cfb-' + Math.random().toString(36).slice(2, 9);
-
-    // Inline CSS (matches .cfb-* classes in styles.css)
-    var css =
-      '.cfb-widget{font-family:var(--cfb-font,system-ui,sans-serif);background:var(--cfb-bg,#f8fafc);color:var(--cfb-text,#1e293b);border-radius:var(--cfb-radius,16px);padding:1.25rem;min-height:320px;display:flex;flex-direction:column;max-width:100%;margin:0 auto}' +
-      '.cfb-progress{margin-bottom:1rem}.cfb-progress-bar{height:4px;background:rgba(0,0,0,.08);border-radius:999px;overflow:hidden}' +
-      '.cfb-progress-fill{height:100%;background:var(--cfb-primary,#6366f1);border-radius:999px;transition:width .4s ease}' +
-      '.cfb-progress-text{font-size:.75rem;color:var(--cfb-text-muted,rgba(30,41,59,.55));margin-top:.35rem}' +
-      '.cfb-chat-area{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:.75rem}' +
-      '.cfb-message{background:#fff;border-radius:calc(var(--cfb-radius,16px)*.75);padding:1rem 1.1rem;box-shadow:0 2px 12px rgba(0,0,0,.06);animation:cfbFadeIn .45s ease}' +
-      '.cfb-message-text{font-size:1rem;line-height:1.55;margin:0}.cfb-message-subtext{font-size:.875rem;color:var(--cfb-text-muted,rgba(30,41,59,.65));margin:.5rem 0 0;line-height:1.45}' +
-      '.cfb-message-image{width:100%;border-radius:calc(var(--cfb-radius,16px)*.5);margin-bottom:.75rem;display:block}' +
-      '.cfb-input-area{margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem;animation:cfbFadeIn .35s ease .1s both}' +
-      '.cfb-input{width:100%;padding:.875rem 1rem;border:2px solid rgba(0,0,0,.08);border-radius:calc(var(--cfb-radius,16px)*.5);font-size:1rem;font-family:inherit;background:#fff;color:var(--cfb-text,#1e293b);box-sizing:border-box}' +
-      '.cfb-input:focus{outline:none;border-color:var(--cfb-primary,#6366f1)}' +
-      '.cfb-buttons{display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem;animation:cfbFadeIn .35s ease .15s both}' +
-      '.cfb-btn{display:block;width:100%;padding:.9rem 1rem;border:none;border-radius:calc(var(--cfb-radius,16px)*.5);background:var(--cfb-btn,#6366f1);color:var(--cfb-btn-text,#fff);font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer;transition:transform .12s,opacity .12s;text-align:center;box-sizing:border-box}' +
-      '.cfb-btn:hover{opacity:.92;transform:translateY(-1px)}.cfb-btn.selected{outline:2px solid var(--cfb-primary,#6366f1);outline-offset:2px}' +
-      '.cfb-btn-cta{background:var(--cfb-cta,#10b981);margin-top:.5rem}.cfb-btn-submit{margin-top:.25rem}' +
-      '@keyframes cfbFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}';
-
-    // Inline JS — same logic as renderFunnelWidget but self-contained
+    var css = getEmbedCSS();
+    var engineSource = runFunnelWidget.toString();
     var js =
       '(function(){' +
       'var DATA=' + dataJson + ';' +
-      'var state={currentStepId:DATA.startStepId||DATA.steps[0].id,email:"",tags:[],answers:{},selectedMultiple:[],visitedCount:0,completed:false};' +
+      'var state={currentStepId:DATA.startStepId||(DATA.steps[0]&&DATA.steps[0].id),email:"",tags:[],answers:{},selectedMultiple:[],visitedCount:0,completed:false,lastAnswerText:"",_seq:0};' +
       'var root=document.getElementById("' + widgetId + '");' +
-      'var s=DATA.styles||{};' +
-      'root.style.setProperty("--cfb-primary",s.primaryColor||"#6366f1");' +
-      'root.style.setProperty("--cfb-bg",s.backgroundColor||"#f8fafc");' +
-      'root.style.setProperty("--cfb-text",s.textColor||"#1e293b");' +
-      'root.style.setProperty("--cfb-btn",s.buttonColor||"#6366f1");' +
-      'root.style.setProperty("--cfb-btn-text",s.buttonTextColor||"#fff");' +
-      'root.style.setProperty("--cfb-cta",s.ctaButtonColor||"#10b981");' +
-      'root.style.setProperty("--cfb-radius",(s.borderRadius||16)+"px");' +
-      'root.style.setProperty("--cfb-font",s.fontFamily||"system-ui,sans-serif");' +
-      'root.style.maxWidth=(s.containerWidth||420)+"px";' +
-      'function getStep(id){return DATA.steps.find(function(x){return x.id===id});}' +
-      'function render(){' +
-      'root.innerHTML="";' +
-      'var step=getStep(state.currentStepId);if(!step){root.innerHTML="<p>No steps.</p>";return;}' +
-      'var w=document.createElement("div");w.className="cfb-widget";' +
-      'w.style.setProperty("--cfb-primary",s.primaryColor||"#6366f1");' +
-      'w.style.setProperty("--cfb-bg",s.backgroundColor||"#f8fafc");' +
-      'w.style.setProperty("--cfb-text",s.textColor||"#1e293b");' +
-      'w.style.setProperty("--cfb-btn",s.buttonColor||"#6366f1");' +
-      'w.style.setProperty("--cfb-btn-text",s.buttonTextColor||"#fff");' +
-      'w.style.setProperty("--cfb-cta",s.ctaButtonColor||"#10b981");' +
-      'w.style.setProperty("--cfb-radius",(s.borderRadius||16)+"px");' +
-      'w.style.setProperty("--cfb-font",s.fontFamily||"system-ui,sans-serif");' +
-      'root.appendChild(w);' +
-      'if(DATA.showProgress){var idx=DATA.steps.findIndex(function(x){return x.id===state.currentStepId;});var pct=Math.max(5,Math.round(((idx+1)/DATA.steps.length)*100));' +
-      'var pr=document.createElement("div");pr.className="cfb-progress";pr.innerHTML=\'<div class="cfb-progress-bar"><div class="cfb-progress-fill" style="width:\'+pct+\'%"></div></div><div class="cfb-progress-text">Step \'+(idx+1)+" of "+DATA.steps.length+"</div>";w.appendChild(pr);}' +
-      'var chat=document.createElement("div");chat.className="cfb-chat-area";w.appendChild(chat);' +
-      'function show(){chat.innerHTML="";var cur=getStep(state.currentStepId);if(!cur)return;' +
-      'var go=function(){var msg=document.createElement("div");msg.className="cfb-message";' +
-      'if(cur.imageUrl){var im=document.createElement("img");im.className="cfb-message-image";im.src=cur.imageUrl;im.alt="";msg.appendChild(im);}' +
-      'var t=document.createElement("p");t.className="cfb-message-text";t.textContent=cur.message;msg.appendChild(t);' +
-      'if(cur.subtext){var st=document.createElement("p");st.className="cfb-message-subtext";st.textContent=cur.subtext;msg.appendChild(st);}' +
-      'chat.appendChild(msg);renderInput(cur);};' +
-      'if(cur.delay>0)setTimeout(go,cur.delay);else go();}' +
-      'function renderInput(cur){' +
-      'if(cur.questionType==="text"||cur.questionType==="email"){' +
-      'var ia=document.createElement("div");ia.className="cfb-input-area";' +
-      'var inp=document.createElement("input");inp.className="cfb-input";inp.type=cur.questionType==="email"?"email":"text";' +
-      'inp.placeholder=cur.questionType==="email"?"Enter your email":"Type your answer…";' +
-      'var sub=document.createElement("button");sub.type="button";sub.className="cfb-btn cfb-btn-submit";sub.textContent="Continue";' +
-      'sub.onclick=function(){var v=inp.value.trim();if(!v)return; if(cur.questionType==="email")state.email=v; state.answers[cur.id]=v; goNext(cur.options[0]&&cur.options[0].nextStepId);};' +
-      'inp.onkeydown=function(e){if(e.key==="Enter")sub.click();};ia.appendChild(inp);ia.appendChild(sub);chat.appendChild(ia);inp.focus();return;}' +
-      'if(cur.questionType==="multiple"){' +
-      'state.selectedMultiple=state.selectedMultiple||[];var mw=document.createElement("div");mw.className="cfb-buttons";' +
-      'cur.options.forEach(function(opt,i){var b=document.createElement("button");b.type="button";b.className="cfb-btn";b.textContent=opt.text;' +
-      'if(state.selectedMultiple.indexOf(i)!==-1)b.classList.add("selected");' +
-      'b.onclick=function(){var p=state.selectedMultiple.indexOf(i);if(p===-1)state.selectedMultiple.push(i);else state.selectedMultiple.splice(p,1);b.classList.toggle("selected");};mw.appendChild(b);});' +
-      'var cb=document.createElement("button");cb.type="button";cb.className="cfb-btn cfb-btn-submit";cb.textContent="Continue";' +
-      'cb.onclick=function(){if(!state.selectedMultiple.length)return;state.selectedMultiple.forEach(function(i){if(cur.options[i]&&cur.options[i].tag)state.tags.push(cur.options[i].tag);});' +
-      'state.answers[cur.id]=state.selectedMultiple.map(function(i){return cur.options[i].text;});' +
-      'goNext(cur.options[state.selectedMultiple[0]]&&cur.options[state.selectedMultiple[0]].nextStepId);};mw.appendChild(cb);chat.appendChild(mw);return;}' +
-      'if(cur.options&&cur.options.length){var bw=document.createElement("div");bw.className="cfb-buttons";' +
-      'cur.options.forEach(function(opt){var b=document.createElement("button");b.type="button";b.className="cfb-btn";b.textContent=opt.text;' +
-      'b.onclick=function(){if(opt.tag)state.tags.push(opt.tag);state.answers[cur.id]=opt.text;goNext(opt.nextStepId);};bw.appendChild(b);});chat.appendChild(bw);}' +
-      'if(cur.ctaText){var cw=document.createElement("div");cw.className="cfb-buttons";var cta=document.createElement("button");cta.type="button";cta.className="cfb-btn cfb-btn-cta";cta.textContent=cur.ctaText;' +
-      'cta.onclick=function(){if(cur.ctaUrl)window.open(cur.ctaUrl,"_blank");complete();};cw.appendChild(cta);chat.appendChild(cw);}}' +
-      'function goNext(nextId){state.selectedMultiple=[];state.visitedCount++;if(!nextId||!getStep(nextId)){complete();return;}state.currentStepId=nextId;show();}' +
-      'function complete(){state.completed=true;if(DATA.redirectUrl)setTimeout(function(){window.location.href=DATA.redirectUrl;},600);}' +
-      'show();}' +
-      'render();' +
+      'var runFunnelWidget=' + engineSource + ';' +
+      'runFunnelWidget(root,DATA,state,null);' +
       'window.conversationFunnelState=state;' +
       '})();';
 
@@ -1175,6 +1247,7 @@
   // ─── Init ───────────────────────────────────────────────────
 
   function init() {
+    funnel = normalizeFunnel(funnel);
     initTabs();
     initEvents();
     renderEditor();
