@@ -70,7 +70,7 @@ copyRecursive(path.join(docs, "ContentGenerator"), path.join(DEPLOY, "ContentGen
 
 // Static app folders (no build)
 console.log("Copying static apps...");
-for (const dir of ["conversation-generator", "Typography", "VSLWriter"]) {
+for (const dir of ["conversation-generator", "ConversationFunnelBuilder", "Typography", "VSLWriter"]) {
   const src = path.join(ROOT, dir);
   if (existsSync(src)) copyRecursive(src, path.join(DEPLOY, dir));
 }

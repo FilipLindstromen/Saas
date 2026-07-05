@@ -30,6 +30,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Content Generator | `/ContentGenerator` | Reddit pain points → video questions for personal development |
 | Content Creator | `/ContentCreator` | AI content machine workflow for research → post |
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
+| Conversation Funnel Builder | `/ConversationFunnelBuilder` | Visual conversation funnel editor with HTML export for Systeme.io |
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 | MetaConnect | `/MetaConnect` | Meta (FB/IG) comment-to-DM automation + lead form sync to Systeme.io (requires server; deploy to Vercel or run locally) |
 

@@ -37,6 +37,7 @@ exclude:
   - InfoGraphics
   - Quiz
   - conversation-generator
+  - ConversationFunnelBuilder
   - "conversation-generator - Copy"
   - "quiz-generator - Copy"
   - VoideDepth

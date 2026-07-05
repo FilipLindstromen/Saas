@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversation Funnel Builder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-brand">
+      <a href="../" class="back-link" title="Back to SaaS Apps">← SaaS Apps</a>
+      <div class="brand-title">
+        <span class="title-icon">🗣️</span>
+        <div>
+          <h1 class="app-title">Conversation Funnel Builder</h1>
+          <input type="text" id="funnel-name" class="funnel-name-input" placeholder="Untitled funnel" aria-label="Funnel name">
+        </div>
+      </div>
+    </div>
+
+    <div class="header-toolbar">
+      <div class="toolbar-group">
+        <span class="toolbar-label">Project</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-save">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-load">Load</button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <span class="toolbar-label">Data</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-import-json">Import JSON</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-export-json">Export JSON</button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <button type="button" class="btn btn-primary" id="btn-generate-html">Generate HTML</button>
+    </div>
+  </header>
+
+  <div id="validation-banner" class="validation-banner hidden" role="alert"></div>
+
+  <main class="app-main">
+    <!-- Left: Step list -->
+    <aside class="panel panel-steps">
+      <div class="panel-header">
+        <h2>Steps</h2>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-step" title="Add step">+ Add</button>
+      </div>
+      <div id="step-list" class="step-list"></div>
+    </aside>
+
+    <!-- Middle: Step editor -->
+    <section class="panel panel-editor">
+      <div class="panel-tabs">
+        <button type="button" class="panel-tab active" data-tab="step">Step</button>
+        <button type="button" class="panel-tab" data-tab="styling">Styling</button>
+        <button type="button" class="panel-tab" data-tab="settings">Settings</button>
+      </div>
+      <div class="panel-body">
+        <div class="tab-panel active" id="tab-step">
+          <div id="step-editor-empty" class="empty-state hidden">
+            <div class="empty-icon">📋</div>
+            <h3>No step selected</h3>
+            <p>Select a step from the list or add a new one to start editing.</p>
+          </div>
+          <div id="step-editor" class="step-editor-form"></div>
+        </div>
+        <div class="tab-panel" id="tab-styling">
+          <div class="tab-intro">
+            <h3>Appearance</h3>
+            <p>These styles apply to the live preview and exported HTML embed.</p>
+          </div>
+          <div class="form-grid" id="styling-editor"></div>
+        </div>
+        <div class="tab-panel" id="tab-settings">
+          <div class="tab-intro">
+            <h3>Funnel settings</h3>
+            <p>Configure flow behavior and completion actions.</p>
+          </div>
+          <div id="settings-editor" class="settings-form"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: Live preview -->
+    <aside class="panel panel-preview">
+      <div class="panel-header">
+        <h2>Live Preview</h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-restart-preview">Restart</button>
+      </div>
+      <div class="preview-stage">
+        <div class="phone-frame">
+          <div class="phone-top">
+            <span class="phone-speaker"></span>
+          </div>
+          <div class="phone-screen">
+            <div id="preview-root" class="preview-root"></div>
+          </div>
+          <div class="phone-home"></div>
+        </div>
+        <p class="preview-caption">Mobile preview · simulates visitor experience</p>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Generate HTML modal -->
+  <div class="modal-backdrop hidden" id="html-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Generated HTML Snippet</h2>
+        <button type="button" class="modal-close" id="html-modal-close" aria-label="Close">×</button>
+      </div>
+      <p class="modal-hint">Copy this entire block and paste it into a Systeme.io raw HTML element. No external dependencies required.</p>
+      <textarea id="html-output" readonly rows="16" aria-label="Generated HTML"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-copy-html-secondary">Copy to Clipboard</button>
+        <button type="button" class="btn btn-primary" id="btn-copy-html">
+          <span class="btn-icon">📋</span> Copy to Clipboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="json-file-input" accept=".json,application/json" hidden>
+
+  <script src="app.js"></script>
+</body>
+</html>
