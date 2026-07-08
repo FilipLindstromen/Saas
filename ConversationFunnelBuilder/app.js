@@ -28,7 +28,8 @@
     fontFamily: 'system-ui, -apple-system, sans-serif',
     containerWidth: '420',
     ctaButtonColor: '#6366f1',
-    typewriterSpeed: '28'
+    typewriterSpeed: '28',
+    autoAdvancePause: '900'
   };
 
   /** Preloaded anxiety offer sample funnel */
@@ -41,11 +42,18 @@
     steps: [
       {
         id: 'step1',
+        userMessage: '',
         message: "Let's find out what's keeping your anxiety switched on.",
-        subtext: '',
+        subtext: 'When does anxiety usually show up for you?',
         imageUrl: '',
-        questionType: 'statement',
-        options: [{ text: 'Start', nextStepId: 'step2', tag: '' }],
+        questionType: 'single',
+        options: [
+          { text: 'Before sleep', nextStepId: 'step2', tag: 'before-sleep' },
+          { text: 'In the morning', nextStepId: 'step2', tag: 'morning' },
+          { text: 'Driving', nextStepId: 'step2', tag: 'driving' },
+          { text: 'Work or meetings', nextStepId: 'step2', tag: 'work' },
+          { text: 'Randomly', nextStepId: 'step2', tag: 'random' }
+        ],
         delay: 0,
         ctaText: '',
         ctaUrl: ''
@@ -53,16 +61,16 @@
       {
         id: 'step2',
         userMessage: '',
-        message: "Good — that tells me you're ready to look at this honestly. Anxiety rarely shows up randomly. It usually follows a pattern.",
-        subtext: 'When does anxiety usually show up for you?',
+        message: "That's an important clue. Your body often signals stress before your mind fully catches up.",
+        subtext: 'What do you notice first when it hits?',
         imageUrl: '',
         questionType: 'single',
         options: [
-          { text: 'Before sleep', nextStepId: 'step3', tag: 'before-sleep' },
-          { text: 'In the morning', nextStepId: 'step3', tag: 'morning' },
-          { text: 'Driving', nextStepId: 'step3', tag: 'driving' },
-          { text: 'Work or meetings', nextStepId: 'step3', tag: 'work' },
-          { text: 'Randomly', nextStepId: 'step3', tag: 'random' }
+          { text: 'Racing thoughts', nextStepId: 'step3', tag: 'thoughts' },
+          { text: 'Tight chest', nextStepId: 'step3', tag: 'chest' },
+          { text: 'Fast heartbeat', nextStepId: 'step3', tag: 'heartbeat' },
+          { text: 'Feeling on edge', nextStepId: 'step3', tag: 'edge' },
+          { text: 'Shallow breathing', nextStepId: 'step3', tag: 'breathing' }
         ],
         delay: 0,
         ctaText: '',
@@ -71,63 +79,45 @@
       {
         id: 'step3',
         userMessage: '',
-        message: "That's an important clue. Your body often signals stress before your mind fully catches up.",
-        subtext: 'What do you notice first when it hits?',
+        message: 'Most people try to fight anxiety at the thought level. But for many people, anxiety starts before the thoughts — inside the body.',
+        subtext: '',
         imageUrl: '',
-        questionType: 'single',
-        options: [
-          { text: 'Racing thoughts', nextStepId: 'step4', tag: 'thoughts' },
-          { text: 'Tight chest', nextStepId: 'step4', tag: 'chest' },
-          { text: 'Fast heartbeat', nextStepId: 'step4', tag: 'heartbeat' },
-          { text: 'Feeling on edge', nextStepId: 'step4', tag: 'edge' },
-          { text: 'Shallow breathing', nextStepId: 'step4', tag: 'breathing' }
-        ],
+        questionType: 'statement',
+        options: [{ text: 'Continue', nextStepId: 'step4', tag: '' }],
         delay: 0,
         ctaText: '',
         ctaUrl: ''
       },
       {
         id: 'step4',
-        userMessage: '',
-        message: 'Most people try to fight anxiety at the thought level. But for many people, anxiety starts before the thoughts — inside the body.',
+        message: 'Anxiety often appears when three protective systems become highly activated: your brain scanning for danger, your body carrying stress, and your nervous system staying on high alert.',
         subtext: '',
         imageUrl: '',
         questionType: 'statement',
-        options: [{ text: 'Show me', nextStepId: 'step5', tag: '' }],
+        options: [{ text: 'Continue', nextStepId: 'step5', tag: '' }],
         delay: 0,
         ctaText: '',
         ctaUrl: ''
       },
       {
         id: 'step5',
-        message: 'Anxiety often appears when three protective systems become highly activated: your brain scanning for danger, your body carrying stress, and your nervous system staying on high alert.',
-        subtext: '',
-        imageUrl: '',
-        questionType: 'statement',
-        options: [{ text: 'Continue', nextStepId: 'step6', tag: '' }],
-        delay: 0,
-        ctaText: '',
-        ctaUrl: ''
-      },
-      {
-        id: 'step6',
         userMessage: '',
         message: "You're not broken — your system is doing its job a little too well. The real question is which part feels loudest for you right now.",
         subtext: 'Which one feels most true for you?',
         imageUrl: '',
         questionType: 'single',
         options: [
-          { text: "My thoughts won't stop", nextStepId: 'step7', tag: 'thoughts' },
-          { text: 'My body feels tense', nextStepId: 'step7', tag: 'body' },
-          { text: 'I never fully relax', nextStepId: 'step7', tag: 'relax' },
-          { text: 'All of them', nextStepId: 'step7', tag: 'all' }
+          { text: "My thoughts won't stop", nextStepId: 'step6', tag: 'thoughts' },
+          { text: 'My body feels tense', nextStepId: 'step6', tag: 'body' },
+          { text: 'I never fully relax', nextStepId: 'step6', tag: 'relax' },
+          { text: 'All of them', nextStepId: 'step6', tag: 'all' }
         ],
         delay: 0,
         ctaText: '',
         ctaUrl: ''
       },
       {
-        id: 'step7',
+        id: 'step6',
         message: 'Based on your answers, your body may be staying in protection mode longer than it needs to. The 90-Second Reset is designed to help turn those systems down physically.',
         subtext: '',
         imageUrl: '',
@@ -341,6 +331,18 @@
     function alive() { return seq === runtime._seq; }
     function getStep(id) { return funnelData.steps.find(function (s) { return s.id === id; }); }
     function speed() { return parseInt(styles.typewriterSpeed, 10) || 28; }
+    function autoPause() { return parseInt(styles.autoAdvancePause, 10) || 900; }
+
+    /** Statement bridge: one option, no question — auto-continue after typing */
+    function shouldAutoAdvance(step) {
+      if (step.autoAdvance === false) return false;
+      if (step.autoAdvance === true) return step.options && step.options.length === 1;
+      return step.questionType === 'statement' &&
+        !(step.subtext && step.subtext.trim()) &&
+        !step.ctaText &&
+        step.options && step.options.length === 1 &&
+        step.options[0].nextStepId;
+    }
 
     function typewriter(el, text, done) {
       if (!alive()) return;
@@ -619,6 +621,14 @@
         }
 
         sequence.push(function (next) {
+          if (shouldAutoAdvance(step)) {
+            setTimeout(function () {
+              if (!alive()) return;
+              goToNext(step.options[0].nextStepId, '');
+            }, autoPause());
+            next();
+            return;
+          }
           renderActions();
           next();
         });
@@ -779,6 +789,10 @@
     html += '<p class="field-hint">Context delivered first — types out before the question and buttons.</p>';
     html += field('Question', 'textarea', 'step-subtext', step.subtext);
     html += '<p class="field-hint">Bold question shown after the response finishes. Buttons appear last.</p>';
+    if (step.questionType === 'statement') {
+      html += '<div class="form-group checkbox-row"><input type="checkbox" id="step-auto-advance"' +
+        (step.autoAdvance !== false ? ' checked' : '') + '><label for="step-auto-advance">Auto-advance (no button — flows to next step after typing)</label></div>';
+    }
     html += field('Image URL (optional)', 'url', 'step-image', step.imageUrl);
 
     html += '<div class="form-group"><label>Question type</label><select id="step-question-type">';
@@ -979,6 +993,9 @@
     var typeSelect = document.getElementById('step-question-type');
     if (typeSelect) step.questionType = typeSelect.value;
 
+    var autoAdv = document.getElementById('step-auto-advance');
+    if (autoAdv) step.autoAdvance = autoAdv.checked;
+
     if (step.questionType === 'text' || step.questionType === 'email') {
       var nextSelect = document.getElementById('input-next-step');
       var nextId = nextSelect ? nextSelect.value : '';
@@ -1008,6 +1025,7 @@
       { key: 'buttonTextColor', label: 'Choice button text', type: 'color' },
       { key: 'ctaButtonColor', label: 'CTA button color', type: 'color' },
       { key: 'typewriterSpeed', label: 'Typewriter speed (ms/char)', type: 'number' },
+      { key: 'autoAdvancePause', label: 'Auto-advance pause (ms)', type: 'number' },
       { key: 'borderRadius', label: 'Border radius (px)', type: 'number' },
       { key: 'containerWidth', label: 'Container width (px)', type: 'number' },
       { key: 'fontFamily', label: 'Font family', type: 'text' }
