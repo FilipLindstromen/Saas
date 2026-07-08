@@ -35,7 +35,8 @@ body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -108,9 +109,10 @@ body {
 .header-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .toolbar-group {
@@ -150,41 +152,51 @@ body {
 
 .app-main {
   display: grid;
-  grid-template-columns: var(--panel-steps) 1fr var(--panel-preview);
-  flex: 1;
+  grid-template-columns: var(--panel-steps) minmax(0, 1fr) var(--panel-preview);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
   min-height: 0;
-  height: 0; /* fill remaining viewport in flex column */
   overflow: hidden;
+}
+
+.app-main > .panel {
+  min-height: 0;
+  max-height: 100%;
 }
 
 @media (max-width: 1100px) { :root { --panel-preview: 320px; } }
 
 @media (max-width: 900px) {
-  body { overflow: auto; }
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
   .app-main {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(200px, 280px) minmax(300px, 1fr) minmax(360px, 50vh);
-    height: auto;
-    min-height: calc(100vh - 64px);
+    grid-template-rows: minmax(220px, 28vh) minmax(320px, 1fr) minmax(420px, auto);
     overflow: visible;
   }
-  .panel { height: auto; min-height: 0; }
-  .panel-steps { max-height: none; }
-  .panel-preview { min-height: 360px; }
+  .app-main > .panel {
+    max-height: none;
+  }
   .phone-screen {
-    height: min(400px, 50vh);
-    max-height: 50vh;
+    height: min(360px, calc(100dvh - 180px));
+    min-height: 260px;
   }
 }
 
 .panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
-  height: 100%;
   overflow: hidden;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-default);
+}
+
+.panel-editor {
+  min-width: 0;
 }
 
 .panel-preview {
@@ -213,12 +225,13 @@ body {
 }
 
 .step-list {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0.5rem;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .step-list-item {
@@ -331,7 +344,7 @@ body {
 .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .panel-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -340,7 +353,10 @@ body {
 }
 
 .tab-panel { display: none; }
-.tab-panel.active { display: block; }
+.tab-panel.active {
+  display: block;
+  min-height: min-content;
+}
 
 .tab-intro {
   margin-bottom: 1.25rem;
@@ -536,15 +552,15 @@ label {
 .btn-icon { font-size: 0.9rem; }
 
 .preview-stage {
-  flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  overflow-y: auto;
-  overflow-x: hidden;
+  justify-content: safe center;
+  padding: 1.25rem 1rem;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -552,41 +568,37 @@ label {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: auto;
-  flex-shrink: 0;
   width: 100%;
-  max-width: 300px;
+  max-width: 280px;
+  flex-shrink: 0;
 }
 
 .phone-frame {
   width: 100%;
-  max-width: 300px;
   background: #0d0d0d;
-  border-radius: 36px;
-  padding: 10px;
+  border-radius: 32px;
+  padding: 8px;
   box-shadow: 0 0 0 2px #2a2a2a, 0 0 0 4px #111, var(--shadow-md);
-  flex-shrink: 0;
 }
 
-.phone-top { display: flex; justify-content: center; padding: 6px 0 8px; }
-.phone-speaker { width: 56px; height: 5px; background: #2a2a2a; border-radius: 999px; }
+.phone-top { display: flex; justify-content: center; padding: 5px 0 7px; }
+.phone-speaker { width: 52px; height: 4px; background: #2a2a2a; border-radius: 999px; }
 .phone-screen {
   background: #ffffff;
-  border-radius: 26px;
-  overflow: hidden;
+  border-radius: 24px;
+  overflow-x: hidden;
   overflow-y: auto;
-  height: min(420px, calc(100vh - 220px));
-  min-height: 280px;
-  max-height: calc(100vh - 220px);
+  height: min(360px, calc(100dvh - 220px));
+  min-height: 260px;
+  -webkit-overflow-scrolling: touch;
 }
-.phone-home { width: 36px; height: 4px; background: #333; border-radius: 999px; margin: 10px auto 4px; }
+.phone-home { width: 32px; height: 4px; background: #333; border-radius: 999px; margin: 8px auto 3px; }
 .preview-root { width: 100%; min-height: 0; }
 .preview-caption {
-  margin: 0.75rem 0 0;
+  margin: 0.65rem 0 0;
   font-size: 0.75rem;
   color: var(--text-tertiary);
   text-align: center;
-  flex-shrink: 0;
 }
 
 .cfb-widget {
@@ -594,7 +606,7 @@ label {
   background: var(--cfb-bg, #ffffff);
   color: var(--cfb-text, #334155);
   padding: 1.25rem 1rem;
-  min-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
