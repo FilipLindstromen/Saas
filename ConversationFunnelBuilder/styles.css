@@ -153,6 +153,7 @@ body {
   grid-template-columns: var(--panel-steps) 1fr var(--panel-preview);
   flex: 1;
   min-height: 0;
+  height: 0; /* fill remaining viewport in flex column */
   overflow: hidden;
 }
 
@@ -162,17 +163,26 @@ body {
   body { overflow: auto; }
   .app-main {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: minmax(200px, 280px) minmax(300px, 1fr) minmax(360px, 50vh);
+    height: auto;
+    min-height: calc(100vh - 64px);
     overflow: visible;
   }
-  .panel-steps { max-height: 280px; }
-  .panel-preview { min-height: 520px; }
+  .panel { height: auto; min-height: 0; }
+  .panel-steps { max-height: none; }
+  .panel-preview { min-height: 360px; }
+  .phone-screen {
+    height: min(400px, 50vh);
+    max-height: 50vh;
+  }
 }
 
 .panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-default);
 }
@@ -204,8 +214,11 @@ body {
 
 .step-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .step-list-item {
@@ -319,8 +332,11 @@ body {
 
 .panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-panel { display: none; }
@@ -521,12 +537,25 @@ label {
 
 .preview-stage {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem 1rem 1rem;
+  padding: 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.preview-stage-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 300px;
 }
 
 .phone-frame {
@@ -536,21 +565,36 @@ label {
   border-radius: 36px;
   padding: 10px;
   box-shadow: 0 0 0 2px #2a2a2a, 0 0 0 4px #111, var(--shadow-md);
+  flex-shrink: 0;
 }
 
 .phone-top { display: flex; justify-content: center; padding: 6px 0 8px; }
 .phone-speaker { width: 56px; height: 5px; background: #2a2a2a; border-radius: 999px; }
-.phone-screen { background: #ffffff; border-radius: 26px; overflow: hidden; min-height: 480px; max-height: 560px; overflow-y: auto; }
+.phone-screen {
+  background: #ffffff;
+  border-radius: 26px;
+  overflow: hidden;
+  overflow-y: auto;
+  height: min(420px, calc(100vh - 220px));
+  min-height: 280px;
+  max-height: calc(100vh - 220px);
+}
 .phone-home { width: 36px; height: 4px; background: #333; border-radius: 999px; margin: 10px auto 4px; }
-.preview-root { width: 100%; min-height: 460px; }
-.preview-caption { margin: 1rem 0 0; font-size: 0.75rem; color: var(--text-tertiary); text-align: center; }
+.preview-root { width: 100%; min-height: 0; }
+.preview-caption {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  flex-shrink: 0;
+}
 
 .cfb-widget {
   font-family: var(--cfb-font, system-ui, sans-serif);
   background: var(--cfb-bg, #ffffff);
   color: var(--cfb-text, #334155);
   padding: 1.25rem 1rem;
-  min-height: 460px;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
