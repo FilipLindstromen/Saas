@@ -3,9 +3,11 @@ import ThemeToggle from '@shared/ThemeToggle'
 import UnsplashPicker from '@shared/stockMedia/UnsplashPicker'
 import { getTheme, initThemeSync, setTheme } from '@shared/theme'
 import MediaControls from './components/MediaControls'
+import CopySection from './components/CopySection'
 import TextControls from './components/TextControls'
 import PreviewPanel from './components/PreviewPanel'
 import { useAdCompositor } from './hooks/useAdCompositor'
+import { analyzeAsOgilvy, generateCopyVersions } from './services/copyAi'
 import {
   DEFAULT_MEDIA,
   DEFAULT_TEXT,
@@ -111,6 +113,10 @@ export default function App() {
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [analysis, setAnalysis] = useState(null)
+  const [versions, setVersions] = useState([])
 
   const format = FORMATS[formatId] || FORMATS.landscape
   const aspectRatio = `${format.width} / ${format.height}`
@@ -206,6 +212,50 @@ export default function App() {
   }
 
   const handleResetTransform = () => setMediaTransform(DEFAULT_MEDIA)
+
+  const handleHeadlineChange = (headline) => {
+    setText((prev) => ({ ...prev, headline }))
+  }
+
+  const handleCopyChange = (copy) => {
+    setText((prev) => ({ ...prev, copy }))
+  }
+
+  const handleAnalyze = async () => {
+    setAiBusy(true)
+    setAiError('')
+    try {
+      const result = await analyzeAsOgilvy(text.headline, text.copy)
+      setAnalysis(result)
+    } catch (err) {
+      setAiError(err?.message || 'Analysis failed')
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  const handleGenerateVersions = async () => {
+    setAiBusy(true)
+    setAiError('')
+    try {
+      const result = await generateCopyVersions(text.headline, text.copy, 5)
+      if (!result.length) throw new Error('No versions were generated')
+      setVersions(result)
+    } catch (err) {
+      setAiError(err?.message || 'Failed to generate versions')
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  const handleApplyVersion = (version) => {
+    setText((prev) => ({
+      ...prev,
+      headline: version.headline || prev.headline,
+      copy: version.copy || prev.copy,
+    }))
+    setStatus('Version applied.')
+  }
 
   const buildExportCanvas = async () => {
     return renderAdToCanvas({
@@ -330,6 +380,20 @@ export default function App() {
             mediaScale={mediaTransform.scale}
             onMediaScaleChange={(scale) => setMediaTransform((p) => ({ ...p, scale }))}
             onResetTransform={handleResetTransform}
+          />
+
+          <CopySection
+            headline={text.headline}
+            copy={text.copy}
+            onHeadlineChange={handleHeadlineChange}
+            onCopyChange={handleCopyChange}
+            analysis={analysis}
+            versions={versions}
+            aiBusy={aiBusy}
+            aiError={aiError}
+            onAnalyze={handleAnalyze}
+            onGenerateVersions={handleGenerateVersions}
+            onApplyVersion={handleApplyVersion}
           />
 
           <TextControls
