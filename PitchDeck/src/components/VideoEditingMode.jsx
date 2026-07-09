@@ -475,6 +475,7 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
         format: exportFormat,
         quality: exportQuality,
         resolution: exportResolution,
+        studioSound,
       }
       if (addCaptions && merged.length > 0) {
         exportOpts.captions = { segments: merged, style: captionStyle }
@@ -498,7 +499,7 @@ function VideoEditingMode({ videoBlob, latestRecordingRef, onExit, openaiKey }) 
     }
     setExportProgress('')
     setIsExporting(false)
-  }, [duration, addCaptions, words, captionStyle, exportFormat, exportQuality, exportResolution])
+  }, [duration, addCaptions, words, captionStyle, exportFormat, exportQuality, exportResolution, studioSound])
 
   if (!videoUrl) {
     return (

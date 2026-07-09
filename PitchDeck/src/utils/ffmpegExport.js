@@ -6,6 +6,8 @@
  */
 
 import { getFfmpegApiBase, WHISPER_MAX_BYTES } from './ffmpegConfig'
+import { getFfmpegCoreUrls } from './ffmpegCoreUrls'
+import { STUDIO_SOUND_FILTER } from './studioSoundFilter'
 
 export { getFfmpegApiBase, WHISPER_MAX_BYTES } from './ffmpegConfig'
 
@@ -35,6 +37,7 @@ async function serverExportVideo(baseUrl, blob, segments, opts = {}) {
   if (opts.captions && (opts.captions.segments?.length > 0 || (opts.captions.transcript && opts.captions.duration))) {
     form.append('captions', JSON.stringify(opts.captions))
   }
+  if (opts.studioSound) form.append('studioSound', 'true')
   const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/export-video`, { method: 'POST', body: form })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -53,10 +56,12 @@ async function getFFmpeg() {
   loadPromise = (async () => {
     const { FFmpeg } = await import('@ffmpeg/ffmpeg')
     const ffmpeg = new FFmpeg()
-    await ffmpeg.load({
-      coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
-      wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm',
-    })
+    const { local, cdn } = getFfmpegCoreUrls()
+    try {
+      await ffmpeg.load(local)
+    } catch {
+      await ffmpeg.load(cdn)
+    }
     ffmpegInstance = ffmpeg
     return ffmpeg
   })()
@@ -321,7 +326,40 @@ export async function exportTrimmedVideo(blob, segments, opts = {}) {
     await ffmpeg.deleteFile(outName)
   } catch (_) {}
 
+  if (opts.studioSound) {
+    report?.('Polishing audio (Studio Sound)…')
+    finalBlob = await applyStudioSoundClient(ffmpeg, finalBlob, ext, report)
+  }
+
   return finalBlob
+}
+
+async function applyStudioSoundClient(ffmpeg, blob, ext, report) {
+  const inputName = `studio_in.${ext}`
+  const outputName = `studio_out.${ext}`
+  const data = new Uint8Array(await blob.arrayBuffer())
+  await ffmpeg.writeFile(inputName, data)
+  const audioCodec = ext === 'mp4' ? 'aac' : 'libopus'
+  const audioBitrate = ext === 'mp4' ? '192k' : '128k'
+  await ffmpeg.exec([
+    '-i', inputName,
+    '-af', STUDIO_SOUND_FILTER,
+    '-c:v', 'copy',
+    '-c:a', audioCodec,
+    '-b:a', audioBitrate,
+    '-y',
+    outputName,
+  ])
+  const outData = await ffmpeg.readFile(outputName)
+  const outBlob = outData instanceof Uint8Array
+    ? new Blob([outData], { type: blob.type })
+    : new Blob([outData.buffer], { type: blob.type })
+  try {
+    await ffmpeg.deleteFile(inputName)
+    await ffmpeg.deleteFile(outputName)
+  } catch (_) {}
+  report?.('Audio polished')
+  return outBlob
 }
 
 /**

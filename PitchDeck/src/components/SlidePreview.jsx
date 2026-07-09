@@ -15,7 +15,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings, analysisFolded = false, onToggleAnalysisFold, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, recordSettings, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', webcamFlipHorizontal: false, webcamFlipVertical: false }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -93,7 +93,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       if (unsplashData.results && unsplashData.results.length > 0) {
         // Use the first result
         const imageUrl = unsplashData.results[0].urls.regular
-        onUpdate({ imageUrl, backgroundOpacity: 0.6 })
+        onUpdate({ imageUrl, backgroundOpacity: 0.6, imageScale: 1.0, imageScaleCustomized: false })
       } else {
         alert('No images found. Try a different search query.')
       }
@@ -122,7 +122,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   }
 
   const handleImageSelect = (imageUrl) => {
-    onUpdate({ imageUrl, backgroundOpacity: 0.6 })
+    onUpdate({ imageUrl, backgroundOpacity: 0.6, imageScale: 1.0, imageScaleCustomized: false })
   }
 
   const handleUploadImage = () => {
@@ -150,7 +150,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     reader.onload = (event) => {
       const dataUrl = event.target?.result
       if (dataUrl) {
-        onUpdate({ imageUrl: dataUrl, backgroundOpacity: 0.6 })
+        onUpdate({ imageUrl: dataUrl, backgroundOpacity: 0.6, imageScale: 1.0, imageScaleCustomized: false })
       }
     }
     reader.onerror = () => {
@@ -167,7 +167,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   }
 
   const handleVideoBackgroundSelect = (videoUrl) => {
-    onUpdate({ backgroundVideoUrl: videoUrl || '' })
+    onUpdate({ backgroundVideoUrl: videoUrl || '', imageScale: 1.0, imageScaleCustomized: false })
     setShowVideoPicker(false)
   }
 
@@ -176,7 +176,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   }
 
   const handleInfographicSelect = (projectId, tabId) => {
-    onUpdate({ infographicProjectId: projectId || undefined, infographicTabId: tabId || undefined })
+    onUpdate({ infographicProjectId: projectId || undefined, infographicTabId: tabId || undefined, imageScale: 1.0, imageScaleCustomized: false })
     setShowInfographicPicker(false)
   }
 
@@ -479,25 +479,6 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
         </div>
         </div>
       </div>
-      {slide.analysis && (
-        <div className="preview-analysis">
-          <div className="preview-analysis-header" onClick={onToggleAnalysisFold}>
-            <div className="preview-analysis-label">Analysis:</div>
-            <button className="preview-analysis-toggle" title={analysisFolded ? 'Expand' : 'Collapse'}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {analysisFolded ? (
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                ) : (
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                )}
-              </svg>
-            </button>
-          </div>
-          {!analysisFolded && (
-            <div className="preview-analysis-text">{slide.analysis}</div>
-          )}
-        </div>
-      )}
       <VideoPicker
         isOpen={showVideoPicker}
         onClose={() => setShowVideoPicker(false)}

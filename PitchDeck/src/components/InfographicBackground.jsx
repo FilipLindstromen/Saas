@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { getInfographicContainScale } from '../utils/backgroundFit'
 import './InfographicBackground.css'
 
 // Arrow designs - must match InfoGraphics CanvasElement
@@ -201,7 +202,7 @@ function InfographicElement({ element, currentTime = 0 }) {
  * Supports timeline animations (clipStart/clipEnd) - when isPlaying, advances time and shows elements accordingly.
  * When showAllElements is true (e.g. for picker previews), all elements are shown regardless of timeline clips.
  */
-function InfographicBackground({ projectData, isPlaying = false, showAllElements = false, opacity = 1, imageScale = 1, imagePositionX = 50, imagePositionY = 50, flipHorizontal = false, className = '' }) {
+function InfographicBackground({ projectData, isPlaying = false, showAllElements = false, opacity = 1, imageScale = 1, imageScaleCustomized = false, imagePositionX = 50, imagePositionY = 50, flipHorizontal = false, className = '' }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [scale, setScale] = useState(1)
   const containerRef = useRef(null)
@@ -230,8 +231,8 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
       const cw = el.clientWidth
       const ch = el.clientHeight
       if (cw && ch && size.w && size.h) {
-        const containScale = Math.min(cw / size.w, ch / size.h)
-        const s = containScale * imageScale
+        const slideLike = { imageScale, imageScaleCustomized }
+        const s = getInfographicContainScale(cw, ch, size.w, size.h, slideLike)
         setScale(s)
       }
     }
@@ -239,7 +240,7 @@ function InfographicBackground({ projectData, isPlaying = false, showAllElements
     const ro = new ResizeObserver(updateScale)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [size.w, size.h, imageScale])
+  }, [size.w, size.h, imageScale, imageScaleCustomized])
 
   const visibleElements = elements
     .filter(el => {

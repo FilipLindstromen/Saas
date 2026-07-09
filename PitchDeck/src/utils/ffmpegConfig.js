@@ -4,6 +4,9 @@
  */
 
 export function getFfmpegApiBase() {
+  if (typeof window !== 'undefined' && window.electronAPI?.ffmpegApiUrl) {
+    return String(window.electronAPI.ffmpegApiUrl).trim()
+  }
   const url = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FFMPEG_API_URL
   return (url && String(url).trim()) || ''
 }

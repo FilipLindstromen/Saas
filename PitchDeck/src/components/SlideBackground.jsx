@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
+import {
+  getImageBackgroundSize,
+  getBackgroundScaleAnimationVars,
+  getVideoBackgroundStyle,
+  isImageScaleCustomized,
+} from '../utils/backgroundFit'
 import './Slide.css'
 
 /**
@@ -105,6 +111,7 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
           showAllElements={!isPlayMode}
           opacity={backgroundOpacity}
           imageScale={imageScale}
+          imageScaleCustomized={isImageScaleCustomized(slide)}
           imagePositionX={imagePositionX}
           imagePositionY={imagePositionY}
           flipHorizontal={slide.flipHorizontal}
@@ -120,14 +127,14 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
           className={`slide-background ${backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{
             backgroundImage: `url(${slide.imageUrl})`,
-            backgroundSize: `${imageScale * 100}%`,
+            backgroundSize: getImageBackgroundSize(slide),
             backgroundPosition: `${currentPosition.x}% ${currentPosition.y}%`,
+            backgroundRepeat: 'no-repeat',
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             ...(backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
-              '--initial-scale': `${imageScale * 100}%`,
-              '--final-scale': `${(imageScale * 100) + (backgroundScaleAmount || 20)}%`
+              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount),
             } : {})
           }}
         />
@@ -148,14 +155,11 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
               playsInline
               preload="auto"
               className="slide-background-video-el"
-              style={{
-                objectFit: 'cover',
-                objectPosition: `${currentPosition.x}% ${currentPosition.y}%`,
-                transform: `${slide.flipHorizontal ? 'scaleX(-1) ' : ''}scale(${imageScale})`,
-                transformOrigin: `${currentPosition.x}% ${currentPosition.y}%`,
-                width: '100%',
-                height: '100%'
-              }}
+              style={getVideoBackgroundStyle(
+                slide,
+                { x: currentPosition.x, y: currentPosition.y },
+                slide.flipHorizontal
+              )}
             />
           </div>
         )

@@ -235,21 +235,26 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     })
   }
 
-  const applyTextCasing = (mode) => {
-    if (selectedSlideId == null || !onUpdateSlide || !selectedSlide) return
-    const transform = mode === 'uppercase' ? (s) => (s || '').toUpperCase() : mode === 'sentence' ? toSentenceCase : toTitleCase
-    const layout = selectedSlide.layout || 'default'
+  const applyCasingToSlide = (slide, transform) => {
+    const layout = slide.layout || 'default'
     if (layout === 'bulletpoints') {
-      const lines = (selectedSlide.content || '').split('\n').map((l) => l.trim()).filter(Boolean)
+      const lines = (slide.content || '').split('\n').map((l) => l.trim()).filter(Boolean)
       const transformed = lines.map((line) => transform(getPlainText(line)))
-      onUpdateSlide(selectedSlideId, { content: transformed.join('\n') })
-    } else {
-      const contentPlain = getPlainText(selectedSlide.content || '')
-      const subtitlePlain = getPlainText(selectedSlide.subtitle || '')
-      const newContent = transform(contentPlain).replace(/\n/g, '<br>')
-      const newSubtitle = subtitlePlain ? transform(subtitlePlain).replace(/\n/g, '<br>') : ''
-      onUpdateSlide(selectedSlideId, { content: newContent, subtitle: newSubtitle })
+      return { content: transformed.join('\n') }
     }
+    const contentPlain = getPlainText(slide.content || '')
+    const subtitlePlain = getPlainText(slide.subtitle || '')
+    const newContent = transform(contentPlain).replace(/\n/g, '<br>')
+    const newSubtitle = subtitlePlain ? transform(subtitlePlain).replace(/\n/g, '<br>') : ''
+    return { content: newContent, subtitle: newSubtitle }
+  }
+
+  const applyTextCasing = (mode) => {
+    if (!onUpdateSlide || !slides?.length) return
+    const transform = mode === 'uppercase' ? (s) => (s || '').toUpperCase() : mode === 'sentence' ? toSentenceCase : toTitleCase
+    slides.forEach((slide) => {
+      onUpdateSlide(slide.id, applyCasingToSlide(slide, transform))
+    })
   }
 
   const content = (
@@ -323,8 +328,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 type="button"
                 className="style-dropdown-btn style-dropdown-casing-btn"
                 onClick={() => applyTextCasing('uppercase')}
-                disabled={selectedSlideId == null}
-                title="Apply ALL CAPS to selected slide text"
+                disabled={!slides?.length}
+                title="Apply ALL CAPS to all slide text"
               >
                 CAPS
               </button>
@@ -332,8 +337,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 type="button"
                 className="style-dropdown-btn style-dropdown-casing-btn"
                 onClick={() => applyTextCasing('sentence')}
-                disabled={selectedSlideId == null}
-                title="Capitalize first letter only"
+                disabled={!slides?.length}
+                title="Capitalize first letter on all slides"
               >
                 Caps on first letter
               </button>
@@ -341,8 +346,8 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 type="button"
                 className="style-dropdown-btn style-dropdown-casing-btn"
                 onClick={() => applyTextCasing('title')}
-                disabled={selectedSlideId == null}
-                title="Capitalize first letter of every word"
+                disabled={!slides?.length}
+                title="Capitalize first letter of every word on all slides"
               >
                 Caps On Every Word
               </button>
@@ -620,6 +625,129 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
                 className="style-dropdown-input"
               />
             </div>
+          </div>
+
+          <div className="style-dropdown-section-title">Text effects</div>
+          <div className="style-dropdown-field">
+            <label className="style-dropdown-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.textDropShadow || false}
+                onChange={(e) => handleChange('textDropShadow', e.target.checked)}
+              />
+              <span>Enable Drop Shadow</span>
+            </label>
+            {settings.textDropShadow && (
+              <div className="style-dropdown-sub-fields">
+                <div className="style-dropdown-sub-field">
+                  <label>Blur (px)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={settings.shadowBlur || 4}
+                    onChange={(e) => handleChange('shadowBlur', parseInt(e.target.value) || 0)}
+                    className="style-dropdown-input"
+                  />
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Offset X</label>
+                  <input
+                    type="number"
+                    min="-20"
+                    max="20"
+                    value={settings.shadowOffsetX || 2}
+                    onChange={(e) => handleChange('shadowOffsetX', parseInt(e.target.value) || 0)}
+                    className="style-dropdown-input"
+                  />
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Offset Y</label>
+                  <input
+                    type="number"
+                    min="-20"
+                    max="20"
+                    value={settings.shadowOffsetY || 2}
+                    onChange={(e) => handleChange('shadowOffsetY', parseInt(e.target.value) || 0)}
+                    className="style-dropdown-input"
+                  />
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Color</label>
+                  <div className="style-dropdown-color-group">
+                    <input
+                      type="color"
+                      value={settings.shadowColor || '#000000'}
+                      onChange={(e) => handleChange('shadowColor', e.target.value)}
+                      className="style-dropdown-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={settings.shadowColor || '#000000'}
+                      onChange={(e) => handleChange('shadowColor', e.target.value)}
+                      className="style-dropdown-input"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="style-dropdown-field">
+            <label className="style-dropdown-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.textInlineBackground || false}
+                onChange={(e) => handleChange('textInlineBackground', e.target.checked)}
+              />
+              <span>Enable Text Highlight</span>
+            </label>
+            {settings.textInlineBackground && (
+              <div className="style-dropdown-sub-fields">
+                <div className="style-dropdown-sub-field">
+                  <label>Color</label>
+                  <div className="style-dropdown-color-group">
+                    <input
+                      type="color"
+                      value={settings.inlineBgColor || '#000000'}
+                      onChange={(e) => handleChange('inlineBgColor', e.target.value)}
+                      className="style-dropdown-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={settings.inlineBgColor || '#000000'}
+                      onChange={(e) => handleChange('inlineBgColor', e.target.value)}
+                      className="style-dropdown-input"
+                    />
+                  </div>
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Opacity</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={settings.inlineBgOpacity !== undefined ? settings.inlineBgOpacity : 0.7}
+                    onChange={(e) => handleChange('inlineBgOpacity', parseFloat(e.target.value))}
+                    className="style-dropdown-input"
+                  />
+                  <span className="style-dropdown-range-value">
+                    {Math.round((settings.inlineBgOpacity !== undefined ? settings.inlineBgOpacity : 0.7) * 100)}%
+                  </span>
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Padding (px)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={settings.inlineBgPadding || 8}
+                    onChange={(e) => handleChange('inlineBgPadding', parseInt(e.target.value) || 0)}
+                    className="style-dropdown-input"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 6. Reset content */}

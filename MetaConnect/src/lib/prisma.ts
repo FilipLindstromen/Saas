@@ -1,22 +1,35 @@
 import { PrismaClient } from "../../prisma/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { resolveDatabaseUrl } from "@/lib/database-url";
 
-function getDatabaseUrl(): string {
-  const url =
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.DATABASE_URL ||
-    process.env.NEON_DATABASE_URL;
-  if (!url) {
-    console.error("[MetaConnect] No DATABASE_URL set. Set DATABASE_URL, POSTGRES_PRISMA_URL, or NEON_DATABASE_URL.");
-    return "";
+/** Used only when no URL is set (e.g. `prisma generate` / Next.js production build). */
+const FALLBACK_LOCAL = "postgresql://127.0.0.1:5432/metaconnect";
+
+function isNextProductionBuild(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
+function getConnectionString(): string {
+  const resolved = resolveDatabaseUrl();
+  if (resolved) return resolved;
+
+  if (!isNextProductionBuild() && process.env.NODE_ENV === "development") {
+    console.warn(
+      `[MetaConnect] No database URL — using ${FALLBACK_LOCAL}. Set DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL, or NEON_DATABASE_URL.`,
+    );
+  } else if (!isNextProductionBuild() && process.env.VERCEL) {
+    console.error(
+      "[MetaConnect] No database URL. Set DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL, or NEON_DATABASE_URL in Vercel project settings.",
+    );
   }
-  return url;
+
+  return FALLBACK_LOCAL;
 }
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createPrismaClient(): PrismaClient {
-  const connectionString = getDatabaseUrl();
+  const connectionString = getConnectionString();
   const onVercel = Boolean(process.env.VERCEL);
   const adapter = new PrismaPg({
     connectionString,

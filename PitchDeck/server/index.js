@@ -13,6 +13,9 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
+const STUDIO_SOUND_FILTER =
+  'highpass=f=80,lowpass=f=14000,afftdn=nf=-22,equalizer=f=3000:width_type=o:width=2:g=2,loudnorm=I=-16:TP=-1.5:LRA=11'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3030
@@ -156,6 +159,7 @@ app.post('/api/export-video', upload.single('video'), async (req, res) => {
   const format = (req.body?.format === 'webm' ? 'webm' : 'mp4').toLowerCase()
   const quality = (req.body?.quality || 'high').toLowerCase() // high | medium | low
   const resolution = (req.body?.resolution || 'original').toLowerCase() // 1080 | 720 | 480 | original
+  const studioSound = req.body?.studioSound === 'true' || req.body?.studioSound === true
   try {
     if (req.body?.segments) segments = JSON.parse(req.body.segments)
     if (req.body?.captions) captions = JSON.parse(req.body.captions)
@@ -213,10 +217,16 @@ app.post('/api/export-video', upload.single('video'), async (req, res) => {
     const vfStr = vfParts.length > 0 ? vfParts.join(',') : null
 
     if (format === 'mp4') {
-      const args = ['-i', concatName, ...(vfStr ? ['-vf', vfStr] : []), '-c:v', 'libx264', '-crf', String(crfH264), '-preset', 'medium', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '192k', '-y', outName]
+      const args = ['-i', concatName]
+      if (vfStr) args.push('-vf', vfStr)
+      if (studioSound) args.push('-af', STUDIO_SOUND_FILTER)
+      args.push('-c:v', 'libx264', '-crf', String(crfH264), '-preset', 'medium', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '192k', '-y', outName)
       await runFfmpeg(args, workDir)
     } else {
-      const args = ['-i', concatName, ...(vfStr ? ['-vf', vfStr] : []), '-c:v', 'libvpx-vp9', '-crf', String(crfVp9), '-b:v', '0', '-c:a', 'libopus', '-b:a', '128k', '-y', outName]
+      const args = ['-i', concatName]
+      if (vfStr) args.push('-vf', vfStr)
+      if (studioSound) args.push('-af', STUDIO_SOUND_FILTER)
+      args.push('-c:v', 'libvpx-vp9', '-crf', String(crfVp9), '-b:v', '0', '-c:a', 'libopus', '-b:a', '128k', '-y', outName)
       await runFfmpeg(args, workDir)
     }
 

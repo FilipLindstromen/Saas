@@ -39,12 +39,6 @@ function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId 
       action: () => onAction('deleteSlide')
     },
     {
-      id: 'analyze',
-      label: 'Analyze Slides',
-      keywords: ['analyze', 'analysis', 'ai'],
-      action: () => onAction('analyze')
-    },
-    {
       id: 'export',
       label: 'Export Project',
       keywords: ['export', 'save', 'download'],

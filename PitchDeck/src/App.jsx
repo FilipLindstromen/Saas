@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
 import { getTheme, setTheme as setSharedTheme, initThemeSync } from '@shared/theme'
 import ThemeToggle from '@shared/ThemeToggle'
@@ -9,16 +9,14 @@ import Settings from './components/Settings'
 import RecordingOptions from './components/RecordingOptions'
 import ColorOptions from './components/ColorOptions'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
-import TextEffectsOptions from './components/TextEffectsOptions'
 import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
-import PresentationFeedback from './components/PresentationFeedback'
-import { LOADING, DONE, ERROR } from './constants/presentationFeedbackStatus'
-import { transcribeRecording, getPresentationFeedback } from './services/presentationAnalysis'
 import { formatTimeAgo } from './utils/formatTimeAgo'
+import { normalizeSlide } from './utils/normalizeSlide'
+import { useUndoRedo } from './hooks/useUndoRedo'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
@@ -75,7 +73,6 @@ function App() {
             imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
             textHeadingLevel: slide.textHeadingLevel || null,
             subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-            analysis: slide.analysis || null,
             graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : []
           }))
           return {
@@ -140,7 +137,6 @@ function App() {
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
   const [mode, setMode] = useState('plan') // Always start in Plan; 'edit', 'present', 'record', 'video-editing' during session
   const lastRecordingBlobRef = useRef(null)
-  const analyzeVideoInputRef = useRef(null)
   const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
   const [isRecordingInPlace, setIsRecordingInPlace] = useState(false)
   const recordingMediaRecorderRef = useRef(null)
@@ -153,24 +149,12 @@ function App() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
   const [inspectorTab, setInspectorTab] = useState('slide')
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisFolded, setAnalysisFolded] = useState(() => {
-    const saved = localStorage.getItem('analysisFolded')
-    return saved === 'true'
-  })
   const [theme, setTheme] = useState(() => getTheme())
   const [showProjectOverview, setShowProjectOverview] = useState(false)
-  const [analyzeThisRecording, setAnalyzeThisRecording] = useState(false)
-  const analyzeAfterRecordingRef = useRef(false)
-  const analysisCallbackRef = useRef(null)
-  const [showPresentationFeedback, setShowPresentationFeedback] = useState(false)
-  const [presentationFeedback, setPresentationFeedback] = useState(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedSlides, setSelectedSlides] = useState(new Set())
   const [selectedGraphicId, setSelectedGraphicId] = useState(null)
-  const [history, setHistory] = useState([])
-  const [historyIndex, setHistoryIndex] = useState(-1)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [recentFiles, setRecentFiles] = useState(() => {
@@ -197,8 +181,6 @@ function App() {
     return localStorage.getItem('pitchDeckCurrentWorkspace') || 'default'
   })
   const fileInputRef = useRef(null)
-  const historyIndexRef = useRef(-1)
-  const initialHistoryPushed = useRef(false)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('sidebarWidth')
     return saved ? parseInt(saved, 10) : 350
@@ -290,7 +272,6 @@ function App() {
           captionFont: parsed.captionFont || 'Poppins',
           captionFontSize: parsed.captionFontSize || 'medium',
           captionDropShadow: parsed.captionDropShadow === true,
-          analyzeWithAI: parsed.analyzeWithAI === true
         }
       } catch (e) {
         console.error('Error parsing record settings:', e)
@@ -324,7 +305,6 @@ function App() {
       videoHighlightHue: 0,
       cameraOverrideEnabled: false,
       cameraOverridePosition: 'fullscreen',
-      analyzeWithAI: false
     }
   })
 
@@ -443,71 +423,6 @@ function App() {
     }
   }, [recordSettings])
 
-  // Callback for post-recording analysis (transcribe + coach feedback)
-  useEffect(() => {
-    analysisCallbackRef.current = async (blob) => {
-      const apiKey = settings.openaiKey
-      if (!apiKey) {
-        setPresentationFeedback({ status: ERROR, errorMessage: 'OpenAI API key not set. Add it in Settings to use AI feedback.' })
-        setShowPresentationFeedback(true)
-        return
-      }
-      setShowPresentationFeedback(true)
-      setPresentationFeedback({ status: LOADING })
-      try {
-        const transcript = await transcribeRecording(blob, apiKey)
-        const slideTitles = (slides || []).map((s) => {
-          const div = document.createElement('div')
-          div.innerHTML = s.content || ''
-          return (div.textContent || div.innerText || '').trim().slice(0, 120)
-        })
-        const feedback = await getPresentationFeedback(transcript, slideTitles, apiKey)
-        setPresentationFeedback({ status: DONE, transcript, feedback })
-      } catch (err) {
-        setPresentationFeedback({ status: ERROR, errorMessage: err?.message || 'Analysis failed.' })
-      }
-    }
-  }, [settings.openaiKey, slides])
-
-  // Analyze video: use latest recording or uploaded file; run transcribe + feedback
-  const handleAnalyzeVideo = useCallback(() => {
-    if (lastRecordingBlobRef.current) {
-      if (analysisCallbackRef.current) analysisCallbackRef.current(lastRecordingBlobRef.current)
-      return
-    }
-    analyzeVideoInputRef.current?.click()
-  }, [])
-
-  const handleAnalyzeVideoFile = useCallback((e) => {
-    const file = e.target?.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const apiKey = settings.openaiKey
-    if (!apiKey) {
-      setPresentationFeedback({ status: ERROR, errorMessage: 'OpenAI API key not set. Add it in Settings to use AI feedback.' })
-      setShowPresentationFeedback(true)
-      return
-    }
-    setShowPresentationFeedback(true)
-    setPresentationFeedback({ status: LOADING })
-    const blob = file instanceof Blob ? file : new Blob([file])
-    const run = async () => {
-      try {
-        const transcript = await transcribeRecording(blob, apiKey)
-        const slideTitles = (slides || []).map((s) => {
-          const div = document.createElement('div')
-          div.innerHTML = s.content || ''
-          return (div.textContent || div.innerText || '').trim().slice(0, 120)
-        })
-        const feedback = await getPresentationFeedback(transcript, slideTitles, apiKey)
-        setPresentationFeedback({ status: DONE, transcript, feedback })
-      } catch (err) {
-        setPresentationFeedback({ status: ERROR, errorMessage: err?.message || 'Analysis failed.' })
-      }
-    }
-    run()
-  }, [settings.openaiKey, slides])
-
   // Handle sidebar resize
   const handleResizeStart = (e) => {
     e.preventDefault()
@@ -603,11 +518,6 @@ function App() {
       document.head.appendChild(link)
     })
   }, [settings.fontFamily, settings.h1FontFamily, settings.h2FontFamily, settings.h3FontFamily, settings.fontPairingSerifFont])
-
-  // Save analysisFolded to localStorage
-  useEffect(() => {
-    localStorage.setItem('analysisFolded', analysisFolded.toString())
-  }, [analysisFolded])
 
   // Apply theme to document when it changes
   useEffect(() => {
@@ -721,9 +631,8 @@ function App() {
       sidebarWidth,
       inspectorWidth,
       projectName,
-      analysisFolded
     }
-  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded])
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName])
   useEffect(() => {
     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
     autoSaveTimeoutRef.current = setTimeout(async () => {
@@ -753,7 +662,7 @@ function App() {
     return () => {
       if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
     }
-  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded])
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName])
 
   // Save recent files
   useEffect(() => {
@@ -765,10 +674,25 @@ function App() {
     localStorage.setItem('pitchDeckWorkspaces', JSON.stringify(workspaces))
   }, [workspaces])
 
-  // Keep ref in sync for use inside debounced saveToHistory
-  useEffect(() => {
-    historyIndexRef.current = historyIndex
-  }, [historyIndex])
+  const restoreHistoryState = useCallback((snapshot) => {
+    if (snapshot.slides) setSlides(snapshot.slides)
+    if (snapshot.chapters) setChapters(snapshot.chapters)
+    if (snapshot.currentChapterId !== undefined) setCurrentChapterId(snapshot.currentChapterId)
+    if (snapshot.selectedSlideId !== undefined) setSelectedSlideId(snapshot.selectedSlideId)
+    if (snapshot.settings) setSettings(snapshot.settings)
+    if (snapshot.recordSettings) setRecordSettings(snapshot.recordSettings)
+  }, [])
+
+  const historySnapshot = useMemo(() => ({
+    slides,
+    selectedSlideId,
+    chapters,
+    currentChapterId,
+    settings,
+    recordSettings,
+  }), [slides, selectedSlideId, chapters, currentChapterId, settings, recordSettings])
+
+  const { saveToHistory, undo, redo, historyIndex, canUndo, canRedo } = useUndoRedo(historySnapshot, restoreHistoryState)
 
   // Keep latest state in ref so debounced updateSlide save uses current state
   useEffect(() => {
@@ -779,73 +703,8 @@ function App() {
       selectedSlideId,
       settings,
       recordSettings,
-      analysisFolded
     }
-  }, [slides, chapters, currentChapterId, selectedSlideId, settings, recordSettings, analysisFolded])
-
-  // Push initial state to history once so undo has a baseline
-  useEffect(() => {
-    if (initialHistoryPushed.current) return
-    initialHistoryPushed.current = true
-    setHistory([{
-      slides,
-      selectedSlideId,
-      chapters,
-      currentChapterId,
-      settings,
-      recordSettings,
-      analysisFolded
-    }])
-    setHistoryIndex(0)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // History management for undo/redo
-  const saveToHistory = useCallback((stateSnapshot) => {
-    const state = stateSnapshot ?? {
-      slides,
-      selectedSlideId,
-      chapters,
-      currentChapterId,
-      settings,
-      recordSettings,
-      analysisFolded
-    }
-    setHistory(prevHistory => {
-      const idx = historyIndexRef.current
-      const newHistory = prevHistory.slice(0, idx + 1)
-      return [...newHistory, state]
-    })
-    setHistoryIndex(prevIndex => prevIndex + 1)
-  }, [slides, selectedSlideId, chapters, currentChapterId, settings, recordSettings, analysisFolded])
-
-  const undo = useCallback(() => {
-    if (historyIndex <= 0) return
-    const prevIndex = historyIndex - 1
-    const prevState = history[prevIndex]
-    setHistoryIndex(prevIndex)
-    setSlides(prevState.slides ?? slides)
-    setChapters(prevState.chapters ?? chapters)
-    setCurrentChapterId(prevState.currentChapterId ?? currentChapterId)
-    setSelectedSlideId(prevState.selectedSlideId ?? selectedSlideId)
-    if (prevState.settings) setSettings(prevState.settings)
-    if (prevState.recordSettings) setRecordSettings(prevState.recordSettings)
-    if (prevState.analysisFolded !== undefined) setAnalysisFolded(prevState.analysisFolded)
-  }, [history, historyIndex, slides, chapters, currentChapterId, selectedSlideId])
-
-  const redo = useCallback(() => {
-    if (historyIndex >= history.length - 1) return
-    const nextIndex = historyIndex + 1
-    const nextState = history[nextIndex]
-    setHistoryIndex(nextIndex)
-    setSlides(nextState.slides ?? slides)
-    setChapters(nextState.chapters ?? chapters)
-    setCurrentChapterId(nextState.currentChapterId ?? currentChapterId)
-    setSelectedSlideId(nextState.selectedSlideId ?? selectedSlideId)
-    if (nextState.settings) setSettings(nextState.settings)
-    if (nextState.recordSettings) setRecordSettings(nextState.recordSettings)
-    if (nextState.analysisFolded !== undefined) setAnalysisFolded(nextState.analysisFolded)
-  }, [history, historyIndex, slides, chapters, currentChapterId, selectedSlideId])
+  }, [slides, chapters, currentChapterId, selectedSlideId, settings, recordSettings])
 
   const defaultSlideShape = useCallback(() => ({
     content: '',
@@ -864,7 +723,6 @@ function App() {
     imagePositionY: 50,
     textHeadingLevel: null,
     subtitleHeadingLevel: null,
-    analysis: null,
     backgroundColorOverride: false,
     backgroundColorOverrideValue: undefined
   }), [])
@@ -890,7 +748,6 @@ function App() {
       imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
       textHeadingLevel: slide.textHeadingLevel ?? null,
       subtitleHeadingLevel: slide.subtitleHeadingLevel ?? null,
-      analysis: slide.analysis ?? null
     })
     const normalizedChapters = (chapters || []).map(ch => ({
       id: ch.id,
@@ -908,10 +765,9 @@ function App() {
       sidebarWidth,
       inspectorWidth,
       projectName,
-      analysisFolded,
       exportedAt: new Date().toISOString()
     }
-  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, analysisFolded, defaultSlideShape])
+  }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, defaultSlideShape])
 
   // Save current project to connected folder (PitchDeck/[projectName]/project.json)
   const handleSaveToFolder = useCallback(async () => {
@@ -1031,7 +887,7 @@ function App() {
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
     setSelectedSlideId(newId)
-    saveToHistory({ slides: newSlides, selectedSlideId: newId, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newSlides, selectedSlideId: newId, chapters: newChapters, currentChapterId, settings, recordSettings })
   }
 
   const deleteSlide = (id) => {
@@ -1043,7 +899,7 @@ function App() {
     setSlides(newSlides)
     setSelectedSlideId(newSelected)
     setChapters(newChapters)
-    saveToHistory({ slides: newSlides, selectedSlideId: newSelected, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newSlides, selectedSlideId: newSelected, chapters: newChapters, currentChapterId, settings, recordSettings })
   }
 
   const duplicateSlide = (id) => {
@@ -1057,7 +913,7 @@ function App() {
     newSlides.splice(slideIndex + 1, 0, duplicatedSlide)
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
-    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
   }
 
   // Comprehensive keyboard shortcuts handler
@@ -1089,26 +945,16 @@ function App() {
       }
 
       // Don't handle other shortcuts if modals are open
-      if (showShortcuts || showCommandPalette || showSettings || showPresentationFeedback) {
+      if (showShortcuts || showCommandPalette || showSettings) {
         if (e.key === 'Escape') {
           setShowShortcuts(false)
           setShowCommandPalette(false)
           setShowSettings(false)
-          if (showPresentationFeedback) {
-            setShowPresentationFeedback(false)
-          }
         }
         return
       }
 
       if (showProjectOverview) return
-
-      // Toggle analysis (Cmd/Ctrl + /)
-      if (e.key === '/' && cmdOrCtrl && !isInputFocused) {
-        e.preventDefault()
-        setAnalysisFolded(!analysisFolded)
-        return
-      }
 
       // Duplicate slide (Cmd/Ctrl + D)
       if (e.key === 'd' && cmdOrCtrl && !isInputFocused && mode === 'edit') {
@@ -1211,7 +1057,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showPresentationFeedback, analysisFolded, selectedSlides, history, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
+  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, selectedSlides, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
     // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
@@ -1268,7 +1114,7 @@ function App() {
     const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
     setSlides(newSlides)
     setChapters(newChapters)
-    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
   }
 
   const updateChapterSlides = (chapterId, newSlides) => {
@@ -1312,7 +1158,7 @@ function App() {
     const newChapters = [...chapters, newChapter]
     setChapters(newChapters)
     setCurrentChapterId(newChapterId)
-    saveToHistory({ slides: newChapter.slides, selectedSlideId: 1, chapters: newChapters, currentChapterId: newChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newChapter.slides, selectedSlideId: 1, chapters: newChapters, currentChapterId: newChapterId, settings, recordSettings })
   }
 
   const handleDeleteChapter = (chapterId) => {
@@ -1331,7 +1177,7 @@ function App() {
         setSlides(nextSlides)
         setSelectedSlideId(nextSelectedId)
       }
-      saveToHistory({ slides: nextSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId: nextChapterId, settings, recordSettings, analysisFolded })
+      saveToHistory({ slides: nextSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId: nextChapterId, settings, recordSettings })
     }
   }
 
@@ -1340,7 +1186,7 @@ function App() {
       c.id === chapterId ? { ...c, name: newName } : c
     )
     setChapters(updatedChapters)
-    saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
   }
 
   // Create a new presentation (clear all slides). If projectName is passed (from Projects modal), use it and skip confirm.
@@ -1402,7 +1248,7 @@ function App() {
     setChapters(updatedChapters)
     setSlides(newSlides)
     setSelectedSlideId(nextSelectedId)
-    saveToHistory({ slides: newSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
+    saveToHistory({ slides: newSlides, selectedSlideId: nextSelectedId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
   }
 
   // Save project name to localStorage when it changes
@@ -1887,7 +1733,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         : chapters
       setSlides(updatedSlides)
       setChapters(updatedChapters)
-      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
+      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
 
       try {
         if (currentChapter) {
@@ -2270,7 +2116,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                           const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
                           setChapters(updatedChapters)
                           setSlides(newSlidesForView)
-                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
+                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
                         }
                       }
                     }
@@ -2288,7 +2134,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                         setCurrentChapterId(nextId)
                         setSlides(nextSlides)
                         setSelectedSlideId(nextSelected)
-                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings, analysisFolded })
+                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings })
                       }
                     }}
                     title="Chapter"
@@ -2580,7 +2426,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                           const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
                           setChapters(updatedChapters)
                           setSlides(newSlidesForView)
-                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings, analysisFolded })
+                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
                         }
                       }
                     }
@@ -2598,7 +2444,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                         setCurrentChapterId(nextId)
                         setSlides(nextSlides)
                         setSelectedSlideId(nextSelected)
-                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings, analysisFolded })
+                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings })
                       }
                     }}
                     title="Chapter"

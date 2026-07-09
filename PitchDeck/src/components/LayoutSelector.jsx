@@ -13,7 +13,7 @@ const LAYOUTS = [
   },
   {
     id: 'left-video',
-    name: 'Left with Video',
+    name: 'Left + Video',
     description: 'Left aligned text with full-height video on right',
     thumbnail: (
       <div className="layout-thumbnail-content">
@@ -26,7 +26,7 @@ const LAYOUTS = [
   },
   {
     id: 'right-video',
-    name: 'Right with Video',
+    name: 'Right + Video',
     description: 'Right aligned text with full-height video on left',
     thumbnail: (
       <div className="layout-thumbnail-content">
@@ -59,26 +59,35 @@ const LAYOUTS = [
   },
   {
     id: 'bulletpoints',
-    name: 'Bullet Points',
+    name: 'Bullets',
     description: 'Animated bullet points',
     thumbnail: (
       <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-bullets">
-          <div className="layout-thumbnail-bullet">• Point 1</div>
-          <div className="layout-thumbnail-bullet">• Point 2</div>
-          <div className="layout-thumbnail-bullet">• Point 3</div>
+        <div className="layout-thumbnail-bullets" aria-hidden="true">
+          <div className="layout-thumbnail-bullet-row">
+            <span className="layout-thumbnail-bullet-dot" />
+            <span className="layout-thumbnail-bullet-line" />
+          </div>
+          <div className="layout-thumbnail-bullet-row">
+            <span className="layout-thumbnail-bullet-dot" />
+            <span className="layout-thumbnail-bullet-line layout-thumbnail-bullet-line-short" />
+          </div>
+          <div className="layout-thumbnail-bullet-row">
+            <span className="layout-thumbnail-bullet-dot" />
+            <span className="layout-thumbnail-bullet-line" />
+          </div>
         </div>
       </div>
     )
   },
   {
     id: 'video',
-    name: 'Video Fullscreen',
+    name: 'Video',
     description: 'Full screen video/webcam',
     thumbnail: (
       <div className="layout-thumbnail-content">
         <div className="layout-thumbnail-video">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M23 7l-7 5 7 5V7z" />
             <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
           </svg>

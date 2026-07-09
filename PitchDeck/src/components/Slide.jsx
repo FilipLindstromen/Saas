@@ -5,6 +5,13 @@ import TextFormatToolbar from './TextFormatToolbar'
 import GraphicOverlay from './GraphicOverlay'
 import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
+import {
+  getImageBackgroundSize,
+  getBackgroundScaleAnimationVars,
+  getVideoBackgroundStyle,
+  getInfographicContainScale,
+  isImageScaleCustomized,
+} from '../utils/backgroundFit'
 
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0 }) {
@@ -1712,6 +1719,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             showAllElements={!isPlayMode}
             opacity={backgroundOpacity}
             imageScale={imageScale}
+            imageScaleCustomized={isImageScaleCustomized(slide)}
             imagePositionX={isDragging ? currentPosition.x : imagePositionX}
             imagePositionY={isDragging ? currentPosition.y : imagePositionY}
             flipHorizontal={slide.flipHorizontal}
@@ -1724,16 +1732,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
-            backgroundSize: `${imageScale * 100}%`,
+            backgroundSize: getImageBackgroundSize(slide),
             backgroundPosition: `${currentPosition.x}% ${currentPosition.y}%`,
+            backgroundRepeat: 'no-repeat',
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             cursor: (!isPlayMode && onUpdate) ? 'move' : 'default',
             pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : 'none',
             ...(isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
-              '--initial-scale': `${imageScale * 100}%`,
-              '--final-scale': `${(imageScale * 100) + (backgroundScaleAmount || 20)}%`
+              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount),
             } : {})
           }}
         />
@@ -1766,14 +1774,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               playsInline
               preload="auto"
               className="slide-background-video-el"
-              style={{
-                objectFit: 'cover',
-                objectPosition: `${currentPosition.x}% ${currentPosition.y}%`,
-                transform: `${slide.flipHorizontal ? 'scaleX(-1) ' : ''}scale(${imageScale})`,
-                transformOrigin: `${currentPosition.x}% ${currentPosition.y}%`,
-                width: '100%',
-                height: '100%'
-              }}
+              style={getVideoBackgroundStyle(
+                slide,
+                { x: currentPosition.x, y: currentPosition.y },
+                slide.flipHorizontal
+              )}
             />
           </div>
         )

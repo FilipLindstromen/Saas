@@ -2,7 +2,6 @@ import RecordingOptions from './RecordingOptions'
 import CaptionsOptions from './CaptionsOptions'
 import ColorOptions from './ColorOptions'
 import TypographyOptions from './TypographyOptions'
-import TextEffectsOptions from './TextEffectsOptions'
 import TransitionOptions from './TransitionOptions'
 import SlideSettings from './SlideSettings'
 import ActiveObjectOptions from './ActiveObjectOptions'
@@ -14,7 +13,6 @@ const TABS = [
   { id: 'recording', label: 'Recording options', icon: 'recording' },
   { id: 'captions', label: 'Captions', icon: 'captions' },
   { id: 'typography', label: 'Typography', icon: 'typography' },
-  { id: 'text-effects', label: 'Text effects', icon: 'text-effects' },
   { id: 'color', label: 'Color', icon: 'color' },
   { id: 'transitions', label: 'Transitions', icon: 'transitions' }
 ]
@@ -105,11 +103,6 @@ function InspectorPanel({
                 <line x1="12" y1="4" x2="12" y2="20" />
               </svg>
             )}
-            {tab.icon === 'text-effects' && (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z" />
-              </svg>
-            )}
             {tab.icon === 'color' && (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -181,13 +174,6 @@ function InspectorPanel({
             selectedSlideId={selectedSlideId}
             selectedSlide={selectedSlide}
             openaiKey={settings.openaiKey}
-            embedded
-          />
-        )}
-        {activeTab === 'text-effects' && (
-          <TextEffectsOptions
-            settings={settings}
-            onUpdateSettings={onUpdateSettings}
             embedded
           />
         )}

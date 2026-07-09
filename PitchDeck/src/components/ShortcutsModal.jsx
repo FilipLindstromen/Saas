@@ -5,7 +5,6 @@ function ShortcutsModal({ onClose }) {
     { key: '?', description: 'Show keyboard shortcuts' },
     { key: 'Cmd/Ctrl + K', description: 'Open command palette' },
     { key: 'Cmd/Ctrl + D', description: 'Duplicate selected slide' },
-    { key: 'Cmd/Ctrl + /', description: 'Toggle analysis/comments' },
     { key: '↑ ↓', description: 'Navigate slides (edit mode)' },
     { key: 'Tab', description: 'Cycle through slides in sidebar' },
     { key: 'Cmd/Ctrl + Z', description: 'Undo' },

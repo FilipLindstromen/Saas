@@ -175,7 +175,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
                 <button
                   type="button"
                   className="slide-settings-btn"
-                  onClick={() => onUpdate({ imageScale: 1.0 })}
+                  onClick={() => onUpdate({ imageScale: 1.0, imageScaleCustomized: true })}
                   title="Fill Screen"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -205,7 +205,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
                     max="3"
                     step="0.1"
                     value={slide.imageScale !== undefined ? slide.imageScale : 1.0}
-                    onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value) })}
+                    onChange={(e) => onUpdate({ imageScale: parseFloat(e.target.value), imageScaleCustomized: true })}
                     className="slide-settings-slider"
                   />
                   <span className="slide-settings-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
