@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 release
+release-staging
+.electron-builder-output
 public/ffmpeg
 *.local
 

@@ -28,6 +28,7 @@ const VITE_APPS = [
   ["VIdeoRecorder", "/VIdeoRecorder/"],
   ["ReelRecorder", "/ReelRecorder/"],
   ["InfoGraphics", "/InfoGraphics/"],
+  ["NativeAdsGenerator", "/NativeAdsGenerator/"],
   ["AutoCaptions", "/AutoCaptions/"],
   ["VideoQuiz/app", "/VideoQuiz/"],
   ["PowerWriter/PowerWriter/client", "/PowerWriter/"],

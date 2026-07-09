@@ -4,7 +4,7 @@ import './Settings.css'
 
 function Settings({ settings, onUpdate, onClose }) {
   const [localSettings, setLocalSettings] = useState(settings)
-  const [activeTab, setActiveTab] = useState('api') // 'api' only (Colors/Typography/Text Effects are in header foldouts)
+  const [activeTab, setActiveTab] = useState('api') // 'api' only (Colors/Typography are in the inspector panel)
 
   const saasAppsUrl = typeof window !== 'undefined'
     ? new URL('../index.html', window.location.href).href

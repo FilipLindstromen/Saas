@@ -1,0 +1,65 @@
+.nag-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nag-btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.nag-btn {
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.nag-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.nag-btn.active {
+  border-color: var(--accent);
+  background: rgba(255, 107, 53, 0.12);
+}
+
+.nag-btn-accent {
+  grid-column: 1 / -1;
+  background: var(--accent-gradient);
+  border: none;
+  color: #fff;
+}
+
+.nag-btn-accent:hover {
+  filter: brightness(1.05);
+}
+
+.nag-btn-ghost {
+  width: 100%;
+  background: transparent;
+}
+
+.nag-media-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.nag-media-status strong {
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.nag-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--error);
+}

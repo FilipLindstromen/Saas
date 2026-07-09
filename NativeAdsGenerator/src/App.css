@@ -1,0 +1,158 @@
+.nag-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
+.nag-header-left {
+  min-width: 0;
+}
+
+.nag-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.nag-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.nag-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nag-link {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  text-decoration: none;
+}
+
+.nag-link:hover {
+  color: var(--accent);
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.toolbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nag-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.nag-sidebar {
+  width: 340px;
+  min-width: 300px;
+  max-width: 380px;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.nag-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  background: var(--bg-primary);
+}
+
+.nag-section-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.nag-format-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.nag-format-btn {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.nag-format-btn.active {
+  border-color: var(--accent);
+  background: rgba(255, 107, 53, 0.1);
+  color: var(--text-primary);
+}
+
+.nag-export-section {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.nag-export-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nag-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--success);
+}
+
+@media (max-width: 900px) {
+  .nag-layout {
+    flex-direction: column;
+  }
+
+  .nag-sidebar {
+    width: 100%;
+    max-width: none;
+    max-height: 42vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}
