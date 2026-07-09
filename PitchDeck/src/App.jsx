@@ -2391,20 +2391,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   <span>Video editing</span>
                 </button>
               </div>
-              <div className="header-format-select-wrap">
-                <label htmlFor="header-slide-format" className="header-format-label">Format</label>
-                <select
-                  id="header-slide-format"
-                  className="header-format-select"
-                  value={settings.slideFormat || '16:9'}
-                  onChange={(e) => setSettings(prev => ({ ...prev, slideFormat: e.target.value }))}
-                  title="Slide aspect ratio"
-                >
-                  <option value="16:9">16:9</option>
-                  <option value="1:1">1:1</option>
-                  <option value="9:16">9:16</option>
-                </select>
-              </div>
             </div>
             <div className="header-right">
               <div className="header-icon-group">
@@ -2714,20 +2700,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   </svg>
                   <span>Video editing</span>
                 </button>
-              </div>
-              <div className="header-format-select-wrap">
-                <label htmlFor="header-slide-format" className="header-format-label">Format</label>
-                <select
-                  id="header-slide-format"
-                  className="header-format-select"
-                  value={settings.slideFormat || '16:9'}
-                  onChange={(e) => setSettings(prev => ({ ...prev, slideFormat: e.target.value }))}
-                  title="Slide aspect ratio"
-                >
-                  <option value="16:9">16:9</option>
-                  <option value="1:1">1:1</option>
-                  <option value="9:16">9:16</option>
-                </select>
               </div>
             </div>
             <div className="header-right">

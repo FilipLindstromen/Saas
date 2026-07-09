@@ -147,6 +147,7 @@ function InspectorPanel({
             backgroundColor={backgroundColor}
             contentEdgeOffset={settings.contentEdgeOffset ?? 9}
             contentBottomOffset={settings.contentBottomOffset ?? 12}
+            slideFormat={settings.slideFormat || '16:9'}
             onUpdateSettings={onUpdateSettings}
           />
         )}

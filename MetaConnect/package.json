@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "build": "next build",
-    "build:vercel": "prisma generate && next build",
+    "build:vercel": "npx prisma generate && npx next build",
     "start": "next start -p 3002",
     "lint": "next lint",
     "db:generate": "prisma generate",

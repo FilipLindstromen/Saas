@@ -1,10 +1,33 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, onUpdateSettings }) {
+function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, slideFormat = '16:9', onUpdateSettings }) {
+  const formatSection = onUpdateSettings ? (
+    <div className="slide-settings-section">
+      <div className="slide-settings-field slide-settings-format">
+        <label htmlFor="slide-settings-format">Format</label>
+        <select
+          id="slide-settings-format"
+          className="slide-settings-select"
+          value={slideFormat}
+          onChange={(e) => onUpdateSettings({ slideFormat: e.target.value })}
+          title="Slide aspect ratio for preview, present, and export"
+        >
+          <option value="16:9">16:9</option>
+          <option value="1:1">1:1</option>
+          <option value="9:16">9:16</option>
+        </select>
+      </div>
+      <p className="slide-settings-hint">Applies to all slides in preview, present mode, and export.</p>
+    </div>
+  ) : null
+
   if (!slide) {
     return (
-      <div className="slide-settings-empty">
-        <p>Select a slide to edit its background and image settings.</p>
+      <div className="slide-settings-content">
+        {formatSection}
+        <div className="slide-settings-empty">
+          <p>Select a slide to edit its background and image settings.</p>
+        </div>
       </div>
     )
   }
@@ -16,6 +39,8 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
 
   return (
     <div className="slide-settings-content">
+      {formatSection}
+
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}

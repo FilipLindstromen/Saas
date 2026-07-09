@@ -1,10 +1,21 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@metaconnect.app";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3002";
 
+function getResend(): Resend | null {
+  const key = process.env.RESEND_API_KEY?.trim();
+  if (!key) return null;
+  return new Resend(key);
+}
+
 export async function sendPasswordResetEmail(email: string, token: string) {
+  const resend = getResend();
+  if (!resend) {
+    console.error("[MetaConnect] RESEND_API_KEY is not set — password reset email not sent.");
+    return;
+  }
+
   const url = `${APP_URL}/reset-password?token=${token}`;
 
   await resend.emails.send({

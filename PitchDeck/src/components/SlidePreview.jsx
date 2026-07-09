@@ -396,7 +396,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             transformOrigin: 'center center'
           }}
         >
-          <div className={`preview-slide-wrap ${safeRecordSettings.captionsEnabled ? 'has-caption-preview' : ''}`}>
+          <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}`}>
           <Slide 
             slide={slide} 
             backgroundColor={backgroundColor} 
