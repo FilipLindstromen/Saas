@@ -6,7 +6,7 @@
 const PITCH_DECK_INDEXED_DB = 'PitchDeckProjectFolder'
 
 /** Keys without pitchDeck prefix that this app owns (safe to clear for PitchDeck-only recovery). */
-const EXTRA_KEYS = ['analysisFolded']
+const EXTRA_KEYS = []
 
 /**
  * Remove every localStorage key used for PitchDeck projects and workspaces.

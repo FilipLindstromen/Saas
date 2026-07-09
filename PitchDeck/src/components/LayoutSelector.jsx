@@ -108,7 +108,7 @@ const CAMERA_OVERRIDE_POSITIONS = [
   { id: 'circle-top-right', title: 'Circle top right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="6" r="4" /></svg> }
 ]
 
-function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1, colorAnalyzeEnabled = false, onColorAnalyzeChange, colorAnalyzeLoading = false }) {
+function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1 }) {
   return (
     <div className="layout-selector">
       <div className="layout-selector-header">
@@ -141,15 +141,6 @@ function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOver
               onChange={(e) => onCameraOverrideChange?.(e.target.checked)}
             />
             <span className="camera-override-label">Camera Override</span>
-          </label>
-          <label className="camera-override-toggle">
-            <input
-              type="checkbox"
-              checked={!!colorAnalyzeEnabled}
-              onChange={(e) => onColorAnalyzeChange?.(e.target.checked)}
-              disabled={colorAnalyzeLoading}
-            />
-            <span className="camera-override-label">Color Analyze{colorAnalyzeLoading ? '…' : ''}</span>
           </label>
         </div>
         {cameraOverrideEnabled && (

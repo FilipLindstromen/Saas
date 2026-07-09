@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require('electron')
+const { app, BrowserWindow, shell, dialog, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
@@ -154,6 +154,7 @@ function createWindow(loadUrl) {
     minWidth: 960,
     minHeight: 640,
     title: 'Pitch Deck 2000',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -195,6 +196,7 @@ function createWindow(loadUrl) {
 }
 
 async function boot() {
+  Menu.setApplicationMenu(null)
   startFfmpegServer()
 
   if (isDevelopment()) {

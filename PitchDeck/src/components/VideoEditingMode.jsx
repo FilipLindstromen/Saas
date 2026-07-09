@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { transcribeWithSegments } from '../services/presentationAnalysis'
+import { transcribeWithSegments } from '../services/videoTranscription'
 import { getFfmpegApiBase, WHISPER_MAX_BYTES } from '../utils/ffmpegConfig'
 import './VideoEditingMode.css'
 

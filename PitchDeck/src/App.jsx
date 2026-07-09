@@ -250,7 +250,6 @@ function App() {
       showBullets: localStorage.getItem('showBullets') !== 'false',
       autoAdvance: localStorage.getItem('autoAdvance') === 'true',
       autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5,
-      colorAnalyzeEnabled: localStorage.getItem('colorAnalyzeEnabled') === 'true'
     }
     return savedSettings
   })
@@ -601,7 +600,6 @@ function App() {
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
     localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
     localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
-    localStorage.setItem('colorAnalyzeEnabled', settings.colorAnalyzeEnabled ? 'true' : 'false')
   }, [settings])
 
   // Save workspace data when it changes
@@ -1381,7 +1379,6 @@ function App() {
           subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
           webcamEnabled: slide.webcamEnabled !== undefined ? slide.webcamEnabled : false,
           selectedCameraId: slide.selectedCameraId || '',
-          analysis: slide.analysis || null
         }))
 
         // Confirm before importing (to avoid losing current work)
@@ -1557,180 +1554,6 @@ function App() {
     alert(message)
   }
 
-  const handleAnalyzeSlides = async () => {
-    if (!settings.openaiKey) {
-      alert('Please set your OpenAI API key in settings first.')
-      return
-    }
-
-    if (slides.length === 0) {
-      alert('No slides to analyze.')
-      return
-    }
-
-    setIsAnalyzing(true)
-
-    try {
-      // Get current chapter name for context
-      const currentChapter = chapters.find(c => c.id === currentChapterId)
-      const chapterName = currentChapter?.name || 'Chapter'
-
-      // Prepare slide data for analysis (exclude section slides)
-      const slidesToAnalyze = slides.filter(s => (s.layout || 'default') !== 'section')
-      
-      if (slidesToAnalyze.length === 0) {
-        alert('No content slides to analyze.')
-        setIsAnalyzing(false)
-        return
-      }
-
-      // Build context about slides
-      const slidesContext = slidesToAnalyze.map((slide, index) => {
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = slide.content || ''
-        const contentText = tempDiv.textContent || tempDiv.innerText || ''
-        const subtitleText = slide.subtitle || ''
-        return {
-          index: index + 1,
-          layout: slide.layout || 'default',
-          content: contentText,
-          subtitle: subtitleText
-        }
-      }).map(s => `Slide ${s.index} (${s.layout}): "${s.content}"${s.subtitle ? ` - Subtitle: "${s.subtitle}"` : ''}`).join('\n')
-
-      // Build the request body - using OpenAI API
-      const requestBody = {
-        model: 'gpt-3.5-turbo',
-        messages: [
-            {
-              role: 'system',
-              content: `You are an expert presentation analyst. Analyze pitch deck slides and provide concise, actionable feedback for each slide. 
-
-The slides are like headlines/outlines - they contain minimal content, not full paragraphs. Consider:
-- The chapter/section context: "${chapterName}"
-- What the slide should emphasize: emotions, facts, proof, credibility, benefits, etc.
-- What would make the slide stronger
-- Suggestions for additional slides if needed
-
-IMPORTANT: Do NOT suggest changing the layout or template. Focus only on content, messaging, and what the slide should emphasize.
-
-For each slide, provide:
-1. What the slide should push on (emotions, facts, proof, etc.)
-2. How to strengthen the content and messaging
-3. Optional: Suggest adding more slides about specific topics if the presentation needs more depth
-
-Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON with this exact structure:
-{
-  "analyses": [
-    {"slideIndex": 1, "analysis": "Analysis text here"},
-    {"slideIndex": 2, "analysis": "Analysis text here"}
-  ]
-}`
-            },
-          {
-            role: 'user',
-            content: `Analyze these slides from "${chapterName}":\n\n${slidesContext}\n\nReturn ONLY the JSON object, no other text.`
-          }
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 2000
-      }
-
-      // Analyze all slides at once using OpenAI API
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.openaiKey}`
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        let errorMessage = `API error: ${response.status} ${response.statusText}`
-        try {
-          const errorData = await response.json()
-          if (errorData.error?.message) {
-            errorMessage = errorData.error.message
-          } else if (errorData.error) {
-            errorMessage = JSON.stringify(errorData.error)
-          }
-        } catch (e) {
-          // If we can't parse the error, use the status text
-        }
-        console.error('OpenAI API Error:', errorMessage)
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
-      
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        throw new Error('Invalid response from OpenAI')
-      }
-
-      const analysisText = data.choices[0].message.content
-      if (!analysisText) {
-        throw new Error('Empty response from OpenAI')
-      }
-
-      let analysisData
-      
-      try {
-        analysisData = JSON.parse(analysisText)
-      } catch (e) {
-        console.error('Failed to parse analysis response:', analysisText)
-        throw new Error('Could not parse analysis response as JSON')
-      }
-
-      if (!analysisData.analyses || !Array.isArray(analysisData.analyses)) {
-        throw new Error('Invalid analysis format: missing analyses array')
-      }
-
-      // Update slides with analysis
-      const updatedSlides = slides.map(slide => {
-        if ((slide.layout || 'default') === 'section') {
-          return slide // Skip section slides
-        }
-
-        // Find analysis for this slide
-        const slideIndex = slidesToAnalyze.findIndex(s => s.id === slide.id) + 1
-        let analysis = null
-
-        if (analysisData.analyses && Array.isArray(analysisData.analyses)) {
-          const slideAnalysis = analysisData.analyses.find(a => a.slideIndex === slideIndex)
-          if (slideAnalysis) {
-            analysis = slideAnalysis.analysis
-          }
-        }
-
-        return { ...slide, analysis }
-      })
-
-      const updatedChapters = currentChapter
-        ? chapters.map(ch => ch.id === currentChapterId ? { ...ch, slides: updatedSlides } : ch)
-        : chapters
-      setSlides(updatedSlides)
-      setChapters(updatedChapters)
-      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
-
-      try {
-        if (currentChapter) {
-          localStorage.setItem('pitchDeckChapters', JSON.stringify(updatedChapters))
-        }
-      } catch (error) {
-        console.error('Error saving analysis:', error)
-      }
-
-      alert(`Analysis complete! ${slidesToAnalyze.length} slide(s) analyzed.`)
-    } catch (error) {
-      console.error('Error analyzing slides:', error)
-      const errorMessage = error.message || 'Unknown error'
-      alert(`Error analyzing slides: ${errorMessage}\n\nPlease check your OpenAI API key in settings and ensure it's valid.`)
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
   const selectedSlide =
     slides.length === 0
       ? null
@@ -1754,7 +1577,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
       case 'newSlide': addSlide(); break
       case 'duplicateSlide': duplicateSlide(selectedSlideId); break
       case 'deleteSlide': deleteSlide(selectedSlideId); break
-      case 'analyze': runAnalyze(); break
       case 'export': handleExportFile(); break
       case 'import': handleImportFile(); break
       case 'settings': setShowSettings(true); break
@@ -1778,9 +1600,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
   const handleRecordClick = async () => {
     try {
       recordingChunksRef.current = []
-      const shouldAnalyze = recordSettings.analyzeWithAI ?? false
-      analyzeAfterRecordingRef.current = shouldAnalyze
-      setAnalyzeThisRecording(shouldAnalyze)
 
       // Request microphone first (same user gesture) when enabled, so audio is ready before display picker
       let audioStream = null
@@ -1899,14 +1718,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         link.click()
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
-
-        if (analyzeAfterRecordingRef.current && analysisCallbackRef.current) {
-          try {
-            analysisCallbackRef.current(blob)
-          } catch (e) {
-            console.error('Presentation analysis failed:', e)
-          }
-        }
       }
 
       const track = displayStream.getVideoTracks()[0]
@@ -2222,7 +2033,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   className="btn-icon-header btn-undo"
                   onClick={undo}
                   title="Undo (Ctrl+Z)"
-                  disabled={historyIndex <= 0}
+                  disabled={!canUndo}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 10h10a5 5 0 0 1 5 5v2" />
@@ -2233,7 +2044,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   className="btn-icon-header btn-redo"
                   onClick={redo}
                   title="Redo (Ctrl+Y)"
-                  disabled={historyIndex >= history.length - 1 || history.length === 0}
+                  disabled={!canRedo}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10H11a5 5 0 0 0-5 5v2" />
@@ -2254,42 +2065,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <polyline points="21 15 16 10 5 21" />
                   </svg>
-                </button>
-                <button 
-                  className="btn-icon-header btn-analyze" 
-                  onClick={handleAnalyzeSlides}
-                  title="Analyze slides"
-                  disabled={!settings.openaiKey || isAnalyzing}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />
-                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
-                    <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header btn-view-feedback"
-                  onClick={() => setShowPresentationFeedback(true)}
-                  title="AI training feedback: view coach feedback from your recording"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  <span className="btn-tooltip">AI feedback</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleAnalyzeVideo}
-                  title={lastRecordingBlobRef.current ? "Analyze latest recorded video" : "Analyze video (upload or use latest recording)"}
-                  disabled={!settings.openaiKey}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span className="btn-tooltip">Analyze video</span>
                 </button>
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
@@ -2532,7 +2307,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   className="btn-icon-header btn-undo"
                   onClick={undo}
                   title="Undo (Ctrl+Z)"
-                  disabled={historyIndex <= 0}
+                  disabled={!canUndo}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 10h10a5 5 0 0 1 5 5v2" />
@@ -2543,7 +2318,7 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                   className="btn-icon-header btn-redo"
                   onClick={redo}
                   title="Redo (Ctrl+Y)"
-                  disabled={historyIndex >= history.length - 1 || history.length === 0}
+                  disabled={!canRedo}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10H11a5 5 0 0 0-5 5v2" />
@@ -2564,42 +2339,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <polyline points="21 15 16 10 5 21" />
                   </svg>
-                </button>
-                <button 
-                  className="btn-icon-header btn-analyze" 
-                  onClick={handleAnalyzeSlides}
-                  title="Analyze slides"
-                  disabled={!settings.openaiKey || isAnalyzing}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />
-                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
-                    <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header btn-view-feedback"
-                  onClick={() => setShowPresentationFeedback(true)}
-                  title="AI training feedback: view coach feedback from your recording"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  <span className="btn-tooltip">AI feedback</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleAnalyzeVideo}
-                  title={lastRecordingBlobRef.current ? "Analyze latest recorded video" : "Analyze video (upload or use latest recording)"}
-                  disabled={!settings.openaiKey}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span className="btn-tooltip">Analyze video</span>
                 </button>
               </div>
               <div className="header-icon-group-divider" aria-hidden="true" />
@@ -2673,9 +2412,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
                 onUpdate={updateSlide}
                 onBatchUpdate={updateSlidesBatch}
                 onReorder={updateSlides}
-                colorAnalyzeEnabled={settings.colorAnalyzeEnabled}
-                onColorAnalyzeChange={(enabled) => setSettings(prev => ({ ...prev, colorAnalyzeEnabled: enabled }))}
-                openaiKey={settings.openaiKey}
               />
             </div>
             <div 
@@ -2693,8 +2429,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
           settings={settings}
           slideFormat={settings.slideFormat || '16:9'}
           onUpdateSettings={setSettings}
-          analysisFolded={analysisFolded}
-          onToggleAnalysisFold={() => setAnalysisFolded(!analysisFolded)}
           backgroundColor={settings.backgroundColor}
           textColor={settings.textColor}
           fontFamily={settings.fontFamily}
@@ -2775,33 +2509,10 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         <div className="recording-bar">
           <span className="recording-bar-dot" />
           <span className="recording-bar-text">Recording</span>
-          <label className="recording-bar-analyze">
-            <input
-              type="checkbox"
-              checked={analyzeThisRecording}
-              onChange={(e) => {
-                const v = e.target.checked
-                setAnalyzeThisRecording(v)
-                analyzeAfterRecordingRef.current = v
-                setRecordSettings((prev) => ({ ...prev, analyzeWithAI: v }))
-              }}
-            />
-            <span>Get AI feedback</span>
-          </label>
           <button type="button" className="recording-bar-stop" onClick={handleStopRecording} title="Stop recording">
             Stop
           </button>
         </div>
-      )}
-      {showPresentationFeedback && (
-        <PresentationFeedback
-          onClose={() => setShowPresentationFeedback(false)}
-          status={presentationFeedback?.status}
-          transcript={presentationFeedback?.transcript}
-          feedback={presentationFeedback?.feedback}
-          errorMessage={presentationFeedback?.errorMessage}
-          onUploadVideo={() => analyzeVideoInputRef.current?.click()}
-        />
       )}
       {showProjectOverview && (
         <Suspense fallback={null}>
@@ -2840,14 +2551,6 @@ Keep each analysis concise (2-3 sentences max). You MUST return ONLY valid JSON 
         type="file"
         accept=".json,application/json"
         onChange={handleFileChange}
-        style={{ display: 'none' }}
-        aria-hidden="true"
-      />
-      <input
-        ref={analyzeVideoInputRef}
-        type="file"
-        accept="video/*,.webm,.mp4,.mov"
-        onChange={handleAnalyzeVideoFile}
         style={{ display: 'none' }}
         aria-hidden="true"
       />

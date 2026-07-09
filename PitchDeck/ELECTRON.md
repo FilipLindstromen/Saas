@@ -46,6 +46,7 @@ npm run electron:pack
 - **Electron shell** (`electron/main.cjs`) opens the app in a native window.
 - **Production UI** is served locally from `dist/` with the headers required for FFmpeg.wasm.
 - **FFmpeg API server** (`server/`) is bundled and started automatically for export/transcription.
+- **FFmpeg.wasm** is bundled in `public/ffmpeg/` for offline browser fallback (no CDN required).
 - Projects are stored locally (browser storage + optional project folder via File System Access API).
 
 ## Web vs desktop

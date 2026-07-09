@@ -952,18 +952,6 @@
   font-size: 0.9rem;
   color: var(--text-primary);
 }
-.recording-bar-analyze {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-.recording-bar-analyze input {
-  cursor: pointer;
-}
 .recording-bar-stop {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
