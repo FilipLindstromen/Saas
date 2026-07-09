@@ -1130,7 +1130,6 @@ function App() {
       currentChapterId,
       settings,
       recordSettings,
-      analysisFolded
     })
   }
 
@@ -1143,7 +1142,6 @@ function App() {
       currentChapterId,
       settings,
       recordSettings,
-      analysisFolded
     })
   }
 
@@ -1256,25 +1254,6 @@ function App() {
     localStorage.setItem('pitchDeckProjectName', projectName)
   }, [projectName])
 
-  // Normalize slide object with default layout and numeric props (shared for load/import).
-  const normalizeSlide = useCallback((slide) => ({
-    ...slide,
-    layout: slide.layout || 'default',
-    gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
-    flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-    backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
-    gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
-    subtitle: slide.subtitle || '',
-    imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
-    imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-    imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
-    textHeadingLevel: slide.textHeadingLevel || null,
-    subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-    analysis: slide.analysis != null ? slide.analysis : null,
-    backgroundColorOverride: slide.backgroundColorOverride === true,
-    backgroundColorOverrideValue: slide.backgroundColorOverrideValue ?? undefined
-  }), [])
-
   // Load project data (from overview Open, or after file read). Same shape as export.
   const loadProjectFromData = useCallback((importData) => {
     if (!importData) return
@@ -1308,8 +1287,7 @@ function App() {
     if (importData.inspectorWidth !== undefined) setInspectorWidth(importData.inspectorWidth)
     if (importData.projectName !== undefined) setProjectName(importData.projectName)
     if (importData.recordSettings) setRecordSettings(importData.recordSettings)
-    if (importData.analysisFolded !== undefined) setAnalysisFolded(importData.analysisFolded)
-  }, [normalizeSlide])
+  }, [])
 
   // On mount: if connected folder has project newer than browser, load from folder
   useEffect(() => {
