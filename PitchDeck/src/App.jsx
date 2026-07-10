@@ -233,6 +233,7 @@ function App() {
       bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1,
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
       bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
+      bulletStyle: localStorage.getItem('bulletStyle') || 'dot',
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
       contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 12,
@@ -585,6 +586,8 @@ function App() {
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
+    localStorage.setItem('bulletGap', settings.bulletGap?.toString() || '0.5')
+    localStorage.setItem('bulletStyle', settings.bulletStyle || 'dot')
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
     if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
@@ -1780,6 +1783,7 @@ function App() {
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
+          bulletStyle={settings.bulletStyle || 'dot'}
           recordSettings={recordSettings}
           isRecording={false}
           textStyleMode={settings.textStyleMode || 'fontPairing'}
@@ -2452,6 +2456,7 @@ function App() {
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
           bulletGap={settings.bulletGap ?? 0.5}
+          bulletStyle={settings.bulletStyle || 'dot'}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           showBullets={settings.showBullets !== false}

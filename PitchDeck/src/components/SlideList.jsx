@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import LayoutSelector from './LayoutSelector'
 import ContextMenu from './ContextMenu'
+import { prepareBulletLayoutContent } from '../utils/bulletStyles'
 import './SlideList.css'
 
 function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
@@ -146,10 +147,19 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
 
   const handleLayoutSelect = (layoutId) => {
     const ids = getIdsToUpdate()
-    const updates = layoutId === 'section'
-      ? { layout: layoutId, imageUrl: '' }
-      : { layout: layoutId }
-    ids.forEach((id) => onUpdate(id, updates))
+    ids.forEach((id) => {
+      const slide = slides.find((s) => s.id === id)
+      let updates = layoutId === 'section'
+        ? { layout: layoutId, imageUrl: '' }
+        : { layout: layoutId }
+      if (layoutId === 'bulletpoints' && slide) {
+        updates = {
+          ...updates,
+          content: prepareBulletLayoutContent(slide.content),
+        }
+      }
+      onUpdate(id, updates)
+    })
   }
 
   const toggleSectionFold = (sectionId) => {

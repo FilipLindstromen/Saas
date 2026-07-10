@@ -34,6 +34,7 @@ export const DEFAULT_TEXT = {
   highlightOpacity: 0.85,
   highlightPadding: 16,
   highlightHeadlineOnly: true,
+  showSubheadline: true,
 }
 
 export const DEFAULT_MEDIA = {
@@ -72,12 +73,13 @@ export function drawAd(ctx, {
     }
   }
 
-  if (!text?.headline?.trim() && !text?.copy?.trim()) return
+  if (!text?.headline?.trim() && !(text.showSubheadline !== false && text?.copy?.trim())) return
 
   const headline = text.headline?.trim() || ''
   const bodyCopy = text.copy?.trim() || ''
+  const showSubheadline = text.showSubheadline !== false
   const headlineLines = headline ? headline.split('\n').filter(Boolean) : []
-  const copyLines = bodyCopy ? bodyCopy.split('\n').filter(Boolean) : []
+  const copyLines = showSubheadline && bodyCopy ? bodyCopy.split('\n').filter(Boolean) : []
 
   const headlineSize = text.headlineFontSize || text.fontSize || 72
   const copySize = text.copyFontSize || Math.round(headlineSize * 0.45)

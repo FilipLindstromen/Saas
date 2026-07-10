@@ -146,10 +146,7 @@
 }
 
 .webcam-toggle-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--accent);
+  flex-shrink: 0;
 }
 
 .webcam-select {
@@ -222,8 +219,7 @@
 .preview-bg-color-override-toggle input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  cursor: pointer;
-  accent-color: var(--accent);
+  background-size: 10px 10px;
 }
 
 .preview-bg-color-picker {

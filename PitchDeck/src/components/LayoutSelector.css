@@ -245,8 +245,7 @@
 .camera-override-toggle input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  cursor: pointer;
-  accent-color: var(--accent);
+  background-size: 10px 10px;
 }
 
 .camera-override-label {

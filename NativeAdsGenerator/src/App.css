@@ -80,17 +80,39 @@
   max-width: 380px;
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nag-sidebar-content {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+  overscroll-behavior: contain;
+}
+
+.nag-panel-embedded {
+  padding: 0;
+  margin: 0;
+}
+
+.nag-panel-embedded.nag-panel-section {
+  gap: 0.75rem;
 }
 
 .nag-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
+  justify-content: center;
   background: var(--bg-primary);
 }
 
@@ -126,9 +148,11 @@
 }
 
 .nag-export-section {
-  margin-top: auto;
-  padding-top: 0.5rem;
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 1rem;
   border-top: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
 }
 
 .nag-export-row {

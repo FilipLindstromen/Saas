@@ -6,15 +6,18 @@ export default function MediaControls({
   onMediaModeChange,
   onUploadImage,
   onUploadVideo,
-  onStartWebcamPhoto,
+  onWebcamPhoto,
   onStartWebcamVideo,
   onStopWebcam,
   onOpenUnsplash,
+  onOpenPexelsVideo,
   webcamActive,
+  webcamPhotoPreview,
   hasMedia,
   mediaScale,
   onMediaScaleChange,
   onResetTransform,
+  embedded = false,
 }) {
   const imageInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -45,8 +48,8 @@ export default function MediaControls({
   }
 
   return (
-    <section className="nag-panel-section">
-      <h3 className="nag-section-title">Media</h3>
+    <section className={`nag-panel-section ${embedded ? 'nag-panel-embedded' : ''}`}>
+      {!embedded && <h3 className="nag-section-title">Media</h3>}
       {error && <p className="nag-error">{error}</p>}
 
       <div className="nag-btn-grid">
@@ -58,18 +61,17 @@ export default function MediaControls({
         </button>
         <button
           type="button"
-          className="nag-btn"
+          className={`nag-btn ${webcamPhotoPreview ? 'active' : ''}`}
           onClick={async () => {
             setError(null)
             try {
-              await onStartWebcamPhoto()
-              onMediaModeChange('webcam-photo')
+              await onWebcamPhoto()
             } catch (err) {
               setError(err?.message || 'Webcam failed')
             }
           }}
         >
-          Webcam photo
+          {webcamPhotoPreview ? 'Take photo' : 'Webcam photo'}
         </button>
         <button
           type="button"
@@ -92,6 +94,9 @@ export default function MediaControls({
         </button>
         <button type="button" className="nag-btn nag-btn-accent" onClick={onOpenUnsplash}>
           Unsplash
+        </button>
+        <button type="button" className="nag-btn nag-btn-accent" onClick={onOpenPexelsVideo}>
+          Pexels video
         </button>
       </div>
 

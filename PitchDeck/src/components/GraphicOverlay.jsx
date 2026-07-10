@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react'
 
-const DRAG_THRESHOLD = 5
+const DRAG_THRESHOLD = 4
 
 function attachGlobalListeners(onMove, onUp) {
   const move = (ev) => {
@@ -21,6 +21,10 @@ function attachGlobalListeners(onMove, onUp) {
   document.addEventListener('pointercancel', up, true)
 }
 
+function isHandleTarget(target) {
+  return target?.closest?.('.slide-graphic-resize-handle, .slide-graphic-rotate-handle, .slide-graphic-flip-handle')
+}
+
 export default function GraphicOverlay({
   graphic,
   isSelected,
@@ -33,6 +37,7 @@ export default function GraphicOverlay({
   const pendingDragRef = useRef(null)
   const resizeRef = useRef(null)
   const rotateRef = useRef(null)
+  const suppressClickRef = useRef(false)
 
   const x = graphic.x ?? 50
   const y = graphic.y ?? 50
@@ -44,6 +49,14 @@ export default function GraphicOverlay({
   const tintOpacity = graphic.tintOpacity ?? 100
 
   const getContainerRect = useCallback(() => containerRef?.current?.getBoundingClientRect(), [containerRef])
+
+  const getScaleFactor = useCallback(() => {
+    const rect = getContainerRect()
+    const el = containerRef?.current
+    if (!rect || !el?.offsetWidth) return 1
+    return rect.width / el.offsetWidth
+  }, [getContainerRect, containerRef])
+
   const getGraphicCenterScreen = useCallback(() => {
     const rect = getContainerRect()
     if (!rect) return null
@@ -55,6 +68,7 @@ export default function GraphicOverlay({
   const handlePointerMove = useCallback((e) => {
     const rect = getContainerRect()
     if (!rect) return
+    const scale = getScaleFactor()
 
     if (pendingDragRef.current && !dragRef.current) {
       const { startX, startY } = pendingDragRef.current
@@ -62,6 +76,7 @@ export default function GraphicOverlay({
       if (dist > DRAG_THRESHOLD) {
         dragRef.current = { ...pendingDragRef.current }
         pendingDragRef.current = null
+        suppressClickRef.current = true
       }
     }
 
@@ -78,13 +93,15 @@ export default function GraphicOverlay({
     }
 
     if (resizeRef.current) {
-      const { startX, startY, startW, startH } = resizeRef.current
-      const dx = e.clientX - startX
-      const dy = e.clientY - startY
-      const newW = Math.max(24, startW + dx)
-      const newH = Math.max(24, startH + dy)
+      const { startX, startY, startW, aspect } = resizeRef.current
+      const dx = (e.clientX - startX) / scale
+      const dy = (e.clientY - startY) / scale
+      const delta = Math.max(dx, dy)
+      const newW = Math.max(24, startW + delta)
+      const newH = Math.max(24, newW * aspect)
       onUpdate({ width: newW, height: newH })
-      resizeRef.current = { ...resizeRef.current, startX: e.clientX, startY: e.clientY, startW: newW, startH: newH }
+      resizeRef.current = { ...resizeRef.current, startX: e.clientX, startY: e.clientY, startW: newW }
+      suppressClickRef.current = true
     }
 
     if (rotateRef.current) {
@@ -98,48 +115,49 @@ export default function GraphicOverlay({
         if (e.shiftKey) newRot = Math.round(newRot / 15) * 15
         onUpdate({ rotation: newRot })
         rotateRef.current = { ...rotateRef.current, startX: e.clientX, startY: e.clientY, startRotation: newRot }
+        suppressClickRef.current = true
       }
     }
-  }, [getContainerRect, getGraphicCenterScreen, onUpdate])
+  }, [getContainerRect, getScaleFactor, getGraphicCenterScreen, onUpdate])
 
-  const handlePointerUp = useCallback((e) => {
-    const didDrag = !!dragRef.current
+  const handlePointerUp = useCallback(() => {
     dragRef.current = null
     pendingDragRef.current = null
     resizeRef.current = null
     rotateRef.current = null
-    if (didDrag) e.preventDefault()
   }, [])
 
   const onMoveDown = useCallback((e) => {
-    if (!isEditing || !isSelected) return
+    if (!isEditing || isHandleTarget(e.target)) return
     e.preventDefault()
     e.stopPropagation()
+    if (!isSelected) onSelect?.()
     const state = { startX: e.clientX, startY: e.clientY, startGx: x, startGy: y }
     pendingDragRef.current = state
     document.body.style.cursor = 'grabbing'
     attachGlobalListeners(handlePointerMove, handlePointerUp)
-  }, [isEditing, isSelected, x, y, handlePointerMove, handlePointerUp])
+  }, [isEditing, isSelected, onSelect, x, y, handlePointerMove, handlePointerUp])
 
   const onResizeDown = useCallback((e) => {
-    if (!isEditing || !isSelected) return
+    if (!isEditing) return
     e.preventDefault()
     e.stopPropagation()
-    const state = { startX: e.clientX, startY: e.clientY, startW: width, startH: height }
+    if (!isSelected) onSelect?.()
+    const state = { startX: e.clientX, startY: e.clientY, startW: width, aspect: height / width || 1 }
     resizeRef.current = state
     document.body.style.cursor = 'nwse-resize'
     attachGlobalListeners(handlePointerMove, handlePointerUp)
-  }, [isEditing, isSelected, width, height, handlePointerMove, handlePointerUp])
+  }, [isEditing, isSelected, onSelect, width, height, handlePointerMove, handlePointerUp])
 
   const onRotateDown = useCallback((e) => {
-    if (!isEditing || !isSelected) return
+    if (!isEditing) return
     e.preventDefault()
     e.stopPropagation()
     const state = { startX: e.clientX, startY: e.clientY, startRotation: rotation }
     rotateRef.current = state
     document.body.style.cursor = 'grabbing'
     attachGlobalListeners(handlePointerMove, handlePointerUp)
-  }, [isEditing, isSelected, rotation, handlePointerMove, handlePointerUp])
+  }, [isEditing, rotation, handlePointerMove, handlePointerUp])
 
   const onFlipClick = useCallback((e) => {
     if (!isEditing || !isSelected) return
@@ -150,6 +168,10 @@ export default function GraphicOverlay({
 
   const onSelectClick = useCallback((e) => {
     e.stopPropagation()
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
     onSelect?.()
   }, [onSelect])
 
@@ -192,8 +214,8 @@ export default function GraphicOverlay({
         height: `${height}px`,
         transform: `translate(-50%, -50%) rotate(${rotation}deg)${flipHorizontal ? ' scaleX(-1)' : ''}`,
         transformOrigin: 'center center',
-        cursor: isEditing ? 'move' : 'pointer',
-        zIndex: isSelected ? 10001 : undefined
+        cursor: isEditing ? (isSelected ? 'grab' : 'pointer') : 'default',
+        zIndex: isSelected ? 2 : 1
       }}
       onClick={onSelectClick}
       onPointerDown={onMoveDown}
@@ -239,6 +261,7 @@ export default function GraphicOverlay({
             className="slide-graphic-resize-handle se"
             style={resizeHandleStyle}
             onPointerDown={onResizeDown}
+            title="Resize"
           />
         </>
       )}

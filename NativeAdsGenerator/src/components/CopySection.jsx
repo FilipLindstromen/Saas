@@ -5,8 +5,10 @@ import './CopySection.css'
 export default function CopySection({
   headline,
   copy,
+  showSubheadline = true,
   onHeadlineChange,
   onCopyChange,
+  onShowSubheadlineChange,
   analysis,
   versions,
   aiBusy,
@@ -14,12 +16,13 @@ export default function CopySection({
   onAnalyze,
   onGenerateVersions,
   onApplyVersion,
+  embedded = false,
 }) {
   const hasOpenAiKey = !!getApiKey('openai')?.trim()
 
   return (
-    <section className="nag-panel-section nag-copy-section">
-      <h3 className="nag-section-title">Headline &amp; copy</h3>
+    <section className={`nag-panel-section nag-copy-section ${embedded ? 'nag-panel-embedded' : ''}`}>
+      {!embedded && <h3 className="nag-section-title">Headline &amp; copy</h3>}
 
       <div className="nag-field-group">
         <label className="nag-label" htmlFor="nag-headline">Headline</label>
@@ -34,7 +37,7 @@ export default function CopySection({
       </div>
 
       <div className="nag-field-group">
-        <label className="nag-label" htmlFor="nag-copy">Copy</label>
+        <label className="nag-label" htmlFor="nag-copy">Sub headline</label>
         <textarea
           id="nag-copy"
           className="nag-textarea"
@@ -44,6 +47,15 @@ export default function CopySection({
           placeholder="Automate outreach in minutes. Join 2,000+ teams who reply faster and close more deals."
         />
       </div>
+
+      <label className="nag-checkbox">
+        <input
+          type="checkbox"
+          checked={showSubheadline}
+          onChange={(e) => onShowSubheadlineChange(e.target.checked)}
+        />
+        <span>Show sub headline in image</span>
+      </label>
 
       <div className="nag-ai-actions">
         <button

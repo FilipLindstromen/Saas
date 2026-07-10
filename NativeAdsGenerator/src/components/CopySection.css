@@ -2,6 +2,20 @@
   gap: 0.65rem;
 }
 
+.nag-copy-section .nag-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.nag-copy-section .nag-checkbox input {
+  flex-shrink: 0;
+}
+
 .nag-ai-actions {
   display: flex;
   flex-direction: column;

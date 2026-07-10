@@ -1,8 +1,11 @@
 .inspector-panel {
   display: flex;
   flex-direction: column;
+  flex: 1;
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   flex-shrink: 0;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-subtle);
@@ -16,6 +19,7 @@
   padding: 0.5rem;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-tertiary);
+  flex-shrink: 0;
 }
 
 .inspector-panel-tab {
@@ -48,11 +52,13 @@
 }
 
 .inspector-panel-content {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 1rem;
   min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Embedded option panels: no fixed positioning, fill inspector */

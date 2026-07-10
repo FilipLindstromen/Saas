@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ThemeToggle from '@shared/ThemeToggle'
 import UnsplashPicker from '@shared/stockMedia/UnsplashPicker'
+import PexelsVideoPicker from '@shared/stockMedia/PexelsVideoPicker'
+import { fetchVideoAsBlobUrl } from '@shared/stockMedia/pexelsVideo'
 import { getTheme, initThemeSync, setTheme } from '@shared/theme'
 import MediaControls from './components/MediaControls'
 import CopySection from './components/CopySection'
 import TextControls from './components/TextControls'
 import PreviewPanel from './components/PreviewPanel'
+import SidebarTabs from './components/SidebarTabs'
 import { useAdCompositor } from './hooks/useAdCompositor'
 import { analyzeAsOgilvy, generateCopyVersions } from './services/copyAi'
 import {
@@ -16,6 +19,7 @@ import {
   exportCanvasAsPng,
   renderAdToCanvas,
 } from './utils/adCompositor'
+import { exportAdAsVideo, isVideoBackgroundMode } from './utils/videoExport'
 import './App.css'
 
 const saasAppsUrl = typeof window !== 'undefined'
@@ -48,50 +52,54 @@ function loadImageFromUrl(url) {
   })
 }
 
-function loadVideoFromFile(file) {
+function loadVideoElement(url, { revokeOnError = true } = {}) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
     const video = document.createElement('video')
     video.muted = true
     video.playsInline = true
     video.loop = true
     video.onloadeddata = () => {
       video.play().catch(() => {})
-      resolve({ video, url })
+      resolve(video)
     }
     video.onerror = () => {
-      URL.revokeObjectURL(url)
+      if (revokeOnError) URL.revokeObjectURL(url)
       reject(new Error('Failed to load video'))
     }
     video.src = url
   })
 }
 
-function captureWebcamPhoto(stream) {
+function loadVideoFromFile(file) {
+  const url = URL.createObjectURL(file)
+  return loadVideoElement(url).then((video) => ({ video, url }))
+}
+
+async function loadVideoFromUrl(url) {
+  const isExternal = url.startsWith('http://') || url.startsWith('https://')
+  const blobUrl = isExternal ? await fetchVideoAsBlobUrl(url) : url
+  const video = await loadVideoElement(blobUrl, { revokeOnError: true })
+  return { video, url: blobUrl }
+}
+
+function captureFromVideoElement(video) {
   return new Promise((resolve, reject) => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.playsInline = true
-    video.srcObject = stream
-    video.onloadedmetadata = () => {
-      video.play()
-        .then(() => {
-          requestAnimationFrame(() => {
-            const canvas = document.createElement('canvas')
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
-            const ctx = canvas.getContext('2d')
-            ctx.drawImage(video, 0, 0)
-            const dataUrl = canvas.toDataURL('image/png')
-            const img = new Image()
-            img.onload = () => resolve(img)
-            img.onerror = () => reject(new Error('Failed to capture photo'))
-            img.src = dataUrl
-          })
-        })
-        .catch(reject)
+    const w = video.videoWidth
+    const h = video.videoHeight
+    if (!w || !h) {
+      reject(new Error('Webcam not ready'))
+      return
     }
-    video.onerror = () => reject(new Error('Webcam error'))
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0)
+    const dataUrl = canvas.toDataURL('image/png')
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Failed to capture photo'))
+    img.src = dataUrl
   })
 }
 
@@ -109,17 +117,21 @@ export default function App() {
   const [mediaMode, setMediaMode] = useState(null)
   const [mediaElement, setMediaElement] = useState(null)
   const [webcamActive, setWebcamActive] = useState(false)
+  const [webcamPhotoPreview, setWebcamPhotoPreview] = useState(false)
   const [isVideoPlaying, setIsVideoPlaying] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
+  const [pexelsOpen, setPexelsOpen] = useState(false)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState('')
   const [analysis, setAnalysis] = useState(null)
   const [versions, setVersions] = useState([])
+  const [sidebarTab, setSidebarTab] = useState('format')
 
   const format = FORMATS[formatId] || FORMATS.landscape
   const aspectRatio = `${format.width} / ${format.height}`
+  const canExportVideo = isVideoBackgroundMode(mediaMode, mediaElement)
 
   const clearMedia = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -133,6 +145,7 @@ export default function App() {
     mediaElementRef.current = null
     setMediaElement(null)
     setWebcamActive(false)
+    setWebcamPhotoPreview(false)
     setIsVideoPlaying(false)
     setMediaMode(null)
   }, [])
@@ -157,23 +170,32 @@ export default function App() {
     setMedia(video, 'upload-video', { playing: true })
   }
 
-  const handleStartWebcamPhoto = async () => {
+  const handleWebcamPhoto = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Webcam is not supported in this browser')
     }
+
+    if (webcamPhotoPreview && mediaElementRef.current) {
+      const img = await captureFromVideoElement(mediaElementRef.current)
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach((t) => t.stop())
+        webcamStreamRef.current = null
+      }
+      setWebcamPhotoPreview(false)
+      setMedia(img, 'webcam-photo')
+      return
+    }
+
     clearMedia()
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     webcamStreamRef.current = stream
-    try {
-      const img = await captureWebcamPhoto(stream)
-      stream.getTracks().forEach((t) => t.stop())
-      webcamStreamRef.current = null
-      setMedia(img, 'webcam-photo')
-    } catch (err) {
-      stream.getTracks().forEach((t) => t.stop())
-      webcamStreamRef.current = null
-      throw err
-    }
+    const video = document.createElement('video')
+    video.muted = true
+    video.playsInline = true
+    video.srcObject = stream
+    await video.play()
+    setWebcamPhotoPreview(true)
+    setMedia(video, 'webcam-photo-preview', { playing: true })
   }
 
   const handleStartWebcamVideo = async () => {
@@ -201,6 +223,14 @@ export default function App() {
     const img = await loadImageFromUrl(dataUrl)
     setMedia(img, 'unsplash')
     setUnsplashOpen(false)
+  }
+
+  const handlePexelsVideoSelect = async (videoUrl) => {
+    clearMedia()
+    const { video, url } = await loadVideoFromUrl(videoUrl)
+    videoObjectUrlRef.current = url
+    setMedia(video, 'pexels-video', { playing: true })
+    setPexelsOpen(false)
   }
 
   const handlePan = (dx, dy) => {
@@ -284,6 +314,31 @@ export default function App() {
     }
   }
 
+  const handleExportVideo = async () => {
+    setBusy(true)
+    setStatus('Exporting video…')
+    try {
+      await exportAdAsVideo({
+        width: format.width,
+        height: format.height,
+        backgroundColor,
+        mediaElement: mediaElementRef.current,
+        mediaScale: mediaTransform.scale,
+        mediaOffsetX: mediaTransform.offsetX,
+        mediaOffsetY: mediaTransform.offsetY,
+        text,
+        mediaMode,
+        filename: `native-ad-${formatId}.webm`,
+        onProgress: (pct) => setStatus(`Exporting video… ${pct}%`),
+      })
+      setStatus('Video exported.')
+    } catch (err) {
+      setStatus(err?.message || 'Video export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleCopy = async () => {
     setBusy(true)
     setStatus('')
@@ -350,58 +405,99 @@ export default function App() {
 
       <div className="nag-layout">
         <aside className="nag-sidebar">
-          <section className="nag-panel-section">
-            <h3 className="nag-section-title">Format</h3>
-            <div className="nag-format-grid">
-              {Object.values(FORMATS).map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  className={`nag-format-btn ${formatId === f.id ? 'active' : ''}`}
-                  onClick={() => setFormatId(f.id)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </section>
+          <SidebarTabs activeTab={sidebarTab} onTabChange={setSidebarTab} />
 
-          <MediaControls
-            mediaMode={mediaMode}
-            onMediaModeChange={setMediaMode}
-            onUploadImage={handleUploadImage}
-            onUploadVideo={handleUploadVideo}
-            onStartWebcamPhoto={handleStartWebcamPhoto}
-            onStartWebcamVideo={handleStartWebcamVideo}
-            onStopWebcam={handleStopWebcam}
-            onOpenUnsplash={() => setUnsplashOpen(true)}
-            webcamActive={webcamActive}
-            hasMedia={!!mediaElement}
-            mediaScale={mediaTransform.scale}
-            onMediaScaleChange={(scale) => setMediaTransform((p) => ({ ...p, scale }))}
-            onResetTransform={handleResetTransform}
-          />
+          <div className="nag-sidebar-content">
+            {sidebarTab === 'format' && (
+              <section className="nag-panel-section nag-panel-embedded">
+                <div className="nag-format-grid">
+                  {Object.values(FORMATS).map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`nag-format-btn ${formatId === f.id ? 'active' : ''}`}
+                      onClick={() => setFormatId(f.id)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          <CopySection
-            headline={text.headline}
-            copy={text.copy}
-            onHeadlineChange={handleHeadlineChange}
-            onCopyChange={handleCopyChange}
-            analysis={analysis}
-            versions={versions}
-            aiBusy={aiBusy}
-            aiError={aiError}
-            onAnalyze={handleAnalyze}
-            onGenerateVersions={handleGenerateVersions}
-            onApplyVersion={handleApplyVersion}
-          />
+            {sidebarTab === 'background' && (
+              <>
+                <MediaControls
+                  embedded
+                  mediaMode={mediaMode}
+                  onMediaModeChange={setMediaMode}
+                  onUploadImage={handleUploadImage}
+                  onUploadVideo={handleUploadVideo}
+                  onWebcamPhoto={handleWebcamPhoto}
+                  onStartWebcamVideo={handleStartWebcamVideo}
+                  onStopWebcam={handleStopWebcam}
+                  onOpenUnsplash={() => setUnsplashOpen(true)}
+                  onOpenPexelsVideo={() => setPexelsOpen(true)}
+                  webcamActive={webcamActive}
+                  webcamPhotoPreview={webcamPhotoPreview}
+                  hasMedia={!!mediaElement}
+                  mediaScale={mediaTransform.scale}
+                  onMediaScaleChange={(scale) => setMediaTransform((p) => ({ ...p, scale }))}
+                  onResetTransform={handleResetTransform}
+                />
+                <section className="nag-panel-section nag-panel-embedded">
+                  <div className="nag-field-group">
+                    <label className="nag-label" htmlFor="nag-sidebar-bg-color">Canvas background</label>
+                    <div className="nag-color-row">
+                      <input
+                        id="nag-sidebar-bg-color"
+                        type="color"
+                        value={backgroundColor}
+                        onChange={(e) => setBackgroundColor(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        className="nag-input"
+                        value={backgroundColor}
+                        onChange={(e) => setBackgroundColor(e.target.value)}
+                      />
+                    </div>
+                    <p className="nag-hint">Shown behind media when the image or video does not cover the full canvas.</p>
+                  </div>
+                </section>
+              </>
+            )}
 
-          <TextControls
-            text={text}
-            onChange={setText}
-            backgroundColor={backgroundColor}
-            onBackgroundColorChange={setBackgroundColor}
-          />
+            {sidebarTab === 'fonts' && (
+              <TextControls
+                embedded
+                hideBackgroundColor
+                text={text}
+                onChange={setText}
+                backgroundColor={backgroundColor}
+                onBackgroundColorChange={setBackgroundColor}
+              />
+            )}
+
+            {sidebarTab === 'copy' && (
+              <CopySection
+                embedded
+                headline={text.headline}
+                copy={text.copy}
+                showSubheadline={text.showSubheadline !== false}
+                onHeadlineChange={handleHeadlineChange}
+                onCopyChange={handleCopyChange}
+                onShowSubheadlineChange={(show) => setText((prev) => ({ ...prev, showSubheadline: show }))}
+                analysis={analysis}
+                versions={versions}
+                aiBusy={aiBusy}
+                aiError={aiError}
+                onAnalyze={handleAnalyze}
+                onGenerateVersions={handleGenerateVersions}
+                onApplyVersion={handleApplyVersion}
+              />
+            )}
+          </div>
 
           <section className="nag-panel-section nag-export-section">
             <h3 className="nag-section-title">Export</h3>
@@ -409,6 +505,11 @@ export default function App() {
               <button type="button" className="nag-btn nag-btn-accent" disabled={busy} onClick={handleExport}>
                 Download PNG
               </button>
+              {canExportVideo && (
+                <button type="button" className="nag-btn nag-btn-accent" disabled={busy} onClick={handleExportVideo}>
+                  Download video
+                </button>
+              )}
               <button type="button" className="nag-btn" disabled={busy} onClick={handleCopy}>
                 Copy to clipboard
               </button>
@@ -433,6 +534,13 @@ export default function App() {
         onClose={() => setUnsplashOpen(false)}
         onSelect={handleUnsplashSelect}
         returnDataUrl
+        initialQuery="advertising"
+      />
+
+      <PexelsVideoPicker
+        isOpen={pexelsOpen}
+        onClose={() => setPexelsOpen(false)}
+        onSelect={handlePexelsVideoSelect}
         initialQuery="advertising"
       />
     </div>

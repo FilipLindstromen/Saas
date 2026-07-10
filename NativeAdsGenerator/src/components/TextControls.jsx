@@ -1,12 +1,19 @@
 import { FONT_OPTIONS } from '../utils/adCompositor'
 import './TextControls.css'
 
-export default function TextControls({ text, onChange, backgroundColor, onBackgroundColorChange }) {
+export default function TextControls({
+  text,
+  onChange,
+  backgroundColor,
+  onBackgroundColorChange,
+  embedded = false,
+  hideBackgroundColor = false,
+}) {
   const update = (key, value) => onChange({ ...text, [key]: value })
 
   return (
-    <section className="nag-panel-section">
-      <h3 className="nag-section-title">Text style</h3>
+    <section className={`nag-panel-section ${embedded ? 'nag-panel-embedded' : ''}`}>
+      {!embedded && <h3 className="nag-section-title">Text style</h3>}
 
       <div className="nag-field-row">
         <div className="nag-field-group">
@@ -69,6 +76,7 @@ export default function TextControls({ text, onChange, backgroundColor, onBackgr
             />
           </div>
         </div>
+        {!hideBackgroundColor && (
         <div className="nag-field-group">
           <label className="nag-label" htmlFor="nag-bg-color">Canvas background</label>
           <div className="nag-color-row">
@@ -86,6 +94,7 @@ export default function TextControls({ text, onChange, backgroundColor, onBackgr
             />
           </div>
         </div>
+        )}
       </div>
 
       <div className="nag-effects-block">

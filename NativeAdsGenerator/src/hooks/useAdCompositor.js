@@ -22,16 +22,22 @@ export function useAdCompositor({
 
     const displayW = canvas.clientWidth
     const displayH = canvas.clientHeight
+    if (!displayW || !displayH) return
+
     if (canvas.width !== displayW || canvas.height !== displayH) {
       canvas.width = displayW
       canvas.height = displayH
     }
 
-    const scaleX = displayW / format.width
-    const scaleY = displayH / format.height
+    const scale = Math.min(displayW / format.width, displayH / format.height)
+    const offsetX = (displayW - format.width * scale) / 2
+    const offsetY = (displayH - format.height * scale) / 2
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, displayW, displayH)
     ctx.save()
-    ctx.scale(scaleX, scaleY)
+    ctx.translate(offsetX, offsetY)
+    ctx.scale(scale, scale)
     drawAd(ctx, {
       width: format.width,
       height: format.height,
@@ -57,6 +63,14 @@ export function useAdCompositor({
   useEffect(() => {
     paint()
   }, [paint])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const observer = new ResizeObserver(() => paint())
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [canvasRef, paint])
 
   useEffect(() => {
     if (!isVideoPlaying) return

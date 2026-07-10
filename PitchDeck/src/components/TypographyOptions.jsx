@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { BULLET_STYLE_OPTIONS } from '../utils/bulletStyles'
 import './StyleDropdown.css'
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Oswald', 'Playfair Display', 'Merriweather', 'Source Sans Pro', 'Nunito', 'Ubuntu', 'Dancing Script', 'Bebas Neue']
@@ -129,6 +130,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     bulletLineHeight: 1,
     bulletTextSize: 3,
     bulletGap: 0.5,
+    bulletStyle: 'dot',
     contentBottomOffset: 12,
     contentEdgeOffset: 9,
     defaultFontWeight: 700,
@@ -587,6 +589,19 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               />
               <span>Show bullets</span>
             </label>
+          </div>
+          <div className="style-dropdown-field">
+            <label>Bullet style</label>
+            <select
+              value={settings.bulletStyle || 'dot'}
+              onChange={(e) => handleChange('bulletStyle', e.target.value)}
+              className="style-dropdown-select"
+            >
+              {BULLET_STYLE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+            <span className="style-dropdown-hint">Applies to all bullet slides</span>
           </div>
           <div className="style-dropdown-sub-fields style-dropdown-sub-fields-inline">
             <div className="style-dropdown-sub-field">

@@ -48,7 +48,7 @@
   justify-content: center;
 }
 
-/* Graphic overlays (giphy etc.) above gradient, below text */
+/* Graphic overlays (giphy etc.) above gradient, below text in play mode; above text in edit mode for drag/resize */
 .slide-graphic-overlays {
   position: absolute;
   inset: 0;
@@ -56,19 +56,26 @@
   pointer-events: none;
 }
 
+.slide:not(.play-mode) .slide-graphic-overlays {
+  z-index: 15;
+}
+
 .slide-graphic-overlay {
   position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .slide-graphic-overlay-inner {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 .slide-graphic-overlay img {
@@ -98,17 +105,20 @@
 
 .slide-graphic-resize-handle {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   background: var(--accent);
-  border: 1px solid white;
+  border: 2px solid #fff;
   border-radius: 2px;
   cursor: nwse-resize;
+  z-index: 2;
+  touch-action: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .slide-graphic-resize-handle.se {
-  bottom: -5px;
-  right: -5px;
+  bottom: -6px;
+  right: -6px;
   cursor: nwse-resize;
 }
 
@@ -675,6 +685,39 @@
   line-height: 1;
   flex-shrink: 0;
   margin-top: 0.1em;
+}
+
+.slide-bullets.bullet-style-dash .slide-bullet::before {
+  content: '–';
+}
+
+.slide-bullets.bullet-style-arrow .slide-bullet::before {
+  content: '→';
+}
+
+.slide-bullets.bullet-style-check .slide-bullet::before {
+  content: '✓';
+}
+
+.slide-bullets.bullet-style-square .slide-bullet::before {
+  content: '■';
+  font-size: 0.65em;
+  margin-top: 0.35em;
+}
+
+.slide-bullets.bullet-style-number {
+  counter-reset: slide-bullet-counter;
+}
+
+.slide-bullets.bullet-style-number .slide-bullet {
+  counter-increment: slide-bullet-counter;
+}
+
+.slide-bullets.bullet-style-number .slide-bullet::before {
+  content: counter(slide-bullet-counter) '.';
+  font-size: 1em;
+  min-width: 1.5em;
+  text-align: right;
 }
 
 .play-mode .slide-bullet::before {

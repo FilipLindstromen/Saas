@@ -468,10 +468,7 @@
 }
 
 .video-editing-toggle-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--accent);
+  flex-shrink: 0;
 }
 
 .video-editing-setting-hint {

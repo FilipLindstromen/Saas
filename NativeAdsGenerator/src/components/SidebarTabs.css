@@ -1,0 +1,40 @@
+.nag-sidebar-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nag-sidebar-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.nag-sidebar-tab {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.35rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.nag-sidebar-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.nag-sidebar-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--bg-secondary);
+}

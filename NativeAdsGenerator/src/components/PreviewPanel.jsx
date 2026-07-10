@@ -18,7 +18,7 @@ export default function PreviewPanel({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      displayScale: rect.width / format.width,
+      displayScale: Math.min(rect.width / format.width, rect.height / format.height),
     }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
@@ -49,7 +49,11 @@ export default function PreviewPanel({
       <div
         ref={containerRef}
         className={`nag-preview-stage ${canPan ? 'draggable' : ''}`}
-        style={{ aspectRatio }}
+        style={{
+          aspectRatio,
+          '--format-ar-w': format.width,
+          '--format-ar-h': format.height,
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

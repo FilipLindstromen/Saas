@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Slide from './Slide'
 import SlideBackground from './SlideBackground'
 import PersistentVideoLayer from './PersistentVideoLayer'
+import { getWebcamCameraId, isWebcamActiveForSlide, isAnyWebcamActive } from '../utils/webcamSettings'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
@@ -242,10 +243,18 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 'large', isVisible = tru
 
     const startStream = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        let stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: cameraId } }
-        })
-        if (videoRef.current) {
+        }).catch(() => null)
+        if (!stream && cameraId) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { ideal: cameraId } }
+          }).catch(() => null)
+        }
+        if (!stream && cameraId) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true }).catch(() => null)
+        }
+        if (videoRef.current && stream) {
           videoRef.current.srcObject = stream
           streamRef.current = stream
         }
@@ -577,7 +586,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -716,8 +725,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     const nextSlideDataForNav = presentationSlides[nextIndex]
     const currentHasVideo = hasVideoLayoutWithMedia(currentSlideData)
     const nextHasVideo = hasVideoLayoutWithMedia(nextSlideDataForNav)
-    const currentHasWebcam = (currentSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
-    const nextHasWebcam = nextSlideDataForNav && (nextSlideDataForNav?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlideDataForNav?.selectedCameraId || recordSettings?.selectedCameraId)
+    const currentHasWebcam = isWebcamActiveForSlide(currentSlideData, recordSettings)
+    const nextHasWebcam = nextSlideDataForNav && isWebcamActiveForSlide(nextSlideDataForNav, recordSettings)
 
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
@@ -836,8 +845,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     const prevSlideDataForNav = presentationSlides[prevIndex]
     const currentHasVideo = hasVideoLayoutWithMedia(currentSlideData)
     const prevHasVideo = hasVideoLayoutWithMedia(prevSlideDataForNav)
-    const currentHasWebcam = (currentSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
-    const prevHasWebcam = prevSlideDataForNav && (prevSlideDataForNav?.webcamEnabled ?? recordSettings?.webcamEnabled) && (prevSlideDataForNav?.selectedCameraId || recordSettings?.selectedCameraId)
+    const currentHasWebcam = isWebcamActiveForSlide(currentSlideData, recordSettings)
+    const prevHasWebcam = prevSlideDataForNav && isWebcamActiveForSlide(prevSlideDataForNav, recordSettings)
 
     setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
@@ -1295,12 +1304,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const currentSlideLayout = currentSlide?.layout || 'default'
   const nextSlideLayout = presentationSlides[currentIndex + 1]?.layout || currentSlideLayout
 
-  // Per-slide webcam: slide.webcamEnabled ?? recordSettings.webcamEnabled, slide.selectedCameraId || recordSettings.selectedCameraId
-  const currentSlideHasWebcam = (currentSlide?.webcamEnabled ?? recordSettings?.webcamEnabled) && (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId)
-  const nextSlideHasWebcam = nextSlideData && (nextSlideData?.webcamEnabled ?? recordSettings?.webcamEnabled) && (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)
-  const firstSlideWithWebcam = presentationSlides.find(s => (s?.webcamEnabled ?? recordSettings?.webcamEnabled) && (s?.selectedCameraId || recordSettings?.selectedCameraId))
-  const anySlideHasWebcam = !!firstSlideWithWebcam
-  const webcamCameraId = (currentSlideHasWebcam ? (currentSlide?.selectedCameraId || recordSettings?.selectedCameraId) : (nextSlideData?.selectedCameraId || recordSettings?.selectedCameraId)) || (firstSlideWithWebcam?.selectedCameraId || recordSettings?.selectedCameraId) || ''
+  const currentSlideHasWebcam = isWebcamActiveForSlide(currentSlide, recordSettings)
+  const nextSlideHasWebcam = nextSlideData && isWebcamActiveForSlide(nextSlideData, recordSettings)
+  const anySlideHasWebcam = isAnyWebcamActive(presentationSlides, recordSettings)
+  const webcamCameraId = getWebcamCameraId(currentSlide, recordSettings) || getWebcamCameraId(nextSlideData, recordSettings) || recordSettings?.selectedCameraId || ''
   const webcamShouldPreload = nextSlideHasWebcam && !currentSlideHasWebcam
   // Keep webcam stream running when on non-webcam slides (for smooth slide-in when returning to webcam slide)
   const webcamShouldKeepAlive = anySlideHasWebcam && !currentSlideHasWebcam
@@ -1344,6 +1351,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     bulletLineHeight,
     bulletTextSize,
     bulletGap,
+    bulletStyle,
     contentBottomOffset,
     contentEdgeOffset,
     showBullets,
