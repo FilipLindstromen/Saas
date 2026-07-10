@@ -201,6 +201,86 @@ export default function TextControls({
               value={text.highlightPadding ?? 16}
               onChange={(e) => update('highlightPadding', parseInt(e.target.value, 10) || 0)}
             />
+            <label className="nag-checkbox nag-checkbox-nested">
+              <input
+                type="checkbox"
+                checked={text.highlightHeadlineOnly !== false}
+                onChange={(e) => update('highlightHeadlineOnly', e.target.checked)}
+              />
+              <span>Headline only</span>
+            </label>
+          </div>
+        )}
+
+        <label className="nag-checkbox">
+          <input
+            type="checkbox"
+            checked={!!text.outline}
+            onChange={(e) => update('outline', e.target.checked)}
+          />
+          <span>Outline</span>
+        </label>
+        {text.outline && (
+          <div className="nag-sub-fields">
+            <div className="nag-color-row">
+              <input
+                type="color"
+                value={text.outlineColor || '#000000'}
+                onChange={(e) => update('outlineColor', e.target.value)}
+              />
+              <input
+                type="text"
+                className="nag-input"
+                value={text.outlineColor || '#000000'}
+                onChange={(e) => update('outlineColor', e.target.value)}
+              />
+            </div>
+            <label className="nag-label">
+              Width <span>{text.outlineWidth ?? 3}px</span>
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="12"
+              value={text.outlineWidth ?? 3}
+              onChange={(e) => update('outlineWidth', parseInt(e.target.value, 10))}
+            />
+          </div>
+        )}
+
+        <label className="nag-checkbox">
+          <input
+            type="checkbox"
+            checked={!!text.glow}
+            onChange={(e) => update('glow', e.target.checked)}
+          />
+          <span>Glow</span>
+        </label>
+        {text.glow && (
+          <div className="nag-sub-fields">
+            <div className="nag-color-row">
+              <input
+                type="color"
+                value={text.glowColor?.startsWith('#') ? text.glowColor : '#ffffff'}
+                onChange={(e) => update('glowColor', e.target.value)}
+              />
+              <input
+                type="text"
+                className="nag-input"
+                value={text.glowColor || '#ffffff'}
+                onChange={(e) => update('glowColor', e.target.value)}
+              />
+            </div>
+            <label className="nag-label">
+              Blur <span>{text.glowBlur ?? 24}px</span>
+            </label>
+            <input
+              type="range"
+              min="4"
+              max="60"
+              value={text.glowBlur ?? 24}
+              onChange={(e) => update('glowBlur', parseInt(e.target.value, 10))}
+            />
           </div>
         )}
       </div>

@@ -35,6 +35,12 @@ export const DEFAULT_TEXT = {
   highlightPadding: 16,
   highlightHeadlineOnly: true,
   showSubheadline: true,
+  outline: false,
+  outlineColor: '#000000',
+  outlineWidth: 3,
+  glow: false,
+  glowColor: '#ffffff',
+  glowBlur: 24,
 }
 
 export const DEFAULT_MEDIA = {
@@ -91,41 +97,66 @@ export function drawAd(ctx, {
   let cursorY = height / 2 - totalHeight / 2
 
   ctx.textAlign = text.textAlign || 'center'
-  ctx.textBaseline = 'top'
 
   const drawLine = (line, y, fontSize, fontWeight, useHighlight) => {
     ctx.font = `${fontWeight} ${fontSize}px ${text.fontFamily || 'Montserrat'}, sans-serif`
     const metrics = ctx.measureText(line)
-    const textWidth = metrics.width
-    const lineH = fontSize * 1.15
+    const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.78
+    const descent = metrics.actualBoundingBoxDescent || fontSize * 0.22
+    const textW = metrics.width
+    const textH = ascent + descent
+    const pad = useHighlight && text.highlight ? (text.highlightPadding ?? 16) : 0
+    const boxH = textH + pad * 2
+    const lineH = Math.max(fontSize * 1.15, boxH)
+    const blockTop = y + (lineH - boxH) / 2
+    const boxW = textW + pad * 2
+    const boxX = width / 2 - boxW / 2
+    const boxY = blockTop
+    const textX = width / 2
+    const baselineY = boxY + pad + ascent
 
     if (useHighlight && text.highlight) {
-      const pad = text.highlightPadding ?? 16
-      const alpha = text.highlightOpacity ?? 0.85
       ctx.save()
-      ctx.globalAlpha = alpha
+      ctx.globalAlpha = text.highlightOpacity ?? 0.85
       ctx.fillStyle = text.highlightColor || '#ff6b35'
-      const boxW = textWidth + pad * 2
-      const boxH = fontSize + pad
-      const boxX = width / 2 - boxW / 2
-      const boxY = y + (lineH - boxH) / 2
       ctx.fillRect(boxX, boxY, boxW, boxH)
       ctx.restore()
     }
 
-    if (text.dropShadow) {
+    if (text.glow) {
       ctx.save()
+      ctx.shadowColor = text.glowColor || text.color || '#ffffff'
+      ctx.shadowBlur = text.glowBlur ?? 24
+      ctx.shadowOffsetX = 0
+      ctx.shadowOffsetY = 0
+      ctx.fillStyle = text.color || '#ffffff'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(line, textX, baselineY)
+      ctx.restore()
+    }
+
+    if (text.outline) {
+      ctx.save()
+      ctx.strokeStyle = text.outlineColor || '#000000'
+      ctx.lineWidth = text.outlineWidth ?? 3
+      ctx.lineJoin = 'round'
+      ctx.miterLimit = 2
+      ctx.textBaseline = 'alphabetic'
+      ctx.strokeText(line, textX, baselineY)
+      ctx.restore()
+    }
+
+    ctx.save()
+    if (text.dropShadow) {
       ctx.shadowColor = text.shadowColor || 'rgba(0,0,0,0.65)'
       ctx.shadowBlur = text.shadowBlur ?? 12
       ctx.shadowOffsetX = text.shadowOffsetX ?? 0
       ctx.shadowOffsetY = text.shadowOffsetY ?? 4
-      ctx.fillStyle = text.color || '#ffffff'
-      ctx.fillText(line, width / 2, y)
-      ctx.restore()
-    } else {
-      ctx.fillStyle = text.color || '#ffffff'
-      ctx.fillText(line, width / 2, y)
     }
+    ctx.fillStyle = text.color || '#ffffff'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(line, textX, baselineY)
+    ctx.restore()
 
     return lineH
   }

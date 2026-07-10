@@ -85,6 +85,10 @@
   accent-color: var(--accent);
 }
 
+.nag-checkbox-nested {
+  margin-top: 0.25rem;
+}
+
 .nag-sub-fields {
   display: flex;
   flex-direction: column;
