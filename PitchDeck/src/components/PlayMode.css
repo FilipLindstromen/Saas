@@ -126,8 +126,12 @@
   pointer-events: auto;
 }
 
-/* Content (background, text, images) fades in when slide changes */
-.play-slide-content-transition .slide {
+/* Content fades in when slide changes — text only, never the background layer */
+.play-slide-content-transition .slide .slide-content,
+.play-slide-content-transition .slide .slide-content-video,
+.play-slide-content-transition .slide .slide-text-centered-wrapper,
+.play-slide-content-transition .slide .slide-section-name,
+.play-slide-content-transition .slide .slide-bullets {
   animation: playContentFadeIn var(--transition-duration, 300ms) ease-out;
 }
 
@@ -353,20 +357,79 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  animation-duration: 0.5s;
+  animation-duration: var(--transition-duration, 500ms);
   animation-timing-function: ease-in-out;
   animation-fill-mode: forwards;
 }
 
+/* Dual-layer transitions: outgoing and incoming backgrounds animate at the same time */
+.play-bg-dual-layer.transition-default .play-crossfade-out {
+  animation-name: fadeOut;
+}
+.play-bg-dual-layer.transition-default .play-crossfade-in {
+  opacity: 0;
+  animation-name: fadeIn;
+}
+
+.play-bg-dual-layer.transition-crossfade .play-crossfade-out {
+  animation-name: crossfadeOut;
+}
+.play-bg-dual-layer.transition-crossfade .play-crossfade-in {
+  opacity: 0;
+  animation-name: crossfadeIn;
+}
+
+.play-bg-dual-layer.transition-slide .play-crossfade-out {
+  animation-name: slideOut;
+}
+.play-bg-dual-layer.transition-slide .play-crossfade-in {
+  opacity: 0;
+  transform: translateX(-100%);
+  animation-name: slideIn;
+}
+
+.play-bg-dual-layer.transition-zoom .play-crossfade-out {
+  animation-name: zoomOut;
+}
+.play-bg-dual-layer.transition-zoom .play-crossfade-in {
+  opacity: 0;
+  transform: scale(1.2);
+  animation-name: zoomIn;
+}
+
+.play-bg-dual-layer.transition-dissolve .play-crossfade-out {
+  animation-name: dissolveOut;
+}
+.play-bg-dual-layer.transition-dissolve .play-crossfade-in {
+  opacity: 0;
+  animation-name: dissolveIn;
+}
+
+.play-bg-dual-layer.transition-blur .play-crossfade-out {
+  animation-name: blurOut;
+}
+.play-bg-dual-layer.transition-blur .play-crossfade-in {
+  opacity: 0;
+  filter: blur(10px);
+  animation-name: blurIn;
+}
+
+.play-bg-dual-layer.transition-sequence .play-crossfade-out {
+  animation-name: sequenceOut;
+}
+.play-bg-dual-layer.transition-sequence .play-crossfade-in {
+  opacity: 0;
+  transform: scale(1.1) translateY(-20px);
+  animation-name: sequenceIn;
+}
+
 .play-crossfade-layer.play-crossfade-out {
   z-index: 1;
-  animation-name: crossfadeOut;
 }
 
 .play-crossfade-layer.play-crossfade-in {
   z-index: 2;
   opacity: 0;
-  animation-name: crossfadeIn;
 }
 
 /* Legacy: when crossfade used with slide container (different bg path) */

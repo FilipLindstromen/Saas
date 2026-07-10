@@ -108,6 +108,8 @@ export default function App() {
   const mediaElementRef = useRef(null)
   const webcamStreamRef = useRef(null)
   const videoObjectUrlRef = useRef(null)
+  const musicObjectUrlRef = useRef(null)
+  const previewMusicRef = useRef(null)
 
   const [theme, setThemeState] = useState(() => getTheme())
   const [formatId, setFormatId] = useState('landscape')
@@ -121,6 +123,8 @@ export default function App() {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false)
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [pexelsOpen, setPexelsOpen] = useState(false)
+  const [backgroundMusic, setBackgroundMusic] = useState(null)
+  const [musicVolume, setMusicVolume] = useState(0.8)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
@@ -156,6 +160,31 @@ export default function App() {
     setMediaMode(mode)
     setIsVideoPlaying(playing)
   }, [])
+
+  const clearBackgroundMusic = useCallback(() => {
+    if (previewMusicRef.current) {
+      previewMusicRef.current.pause()
+      previewMusicRef.current.src = ''
+    }
+    if (musicObjectUrlRef.current) {
+      URL.revokeObjectURL(musicObjectUrlRef.current)
+      musicObjectUrlRef.current = null
+    }
+    setBackgroundMusic(null)
+  }, [])
+
+  const handleUploadMusic = (file) => {
+    if (musicObjectUrlRef.current) {
+      URL.revokeObjectURL(musicObjectUrlRef.current)
+    }
+    const url = URL.createObjectURL(file)
+    musicObjectUrlRef.current = url
+    setBackgroundMusic({ name: file.name, url })
+  }
+
+  const handleRemoveMusic = () => {
+    clearBackgroundMusic()
+  }
 
   const handleUploadImage = async (file) => {
     clearMedia()
@@ -317,6 +346,7 @@ export default function App() {
   const handleExportVideo = async () => {
     setBusy(true)
     setStatus('Exporting video…')
+    if (previewMusicRef.current) previewMusicRef.current.pause()
     try {
       await exportAdAsVideo({
         width: format.width,
@@ -328,6 +358,8 @@ export default function App() {
         mediaOffsetY: mediaTransform.offsetY,
         text,
         mediaMode,
+        backgroundMusicUrl: backgroundMusic?.url ?? null,
+        musicVolume,
         filename: `native-ad-${formatId}.webm`,
         onProgress: (pct) => setStatus(`Exporting video… ${pct}%`),
       })
@@ -336,6 +368,9 @@ export default function App() {
       setStatus(err?.message || 'Video export failed')
     } finally {
       setBusy(false)
+      if (canExportVideo && backgroundMusic?.url && previewMusicRef.current) {
+        previewMusicRef.current.play().catch(() => {})
+      }
     }
   }
 
@@ -379,7 +414,30 @@ export default function App() {
     return () => window.removeEventListener('saas-theme-change', onThemeChange)
   }, [])
 
-  useEffect(() => () => clearMedia(), [clearMedia])
+  useEffect(() => () => {
+    clearMedia()
+    clearBackgroundMusic()
+  }, [clearMedia, clearBackgroundMusic])
+
+  useEffect(() => {
+    if (!canExportVideo || !backgroundMusic?.url) {
+      if (previewMusicRef.current) {
+        previewMusicRef.current.pause()
+      }
+      return undefined
+    }
+
+    const audio = previewMusicRef.current ?? new Audio()
+    previewMusicRef.current = audio
+    audio.src = backgroundMusic.url
+    audio.loop = true
+    audio.volume = musicVolume
+    audio.play().catch(() => {})
+
+    return () => {
+      audio.pause()
+    }
+  }, [canExportVideo, backgroundMusic?.url, musicVolume])
 
   return (
     <div className="nag-app">
@@ -444,6 +502,12 @@ export default function App() {
                   mediaScale={mediaTransform.scale}
                   onMediaScaleChange={(scale) => setMediaTransform((p) => ({ ...p, scale }))}
                   onResetTransform={handleResetTransform}
+                  isVideoBackground={canExportVideo}
+                  backgroundMusic={backgroundMusic}
+                  musicVolume={musicVolume}
+                  onUploadMusic={handleUploadMusic}
+                  onRemoveMusic={handleRemoveMusic}
+                  onMusicVolumeChange={setMusicVolume}
                 />
                 <section className="nag-panel-section nag-panel-embedded">
                   <div className="nag-field-group">

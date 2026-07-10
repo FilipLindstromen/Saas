@@ -63,3 +63,33 @@
   font-size: 0.8rem;
   color: var(--error);
 }
+
+.nag-music-group {
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.nag-music-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nag-music-row .nag-btn {
+  flex: 1;
+}
+
+.nag-music-remove {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 5rem;
+}
+
+.nag-music-name {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

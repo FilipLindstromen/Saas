@@ -17,10 +17,17 @@ export default function MediaControls({
   mediaScale,
   onMediaScaleChange,
   onResetTransform,
+  isVideoBackground = false,
+  backgroundMusic,
+  musicVolume = 0.8,
+  onUploadMusic,
+  onRemoveMusic,
+  onMusicVolumeChange,
   embedded = false,
 }) {
   const imageInputRef = useRef(null)
   const videoInputRef = useRef(null)
+  const musicInputRef = useRef(null)
   const [error, setError] = useState(null)
 
   const handleImageFile = (e) => {
@@ -44,6 +51,18 @@ export default function MediaControls({
     }
     setError(null)
     onUploadVideo(file)
+    e.target.value = ''
+  }
+
+  const handleMusicFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('audio/')) {
+      setError('Please choose an audio file.')
+      return
+    }
+    setError(null)
+    onUploadMusic?.(file)
     e.target.value = ''
   }
 
@@ -102,6 +121,41 @@ export default function MediaControls({
 
       <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageFile} />
       <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={handleVideoFile} />
+      <input ref={musicInputRef} type="file" accept="audio/*" hidden onChange={handleMusicFile} />
+
+      {isVideoBackground && (
+        <div className="nag-field-group nag-music-group">
+          <label className="nag-label">Background music</label>
+          <div className="nag-music-row">
+            <button type="button" className="nag-btn" onClick={() => musicInputRef.current?.click()}>
+              {backgroundMusic ? 'Replace music' : 'Upload music'}
+            </button>
+            {backgroundMusic && (
+              <button type="button" className="nag-btn nag-btn-ghost nag-music-remove" onClick={onRemoveMusic}>
+                Remove
+              </button>
+            )}
+          </div>
+          {backgroundMusic && (
+            <>
+              <p className="nag-music-name" title={backgroundMusic.name}>{backgroundMusic.name}</p>
+              <label className="nag-label">
+                Music volume
+                <span className="nag-label-value">{Math.round(musicVolume * 100)}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={musicVolume}
+                onChange={(e) => onMusicVolumeChange?.(parseFloat(e.target.value))}
+              />
+              <p className="nag-hint">Music is mixed into the exported video. Loops if shorter than the clip.</p>
+            </>
+          )}
+        </div>
+      )}
 
       {hasMedia && (
         <div className="nag-field-group">

@@ -3,6 +3,8 @@ import { drawAd } from './adCompositor'
 const FPS = 30
 
 const MIME_CANDIDATES = [
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
   'video/webm',
@@ -41,6 +43,78 @@ function getExportDuration(video, mediaMode) {
   return Math.min(duration, 60)
 }
 
+function waitForAudioReady(audio) {
+  if (audio.readyState >= 3) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const onReady = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('Failed to load background music'))
+    }
+    const cleanup = () => {
+      audio.removeEventListener('canplaythrough', onReady)
+      audio.removeEventListener('error', onError)
+    }
+    audio.addEventListener('canplaythrough', onReady)
+    audio.addEventListener('error', onError)
+  })
+}
+
+async function setupExportAudio({ video, backgroundMusicUrl, musicVolume = 0.8 }) {
+  const audioContext = new AudioContext()
+  if (audioContext.state === 'suspended') await audioContext.resume()
+
+  const destination = audioContext.createMediaStreamDestination()
+  const nodes = []
+  let musicAudio = null
+
+  const sourceStream = video.captureStream?.() ?? video.mozCaptureStream?.()
+  const videoAudioTracks = sourceStream?.getAudioTracks() ?? []
+  if (videoAudioTracks.length) {
+    const videoSource = audioContext.createMediaStreamSource(sourceStream)
+    const videoGain = audioContext.createGain()
+    videoGain.gain.value = backgroundMusicUrl ? 0.25 : 1
+    videoSource.connect(videoGain)
+    videoGain.connect(destination)
+    nodes.push(videoSource, videoGain)
+  }
+
+  if (backgroundMusicUrl) {
+    musicAudio = new Audio(backgroundMusicUrl)
+    musicAudio.loop = true
+    musicAudio.preload = 'auto'
+    await waitForAudioReady(musicAudio)
+    musicAudio.currentTime = 0
+
+    const musicSource = audioContext.createMediaElementSource(musicAudio)
+    const musicGain = audioContext.createGain()
+    musicGain.gain.value = Math.max(0, Math.min(1, musicVolume))
+    musicSource.connect(musicGain)
+    musicGain.connect(destination)
+    nodes.push(musicSource, musicGain)
+    await musicAudio.play().catch(() => {})
+  }
+
+  const hasAudio = (destination.stream.getAudioTracks().length > 0)
+
+  return {
+    stream: destination.stream,
+    hasAudio,
+    cleanup: async () => {
+      if (musicAudio) {
+        musicAudio.pause()
+        musicAudio.src = ''
+      }
+      nodes.forEach((node) => node.disconnect?.())
+      if (sourceStream) sourceStream.getTracks().forEach((t) => t.stop())
+      await audioContext.close().catch(() => {})
+    },
+  }
+}
+
 /**
  * Record composed ad frames to a downloadable WebM video.
  */
@@ -54,6 +128,8 @@ export async function exportAdAsVideo({
   mediaOffsetY,
   text,
   mediaMode,
+  backgroundMusicUrl = null,
+  musicVolume = 0.8,
   filename = 'native-ad.webm',
   onProgress,
 }) {
@@ -73,11 +149,13 @@ export async function exportAdAsVideo({
 
   const wasLooping = video.loop
   const wasMuted = video.muted
+  const wasVolume = video.volume
   const savedTime = video.currentTime
   const wasPaused = video.paused
 
   video.loop = false
-  video.muted = true
+  video.muted = false
+  video.volume = 0
 
   await waitForMetadata(video)
   const duration = getExportDuration(video, mediaMode)
@@ -89,21 +167,22 @@ export async function exportAdAsVideo({
   const combined = new MediaStream()
   combined.addTrack(canvasStream.getVideoTracks()[0])
 
-  const sourceStream = video.captureStream?.() ?? video.mozCaptureStream?.()
-  if (sourceStream) {
-    sourceStream.getAudioTracks().forEach((track) => combined.addTrack(track))
+  const exportAudio = await setupExportAudio({ video, backgroundMusicUrl, musicVolume })
+  if (exportAudio.hasAudio) {
+    exportAudio.stream.getAudioTracks().forEach((track) => combined.addTrack(track))
   }
 
   const mimeType = pickMimeType()
   const chunks = []
 
-  const restoreVideo = () => {
+  const restoreVideo = async () => {
     video.loop = wasLooping
     video.muted = wasMuted
+    video.volume = wasVolume
     video.currentTime = savedTime
     if (!wasPaused) video.play().catch(() => {})
     canvasStream.getTracks().forEach((t) => t.stop())
-    if (sourceStream) sourceStream.getTracks().forEach((t) => t.stop())
+    await exportAudio.cleanup()
   }
 
   return new Promise((resolve, reject) => {
@@ -115,7 +194,7 @@ export async function exportAdAsVideo({
         audioBitsPerSecond: 128_000,
       })
     } catch (err) {
-      restoreVideo()
+      restoreVideo().catch(() => {})
       reject(err instanceof Error ? err : new Error('Failed to start recorder'))
       return
     }
@@ -124,11 +203,11 @@ export async function exportAdAsVideo({
       if (e.data.size) chunks.push(e.data)
     }
     recorder.onerror = () => {
-      restoreVideo()
+      restoreVideo().catch(() => {})
       reject(new Error('Recording failed'))
     }
     recorder.onstop = () => {
-      restoreVideo()
+      restoreVideo().catch(() => {})
       if (!chunks.length) {
         reject(new Error('Export produced no data'))
         return

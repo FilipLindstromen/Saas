@@ -785,9 +785,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setPendingIndex(nextIndex)
       pendingDirectionRef.current = 1
 
-      if (transitionStyle === 'crossfade' && !sameBg) {
-        // Crossfade: one bg fades out while next fades in (simultaneous)
-        setTransitionPhase('crossfade')
+      if (!sameBg) {
+        // Overlapping dual-layer background transition (out + in at once) — avoids flash/gap between slides
+        setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         setTimeout(() => {
           setCurrentIndex(nextIndex)
@@ -800,23 +800,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phaseDuration)
       } else if (sameBg) {
         // Same bg, different position/scale: text transition only, bg animates position/scale
-        setTransitionPhase('fade-out')
-        const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
-        setTimeout(() => {
-          setCurrentIndex(nextIndex)
-          setSlideKey(k => k + 1)
-          setPendingIndex(null)
-          setTransitionPhase('fade-in')
-
-          setTimeout(() => {
-            setTransitionPhase('idle')
-            setIsWebcamSlidingOff(false)
-            setIsWebcamSlidingIn(false)
-            setIsTransitioning(false)
-          }, transitionDuration)
-        }, phase1Duration)
-      } else {
-        // Two-phase transition (text out + background out, then switch, then in)
         setTransitionPhase('fade-out')
         const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         setTimeout(() => {
@@ -899,8 +882,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setPendingIndex(prevIndex)
       pendingDirectionRef.current = -1
 
-      if (transitionStyle === 'crossfade' && !sameBg) {
-        setTransitionPhase('crossfade')
+      if (!sameBg) {
+        setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         setTimeout(() => {
           setCurrentIndex(prevIndex)
@@ -912,22 +895,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           setIsTransitioning(false)
         }, phaseDuration)
       } else if (sameBg) {
-        setTransitionPhase('fade-out')
-        const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
-        setTimeout(() => {
-          setCurrentIndex(prevIndex)
-          setSlideKey(k => k + 1)
-          setPendingIndex(null)
-          setTransitionPhase('fade-in')
-
-          setTimeout(() => {
-            setTransitionPhase('idle')
-            setIsWebcamSlidingOff(false)
-            setIsWebcamSlidingIn(false)
-            setIsTransitioning(false)
-          }, phase1Duration)
-        }, phase1Duration)
-      } else {
         setTransitionPhase('fade-out')
         const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         setTimeout(() => {
@@ -1387,6 +1354,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const sameBgNoTransition = targetSlide && sameBackground(currentSlide, targetSlide)
   // Use target slide for background during transition so position/scale animates smoothly from current to target
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
+  const backgroundTransitionActive = transitionPhase === 'background-transition' && pendingIndex != null && !sameBgNoTransition
   const transitionDurationMs = getTransitionDuration(transitionStyle)
 
   return (
@@ -1407,45 +1375,21 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         aria-hidden="true"
       />
       {/* Layer 1: Background image/video - transition applied here (not webcam). Skip when same bg (pos/scale animates) */}
-      {transitionPhase === 'crossfade' && pendingIndex != null && presentationSlides[pendingIndex] && !sameBgNoTransition ? (
-        /* Crossfade: both layers in same container so they fade at exactly the same time */
-        <div className="play-crossfade-container" aria-hidden="true">
+      {backgroundTransitionActive && presentationSlides[pendingIndex] ? (
+        /* Dual-layer: outgoing and incoming backgrounds animate simultaneously (no gap/flash) */
+        <div className={`play-crossfade-container play-bg-dual-layer transition-${transitionStyle}`} aria-hidden="true">
           <div
             className="play-crossfade-layer play-crossfade-out"
             style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
           >
-            {usePersistentVideo && videoSlideForLayer && (
-              <PersistentVideoLayer
-                videoSlide={videoSlideForLayer}
-                layout={videoLayoutForLayer}
-                isSlidingOff={false}
-                isSlidingIn={false}
-                canvasSize={canvasSize}
-                recordSettings={recordSettings}
-              />
-            )}
-            {usePersistentBackground && (
-              <div className="play-background-layer" aria-hidden="true">
-                <SlideBackground
-                  slide={currentSlide}
-                  backgroundScaleAnimation={backgroundScaleAnimation}
-                  backgroundScaleTime={backgroundScaleTime}
-                  backgroundScaleAmount={backgroundScaleAmount}
-                  isPreload={false}
-                  isPlayMode={true}
-                />
-              </div>
-            )}
-            {!usePersistentVideo && !usePersistentBackground && (
-              <SlideBackground
-                slide={currentSlide}
-                backgroundScaleAnimation={backgroundScaleAnimation}
-                backgroundScaleTime={backgroundScaleTime}
-                backgroundScaleAmount={backgroundScaleAmount}
-                isPreload={false}
-                isPlayMode={true}
-              />
-            )}
+            <SlideBackground
+              slide={currentSlide}
+              backgroundScaleAnimation={backgroundScaleAnimation}
+              backgroundScaleTime={backgroundScaleTime}
+              backgroundScaleAmount={backgroundScaleAmount}
+              isPreload={false}
+              isPlayMode={true}
+            />
           </div>
           <div
             className="play-crossfade-layer play-crossfade-in"
@@ -1518,7 +1462,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       {/* Content layer: transition on background (not webcam); text-out before new text in */}
       <div 
         key={slideKey}
-        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''} ${transitionPhase === 'fade-out' ? 'fade-out text-out' : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''} ${transitionPhase === 'crossfade' ? 'crossfade-out text-out' : ''}`}
+        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''} ${transitionPhase === 'fade-out' ? 'fade-out text-out' : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''} ${backgroundTransitionActive ? 'text-out' : ''}`}
         style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
       >
         <Slide 
@@ -1529,7 +1473,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
           isPreload={false}
-          hideBackground={usePersistentBackground || usePersistentVideo || (transitionPhase === 'crossfade' && pendingIndex != null && !sameBgNoTransition)}
+          hideBackground={usePersistentBackground || usePersistentVideo || backgroundTransitionActive}
           hideGradient={usePersistentGradient}
         />
       </div>
