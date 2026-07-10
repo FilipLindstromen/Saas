@@ -20,26 +20,42 @@ import {
   renderAdToCanvas,
 } from './utils/adCompositor'
 import { exportAdAsVideo, isVideoBackgroundMode } from './utils/videoExport'
+import {
+  clearPersistedMedia,
+  clearPersistedMusic,
+  loadProject,
+  persistMediaSource,
+  persistMusicSource,
+  saveProject,
+} from './utils/projectStorage'
+import { restoreMediaFromPersisted, restoreMusicFromPersisted } from './utils/restoreMedia'
 import './App.css'
+
+const initialProject = typeof window !== 'undefined' ? loadProject() : null
+
+function mergeText(saved) {
+  return { ...DEFAULT_TEXT, ...(saved && typeof saved === 'object' ? saved : {}) }
+}
 
 const saasAppsUrl = typeof window !== 'undefined'
   ? new URL('../index.html', window.location.href).href
   : '/index.html'
 
-function loadImageFromFile(file) {
+function loadImageFromBlob(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve(img)
-    }
+    img.onload = () => resolve({ img, url })
     img.onerror = () => {
       URL.revokeObjectURL(url)
       reject(new Error('Failed to load image'))
     }
     img.src = url
   })
+}
+
+function loadImageFromFile(file) {
+  return loadImageFromBlob(file).then(({ img }) => img)
 }
 
 function loadImageFromUrl(url) {
@@ -110,12 +126,20 @@ export default function App() {
   const videoObjectUrlRef = useRef(null)
   const musicObjectUrlRef = useRef(null)
   const previewMusicRef = useRef(null)
+  const persistedMediaRef = useRef(initialProject?.media ?? null)
+  const persistedMusicRef = useRef(initialProject?.music ?? null)
+  const [persistReady, setPersistReady] = useState(false)
 
   const [theme, setThemeState] = useState(() => getTheme())
-  const [formatId, setFormatId] = useState('landscape')
-  const [backgroundColor, setBackgroundColor] = useState('#000000')
-  const [text, setText] = useState(DEFAULT_TEXT)
-  const [mediaTransform, setMediaTransform] = useState(DEFAULT_MEDIA)
+  const [formatId, setFormatId] = useState(initialProject?.formatId || 'landscape')
+  const [backgroundColor, setBackgroundColor] = useState(initialProject?.backgroundColor || '#000000')
+  const [text, setText] = useState(() => mergeText(initialProject?.text))
+  const [mediaTransform, setMediaTransform] = useState({
+    ...DEFAULT_MEDIA,
+    ...(initialProject?.mediaTransform && typeof initialProject.mediaTransform === 'object'
+      ? initialProject.mediaTransform
+      : {}),
+  })
   const [mediaMode, setMediaMode] = useState(null)
   const [mediaElement, setMediaElement] = useState(null)
   const [webcamActive, setWebcamActive] = useState(false)
@@ -124,14 +148,14 @@ export default function App() {
   const [unsplashOpen, setUnsplashOpen] = useState(false)
   const [pexelsOpen, setPexelsOpen] = useState(false)
   const [backgroundMusic, setBackgroundMusic] = useState(null)
-  const [musicVolume, setMusicVolume] = useState(0.8)
+  const [musicVolume, setMusicVolume] = useState(initialProject?.musicVolume ?? 0.8)
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [analysis, setAnalysis] = useState(null)
-  const [versions, setVersions] = useState([])
-  const [sidebarTab, setSidebarTab] = useState('format')
+  const [analysis, setAnalysis] = useState(initialProject?.analysis ?? null)
+  const [versions, setVersions] = useState(Array.isArray(initialProject?.versions) ? initialProject.versions : [])
+  const [sidebarTab, setSidebarTab] = useState(initialProject?.sidebarTab || 'format')
 
   const format = FORMATS[formatId] || FORMATS.landscape
   const aspectRatio = `${format.width} / ${format.height}`
@@ -152,6 +176,8 @@ export default function App() {
     setWebcamPhotoPreview(false)
     setIsVideoPlaying(false)
     setMediaMode(null)
+    persistedMediaRef.current = null
+    clearPersistedMedia()
   }, [])
 
   const setMedia = useCallback((element, mode, { playing = false } = {}) => {
@@ -171,15 +197,36 @@ export default function App() {
       musicObjectUrlRef.current = null
     }
     setBackgroundMusic(null)
+    persistedMusicRef.current = null
+    clearPersistedMusic()
   }, [])
 
-  const handleUploadMusic = (file) => {
+  const storeMediaPersist = async (mode, source) => {
+    try {
+      persistedMediaRef.current = await persistMediaSource(mode, source)
+    } catch (err) {
+      console.warn('Native Ads Generator: could not persist media', err)
+      if (mode === 'pexels-video' && source.externalUrl) {
+        persistedMediaRef.current = { mode, externalUrl: source.externalUrl }
+      } else {
+        persistedMediaRef.current = null
+      }
+    }
+  }
+
+  const handleUploadMusic = async (file) => {
     if (musicObjectUrlRef.current) {
       URL.revokeObjectURL(musicObjectUrlRef.current)
     }
     const url = URL.createObjectURL(file)
     musicObjectUrlRef.current = url
     setBackgroundMusic({ name: file.name, url })
+    try {
+      persistedMusicRef.current = await persistMusicSource(file)
+    } catch (err) {
+      console.warn('Native Ads Generator: could not persist music', err)
+      persistedMusicRef.current = null
+    }
   }
 
   const handleRemoveMusic = () => {
@@ -188,14 +235,17 @@ export default function App() {
 
   const handleUploadImage = async (file) => {
     clearMedia()
-    const img = await loadImageFromFile(file)
+    const { img, url } = await loadImageFromBlob(file)
+    await storeMediaPersist('upload-image', { blob: file, fileName: file.name })
     setMedia(img, 'upload-image')
+    URL.revokeObjectURL(url)
   }
 
   const handleUploadVideo = async (file) => {
     clearMedia()
     const { video, url } = await loadVideoFromFile(file)
     videoObjectUrlRef.current = url
+    await storeMediaPersist('upload-video', { blob: file, fileName: file.name })
     setMedia(video, 'upload-video', { playing: true })
   }
 
@@ -211,6 +261,7 @@ export default function App() {
         webcamStreamRef.current = null
       }
       setWebcamPhotoPreview(false)
+      await storeMediaPersist('webcam-photo', { dataUrl: img.src })
       setMedia(img, 'webcam-photo')
       return
     }
@@ -250,6 +301,7 @@ export default function App() {
   const handleUnsplashSelect = async (dataUrl) => {
     clearMedia()
     const img = await loadImageFromUrl(dataUrl)
+    await storeMediaPersist('unsplash', { dataUrl })
     setMedia(img, 'unsplash')
     setUnsplashOpen(false)
   }
@@ -258,6 +310,7 @@ export default function App() {
     clearMedia()
     const { video, url } = await loadVideoFromUrl(videoUrl)
     videoObjectUrlRef.current = url
+    await storeMediaPersist('pexels-video', { externalUrl: videoUrl })
     setMedia(video, 'pexels-video', { playing: true })
     setPexelsOpen(false)
   }
@@ -405,6 +458,72 @@ export default function App() {
   }, [theme])
 
   useEffect(() => initThemeSync(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        if (persistedMediaRef.current) {
+          const restored = await restoreMediaFromPersisted(persistedMediaRef.current)
+          if (!cancelled && restored) {
+            if (restored.url) videoObjectUrlRef.current = restored.url
+            mediaElementRef.current = restored.element
+            setMediaElement(restored.element)
+            setMediaMode(restored.mode)
+            setIsVideoPlaying(restored.playing)
+          }
+        }
+        if (persistedMusicRef.current) {
+          const music = await restoreMusicFromPersisted(persistedMusicRef.current)
+          if (!cancelled && music) {
+            musicObjectUrlRef.current = music.url
+            setBackgroundMusic(music)
+          }
+        }
+      } catch (err) {
+        console.warn('Native Ads Generator: failed to restore saved project', err)
+      } finally {
+        if (!cancelled) {
+          setPersistReady(true)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!persistReady) return undefined
+    const timer = window.setTimeout(() => {
+      saveProject({
+        formatId,
+        backgroundColor,
+        text,
+        mediaTransform,
+        media: persistedMediaRef.current,
+        music: persistedMusicRef.current,
+        musicVolume,
+        sidebarTab,
+        analysis,
+        versions,
+      })
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [
+    persistReady,
+    formatId,
+    backgroundColor,
+    text,
+    mediaTransform,
+    mediaMode,
+    mediaElement,
+    backgroundMusic,
+    musicVolume,
+    sidebarTab,
+    analysis,
+    versions,
+  ])
 
   useEffect(() => {
     const onThemeChange = (e) => {
