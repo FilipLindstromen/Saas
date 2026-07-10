@@ -139,6 +139,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/InfoGraphics/
           cp -r dist ../deploy/InfoGraphics
 
+      - name: Build Native Ads Generator
+        run: |
+          cd NativeAdsGenerator
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/NativeAdsGenerator/
+          cp -r dist ../deploy/NativeAdsGenerator
+
       - name: Copy CrimeScene
         run: cp -r CrimeScene deploy/CrimeScene
 
