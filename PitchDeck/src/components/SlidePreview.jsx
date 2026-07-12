@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import Slide from './Slide'
+import { normalizeWebcamSizePercent } from '../utils/webcamSize'
 import ImagePicker from './ImagePicker'
 import VideoPicker from './VideoPicker'
 import InfographicPicker from './InfographicPicker'
@@ -411,6 +412,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             h3FontFamily={h3FontFamily}
             webcamEnabled={safeRecordSettings.webcamEnabled}
             selectedCameraId={safeRecordSettings.selectedCameraId}
+            webcamSize={normalizeWebcamSizePercent(safeRecordSettings.webcamSize)}
             webcamFlipHorizontal={safeRecordSettings.webcamFlipHorizontal === true}
             webcamFlipVertical={safeRecordSettings.webcamFlipVertical === true}
             videoBrightness={typeof safeRecordSettings.videoBrightness === 'number' ? safeRecordSettings.videoBrightness : 1}

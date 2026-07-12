@@ -1,5 +1,6 @@
 /** Normalize slide object with default layout and numeric props (load/import). */
 export function normalizeSlide(slide) {
+  if (!slide || typeof slide !== 'object') return null
   return {
     ...slide,
     layout: slide.layout || 'default',
@@ -16,5 +17,8 @@ export function normalizeSlide(slide) {
     backgroundColorOverride: slide.backgroundColorOverride === true,
     backgroundColorOverrideValue: slide.backgroundColorOverrideValue ?? undefined,
     graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : [],
+    backgroundVideoUrl: slide.backgroundVideoUrl || '',
+    webcamEnabled: slide.webcamEnabled === true,
+    selectedCameraId: slide.selectedCameraId || '',
   }
 }

@@ -16,6 +16,7 @@ import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
 import { formatTimeAgo } from './utils/formatTimeAgo'
 import { normalizeSlide } from './utils/normalizeSlide'
+import { normalizeWebcamSizePercent } from './utils/webcamSize'
 import { useUndoRedo } from './hooks/useUndoRedo'
 import './App.css'
 
@@ -261,7 +262,7 @@ function App() {
         const parsed = JSON.parse(saved)
         return {
           ...parsed,
-          webcamSize: parsed.webcamSize || 'large',
+          webcamSize: normalizeWebcamSizePercent(parsed.webcamSize),
           webcamFlipHorizontal: parsed.webcamFlipHorizontal === true,
           webcamFlipVertical: parsed.webcamFlipVertical === true,
           recordingFileFormat: parsed.recordingFileFormat || 'webm-vp9',
@@ -280,7 +281,7 @@ function App() {
     return {
       recordInPresentMode: false,
       webcamEnabled: false,
-      webcamSize: 'large',
+      webcamSize: 20,
       webcamFlipHorizontal: false,
       webcamFlipVertical: false,
       selectedCameraId: '',
@@ -693,7 +694,7 @@ function App() {
     recordSettings,
   }), [slides, selectedSlideId, chapters, currentChapterId, settings, recordSettings])
 
-  const { saveToHistory, undo, redo, historyIndex, canUndo, canRedo } = useUndoRedo(historySnapshot, restoreHistoryState)
+  const { saveToHistory, resetHistory, undo, redo, historyIndex, canUndo, canRedo } = useUndoRedo(historySnapshot, restoreHistoryState)
 
   // Keep latest state in ref so debounced updateSlide save uses current state
   useEffect(() => {
@@ -903,6 +904,23 @@ function App() {
     saveToHistory({ slides: newSlides, selectedSlideId: newSelected, chapters: newChapters, currentChapterId, settings, recordSettings })
   }
 
+  const deleteSlides = (ids) => {
+    const idsToDelete = new Set(Array.isArray(ids) ? ids : [ids])
+    if (idsToDelete.size === 0) return
+    const newSlides = slides.filter(s => !idsToDelete.has(s.id))
+    if (newSlides.length === 0) return
+    let newSelected = selectedSlideId
+    if (idsToDelete.has(selectedSlideId)) {
+      const firstRemaining = newSlides.find(s => s.layout !== 'section') || newSlides[0]
+      newSelected = firstRemaining?.id ?? null
+    }
+    const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: newSlides } : c)
+    setSlides(newSlides)
+    setSelectedSlideId(newSelected)
+    setChapters(newChapters)
+    saveToHistory({ slides: newSlides, selectedSlideId: newSelected, chapters: newChapters, currentChapterId, settings, recordSettings })
+  }
+
   const duplicateSlide = (id) => {
     const slideToDuplicate = slides.find(s => s.id === id)
     if (!slideToDuplicate) return
@@ -996,13 +1014,10 @@ function App() {
       if (e.key === 'Delete' && !isInputFocused && mode === 'edit') {
         e.preventDefault()
         if (selectedSlides.size > 0) {
-          // Delete multiple selected slides
           const slidesToDelete = Array.from(selectedSlides)
-          slidesToDelete.forEach(id => {
-            if (slides.length > 1) {
-              deleteSlide(id)
-            }
-          })
+          if (slides.length - slidesToDelete.length >= 1) {
+            deleteSlides(slidesToDelete)
+          }
           setSelectedSlides(new Set())
         } else if (selectedSlideId) {
           deleteSlide(selectedSlideId)
@@ -1258,29 +1273,34 @@ function App() {
   // Load project data (from overview Open, or after file read). Same shape as export.
   const loadProjectFromData = useCallback((importData) => {
     if (!importData) return
+    let normalizedChapters = []
+    let nextChapterId = 1
     if (importData.chapters && Array.isArray(importData.chapters)) {
-      const normalizedChapters = importData.chapters.map(ch => ({
+      normalizedChapters = importData.chapters.map(ch => ({
         ...ch,
-        slides: (ch.slides || []).map(normalizeSlide)
+        slides: (ch.slides || []).map(normalizeSlide).filter(Boolean)
       }))
+      nextChapterId = importData.currentChapterId || importData.chapters[0]?.id || 1
       setChapters(normalizedChapters)
-      setCurrentChapterId(importData.currentChapterId || importData.chapters[0]?.id || 1)
+      setCurrentChapterId(nextChapterId)
     } else if (importData.slides && Array.isArray(importData.slides)) {
-      const slidesWithLayout = importData.slides.map(normalizeSlide)
-      setChapters([{ id: 1, name: 'Chapter 1', slides: slidesWithLayout }])
+      const slidesWithLayout = importData.slides.map(normalizeSlide).filter(Boolean)
+      normalizedChapters = [{ id: 1, name: 'Chapter 1', slides: slidesWithLayout }]
+      nextChapterId = 1
+      setChapters(normalizedChapters)
       setCurrentChapterId(1)
     } else return
-    const chaptersToUse = importData.chapters && Array.isArray(importData.chapters)
-      ? importData.chapters.map(ch => ({ ...ch, slides: (ch.slides || []).map(normalizeSlide) }))
-      : [{ id: 1, name: 'Chapter 1', slides: (importData.slides || []).map(normalizeSlide) }]
-    const currentChapter = chaptersToUse.find(c => c.id === (importData.currentChapterId || chaptersToUse[0]?.id))
-    const slidesToLoad = currentChapter ? currentChapter.slides : (importData.slides || []).map(normalizeSlide)
-    const slidesWithLayout = Array.isArray(slidesToLoad) ? slidesToLoad : []
+
+    const currentChapter = normalizedChapters.find(c => c.id === nextChapterId) ?? normalizedChapters[0]
+    const slidesWithLayout = currentChapter?.slides ?? []
     setSlides(slidesWithLayout)
     const validSelectedId = slidesWithLayout.find(s => s.id === importData.selectedSlideId)
       ? importData.selectedSlideId
       : slidesWithLayout[0]?.id || 1
     setSelectedSlideId(validSelectedId)
+
+    const nextSettings = importData.settings ? { ...settings, ...importData.settings } : settings
+    const nextRecordSettings = importData.recordSettings ? { ...recordSettings, ...importData.recordSettings } : recordSettings
     if (importData.settings) {
       setSettings(prev => ({ ...prev, ...importData.settings }))
     }
@@ -1288,7 +1308,16 @@ function App() {
     if (importData.inspectorWidth !== undefined) setInspectorWidth(importData.inspectorWidth)
     if (importData.projectName !== undefined) setProjectName(importData.projectName)
     if (importData.recordSettings) setRecordSettings(importData.recordSettings)
-  }, [])
+
+    resetHistory({
+      slides: slidesWithLayout,
+      selectedSlideId: validSelectedId,
+      chapters: normalizedChapters,
+      currentChapterId: nextChapterId,
+      settings: nextSettings,
+      recordSettings: nextRecordSettings,
+    })
+  }, [resetHistory, settings, recordSettings])
 
   // On mount: if connected folder has project newer than browser, load from folder
   useEffect(() => {
@@ -1359,76 +1388,19 @@ function App() {
           return
         }
 
-        // Ensure all slides have required properties (for current chapter)
-        const currentChapter = importData.chapters 
-          ? importData.chapters.find(c => c.id === (importData.currentChapterId || importData.chapters[0]?.id))
-          : null
-        const slidesToLoad = currentChapter 
-          ? currentChapter.slides 
-          : (importData.slides || [])
-        
-        const slidesWithLayout = slidesToLoad.map(slide => ({
-          ...slide,
-          layout: slide.layout || 'default',
-          gradientStrength: slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7,
-          flipHorizontal: slide.flipHorizontal !== undefined ? slide.flipHorizontal : false,
-          backgroundOpacity: slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6,
-          gradientFlipped: slide.gradientFlipped !== undefined ? slide.gradientFlipped : false,
-          subtitle: slide.subtitle || '',
-          imageScale: slide.imageScale !== undefined ? slide.imageScale : 1.0,
-          imagePositionX: slide.imagePositionX !== undefined ? slide.imagePositionX : 50,
-          imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
-          textHeadingLevel: slide.textHeadingLevel || null,
-          subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-          webcamEnabled: slide.webcamEnabled !== undefined ? slide.webcamEnabled : false,
-          selectedCameraId: slide.selectedCameraId || '',
-        }))
-
-        // Confirm before importing (to avoid losing current work)
         const confirmMessage = `This will replace your current presentation with the imported data. Continue?`
         if (!window.confirm(confirmMessage)) {
-          e.target.value = '' // Reset file input
+          e.target.value = ''
           return
         }
 
-        // Load slides for current chapter
-        setSlides(slidesWithLayout)
-        
-        // Load selected slide ID (validate it exists)
-        const validSelectedId = slidesWithLayout.find(s => s.id === importData.selectedSlideId)
-          ? importData.selectedSlideId
-          : slidesWithLayout[0]?.id || 1
-        setSelectedSlideId(validSelectedId)
+        loadProjectFromData(importData)
 
-        // Load settings if provided (merge with existing to preserve API keys if not in file)
-        if (importData.settings) {
-          setSettings(prevSettings => ({
-            ...prevSettings,
-            ...importData.settings
-          }))
-        }
-
-        // Load sidebar width if provided
-        if (importData.sidebarWidth !== undefined) {
-          setSidebarWidth(importData.sidebarWidth)
-        }
-
-        // Load inspector width if provided
-        if (importData.inspectorWidth !== undefined) {
-          setInspectorWidth(importData.inspectorWidth)
-        }
-
-        // Load project name if provided
-        if (importData.projectName !== undefined) {
-          setProjectName(importData.projectName)
-        }
-
-        // Load record settings if provided
-        if (importData.recordSettings) {
-          setRecordSettings(importData.recordSettings)
-        }
-
-        alert(`Successfully imported ${slidesWithLayout.length} slide(s)!`)
+        const slideCount = importData.chapters?.length
+          ? (importData.chapters.find(c => c.id === (importData.currentChapterId || importData.chapters[0]?.id))?.slides?.length
+            ?? importData.chapters[0]?.slides?.length ?? 0)
+          : (importData.slides?.length ?? 0)
+        alert(`Successfully imported ${slideCount} slide(s)!`)
       } catch (error) {
         console.error('Error importing file:', error)
         alert('Error importing file. Please make sure it is a valid JSON file.')
@@ -1552,6 +1524,9 @@ function App() {
     }
 
     setSlides(updatedSlides)
+    const newChapters = chapters.map(c => c.id === currentChapterId ? { ...c, slides: updatedSlides } : c)
+    setChapters(newChapters)
+    saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
     
     const message = `Image selection complete!\n${successCount} image(s) added successfully.${failCount > 0 ? `\n${failCount} slide(s) could not be processed.` : ''}`
     alert(message)
@@ -1839,15 +1814,30 @@ function App() {
                         onClick={() => {
                           setCurrentWorkspace(workspace.id)
                           localStorage.setItem('pitchDeckCurrentWorkspace', workspace.id)
-                          // Load workspace data
                           const workspaceData = localStorage.getItem(`pitchDeckWorkspace_${workspace.id}`)
                           if (workspaceData) {
                             try {
                               const data = JSON.parse(workspaceData)
                               if (data.chapters) setChapters(data.chapters)
-                              if (data.currentChapterId) setCurrentChapterId(data.currentChapterId)
+                              const chapterId = data.currentChapterId || data.chapters?.[0]?.id || 1
+                              setCurrentChapterId(chapterId)
+                              const chapter = data.chapters?.find(c => c.id === chapterId) ?? data.chapters?.[0]
+                              const chapterSlides = chapter?.slides ?? []
+                              if (chapter) {
+                                setSlides(chapterSlides)
+                                const firstSlide = chapterSlides.find(s => s.layout !== 'section') || chapterSlides[0]
+                                if (firstSlide) setSelectedSlideId(firstSlide.id)
+                              }
                               if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }))
                               if (data.projectName) setProjectName(data.projectName)
+                              resetHistory({
+                                slides: chapterSlides,
+                                selectedSlideId: chapterSlides.find(s => s.layout !== 'section')?.id ?? chapterSlides[0]?.id ?? null,
+                                chapters: data.chapters ?? [],
+                                currentChapterId: chapterId,
+                                settings: data.settings ? { ...settings, ...data.settings } : settings,
+                                recordSettings,
+                              })
                             } catch (e) {
                               console.error('Error loading workspace:', e)
                             }

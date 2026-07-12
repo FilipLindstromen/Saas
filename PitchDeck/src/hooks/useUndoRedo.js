@@ -27,10 +27,20 @@ export function useUndoRedo(currentState, restoreState) {
     const state = stateSnapshot ?? currentState
     setHistory((prevHistory) => {
       const idx = historyIndexRef.current
-      const newHistory = prevHistory.slice(0, idx + 1)
-      return [...newHistory, state]
+      const newHistory = [...prevHistory.slice(0, idx + 1), state]
+      const newIndex = idx + 1
+      historyIndexRef.current = newIndex
+      setHistoryIndex(newIndex)
+      return newHistory
     })
-    setHistoryIndex((prevIndex) => prevIndex + 1)
+  }, [currentState])
+
+  const resetHistory = useCallback((stateSnapshot) => {
+    const state = stateSnapshot ?? currentState
+    initialPushed.current = true
+    historyIndexRef.current = 0
+    setHistory([state])
+    setHistoryIndex(0)
   }, [currentState])
 
   const undo = useCallback(() => {
@@ -53,6 +63,7 @@ export function useUndoRedo(currentState, restoreState) {
     history,
     historyIndex,
     saveToHistory,
+    resetHistory,
     undo,
     redo,
     canUndo: historyIndex > 0,

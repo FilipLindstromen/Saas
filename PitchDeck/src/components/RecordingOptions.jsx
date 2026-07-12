@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { normalizeWebcamSizePercent } from '../utils/webcamSize'
 import './RecordingOptions.css'
 
 function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef, embedded }) {
@@ -6,7 +7,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
   const [localSettings, setLocalSettings] = useState({
     recordInPresentMode: recordSettings?.recordInPresentMode !== undefined ? recordSettings.recordInPresentMode : false,
     webcamEnabled: recordSettings?.webcamEnabled || false,
-    webcamSize: recordSettings?.webcamSize || 'large',
+    webcamSize: normalizeWebcamSizePercent(recordSettings?.webcamSize),
     webcamFlipHorizontal: recordSettings?.webcamFlipHorizontal || false,
     webcamFlipVertical: recordSettings?.webcamFlipVertical || false,
     selectedCameraId: recordSettings?.selectedCameraId || '',
@@ -179,17 +180,21 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
 
           {localSettings.webcamEnabled && (
             <div className="recording-options-field">
-              <label htmlFor="recording-webcam-size-select">Webcam size</label>
-              <select
-                id="recording-webcam-size-select"
-                value={localSettings.webcamSize || 'large'}
-                onChange={(e) => handleChange('webcamSize', e.target.value)}
-                className="recording-options-select"
-              >
-                <option value="small">Small</option>
-                <option value="medium">Medium</option>
-                <option value="large">Large</option>
-              </select>
+              <div className="recording-options-video-adj-row">
+                <label htmlFor="recording-webcam-size-slider">Webcam size</label>
+                <input
+                  id="recording-webcam-size-slider"
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={localSettings.webcamSize}
+                  onChange={(e) => handleChange('webcamSize', parseInt(e.target.value, 10))}
+                  className="recording-options-video-adj-slider"
+                />
+                <span className="recording-options-video-adj-value">{localSettings.webcamSize}%</span>
+              </div>
+              <p className="recording-options-hint">Height of the webcam circle relative to the slide.</p>
             </div>
           )}
 

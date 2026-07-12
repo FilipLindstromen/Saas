@@ -169,7 +169,9 @@ export async function listFromProjectFolder() {
 }
 
 const IMAGES_SUBFOLDER = 'images'
+const VIDEOS_SUBFOLDER = 'videos'
 const SLIDE_IMAGE_PREFIX = 'slide'
+const SLIDE_VIDEO_PREFIX = 'slide-video'
 
 function isEmbeddedOrBlobUrl(url) {
   return typeof url === 'string' && (url.startsWith('data:') || url.startsWith('blob:'))
@@ -181,6 +183,28 @@ function mimeToExt(mime) {
   if (part === 'jpeg' || part === 'jpg') return 'jpg'
   if (part === 'png' || part === 'gif' || part === 'webp' || part === 'avif') return part
   return 'png'
+}
+
+function videoMimeToExt(mime) {
+  if (!mime || !mime.startsWith('video/')) return 'mp4'
+  const part = mime.split('/')[1] || ''
+  if (part.includes('webm')) return 'webm'
+  if (part.includes('quicktime')) return 'mov'
+  if (part.includes('mp4') || part === 'mpeg') return 'mp4'
+  return 'mp4'
+}
+
+async function saveSlideMediaToFolder({ folder, subfolder, filename, blob, imagesDirHandle, videosDirHandle }) {
+  const relativePath = `${subfolder}/${filename}`
+  let dirHandle = subfolder === IMAGES_SUBFOLDER ? imagesDirHandle : videosDirHandle
+  if (!dirHandle) {
+    dirHandle = await folder.handle.getDirectoryHandle(subfolder, { create: true })
+  }
+  const fileHandle = await dirHandle.getFileHandle(filename, { create: true })
+  const writable = await fileHandle.createWritable()
+  await writable.write(blob)
+  await writable.close()
+  return { relativePath, dirHandle }
 }
 
 /**
@@ -218,27 +242,52 @@ export async function saveToProjectFolder(getExportData, projectName) {
   const data = JSON.parse(JSON.stringify(raw))
   const chapters = data.chapters || []
   let imagesDirHandle = null
+  let videosDirHandle = null
   for (const chapter of chapters) {
     const slides = chapter.slides || []
     for (const slide of slides) {
-      const url = slide.imageUrl
-      if (!url || !isEmbeddedOrBlobUrl(url)) continue
-      try {
-        const blob = await urlToBlob(url)
-        const mime = blob.type || 'image/png'
-        const ext = mimeToExt(mime)
-        const imageFilename = `${SLIDE_IMAGE_PREFIX}-${chapter.id}-${slide.id}.${ext}`
-        const relativePath = `${IMAGES_SUBFOLDER}/${imageFilename}`
-        if (!imagesDirHandle) {
-          imagesDirHandle = await folder.handle.getDirectoryHandle(IMAGES_SUBFOLDER, { create: true })
+      const imageUrl = slide.imageUrl
+      if (imageUrl && isEmbeddedOrBlobUrl(imageUrl)) {
+        try {
+          const blob = await urlToBlob(imageUrl)
+          const mime = blob.type || 'image/png'
+          const ext = mimeToExt(mime)
+          const imageFilename = `${SLIDE_IMAGE_PREFIX}-${chapter.id}-${slide.id}.${ext}`
+          const { relativePath, dirHandle } = await saveSlideMediaToFolder({
+            folder,
+            subfolder: IMAGES_SUBFOLDER,
+            filename: imageFilename,
+            blob,
+            imagesDirHandle,
+            videosDirHandle,
+          })
+          imagesDirHandle = dirHandle
+          slide.imageUrl = relativePath
+        } catch (e) {
+          console.warn('Could not save slide image to project folder:', e)
         }
-        const fileHandle = await imagesDirHandle.getFileHandle(imageFilename, { create: true })
-        const writable = await fileHandle.createWritable()
-        await writable.write(blob)
-        await writable.close()
-        slide.imageUrl = relativePath
-      } catch (e) {
-        console.warn('Could not save slide image to project folder:', e)
+      }
+
+      const videoUrl = slide.backgroundVideoUrl
+      if (videoUrl && isEmbeddedOrBlobUrl(videoUrl)) {
+        try {
+          const blob = await urlToBlob(videoUrl)
+          const mime = blob.type || 'video/mp4'
+          const ext = videoMimeToExt(mime)
+          const videoFilename = `${SLIDE_VIDEO_PREFIX}-${chapter.id}-${slide.id}.${ext}`
+          const { relativePath, dirHandle } = await saveSlideMediaToFolder({
+            folder,
+            subfolder: VIDEOS_SUBFOLDER,
+            filename: videoFilename,
+            blob,
+            imagesDirHandle,
+            videosDirHandle,
+          })
+          videosDirHandle = dirHandle
+          slide.backgroundVideoUrl = relativePath
+        } catch (e) {
+          console.warn('Could not save slide video to project folder:', e)
+        }
       }
     }
   }
@@ -260,26 +309,35 @@ export async function resolveProjectImageUrls(data, folderHandle) {
   if (!data || !folderHandle) return data
   const out = JSON.parse(JSON.stringify(data))
   const chapters = out.chapters || []
-  let imagesDirHandle = null
+
+  async function resolveRelativeMediaPath(url, subfolder) {
+    if (!url || typeof url !== 'string') return url
+    const prefixes = [subfolder + '/', './' + subfolder + '/']
+    if (!prefixes.some((p) => url.startsWith(p))) return url
+    const path = url.replace(/^\.\/+/, '')
+    const filename = path.startsWith(subfolder + '/')
+      ? path.slice((subfolder + '/').length)
+      : path.replace(new RegExp(`^${subfolder}/`), '')
+    const parts = [subfolder, filename]
+    try {
+      let dir = folderHandle
+      for (let i = 0; i < parts.length - 1; i++) {
+        dir = await dir.getDirectoryHandle(parts[i], { create: false })
+      }
+      const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: false })
+      const file = await fileHandle.getFile()
+      return URL.createObjectURL(file)
+    } catch (e) {
+      console.warn('Could not resolve project media:', path, e)
+      return url
+    }
+  }
+
   for (const chapter of chapters) {
     const slides = chapter.slides || []
     for (const slide of slides) {
-      const url = slide.imageUrl
-      if (!url || typeof url !== 'string' || (!url.startsWith(IMAGES_SUBFOLDER + '/') && !url.startsWith('./' + IMAGES_SUBFOLDER))) continue
-      const path = url.replace(/^\.\/+/, '')
-      const filename = path.startsWith(IMAGES_SUBFOLDER + '/') ? path.slice((IMAGES_SUBFOLDER + '/').length) : path.replace(/^images\//, '')
-      const parts = [IMAGES_SUBFOLDER, filename]
-      try {
-        let dir = folderHandle
-        for (let i = 0; i < parts.length - 1; i++) {
-          dir = await dir.getDirectoryHandle(parts[i], { create: false })
-        }
-        const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: false })
-        const file = await fileHandle.getFile()
-        slide.imageUrl = URL.createObjectURL(file)
-      } catch (e) {
-        console.warn('Could not resolve project image:', path, e)
-      }
+      slide.imageUrl = await resolveRelativeMediaPath(slide.imageUrl, IMAGES_SUBFOLDER)
+      slide.backgroundVideoUrl = await resolveRelativeMediaPath(slide.backgroundVideoUrl, VIDEOS_SUBFOLDER)
     }
   }
   return out
