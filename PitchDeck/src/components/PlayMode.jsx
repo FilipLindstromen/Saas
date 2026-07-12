@@ -4,6 +4,7 @@ import SlideBackground from './SlideBackground'
 import PersistentVideoLayer from './PersistentVideoLayer'
 import { getWebcamCameraId, isWebcamActiveForSlide, isAnyWebcamActive } from '../utils/webcamSettings'
 import { getWebcamCirclePixelSize, normalizeWebcamSizePercent } from '../utils/webcamSize'
+import { getBackgroundScaleProgress } from '../utils/backgroundFit'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
@@ -619,6 +620,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [pendingIndex, setPendingIndex] = useState(null)
   const pendingDirectionRef = useRef(1) // 1 = next, -1 = prev
   const transitionTimeoutsRef = useRef([])
+  const slideEnteredAtRef = useRef(Date.now())
+  const [frozenBgScale, setFrozenBgScale] = useState({ outgoing: 0, incoming: 0 })
 
   const clearTransitionTimeouts = useCallback(() => {
     transitionTimeoutsRef.current.forEach((id) => clearTimeout(id))
@@ -631,6 +634,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }, [])
 
   useEffect(() => () => clearTransitionTimeouts(), [clearTransitionTimeouts])
+
+  useEffect(() => {
+    slideEnteredAtRef.current = Date.now()
+  }, [currentIndex])
   
   // Recording state
   const [recordingState, setRecordingState] = useState('idle') // 'idle', 'recording', 'stopping'
@@ -806,6 +813,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
       if (!sameBg) {
         // Overlapping dual-layer background transition (out + in at once) — avoids flash/gap between slides
+        const outgoingScale = getBackgroundScaleProgress(Date.now() - slideEnteredAtRef.current, backgroundScaleTime)
+        setFrozenBgScale({ outgoing: outgoingScale, incoming: 0 })
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -813,6 +822,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           setSlideKey(k => k + 1)
           setPendingIndex(null)
           setTransitionPhase('idle')
+          setFrozenBgScale({ outgoing: 0, incoming: 0 })
           setIsWebcamSlidingOff(false)
           setIsWebcamSlidingIn(false)
           setIsTransitioning(false)
@@ -904,6 +914,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       pendingDirectionRef.current = -1
 
       if (!sameBg) {
+        const outgoingScale = getBackgroundScaleProgress(Date.now() - slideEnteredAtRef.current, backgroundScaleTime)
+        setFrozenBgScale({ outgoing: outgoingScale, incoming: 0 })
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -911,6 +923,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           setSlideKey(k => k + 1)
           setPendingIndex(null)
           setTransitionPhase('idle')
+          setFrozenBgScale({ outgoing: 0, incoming: 0 })
           setIsWebcamSlidingOff(false)
           setIsWebcamSlidingIn(false)
           setIsTransitioning(false)
@@ -1373,7 +1386,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   // Use target slide for background during same-bg transition so position/scale animates smoothly
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
   const backgroundSlideForLayer = backgroundTransitionActive && targetSlide ? targetSlide : backgroundSlideForPosScale
-  const pauseBackgroundScale = backgroundTransitionActive
   const transitionDurationMs = getTransitionDuration(transitionStyle)
 
   return (
@@ -1413,9 +1425,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           >
             <SlideBackground
               slide={currentSlide}
-              backgroundScaleAnimation={false}
+              backgroundScaleAnimation={backgroundScaleAnimation}
               backgroundScaleTime={backgroundScaleTime}
               backgroundScaleAmount={backgroundScaleAmount}
+              frozenScaleProgress={frozenBgScale.outgoing}
               isPreload={false}
               isPlayMode={true}
             />
@@ -1432,9 +1445,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           >
             <SlideBackground
               slide={backgroundSlideForLayer}
-              backgroundScaleAnimation={backgroundScaleAnimation && !pauseBackgroundScale}
+              backgroundScaleAnimation={backgroundScaleAnimation}
               backgroundScaleTime={backgroundScaleTime}
               backgroundScaleAmount={backgroundScaleAmount}
+              frozenScaleProgress={backgroundTransitionActive ? frozenBgScale.incoming : null}
               isPreload={false}
               isPlayMode={true}
             />

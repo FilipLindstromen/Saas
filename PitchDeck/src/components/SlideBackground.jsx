@@ -5,7 +5,9 @@ import {
   getImageBackgroundSize,
   getBackgroundScaleAnimationVars,
   getVideoBackgroundStyle,
+  getFrozenBackgroundScaleSize,
   isImageScaleCustomized,
+  shouldAnimateBackgroundScale,
 } from '../utils/backgroundFit'
 import './Slide.css'
 
@@ -14,7 +16,7 @@ import './Slide.css'
  * Used in PlayMode when consecutive slides share the same background - we keep this layer visible
  * and only fade the content to avoid redundant background fade in/out.
  */
-function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, isPreload = false, isPlayMode = false }) {
+function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
@@ -98,6 +100,11 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
 
   const currentPosition = { x: imagePositionX, y: imagePositionY }
   const layoutClass = layout === 'left-video' ? 'layout-left-video' : layout === 'right-video' ? 'layout-right-video' : ''
+  const kenBurnsActive = shouldAnimateBackgroundScale(slide, backgroundScaleAnimation)
+  const freezeScale = frozenScaleProgress !== null && frozenScaleProgress !== undefined && kenBurnsActive
+  const imageBackgroundSize = freezeScale
+    ? getFrozenBackgroundScaleSize(slide, backgroundScaleAmount, frozenScaleProgress)
+    : getImageBackgroundSize(slide)
 
   if (slide.infographicProjectId) {
     const projectData = loadInfographicProjectData(slide.infographicProjectId, slide.infographicTabId)
@@ -107,7 +114,7 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
         <InfographicBackground
           key={`infographic-${slide.infographicProjectId}-${slide.infographicTabId || ''}`}
           projectData={projectData}
-          isPlaying={isPlayMode}
+          isPlaying={isPlayMode && !freezeScale}
           showAllElements={!isPlayMode}
           opacity={backgroundOpacity}
           imageScale={imageScale}
@@ -124,15 +131,15 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
     <div className={`slide slide-background-standalone ${layoutClass}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', backgroundColor: 'transparent' }}>
       {slide.imageUrl && !slide.backgroundVideoUrl && (
         <div
-          className={`slide-background ${backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${kenBurnsActive && !freezeScale ? 'background-scale-animation' : ''}`}
           style={{
             backgroundImage: `url(${slide.imageUrl})`,
-            backgroundSize: getImageBackgroundSize(slide),
+            backgroundSize: imageBackgroundSize,
             backgroundPosition: `${currentPosition.x}% ${currentPosition.y}%`,
             backgroundRepeat: 'no-repeat',
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
-            ...(backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
+            ...(kenBurnsActive && !freezeScale ? {
               '--scale-duration': `${backgroundScaleTime}s`,
               ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount),
             } : {})

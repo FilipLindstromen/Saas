@@ -18,6 +18,46 @@ export function getImageBackgroundSize(slide) {
   return 'auto 100%'
 }
 
+/** Interpolate between two CSS background-size values at progress 0–1. */
+export function interpolateBackgroundSize(initial, final, progress) {
+  const t = Math.min(1, Math.max(0, progress))
+  const parse = (value) => {
+    const str = String(value).trim()
+    if (str.startsWith('auto ')) {
+      return { mode: 'auto-height', heightPct: parseFloat(str.slice(5)) || 100 }
+    }
+    return { mode: 'uniform', pct: parseFloat(str) || 100 }
+  }
+  const a = parse(initial)
+  const b = parse(final)
+  if (a.mode === 'auto-height' && b.mode === 'auto-height') {
+    const h = a.heightPct + (b.heightPct - a.heightPct) * t
+    return `auto ${h}%`
+  }
+  if (a.mode === 'uniform' && b.mode === 'uniform') {
+    const p = a.pct + (b.pct - a.pct) * t
+    return `${p}%`
+  }
+  return t >= 1 ? final : initial
+}
+
+/** Ken Burns background-size frozen at a point in the animation (0 = start, 1 = end). */
+export function getFrozenBackgroundScaleSize(slide, backgroundScaleAmount = 20, progress = 0) {
+  const vars = getBackgroundScaleAnimationVars(slide, backgroundScaleAmount)
+  return interpolateBackgroundSize(vars['--initial-scale'], vars['--final-scale'], progress)
+}
+
+/** Progress 0–1 for Ken Burns based on time spent on the current slide. */
+export function getBackgroundScaleProgress(elapsedMs, durationSeconds = 10) {
+  const durationMs = Math.max(1, (durationSeconds || 10) * 1000)
+  return Math.min(1, Math.max(0, elapsedMs / durationMs))
+}
+
+/** True when this slide should use Ken Burns background scale animation in play mode. */
+export function shouldAnimateBackgroundScale(slide, backgroundScaleAnimation = false) {
+  return !!(backgroundScaleAnimation && slide && !slide.overrideBackgroundScaleAnimation)
+}
+
 /** CSS custom properties for Ken Burns-style background scale animation. */
 export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = 20) {
   if (!isImageScaleCustomized(slide)) {
