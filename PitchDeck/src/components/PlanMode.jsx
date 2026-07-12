@@ -12,6 +12,24 @@ function plainTextToStorage(text) {
     .replace(/\n/g, '<br>')
 }
 
+// Convert stored HTML back to plain text, preserving <br> as newlines
+function getPlainText(content) {
+  if (!content || typeof content !== 'string') return ''
+  return content
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<div[^>]*>\s*/gi, '\n')
+    .replace(/<\/div>\s*/gi, '')
+    .replace(/<p[^>]*>\s*/gi, '\n')
+    .replace(/<\/p>\s*/gi, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
 function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange }) {
   const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
   const [editingId, setEditingId] = useState(null)
@@ -429,10 +447,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       setEditingChapterId(null)
     }
     setEditingId(slide.id)
-    // Remove HTML tags for editing
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = slide.content || ''
-    setEditContent(tempDiv.textContent || tempDiv.innerText || '')
+    setEditContent(getPlainText(slide.content || ''))
   }
 
   const handleChange = (e) => {
@@ -902,9 +917,7 @@ Example format:
 
   const renderSceneRows = (slidesForList, chapterId) =>
     slidesForList.map((slide, index) => {
-      const tempDiv = document.createElement('div')
-      tempDiv.innerHTML = slide.content || ''
-      const displayText = tempDiv.textContent || tempDiv.innerText || ''
+      const displayText = getPlainText(slide.content || '')
       const isEditing = (chapterId != null && isOverview)
         ? (editingChapterId === chapterId && editingId === slide.id)
         : (editingId === slide.id)
@@ -938,10 +951,8 @@ Example format:
               style={{ minHeight: '1.5em', height: 'auto', resize: 'none', overflow: 'hidden' }}
             />
           ) : (
-            <span className="scene-text">
-              {displayText.split('\n').map((line, i) => (
-                <span key={i}>{line}{i < displayText.split('\n').length - 1 && <br />}</span>
-              )) || 'Click to edit...'}
+            <span className="scene-text" style={{ whiteSpace: 'pre-line' }}>
+              {displayText || 'Click to edit...'}
             </span>
           )}
           {slidesForList.length > 1 && (
