@@ -4,7 +4,6 @@ export const SIDEBAR_TABS = [
   { id: 'format', label: 'Format' },
   { id: 'background', label: 'Background' },
   { id: 'fonts', label: 'Fonts' },
-  { id: 'copy', label: 'Copy' },
 ]
 
 export default function SidebarTabs({ activeTab, onTabChange }) {

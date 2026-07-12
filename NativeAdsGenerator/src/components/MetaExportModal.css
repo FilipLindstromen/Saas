@@ -1,0 +1,99 @@
+.nag-meta-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.nag-meta-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius, 16px);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.nag-meta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.nag-meta-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.nag-meta-close {
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.nag-meta-close:hover {
+  color: var(--text-primary);
+}
+
+.nag-meta-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nag-meta-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.nag-meta-error {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--error);
+  line-height: 1.45;
+}
+
+.nag-meta-error code {
+  font-size: 0.78rem;
+  background: var(--bg-tertiary);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.nag-meta-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.nag-meta-success {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--success);
+}
+
+.nag-meta-success a {
+  color: var(--accent);
+}

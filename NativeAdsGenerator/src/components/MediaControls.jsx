@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { isImageFile, isVideoFile, VIDEO_FILE_ACCEPT } from '../utils/mediaFiles'
 import './MediaControls.css'
 
 export default function MediaControls({
@@ -29,29 +30,44 @@ export default function MediaControls({
   const videoInputRef = useRef(null)
   const musicInputRef = useRef(null)
   const [error, setError] = useState(null)
+  const [uploading, setUploading] = useState(false)
 
-  const handleImageFile = (e) => {
+  const handleImageFile = async (e) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file.')
+    if (!isImageFile(file)) {
+      setError('Please choose an image file (JPG, PNG, WebP, etc.).')
       return
     }
     setError(null)
-    onUploadImage(file)
-    e.target.value = ''
+    setUploading(true)
+    try {
+      await onUploadImage(file)
+    } catch (err) {
+      setError(err?.message || 'Failed to upload image')
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const handleVideoFile = (e) => {
+  const handleVideoFile = async (e) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('video/')) {
-      setError('Please choose a video file.')
+    if (!isVideoFile(file)) {
+      setError('Please choose a video file (MP4, MOV, WebM, etc.).')
       return
     }
     setError(null)
-    onUploadVideo(file)
-    e.target.value = ''
+    setUploading(true)
+    try {
+      await onUploadVideo(file)
+    } catch (err) {
+      setError(err?.message || 'Failed to upload video')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleMusicFile = (e) => {
@@ -72,11 +88,11 @@ export default function MediaControls({
       {error && <p className="nag-error">{error}</p>}
 
       <div className="nag-btn-grid">
-        <button type="button" className="nag-btn" onClick={() => imageInputRef.current?.click()}>
-          Upload image
+        <button type="button" className="nag-btn" disabled={uploading} onClick={() => imageInputRef.current?.click()}>
+          {uploading ? 'Uploading…' : 'Upload image'}
         </button>
-        <button type="button" className="nag-btn" onClick={() => videoInputRef.current?.click()}>
-          Upload video
+        <button type="button" className="nag-btn" disabled={uploading} onClick={() => videoInputRef.current?.click()}>
+          {uploading ? 'Uploading…' : 'Upload video'}
         </button>
         <button
           type="button"
@@ -120,7 +136,7 @@ export default function MediaControls({
       </div>
 
       <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageFile} />
-      <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={handleVideoFile} />
+      <input ref={videoInputRef} type="file" accept={VIDEO_FILE_ACCEPT} hidden onChange={handleVideoFile} />
       <input ref={musicInputRef} type="file" accept="audio/*" hidden onChange={handleMusicFile} />
 
       {isVideoBackground && (

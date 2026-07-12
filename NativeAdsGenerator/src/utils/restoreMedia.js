@@ -1,4 +1,5 @@
 import { fetchVideoAsBlobUrl } from '@shared/stockMedia/pexelsVideo'
+import { loadVideoElement } from './mediaFiles'
 import { isRestorableMediaMode, loadBlob } from './projectStorage'
 
 function loadImageFromObjectUrl(url, { keepUrl = false } = {}) {
@@ -16,29 +17,11 @@ function loadImageFromObjectUrl(url, { keepUrl = false } = {}) {
   })
 }
 
-function loadVideoFromObjectUrl(url) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.playsInline = true
-    video.loop = true
-    video.onloadeddata = () => {
-      video.play().catch(() => {})
-      resolve({ element: video, url })
-    }
-    video.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Failed to load video'))
-    }
-    video.src = url
-  })
-}
-
 async function loadVideoFromExternalUrl(url) {
   const isExternal = url.startsWith('http://') || url.startsWith('https://')
   const blobUrl = isExternal ? await fetchVideoAsBlobUrl(url) : url
-  const { element, url: objectUrl } = await loadVideoFromObjectUrl(blobUrl)
-  return { element, url: objectUrl }
+  const element = await loadVideoElement(blobUrl)
+  return { element, url: blobUrl }
 }
 
 export async function restoreMediaFromPersisted(persisted) {
@@ -60,8 +43,8 @@ export async function restoreMediaFromPersisted(persisted) {
   const objectUrl = URL.createObjectURL(blob)
 
   if (mode === 'upload-video') {
-    const { element, url } = await loadVideoFromObjectUrl(objectUrl)
-    return { element, url, mode, playing: true }
+    const element = await loadVideoElement(objectUrl)
+    return { element, url: objectUrl, mode, playing: true }
   }
 
   const { element, url } = await loadImageFromObjectUrl(objectUrl, { keepUrl: true })

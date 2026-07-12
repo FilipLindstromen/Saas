@@ -76,3 +76,29 @@
   border-radius: 6px;
   pointer-events: none;
 }
+
+.nag-preview-stage.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.nag-preview-drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.nag-preview-drop-error {
+  margin: 0;
+  width: 100%;
+  font-size: 0.8rem;
+  color: var(--danger, #e74c3c);
+}

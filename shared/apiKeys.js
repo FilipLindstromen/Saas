@@ -15,7 +15,10 @@ const DEFAULT_KEYS = {
   pixabay: '',
   pexels: '',
   unsplash: '',
-  googleClientId: ''
+  googleClientId: '',
+  metaAccessToken: '',
+  metaAdAccountId: '',
+  metaPageId: '',
 }
 
 /** Read API keys from environment (root .env on localhost). Only returns keys that are set. */

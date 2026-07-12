@@ -745,6 +745,23 @@
           <span class="settings-label-hint">For ReelRecorder YouTube upload. OAuth 2.0 Client ID from Google Cloud Console.</span>
         </div>
         <div class="settings-section-divider"></div>
+        <h3 class="settings-section-title">Meta Ads</h3>
+        <div class="settings-field">
+          <label class="settings-label" for="key-metaAccessToken">Meta access token</label>
+          <input type="password" id="key-metaAccessToken" class="settings-input" placeholder="Long-lived user token" autocomplete="off" autocapitalize="off" autocorrect="off">
+          <span class="settings-label-hint">Needs <code>ads_management</code> scope. From Meta Graph API Explorer or Business settings.</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="key-metaAdAccountId">Ad account ID</label>
+          <input type="text" id="key-metaAdAccountId" class="settings-input" placeholder="act_1234567890 or numeric ID" autocomplete="off" autocapitalize="off" autocorrect="off">
+          <span class="settings-label-hint">Found in Meta Ads Manager URL or Business settings.</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="key-metaPageId">Facebook page ID</label>
+          <input type="text" id="key-metaPageId" class="settings-input" placeholder="Page ID for ad creative" autocomplete="off" autocapitalize="off" autocorrect="off">
+          <span class="settings-label-hint">Used as the publishing page on the ad creative.</span>
+        </div>
+        <div class="settings-section-divider"></div>
         <h3 class="settings-section-title">Storage</h3>
         <div class="settings-field">
           <label class="settings-label">Google Drive</label>
@@ -808,7 +825,7 @@
 
       // Settings modal - API keys
       const modal = document.getElementById('settings-modal');
-      const keys = ['openai', 'unsplash', 'giphy', 'pixabay', 'pexels', 'googleClientId'];
+      const keys = ['openai', 'unsplash', 'giphy', 'pixabay', 'pexels', 'googleClientId', 'metaAccessToken', 'metaAdAccountId', 'metaPageId'];
 
       function updateStorageStatus() {
         var data = window.SaasApiKeys ? window.SaasApiKeys.load() : {};

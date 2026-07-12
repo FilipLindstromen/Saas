@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { isImageFile, isVideoFile } from '../utils/mediaFiles'
 import './PreviewPanel.css'
 
 export default function PreviewPanel({
@@ -7,9 +8,14 @@ export default function PreviewPanel({
   aspectRatio,
   onPan,
   canPan,
+  onUploadImage,
+  onUploadVideo,
 }) {
   const containerRef = useRef(null)
   const dragRef = useRef(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [dropError, setDropError] = useState(null)
+  const [dropping, setDropping] = useState(false)
 
   const handlePointerDown = (e) => {
     if (!canPan) return
@@ -40,15 +46,54 @@ export default function PreviewPanel({
     } catch {}
   }
 
+  const handleDragOver = (e) => {
+    if (!onUploadImage && !onUploadVideo) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOver(false)
+    }
+  }
+
+  const handleDrop = async (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    setDropError(null)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+
+    setDropping(true)
+    try {
+      if (isVideoFile(file) && onUploadVideo) {
+        await onUploadVideo(file)
+      } else if (isImageFile(file) && onUploadImage) {
+        await onUploadImage(file)
+      } else {
+        setDropError('Drop an image or video file (MP4, MOV, WebM, JPG, PNG, etc.).')
+      }
+    } catch (err) {
+      setDropError(err?.message || 'Failed to load file')
+    } finally {
+      setDropping(false)
+    }
+  }
+
+  const canDrop = !!(onUploadImage || onUploadVideo)
+
   return (
     <div className="nag-preview-wrap">
       <div className="nag-preview-header">
         <h2 className="nag-preview-title">Preview</h2>
         <span className="nag-preview-size">{format.label}</span>
       </div>
+      {dropError && <p className="nag-preview-drop-error">{dropError}</p>}
       <div
         ref={containerRef}
-        className={`nag-preview-stage ${canPan ? 'draggable' : ''}`}
+        className={`nag-preview-stage ${canPan ? 'draggable' : ''} ${dragOver ? 'drag-over' : ''}`}
         style={{
           aspectRatio,
           '--format-ar-w': format.width,
@@ -58,9 +103,20 @@ export default function PreviewPanel({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onDragOver={canDrop ? handleDragOver : undefined}
+        onDragLeave={canDrop ? handleDragLeave : undefined}
+        onDrop={canDrop ? handleDrop : undefined}
       >
         <canvas ref={canvasRef} className="nag-preview-canvas" />
-        {canPan && <span className="nag-preview-drag-hint">Drag to reposition media</span>}
+        {dragOver && (
+          <div className="nag-preview-drop-overlay">
+            {dropping ? 'Loading…' : 'Drop image or video'}
+          </div>
+        )}
+        {canPan && !dragOver && <span className="nag-preview-drag-hint">Drag to reposition media</span>}
+        {canDrop && !canPan && !dragOver && (
+          <span className="nag-preview-drag-hint">Drop image or video here</span>
+        )}
       </div>
     </div>
   )

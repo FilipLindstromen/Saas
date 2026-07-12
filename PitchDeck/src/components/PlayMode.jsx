@@ -8,6 +8,13 @@ import './PlayMode.css'
 const VIDEO_TRANSITION_MS = 500
 const WEBCAM_TRANSITION_MS = 500
 
+// Slide has image, video, or infographic background (not section layout)
+function slideHasBackgroundMedia(slide) {
+  if (!slide) return false
+  if ((slide.layout || 'default') === 'section') return false
+  return !!(slide.infographicProjectId || slide.imageUrl || slide.backgroundVideoUrl)
+}
+
 // Two slides share the same background if they use the same image, video, or infographic
 function sameBackground(a, b) {
   if (!a || !b) return false
@@ -648,11 +655,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const nextSlideHasVideo = hasVideoLayoutWithMedia(nextSlideData)
   const prevSlideHasVideo = hasVideoLayoutWithMedia(prevSlideData)
   // When consecutive slides share same bg (image/video), use persistent background - no transition, just keep it
-  const hasSameBgWithAdjacent = (nextSlideData && sameBackground(currentSlide, nextSlideData)) || (prevSlideData && sameBackground(currentSlide, prevSlideData))
-  // Use persistent background when same bg: single layer for both video and image, no swap/flash
-  const usePersistentBackground = !!hasSameBgWithAdjacent
-  // Use persistent video layer only when different bg: current has video, or we're sliding off/in
-  const usePersistentVideo = !usePersistentBackground && (currentSlideHasVideo || isSlidingOff || isSlidingIn)
+  const targetSlide = pendingIndex != null ? presentationSlides[pendingIndex] : null
+  const sameBgNoTransition = targetSlide && sameBackground(currentSlide, targetSlide)
+  const backgroundTransitionActive = transitionPhase === 'background-transition' && pendingIndex != null && !sameBgNoTransition
+  // Always keep background in a dedicated layer (avoids flash when crossfade ends)
+  const usePersistentBackground = slideHasBackgroundMedia(currentSlide)
+    || (backgroundTransitionActive && slideHasBackgroundMedia(targetSlide))
+  // Use persistent video layer only for slide-off/in when current slide has no background media
+  const usePersistentVideo = !slideHasBackgroundMedia(currentSlide) && (currentSlideHasVideo || isSlidingOff || isSlidingIn)
   const usePersistentGradient = usePersistentBackground || usePersistentVideo
   // Which slide's video to show in PersistentVideoLayer
   const videoSlideForLayer = isSlidingOff ? videoSlideForTransitionRef.current : (currentSlideHasVideo ? currentSlide : null)
@@ -1349,12 +1359,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }, [])
   const scale = Math.min(viewportSize.w / canvasSize.w, viewportSize.h / canvasSize.h)
 
-  // When transitioning with same bg (different pos/scale), skip background fade - only animate position/scale
-  const targetSlide = pendingIndex != null ? presentationSlides[pendingIndex] : null
-  const sameBgNoTransition = targetSlide && sameBackground(currentSlide, targetSlide)
-  // Use target slide for background during transition so position/scale animates smoothly from current to target
+  // Use target slide for background during same-bg transition so position/scale animates smoothly
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
-  const backgroundTransitionActive = transitionPhase === 'background-transition' && pendingIndex != null && !sameBgNoTransition
+  const backgroundSlideForLayer = backgroundTransitionActive && targetSlide ? targetSlide : backgroundSlideForPosScale
+  const pauseBackgroundScale = backgroundTransitionActive
   const transitionDurationMs = getTransitionDuration(transitionStyle)
 
   return (
@@ -1374,66 +1382,54 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         style={{ backgroundColor: backgroundColor || '#1a1a1a' }}
         aria-hidden="true"
       />
-      {/* Layer 1: Background image/video - transition applied here (not webcam). Skip when same bg (pos/scale animates) */}
-      {backgroundTransitionActive && presentationSlides[pendingIndex] ? (
-        /* Dual-layer: outgoing and incoming backgrounds animate simultaneously (no gap/flash) */
-        <div className={`play-crossfade-container play-bg-dual-layer transition-${transitionStyle}`} aria-hidden="true">
+      {/* Layer 1: Background image/video - transition applied here (not webcam) */}
+      <div className="play-background-transition-wrapper">
+        {usePersistentVideo && videoSlideForLayer && (
+          <PersistentVideoLayer
+            videoSlide={videoSlideForLayer}
+            layout={videoLayoutForLayer}
+            isSlidingOff={isSlidingOff}
+            isSlidingIn={isSlidingIn}
+            canvasSize={canvasSize}
+            recordSettings={recordSettings}
+          />
+        )}
+        {backgroundTransitionActive && targetSlide && (
           <div
-            className="play-crossfade-layer play-crossfade-out"
+            className="play-crossfade-layer play-crossfade-out play-bg-crossfade-out"
             style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
+            aria-hidden="true"
           >
             <SlideBackground
               slide={currentSlide}
-              backgroundScaleAnimation={backgroundScaleAnimation}
+              backgroundScaleAnimation={false}
               backgroundScaleTime={backgroundScaleTime}
               backgroundScaleAmount={backgroundScaleAmount}
               isPreload={false}
               isPlayMode={true}
             />
           </div>
+        )}
+        {usePersistentBackground && (
           <div
-            className="play-crossfade-layer play-crossfade-in"
-            style={{ '--bg-opacity': presentationSlides[pendingIndex]?.backgroundOpacity !== undefined ? presentationSlides[pendingIndex].backgroundOpacity : 0.6 }}
+            className={`play-background-layer ${backgroundTransitionActive ? 'play-crossfade-layer play-crossfade-in play-bg-crossfade-in' : ''} ${!backgroundTransitionActive && sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!backgroundTransitionActive && !sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${!backgroundTransitionActive && !sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''}`}
+            style={{
+              '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
+              '--pos-scale-duration': `${transitionDurationMs}ms`,
+            }}
+            aria-hidden="true"
           >
             <SlideBackground
-              slide={presentationSlides[pendingIndex]}
-              backgroundScaleAnimation={backgroundScaleAnimation}
+              slide={backgroundSlideForLayer}
+              backgroundScaleAnimation={backgroundScaleAnimation && !pauseBackgroundScale}
               backgroundScaleTime={backgroundScaleTime}
               backgroundScaleAmount={backgroundScaleAmount}
               isPreload={false}
               isPlayMode={true}
             />
           </div>
-        </div>
-      ) : (
-        <div
-          className={`play-background-transition-wrapper ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${!sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
-          style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6, '--pos-scale-duration': `${transitionDurationMs}ms` }}
-        >
-          {usePersistentVideo && videoSlideForLayer && (
-            <PersistentVideoLayer
-              videoSlide={videoSlideForLayer}
-              layout={videoLayoutForLayer}
-              isSlidingOff={isSlidingOff}
-              isSlidingIn={isSlidingIn}
-              canvasSize={canvasSize}
-              recordSettings={recordSettings}
-            />
-          )}
-          {usePersistentBackground && (
-            <div className="play-background-layer" aria-hidden="true">
-              <SlideBackground
-                slide={backgroundSlideForPosScale}
-                backgroundScaleAnimation={backgroundScaleAnimation}
-                backgroundScaleTime={backgroundScaleTime}
-                backgroundScaleAmount={backgroundScaleAmount}
-                isPreload={false}
-                isPlayMode={true}
-              />
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
       {/* Layer 2: Webcam - inside canvas for correct layer order */}
       {anySlideHasWebcam && webcamCameraId && (
         <div className="play-webcam-layer" aria-hidden="true">

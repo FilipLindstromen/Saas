@@ -360,9 +360,31 @@
   animation-duration: var(--transition-duration, 500ms);
   animation-timing-function: ease-in-out;
   animation-fill-mode: forwards;
+  will-change: opacity;
 }
 
-/* Dual-layer transitions: outgoing and incoming backgrounds animate at the same time */
+/* Background crossfade between different slides: opacity only (no zoom/slide/blur) */
+.play-bg-crossfade-out {
+  z-index: 2;
+  animation-name: crossfadeOut;
+  transform: none !important;
+  filter: none !important;
+}
+
+.play-bg-crossfade-in {
+  z-index: 1;
+  opacity: 0;
+  animation-name: crossfadeIn;
+  transform: none !important;
+  filter: none !important;
+}
+
+.play-bg-crossfade-out .slide-background.background-scale-animation,
+.play-bg-crossfade-in .slide-background.background-scale-animation {
+  animation: none !important;
+}
+
+/* Dual-layer transitions (legacy path): outgoing and incoming backgrounds animate at the same time */
 .play-bg-dual-layer.transition-default .play-crossfade-out {
   animation-name: fadeOut;
 }

@@ -4,6 +4,16 @@ export const FORMATS = {
   square: { id: 'square', label: '1080 × 1080', width: 1080, height: 1080 },
 }
 
+import {
+  COPY_VERSION_COUNT,
+  DEFAULT_COPY_SLOT,
+  createDefaultCopyVersions,
+  getActiveCopy,
+  normalizeCopyVersions,
+} from './copyVersions'
+
+export { COPY_VERSION_COUNT, createDefaultCopyVersions, getActiveCopy, normalizeCopyVersions }
+
 export const FONT_OPTIONS = [
   'DM Sans',
   'Inter',
@@ -15,8 +25,12 @@ export const FONT_OPTIONS = [
 ]
 
 export const DEFAULT_TEXT = {
-  headline: 'Your headline here',
-  copy: 'Supporting copy that explains the benefit and invites action.',
+  ...DEFAULT_COPY_SLOT,
+  copyVersions: createDefaultCopyVersions(),
+  activeCopyVersion: 0,
+  showLinkTitle: true,
+  linkTitleFontSize: 26,
+  linkTitleFontWeight: 600,
   fontFamily: 'Montserrat',
   headlineFontSize: 72,
   copyFontSize: 32,
@@ -79,21 +93,30 @@ export function drawAd(ctx, {
     }
   }
 
-  if (!text?.headline?.trim() && !(text.showSubheadline !== false && text?.copy?.trim())) return
-
-  const headline = text.headline?.trim() || ''
-  const bodyCopy = text.copy?.trim() || ''
+  const activeCopy = getActiveCopy(text)
   const showSubheadline = text.showSubheadline !== false
+  const showLinkTitle = text.showLinkTitle !== false
+  const headline = activeCopy.headline?.trim() || ''
+  const bodyCopy = activeCopy.copy?.trim() || ''
+  const linkTitle = activeCopy.linkTitle?.trim() || ''
+
+  if (!headline && !(showSubheadline && bodyCopy) && !(showLinkTitle && linkTitle)) return
+
   const headlineLines = headline ? headline.split('\n').filter(Boolean) : []
   const copyLines = showSubheadline && bodyCopy ? bodyCopy.split('\n').filter(Boolean) : []
 
   const headlineSize = text.headlineFontSize || text.fontSize || 72
   const copySize = text.copyFontSize || Math.round(headlineSize * 0.45)
+  const linkTitleSize = text.linkTitleFontSize ?? Math.round(copySize * 0.85)
   const gap = headlineLines.length && copyLines.length ? headlineSize * 0.35 : 0
+  const linkGap = (headlineLines.length || copyLines.length) && showLinkTitle && linkTitle
+    ? headlineSize * 0.28
+    : 0
 
   const headlineBlockH = headlineLines.length * headlineSize * 1.15
   const copyBlockH = copyLines.length * copySize * 1.3
-  const totalHeight = headlineBlockH + gap + copyBlockH
+  const linkBlockH = showLinkTitle && linkTitle ? linkTitleSize * 1.2 + linkGap : 0
+  const totalHeight = headlineBlockH + gap + copyBlockH + linkBlockH
   let cursorY = height / 2 - totalHeight / 2
 
   ctx.textAlign = text.textAlign || 'center'
@@ -174,6 +197,12 @@ export function drawAd(ctx, {
     const lineH = drawLine(line, cursorY, copySize, text.copyFontWeight || 500, highlight)
     cursorY += lineH * 1.15
   })
+
+  if (linkGap) cursorY += linkGap
+
+  if (showLinkTitle && linkTitle) {
+    drawLine(linkTitle, cursorY, linkTitleSize, text.linkTitleFontWeight ?? 600, false)
+  }
 }
 
 export async function renderAdToCanvas(options) {

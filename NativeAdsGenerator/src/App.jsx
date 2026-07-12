@@ -9,17 +9,23 @@ import CopySection from './components/CopySection'
 import TextControls from './components/TextControls'
 import PreviewPanel from './components/PreviewPanel'
 import SidebarTabs from './components/SidebarTabs'
+import MetaExportModal from './components/MetaExportModal'
 import { useAdCompositor } from './hooks/useAdCompositor'
 import { analyzeAsOgilvy, generateCopyVersions } from './services/copyAi'
+import { exportNativeAdToMeta } from './services/metaAdExport'
+import { getApiKey } from '@shared/apiKeys'
 import {
   DEFAULT_MEDIA,
   DEFAULT_TEXT,
   FORMATS,
   copyCanvasToClipboard,
   exportCanvasAsPng,
+  normalizeCopyVersions,
   renderAdToCanvas,
 } from './utils/adCompositor'
+import { COPY_VERSION_COUNT, getActiveCopy } from './utils/copyVersions'
 import { exportAdAsVideo, isVideoBackgroundMode } from './utils/videoExport'
+import { isImageFile, isVideoFile, loadVideoElement, loadVideoFromFile } from './utils/mediaFiles'
 import {
   clearPersistedMedia,
   clearPersistedMusic,
@@ -34,7 +40,14 @@ import './App.css'
 const initialProject = typeof window !== 'undefined' ? loadProject() : null
 
 function mergeText(saved) {
-  return { ...DEFAULT_TEXT, ...(saved && typeof saved === 'object' ? saved : {}) }
+  const merged = { ...DEFAULT_TEXT, ...(saved && typeof saved === 'object' ? saved : {}) }
+  const { copyVersions, activeCopyVersion } = normalizeCopyVersions(merged)
+  return { ...merged, copyVersions, activeCopyVersion }
+}
+
+function getInitialSidebarTab(savedTab) {
+  if (savedTab === 'copy') return 'format'
+  return savedTab || 'format'
 }
 
 const saasAppsUrl = typeof window !== 'undefined'
@@ -68,34 +81,13 @@ function loadImageFromUrl(url) {
   })
 }
 
-function loadVideoElement(url, { revokeOnError = true } = {}) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.playsInline = true
-    video.loop = true
-    video.onloadeddata = () => {
-      video.play().catch(() => {})
-      resolve(video)
-    }
-    video.onerror = () => {
-      if (revokeOnError) URL.revokeObjectURL(url)
-      reject(new Error('Failed to load video'))
-    }
-    video.src = url
-  })
-}
-
-function loadVideoFromFile(file) {
-  const url = URL.createObjectURL(file)
-  return loadVideoElement(url).then((video) => ({ video, url }))
-}
-
-async function loadVideoFromUrl(url) {
+function loadVideoFromUrl(url) {
   const isExternal = url.startsWith('http://') || url.startsWith('https://')
-  const blobUrl = isExternal ? await fetchVideoAsBlobUrl(url) : url
-  const video = await loadVideoElement(blobUrl, { revokeOnError: true })
-  return { video, url: blobUrl }
+  return (async () => {
+    const blobUrl = isExternal ? await fetchVideoAsBlobUrl(url) : url
+    const video = await loadVideoElement(blobUrl, { revokeOnError: true })
+    return { video, url: blobUrl }
+  })()
 }
 
 function captureFromVideoElement(video) {
@@ -154,8 +146,10 @@ export default function App() {
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState('')
   const [analysis, setAnalysis] = useState(initialProject?.analysis ?? null)
-  const [versions, setVersions] = useState(Array.isArray(initialProject?.versions) ? initialProject.versions : [])
-  const [sidebarTab, setSidebarTab] = useState(initialProject?.sidebarTab || 'format')
+  const [sidebarTab, setSidebarTab] = useState(() => getInitialSidebarTab(initialProject?.sidebarTab))
+  const [metaExportOpen, setMetaExportOpen] = useState(false)
+  const [metaExportError, setMetaExportError] = useState('')
+  const [metaExportSuccess, setMetaExportSuccess] = useState(null)
 
   const format = FORMATS[formatId] || FORMATS.landscape
   const aspectRatio = `${format.width} / ${format.height}`
@@ -234,19 +228,39 @@ export default function App() {
   }
 
   const handleUploadImage = async (file) => {
-    clearMedia()
-    const { img, url } = await loadImageFromBlob(file)
-    await storeMediaPersist('upload-image', { blob: file, fileName: file.name })
-    setMedia(img, 'upload-image')
-    URL.revokeObjectURL(url)
+    setBusy(true)
+    setStatus('')
+    try {
+      clearMedia()
+      const { img, url } = await loadImageFromBlob(file)
+      setMedia(img, 'upload-image')
+      URL.revokeObjectURL(url)
+      storeMediaPersist('upload-image', { blob: file, fileName: file.name })
+      setStatus('Image uploaded.')
+    } catch (err) {
+      setStatus(err?.message || 'Failed to load image')
+      throw err
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleUploadVideo = async (file) => {
-    clearMedia()
-    const { video, url } = await loadVideoFromFile(file)
-    videoObjectUrlRef.current = url
-    await storeMediaPersist('upload-video', { blob: file, fileName: file.name })
-    setMedia(video, 'upload-video', { playing: true })
+    setBusy(true)
+    setStatus('')
+    try {
+      clearMedia()
+      const { video, url } = await loadVideoFromFile(file)
+      videoObjectUrlRef.current = url
+      setMedia(video, 'upload-video', { playing: true })
+      storeMediaPersist('upload-video', { blob: file, fileName: file.name })
+      setStatus('Video uploaded.')
+    } catch (err) {
+      setStatus(err?.message || 'Failed to load video')
+      throw err
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleWebcamPhoto = async () => {
@@ -325,19 +339,12 @@ export default function App() {
 
   const handleResetTransform = () => setMediaTransform(DEFAULT_MEDIA)
 
-  const handleHeadlineChange = (headline) => {
-    setText((prev) => ({ ...prev, headline }))
-  }
-
-  const handleCopyChange = (copy) => {
-    setText((prev) => ({ ...prev, copy }))
-  }
-
   const handleAnalyze = async () => {
+    const active = getActiveCopy(text)
     setAiBusy(true)
     setAiError('')
     try {
-      const result = await analyzeAsOgilvy(text.headline, text.copy)
+      const result = await analyzeAsOgilvy(active.headline, active.copy)
       setAnalysis(result)
     } catch (err) {
       setAiError(err?.message || 'Analysis failed')
@@ -347,26 +354,31 @@ export default function App() {
   }
 
   const handleGenerateVersions = async () => {
+    const active = getActiveCopy(text)
     setAiBusy(true)
     setAiError('')
     try {
-      const result = await generateCopyVersions(text.headline, text.copy, 5)
+      const result = await generateCopyVersions(active.headline, active.copy, COPY_VERSION_COUNT)
       if (!result.length) throw new Error('No versions were generated')
-      setVersions(result)
+      setText((prev) => {
+        const normalized = normalizeCopyVersions(prev)
+        const copyVersions = [...normalized.copyVersions]
+        result.forEach((version, i) => {
+          if (i >= COPY_VERSION_COUNT) return
+          copyVersions[i] = {
+            ...copyVersions[i],
+            headline: version.headline || copyVersions[i].headline,
+            copy: version.copy || copyVersions[i].copy,
+          }
+        })
+        return { ...prev, copyVersions }
+      })
+      setStatus(`AI filled ${Math.min(result.length, COPY_VERSION_COUNT)} copy versions.`)
     } catch (err) {
       setAiError(err?.message || 'Failed to generate versions')
     } finally {
       setAiBusy(false)
     }
-  }
-
-  const handleApplyVersion = (version) => {
-    setText((prev) => ({
-      ...prev,
-      headline: version.headline || prev.headline,
-      copy: version.copy || prev.copy,
-    }))
-    setStatus('Version applied.')
   }
 
   const buildExportCanvas = async () => {
@@ -441,6 +453,53 @@ export default function App() {
     }
   }
 
+  const handleMetaExport = async ({ adSetId, pageId, destinationUrl, adName }) => {
+    setBusy(true)
+    setMetaExportError('')
+    setMetaExportSuccess(null)
+    try {
+      const accessToken = getApiKey('metaAccessToken')
+      const adAccountId = getApiKey('metaAdAccountId')
+      if (!accessToken?.trim() || !adAccountId?.trim()) {
+        throw new Error('Add Meta credentials in API keys')
+      }
+
+      const canvas = await buildExportCanvas()
+      const imageBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Failed to render image'))), 'image/png')
+      })
+
+      const active = getActiveCopy(text)
+      const primaryText = text.showSubheadline !== false ? active.copy : ''
+      const headline = active.headline
+      const description = text.showLinkTitle !== false ? active.linkTitle : ''
+
+      const result = await exportNativeAdToMeta({
+        accessToken: accessToken.trim(),
+        adAccountId: adAccountId.trim(),
+        pageId,
+        adSetId,
+        destinationUrl,
+        imageBlob,
+        primaryText,
+        headline,
+        description,
+        adName,
+        creativeName: `${adName} creative`,
+      })
+
+      setMetaExportSuccess(result)
+      setStatus('Meta ad created (paused). Open Ads Manager to preview and publish.')
+      setMetaExportOpen(false)
+    } catch (err) {
+      setMetaExportError(err?.message || 'Meta export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const activeCopy = getActiveCopy(text)
+
   useAdCompositor({
     canvasRef,
     format,
@@ -506,7 +565,6 @@ export default function App() {
         musicVolume,
         sidebarTab,
         analysis,
-        versions,
       })
     }, 500)
     return () => window.clearTimeout(timer)
@@ -522,7 +580,6 @@ export default function App() {
     musicVolume,
     sidebarTab,
     analysis,
-    versions,
   ])
 
   useEffect(() => {
@@ -661,25 +718,6 @@ export default function App() {
                 onBackgroundColorChange={setBackgroundColor}
               />
             )}
-
-            {sidebarTab === 'copy' && (
-              <CopySection
-                embedded
-                headline={text.headline}
-                copy={text.copy}
-                showSubheadline={text.showSubheadline !== false}
-                onHeadlineChange={handleHeadlineChange}
-                onCopyChange={handleCopyChange}
-                onShowSubheadlineChange={(show) => setText((prev) => ({ ...prev, showSubheadline: show }))}
-                analysis={analysis}
-                versions={versions}
-                aiBusy={aiBusy}
-                aiError={aiError}
-                onAnalyze={handleAnalyze}
-                onGenerateVersions={handleGenerateVersions}
-                onApplyVersion={handleApplyVersion}
-              />
-            )}
           </div>
 
           <section className="nag-panel-section nag-export-section">
@@ -696,8 +734,28 @@ export default function App() {
               <button type="button" className="nag-btn" disabled={busy} onClick={handleCopy}>
                 Copy to clipboard
               </button>
+              <button
+                type="button"
+                className="nag-btn nag-btn-meta"
+                disabled={busy}
+                onClick={() => {
+                  setMetaExportError('')
+                  setMetaExportSuccess(null)
+                  setMetaExportOpen(true)
+                }}
+              >
+                Export as Meta ad
+              </button>
             </div>
-            {status && <p className="nag-status">{status}</p>}
+            {metaExportSuccess?.adsManagerUrl && (
+              <p className="nag-status">
+                Paused ad created.{' '}
+                <a href={metaExportSuccess.adsManagerUrl} target="_blank" rel="noopener noreferrer">
+                  Open in Ads Manager
+                </a>
+              </p>
+            )}
+            {status && !metaExportSuccess?.adsManagerUrl && <p className="nag-status">{status}</p>}
           </section>
         </aside>
 
@@ -708,8 +766,25 @@ export default function App() {
             aspectRatio={aspectRatio}
             onPan={handlePan}
             canPan={!!mediaElement}
+            onUploadImage={handleUploadImage}
+            onUploadVideo={handleUploadVideo}
           />
         </main>
+
+        <aside className="nag-copy-panel">
+          <div className="nag-copy-panel-content">
+            <CopySection
+              panel
+              text={text}
+              onChange={setText}
+              analysis={analysis}
+              aiBusy={aiBusy}
+              aiError={aiError}
+              onAnalyze={handleAnalyze}
+              onGenerateVersions={handleGenerateVersions}
+            />
+          </div>
+        </aside>
       </div>
 
       <UnsplashPicker
@@ -725,6 +800,15 @@ export default function App() {
         onClose={() => setPexelsOpen(false)}
         onSelect={handlePexelsVideoSelect}
         initialQuery="advertising"
+      />
+
+      <MetaExportModal
+        isOpen={metaExportOpen}
+        onClose={() => setMetaExportOpen(false)}
+        onSubmit={handleMetaExport}
+        busy={busy}
+        error={metaExportError}
+        defaultAdName={activeCopy.headline?.trim() || 'Native ad'}
       />
     </div>
   )

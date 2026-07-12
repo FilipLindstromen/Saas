@@ -13,7 +13,10 @@
     unsplash: '',
     googleClientId: '',
     googleDriveAccessToken: '',
-    localFolderName: ''
+    localFolderName: '',
+    metaAccessToken: '',
+    metaAdAccountId: '',
+    metaPageId: '',
   };
 
   window.SaasApiKeys = {
