@@ -794,6 +794,18 @@
   z-index: 10003;
 }
 
+.play-controls-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  right: auto;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+
 .play-slide-indicator {
   display: flex;
   align-items: center;

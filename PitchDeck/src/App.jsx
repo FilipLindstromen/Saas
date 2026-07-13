@@ -1,19 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import { loadApiKeys, saveApiKeys } from '@shared/apiKeys'
 import { getTheme, setTheme as setSharedTheme, initThemeSync } from '@shared/theme'
-import ThemeToggle from '@shared/ThemeToggle'
 import SlideList from './components/SlideList'
 import SlidePreview from './components/SlidePreview'
 import PlanMode from './components/PlanMode'
 import Settings from './components/Settings'
-import RecordingOptions from './components/RecordingOptions'
-import ColorOptions from './components/ColorOptions'
-import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
-import TransitionOptions from './components/TransitionOptions'
 import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
-import AppLogo from './components/AppLogo'
+import AppHeader from './components/AppHeader'
 import InspectorPanel from './components/InspectorPanel'
+import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import InstagramCarouselExportModal from './components/InstagramCarouselExportModal'
 import { formatTimeAgo } from './utils/formatTimeAgo'
 import { isInstagramCarouselFormat } from './utils/slideFormats'
@@ -151,7 +147,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
-  const [inspectorTab, setInspectorTab] = useState('slide')
+  const [inspectorTab, setInspectorTab] = useState('document')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('pitchDeckSidebarCollapsed') === 'true')
+  const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false)
+  const previousModeRef = useRef('plan')
   const [theme, setTheme] = useState(() => getTheme())
   const [showProjectOverview, setShowProjectOverview] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -1094,28 +1093,6 @@ function App() {
         return
       }
 
-      // Tab to cycle through slides in sidebar (only in edit mode)
-      if (e.key === 'Tab' && !isInputFocused && mode === 'edit' && !e.shiftKey) {
-        e.preventDefault()
-        const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
-        const nextIndex = (currentIndex + 1) % slides.length
-        const newId = slides[nextIndex].id
-        setSelectedSlideId(newId)
-        setSelectedSlides(new Set([newId]))
-        return
-      }
-
-      // Shift+Tab to cycle backwards
-      if (e.key === 'Tab' && !isInputFocused && mode === 'edit' && e.shiftKey) {
-        e.preventDefault()
-        const currentIndex = slides.findIndex(s => s.id === selectedSlideId)
-        const prevIndex = currentIndex === 0 ? slides.length - 1 : currentIndex - 1
-        const newId = slides[prevIndex].id
-        setSelectedSlideId(newId)
-        setSelectedSlides(new Set([newId]))
-        return
-      }
-
       // Arrow keys for slide navigation (only in edit mode, not in input)
       if (mode === 'edit' && !isInputFocused) {
         if (e.key === 'ArrowUp') {
@@ -1271,6 +1248,104 @@ function App() {
     setChapters(updatedChapters)
     saveToHistory({ slides, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
   }
+
+  const handleChapterSelect = (nextId) => {
+    const nextChapter = chapters.find(c => c.id === nextId)
+    if (nextChapter) {
+      const nextSlides = nextChapter.slides
+      const nextSelected = nextSlides.some(s => s.id === selectedSlideId) ? selectedSlideId : (nextSlides[0]?.id ?? selectedSlideId)
+      setCurrentChapterId(nextId)
+      setSlides(nextSlides)
+      setSelectedSlideId(nextSelected)
+      saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings })
+    }
+  }
+
+  const handleChapterDrop = (e) => {
+    e.preventDefault()
+    const slideId = parseInt(e.dataTransfer.getData('text/html'), 10)
+    if (!slideId) return
+    const slide = slides.find(s => s.id === slideId)
+    const targetChapter = chapters.find(c => c.id === currentChapterId)
+    if (slide && targetChapter && !targetChapter.slides.some(s => s.id === slideId)) {
+      const sourceChapter = chapters.find(c => c.slides.some(s => s.id === slideId))
+      if (sourceChapter) {
+        const updatedSource = { ...sourceChapter, slides: sourceChapter.slides.filter(s => s.id !== slideId) }
+        const updatedTarget = { ...targetChapter, slides: [...targetChapter.slides, slide] }
+        const updatedChapters = chapters.map(c => {
+          if (c.id === sourceChapter.id) return updatedSource
+          if (c.id === currentChapterId) return updatedTarget
+          return c
+        })
+        const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
+        setChapters(updatedChapters)
+        setSlides(newSlidesForView)
+        saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
+      }
+    }
+  }
+
+  const handleSwitchWorkspace = (workspaceId) => {
+    setCurrentWorkspace(workspaceId)
+    localStorage.setItem('pitchDeckCurrentWorkspace', workspaceId)
+    const workspaceData = localStorage.getItem(`pitchDeckWorkspace_${workspaceId}`)
+    if (!workspaceData) return
+    try {
+      const data = JSON.parse(workspaceData)
+      if (data.chapters) setChapters(data.chapters)
+      const chapterId = data.currentChapterId || data.chapters?.[0]?.id || 1
+      setCurrentChapterId(chapterId)
+      const chapter = data.chapters?.find(c => c.id === chapterId) ?? data.chapters?.[0]
+      const chapterSlides = chapter?.slides ?? []
+      if (chapter) {
+        setSlides(chapterSlides)
+        const firstSlide = chapterSlides.find(s => s.layout !== 'section') || chapterSlides[0]
+        if (firstSlide) setSelectedSlideId(firstSlide.id)
+      }
+      if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }))
+      if (data.projectName) setProjectName(data.projectName)
+      resetHistory({
+        slides: chapterSlides,
+        selectedSlideId: chapterSlides.find(s => s.layout !== 'section')?.id ?? chapterSlides[0]?.id ?? null,
+        chapters: data.chapters ?? [],
+        currentChapterId: chapterId,
+        settings: data.settings ? { ...settings, ...data.settings } : settings,
+        recordSettings,
+      })
+    } catch (e) {
+      console.error('Error loading workspace:', e)
+    }
+  }
+
+  const handleAddWorkspace = () => {
+    const numericIds = workspaces.map((w) =>
+      typeof w.id === 'number' && Number.isFinite(w.id) ? w.id : 0
+    )
+    const newId = Math.max(0, ...numericIds) + 1
+    const newWorkspace = { id: newId, name: `Workspace ${newId}` }
+    const next = [...workspaces, newWorkspace]
+    setWorkspaces(next)
+    localStorage.setItem('pitchDeckWorkspaces', JSON.stringify(next))
+  }
+
+  const exitToPreviousMode = () => {
+    setMode(previousModeRef.current === 'plan' ? 'plan' : 'edit')
+  }
+
+  const handleEnterVideoEditing = () => {
+    previousModeRef.current = mode
+    setMode('video-editing')
+  }
+
+  useEffect(() => {
+    if (selectedGraphicId) setInspectorTab('object')
+  }, [selectedGraphicId])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckSidebarCollapsed', String(sidebarCollapsed))
+    } catch (_) {}
+  }, [sidebarCollapsed])
 
   // Create a new presentation (clear all slides). If projectName is passed (from Projects modal), use it and skip confirm.
   const handleNewPresentation = (projectNameFromModal) => {
@@ -1608,7 +1683,7 @@ function App() {
 
   // Present: open present view and fullscreen (one button, one action)
   const handlePresentClick = () => {
-    // Blur any focused contentEditable so line breaks and edits are saved before switching
+    previousModeRef.current = mode
     if (document.activeElement?.isContentEditable) {
       document.activeElement.blur()
       setTimeout(() => setMode('present'), 0)
@@ -1629,7 +1704,11 @@ function App() {
       case 'exportInstagram': setShowInstagramExport(true); break
       case 'import': handleImportFile(); break
       case 'settings': setShowSettings(true); break
-      case 'transitions': setInspectorTab('transitions'); break
+      case 'transitions':
+        setMode('edit')
+        setInspectorTab('present')
+        setInspectorDrawerOpen(true)
+        break
       case 'toggleTheme': setSharedTheme(theme === 'dark' ? 'light' : 'dark'); break
       case 'present':
         if (document.activeElement?.isContentEditable) {
@@ -1795,7 +1874,7 @@ function App() {
       <Suspense fallback={null}>
         <PlayMode 
           slides={slides} 
-          onExit={() => setMode('plan')} 
+          onExit={exitToPreviousMode} 
           backgroundColor={settings.backgroundColor} 
           textColor={settings.textColor} 
           fontFamily={settings.fontFamily}
@@ -1861,672 +1940,75 @@ function App() {
     )
   }
 
-  // Plan mode
-  if (mode === 'plan') {
-    return (
-      <div className="app plan-mode-app">
-        <div className="app-header">
-          <div className="header-top-row">
-            <div className="header-left">
-            <button type="button" className="header-app-title" onClick={() => setShowProjectOverview(true)} title="Project overview">
-              <AppLogo />
-            </button>
-            <div className="header-file-actions">
-              {workspaces.length > 1 && (
-                <div className="workspace-switcher">
-                  <button className="btn-icon-header btn-workspace" title="Switch workspace">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="9" y1="3" x2="9" y2="21" />
-                    </svg>
-                    <span>{workspaces.find(w => w.id === currentWorkspace)?.name || 'Workspace'}</span>
-                  </button>
-                  <div className="workspace-menu">
-                    {workspaces.map(workspace => (
-                      <button
-                        key={workspace.id}
-                        className={`workspace-item ${currentWorkspace === workspace.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setCurrentWorkspace(workspace.id)
-                          localStorage.setItem('pitchDeckCurrentWorkspace', workspace.id)
-                          const workspaceData = localStorage.getItem(`pitchDeckWorkspace_${workspace.id}`)
-                          if (workspaceData) {
-                            try {
-                              const data = JSON.parse(workspaceData)
-                              if (data.chapters) setChapters(data.chapters)
-                              const chapterId = data.currentChapterId || data.chapters?.[0]?.id || 1
-                              setCurrentChapterId(chapterId)
-                              const chapter = data.chapters?.find(c => c.id === chapterId) ?? data.chapters?.[0]
-                              const chapterSlides = chapter?.slides ?? []
-                              if (chapter) {
-                                setSlides(chapterSlides)
-                                const firstSlide = chapterSlides.find(s => s.layout !== 'section') || chapterSlides[0]
-                                if (firstSlide) setSelectedSlideId(firstSlide.id)
-                              }
-                              if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }))
-                              if (data.projectName) setProjectName(data.projectName)
-                              resetHistory({
-                                slides: chapterSlides,
-                                selectedSlideId: chapterSlides.find(s => s.layout !== 'section')?.id ?? chapterSlides[0]?.id ?? null,
-                                chapters: data.chapters ?? [],
-                                currentChapterId: chapterId,
-                                settings: data.settings ? { ...settings, ...data.settings } : settings,
-                                recordSettings,
-                              })
-                            } catch (e) {
-                              console.error('Error loading workspace:', e)
-                            }
-                          }
-                        }}
-                      >
-                        {workspace.name}
-                      </button>
-                    ))}
-                    <button
-                      className="workspace-item add"
-                      onClick={() => {
-                        const numericIds = workspaces.map((w) =>
-                          typeof w.id === 'number' && Number.isFinite(w.id) ? w.id : 0
-                        )
-                        const newId = Math.max(0, ...numericIds) + 1
-                        const newWorkspace = { id: newId, name: `Workspace ${newId}` }
-                        setWorkspaces([...workspaces, newWorkspace])
-                        localStorage.setItem('pitchDeckWorkspaces', JSON.stringify([...workspaces, newWorkspace]))
-                      }}
-                    >
-                      + New Workspace
-                    </button>
-                  </div>
-                </div>
-              )}
-              <input
-                type="text"
-                className="project-name-input"
-                placeholder="Project name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                title="Project name (used when saving files)"
-              />
-              </div>
-              {(mode === 'plan' || mode === 'edit') && (
-                <div
-                  className="header-chapters"
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const slideId = parseInt(e.dataTransfer.getData('text/html'))
-                    if (slideId) {
-                      const slide = slides.find(s => s.id === slideId)
-                      const targetChapter = chapters.find(c => c.id === currentChapterId)
-                      if (slide && targetChapter && !targetChapter.slides.some(s => s.id === slideId)) {
-                        const sourceChapter = chapters.find(c => c.slides.some(s => s.id === slideId))
-                        if (sourceChapter) {
-                          const updatedSource = { ...sourceChapter, slides: sourceChapter.slides.filter(s => s.id !== slideId) }
-                          const updatedTarget = { ...targetChapter, slides: [...targetChapter.slides, slide] }
-                          const updatedChapters = chapters.map(c => {
-                            if (c.id === sourceChapter.id) return updatedSource
-                            if (c.id === currentChapterId) return updatedTarget
-                            return c
-                          })
-                          const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
-                          setChapters(updatedChapters)
-                          setSlides(newSlidesForView)
-                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <select
-                    className="chapter-dropdown"
-                    value={currentChapterId}
-                    onChange={(e) => {
-                      const nextId = parseInt(e.target.value, 10)
-                      const nextChapter = chapters.find(c => c.id === nextId)
-                      if (nextChapter) {
-                        const nextSlides = nextChapter.slides
-                        const nextSelected = nextSlides.some(s => s.id === selectedSlideId) ? selectedSlideId : (nextSlides[0]?.id ?? selectedSlideId)
-                        setCurrentChapterId(nextId)
-                        setSlides(nextSlides)
-                        setSelectedSlideId(nextSelected)
-                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings })
-                      }
-                    }}
-                    title="Chapter"
-                  >
-                    {chapters.map((chapter) => (
-                      <option key={chapter.id} value={chapter.id}>
-                        {chapter.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="chapter-rename-btn"
-                    onClick={() => {
-                      const currentChapter = chapters.find(c => c.id === currentChapterId)
-                      if (!currentChapter) return
-                      const newName = window.prompt('Rename chapter', currentChapter.name)
-                      if (newName != null && newName.trim() !== '') {
-                        handleUpdateChapterName(currentChapterId, newName.trim())
-                      }
-                    }}
-                    title="Rename chapter"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </button>
-                  <button
-                    className="chapter-tab-add"
-                    onClick={handleAddChapter}
-                    title="Add chapter"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="header-center">
-              <div className="header-mode-buttons">
-                <button
-                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-                  onClick={() => setMode('plan')}
-                  title="Plan"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span>Plan</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setMode('edit')}
-                  title="Edit"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  <span>Edit</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={handlePresentClick}
-                  title="Present (fullscreen)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  <span>Present</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${isRecordingInPlace ? 'active' : ''} present-with-recording`}
-                  onClick={handleRecordClick}
-                  disabled={isRecordingInPlace}
-                  title="Record screen"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                  <span>Record</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'video-editing' ? 'active' : ''}`}
-                  onClick={() => setMode('video-editing')}
-                  title="Video editing"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span>Video editing</span>
-                </button>
-              </div>
-            </div>
-            <div className="header-right">
-              <div className="header-icon-group">
-                <button
-                  className="btn-icon-header btn-undo"
-                  onClick={undo}
-                  title="Undo (Ctrl+Z)"
-                  disabled={!canUndo}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 10h10a5 5 0 0 1 5 5v2" />
-                    <polyline points="3 10 8 5 3 0" />
-                  </svg>
-                </button>
-                <button
-                  className="btn-icon-header btn-redo"
-                  onClick={redo}
-                  title="Redo (Ctrl+Y)"
-                  disabled={!canRedo}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10H11a5 5 0 0 0-5 5v2" />
-                    <polyline points="21 10 16 5 21 0" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
-                <button 
-                  className="btn-icon-header btn-bulk-images" 
-                  onClick={handleBulkSelectImages}
-                  title="Auto-select images for all slides without images"
-                  disabled={!settings.openaiKey || !settings.unsplashKey}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleExportSlidesAsPng}
-                  disabled={isExportingPng}
-                  title="Export all slides as PNG (ZIP)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                  <span className="btn-tooltip">Export PNG</span>
-                </button>
-                {isInstagramCarouselFormat(settings.slideFormat) && (
-                  <button
-                    type="button"
-                    className="btn-icon-header btn-instagram-export"
-                    onClick={() => setShowInstagramExport(true)}
-                    disabled={isExportingPng}
-                    title="Export Instagram carousel (1080×1440)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="14" y="3" width="7" height="7" rx="1" />
-                      <rect x="3" y="14" width="7" height="7" rx="1" />
-                      <rect x="14" y="14" width="7" height="7" rx="1" />
-                    </svg>
-                    <span className="btn-tooltip">Instagram carousel</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={exportSlidesAsText}
-                  title="Copy slides to clipboard"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span className="btn-tooltip">Copy text</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleSaveToFolder}
-                  title="Save to connected folder (PitchDeck/[project]/project.json)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  <span className="btn-tooltip">Save to folder</span>
-                </button>
-                <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
-                <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="app-content plan-mode-content">
-          <PlanMode slides={slides} onUpdateSlides={updateSlides} chapters={chapters} currentChapterId={currentChapterId} onUpdateChapterSlides={updateChapterSlides} onReorderChapters={reorderChapters} onUpdateChapterName={handleUpdateChapterName} onLoadTemplate={handleLoadTemplate} showTemplates={showTemplates} setShowTemplates={setShowTemplates} settings={settings} projectName={projectName} onProjectNameChange={setProjectName} />
-        </div>
-        {showProjectOverview && (
-          <Suspense fallback={null}>
-            <ProjectOverview
-              onClose={() => setShowProjectOverview(false)}
-              recentFiles={recentFiles}
-              getExportData={getExportData}
-              onLoadProject={loadProjectFromData}
-              onNewProject={handleNewPresentation}
-              projectName={projectName}
-              googleClientId={settings.googleClientId}
-            />
-          </Suspense>
-        )}
-        {showSettings && (
-          <Settings
-            settings={settings}
-            onUpdate={setSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-        {isExportingPng && (
-          <div className="auto-save-indicator">
-            <div className="auto-save-spinner"></div>
-            <span>{exportProgress || 'Exporting PNG…'}</span>
-          </div>
-        )}
-    </div>
-  )
-}
-
   return (
-    <div className="app">
-        <div className="app-header">
-          <div className="header-top-row">
-            <div className="header-left">
-              <button type="button" className="header-app-title" onClick={() => setShowProjectOverview(true)} title="Project overview">
-                <AppLogo />
-              </button>
-              <div className="header-file-actions">
-                <input
-                  type="text"
-                  className="project-name-input"
-                  placeholder="Project name"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  title="Project name (used when saving files)"
-                />
-              </div>
-              {(mode === 'plan' || mode === 'edit') && (
-                <div
-                  className="header-chapters"
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const slideId = parseInt(e.dataTransfer.getData('text/html'))
-                    if (slideId) {
-                      const slide = slides.find(s => s.id === slideId)
-                      const targetChapter = chapters.find(c => c.id === currentChapterId)
-                      if (slide && targetChapter && !targetChapter.slides.some(s => s.id === slideId)) {
-                        const sourceChapter = chapters.find(c => c.slides.some(s => s.id === slideId))
-                        if (sourceChapter) {
-                          const updatedSource = { ...sourceChapter, slides: sourceChapter.slides.filter(s => s.id !== slideId) }
-                          const updatedTarget = { ...targetChapter, slides: [...targetChapter.slides, slide] }
-                          const updatedChapters = chapters.map(c => {
-                            if (c.id === sourceChapter.id) return updatedSource
-                            if (c.id === currentChapterId) return updatedTarget
-                            return c
-                          })
-                          const newSlidesForView = currentChapterId === sourceChapter.id ? updatedSource.slides : updatedTarget.slides
-                          setChapters(updatedChapters)
-                          setSlides(newSlidesForView)
-                          saveToHistory({ slides: newSlidesForView, selectedSlideId, chapters: updatedChapters, currentChapterId, settings, recordSettings })
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <select
-                    className="chapter-dropdown"
-                    value={currentChapterId}
-                    onChange={(e) => {
-                      const nextId = parseInt(e.target.value, 10)
-                      const nextChapter = chapters.find(c => c.id === nextId)
-                      if (nextChapter) {
-                        const nextSlides = nextChapter.slides
-                        const nextSelected = nextSlides.some(s => s.id === selectedSlideId) ? selectedSlideId : (nextSlides[0]?.id ?? selectedSlideId)
-                        setCurrentChapterId(nextId)
-                        setSlides(nextSlides)
-                        setSelectedSlideId(nextSelected)
-                        saveToHistory({ slides: nextSlides, selectedSlideId: nextSelected, chapters, currentChapterId: nextId, settings, recordSettings })
-                      }
-                    }}
-                    title="Chapter"
-                  >
-                    {chapters.map((chapter) => (
-                      <option key={chapter.id} value={chapter.id}>
-                        {chapter.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="chapter-rename-btn"
-                    onClick={() => {
-                      const currentChapter = chapters.find(c => c.id === currentChapterId)
-                      if (!currentChapter) return
-                      const newName = window.prompt('Rename chapter', currentChapter.name)
-                      if (newName != null && newName.trim() !== '') {
-                        handleUpdateChapterName(currentChapterId, newName.trim())
-                      }
-                    }}
-                    title="Rename chapter"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </button>
-                  <button
-                    className="chapter-tab-add"
-                    onClick={handleAddChapter}
-                    title="Add chapter"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="header-center">
-              <div className="header-mode-buttons">
-                <button
-                  className={`header-mode-btn ${mode === 'plan' ? 'active' : ''}`}
-                  onClick={() => setMode('plan')}
-                  title="Plan"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span>Plan</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setMode('edit')}
-                  title="Edit"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  <span>Edit</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'present' ? 'active' : ''}`}
-                  onClick={handlePresentClick}
-                  title="Present (fullscreen)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  <span>Present</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${isRecordingInPlace ? 'active' : ''} present-with-recording`}
-                  onClick={handleRecordClick}
-                  disabled={isRecordingInPlace}
-                  title="Record screen"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="3" fill="currentColor" />
-                  </svg>
-                  <span>Record</span>
-                </button>
-                <button
-                  className={`header-mode-btn ${mode === 'video-editing' ? 'active' : ''}`}
-                  onClick={() => setMode('video-editing')}
-                  title="Video editing"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span>Video editing</span>
-                </button>
-              </div>
-            </div>
-            <div className="header-right">
-              <div className="header-icon-group">
-                <button
-                  className="btn-icon-header btn-undo"
-                  onClick={undo}
-                  title="Undo (Ctrl+Z)"
-                  disabled={!canUndo}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 10h10a5 5 0 0 1 5 5v2" />
-                    <polyline points="3 10 8 5 3 0" />
-                  </svg>
-                </button>
-                <button
-                  className="btn-icon-header btn-redo"
-                  onClick={redo}
-                  title="Redo (Ctrl+Y)"
-                  disabled={!canRedo}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10H11a5 5 0 0 0-5 5v2" />
-                    <polyline points="21 10 16 5 21 0" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
-                <button 
-                  className="btn-icon-header btn-bulk-images" 
-                  onClick={handleBulkSelectImages}
-                  title="Auto-select images for all slides without images"
-                  disabled={!settings.openaiKey || !settings.unsplashKey}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                </button>
-              </div>
-              <div className="header-icon-group-divider" aria-hidden="true" />
-              <div className="header-icon-group">
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleExportSlidesAsPng}
-                  disabled={isExportingPng}
-                  title="Export all slides as PNG (ZIP)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                  </svg>
-                  <span className="btn-tooltip">Export PNG</span>
-                </button>
-                {isInstagramCarouselFormat(settings.slideFormat) && (
-                  <button
-                    type="button"
-                    className="btn-icon-header btn-instagram-export"
-                    onClick={() => setShowInstagramExport(true)}
-                    disabled={isExportingPng}
-                    title="Export Instagram carousel (1080×1440)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="14" y="3" width="7" height="7" rx="1" />
-                      <rect x="3" y="14" width="7" height="7" rx="1" />
-                      <rect x="14" y="14" width="7" height="7" rx="1" />
-                    </svg>
-                    <span className="btn-tooltip">Instagram carousel</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={exportSlidesAsText}
-                  title="Copy slides to clipboard"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
-                  </svg>
-                  <span className="btn-tooltip">Copy text</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon-header"
-                  onClick={handleSaveToFolder}
-                  title="Save to connected folder (PitchDeck/[project]/project.json)"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  <span className="btn-tooltip">Save to folder</span>
-                </button>
-                <ThemeToggle theme={theme} onToggle={setTheme} className="btn-icon-header btn-theme-toggle" />
-                <button className="btn-icon-header btn-settings" onClick={() => setShowSettings(true)} title="API Keys & Settings">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-      </div>
-      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'video-editing' ? 'video-editing-content' : ''}`}>
-        {mode === 'video-editing' ? (
+    <div className={`app${mode === 'plan' ? ' plan-mode-app' : ''}${mode === 'edit' ? ' edit-mode-app' : ''}`}>
+        <AppHeader
+          mode={mode}
+          projectName={projectName}
+          onProjectNameChange={setProjectName}
+          onOpenProjectOverview={() => setShowProjectOverview(true)}
+          chapters={chapters}
+          currentChapterId={currentChapterId}
+          onChapterChange={handleChapterSelect}
+          onAddChapter={handleAddChapter}
+          onUpdateChapterName={handleUpdateChapterName}
+          onChapterDrop={handleChapterDrop}
+          workspaces={workspaces}
+          currentWorkspace={currentWorkspace}
+          onSwitchWorkspace={handleSwitchWorkspace}
+          onAddWorkspace={handleAddWorkspace}
+          onSetMode={setMode}
+          onPresent={handlePresentClick}
+          onRecord={handleRecordClick}
+          onVideoEditing={handleEnterVideoEditing}
+          isRecordingInPlace={isRecordingInPlace}
+          undo={undo}
+          redo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onBulkSelectImages={handleBulkSelectImages}
+          bulkImagesDisabled={!settings.openaiKey || !settings.unsplashKey}
+          onExportProject={handleExportFile}
+          onExportPng={handleExportSlidesAsPng}
+          onExportInstagram={() => setShowInstagramExport(true)}
+          onCopyText={exportSlidesAsText}
+          onSaveToFolder={handleSaveToFolder}
+          onImport={handleImportFile}
+          slideFormat={settings.slideFormat}
+          isExportingPng={isExportingPng}
+          theme={theme}
+          onToggleTheme={setTheme}
+          onOpenPreferences={() => setShowSettings(true)}
+          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleInspector={() => setInspectorDrawerOpen((v) => !v)}
+          inspectorOpen={inspectorDrawerOpen}
+          showLayoutToggles={mode === 'edit'}
+        />
+      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''} ${mode === 'video-editing' ? 'video-editing-content' : ''}${mode === 'plan' ? ' plan-mode-content' : ''}`}>
+        {mode === 'plan' ? (
+          <PlanMode
+            slides={slides}
+            onUpdateSlides={updateSlides}
+            chapters={chapters}
+            currentChapterId={currentChapterId}
+            onUpdateChapterSlides={updateChapterSlides}
+            onReorderChapters={reorderChapters}
+            onUpdateChapterName={handleUpdateChapterName}
+            onLoadTemplate={handleLoadTemplate}
+            showTemplates={showTemplates}
+            setShowTemplates={setShowTemplates}
+            settings={settings}
+            projectName={projectName}
+            onProjectNameChange={setProjectName}
+          />
+        ) : mode === 'video-editing' ? (
           <Suspense fallback={null}>
             <VideoEditingMode
               key={lastRecordingBlobVersion}
               videoBlob={lastRecordingBlobRef.current}
               latestRecordingRef={lastRecordingBlobRef}
-              onExit={() => setMode('plan')}
+              onExit={exitToPreviousMode}
               openaiKey={settings.openaiKey}
             />
           </Suspense>
@@ -2534,8 +2016,10 @@ function App() {
           <>
             <div 
               ref={sidebarRef}
-              className="sidebar-container"
-              style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+              className={`sidebar-container${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+              style={sidebarCollapsed
+                ? { width: '52px', minWidth: '52px', maxWidth: '52px' }
+                : { width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
             >
               <SlideList
                 slides={slides}
@@ -2551,11 +2035,13 @@ function App() {
                 onReorder={updateSlides}
               />
             </div>
+            {!sidebarCollapsed && (
             <div 
               className="resize-handle"
               onMouseDown={handleResizeStart}
               style={{ cursor: 'col-resize' }}
             />
+            )}
             <div className="main-preview-area">
             <SlidePreview
           slide={selectedSlide}
@@ -2609,7 +2095,7 @@ function App() {
           recordSettings={recordSettings}
         />
             </div>
-            {(mode === 'plan' || mode === 'edit') && (
+            {mode === 'edit' && (
               <>
                 <div
                   className="resize-handle resize-handle-inspector"
@@ -2618,7 +2104,7 @@ function App() {
                   title="Drag to resize inspector"
                 />
                 <div
-                  className="inspector-panel-wrapper"
+                  className={`inspector-panel-wrapper${inspectorDrawerOpen ? ' inspector-drawer-open' : ''}`}
                   style={{
                     width: `${inspectorWidth}px`,
                     minWidth: `${inspectorWidth}px`,
@@ -2709,9 +2195,9 @@ function App() {
       />
       {/* Auto-save indicator */}
       {isExportingPng && (
-        <div className="auto-save-indicator">
+        <div className="auto-save-indicator auto-save-indicator-export">
           <div className="auto-save-spinner"></div>
-          <span>{exportProgress || 'Exporting PNG…'}</span>
+          <span>{exportProgress || 'Exporting…'}</span>
         </div>
       )}
       {!isExportingPng && isSaving && (

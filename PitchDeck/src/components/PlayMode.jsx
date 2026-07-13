@@ -1538,8 +1538,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           </div>
         </div>
       )}
-      {!showMenu && (
-        <div className="play-controls">
+      <div className={`play-controls ${showMenu ? 'play-controls-bar' : ''}`}>
           <div className="play-slide-indicator">
             {currentIndex + 1} / {presentationSlides.length}
             {autoAdvance && (
@@ -1554,9 +1553,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
               <span>Recording</span>
             </div>
           )}
-          <button className="btn-exit" onClick={onExit}>Exit</button>
-        </div>
-      )}
+        <button type="button" className="btn-exit" onClick={(e) => { e.stopPropagation(); onExit() }}>Exit</button>
+      </div>
     </div>
   )
 }

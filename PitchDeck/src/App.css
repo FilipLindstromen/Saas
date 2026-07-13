@@ -354,18 +354,13 @@ input[type="checkbox"]:disabled {
   overflow: hidden;
 }
 
-/* Hide undo/redo — keyboard shortcuts still work */
-.btn-undo,
-.btn-redo {
-  display: none !important;
-}
-
+/* Undo/redo visible in header */
 .header-right > .header-icon-group:first-child {
-  display: none;
+  display: flex;
 }
 
 .header-right > .header-icon-group-divider:first-of-type {
-  display: none;
+  display: block;
 }
 
 /* Logical groups for header icons */
@@ -1145,4 +1140,55 @@ input[type="checkbox"]:disabled {
   min-width: auto;
   width: 40px;
   height: 40px;
+}
+
+/* Collapsed slide list rail */
+.sidebar-container.sidebar-collapsed {
+  overflow: hidden;
+}
+
+.sidebar-container.sidebar-collapsed .slide-list-header h3,
+.sidebar-container.sidebar-collapsed .layout-selector,
+.sidebar-container.sidebar-collapsed .slide-item-content,
+.sidebar-container.sidebar-collapsed .slide-item-actions,
+.sidebar-container.sidebar-collapsed .btn-add-slide span {
+  display: none;
+}
+
+.sidebar-container.sidebar-collapsed .slide-list-header,
+.sidebar-container.sidebar-collapsed .slide-item {
+  justify-content: center;
+}
+
+/* Inspector drawer on narrow viewports */
+@media (max-width: 1024px) {
+  .edit-mode-app .inspector-panel-wrapper {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    bottom: 0;
+    z-index: 150;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-xl);
+    max-width: min(360px, 92vw);
+  }
+
+  .edit-mode-app .inspector-panel-wrapper.inspector-drawer-open {
+    transform: translateX(0);
+  }
+
+  .edit-mode-app .resize-handle-inspector {
+    display: none;
+  }
+
+  .edit-mode-app .main-preview-area {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1025px) {
+  .edit-mode-app .inspector-panel-wrapper {
+    transform: none !important;
+  }
 }

@@ -1,6 +1,6 @@
 .inspector-panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -12,43 +12,59 @@
   overflow: hidden;
 }
 
-.inspector-panel-tabs {
+.inspector-panel-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 0.2rem;
   padding: 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
+  width: 108px;
+  min-width: 108px;
+  border-right: 1px solid var(--border-subtle);
   background: var(--bg-tertiary);
   flex-shrink: 0;
 }
 
-.inspector-panel-tab {
+.inspector-panel-nav-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
   background: transparent;
   border: none;
   border-radius: 8px;
   color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
 }
 
-.inspector-panel-tab:hover {
+.inspector-panel-nav-item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.inspector-panel-tab.active {
+.inspector-panel-nav-item.active {
   background: var(--bg-active);
   color: var(--accent);
 }
 
-.inspector-panel-tab svg {
-  flex-shrink: 0;
+.inspector-panel-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
 }
 
 .inspector-panel-content {
@@ -61,7 +77,17 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Embedded option panels: no fixed positioning, fill inspector */
+.inspector-panel-empty {
+  padding: 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.inspector-panel-empty p {
+  margin: 0;
+}
+
 .inspector-panel-content .recording-options-content,
 .inspector-panel-content .captions-options-content,
 .inspector-panel-content .style-dropdown-content,
@@ -80,3 +106,14 @@
   background: transparent;
 }
 
+@media (max-width: 1024px) {
+  .inspector-panel-nav {
+    width: 88px;
+    min-width: 88px;
+  }
+
+  .inspector-panel-nav-item {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+}

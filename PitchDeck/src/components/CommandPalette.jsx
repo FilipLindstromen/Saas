@@ -64,8 +64,8 @@ function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId,
     },
     {
       id: 'settings',
-      label: 'Open Settings',
-      keywords: ['settings', 'preferences', 'config'],
+      label: 'Open Preferences',
+      keywords: ['settings', 'preferences', 'config', 'api'],
       action: () => onAction('settings')
     },
     {

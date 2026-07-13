@@ -24,6 +24,10 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   const [showVideoPicker, setShowVideoPicker] = useState(false)
   const [showInfographicPicker, setShowInfographicPicker] = useState(false)
   const [showGraphicPicker, setShowGraphicPicker] = useState(null) // 'giphy' | 'icon' | null
+  const [backgroundMenuOpen, setBackgroundMenuOpen] = useState(false)
+  const [overlayMenuOpen, setOverlayMenuOpen] = useState(false)
+  const backgroundMenuRef = useRef(null)
+  const overlayMenuRef = useRef(null)
   const [previewZoom, setPreviewZoom] = useState(() => {
     try {
       const saved = localStorage.getItem('pitchDeckPreviewZoom')
@@ -41,6 +45,19 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       localStorage.setItem('pitchDeckPreviewZoom', String(previewZoom))
     } catch (e) {}
   }, [previewZoom])
+
+  useEffect(() => {
+    const closeMenus = (e) => {
+      if (backgroundMenuRef.current && !backgroundMenuRef.current.contains(e.target)) {
+        setBackgroundMenuOpen(false)
+      }
+      if (overlayMenuRef.current && !overlayMenuRef.current.contains(e.target)) {
+        setOverlayMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', closeMenus)
+    return () => document.removeEventListener('mousedown', closeMenus)
+  }, [])
 
   const handleSelectImages = async () => {
     if (!settings.openaiKey || !settings.unsplashKey) {
@@ -232,31 +249,22 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
           {(slide.layout || 'default') !== 'section' && (
-            <div className="preview-header-graphic-btns">
+            <div className="preview-header-graphic-btns" ref={overlayMenuRef}>
               <button
-                className="btn-icon btn-add-giphy"
-                onClick={() => setShowGraphicPicker('giphy')}
-                title="Add Giphy"
+                type="button"
+                className="preview-toolbar-group-btn"
+                onClick={() => { setOverlayMenuOpen((v) => !v); setBackgroundMenuOpen(false) }}
+                aria-expanded={overlayMenuOpen}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="12" r="1.5" />
-                  <circle cx="15.5" cy="12" r="1.5" />
-                  <path d="M8.5 12h7" />
-                </svg>
-                <span className="btn-tooltip">Add Giphy</span>
+                Overlay
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
               </button>
-              <button
-                className="btn-icon btn-add-icon"
-                onClick={() => setShowGraphicPicker('icon')}
-                title="Add icon"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 8v8M8 12h8" />
-                </svg>
-                <span className="btn-tooltip">Add icon</span>
-              </button>
+              {overlayMenuOpen && (
+                <div className="preview-toolbar-dropdown">
+                  <button type="button" onClick={() => { setShowGraphicPicker('giphy'); setOverlayMenuOpen(false) }}>Add Giphy</button>
+                  <button type="button" onClick={() => { setShowGraphicPicker('icon'); setOverlayMenuOpen(false) }}>Add icon</button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -270,121 +278,35 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />
-              <button
-                className="btn-icon btn-upload-image"
-                onClick={handleUploadImage}
-                title="Upload Image"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                <span className="btn-tooltip">Upload Image</span>
-              </button>
-              <button
-                className="btn-icon btn-swap-image"
-                onClick={handleSwapImage}
-                disabled={!settings.unsplashKey}
-                title="Choose image"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-                <span className="btn-tooltip">Choose image</span>
-              </button>
-              <button
-                className="btn-icon btn-select-images"
-                onClick={handleSelectImages}
-                disabled={isSelectingImages || !slide.content || (slide.layout || 'default') === 'video'}
-                title={(slide.layout || 'default') === 'video' ? 'Not available for fullscreen camera layout' : 'Auto select image'}
-              >
-                {isSelectingImages ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 3v18" />
-                    <path d="M12 3l-2 2M12 3l2 2" />
-                    <path d="M8 6l-1.5-1.5M16 6l1.5-1.5" />
-                    <path d="M6 9l-1-1M18 9l1-1" />
-                    <circle cx="12" cy="12" r="1" fill="currentColor" />
-                  </svg>
+              <div className="preview-toolbar-group" ref={backgroundMenuRef}>
+                <button
+                  type="button"
+                  className="preview-toolbar-group-btn"
+                  onClick={() => { setBackgroundMenuOpen((v) => !v); setOverlayMenuOpen(false) }}
+                  aria-expanded={backgroundMenuOpen}
+                >
+                  Background
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                </button>
+                {backgroundMenuOpen && (
+                  <div className="preview-toolbar-dropdown">
+                    <button type="button" onClick={() => { handleUploadImage(); setBackgroundMenuOpen(false) }}>Upload image</button>
+                    <button type="button" onClick={() => { handleSwapImage(); setBackgroundMenuOpen(false) }} disabled={!settings.unsplashKey}>Choose image</button>
+                    <button type="button" onClick={() => { handleSelectImages(); setBackgroundMenuOpen(false) }} disabled={isSelectingImages || !slide.content || (slide.layout || 'default') === 'video'}>
+                      {isSelectingImages ? 'Selecting…' : 'Auto-select image'}
+                    </button>
+                    <button type="button" onClick={() => { setShowInfographicPicker(true); setBackgroundMenuOpen(false) }}>Infographic</button>
+                    <button type="button" onClick={() => { setShowVideoPicker(true); setBackgroundMenuOpen(false) }} disabled={!(settings.pexelsKey?.trim() || settings.pixabayKey?.trim())}>Video</button>
+                    {slide.imageUrl && <button type="button" onClick={() => { handleRemoveImage(); setBackgroundMenuOpen(false) }}>Remove image</button>}
+                    {slide.infographicProjectId && (
+                      <button type="button" onClick={() => { onUpdate({ infographicProjectId: undefined, infographicTabId: undefined }); setBackgroundMenuOpen(false) }}>Remove infographic</button>
+                    )}
+                    {slide.backgroundVideoUrl && (
+                      <button type="button" onClick={() => { handleRemoveVideoBackground(); setBackgroundMenuOpen(false) }}>Remove video</button>
+                    )}
+                  </div>
                 )}
-                <span className="btn-tooltip">{isSelectingImages ? 'Selecting...' : 'Auto select image'}</span>
-              </button>
-              <button
-                className="btn-icon btn-infographic-background"
-                onClick={() => setShowInfographicPicker(true)}
-                title="Infographic background"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <path d="M3 9h18M9 21V9" />
-                </svg>
-                <span className="btn-tooltip">Infographic background</span>
-              </button>
-              <button
-                className="btn-icon btn-video-background"
-                onClick={() => setShowVideoPicker(true)}
-                disabled={!(settings.pexelsKey && settings.pexelsKey.trim()) && !(settings.pixabayKey && settings.pixabayKey.trim())}
-                title="Video background"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                </svg>
-                <span className="btn-tooltip">Video background</span>
-              </button>
-              {slide.imageUrl && (
-                <>
-                  <button
-                    className="btn-icon btn-remove-image"
-                    onClick={handleRemoveImage}
-                    title="Remove Image"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                    <span className="btn-tooltip">Remove Image</span>
-                  </button>
-                </>
-              )}
-              {slide.infographicProjectId && (
-                <button
-                  className="btn-icon btn-remove-infographic"
-                  onClick={() => onUpdate({ infographicProjectId: undefined, infographicTabId: undefined })}
-                  title="Remove infographic background"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <path d="M3 9h18M9 21V9" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                  </svg>
-                  <span className="btn-tooltip">Remove infographic</span>
-                </button>
-              )}
-              {slide.backgroundVideoUrl && (
-                <button
-                  className="btn-icon btn-remove-video"
-                  onClick={handleRemoveVideoBackground}
-                  title="Remove video background"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                  </svg>
-                  <span className="btn-tooltip">Remove video</span>
-                </button>
-              )}
+              </div>
             </>
           )}
         </div>

@@ -36,6 +36,15 @@
   }
 }
 
+.auto-save-indicator-export {
+  border-color: rgba(255, 107, 53, 0.35);
+  color: var(--accent);
+}
+
+.auto-save-indicator-export .auto-save-spinner {
+  border-top-color: var(--accent-secondary);
+}
+
 .auto-save-indicator svg {
   width: 14px;
   height: 14px;

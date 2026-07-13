@@ -1,102 +1,23 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, contentVerticalAlign = 'bottom', slideFormat = '16:9', onUpdateSettings }) {
-  const formatSection = onUpdateSettings ? (
-    <div className="slide-settings-section">
-      <div className="slide-settings-field slide-settings-format">
-        <label htmlFor="slide-settings-format">Format</label>
-        <select
-          id="slide-settings-format"
-          className="slide-settings-select"
-          value={slideFormat}
-          onChange={(e) => onUpdateSettings({ slideFormat: e.target.value })}
-          title="Slide aspect ratio for preview, present, and export"
-        >
-          <option value="16:9">16:9</option>
-          <option value="1:1">1:1</option>
-          <option value="9:16">9:16</option>
-          <option value="3:4">1080×1440 (Instagram)</option>
-        </select>
-      </div>
-      <p className="slide-settings-hint">Applies to all slides in preview, present mode, and export.</p>
-      {slideFormat === '3:4' && (
-        <p className="slide-settings-hint">Export as an Instagram carousel from the header or command palette (Ctrl+K).</p>
-      )}
-    </div>
-  ) : null
-
-  const textPositionSection = onUpdateSettings ? (
-    <div className="slide-settings-section slide-settings-text-position">
-      <h4 className="slide-settings-section-title">Text position</h4>
-      <div className="slide-settings-field">
-        <label htmlFor="slide-settings-vertical-align">Vertical alignment</label>
-        <select
-          id="slide-settings-vertical-align"
-          className="slide-settings-select"
-          value={contentVerticalAlign || 'bottom'}
-          onChange={(e) => onUpdateSettings({ contentVerticalAlign: e.target.value })}
-          title="Align slide text to the top or bottom (all slides)"
-        >
-          <option value="bottom">Bottom</option>
-          <option value="top">Top</option>
-        </select>
-      </div>
-      <div className="slide-settings-field">
-        <label htmlFor="slide-settings-edge">Distance from edge (%)</label>
-        <input
-          id="slide-settings-edge"
-          type="number"
-          min="2"
-          max="25"
-          step="0.5"
-          value={contentEdgeOffset}
-          onChange={(e) => onUpdateSettings({ contentEdgeOffset: parseFloat(e.target.value) ?? 9 })}
-          className="slide-settings-input"
-          title="Horizontal distance from left/right edge for all slides"
-        />
-      </div>
-      <div className="slide-settings-field">
-        <label htmlFor="slide-settings-vertical-distance">
-          Distance from {contentVerticalAlign === 'top' ? 'top' : 'bottom'} (%)
-        </label>
-        <input
-          id="slide-settings-vertical-distance"
-          type="number"
-          min="5"
-          max="30"
-          step="0.5"
-          value={contentBottomOffset}
-          onChange={(e) => onUpdateSettings({ contentBottomOffset: parseFloat(e.target.value) ?? 12 })}
-          className="slide-settings-input"
-          title={`How far from the ${contentVerticalAlign === 'top' ? 'top' : 'bottom'} the text sits (all slides)`}
-        />
-      </div>
-      <p className="slide-settings-hint">Applies to all slides in edit, present, and export.</p>
-    </div>
-  ) : null
-
+function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a' }) {
   if (!slide) {
     return (
       <div className="slide-settings-content">
-        {formatSection}
-        {textPositionSection}
         <div className="slide-settings-empty">
-          <p>Select a slide to edit its background and image settings.</p>
+          <p>Select a slide to edit its background, gradient, and image settings.</p>
         </div>
       </div>
     )
   }
-  const isMultiSelect = selectedCount > 1
 
+  const isMultiSelect = selectedCount > 1
   const layout = slide.layout || 'default'
   const showGradient = layout !== 'centered' && layout !== 'right'
   const showImage = layout !== 'section'
 
   return (
     <div className="slide-settings-content">
-      {formatSection}
-      {textPositionSection}
-
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}
@@ -173,35 +94,35 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
           </div>
           {slide.gradientEnabled !== false && (
             <>
-          <div className="slide-settings-field slide-settings-row">
-            <button
-              type="button"
-              className={`slide-settings-btn ${slide.gradientFlipped ? 'active' : ''}`}
-              onClick={() => onUpdate({ gradientFlipped: !slide.gradientFlipped })}
-              title="Flip Gradient Direction"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
-              </svg>
-              <span>Flip Gradient</span>
-            </button>
-          </div>
-          <div className="slide-settings-field">
-            <label htmlFor="slide-settings-gradient">Gradient:</label>
-            <div className="slide-settings-slider-wrap">
-              <input
-                id="slide-settings-gradient"
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7}
-                onChange={(e) => onUpdate({ gradientStrength: parseFloat(e.target.value) })}
-                className="slide-settings-slider"
-              />
-              <span className="slide-settings-value">{Math.round((slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7) * 100)}%</span>
-            </div>
-          </div>
+              <div className="slide-settings-field slide-settings-row">
+                <button
+                  type="button"
+                  className={`slide-settings-btn ${slide.gradientFlipped ? 'active' : ''}`}
+                  onClick={() => onUpdate({ gradientFlipped: !slide.gradientFlipped })}
+                  title="Flip Gradient Direction"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12h-8M3 12h8M12 3l-9 9 9 9M12 21l9-9-9-9" />
+                  </svg>
+                  <span>Flip Gradient</span>
+                </button>
+              </div>
+              <div className="slide-settings-field">
+                <label htmlFor="slide-settings-gradient">Gradient:</label>
+                <div className="slide-settings-slider-wrap">
+                  <input
+                    id="slide-settings-gradient"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7}
+                    onChange={(e) => onUpdate({ gradientStrength: parseFloat(e.target.value) })}
+                    className="slide-settings-slider"
+                  />
+                  <span className="slide-settings-value">{Math.round((slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7) * 100)}%</span>
+                </div>
+              </div>
             </>
           )}
         </div>

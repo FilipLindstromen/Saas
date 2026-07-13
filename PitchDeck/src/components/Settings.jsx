@@ -31,7 +31,7 @@ function Settings({ settings, onUpdate, onClose }) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h2>Settings</h2>
+          <h2>Preferences</h2>
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
         <div className="settings-tabs">
