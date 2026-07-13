@@ -711,6 +711,48 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
             <label className="style-dropdown-checkbox">
               <input
                 type="checkbox"
+                checked={settings.textOutline || false}
+                onChange={(e) => handleChange('textOutline', e.target.checked)}
+              />
+              <span>Enable Outline</span>
+            </label>
+            {settings.textOutline && (
+              <div className="style-dropdown-sub-fields">
+                <div className="style-dropdown-sub-field">
+                  <label>Width (px)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={settings.outlineWidth || 2}
+                    onChange={(e) => handleChange('outlineWidth', parseInt(e.target.value) || 1)}
+                    className="style-dropdown-input"
+                  />
+                </div>
+                <div className="style-dropdown-sub-field">
+                  <label>Color</label>
+                  <div className="style-dropdown-color-group">
+                    <input
+                      type="color"
+                      value={settings.outlineColor || '#000000'}
+                      onChange={(e) => handleChange('outlineColor', e.target.value)}
+                      className="style-dropdown-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={settings.outlineColor || '#000000'}
+                      onChange={(e) => handleChange('outlineColor', e.target.value)}
+                      className="style-dropdown-input"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="style-dropdown-field">
+            <label className="style-dropdown-checkbox">
+              <input
+                type="checkbox"
                 checked={settings.textInlineBackground || false}
                 onChange={(e) => handleChange('textInlineBackground', e.target.checked)}
               />

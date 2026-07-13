@@ -218,6 +218,9 @@ function App() {
       shadowOffsetX: parseInt(localStorage.getItem('shadowOffsetX')) || 2,
       shadowOffsetY: parseInt(localStorage.getItem('shadowOffsetY')) || 2,
       shadowColor: localStorage.getItem('shadowColor') || '#000000',
+      textOutline: localStorage.getItem('textOutline') === 'true',
+      outlineWidth: parseInt(localStorage.getItem('outlineWidth')) || 2,
+      outlineColor: localStorage.getItem('outlineColor') || '#000000',
       textInlineBackground: localStorage.getItem('textInlineBackground') === 'true',
       inlineBgColor: localStorage.getItem('inlineBgColor') || '#000000',
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
@@ -572,6 +575,9 @@ function App() {
     localStorage.setItem('shadowOffsetX', settings.shadowOffsetX?.toString() || '2')
     localStorage.setItem('shadowOffsetY', settings.shadowOffsetY?.toString() || '2')
     localStorage.setItem('shadowColor', settings.shadowColor || '#000000')
+    localStorage.setItem('textOutline', settings.textOutline ? 'true' : 'false')
+    localStorage.setItem('outlineWidth', settings.outlineWidth?.toString() || '2')
+    localStorage.setItem('outlineColor', settings.outlineColor || '#000000')
     localStorage.setItem('textInlineBackground', settings.textInlineBackground ? 'true' : 'false')
     localStorage.setItem('inlineBgColor', settings.inlineBgColor || '#000000')
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
@@ -1740,6 +1746,9 @@ function App() {
           shadowOffsetX={settings.shadowOffsetX}
           shadowOffsetY={settings.shadowOffsetY}
           shadowColor={settings.shadowColor}
+          textOutline={settings.textOutline}
+          outlineWidth={settings.outlineWidth}
+          outlineColor={settings.outlineColor}
           textInlineBackground={settings.textInlineBackground}
           inlineBgColor={settings.inlineBgColor}
           inlineBgOpacity={settings.inlineBgOpacity}
@@ -2438,6 +2447,9 @@ function App() {
           shadowOffsetX={settings.shadowOffsetX}
           shadowOffsetY={settings.shadowOffsetY}
           shadowColor={settings.shadowColor}
+          textOutline={settings.textOutline}
+          outlineWidth={settings.outlineWidth}
+          outlineColor={settings.outlineColor}
           textInlineBackground={settings.textInlineBackground}
           inlineBgColor={settings.inlineBgColor}
           inlineBgOpacity={settings.inlineBgOpacity}

@@ -29,7 +29,7 @@ export function getWebcamCircleSizeStyle(webcamSize) {
   const pct = normalizeWebcamSizePercent(webcamSize)
   return {
     height: `${pct}%`,
-    width: `${pct}%`,
+    width: 'auto',
     minWidth: 0,
     minHeight: 0,
   }
