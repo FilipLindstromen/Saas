@@ -88,10 +88,36 @@
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1rem;
+  padding: 0.75rem 1rem 1rem;
   min-height: 0;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.inspector-panel-content-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -0.75rem -1rem 0.75rem;
+  padding: 0.75rem 1rem 0.65rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.inspector-panel-content-group {
+  margin: 0 0 0.15rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.inspector-panel-content-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .inspector-panel-empty {

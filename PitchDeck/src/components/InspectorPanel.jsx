@@ -6,7 +6,7 @@ import TransitionOptions from './TransitionOptions'
 import SlideSettings from './SlideSettings'
 import DocumentSettings from './DocumentSettings'
 import ActiveObjectOptions from './ActiveObjectOptions'
-import { INSPECTOR_TABS, InspectorTabIcon, normalizeInspectorTab } from './InspectorIcons'
+import { INSPECTOR_TABS, INSPECTOR_GROUP_LABELS, InspectorTabIcon, getInspectorTabMeta, normalizeInspectorTab } from './InspectorIcons'
 import './InspectorPanel.css'
 
 function InspectorPanel({
@@ -26,6 +26,8 @@ function InspectorPanel({
   backgroundColor,
 }) {
   const tab = normalizeInspectorTab(activeTab)
+  const tabMeta = getInspectorTabMeta(tab)
+  const groupLabel = INSPECTOR_GROUP_LABELS[tabMeta.group]
 
   const getIdsToUpdate = () => {
     if (selectedSlides.size > 0) return Array.from(selectedSlides)
@@ -100,6 +102,11 @@ function InspectorPanel({
       </nav>
 
       <div className="inspector-panel-content">
+        <header className="inspector-panel-content-header">
+          <p className="inspector-panel-content-group">{groupLabel}</p>
+          <h2 className="inspector-panel-content-title">{tabMeta.label}</h2>
+        </header>
+
         {tab === 'layout' && (
           <DocumentSettings
             slideFormat={settings.slideFormat || '16:9'}
@@ -131,10 +138,14 @@ function InspectorPanel({
           />
         )}
 
-        {(tab === 'slide' || tab === 'gradient' || tab === 'media') && (
+        {(tab === 'slide-bg' || tab === 'slide-lines' || tab === 'gradient' || tab === 'media') && (
           <SlideSettings
             {...slideSettingsProps}
-            section={tab === 'slide' ? 'general' : tab}
+            section={
+              tab === 'slide-bg' ? 'bg'
+                : tab === 'slide-lines' ? 'lines'
+                  : tab
+            }
           />
         )}
 

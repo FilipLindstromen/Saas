@@ -43,8 +43,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}
-      {show('general') && (
-      <>
+      {show('bg') && (
       <div className="slide-settings-section">
         <div className="slide-settings-field slide-settings-bg-color">
           <label htmlFor="slide-settings-bg-override">Bg color:</label>
@@ -89,7 +88,9 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
           )}
         </div>
       </div>
+      )}
 
+      {show('lines') && (
       <div className="slide-settings-section">
         <div className="slide-settings-field">
           <label className="slide-settings-toggle">
@@ -103,7 +104,6 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
         </div>
         <p className="slide-settings-hint">When enabled, each click in present mode reveals one more text line (or bullet).</p>
       </div>
-      </>
       )}
 
       {show('gradient') && showGradient && (

@@ -10,11 +10,20 @@ const iconProps = {
   'aria-hidden': true,
 }
 
+export const INSPECTOR_GROUP_LABELS = {
+  document: 'Document',
+  slide: 'Slide',
+  present: 'Present',
+  record: 'Record',
+  object: 'Object',
+}
+
 export const INSPECTOR_TABS = [
   { id: 'layout', label: 'Layout', group: 'document' },
   { id: 'colors', label: 'Colors', group: 'document' },
   { id: 'typography', label: 'Typography', group: 'document' },
-  { id: 'slide', label: 'Slide', group: 'slide' },
+  { id: 'slide-bg', label: 'Background', group: 'slide' },
+  { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
   { id: 'gradient', label: 'Gradient', group: 'slide' },
   { id: 'media', label: 'Media', group: 'slide' },
   { id: 'playback', label: 'Auto-advance', group: 'present' },
@@ -30,8 +39,14 @@ export const INSPECTOR_TABS = [
 
 const LEGACY_TAB_IDS = {
   document: 'layout',
+  slide: 'slide-bg',
   present: 'playback',
   'active-object': 'object',
+}
+
+export function getInspectorTabMeta(tabId) {
+  const id = normalizeInspectorTab(tabId)
+  return INSPECTOR_TABS.find((t) => t.id === id) || INSPECTOR_TABS[0]
 }
 
 export function normalizeInspectorTab(tab) {
@@ -61,6 +76,21 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M4 7V5h16v2" />
           <path d="M12 5v14" />
           <path d="M8 19h8" />
+        </svg>
+      )
+    case 'slide-bg':
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 15h18" fill="currentColor" stroke="none" opacity="0.25" />
+        </svg>
+      )
+    case 'slide-lines':
+      return (
+        <svg {...iconProps}>
+          <path d="M4 7h16" />
+          <path d="M4 12h12" />
+          <path d="M4 17h8" />
         </svg>
       )
     case 'slide':
