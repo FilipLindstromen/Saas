@@ -133,6 +133,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     bulletStyle: 'dot',
     contentBottomOffset: 12,
     contentEdgeOffset: 9,
+    contentVerticalAlign: 'bottom',
     defaultFontWeight: 700,
     h1Weight: 700,
     h2Weight: 700,

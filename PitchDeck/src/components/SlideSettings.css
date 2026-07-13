@@ -29,6 +29,20 @@
   gap: 0.75rem;
 }
 
+.slide-settings-section-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.slide-settings-text-position {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .slide-settings-field {
   display: flex;
   align-items: center;

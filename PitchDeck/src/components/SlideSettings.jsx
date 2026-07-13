@@ -1,6 +1,6 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, slideFormat = '16:9', onUpdateSettings }) {
+function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', contentEdgeOffset = 9, contentBottomOffset = 12, contentVerticalAlign = 'bottom', slideFormat = '16:9', onUpdateSettings }) {
   const formatSection = onUpdateSettings ? (
     <div className="slide-settings-section">
       <div className="slide-settings-field slide-settings-format">
@@ -15,9 +15,63 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
           <option value="16:9">16:9</option>
           <option value="1:1">1:1</option>
           <option value="9:16">9:16</option>
+          <option value="3:4">1080×1440 (Instagram)</option>
         </select>
       </div>
       <p className="slide-settings-hint">Applies to all slides in preview, present mode, and export.</p>
+      {slideFormat === '3:4' && (
+        <p className="slide-settings-hint">Export as an Instagram carousel from the header or command palette (Ctrl+K).</p>
+      )}
+    </div>
+  ) : null
+
+  const textPositionSection = onUpdateSettings ? (
+    <div className="slide-settings-section slide-settings-text-position">
+      <h4 className="slide-settings-section-title">Text position</h4>
+      <div className="slide-settings-field">
+        <label htmlFor="slide-settings-vertical-align">Vertical alignment</label>
+        <select
+          id="slide-settings-vertical-align"
+          className="slide-settings-select"
+          value={contentVerticalAlign || 'bottom'}
+          onChange={(e) => onUpdateSettings({ contentVerticalAlign: e.target.value })}
+          title="Align slide text to the top or bottom (all slides)"
+        >
+          <option value="bottom">Bottom</option>
+          <option value="top">Top</option>
+        </select>
+      </div>
+      <div className="slide-settings-field">
+        <label htmlFor="slide-settings-edge">Distance from edge (%)</label>
+        <input
+          id="slide-settings-edge"
+          type="number"
+          min="2"
+          max="25"
+          step="0.5"
+          value={contentEdgeOffset}
+          onChange={(e) => onUpdateSettings({ contentEdgeOffset: parseFloat(e.target.value) ?? 9 })}
+          className="slide-settings-input"
+          title="Horizontal distance from left/right edge for all slides"
+        />
+      </div>
+      <div className="slide-settings-field">
+        <label htmlFor="slide-settings-vertical-distance">
+          Distance from {contentVerticalAlign === 'top' ? 'top' : 'bottom'} (%)
+        </label>
+        <input
+          id="slide-settings-vertical-distance"
+          type="number"
+          min="5"
+          max="30"
+          step="0.5"
+          value={contentBottomOffset}
+          onChange={(e) => onUpdateSettings({ contentBottomOffset: parseFloat(e.target.value) ?? 12 })}
+          className="slide-settings-input"
+          title={`How far from the ${contentVerticalAlign === 'top' ? 'top' : 'bottom'} the text sits (all slides)`}
+        />
+      </div>
+      <p className="slide-settings-hint">Applies to all slides in edit, present, and export.</p>
     </div>
   ) : null
 
@@ -25,6 +79,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
     return (
       <div className="slide-settings-content">
         {formatSection}
+        {textPositionSection}
         <div className="slide-settings-empty">
           <p>Select a slide to edit its background and image settings.</p>
         </div>
@@ -40,6 +95,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
   return (
     <div className="slide-settings-content">
       {formatSection}
+      {textPositionSection}
 
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
@@ -224,39 +280,6 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {onUpdateSettings && (
-        <div className="slide-settings-section">
-          <div className="slide-settings-field">
-            <label htmlFor="slide-settings-edge">Distance from edge (%)</label>
-            <input
-              id="slide-settings-edge"
-              type="number"
-              min="2"
-              max="25"
-              step="0.5"
-              value={contentEdgeOffset}
-              onChange={(e) => onUpdateSettings({ contentEdgeOffset: parseFloat(e.target.value) ?? 9 })}
-              className="slide-settings-input"
-              title="Horizontal distance from left/right edge for all slides"
-            />
-          </div>
-          <div className="slide-settings-field">
-            <label htmlFor="slide-settings-bottom">Distance from bottom (%)</label>
-            <input
-              id="slide-settings-bottom"
-              type="number"
-              min="5"
-              max="30"
-              step="0.5"
-              value={contentBottomOffset}
-              onChange={(e) => onUpdateSettings({ contentBottomOffset: parseFloat(e.target.value) ?? 12 })}
-              className="slide-settings-input"
-              title="How far from the bottom the text sits (all slides)"
-            />
-          </div>
         </div>
       )}
     </div>

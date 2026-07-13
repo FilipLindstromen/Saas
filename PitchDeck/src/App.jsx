@@ -14,7 +14,9 @@ import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
 import AppLogo from './components/AppLogo'
 import InspectorPanel from './components/InspectorPanel'
+import InstagramCarouselExportModal from './components/InstagramCarouselExportModal'
 import { formatTimeAgo } from './utils/formatTimeAgo'
+import { isInstagramCarouselFormat } from './utils/slideFormats'
 import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
 import { useUndoRedo } from './hooks/useUndoRedo'
@@ -158,6 +160,9 @@ function App() {
   const [selectedGraphicId, setSelectedGraphicId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+  const [isExportingPng, setIsExportingPng] = useState(false)
+  const [exportProgress, setExportProgress] = useState('')
+  const [showInstagramExport, setShowInstagramExport] = useState(false)
   const [recentFiles, setRecentFiles] = useState(() => {
     try {
       const saved = localStorage.getItem('pitchDeckRecentFiles')
@@ -242,6 +247,7 @@ function App() {
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
       contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 12,
       contentEdgeOffset: parseFloat(localStorage.getItem('contentEdgeOffset')) || 9,
+      contentVerticalAlign: localStorage.getItem('contentVerticalAlign') || 'bottom',
       defaultFontWeight: parseInt(localStorage.getItem('defaultFontWeight'), 10) || 700,
       h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
       h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
@@ -599,6 +605,7 @@ function App() {
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
     if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
     if (settings.contentEdgeOffset !== undefined) localStorage.setItem('contentEdgeOffset', settings.contentEdgeOffset.toString())
+    localStorage.setItem('contentVerticalAlign', settings.contentVerticalAlign || 'bottom')
     localStorage.setItem('showBullets', settings.showBullets !== false ? 'true' : 'false')
     if (settings.defaultFontWeight !== undefined) localStorage.setItem('defaultFontWeight', settings.defaultFontWeight.toString())
     if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
@@ -888,6 +895,61 @@ function App() {
     }
   }, [chapters])
 
+  const handleExportSlidesAsPng = useCallback(async () => {
+    if (isExportingPng) return
+    const allSlides = chapters.flatMap((ch) => ch.slides)
+    if (!allSlides.length) {
+      alert('No slides to export.')
+      return
+    }
+    setIsExportingPng(true)
+    setExportProgress('Preparing export…')
+    try {
+      const { exportSlidesAsPng } = await import('./utils/exportSlidesAsPng.jsx')
+      await exportSlidesAsPng({
+        slides: allSlides,
+        settings,
+        slideFormat: settings.slideFormat || '16:9',
+        projectName,
+        onProgress: setExportProgress,
+      })
+    } catch (err) {
+      console.error('PNG export failed:', err)
+      alert(`PNG export failed: ${err?.message ?? 'Unknown error'}`)
+    } finally {
+      setIsExportingPng(false)
+      setExportProgress('')
+    }
+  }, [chapters, settings, projectName, isExportingPng])
+
+  const handleInstagramCarouselExport = useCallback(async (options) => {
+    if (isExportingPng) return
+    const allSlides = chapters.flatMap((ch) => ch.slides)
+    if (!allSlides.length) {
+      alert('No slides to export.')
+      return
+    }
+    setIsExportingPng(true)
+    setExportProgress('Preparing carousel…')
+    try {
+      const { exportInstagramCarousel } = await import('./utils/exportSlidesAsPng.jsx')
+      await exportInstagramCarousel({
+        slides: allSlides,
+        settings,
+        projectName,
+        onProgress: setExportProgress,
+        ...options,
+      })
+      setShowInstagramExport(false)
+    } catch (err) {
+      console.error('Instagram export failed:', err)
+      alert(`Instagram export failed: ${err?.message ?? 'Unknown error'}`)
+    } finally {
+      setIsExportingPng(false)
+      setExportProgress('')
+    }
+  }, [chapters, settings, projectName, isExportingPng])
+
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
     const newSlide = { id: newId, content: '', subtitle: '', imageUrl: '', backgroundVideoUrl: '', infographicProjectId: undefined, infographicTabId: undefined, layout: 'default', gradientStrength: 0.7, flipHorizontal: false, backgroundOpacity: 0.6, gradientFlipped: false, imageScale: 1.0, imagePositionX: 50, imagePositionY: 50, textHeadingLevel: null, subtitleHeadingLevel: null }
@@ -970,11 +1032,12 @@ function App() {
       }
 
       // Don't handle other shortcuts if modals are open
-      if (showShortcuts || showCommandPalette || showSettings) {
+      if (showShortcuts || showCommandPalette || showSettings || showInstagramExport) {
         if (e.key === 'Escape') {
           setShowShortcuts(false)
           setShowCommandPalette(false)
           setShowSettings(false)
+          if (!isExportingPng) setShowInstagramExport(false)
         }
         return
       }
@@ -1079,7 +1142,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, selectedSlides, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
+  }, [mode, selectedSlideId, slides, showShortcuts, showCommandPalette, showSettings, showInstagramExport, isExportingPng, selectedSlides, historyIndex, duplicateSlide, deleteSlide, handleExportFile, undo, redo])
 
   const updateSlide = (id, updates) => {
     // Use functional updater so rapid successive updates (e.g. auto-set serif for multiple slides) all apply;
@@ -1562,6 +1625,8 @@ function App() {
       case 'duplicateSlide': duplicateSlide(selectedSlideId); break
       case 'deleteSlide': deleteSlide(selectedSlideId); break
       case 'export': handleExportFile(); break
+      case 'exportPng': handleExportSlidesAsPng(); break
+      case 'exportInstagram': setShowInstagramExport(true); break
       case 'import': handleImportFile(); break
       case 'settings': setShowSettings(true); break
       case 'transitions': setInspectorTab('transitions'); break
@@ -1776,6 +1841,7 @@ function App() {
           slideFormat={settings.slideFormat || '16:9'}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
+          contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
           showBullets={settings.showBullets !== false}
           autoAdvance={settings.autoAdvance === true}
           autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
@@ -2075,6 +2141,37 @@ function App() {
                 <button
                   type="button"
                   className="btn-icon-header"
+                  onClick={handleExportSlidesAsPng}
+                  disabled={isExportingPng}
+                  title="Export all slides as PNG (ZIP)"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <span className="btn-tooltip">Export PNG</span>
+                </button>
+                {isInstagramCarouselFormat(settings.slideFormat) && (
+                  <button
+                    type="button"
+                    className="btn-icon-header btn-instagram-export"
+                    onClick={() => setShowInstagramExport(true)}
+                    disabled={isExportingPng}
+                    title="Export Instagram carousel (1080×1440)"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="14" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="14" width="7" height="7" rx="1" />
+                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    <span className="btn-tooltip">Instagram carousel</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-icon-header"
                   onClick={exportSlidesAsText}
                   title="Copy slides to clipboard"
                 >
@@ -2133,6 +2230,12 @@ function App() {
             onUpdate={setSettings}
             onClose={() => setShowSettings(false)}
           />
+        )}
+        {isExportingPng && (
+          <div className="auto-save-indicator">
+            <div className="auto-save-spinner"></div>
+            <span>{exportProgress || 'Exporting PNG…'}</span>
+          </div>
         )}
     </div>
   )
@@ -2349,6 +2452,37 @@ function App() {
                 <button
                   type="button"
                   className="btn-icon-header"
+                  onClick={handleExportSlidesAsPng}
+                  disabled={isExportingPng}
+                  title="Export all slides as PNG (ZIP)"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <span className="btn-tooltip">Export PNG</span>
+                </button>
+                {isInstagramCarouselFormat(settings.slideFormat) && (
+                  <button
+                    type="button"
+                    className="btn-icon-header btn-instagram-export"
+                    onClick={() => setShowInstagramExport(true)}
+                    disabled={isExportingPng}
+                    title="Export Instagram carousel (1080×1440)"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="14" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="14" width="7" height="7" rx="1" />
+                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    <span className="btn-tooltip">Instagram carousel</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-icon-header"
                   onClick={exportSlidesAsText}
                   title="Copy slides to clipboard"
                 >
@@ -2461,6 +2595,7 @@ function App() {
           bulletStyle={settings.bulletStyle || 'dot'}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
+          contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
           showBullets={settings.showBullets !== false}
           autoAdvance={settings.autoAdvance === true}
           autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
@@ -2551,6 +2686,17 @@ function App() {
           slides={slides}
           chapters={chapters}
           currentChapterId={currentChapterId}
+          instagramCarouselEnabled={isInstagramCarouselFormat(settings.slideFormat)}
+        />
+      )}
+      {showInstagramExport && (
+        <InstagramCarouselExportModal
+          slides={chapters.flatMap((ch) => ch.slides)}
+          projectName={projectName}
+          onClose={() => { if (!isExportingPng) setShowInstagramExport(false) }}
+          onExport={handleInstagramCarouselExport}
+          isExporting={isExportingPng}
+          exportProgress={exportProgress}
         />
       )}
       <input
@@ -2562,13 +2708,19 @@ function App() {
         aria-hidden="true"
       />
       {/* Auto-save indicator */}
-      {isSaving && (
+      {isExportingPng && (
+        <div className="auto-save-indicator">
+          <div className="auto-save-spinner"></div>
+          <span>{exportProgress || 'Exporting PNG…'}</span>
+        </div>
+      )}
+      {!isExportingPng && isSaving && (
         <div className="auto-save-indicator">
           <div className="auto-save-spinner"></div>
           <span>Saving...</span>
         </div>
       )}
-      {!isSaving && lastSaved && (
+      {!isExportingPng && !isSaving && lastSaved && (
         <div className="auto-save-indicator saved">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="20 6 9 17 4 12" />

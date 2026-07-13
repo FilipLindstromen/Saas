@@ -461,6 +461,11 @@
   aspect-ratio: 9 / 16;
 }
 
+.preview-slide-wrap.preview-format-3-4 .slide {
+  width: min(1200px, 100cqw, calc(100cqh * 3 / 4));
+  aspect-ratio: 3 / 4;
+}
+
 .preview-header-graphic-btns {
   display: flex;
   align-items: center;

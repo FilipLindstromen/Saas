@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './CommandPalette.css'
 
-function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId }) {
+function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId, instagramCarouselEnabled = false }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
@@ -44,6 +44,18 @@ function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId 
       keywords: ['export', 'save', 'download'],
       action: () => onAction('export')
     },
+    {
+      id: 'export-png',
+      label: 'Export Slides as PNG',
+      keywords: ['export', 'png', 'image', 'slides', 'download', 'zip'],
+      action: () => onAction('exportPng')
+    },
+    ...(instagramCarouselEnabled ? [{
+      id: 'export-instagram',
+      label: 'Export Instagram Carousel',
+      keywords: ['export', 'instagram', 'carousel', 'social', '1080', '1440'],
+      action: () => onAction('exportInstagram')
+    }] : []),
     {
       id: 'import',
       label: 'Import Project',
