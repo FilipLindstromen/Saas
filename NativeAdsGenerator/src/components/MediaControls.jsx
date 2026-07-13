@@ -3,6 +3,7 @@ import { isImageFile, isVideoFile, VIDEO_FILE_ACCEPT } from '../utils/mediaFiles
 import './MediaControls.css'
 
 export default function MediaControls({
+  activeCopyVersion = 0,
   mediaMode,
   onMediaModeChange,
   onUploadImage,
@@ -85,6 +86,11 @@ export default function MediaControls({
   return (
     <section className={`nag-panel-section ${embedded ? 'nag-panel-embedded' : ''}`}>
       {!embedded && <h3 className="nag-section-title">Media</h3>}
+      {embedded && (
+        <p className="nag-hint nag-version-bg-label">
+          Background for version {activeCopyVersion + 1}. Switch copy version to edit another background.
+        </p>
+      )}
       {error && <p className="nag-error">{error}</p>}
 
       <div className="nag-btn-grid">

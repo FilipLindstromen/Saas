@@ -2,6 +2,7 @@ export const FORMATS = {
   landscape: { id: 'landscape', label: '1920 × 1080', width: 1920, height: 1080 },
   portrait: { id: 'portrait', label: '1080 × 1920', width: 1080, height: 1920 },
   square: { id: 'square', label: '1080 × 1080', width: 1080, height: 1080 },
+  instagram: { id: 'instagram', label: '1080 × 1440', width: 1080, height: 1440 },
 }
 
 import {
@@ -24,6 +25,12 @@ export const FONT_OPTIONS = [
   'Bebas Neue',
 ]
 
+export const TEXT_ALIGN_OPTIONS = [
+  { id: 'left', label: 'Left' },
+  { id: 'center', label: 'Center' },
+  { id: 'right', label: 'Right' },
+]
+
 export const DEFAULT_TEXT = {
   ...DEFAULT_COPY_SLOT,
   copyVersions: createDefaultCopyVersions(),
@@ -38,6 +45,8 @@ export const DEFAULT_TEXT = {
   copyFontWeight: 500,
   color: '#ffffff',
   textAlign: 'center',
+  wordWrap: true,
+  textPadding: null,
   dropShadow: true,
   shadowBlur: 12,
   shadowOffsetX: 0,
@@ -61,6 +70,104 @@ export const DEFAULT_MEDIA = {
   scale: 1,
   offsetX: 0,
   offsetY: 0,
+}
+
+function getHorizontalPadding(width, text) {
+  if (typeof text.textPadding === 'number' && text.textPadding >= 0) {
+    return text.textPadding
+  }
+  return Math.round(width * 0.06)
+}
+
+function wrapLongWord(ctx, word, maxWidth) {
+  const lines = []
+  let current = ''
+  for (const char of word) {
+    const test = current + char
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test
+    } else {
+      if (current) lines.push(current)
+      current = char
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+function wrapParagraph(ctx, paragraph, maxWidth) {
+  const words = paragraph.trim().split(/\s+/).filter(Boolean)
+  if (!words.length) return []
+
+  const lines = []
+  let current = words[0]
+
+  if (ctx.measureText(current).width > maxWidth) {
+    const broken = wrapLongWord(ctx, current, maxWidth)
+    if (broken.length > 1) {
+      lines.push(...broken.slice(0, -1))
+      current = broken[broken.length - 1]
+    } else {
+      current = broken[0] || current
+    }
+  }
+
+  for (let i = 1; i < words.length; i += 1) {
+    const word = words[i]
+    const test = `${current} ${word}`
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test
+      continue
+    }
+
+    lines.push(current)
+
+    if (ctx.measureText(word).width > maxWidth) {
+      const broken = wrapLongWord(ctx, word, maxWidth)
+      lines.push(...broken.slice(0, -1))
+      current = broken[broken.length - 1] || ''
+    } else {
+      current = word
+    }
+  }
+
+  if (current) lines.push(current)
+  return lines
+}
+
+function buildTextLines(ctx, rawText, fontSize, fontWeight, fontFamily, maxWidth, wordWrap) {
+  if (!rawText?.trim()) return []
+
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
+
+  if (!wordWrap) {
+    return rawText.split('\n').map((line) => line.trim()).filter(Boolean)
+  }
+
+  const lines = []
+  rawText.split('\n').forEach((paragraph) => {
+    const trimmed = paragraph.trim()
+    if (!trimmed) return
+    lines.push(...wrapParagraph(ctx, trimmed, maxWidth))
+  })
+  return lines
+}
+
+function getTextPositions(align, width, padH, textW, boxW, highlightPad) {
+  if (align === 'left') {
+    const textX = padH
+    const boxX = Math.max(0, padH - highlightPad)
+    return { textX, boxX }
+  }
+  if (align === 'right') {
+    const textX = width - padH
+    const boxX = width - padH - textW - highlightPad
+    return { textX, boxX }
+  }
+  return {
+    textX: width / 2,
+    boxX: width / 2 - boxW / 2,
+  }
 }
 
 /**
@@ -102,41 +209,61 @@ export function drawAd(ctx, {
 
   if (!headline && !(showSubheadline && bodyCopy) && !(showLinkTitle && linkTitle)) return
 
-  const headlineLines = headline ? headline.split('\n').filter(Boolean) : []
-  const copyLines = showSubheadline && bodyCopy ? bodyCopy.split('\n').filter(Boolean) : []
-
+  const fontFamily = text.fontFamily || 'Montserrat'
   const headlineSize = text.headlineFontSize || text.fontSize || 72
   const copySize = text.copyFontSize || Math.round(headlineSize * 0.45)
   const linkTitleSize = text.linkTitleFontSize ?? Math.round(copySize * 0.85)
+  const align = text.textAlign || 'center'
+  const wordWrap = text.wordWrap !== false
+  const padH = getHorizontalPadding(width, text)
+  const maxTextWidth = Math.max(40, width - padH * 2)
+
+  const headlineLines = headline
+    ? buildTextLines(ctx, headline, headlineSize, text.fontWeight || 700, fontFamily, maxTextWidth, wordWrap)
+    : []
+  const copyLines = showSubheadline && bodyCopy
+    ? buildTextLines(ctx, bodyCopy, copySize, text.copyFontWeight || 500, fontFamily, maxTextWidth, wordWrap)
+    : []
+  const linkLines = showLinkTitle && linkTitle
+    ? buildTextLines(
+      ctx,
+      linkTitle,
+      linkTitleSize,
+      text.linkTitleFontWeight ?? 600,
+      fontFamily,
+      maxTextWidth,
+      wordWrap
+    )
+    : []
+
   const gap = headlineLines.length && copyLines.length ? headlineSize * 0.35 : 0
-  const linkGap = (headlineLines.length || copyLines.length) && showLinkTitle && linkTitle
+  const linkGap = (headlineLines.length || copyLines.length) && linkLines.length
     ? headlineSize * 0.28
     : 0
 
   const headlineBlockH = headlineLines.length * headlineSize * 1.15
   const copyBlockH = copyLines.length * copySize * 1.3
-  const linkBlockH = showLinkTitle && linkTitle ? linkTitleSize * 1.2 + linkGap : 0
+  const linkBlockH = linkLines.length ? linkLines.length * linkTitleSize * 1.2 + linkGap : 0
   const totalHeight = headlineBlockH + gap + copyBlockH + linkBlockH
   let cursorY = height / 2 - totalHeight / 2
 
-  ctx.textAlign = text.textAlign || 'center'
+  ctx.textAlign = align
 
   const drawLine = (line, y, fontSize, fontWeight, useHighlight) => {
-    ctx.font = `${fontWeight} ${fontSize}px ${text.fontFamily || 'Montserrat'}, sans-serif`
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
     const metrics = ctx.measureText(line)
     const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.78
     const descent = metrics.actualBoundingBoxDescent || fontSize * 0.22
     const textW = metrics.width
     const textH = ascent + descent
-    const pad = useHighlight && text.highlight ? (text.highlightPadding ?? 16) : 0
-    const boxH = textH + pad * 2
+    const highlightPad = useHighlight && text.highlight ? (text.highlightPadding ?? 16) : 0
+    const boxH = textH + highlightPad * 2
     const lineH = Math.max(fontSize * 1.15, boxH)
     const blockTop = y + (lineH - boxH) / 2
-    const boxW = textW + pad * 2
-    const boxX = width / 2 - boxW / 2
+    const boxW = textW + highlightPad * 2
+    const { textX, boxX } = getTextPositions(align, width, padH, textW, boxW, highlightPad)
     const boxY = blockTop
-    const textX = width / 2
-    const baselineY = boxY + pad + ascent
+    const baselineY = boxY + highlightPad + ascent
 
     if (useHighlight && text.highlight) {
       ctx.save()
@@ -200,9 +327,10 @@ export function drawAd(ctx, {
 
   if (linkGap) cursorY += linkGap
 
-  if (showLinkTitle && linkTitle) {
-    drawLine(linkTitle, cursorY, linkTitleSize, text.linkTitleFontWeight ?? 600, false)
-  }
+  linkLines.forEach((line) => {
+    drawLine(line, cursorY, linkTitleSize, text.linkTitleFontWeight ?? 600, false)
+    cursorY += linkTitleSize * 1.2
+  })
 }
 
 export async function renderAdToCanvas(options) {

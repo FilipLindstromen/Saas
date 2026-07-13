@@ -37,7 +37,8 @@ export async function restoreMediaFromPersisted(persisted) {
   }
 
   if (!persisted.blobKey) return null
-  const blob = await loadBlob(persisted.blobKey)
+  const blobKey = persisted.blobKey === 'media' ? 'media-v0' : persisted.blobKey
+  const blob = await loadBlob(blobKey)
   if (!blob) return null
 
   const objectUrl = URL.createObjectURL(blob)

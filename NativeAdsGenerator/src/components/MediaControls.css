@@ -4,6 +4,10 @@
   gap: 0.75rem;
 }
 
+.nag-version-bg-label {
+  margin: 0;
+}
+
 .nag-btn-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -1,7 +1,7 @@
 const PROJECT_KEY = 'nativeAdsGeneratorProject'
 const IDB_NAME = 'nativeAdsGenerator'
 const IDB_STORE = 'blobs'
-const PROJECT_VERSION = 1
+const PROJECT_VERSION = 2
 
 const RESTORABLE_MEDIA_MODES = new Set([
   'upload-image',
@@ -107,11 +107,13 @@ export async function blobFromDataUrl(dataUrl) {
   return res.blob()
 }
 
-export async function persistMediaSource(mode, source) {
+export async function persistMediaSource(mode, source, versionIndex = 0) {
   if (!isRestorableMediaMode(mode)) return null
 
+  const blobKey = `media-v${versionIndex}`
+
   if (mode === 'pexels-video' && source.externalUrl) {
-    return { mode, externalUrl: source.externalUrl }
+    return { mode, externalUrl: source.externalUrl, blobKey }
   }
 
   let blob = source.blob ?? null
@@ -120,10 +122,10 @@ export async function persistMediaSource(mode, source) {
   }
   if (!blob) return null
 
-  await saveBlob('media', blob)
+  await saveBlob(blobKey, blob)
   return {
     mode,
-    blobKey: 'media',
+    blobKey,
     fileName: source.fileName || null,
     externalUrl: source.externalUrl || null,
   }
@@ -135,9 +137,13 @@ export async function persistMusicSource(file) {
   return { blobKey: 'music', name: file.name }
 }
 
-export async function clearPersistedMedia() {
+export async function clearPersistedMedia(versionIndex = 0) {
   try {
-    await deleteBlob('media')
+    await deleteBlob(`media-v${versionIndex}`)
+    // Legacy key cleanup
+    if (versionIndex === 0) {
+      await deleteBlob('media')
+    }
   } catch {
     /* ignore */
   }

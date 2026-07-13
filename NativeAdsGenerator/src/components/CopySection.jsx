@@ -3,10 +3,12 @@ import {
   COPY_VERSION_COUNT,
   normalizeCopyVersions,
 } from '../utils/copyVersions'
+import { versionHasBackground } from '../utils/versionBackgrounds'
 import './CopySection.css'
 
 export default function CopySection({
   text,
+  versionBackgrounds = [],
   onChange,
   analysis,
   aiBusy,
@@ -52,8 +54,9 @@ export default function CopySection({
             type="button"
             role="tab"
             aria-selected={activeCopyVersion === i}
-            className={`nag-copy-version-tab ${activeCopyVersion === i ? 'active' : ''} ${hasSlotContent(copyVersions[i]) ? 'has-content' : ''}`}
+            className={`nag-copy-version-tab ${activeCopyVersion === i ? 'active' : ''} ${hasSlotContent(copyVersions[i]) ? 'has-content' : ''} ${versionHasBackground(versionBackgrounds[i]) ? 'has-background' : ''}`}
             onClick={() => setActiveVersion(i)}
+            title={versionHasBackground(versionBackgrounds[i]) ? 'Has custom background' : undefined}
           >
             {i + 1}
           </button>
@@ -61,7 +64,7 @@ export default function CopySection({
       </div>
 
       <p className="nag-hint nag-copy-version-hint">
-        Version {activeCopyVersion + 1} is shown in the preview. Write up to {COPY_VERSION_COUNT} variants.
+        Version {activeCopyVersion + 1} is shown in the preview. Copy and background are saved per version (1–{COPY_VERSION_COUNT}).
       </p>
 
       <div className="nag-field-group">

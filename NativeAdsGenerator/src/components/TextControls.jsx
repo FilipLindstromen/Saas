@@ -1,4 +1,4 @@
-import { FONT_OPTIONS } from '../utils/adCompositor'
+import { FONT_OPTIONS, TEXT_ALIGN_OPTIONS } from '../utils/adCompositor'
 import './TextControls.css'
 
 export default function TextControls({
@@ -30,6 +30,33 @@ export default function TextControls({
           </select>
         </div>
       </div>
+
+      <div className="nag-field-group">
+        <span className="nag-label">Alignment</span>
+        <div className="nag-align-row" role="group" aria-label="Text alignment">
+          {TEXT_ALIGN_OPTIONS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              className={`nag-align-btn ${(text.textAlign || 'center') === id ? 'active' : ''}`}
+              aria-pressed={(text.textAlign || 'center') === id}
+              onClick={() => update('textAlign', id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="nag-checkbox">
+        <input
+          type="checkbox"
+          checked={text.wordWrap !== false}
+          onChange={(e) => update('wordWrap', e.target.checked)}
+        />
+        <span>Auto word wrap</span>
+      </label>
+      <p className="nag-hint">Wraps headline and copy to fit within the canvas margins.</p>
 
       <div className="nag-field-row">
         <div className="nag-field-group">

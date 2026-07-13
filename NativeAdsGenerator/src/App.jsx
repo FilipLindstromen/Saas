@@ -24,6 +24,11 @@ import {
   renderAdToCanvas,
 } from './utils/adCompositor'
 import { COPY_VERSION_COUNT, getActiveCopy } from './utils/copyVersions'
+import {
+  createDefaultVersionBackgrounds,
+  migrateLegacyMediaRef,
+  normalizeVersionBackgrounds,
+} from './utils/versionBackgrounds'
 import { exportAdAsVideo, isVideoBackgroundMode } from './utils/videoExport'
 import { isImageFile, isVideoFile, loadVideoElement, loadVideoFromFile } from './utils/mediaFiles'
 import {
@@ -38,6 +43,15 @@ import { restoreMediaFromPersisted, restoreMusicFromPersisted } from './utils/re
 import './App.css'
 
 const initialProject = typeof window !== 'undefined' ? loadProject() : null
+
+const initialVersionBackgrounds = normalizeVersionBackgrounds(
+  initialProject?.versionBackgrounds,
+  {
+    backgroundColor: initialProject?.backgroundColor,
+    mediaTransform: initialProject?.mediaTransform,
+    media: migrateLegacyMediaRef(initialProject?.media),
+  }
+)
 
 function mergeText(saved) {
   const merged = { ...DEFAULT_TEXT, ...(saved && typeof saved === 'object' ? saved : {}) }
@@ -118,19 +132,27 @@ export default function App() {
   const videoObjectUrlRef = useRef(null)
   const musicObjectUrlRef = useRef(null)
   const previewMusicRef = useRef(null)
-  const persistedMediaRef = useRef(initialProject?.media ?? null)
+  const persistedMediaRef = useRef(migrateLegacyMediaRef(initialVersionBackgrounds[0]?.media ?? initialProject?.media ?? null))
   const persistedMusicRef = useRef(initialProject?.music ?? null)
+  const versionBackgroundsRef = useRef(initialVersionBackgrounds)
+  const activeVersionRef = useRef(normalizeCopyVersions(mergeText(initialProject?.text)).activeCopyVersion)
+  const switchingVersionRef = useRef(false)
   const [persistReady, setPersistReady] = useState(false)
+  const [versionBackgrounds, setVersionBackgrounds] = useState(initialVersionBackgrounds)
 
   const [theme, setThemeState] = useState(() => getTheme())
   const [formatId, setFormatId] = useState(initialProject?.formatId || 'landscape')
-  const [backgroundColor, setBackgroundColor] = useState(initialProject?.backgroundColor || '#000000')
+  const [backgroundColor, setBackgroundColor] = useState(
+    initialVersionBackgrounds[0]?.backgroundColor || initialProject?.backgroundColor || '#000000'
+  )
   const [text, setText] = useState(() => mergeText(initialProject?.text))
   const [mediaTransform, setMediaTransform] = useState({
     ...DEFAULT_MEDIA,
-    ...(initialProject?.mediaTransform && typeof initialProject.mediaTransform === 'object'
-      ? initialProject.mediaTransform
-      : {}),
+    ...(initialVersionBackgrounds[0]?.mediaTransform && typeof initialVersionBackgrounds[0].mediaTransform === 'object'
+      ? initialVersionBackgrounds[0].mediaTransform
+      : initialProject?.mediaTransform && typeof initialProject.mediaTransform === 'object'
+        ? initialProject.mediaTransform
+        : {}),
   })
   const [mediaMode, setMediaMode] = useState(null)
   const [mediaElement, setMediaElement] = useState(null)
@@ -154,6 +176,68 @@ export default function App() {
   const format = FORMATS[formatId] || FORMATS.landscape
   const aspectRatio = `${format.width} / ${format.height}`
   const canExportVideo = isVideoBackgroundMode(mediaMode, mediaElement)
+  const activeCopyVersion = normalizeCopyVersions(text).activeCopyVersion
+
+  const syncVersionBackgroundSlot = useCallback((index, patch) => {
+    versionBackgroundsRef.current[index] = {
+      ...versionBackgroundsRef.current[index],
+      ...patch,
+    }
+    setVersionBackgrounds([...versionBackgroundsRef.current])
+  }, [])
+
+  const snapshotCurrentVersion = useCallback((index) => {
+    syncVersionBackgroundSlot(index, {
+      backgroundColor,
+      mediaTransform: { ...mediaTransform },
+      media: persistedMediaRef.current,
+    })
+  }, [backgroundColor, mediaTransform, syncVersionBackgroundSlot])
+
+  const applyVersionBackground = useCallback(async (index) => {
+    const slot = versionBackgroundsRef.current[index] || createDefaultVersionBackgrounds()[index]
+    switchingVersionRef.current = true
+    setBackgroundColor(slot.backgroundColor || '#000000')
+    setMediaTransform({
+      ...DEFAULT_MEDIA,
+      ...(slot.mediaTransform && typeof slot.mediaTransform === 'object' ? slot.mediaTransform : {}),
+    })
+
+    if (webcamStreamRef.current) {
+      webcamStreamRef.current.getTracks().forEach((t) => t.stop())
+      webcamStreamRef.current = null
+    }
+    if (videoObjectUrlRef.current) {
+      URL.revokeObjectURL(videoObjectUrlRef.current)
+      videoObjectUrlRef.current = null
+    }
+    mediaElementRef.current = null
+    setMediaElement(null)
+    setWebcamActive(false)
+    setWebcamPhotoPreview(false)
+    setIsVideoPlaying(false)
+    setMediaMode(null)
+
+    const persisted = migrateLegacyMediaRef(slot.media)
+    persistedMediaRef.current = persisted
+
+    if (persisted) {
+      try {
+        const restored = await restoreMediaFromPersisted(persisted)
+        if (restored) {
+          if (restored.url) videoObjectUrlRef.current = restored.url
+          mediaElementRef.current = restored.element
+          setMediaElement(restored.element)
+          setMediaMode(restored.mode)
+          setIsVideoPlaying(restored.playing)
+        }
+      } catch (err) {
+        console.warn('Native Ads Generator: could not restore version background', err)
+        persistedMediaRef.current = null
+      }
+    }
+    switchingVersionRef.current = false
+  }, [])
 
   const clearMedia = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -171,8 +255,9 @@ export default function App() {
     setIsVideoPlaying(false)
     setMediaMode(null)
     persistedMediaRef.current = null
-    clearPersistedMedia()
-  }, [])
+    clearPersistedMedia(activeVersionRef.current)
+    syncVersionBackgroundSlot(activeVersionRef.current, { media: null })
+  }, [syncVersionBackgroundSlot])
 
   const setMedia = useCallback((element, mode, { playing = false } = {}) => {
     mediaElementRef.current = element
@@ -195,15 +280,18 @@ export default function App() {
     clearPersistedMusic()
   }, [])
 
-  const storeMediaPersist = async (mode, source) => {
+  const storeMediaPersist = async (mode, source, versionIndex = activeVersionRef.current) => {
     try {
-      persistedMediaRef.current = await persistMediaSource(mode, source)
+      persistedMediaRef.current = await persistMediaSource(mode, source, versionIndex)
+      syncVersionBackgroundSlot(versionIndex, { media: persistedMediaRef.current })
     } catch (err) {
       console.warn('Native Ads Generator: could not persist media', err)
       if (mode === 'pexels-video' && source.externalUrl) {
-        persistedMediaRef.current = { mode, externalUrl: source.externalUrl }
+        persistedMediaRef.current = { mode, externalUrl: source.externalUrl, blobKey: `media-v${versionIndex}` }
+        syncVersionBackgroundSlot(versionIndex, { media: persistedMediaRef.current })
       } else {
         persistedMediaRef.current = null
+        syncVersionBackgroundSlot(versionIndex, { media: null })
       }
     }
   }
@@ -330,14 +418,50 @@ export default function App() {
   }
 
   const handlePan = (dx, dy) => {
-    setMediaTransform((prev) => ({
-      ...prev,
-      offsetX: prev.offsetX + dx,
-      offsetY: prev.offsetY + dy,
-    }))
+    setMediaTransform((prev) => {
+      const next = {
+        ...prev,
+        offsetX: prev.offsetX + dx,
+        offsetY: prev.offsetY + dy,
+      }
+      if (!switchingVersionRef.current) {
+        syncVersionBackgroundSlot(activeVersionRef.current, { mediaTransform: next })
+      }
+      return next
+    })
   }
 
-  const handleResetTransform = () => setMediaTransform(DEFAULT_MEDIA)
+  const handleResetTransform = () => {
+    setMediaTransform(DEFAULT_MEDIA)
+    syncVersionBackgroundSlot(activeVersionRef.current, { mediaTransform: DEFAULT_MEDIA })
+  }
+
+  const handleBackgroundColorChange = (color) => {
+    setBackgroundColor(color)
+    syncVersionBackgroundSlot(activeVersionRef.current, { backgroundColor: color })
+  }
+
+  const handleMediaScaleChange = (scale) => {
+    setMediaTransform((prev) => {
+      const next = { ...prev, scale }
+      syncVersionBackgroundSlot(activeVersionRef.current, { mediaTransform: next })
+      return next
+    })
+  }
+
+  const handleTextChange = useCallback((updater) => {
+    setText((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      const oldVer = normalizeCopyVersions(prev).activeCopyVersion
+      const newVer = normalizeCopyVersions(next).activeCopyVersion
+      if (oldVer !== newVer) {
+        snapshotCurrentVersion(oldVer)
+        activeVersionRef.current = newVer
+        applyVersionBackground(newVer)
+      }
+      return next
+    })
+  }, [applyVersionBackground, snapshotCurrentVersion])
 
   const handleAnalyze = async () => {
     const active = getActiveCopy(text)
@@ -555,12 +679,23 @@ export default function App() {
   useEffect(() => {
     if (!persistReady) return undefined
     const timer = window.setTimeout(() => {
+      const idx = activeVersionRef.current
+      const backgrounds = [...versionBackgroundsRef.current]
+      backgrounds[idx] = {
+        ...backgrounds[idx],
+        backgroundColor,
+        mediaTransform: { ...mediaTransform },
+        media: persistedMediaRef.current,
+      }
+      versionBackgroundsRef.current = backgrounds
+      setVersionBackgrounds(backgrounds)
       saveProject({
         formatId,
         backgroundColor,
         text,
         mediaTransform,
         media: persistedMediaRef.current,
+        versionBackgrounds: backgrounds,
         music: persistedMusicRef.current,
         musicVolume,
         sidebarTab,
@@ -663,6 +798,7 @@ export default function App() {
               <>
                 <MediaControls
                   embedded
+                  activeCopyVersion={activeCopyVersion}
                   mediaMode={mediaMode}
                   onMediaModeChange={setMediaMode}
                   onUploadImage={handleUploadImage}
@@ -676,7 +812,7 @@ export default function App() {
                   webcamPhotoPreview={webcamPhotoPreview}
                   hasMedia={!!mediaElement}
                   mediaScale={mediaTransform.scale}
-                  onMediaScaleChange={(scale) => setMediaTransform((p) => ({ ...p, scale }))}
+                  onMediaScaleChange={handleMediaScaleChange}
                   onResetTransform={handleResetTransform}
                   isVideoBackground={canExportVideo}
                   backgroundMusic={backgroundMusic}
@@ -693,16 +829,16 @@ export default function App() {
                         id="nag-sidebar-bg-color"
                         type="color"
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => handleBackgroundColorChange(e.target.value)}
                       />
                       <input
                         type="text"
                         className="nag-input"
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => handleBackgroundColorChange(e.target.value)}
                       />
                     </div>
-                    <p className="nag-hint">Shown behind media when the image or video does not cover the full canvas.</p>
+                    <p className="nag-hint">Background for version {activeCopyVersion + 1}. Shown behind media when it does not cover the full canvas.</p>
                   </div>
                 </section>
               </>
@@ -776,7 +912,8 @@ export default function App() {
             <CopySection
               panel
               text={text}
-              onChange={setText}
+              versionBackgrounds={versionBackgrounds}
+              onChange={handleTextChange}
               analysis={analysis}
               aiBusy={aiBusy}
               aiError={aiError}
