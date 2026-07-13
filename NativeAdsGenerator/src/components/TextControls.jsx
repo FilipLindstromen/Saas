@@ -268,7 +268,7 @@ export default function TextControls({
             <input
               type="range"
               min="1"
-              max="12"
+              max="48"
               value={text.outlineWidth ?? 3}
               onChange={(e) => update('outlineWidth', parseInt(e.target.value, 10))}
             />
