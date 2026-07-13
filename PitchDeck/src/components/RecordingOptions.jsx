@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { normalizeWebcamSizePercent } from '../utils/webcamSize'
 import './RecordingOptions.css'
 
-function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef, embedded }) {
+function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef, embedded, section }) {
+  const show = (name) => !section || section === name
   const dropdownRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     recordInPresentMode: recordSettings?.recordInPresentMode !== undefined ? recordSettings.recordInPresentMode : false,
@@ -134,6 +135,8 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
 
   const content = (
     <div className="recording-options-content">
+          {show('devices') && (
+          <>
           <div className="recording-options-field">
             <label className="recording-options-checkbox">
               <input
@@ -246,6 +249,10 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
             </div>
           )}
 
+          </>
+          )}
+
+          {show('output') && (
           <div className="recording-options-output-section">
             <div className="recording-options-video-adj-title">Recording output</div>
             <div className="recording-options-field">
@@ -289,7 +296,9 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               </select>
             </div>
           </div>
+          )}
 
+          {show('videoAdj') && (
           <div className="recording-options-video-adj">
             <div className="recording-options-video-adj-title">Video adjustments</div>
             <div className="recording-options-video-adj-row">
@@ -422,6 +431,7 @@ function RecordingOptions({ recordSettings, onClose, onUpdateSettings, buttonRef
               Reset
             </button>
           </div>
+          )}
     </div>
   )
 

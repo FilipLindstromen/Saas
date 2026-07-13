@@ -1,6 +1,8 @@
 import './SlideSettings.css'
 
-function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a' }) {
+function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', section }) {
+  const show = (name) => !section || section === name
+
   if (!slide) {
     return (
       <div className="slide-settings-content">
@@ -16,11 +18,33 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
   const showGradient = layout !== 'centered' && layout !== 'right'
   const showImage = layout !== 'section'
 
+  if (section === 'gradient' && !showGradient) {
+    return (
+      <div className="slide-settings-content">
+        <div className="slide-settings-empty">
+          <p>Gradient settings are not available for this slide layout.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (section === 'media' && !showImage) {
+    return (
+      <div className="slide-settings-content">
+        <div className="slide-settings-empty">
+          <p>Media settings are not available for section slides.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="slide-settings-content">
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}
+      {show('general') && (
+      <>
       <div className="slide-settings-section">
         <div className="slide-settings-field slide-settings-bg-color">
           <label htmlFor="slide-settings-bg-override">Bg color:</label>
@@ -79,8 +103,10 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
         </div>
         <p className="slide-settings-hint">When enabled, each click in present mode reveals one more text line (or bullet).</p>
       </div>
+      </>
+      )}
 
-      {showGradient && (
+      {show('gradient') && showGradient && (
         <div className="slide-settings-section">
           <div className="slide-settings-field">
             <label className="slide-settings-toggle">
@@ -128,7 +154,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
         </div>
       )}
 
-      {showImage && (
+      {show('media') && showImage && (
         <div className="slide-settings-section">
           <div className="slide-settings-field">
             <label htmlFor="slide-settings-opacity">Image:</label>

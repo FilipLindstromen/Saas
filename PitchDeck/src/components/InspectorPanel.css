@@ -15,30 +15,43 @@
 .inspector-panel-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.5rem;
-  width: 108px;
-  min-width: 108px;
+  gap: 0.15rem;
+  padding: 0.45rem 0.35rem;
+  width: 52px;
+  min-width: 52px;
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-tertiary);
   flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.inspector-panel-nav-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.inspector-panel-nav-divider {
+  height: 1px;
+  margin: 0.2rem 0.15rem;
+  background: var(--border-subtle);
 }
 
 .inspector-panel-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  width: 100%;
-  padding: 0.55rem 0.65rem;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  padding: 0;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-tertiary);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  font-family: inherit;
-  text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -54,17 +67,21 @@
 }
 
 .inspector-panel-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .inspector-panel-content {
@@ -108,12 +125,12 @@
 
 @media (max-width: 1024px) {
   .inspector-panel-nav {
-    width: 88px;
-    min-width: 88px;
+    width: 48px;
+    min-width: 48px;
   }
 
   .inspector-panel-nav-item {
-    font-size: 0.75rem;
-    padding: 0.5rem;
+    width: 36px;
+    height: 36px;
   }
 }

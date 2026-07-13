@@ -9,6 +9,7 @@ import ShortcutsModal from './components/ShortcutsModal'
 import CommandPalette from './components/CommandPalette'
 import AppHeader from './components/AppHeader'
 import InspectorPanel from './components/InspectorPanel'
+import { normalizeInspectorTab } from './components/InspectorIcons'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import InstagramCarouselExportModal from './components/InstagramCarouselExportModal'
 import { formatTimeAgo } from './utils/formatTimeAgo'
@@ -147,7 +148,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
-  const [inspectorTab, setInspectorTab] = useState('document')
+  const [inspectorTab, setInspectorTabState] = useState('layout')
+  const setInspectorTab = useCallback((tab) => {
+    setInspectorTabState(normalizeInspectorTab(tab))
+  }, [])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('pitchDeckSidebarCollapsed') === 'true')
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false)
   const previousModeRef = useRef('plan')
@@ -1706,7 +1710,7 @@ function App() {
       case 'settings': setShowSettings(true); break
       case 'transitions':
         setMode('edit')
-        setInspectorTab('present')
+        setInspectorTab('transitions')
         setInspectorDrawerOpen(true)
         break
       case 'toggleTheme': setSharedTheme(theme === 'dark' ? 'light' : 'dark'); break

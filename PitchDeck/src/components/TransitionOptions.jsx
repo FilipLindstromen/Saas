@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import './TransitionOptions.css'
 
-function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, embedded }) {
+function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, embedded, section }) {
+  const show = (name) => !section || section === name
   const panelRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
     transitionStyle: settings?.transitionStyle || 'default',
@@ -51,6 +52,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
 
   const content = (
     <div className="transition-options-content">
+          {show('autoAdvance') && (
           <div className="transition-options-section">
             <h3>Auto-advance (Presentation)</h3>
             <div className="transition-options-field">
@@ -83,7 +85,9 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               </div>
             )}
           </div>
+          )}
 
+          {show('transitions') && (
           <div className="transition-options-section">
             <h3>Slide Transitions</h3>
             <div className="transition-options-field">
@@ -119,7 +123,9 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               />
             </div>
           </div>
+          )}
 
+          {show('textAnimation') && (
           <div className="transition-options-section">
             <h3>Text in &amp; out animations</h3>
             <div className="transition-options-field">
@@ -175,7 +181,9 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               </div>
             )}
           </div>
+          )}
 
+          {show('backgroundAnimation') && (
           <div className="transition-options-section">
             <h3>Background Animations</h3>
             <div className="transition-options-field">
@@ -223,6 +231,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               </>
             )}
           </div>
+          )}
     </div>
   )
 
