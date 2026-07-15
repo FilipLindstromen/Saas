@@ -1,0 +1,283 @@
+/* Infographic background - fills slide container, scales canvas to cover (layer 1: background image) */
+.infographic-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Canvas keeps intrinsic size (e.g. 800x450); scaling is done via transform only */
+.infographic-background-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  flex-shrink: 0;
+  transform-origin: center center;
+  /* transform (with scale) is set inline in InfographicBackground.jsx */
+}
+
+/* Element styles - match InfoGraphics CanvasElement */
+.infographic-element {
+  position: absolute;
+  cursor: default;
+  min-width: 40px;
+  min-height: 24px;
+}
+
+.infographic-element-animation-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.infographic-element-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 10px;
+}
+
+.infographic-element-image .infographic-element-inner,
+.infographic-element-image-text .infographic-element-inner {
+  padding: 6px;
+}
+
+.infographic-element-headline .infographic-element-inner,
+.infographic-element-gradient .infographic-element-inner {
+  padding: 0;
+}
+
+.infographic-element-gradient {
+  width: 100%;
+  height: 100%;
+}
+
+.infographic-element-image-text .infographic-element-inner {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.infographic-element-scale-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.infographic-element-headline .infographic-element-scale-wrapper,
+.infographic-element-cta .infographic-element-scale-wrapper {
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.infographic-element-image-wrap {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infographic-element-image-text .infographic-element-image-wrap {
+  width: 110px;
+  height: 90px;
+  flex-shrink: 0;
+}
+
+.infographic-element-image-wrap.infographic-element-image-full {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.infographic-element-image-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.infographic-element-image-tint-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.infographic-element-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.infographic-element-text {
+  word-break: break-word;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.infographic-element-headline {
+  font-weight: 700;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.infographic-element-arrow {
+  width: 80%;
+  height: 80%;
+  color: #374151;
+}
+
+.infographic-element-cta {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  color: white !important;
+  text-align: center;
+}
+
+/* In/out animations - match InfoGraphics CanvasElement */
+@keyframes infographic-anim-in-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes infographic-anim-out-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes infographic-anim-in-fade-scale {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes infographic-anim-out-fade-scale {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.8); }
+}
+@keyframes infographic-anim-in-fade-move-x {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes infographic-anim-out-fade-move-x {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-40px); }
+}
+@keyframes infographic-anim-in-fade-move-x-reverse {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes infographic-anim-out-fade-move-x-reverse {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(40px); }
+}
+@keyframes infographic-anim-in-fade-move-y {
+  from { opacity: 0; transform: translateY(-40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes infographic-anim-out-fade-move-y {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-40px); }
+}
+@keyframes infographic-anim-in-fade-move-y-reverse {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes infographic-anim-out-fade-move-y-reverse {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(40px); }
+}
+@keyframes infographic-anim-in-scale {
+  from { transform: scale(0.8); }
+  to { transform: scale(1); }
+}
+@keyframes infographic-anim-out-scale {
+  from { transform: scale(1); }
+  to { transform: scale(0.8); }
+}
+@keyframes infographic-anim-in-slide-x {
+  from { transform: translateX(-60px); }
+  to { transform: translateX(0); }
+}
+@keyframes infographic-anim-out-slide-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-60px); }
+}
+@keyframes infographic-anim-in-slide-x-reverse {
+  from { transform: translateX(60px); }
+  to { transform: translateX(0); }
+}
+@keyframes infographic-anim-out-slide-x-reverse {
+  from { transform: translateX(0); }
+  to { transform: translateX(60px); }
+}
+@keyframes infographic-anim-in-slide-y {
+  from { transform: translateY(-60px); }
+  to { transform: translateY(0); }
+}
+@keyframes infographic-anim-out-slide-y {
+  from { transform: translateY(0); }
+  to { transform: translateY(-60px); }
+}
+@keyframes infographic-anim-in-slide-y-reverse {
+  from { transform: translateY(60px); }
+  to { transform: translateY(0); }
+}
+@keyframes infographic-anim-out-slide-y-reverse {
+  from { transform: translateY(0); }
+  to { transform: translateY(60px); }
+}
+
+.infographic-element-animation-wrapper.animate-in-fade { animation: infographic-anim-in-fade 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade { animation: infographic-anim-out-fade 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-fade-scale { animation: infographic-anim-in-fade-scale 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade-scale { animation: infographic-anim-out-fade-scale 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-fade-move-x { animation: infographic-anim-in-fade-move-x 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade-move-x { animation: infographic-anim-out-fade-move-x 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-fade-move-x-reverse { animation: infographic-anim-in-fade-move-x-reverse 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade-move-x-reverse { animation: infographic-anim-out-fade-move-x-reverse 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-fade-move-y { animation: infographic-anim-in-fade-move-y 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade-move-y { animation: infographic-anim-out-fade-move-y 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-fade-move-y-reverse { animation: infographic-anim-in-fade-move-y-reverse 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-fade-move-y-reverse { animation: infographic-anim-out-fade-move-y-reverse 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-scale { animation: infographic-anim-in-scale 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-scale { animation: infographic-anim-out-scale 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-slide-x { animation: infographic-anim-in-slide-x 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-slide-x { animation: infographic-anim-out-slide-x 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-slide-x-reverse { animation: infographic-anim-in-slide-x-reverse 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-slide-x-reverse { animation: infographic-anim-out-slide-x-reverse 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-slide-y { animation: infographic-anim-in-slide-y 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-slide-y { animation: infographic-anim-out-slide-y 0.5s ease-in forwards; }
+.infographic-element-animation-wrapper.animate-in-slide-y-reverse { animation: infographic-anim-in-slide-y-reverse 0.5s ease-out forwards; }
+.infographic-element-animation-wrapper.animate-out-slide-y-reverse { animation: infographic-anim-out-slide-y-reverse 0.5s ease-in forwards; }

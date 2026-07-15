@@ -1,0 +1,895 @@
+.play-mode {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+/* Canvas wrapper: fixed pixel dimensions (1920×1080, 1080×1080, 1080×1920) scaled to fit viewport.
+   z-index 10001 ensures slide content (text) is always above the webcam overlay (z-index 100). */
+.play-canvas-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  z-index: 10001 !important;
+}
+
+/* Persistent video layer: video slides in from right when returning to video slide */
+@keyframes play-video-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Webcam: slides in from right when returning to webcam slide */
+@keyframes play-webcam-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Present mode layer order (back to front):
+   0 = background color, 1 = background image/video, 2 = webcam, 3 = gradient, 4 = graphic overlays, 5 = text */
+
+/* Layer 0: Background color - base of canvas */
+.play-layer-bg-color {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Layer 1: Background image/video */
+.play-background-layer,
+.play-persistent-video-layer {
+  z-index: 1;
+}
+.play-background-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Layer 2: Webcam - WebcamOverlay when inside canvas */
+.play-webcam-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Layer 3: Gradient */
+.play-gradient-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.play-gradient-layer .slide-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Layer 4 & 5: Graphic overlays + text - slide container must be transparent, pointer-events none so video shows through */
+.play-slide-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  /* Critical: transparent so video/gradient show through; pointer-events none so layer doesn't block */
+  background: transparent !important;
+  background-color: transparent !important;
+  pointer-events: none;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Slide content needs pointer-events for click-through navigation (handled by parent play-mode) */
+.play-slide-container .slide {
+  pointer-events: auto;
+}
+
+/* Content fades in when slide changes — text only, never the background layer */
+.play-slide-content-transition .slide .slide-content,
+.play-slide-content-transition .slide .slide-content-video,
+.play-slide-content-transition .slide .slide-text-centered-wrapper,
+.play-slide-content-transition .slide .slide-section-name,
+.play-slide-content-transition .slide .slide-bullets {
+  animation: playContentFadeIn var(--transition-duration, 300ms) ease-out;
+}
+
+@keyframes playContentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Video layout: content layer above gradient (z-index 5 for text to be on top) */
+.play-slide-container-video-layout {
+  z-index: 5;
+}
+
+/* First slide: 2 second delay before text shows - hide text initially, then fade in */
+.play-slide-container.first-slide-text-delayed .slide .slide-content {
+  opacity: 0;
+}
+.play-slide-container .slide .slide-content {
+  transition: opacity 0.5s ease;
+}
+
+/* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory).
+   Use clip-path to ensure content is never visible on screen, even if layout shifts. */
+.play-preload-zone {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+  clip-path: inset(100%);
+}
+
+.play-preload-slide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Camera override: text stays in front of webcam overlay */
+.play-slide-container-camera-override {
+  z-index: 1001;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--bg-opacity, 1);
+  }
+}
+
+/* Background transition wrapper - transition applies to background image/video (not webcam) */
+.play-background-transition-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Text out: play before new text appears */
+.play-slide-container.text-out .slide .slide-content,
+.play-slide-container.text-out .slide .slide-content-video {
+  animation: textFadeOut var(--transition-duration, 300ms) ease-out forwards;
+}
+
+@keyframes textFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Transition Styles - applied to background (wrapper when persistent, or .slide .slide-background when not) */
+.play-background-transition-wrapper.transition-default.fade-out,
+.play-slide-container.transition-default.fade-out .slide .slide-background,
+.play-slide-container.transition-default.fade-out .slide .slide-background-video {
+  animation: fadeOut 0.3s ease-in-out forwards;
+}
+
+.play-background-transition-wrapper.transition-default.fade-in,
+.play-slide-container.transition-default.fade-in .slide .slide-background,
+.play-slide-container.transition-default.fade-in .slide .slide-background-video {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-in-out forwards;
+  visibility: visible;
+}
+
+.play-slide-container.transition-default.fade-out {
+  animation: none;
+}
+
+.play-slide-container.transition-default.fade-in {
+  opacity: 1;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Slide Transition */
+.play-background-transition-wrapper.transition-slide.fade-out,
+.play-slide-container.transition-slide.fade-out .slide .slide-background,
+.play-slide-container.transition-slide.fade-out .slide .slide-background-video {
+  animation: slideOut var(--transition-duration, 300ms) ease-in-out forwards;
+}
+
+.play-background-transition-wrapper.transition-slide.fade-in,
+.play-slide-container.transition-slide.fade-in .slide .slide-background,
+.play-slide-container.transition-slide.fade-in .slide .slide-background-video {
+  opacity: 0;
+  transform: translateX(-100%);
+  animation: slideIn var(--transition-duration, 300ms) ease-in-out forwards;
+}
+
+.play-slide-container.transition-slide.fade-out,
+.play-slide-container.transition-slide.fade-in {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes slideOut {
+  from {
+    opacity: var(--bg-opacity, 1);
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: var(--bg-opacity, 1);
+    transform: translateX(0);
+  }
+}
+
+/* Zoom Transition */
+.play-background-transition-wrapper.transition-zoom.fade-out,
+.play-slide-container.transition-zoom.fade-out .slide .slide-background,
+.play-slide-container.transition-zoom.fade-out .slide .slide-background-video {
+  animation: zoomOut var(--transition-duration, 300ms) ease-in-out forwards;
+}
+
+.play-background-transition-wrapper.transition-zoom.fade-in,
+.play-slide-container.transition-zoom.fade-in .slide .slide-background,
+.play-slide-container.transition-zoom.fade-in .slide .slide-background-video {
+  opacity: 0;
+  transform: scale(1.2);
+  animation: zoomIn var(--transition-duration, 300ms) ease-in-out forwards;
+}
+
+.play-slide-container.transition-zoom.fade-out,
+.play-slide-container.transition-zoom.fade-in {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes zoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Same bg, different position/scale: smooth transition (no fade) */
+.play-bg-pos-scale-transition .play-background-layer .slide-background,
+.play-bg-pos-scale-transition .play-background-layer .slide-background-video .slide-background-video-el,
+.play-bg-pos-scale-transition .play-background-layer .infographic-background-canvas,
+.play-bg-pos-scale-transition .play-persistent-video-el,
+.play-bg-pos-scale-transition .play-persistent-video-bg-image {
+  transition: background-position var(--pos-scale-duration, 500ms) ease-in-out, background-size var(--pos-scale-duration, 500ms) ease-in-out, object-position var(--pos-scale-duration, 500ms) ease-in-out, transform var(--pos-scale-duration, 500ms) ease-in-out;
+}
+
+/* Crossfade Transition - both layers in same container, fade at exactly the same time */
+.play-crossfade-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.play-crossfade-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation-duration: var(--transition-duration, 500ms);
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: forwards;
+  will-change: opacity;
+}
+
+/* Background crossfade between different slides: opacity only (no zoom/slide/blur) */
+.play-bg-crossfade-out {
+  z-index: 2;
+  animation-name: crossfadeOut;
+  transform: none !important;
+  filter: none !important;
+}
+
+.play-bg-crossfade-in {
+  z-index: 1;
+  opacity: 0;
+  animation-name: crossfadeIn;
+  transform: none !important;
+  filter: none !important;
+}
+
+.play-bg-crossfade-out .slide-background.background-scale-animation,
+.play-bg-crossfade-in .slide-background.background-scale-animation {
+  animation: none !important;
+}
+
+/* Dual-layer transitions (legacy path): outgoing and incoming backgrounds animate at the same time */
+.play-bg-dual-layer.transition-default .play-crossfade-out {
+  animation-name: fadeOut;
+}
+.play-bg-dual-layer.transition-default .play-crossfade-in {
+  opacity: 0;
+  animation-name: fadeIn;
+}
+
+.play-bg-dual-layer.transition-crossfade .play-crossfade-out {
+  animation-name: crossfadeOut;
+}
+.play-bg-dual-layer.transition-crossfade .play-crossfade-in {
+  opacity: 0;
+  animation-name: crossfadeIn;
+}
+
+.play-bg-dual-layer.transition-slide .play-crossfade-out {
+  animation-name: slideOut;
+}
+.play-bg-dual-layer.transition-slide .play-crossfade-in {
+  opacity: 0;
+  transform: translateX(-100%);
+  animation-name: slideIn;
+}
+
+.play-bg-dual-layer.transition-zoom .play-crossfade-out {
+  animation-name: zoomOut;
+}
+.play-bg-dual-layer.transition-zoom .play-crossfade-in {
+  opacity: 0;
+  transform: scale(1.2);
+  animation-name: zoomIn;
+}
+
+.play-bg-dual-layer.transition-dissolve .play-crossfade-out {
+  animation-name: dissolveOut;
+}
+.play-bg-dual-layer.transition-dissolve .play-crossfade-in {
+  opacity: 0;
+  animation-name: dissolveIn;
+}
+
+.play-bg-dual-layer.transition-blur .play-crossfade-out {
+  animation-name: blurOut;
+}
+.play-bg-dual-layer.transition-blur .play-crossfade-in {
+  opacity: 0;
+  filter: blur(10px);
+  animation-name: blurIn;
+}
+
+.play-bg-dual-layer.transition-sequence .play-crossfade-out {
+  animation-name: sequenceOut;
+}
+.play-bg-dual-layer.transition-sequence .play-crossfade-in {
+  opacity: 0;
+  transform: scale(1.1) translateY(-20px);
+  animation-name: sequenceIn;
+}
+
+.play-crossfade-layer.play-crossfade-out {
+  z-index: 1;
+}
+
+.play-crossfade-layer.play-crossfade-in {
+  z-index: 2;
+  opacity: 0;
+}
+
+/* Legacy: when crossfade used with slide container (different bg path) */
+.play-background-transition-wrapper.transition-crossfade.crossfade-out,
+.play-slide-container.crossfade-out .slide .slide-background,
+.play-slide-container.crossfade-out .slide .slide-background-video {
+  animation: crossfadeOut var(--transition-duration, 500ms) ease-in-out forwards;
+}
+
+.play-crossfade-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  animation: crossfadeIn var(--transition-duration, 500ms) ease-in-out forwards;
+}
+
+@keyframes crossfadeOut {
+  from { opacity: var(--bg-opacity, 1); }
+  to { opacity: 0; }
+}
+
+@keyframes crossfadeIn {
+  from { opacity: 0; }
+  to { opacity: var(--bg-opacity, 1); }
+}
+
+/* Dissolve Transition */
+.play-background-transition-wrapper.transition-dissolve.fade-out,
+.play-slide-container.transition-dissolve.fade-out .slide .slide-background,
+.play-slide-container.transition-dissolve.fade-out .slide .slide-background-video {
+  animation: dissolveOut var(--transition-duration, 500ms) ease-in-out forwards;
+}
+
+.play-background-transition-wrapper.transition-dissolve.fade-in,
+.play-slide-container.transition-dissolve.fade-in .slide .slide-background,
+.play-slide-container.transition-dissolve.fade-in .slide .slide-background-video {
+  opacity: 0;
+  animation: dissolveIn var(--transition-duration, 500ms) ease-in-out forwards;
+}
+
+.play-slide-container.transition-dissolve.fade-out,
+.play-slide-container.transition-dissolve.fade-in {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes dissolveOut {
+  from {
+    opacity: var(--bg-opacity, 1);
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dissolveIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--bg-opacity, 1);
+  }
+}
+
+/* Blur Transition */
+.play-background-transition-wrapper.transition-blur.fade-out,
+.play-slide-container.transition-blur.fade-out .slide .slide-background,
+.play-slide-container.transition-blur.fade-out .slide .slide-background-video {
+  animation: blurOut 0.4s ease-in-out forwards;
+}
+
+.play-background-transition-wrapper.transition-blur.fade-in,
+.play-slide-container.transition-blur.fade-in .slide .slide-background,
+.play-slide-container.transition-blur.fade-in .slide .slide-background-video {
+  opacity: 0;
+  filter: blur(10px);
+  animation: blurIn 0.4s ease-in-out forwards;
+}
+
+.play-slide-container.transition-blur.fade-out,
+.play-slide-container.transition-blur.fade-in {
+  animation: none;
+  opacity: 1;
+  filter: none;
+}
+
+@keyframes blurOut {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+
+@keyframes blurIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Object Sequence Transition */
+.play-background-transition-wrapper.transition-sequence.fade-out,
+.play-slide-container.transition-sequence.fade-out .slide .slide-background,
+.play-slide-container.transition-sequence.fade-out .slide .slide-background-video {
+  animation: sequenceOut var(--transition-duration, 600ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.play-background-transition-wrapper.transition-sequence.fade-in,
+.play-slide-container.transition-sequence.fade-in .slide .slide-background,
+.play-slide-container.transition-sequence.fade-in .slide .slide-background-video {
+  opacity: 0;
+  transform: scale(1.1) translateY(-20px);
+  animation: sequenceIn var(--transition-duration, 600ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.play-slide-container.transition-sequence.fade-out,
+.play-slide-container.transition-sequence.fade-in {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes sequenceOut {
+  from {
+    opacity: var(--bg-opacity, 1);
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+}
+
+@keyframes sequenceIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.1) translateY(-20px);
+  }
+  50% {
+    opacity: calc(var(--bg-opacity, 1) * 0.8);
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: var(--bg-opacity, 1);
+    transform: scale(1) translateY(0);
+  }
+}
+
+.play-mode .slide {
+  /* Fill viewport so content padding/position matches edit mode (same % of viewport) */
+  border-radius: 0;
+  box-shadow: none;
+  position: relative;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  /* Override format aspect-ratio so slide fills viewport; padding % then matches edit */
+  aspect-ratio: auto !important;
+}
+
+/* Video layouts: slide and content must be fully transparent so video shows through */
+.play-mode .slide.layout-left-video,
+.play-mode .slide.layout-right-video,
+.play-mode .slide.layout-video,
+.play-slide-container-video-layout .slide {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+.play-mode .slide.layout-left-video .slide-content,
+.play-mode .slide.layout-right-video .slide-content,
+.play-mode .slide.layout-video .slide-content,
+.play-mode .slide .slide-content-video,
+.play-slide-container-video-layout .slide .slide-content,
+.play-slide-container-video-layout .slide .slide-content-video {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.play-mode .slide.slide-format-16-9,
+.play-mode .slide.slide-format-1-1,
+.play-mode .slide.slide-format-9-16,
+.play-mode .slide.slide-format-3-4 {
+  /* Same as .play-mode .slide: fill container for consistent content positioning */
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: auto !important;
+}
+
+/* Do not override .slide-background here: scale and position come from Slide.jsx inline styles
+   (imageScale, imagePositionX/Y) so they match edit mode in present mode. */
+
+/* Ensure webcam positioning is identical in present mode */
+.play-mode .slide .slide-webcam {
+  position: absolute;
+  /* Positioning values are inherited from Slide.css */
+  /* This ensures webcam appears in the same relative position */
+  /* Do not override bottom, right, left, top, width, or height values */
+  /* All positioning must match Slide.css exactly */
+  /* Ensure object-fit and aspect-ratio are maintained */
+  object-fit: cover;
+}
+
+/* Explicitly ensure webcam positioning classes match edit mode exactly */
+.play-mode .slide .slide-webcam.webcam-video-bottom-right {
+  position: absolute !important;
+  bottom: 4% !important;
+  right: 4% !important;
+  top: auto !important;
+  left: auto !important;
+  width: 20% !important;
+  height: auto !important;
+  min-width: 120px !important;
+  min-height: 120px !important;
+  aspect-ratio: 1 / 1 !important;
+  z-index: 5 !important;
+  /* Ensure these values exactly match Slide.css */
+}
+
+.play-mode .slide .slide-webcam.webcam-video-bottom-left {
+  position: absolute !important;
+  bottom: 4% !important;
+  left: 4% !important;
+  top: auto !important;
+  right: auto !important;
+  width: 20% !important;
+  height: auto !important;
+  min-width: 120px !important;
+  min-height: 120px !important;
+  aspect-ratio: 1 / 1 !important;
+  z-index: 5 !important;
+  /* Ensure these values exactly match Slide.css */
+}
+
+.play-mode .slide .slide-webcam.webcam-video-fullscreen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  aspect-ratio: auto;
+  z-index: 5;
+  /* Ensure these values exactly match Slide.css */
+}
+
+/* All sizing is now percentage-based in Slide.css, so it scales naturally */
+/* No need for additional scaling overrides */
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--accent-secondary, #ff4757);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 71, 87, 0.15);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 71, 87, 0.35);
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-secondary, #ff4757);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.captions-processing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+}
+
+.captions-processing-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  background: var(--bg-elevated, #2a2a2a);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+  color: var(--text-primary, #fff);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.captions-processing-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: var(--accent, #ff6b35);
+  border-radius: 50%;
+  animation: captions-spin 0.8s linear infinite;
+}
+
+@keyframes captions-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.play-controls {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  z-index: 10003;
+}
+
+.play-controls-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  right: auto;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+
+.play-slide-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.play-auto-advance-badge {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  color: #a0e0a0;
+}
+
+/* Webcam overlay - behind slide content (play-canvas-wrapper has z-index 10001) */
+.play-webcam-overlay {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  /* Use 'all' for seamless transitions in both directions */
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: top, right, bottom, left, width, height, min-width, min-height, border-radius, clip-path, aspect-ratio;
+  /* Ensure smooth rendering and prevent layout shifts */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Contain layout to prevent reflows during transitions */
+  contain: layout style paint;
+}
+
+.play-webcam-overlay video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Ensure video doesn't cause layout shifts */
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.btn-fullscreen {
+  padding: 0.5rem 1rem;
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-fullscreen:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.btn-exit {
+  padding: 0.5rem 1.5rem;
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-exit:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.play-empty {
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
+  text-align: center;
+}

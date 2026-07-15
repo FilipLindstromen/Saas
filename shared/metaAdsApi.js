@@ -124,6 +124,62 @@ export async function uploadAdImage(adAccountId, accessToken, imageBlob, filenam
   return hash
 }
 
+export async function createCarouselAdCreative({
+  adAccountId,
+  accessToken,
+  pageId,
+  destinationUrl,
+  primaryText,
+  childAttachments,
+  creativeName,
+}) {
+  const actId = normalizeAdAccountId(adAccountId)
+  const url = new URL(`${GRAPH_BASE}/${actId}/adcreatives`)
+  url.searchParams.set('access_token', accessToken)
+
+  const body = {
+    name: creativeName || 'Carousel Designer creative',
+    object_story_spec: {
+      page_id: pageId,
+      link_data: {
+        link: destinationUrl,
+        message: primaryText || '',
+        child_attachments: childAttachments.map((card) => ({
+          link: destinationUrl,
+          image_hash: card.imageHash,
+          name: card.headline || '',
+          description: card.description || '',
+          call_to_action: {
+            type: 'LEARN_MORE',
+            value: { link: destinationUrl },
+          },
+        })),
+      },
+    },
+  }
+
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) {
+    throw new Error(parseGraphError(data, res.status))
+  }
+  return data.id
+}
+
+export async function uploadAdImages(adAccountId, accessToken, imageBlobs, filenamePrefix = 'carousel') {
+  const hashes = []
+  for (let i = 0; i < imageBlobs.length; i += 1) {
+    const filename = `${filenamePrefix}-${String(i + 1).padStart(2, '0')}.jpg`
+    const hash = await uploadAdImage(adAccountId, accessToken, imageBlobs[i], filename)
+    hashes.push(hash)
+  }
+  return hashes
+}
+
 export async function createLinkAdCreative({
   adAccountId,
   accessToken,

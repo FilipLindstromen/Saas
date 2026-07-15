@@ -1,0 +1,52 @@
+.share-export-menu {
+  position: relative;
+}
+
+.share-export-trigger {
+  white-space: nowrap;
+}
+
+.share-export-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  padding: 0.35rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.share-export-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.share-export-dropdown button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.share-export-dropdown button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.share-export-divider {
+  height: 1px;
+  margin: 0.25rem 0;
+  background: var(--border-subtle);
+}

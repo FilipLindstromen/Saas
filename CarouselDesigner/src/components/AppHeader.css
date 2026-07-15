@@ -1,0 +1,141 @@
+.header-btn-labeled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.header-btn-labeled:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.header-btn-labeled:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.present-menu {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.present-menu-trigger {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.present-menu-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.present-menu-chevron:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.present-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  padding: 0.35rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.present-menu-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.present-menu-dropdown button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.present-menu-dropdown button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chapter-rename-input {
+  width: 120px;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.header-layout-toggle,
+.header-inspector-toggle {
+  flex-shrink: 0;
+}
+
+.header-overflow-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+  .header-inspector-toggle {
+    display: flex;
+  }
+}
+
+@media (min-width: 1025px) {
+  .header-inspector-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .header-mode-btn span,
+  .header-btn-labeled span {
+    display: none;
+  }
+
+  .header-mode-btn,
+  .header-btn-labeled {
+    padding: 0.45rem;
+  }
+}

@@ -1,0 +1,1309 @@
+.slide {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  /* Base font size: Use CSS custom property set via JavaScript */
+  /* This ensures font-size scales with the slide's actual width */
+  /* Default: 16px at 1200px width */
+  font-size: var(--slide-base-font-size, 1rem);
+}
+
+.png-export-wrap .slide {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  aspect-ratio: unset !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Allow text animation (translateY) to not be clipped for centered/word animations */
+.slide[class*="text-animation-"]:not(.text-animation-none) {
+  overflow: visible;
+}
+
+/* Layer order (back to front): 0=bg color (slide), 1=bg image, 2=video, 3=gradient, 4=graphic overlays, 5=webcam, 6=text (text always on top) */
+.slide-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  z-index: 1;
+  /* background-size and background-position are set dynamically via inline style */
+}
+
+.slide-background.editable {
+  pointer-events: auto;
+}
+
+/* Video sits above background image, below gradient */
+.slide-background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Graphic overlays (giphy etc.) above gradient, below text in play mode; above text in edit mode for drag/resize */
+.slide-graphic-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.slide:not(.play-mode) .slide-graphic-overlays {
+  z-index: 15;
+}
+
+.slide-graphic-overlay {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.slide-graphic-overlay-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.slide-graphic-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.slide-graphic-tint-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.slide-graphic-overlay.selected {
+  box-shadow: 0 0 0 3px var(--accent);
+  border-radius: 4px;
+}
+
+.slide-graphic-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  z-index: 2;
+  touch-action: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.slide-graphic-resize-handle.se {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}
+
+.slide-graphic-rotate-handle {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: 1px solid white;
+  border-radius: 50%;
+  color: white;
+  cursor: grab;
+  z-index: 1;
+}
+
+.slide-graphic-rotate-handle:active {
+  cursor: grabbing;
+}
+
+.slide-graphic-flip-handle {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: 1px solid white;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.slide-graphic-flip-handle:hover {
+  background: var(--accent-hover, #2563eb);
+}
+
+.slide-background-video-el {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
+}
+
+/* Left with Video / Right with Video: background image/video covers full slide (no black mask) */
+.slide.layout-left-video .slide-background-video-el,
+.slide.layout-right-video .slide-background-video-el {
+  object-fit: cover;
+  object-position: center;
+}
+
+.slide-background.background-scale-animation {
+  animation: backgroundScale var(--scale-duration, 10s) linear forwards;
+  animation-fill-mode: forwards;
+}
+
+@keyframes backgroundScale {
+  from {
+    background-size: var(--initial-scale, 100%);
+  }
+  to {
+    background-size: var(--final-scale, 120%);
+  }
+}
+
+/* Gradient above video/image for text readability; below graphic overlays and text */
+.slide-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  /* Gradient is now set dynamically via inline style */
+}
+
+.slide-content {
+  position: relative;
+  z-index: 10;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  /* Bottom and edge from typography (--slide-content-bottom, --slide-content-edge); centered uses only padding */
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+  background: transparent;
+}
+
+.slide-content.bulletpoints {
+  align-items: flex-end;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+.slide-content.centered {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  /* Centered: same padding all sides, no distance-from-edge setting */
+  padding: 4%;
+}
+
+/* Centered layout: wrap title + subtitle; fill height so title is vertically centered when no subtitle */
+.slide-text-centered-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
+  text-align: center;
+}
+
+.slide-text-centered-wrapper .slide-text,
+.slide-text-centered-wrapper .slide-subtitle {
+  text-align: center;
+  width: 100%;
+  max-width: 85%;
+  box-sizing: border-box;
+}
+
+.slide-content.right {
+  align-items: flex-end;
+  justify-content: flex-end;
+  /* Position text in lower third; minus 1.4em moves text down by ~1 line */
+  padding: 4% var(--slide-content-edge, 9%) calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
+}
+
+.slide-content.section {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 4%;
+}
+
+.slide-content.video {
+  display: none;
+}
+
+/* Present mode: ensure content position matches edit mode (same distance from edge/bottom) */
+.play-mode .slide .slide-content:not(.centered):not(.section) {
+  justify-content: flex-start;
+  align-items: flex-end;
+  /* Explicit padding so --slide-content-edge and --slide-content-bottom apply in present mode */
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+/* Left-aligned (default) layout in present mode: force full width and left padding so text stays left */
+.play-mode .slide .slide-content.default {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+  padding-top: 4%;
+  padding-bottom: var(--slide-content-bottom, 12%);
+}
+.play-mode .slide .slide-content.right,
+.play-mode .slide .slide-content.right-video {
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 4% var(--slide-content-edge, 9%) calc(var(--slide-content-bottom, 12%) - 1.4em) 0;
+}
+.play-mode .slide .slide-content.right-video {
+  padding: 4% var(--slide-content-edge, 9%) var(--slide-content-bottom, 12%) 0;
+}
+.play-mode .slide .slide-content.centered,
+.play-mode .slide .slide-content.section {
+  justify-content: center;
+  align-items: center;
+  padding: 4%;
+}
+.play-mode .slide .slide-content-video,
+.play-mode .slide .slide-content.left-video {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+.slide-content-video {
+  /* Text overlay for video layout - above webcam/video in all modes */
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+/* Play mode: ensure text stays in front of video and gradient */
+.slide.play-mode .slide-content-video {
+  z-index: 10;
+}
+
+/* Left with Video: typography bottom and edge; text area is narrower */
+.slide-content.left-video {
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+/* Right with Video: text on right, video panel on left */
+.slide-content.right-video {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 4% var(--slide-content-edge, 9%) var(--slide-content-bottom, 12%) 0;
+}
+
+/* Top-aligned text: vertical distance % applies from top instead of bottom */
+.slide.content-vertical-top .slide-content:not(.centered):not(.section),
+.slide.content-vertical-top .slide-content.bulletpoints,
+.slide.content-vertical-top .slide-content-video,
+.slide.content-vertical-top .slide-content.left-video {
+  align-items: flex-start;
+  padding: var(--slide-content-top, 12%) 0 4% var(--slide-content-edge, 9%);
+}
+
+.slide.content-vertical-top .slide-content.right,
+.slide.content-vertical-top .slide-content.right-video {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: calc(var(--slide-content-top, 12%) + 1.4em) var(--slide-content-edge, 9%) 4% 0;
+}
+
+.slide.content-vertical-top .slide-content.right-video {
+  padding: var(--slide-content-top, 12%) var(--slide-content-edge, 9%) 4% 0;
+}
+
+.play-mode .slide.content-vertical-top .slide-content:not(.centered):not(.section),
+.play-mode .slide.content-vertical-top .slide-content.bulletpoints,
+.play-mode .slide.content-vertical-top .slide-content-video,
+.play-mode .slide.content-vertical-top .slide-content.left-video {
+  align-items: flex-start;
+  padding: var(--slide-content-top, 12%) 0 4% var(--slide-content-edge, 9%);
+}
+
+.play-mode .slide.content-vertical-top .slide-content.default {
+  align-items: flex-start;
+  padding-top: var(--slide-content-top, 12%);
+  padding-bottom: 4%;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+}
+
+.play-mode .slide.content-vertical-top .slide-content.right,
+.play-mode .slide.content-vertical-top .slide-content.right-video {
+  align-items: flex-start;
+  padding: calc(var(--slide-content-top, 12%) + 1.4em) var(--slide-content-edge, 9%) 4% 0;
+}
+
+.play-mode .slide.content-vertical-top .slide-content.right-video {
+  padding: var(--slide-content-top, 12%) var(--slide-content-edge, 9%) 4% 0;
+}
+
+.play-mode .slide.content-vertical-top .slide-text.left-video {
+  align-self: flex-start;
+}
+
+.slide.content-vertical-top .slide-text.left-video {
+  align-self: flex-start;
+}
+
+.slide-text {
+  color: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 66.67%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+/* Font Pairing Styles - use variable from slide root so serif font applies in edit and present mode */
+.font-pairing-serif {
+  font-family: var(--slide-pairing-font, "Playfair Display", serif) !important;
+  font-style: italic;
+  display: inline;
+}
+
+/* Dynamic Text Sizing */
+.text-dynamic-sizing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.text-dynamic-sizing .slide-text,
+.text-dynamic-sizing .slide-subtitle {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 8vw, 12rem) !important;
+  line-height: 1.1 !important;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* For dynamic sizing, we need to calculate the optimal font size */
+.slide-content .text-dynamic-sizing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+.slide-text.text-dynamic-sizing {
+  font-size: var(--dynamic-font-size, 4rem);
+  transition: font-size 0.3s ease;
+}
+
+.slide-text.centered {
+  text-align: center;
+  max-width: 100%;
+}
+
+.slide-text.right {
+  text-align: right;
+}
+
+/* Narrower text area only; same left position as default Left layout */
+.slide-text.left-video {
+  text-align: left;
+  max-width: 45%;
+}
+
+/* Present mode: ensure left-video text uses distance from edge/bottom and stays left-aligned */
+.play-mode .slide .slide-text.left-video {
+  text-align: left;
+  align-self: flex-end;
+  margin-right: auto;
+}
+
+/* Right with Video: text on right, narrower text area */
+.slide-text.right-video {
+  text-align: right;
+  max-width: 45%;
+}
+
+.slide-text:empty::before {
+  content: 'Click to edit';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-text[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-subtitle {
+  color: inherit;
+  font-weight: 400;
+  font-size: 0.6em;
+  line-height: 1.4;
+  margin-top: 0.5em;
+  max-width: 66.67%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  background: transparent;
+  border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+.slide-subtitle:empty::before {
+  content: 'Subtitle (optional)';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-subtitle[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-section-name {
+  color: inherit;
+  font-weight: 700;
+  font-size: 4rem;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+.slide-section-name:empty::before {
+  content: 'Section Name';
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.slide-section-name[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--slide-bullet-gap, 0.5em);
+  width: 100%;
+  max-width: 66.67%;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  /* Bullet text size set via --slide-bullet-font-size (px) from Slide.jsx */
+  font-size: var(--slide-bullet-font-size, 1em);
+  /* Color, fontFamily, and textShadow are set via inline style */
+  outline: none;
+  border: none;
+  resize: none;
+  overflow: visible;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  pointer-events: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+/* Single text field for bulletpoints in edit mode */
+.slide-bullets-single-field {
+  max-width: 66.67%;
+  min-height: 6em;
+}
+
+.slide-bullets-textarea {
+  width: 100%;
+  min-height: 8em;
+  padding: 0.5em 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slide-bullets-textarea::placeholder {
+  opacity: 0.5;
+}
+
+/* Heading styles override default font-size and font-family when applied */
+.slide-text.text-heading-h1,
+.slide-text.text-heading-h2,
+.slide-text.text-heading-h3,
+.slide-subtitle.text-heading-h1,
+.slide-subtitle.text-heading-h2,
+.slide-subtitle.text-heading-h3,
+.slide-section-name.text-heading-h1,
+.slide-section-name.text-heading-h2,
+.slide-section-name.text-heading-h3 {
+  /* Font size and family are set via inline style from Slide component */
+}
+
+.slide-text:focus {
+  outline: none;
+  border: none;
+}
+
+.slide-text strong {
+  font-weight: 700;
+}
+
+.slide-text em {
+  font-style: italic;
+}
+
+.slide-text s,
+.slide-text strike,
+.slide-subtitle s,
+.slide-subtitle strike,
+.bullet-text s,
+.bullet-text strike {
+  text-decoration: line-through;
+}
+
+/* H1/H2/H3 in content: block display so heading sizes from Slide.jsx apply in edit and present mode */
+.slide-content h1,
+.slide-content-video h1,
+.slide-content h2,
+.slide-content-video h2,
+.slide-content h3,
+.slide-content-video h3,
+.slide-subtitle h1,
+.slide-subtitle h2,
+.slide-subtitle h3,
+.bullet-text h1,
+.bullet-text h2,
+.bullet-text h3 {
+  display: block;
+  font-weight: 700;
+  margin: 0.1em 0;
+}
+
+.slide-content h1,
+.slide-content-video h1,
+.slide-subtitle h1,
+.bullet-text h1 { margin-top: 0; }
+/* Slight space below H3 so the next line isn’t too tight */
+.slide-content h3,
+.slide-content-video h3,
+.slide-subtitle h3,
+.bullet-text h3 { margin-bottom: 0.1em; }
+
+.slide-text mark,
+.slide-subtitle mark,
+.slide-bullet mark {
+  /* Highlight styling is applied inline via formatContentForDisplay when enabled */
+}
+
+/* When text highlight is disabled globally, strip background only from marks without inline style; toolbar-applied marks keep their color */
+.slide.no-text-highlight .slide-text mark:not([style*="background"]),
+.slide.no-text-highlight .slide-subtitle mark:not([style*="background"]),
+.slide.no-text-highlight .slide-bullet mark:not([style*="background"]) {
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.slide-bullet {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.slide-bullet:last-child {
+  margin-bottom: 0;
+}
+
+/* Present mode: hide bullets until revealed */
+.slide-bullet.hidden {
+  display: none;
+}
+
+/* One line at a time reveal (play mode) */
+.slide-reveal-line {
+  display: block;
+}
+.slide-reveal-line-hidden {
+  display: none;
+}
+
+/* Present mode: H2 line-height in bullets - use slide variable so it matches edit mode */
+.play-mode .slide .slide-bullets .bullet-text h2 {
+  line-height: var(--slide-h2-line-height, 1.2) !important;
+}
+
+/* Present mode: H2 in slide-content/slide-content-video (non-bullet) - same fix */
+.play-mode .slide .slide-content h2,
+.play-mode .slide .slide-content-video h2 {
+  line-height: var(--slide-h2-line-height, 1.2) !important;
+}
+
+/* Present mode: top-align bullet with text (edit mode keeps bottom alignment above) */
+.play-mode .slide-bullet {
+  align-items: flex-start;
+}
+
+.slide-bullet::before {
+  content: '•';
+  font-size: 1.2em;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1em;
+}
+
+.slide-bullets.bullet-style-dash .slide-bullet::before {
+  content: '–';
+}
+
+.slide-bullets.bullet-style-arrow .slide-bullet::before {
+  content: '→';
+}
+
+.slide-bullets.bullet-style-check .slide-bullet::before {
+  content: '✓';
+}
+
+.slide-bullets.bullet-style-square .slide-bullet::before {
+  content: '■';
+  font-size: 0.65em;
+  margin-top: 0.35em;
+}
+
+.slide-bullets.bullet-style-number {
+  counter-reset: slide-bullet-counter;
+}
+
+.slide-bullets.bullet-style-number .slide-bullet {
+  counter-increment: slide-bullet-counter;
+}
+
+.slide-bullets.bullet-style-number .slide-bullet::before {
+  content: counter(slide-bullet-counter) '.';
+  font-size: 1em;
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.play-mode .slide-bullet::before {
+  margin-top: 0;
+}
+
+/* Hide bullet marker when "Show bullets" is off (text only) */
+.slide-bullets.bullets-hidden .slide-bullet::before {
+  content: none;
+  display: none;
+}
+
+/* Bullet text (class is "bullet-text" in JSX) */
+.slide-bullet .bullet-text {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  background: transparent;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+/* Ensure editable bullet text is focusable and shows outline in edit mode */
+.slide-bullet .bullet-text[contenteditable="true"] {
+  cursor: text;
+  outline: none;
+}
+
+.slide-bullet .bullet-text[contenteditable="true"]:focus {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.slide-bullet-text {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  /* Color, fontFamily, and textShadow are set via inline style */
+  background: transparent;
+}
+
+/* Webcam is positioned inside the slide - above text for visibility */
+.slide-webcam {
+  position: absolute;
+  z-index: 5;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-secondary);
+}
+
+.slide-webcam.webcam-video-bottom-right {
+  bottom: 4%;
+  right: 4%;
+  top: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+
+.slide-webcam.webcam-video-bottom-left {
+  bottom: 4%;
+  left: 4%;
+  top: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+
+.slide-webcam.webcam-video-right-panel {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.slide-webcam.webcam-video-left-panel {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.slide-webcam.webcam-video-fullscreen {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+/* Camera override: circle corners */
+.slide-webcam.webcam-video-circle-top-left {
+  top: 4%;
+  left: 4%;
+  bottom: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-top-right {
+  top: 4%;
+  right: 4%;
+  bottom: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-bottom-left {
+  bottom: 4%;
+  left: 4%;
+  top: auto;
+  right: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+.slide-webcam.webcam-video-circle-bottom-right {
+  bottom: 4%;
+  right: 4%;
+  top: auto;
+  left: auto;
+  width: 20%;
+  height: auto;
+  min-width: 120px;
+  min-height: 120px;
+  aspect-ratio: 1 / 1;
+}
+/* Camera override: thirds */
+.slide-webcam.webcam-video-left-third {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.slide-webcam.webcam-video-right-third {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 33.33%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.slide-webcam.play-mode {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Font pairing context menu (edit mode, font pairing mode only) */
+.slide-font-pairing-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 160px;
+  padding: 4px 0;
+  background: var(--bg-secondary, #2a2a2a);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.slide-font-pairing-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.slide-font-pairing-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ========== Text in/out animations (present mode) ========== */
+.slide[class*="text-animation-"] .slide-content,
+.slide[class*="text-animation-"] .slide-content-video,
+.slide[class*="text-animation-"] .slide-text,
+.slide[class*="text-animation-"] .slide-text-centered-wrapper .slide-text,
+.slide[class*="text-animation-"] .slide-subtitle,
+.slide[class*="text-animation-"] .slide-text-centered-wrapper .slide-subtitle,
+.slide[class*="text-animation-"] .slide-section-name,
+.slide[class*="text-animation-"] .slide-bullet .bullet-text {
+  animation-duration: var(--text-animation-duration, 0.7s);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+/* Chunked text (word/sentence): shared duration/timing for all animation types */
+.slide[class*="text-animation-"] .slide-text .text-animation-word,
+.slide[class*="text-animation-"] .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide[class*="text-animation-"] .slide-bullet .bullet-text .text-animation-word {
+  animation-duration: var(--text-animation-duration, 0.6s);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+/* Words-fade-up: animate each word (staggered) */
+.slide.text-animation-words-fade-up .slide-text-words .text-animation-word,
+.slide.text-animation-words-fade-up .slide-text-centered-wrapper .slide-text-words .text-animation-word,
+.slide.text-animation-words-fade-up .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: text-word-fade-up var(--text-animation-duration, 0.6s) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes text-word-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1. Fade in */
+.slide.text-animation-fade-in .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in .slide-subtitle,
+.slide.text-animation-fade-in .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-fade-in .slide-section-name,
+.slide.text-animation-fade-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  animation-name: text-fade-in;
+}
+.slide.text-animation-fade-in .slide-text .text-animation-word,
+.slide.text-animation-fade-in .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-fade-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  animation-name: text-fade-in;
+}
+
+@keyframes text-fade-in {
+  to { opacity: 1; }
+}
+
+/* 2. Fade in + slide up */
+.slide.text-animation-fade-in-up .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-up .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-up .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-up .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-up .slide-subtitle,
+.slide.text-animation-fade-in-up .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-fade-in-up .slide-section-name,
+.slide.text-animation-fade-in-up .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(32px);
+  animation-name: text-fade-in-up;
+}
+.slide.text-animation-fade-in-up .slide-text .text-animation-word,
+.slide.text-animation-fade-in-up .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-fade-in-up .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(32px);
+  animation-name: text-fade-in-up;
+}
+
+@keyframes text-fade-in-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Fade in + slide down */
+.slide.text-animation-fade-in-down .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-down .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-down .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-down .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-fade-in-down .slide-subtitle,
+.slide.text-animation-fade-in-down .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-fade-in-down .slide-section-name,
+.slide.text-animation-fade-in-down .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(-32px);
+  animation-name: text-fade-in-down;
+}
+.slide.text-animation-fade-in-down .slide-text .text-animation-word,
+.slide.text-animation-fade-in-down .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-fade-in-down .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(-32px);
+  animation-name: text-fade-in-down;
+}
+
+@keyframes text-fade-in-down {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 4. Slide in from right (-x) */
+.slide.text-animation-slide-in-left .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-left .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-left .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-left .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-left .slide-subtitle,
+.slide.text-animation-slide-in-left .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-slide-in-left .slide-section-name,
+.slide.text-animation-slide-in-left .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateX(48px);
+  animation-name: text-slide-in-left;
+}
+.slide.text-animation-slide-in-left .slide-text .text-animation-word,
+.slide.text-animation-slide-in-left .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-slide-in-left .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateX(48px);
+  animation-name: text-slide-in-left;
+}
+
+@keyframes text-slide-in-left {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 5. Slide in from left (+x) */
+.slide.text-animation-slide-in-right .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-right .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-right .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-right .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-slide-in-right .slide-subtitle,
+.slide.text-animation-slide-in-right .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-slide-in-right .slide-section-name,
+.slide.text-animation-slide-in-right .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateX(-48px);
+  animation-name: text-slide-in-right;
+}
+.slide.text-animation-slide-in-right .slide-text .text-animation-word,
+.slide.text-animation-slide-in-right .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-slide-in-right .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateX(-48px);
+  animation-name: text-slide-in-right;
+}
+
+@keyframes text-slide-in-right {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 6. Typewriter */
+.slide.text-animation-typewriter .slide-content,
+.slide.text-animation-typewriter .slide-content-video,
+.slide.text-animation-typewriter .slide-text,
+.slide.text-animation-typewriter .slide-text-centered-wrapper .slide-text,
+.slide.text-animation-typewriter .slide-subtitle,
+.slide.text-animation-typewriter .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-typewriter .slide-section-name,
+.slide.text-animation-typewriter .slide-bullet .bullet-text {
+  overflow: hidden;
+  border-right: 0.08em solid currentColor;
+  white-space: nowrap;
+  width: 0;
+  animation: text-typewriter calc(2 * var(--text-animation-duration, 0.6s)) steps(40, end) calc(0.5 * var(--text-animation-duration, 0.6s)) both;
+}
+
+.slide.text-animation-typewriter .slide-content br,
+.slide.text-animation-typewriter .slide-text br,
+.slide.text-animation-typewriter .slide-text-centered-wrapper .slide-text br,
+.slide.text-animation-typewriter .slide-subtitle br,
+.slide.text-animation-typewriter .slide-bullet .bullet-text br {
+  display: none;
+}
+
+@keyframes text-typewriter {
+  0% { width: 0; border-right-color: currentColor; }
+  95% { width: 100%; border-right-color: currentColor; }
+  100% { width: 100%; border-right-color: transparent; }
+}
+
+/* 7. Zoom in */
+.slide.text-animation-zoom-in .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-zoom-in .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-zoom-in .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-zoom-in .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-zoom-in .slide-subtitle,
+.slide.text-animation-zoom-in .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-zoom-in .slide-section-name,
+.slide.text-animation-zoom-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: scale(0.85);
+  animation-name: text-zoom-in;
+}
+.slide.text-animation-zoom-in .slide-text .text-animation-word,
+.slide.text-animation-zoom-in .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-zoom-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: scale(0.85);
+  animation-name: text-zoom-in;
+}
+
+@keyframes text-zoom-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 8. Bounce in */
+.slide.text-animation-bounce-in .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-bounce-in .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-bounce-in .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-bounce-in .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-bounce-in .slide-subtitle,
+.slide.text-animation-bounce-in .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-bounce-in .slide-section-name,
+.slide.text-animation-bounce-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: scale(0.3);
+  animation: text-bounce-in calc(1.333 * var(--text-animation-duration, 0.6s)) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.slide.text-animation-bounce-in .slide-text .text-animation-word,
+.slide.text-animation-bounce-in .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-bounce-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: scale(0.3);
+  animation: text-bounce-in calc(1.333 * var(--text-animation-duration, 0.6s)) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes text-bounce-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 9. Words fade up - word spans handled above; subtitle and bullets without word spans use fade-in-up */
+.slide.text-animation-words-fade-up .slide-subtitle,
+.slide.text-animation-words-fade-up .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-words-fade-up .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  transform: translateY(24px);
+  animation-name: text-fade-in-up;
+}
+
+/* 10. Blur in */
+.slide.text-animation-blur-in .slide-content:not(:has(.text-animation-word)),
+.slide.text-animation-blur-in .slide-content-video:not(:has(.text-animation-word)),
+.slide.text-animation-blur-in .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-blur-in .slide-text-centered-wrapper .slide-text:not(:has(.text-animation-word)),
+.slide.text-animation-blur-in .slide-subtitle,
+.slide.text-animation-blur-in .slide-text-centered-wrapper .slide-subtitle,
+.slide.text-animation-blur-in .slide-section-name,
+.slide.text-animation-blur-in .slide-bullet .bullet-text:not(:has(.text-animation-word)) {
+  opacity: 0;
+  filter: blur(12px);
+  animation-name: text-blur-in;
+}
+.slide.text-animation-blur-in .slide-text .text-animation-word,
+.slide.text-animation-blur-in .slide-text-centered-wrapper .slide-text .text-animation-word,
+.slide.text-animation-blur-in .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(12px);
+  animation-name: text-blur-in;
+}
+
+@keyframes text-blur-in {
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
