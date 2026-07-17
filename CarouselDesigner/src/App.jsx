@@ -23,6 +23,7 @@ import { exportCreatorKit, exportLinkedInPdf } from './services/carouselExportKi
 import { applyStylePresetToSlides, applyStylePresetToSettings, fillSlidesWithImages } from './services/carouselAssets'
 import { fitAllSlidesCopy } from './services/carouselAi'
 import { getApiKey } from '@shared/apiKeys'
+import { APP_ID } from './config/appConfig'
 import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
 import { useUndoRedo } from './hooks/useUndoRedo'
@@ -200,7 +201,7 @@ function App() {
   })
   const fileInputRef = useRef(null)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem('sidebarWidth')
+    const saved = localStorage.getItem('carouselDesignerSidebarWidth')
     return saved ? parseInt(saved, 10) : 350
   })
   const [inspectorWidth, setInspectorWidth] = useState(() => {
@@ -430,7 +431,7 @@ function App() {
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem('sidebarWidth', sidebarWidth.toString())
+      localStorage.setItem('carouselDesignerSidebarWidth', sidebarWidth.toString())
     } catch (error) {
       console.error('Error saving sidebar width:', error)
     }
@@ -685,7 +686,7 @@ function App() {
         if (await hasConnectedFolder()) {
           setIsSaving(true)
           const projName = (data.projectName || '').trim() || 'Untitled Project'
-          await saveProjectToConnectedFolder('PitchDeck', projName, () => exportData)
+          await saveProjectToConnectedFolder(APP_ID, projName, () => exportData)
           setLastSaved(new Date())
           localStorage.setItem('carouselDesignerLastModified', String(Date.now()))
         }
@@ -792,6 +793,7 @@ function App() {
     }))
     return {
       version: '1.0',
+      appId: APP_ID,
       chapters: normalizedChapters,
       currentChapterId,
       slides: (slides || []).map(normalizeSlide),
@@ -805,7 +807,7 @@ function App() {
     }
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, inspectorWidth, projectName, defaultSlideShape])
 
-  // Save current project to connected folder (PitchDeck/[projectName]/project.json)
+  // Save current project to connected folder (CarouselDesigner/[projectName]/project.json)
   const handleSaveToFolder = useCallback(async () => {
     const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
     if (!(await hasConnectedFolder())) {
@@ -814,7 +816,7 @@ function App() {
     }
     try {
       const projName = (projectName || '').trim() || 'Untitled Project'
-      await saveProjectToConnectedFolder('PitchDeck', projName, getExportData)
+      await saveProjectToConnectedFolder(APP_ID, projName, getExportData)
       setLastSaved(new Date())
       localStorage.setItem('carouselDesignerLastModified', String(Date.now()))
     } catch (e) {
@@ -851,7 +853,7 @@ function App() {
     try {
       const { hasConnectedFolder, saveProjectToConnectedFolder } = await getProjectFolderStorage()
       if (await hasConnectedFolder()) {
-        await saveProjectToConnectedFolder('PitchDeck', (projectName || '').trim() || 'Untitled Project', () => exportData)
+        await saveProjectToConnectedFolder(APP_ID, (projectName || '').trim() || 'Untitled Project', () => exportData)
         localStorage.setItem('carouselDesignerLastModified', String(Date.now()))
         setRecentFiles(prev => {
           const filtered = prev.filter(f => f.path !== filename)
@@ -1668,6 +1670,12 @@ function App() {
   // Load project data (from overview Open, or after file read). Same shape as export.
   const loadProjectFromData = useCallback((importData) => {
     if (!importData) return
+    if (importData.appId && importData.appId !== APP_ID) {
+      const source = importData.appId === 'PitchDeck' ? 'Pitch Deck' : importData.appId
+      if (!window.confirm(`This project was saved from ${source}. Open it in Carousel Designer anyway?`)) {
+        return
+      }
+    }
     let normalizedChapters = []
     let nextChapterId = 1
     if (importData.chapters && Array.isArray(importData.chapters)) {
@@ -1721,7 +1729,7 @@ function App() {
       const { hasConnectedFolder, loadProjectFromConnectedFolder } = await getProjectFolderStorage()
       if (!(await hasConnectedFolder())) return
       const projName = localStorage.getItem('carouselDesignerProjectName') || 'Untitled Project'
-      const result = await loadProjectFromConnectedFolder('PitchDeck', projName)
+      const result = await loadProjectFromConnectedFolder(APP_ID, projName)
       if (cancelled || !result?.data) return
       const browserLastModified = parseInt(localStorage.getItem('carouselDesignerLastModified') || '0', 10)
       if (result.modifiedTime > browserLastModified) {

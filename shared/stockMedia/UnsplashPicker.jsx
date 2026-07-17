@@ -6,7 +6,32 @@ import { searchUnsplashPhotos, fetchUnsplashImageAsDataUrl } from './unsplash';
 import { getApiKey } from '@shared/apiKeys';
 import './StockPicker.css';
 
-export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery = '', returnDataUrl = false }) {
+function readStoredQuery(storageKey) {
+  if (!storageKey) return '';
+  try {
+    return localStorage.getItem(storageKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredQuery(storageKey, value) {
+  if (!storageKey || !value?.trim()) return;
+  try {
+    localStorage.setItem(storageKey, value.trim());
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export default function UnsplashPicker({
+  isOpen,
+  onClose,
+  onSelect,
+  initialQuery = '',
+  queryStorageKey = '',
+  returnDataUrl = false,
+}) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [page, setPage] = useState(1);
@@ -19,7 +44,8 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
   const accessKey = getApiKey('unsplash');
 
   const search = useCallback(
-    async (pageNum = 1, append = false) => {
+    async (pageNum = 1, append = false, queryOverride) => {
+      const searchQuery = queryOverride ?? query;
       if (!accessKey?.trim()) {
         setError('Add Unsplash Access Key in Settings.');
         return;
@@ -28,7 +54,7 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       try {
-        const data = await searchUnsplashPhotos(accessKey, query || 'nature', pageNum, 15);
+        const data = await searchUnsplashPhotos(accessKey, searchQuery || 'nature', pageNum, 15);
         setTotalPages(data.total_pages ?? 0);
         setPage(pageNum);
         if (append) setResults((prev) => [...prev, ...(data.results ?? [])]);
@@ -46,12 +72,17 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
 
   useEffect(() => {
     if (!isOpen) return;
-    setQuery(initialQuery);
-    if (initialQuery?.trim()) search(1);
+    const storedQuery = readStoredQuery(queryStorageKey);
+    const nextQuery = storedQuery.trim() || initialQuery;
+    setQuery(nextQuery);
+    if (nextQuery.trim()) search(1, false, nextQuery);
     else setResults([]);
-  }, [isOpen, initialQuery]);
+  }, [isOpen, initialQuery, queryStorageKey]);
 
-  const handleSearch = () => search(1);
+  const handleSearch = () => {
+    writeStoredQuery(queryStorageKey, query);
+    search(1, false, query);
+  };
   const handleLoadMore = () => search(page + 1, true);
 
   const handlePick = async (photo) => {

@@ -7,7 +7,7 @@ const PITCH_DECK_MIME = 'application/json'
 const DRIVE_APP_FOLDER = 'appDataFolder'
 const DRIVE_FILE_MIME = 'application/vnd.google-apps.file'
 
-const PROJECT_FOLDER_DB = 'PitchDeckProjectFolder'
+const PROJECT_FOLDER_DB = 'CarouselDesignerProjectFolder'
 const PROJECT_FOLDER_STORE = 'folder'
 
 function openDB() {
@@ -237,7 +237,7 @@ export async function saveToProjectFolder(getExportData, projectName) {
   }
   const filename = (projectName && projectName.trim())
     ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
-    : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+    : `carousel-${new Date().toISOString().split('T')[0]}.json`
   const raw = getExportData()
   const data = JSON.parse(JSON.stringify(raw))
   const chapters = data.chapters || []
@@ -351,7 +351,7 @@ export async function saveToLocalFolder(getExportData, projectName) {
   const dirHandle = await window.showDirectoryPicker()
   const filename = (projectName && projectName.trim())
     ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
-    : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+    : `carousel-${new Date().toISOString().split('T')[0]}.json`
   const fileHandle = await dirHandle.getFileHandle(filename, { create: true })
   const writable = await fileHandle.createWritable()
   const data = getExportData()
@@ -473,7 +473,7 @@ export async function listDriveProjects(accessToken) {
 export async function saveToDrive(accessToken, exportData, projectName, existingFileId = null) {
   const filename = (projectName && projectName.trim())
     ? `${projectName.trim().replace(/[^a-z0-9]/gi, '-').toLowerCase()}.json`
-    : `pitch-deck-${new Date().toISOString().split('T')[0]}.json`
+    : `carousel-${new Date().toISOString().split('T')[0]}.json`
   const json = JSON.stringify(exportData, null, 2)
   const blob = new Blob([json], { type: PITCH_DECK_MIME })
 

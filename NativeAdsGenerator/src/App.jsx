@@ -64,6 +64,9 @@ function getInitialSidebarTab(savedTab) {
   return savedTab || 'format'
 }
 
+const UNSPLASH_QUERY_KEY = 'nativeAdsUnsplashQuery'
+const PEXELS_QUERY_KEY = 'nativeAdsPexelsQuery'
+
 const saasAppsUrl = typeof window !== 'undefined'
   ? new URL('../index.html', window.location.href).href
   : '/index.html'
@@ -930,6 +933,7 @@ export default function App() {
         onSelect={handleUnsplashSelect}
         returnDataUrl
         initialQuery="advertising"
+        queryStorageKey={UNSPLASH_QUERY_KEY}
       />
 
       <PexelsVideoPicker
@@ -937,6 +941,7 @@ export default function App() {
         onClose={() => setPexelsOpen(false)}
         onSelect={handlePexelsVideoSelect}
         initialQuery="advertising"
+        queryStorageKey={PEXELS_QUERY_KEY}
       />
 
       <MetaExportModal

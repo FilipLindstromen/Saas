@@ -135,19 +135,30 @@ function wrapParagraph(ctx, paragraph, maxWidth) {
   return lines
 }
 
+function lineHeightForLine(line, fontSize, { blank = 0.55, normal = 1.15 } = {}) {
+  return fontSize * (line === '' ? blank : normal)
+}
+
+function blockHeightForLines(lines, fontSize, ratios) {
+  return lines.reduce((sum, line) => sum + lineHeightForLine(line, fontSize, ratios), 0)
+}
+
 function buildTextLines(ctx, rawText, fontSize, fontWeight, fontFamily, maxWidth, wordWrap) {
   if (!rawText?.trim()) return []
 
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
 
   if (!wordWrap) {
-    return rawText.split('\n').map((line) => line.trim()).filter(Boolean)
+    return rawText.split('\n').map((line) => line.trim())
   }
 
   const lines = []
   rawText.split('\n').forEach((paragraph) => {
     const trimmed = paragraph.trim()
-    if (!trimmed) return
+    if (!trimmed) {
+      lines.push('')
+      return
+    }
     lines.push(...wrapParagraph(ctx, trimmed, maxWidth))
   })
   return lines
@@ -203,11 +214,11 @@ export function drawAd(ctx, {
   const activeCopy = getActiveCopy(text)
   const showSubheadline = text.showSubheadline !== false
   const showLinkTitle = text.showLinkTitle !== false
-  const headline = activeCopy.headline?.trim() || ''
-  const bodyCopy = activeCopy.copy?.trim() || ''
-  const linkTitle = activeCopy.linkTitle?.trim() || ''
+  const headlineRaw = activeCopy.headline || ''
+  const bodyCopyRaw = activeCopy.copy || ''
+  const linkTitleRaw = activeCopy.linkTitle || ''
 
-  if (!headline && !(showSubheadline && bodyCopy) && !(showLinkTitle && linkTitle)) return
+  if (!headlineRaw.trim() && !(showSubheadline && bodyCopyRaw.trim()) && !(showLinkTitle && linkTitleRaw.trim())) return
 
   const fontFamily = text.fontFamily || 'Montserrat'
   const headlineSize = text.headlineFontSize || text.fontSize || 72
@@ -218,16 +229,16 @@ export function drawAd(ctx, {
   const padH = getHorizontalPadding(width, text)
   const maxTextWidth = Math.max(40, width - padH * 2)
 
-  const headlineLines = headline
-    ? buildTextLines(ctx, headline, headlineSize, text.fontWeight || 700, fontFamily, maxTextWidth, wordWrap)
+  const headlineLines = headlineRaw.trim()
+    ? buildTextLines(ctx, headlineRaw, headlineSize, text.fontWeight || 700, fontFamily, maxTextWidth, wordWrap)
     : []
-  const copyLines = showSubheadline && bodyCopy
-    ? buildTextLines(ctx, bodyCopy, copySize, text.copyFontWeight || 500, fontFamily, maxTextWidth, wordWrap)
+  const copyLines = showSubheadline && bodyCopyRaw.trim()
+    ? buildTextLines(ctx, bodyCopyRaw, copySize, text.copyFontWeight || 500, fontFamily, maxTextWidth, wordWrap)
     : []
-  const linkLines = showLinkTitle && linkTitle
+  const linkLines = showLinkTitle && linkTitleRaw.trim()
     ? buildTextLines(
       ctx,
-      linkTitle,
+      linkTitleRaw,
       linkTitleSize,
       text.linkTitleFontWeight ?? 600,
       fontFamily,
@@ -241,15 +252,21 @@ export function drawAd(ctx, {
     ? headlineSize * 0.28
     : 0
 
-  const headlineBlockH = headlineLines.length * headlineSize * 1.15
-  const copyBlockH = copyLines.length * copySize * 1.3
-  const linkBlockH = linkLines.length ? linkLines.length * linkTitleSize * 1.2 + linkGap : 0
+  const headlineBlockH = blockHeightForLines(headlineLines, headlineSize)
+  const copyBlockH = blockHeightForLines(copyLines, copySize, { blank: 0.55, normal: 1.3 })
+  const linkBlockH = linkLines.length
+    ? blockHeightForLines(linkLines, linkTitleSize, { blank: 0.55, normal: 1.2 }) + linkGap
+    : 0
   const totalHeight = headlineBlockH + gap + copyBlockH + linkBlockH
   let cursorY = height / 2 - totalHeight / 2
 
   ctx.textAlign = align
 
   const drawLine = (line, y, fontSize, fontWeight, useHighlight) => {
+    if (!line) {
+      return lineHeightForLine('', fontSize)
+    }
+
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`
     const metrics = ctx.measureText(line)
     const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.78
@@ -313,23 +330,23 @@ export function drawAd(ctx, {
 
   headlineLines.forEach((line) => {
     const highlight = text.highlight && (text.highlightHeadlineOnly !== false)
-    const lineH = drawLine(line, cursorY, headlineSize, text.fontWeight || 700, highlight)
-    cursorY += lineH
+    drawLine(line, cursorY, headlineSize, text.fontWeight || 700, highlight)
+    cursorY += lineHeightForLine(line, headlineSize)
   })
 
   if (gap) cursorY += gap
 
   copyLines.forEach((line) => {
     const highlight = text.highlight && text.highlightHeadlineOnly === false
-    const lineH = drawLine(line, cursorY, copySize, text.copyFontWeight || 500, highlight)
-    cursorY += lineH * 1.15
+    drawLine(line, cursorY, copySize, text.copyFontWeight || 500, highlight)
+    cursorY += lineHeightForLine(line, copySize, { blank: 0.55, normal: 1.3 })
   })
 
   if (linkGap) cursorY += linkGap
 
   linkLines.forEach((line) => {
     drawLine(line, cursorY, linkTitleSize, text.linkTitleFontWeight ?? 600, false)
-    cursorY += linkTitleSize * 1.2
+    cursorY += lineHeightForLine(line, linkTitleSize, { blank: 0.55, normal: 1.2 })
   })
 }
 

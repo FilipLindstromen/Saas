@@ -6,7 +6,31 @@ import { getApiKey } from '@shared/apiKeys';
 import { pickPexelsVideoUrl, searchPexelsVideos } from './pexelsVideo';
 import './StockPicker.css';
 
-export default function PexelsVideoPicker({ isOpen, onClose, onSelect, initialQuery = '' }) {
+function readStoredQuery(storageKey) {
+  if (!storageKey) return '';
+  try {
+    return localStorage.getItem(storageKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredQuery(storageKey, value) {
+  if (!storageKey || !value?.trim()) return;
+  try {
+    localStorage.setItem(storageKey, value.trim());
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export default function PexelsVideoPicker({
+  isOpen,
+  onClose,
+  onSelect,
+  initialQuery = '',
+  queryStorageKey = '',
+}) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [page, setPage] = useState(1);
@@ -20,7 +44,8 @@ export default function PexelsVideoPicker({ isOpen, onClose, onSelect, initialQu
   const accessKey = getApiKey('pexels');
 
   const search = useCallback(
-    async (pageNum = 1, append = false) => {
+    async (pageNum = 1, append = false, queryOverride) => {
+      const searchQuery = queryOverride ?? query;
       if (!accessKey?.trim()) {
         setError('Add Pexels API key in Settings.');
         return;
@@ -29,7 +54,7 @@ export default function PexelsVideoPicker({ isOpen, onClose, onSelect, initialQu
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       try {
-        const data = await searchPexelsVideos(accessKey, query || 'nature', pageNum, 15);
+        const data = await searchPexelsVideos(accessKey, searchQuery || 'nature', pageNum, 15);
         setTotalResults(data.total_results ?? 0);
         setPerPage(data.per_page ?? 15);
         setPage(pageNum);
@@ -54,12 +79,17 @@ export default function PexelsVideoPicker({ isOpen, onClose, onSelect, initialQu
 
   useEffect(() => {
     if (!isOpen) return;
-    setQuery(initialQuery);
-    if (initialQuery?.trim()) search(1);
+    const storedQuery = readStoredQuery(queryStorageKey);
+    const nextQuery = storedQuery.trim() || initialQuery;
+    setQuery(nextQuery);
+    if (nextQuery.trim()) search(1, false, nextQuery);
     else setResults([]);
-  }, [isOpen, initialQuery]);
+  }, [isOpen, initialQuery, queryStorageKey]);
 
-  const handleSearch = () => search(1);
+  const handleSearch = () => {
+    writeStoredQuery(queryStorageKey, query);
+    search(1, false, query);
+  };
   const handleLoadMore = () => search(page + 1, true);
   const hasMore = page * perPage < totalResults;
 

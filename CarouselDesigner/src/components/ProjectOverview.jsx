@@ -9,9 +9,10 @@ import {
   saveProjectToConnectedFolder,
   isLocalFolderSupported
 } from '@shared/projectFolderStorage'
+import { APP_ID } from '../config/appConfig'
 import './ProjectOverview.css'
 
-const APP_NAME = 'PitchDeck'
+const APP_NAME = APP_ID
 
 /** Get the first background image URL from a project's chapters/slides (first slide with imageUrl). */
 function getFirstSlideImageUrl(data) {
@@ -235,7 +236,7 @@ function ProjectOverview({
               <p>No projects yet.</p>
               <p className="project-overview-empty-hint">
                 Use <strong>Open project folder</strong> to connect the folder from SaaS Apps settings, or create a <strong>New Project</strong>.
-                Projects save to <code>PitchDeck/[project name]/project.json</code>.
+                Projects save to <code>CarouselDesigner/[project name]/project.json</code>.
               </p>
             </div>
           )}
