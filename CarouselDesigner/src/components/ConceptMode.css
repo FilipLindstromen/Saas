@@ -166,3 +166,93 @@
     grid-template-columns: 1fr;
   }
 }
+
+.concept-action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.concept-btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+}
+
+.concept-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.concept-tabs button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.concept-tabs button.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.concept-idea-role-row {
+  margin-bottom: 4px;
+}
+
+.concept-variants-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.concept-variant-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.concept-variant-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.concept-variant-angle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.concept-variant-slides {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+
+.concept-variant-slides li {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.concept-variant-more {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.concept-btn-sm {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}

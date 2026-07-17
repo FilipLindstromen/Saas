@@ -24,6 +24,15 @@
     const categories = window.SAAS_APPS_CATALOG || []
     if (!catalog) return
 
+    if (!categories.length) {
+      catalog.innerHTML =
+        '<section class="catalog-error">' +
+        '<h2>Could not load apps</h2>' +
+        '<p>The app catalog did not load. If you manage this site, ensure <code>apps-data.js</code>, <code>saas-home.js</code>, and <code>saas-home.css</code> are included in the deployment (GitHub Actions workflow or <code>docs/</code> folder).</p>' +
+        '</section>'
+      if (countEl) countEl.textContent = ''
+      return
+    }
     let totalApps = 0
     catalog.innerHTML = ''
 

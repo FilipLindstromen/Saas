@@ -1,0 +1,120 @@
+.performance-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.performance-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  width: min(480px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+}
+
+.performance-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.performance-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.performance-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.performance-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.performance-field select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.performance-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.performance-metric {
+  background: var(--bg-primary);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.performance-metric-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.performance-metric-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.performance-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.performance-suggestion {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: var(--bg-primary);
+  border-left: 3px solid var(--accent);
+}
+
+.performance-suggestion.severity-high { border-left-color: #ff8787; }
+.performance-suggestion.severity-medium { border-left-color: #ffd43b; }
+.performance-suggestion.severity-info { border-left-color: #4dabf7; }
+
+.performance-hint,
+.performance-loading,
+.performance-error {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.performance-error { color: #ff8787; }
+
+.performance-link {
+  color: var(--accent);
+  font-size: 0.85rem;
+}

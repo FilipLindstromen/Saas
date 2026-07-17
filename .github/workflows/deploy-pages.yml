@@ -32,6 +32,9 @@ jobs:
         run: |
           mkdir -p deploy
           cp docs/index.html deploy/
+          cp docs/saas-home.css deploy/
+          cp docs/saas-home.js deploy/
+          cp docs/apps-data.js deploy/
           cp docs/apiKeys.js deploy/
           cp docs/saasStorage.js deploy/
           cp docs/google-drive-callback.html deploy/
@@ -117,6 +120,13 @@ jobs:
           npm install
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/PitchDeck/
           cp -r dist ../deploy/PitchDeck
+
+      - name: Build Carousel Designer
+        run: |
+          cd CarouselDesigner
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/CarouselDesigner/
+          cp -r dist ../deploy/CarouselDesigner
 
       - name: Build Video Recorder
         run: |

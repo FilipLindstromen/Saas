@@ -1,3 +1,6 @@
+import CarouselToolsOptions from './CarouselToolsOptions'
+import CaptionStudio from './CaptionStudio'
+import PerformanceInsightsPanel from './PerformanceInsightsPanel'
 import ColorOptions from './ColorOptions'
 import TypographyOptions from './TypographyOptions'
 import TransitionOptions from './TransitionOptions'
@@ -20,6 +23,19 @@ function InspectorPanel({
   selectedGraphicId,
   onDeselectGraphic,
   backgroundColor,
+  carouselCaption,
+  carouselHashtags,
+  carouselFirstComment,
+  onCaptionUpdate,
+  conceptInstructions,
+  onApplyStylePreset,
+  onApplyStyleToAllSlides,
+  onFillImages,
+  onFitAllCopy,
+  carouselToolsBusy,
+  visualTheme,
+  onVisualThemeChange,
+  lastExportedAdId,
 }) {
   const tab = normalizeInspectorTab(activeTab)
   const tabMeta = getInspectorTabMeta(tab)
@@ -102,6 +118,36 @@ function InspectorPanel({
           <p className="inspector-panel-content-group">{groupLabel}</p>
           <h2 className="inspector-panel-content-title">{tabMeta.label}</h2>
         </header>
+
+        {tab === 'carousel-tools' && (
+          <CarouselToolsOptions
+            onApplyStylePreset={onApplyStylePreset}
+            onApplyStyleToAllSlides={onApplyStyleToAllSlides}
+            onFillImages={onFillImages}
+            onFitAllCopy={onFitAllCopy}
+            busy={carouselToolsBusy}
+            visualTheme={visualTheme}
+            onVisualThemeChange={onVisualThemeChange}
+          />
+        )}
+
+        {tab === 'caption' && (
+          <CaptionStudio
+            slides={slides}
+            instructions={conceptInstructions}
+            caption={carouselCaption}
+            hashtags={carouselHashtags}
+            firstComment={carouselFirstComment}
+            onUpdate={onCaptionUpdate}
+          />
+        )}
+
+        {tab === 'performance' && (
+          <PerformanceInsightsPanel
+            slides={slides}
+            lastExportedAdId={lastExportedAdId}
+          />
+        )}
 
         {tab === 'layout' && (
           <DocumentSettings

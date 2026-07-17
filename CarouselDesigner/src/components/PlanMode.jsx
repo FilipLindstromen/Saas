@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import SlideRoleBadge from './SlideRoleBadge'
+import SlideLimitIndicator from './SlideLimitIndicator'
+import CaptionStudio from './CaptionStudio'
 import TemplateSelector from './TemplateSelector'
+import { fitSlideCopyToCarousel } from '../services/carouselAi'
 import './PlanMode.css'
 
 // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
@@ -30,7 +34,7 @@ function getPlainText(content) {
     .replace(/&#39;/g, "'")
 }
 
-function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange }) {
+function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange, carouselCaption = '', carouselHashtags = '', carouselFirstComment = '', onCaptionUpdate, conceptInstructions = '' }) {
   const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
@@ -69,7 +73,8 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
   const textareaRef = useRef(null)
-  const lastEnterTimeRef = useRef(0)
+  const [showCaptionPanel, setShowCaptionPanel] = useState(true)
+  const [fittingId, setFittingId] = useState(null)
 
   const isOverview = planView === 'overview' && chapters?.length && onUpdateChapterSlides
   const currentChapter = (chapters || []).find(c => c.id === currentChapterId) || (chapters || [])[0]
@@ -855,6 +860,44 @@ Example format:
 
   const editingContextKey = () => (isOverview && editingChapterId != null ? editingChapterId : editingId)
 
+  const handleFitSlide = async (slide, chapterId) => {
+    if ((slide.layout || 'default') === 'section') return
+    setFittingId(slide.id)
+    try {
+      const headline = getPlainText(slide.content)
+      const body = getPlainText(slide.subtitle)
+      const fitted = await fitSlideCopyToCarousel({ headline, body })
+      const updates = {
+        content: plainTextToStorage(fitted.headline || headline),
+        subtitle: fitted.body ? plainTextToStorage(fitted.body) : slide.subtitle,
+      }
+      if (chapterId != null && isOverview && onUpdateChapterSlides) {
+        const chapter = chapters.find((c) => c.id === chapterId)
+        if (chapter) {
+          onUpdateChapterSlides(chapterId, chapter.slides.map((s) => (s.id === slide.id ? { ...s, ...updates } : s)))
+        }
+      } else {
+        onUpdateSlides(slides.map((s) => (s.id === slide.id ? { ...s, ...updates } : s)))
+      }
+    } catch (err) {
+      alert(err?.message || 'Could not fit slide copy')
+    } finally {
+      setFittingId(null)
+    }
+  }
+
+  const handleRoleChange = (slideId, role, chapterId) => {
+    const patch = { role: role || undefined }
+    if (chapterId != null && isOverview && onUpdateChapterSlides) {
+      const chapter = chapters.find((c) => c.id === chapterId)
+      if (chapter) {
+        onUpdateChapterSlides(chapterId, chapter.slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)))
+      }
+    } else {
+      onUpdateSlides(slides.map((s) => (s.id === slideId ? { ...s, ...patch } : s)))
+    }
+  }
+
   const renderSceneRows = (slidesForList, chapterId) =>
     slidesForList.map((slide, index) => {
       const displayText = getPlainText(slide.content || '')
@@ -877,6 +920,13 @@ Example format:
           onClick={() => !isEditing && handleSceneClick(slide, chapterId)}
         >
           <span className="scene-number">{isSection ? 'Section' : `Slide ${index + 1}`}</span>
+          {!isSection && (
+            <SlideRoleBadge
+              role={slide.role}
+              editable
+              onChange={(role) => handleRoleChange(slide.id, role, chapterId)}
+            />
+          )}
           <div className="scene-separator" />
           {isEditing ? (
             <textarea
@@ -894,6 +944,18 @@ Example format:
             <span className="scene-text" style={{ whiteSpace: 'pre-line' }}>
               {displayText || 'Click to edit...'}
             </span>
+          )}
+          {!isSection && <SlideLimitIndicator slide={slide} compact />}
+          {!isSection && !isEditing && (
+            <button
+              type="button"
+              className="plan-scene-fit-btn"
+              onClick={(e) => { e.stopPropagation(); handleFitSlide(slide, chapterId) }}
+              disabled={fittingId === slide.id}
+              title="AI shorten to carousel limits"
+            >
+              {fittingId === slide.id ? '…' : 'Fit'}
+            </button>
           )}
           {slidesForList.length > 1 && (
             <button
@@ -1214,6 +1276,29 @@ Example format:
           </div>
         </div>
         </div>
+
+        {showCaptionPanel && onCaptionUpdate && (
+          <aside className="plan-caption-sidebar">
+            <div className="plan-caption-header">
+              <h3>Caption</h3>
+              <button type="button" className="plan-caption-toggle" onClick={() => setShowCaptionPanel(false)} title="Hide">×</button>
+            </div>
+            <CaptionStudio
+              slides={slides}
+              instructions={conceptInstructions}
+              caption={carouselCaption}
+              hashtags={carouselHashtags}
+              firstComment={carouselFirstComment}
+              onUpdate={onCaptionUpdate}
+              compact
+            />
+          </aside>
+        )}
+        {!showCaptionPanel && onCaptionUpdate && (
+          <button type="button" className="plan-caption-show-btn" onClick={() => setShowCaptionPanel(true)}>
+            Caption
+          </button>
+        )}
       </div>
     </div>
   )

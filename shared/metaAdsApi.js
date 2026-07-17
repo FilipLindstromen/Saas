@@ -255,6 +255,90 @@ export async function createPausedAd({
   return data.id
 }
 
+export async function fetchRecentAds(adAccountId, accessToken, limit = 25) {
+  const actId = normalizeAdAccountId(adAccountId)
+  return graphGetAll(`${actId}/ads`, accessToken, {
+    fields: 'id,name,status,effective_status,creative{id,name,object_story_spec}',
+    limit: String(limit),
+  })
+}
+
+export async function fetchAdInsights(adId, accessToken) {
+  return graphGet(`${adId}/insights`, accessToken, {
+    fields: 'impressions,clicks,ctr,cpc,spend,actions,cost_per_action_type',
+    date_preset: 'last_30d',
+  })
+}
+
+export async function fetchCarouselAdInsights(adAccountId, accessToken, adId) {
+  const actId = normalizeAdAccountId(adAccountId)
+  const insights = await graphGet(`${adId}/insights`, accessToken, {
+    fields: 'impressions,clicks,ctr,spend,actions',
+    date_preset: 'last_30d',
+    breakdowns: 'carousel_card_id',
+  })
+  return insights
+}
+
+export function analyzeInsightsForSuggestions(insightsData, slides = []) {
+  const suggestions = []
+  const rows = insightsData?.data || []
+  const main = rows[0] || {}
+  const ctr = parseFloat(main.ctr || 0)
+  const clicks = parseInt(main.clicks || 0, 10)
+  const impressions = parseInt(main.impressions || 0, 10)
+
+  if (impressions > 500 && ctr < 1) {
+    suggestions.push({
+      type: 'hook',
+      severity: 'high',
+      message: 'CTR is below 1%. Try a stronger hook on slide 1 — use a question or bold claim.',
+    })
+  }
+  if (slides.length > 0 && clicks > 0 && impressions > 0) {
+    const clickRate = clicks / impressions
+    if (clickRate < 0.005) {
+      suggestions.push({
+        type: 'cta',
+        severity: 'medium',
+        message: 'Low engagement overall. Strengthen your final slide CTA with a specific action.',
+      })
+    }
+  }
+  if (slides.some((s) => {
+    const text = String(s.content || '').replace(/<[^>]+>/g, '')
+    return text.split(/\s+/).length > 15
+  })) {
+    suggestions.push({
+      type: 'copy',
+      severity: 'medium',
+      message: 'Some slides have long headlines. Shorten copy for mobile readability.',
+    })
+  }
+  if (!slides.some((s) => s.role === 'cta' || (s.role == null && slides.indexOf(s) === slides.length - 1))) {
+    suggestions.push({
+      type: 'structure',
+      severity: 'low',
+      message: 'Consider labeling your last slide as CTA for clearer narrative arc.',
+    })
+  }
+  if (suggestions.length === 0 && impressions > 100) {
+    suggestions.push({
+      type: 'success',
+      severity: 'info',
+      message: `Performance looks healthy (${ctr.toFixed(2)}% CTR). Consider A/B testing a new hook variant.`,
+    })
+  }
+  if (impressions === 0 && clicks === 0) {
+    suggestions.push({
+      type: 'data',
+      severity: 'info',
+      message: 'No performance data yet. Export to Meta and run the ad to see insights here.',
+    })
+  }
+  return { metrics: main, suggestions }
+}
+
 export function getMetaAdsCredentials() {
   try {
     const raw = localStorage.getItem('saasApiKeys')

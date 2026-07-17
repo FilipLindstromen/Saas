@@ -1,0 +1,76 @@
+.performance-insights-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.performance-panel-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.performance-panel-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.performance-panel-select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.performance-panel-refresh {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.performance-panel-error {
+  color: #ff8787;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.performance-panel-metrics {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+}
+
+.performance-panel-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.performance-panel-suggestions li {
+  font-size: 0.8rem;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  border-left: 3px solid var(--accent);
+}
+
+.performance-panel-suggestions .severity-high { border-left-color: #ff8787; }
+.performance-panel-suggestions .severity-medium { border-left-color: #ffd43b; }
+
+.performance-panel-link {
+  font-size: 0.82rem;
+  color: var(--accent);
+}

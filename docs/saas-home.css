@@ -263,6 +263,36 @@ body::before {
   white-space: nowrap;
 }
 
+.catalog-error {
+  grid-column: 1 / -1;
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+}
+
+.catalog-error h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.catalog-error p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+.catalog-error code {
+  font-size: 0.85em;
+  background: var(--bg-tertiary);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
 /* Settings modal (unchanged structure, tightened) */
 .settings-backdrop {
   position: fixed;

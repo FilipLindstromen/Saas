@@ -13,6 +13,7 @@ const iconProps = {
 export const INSPECTOR_GROUP_LABELS = {
   document: 'Document',
   slide: 'Slide',
+  carousel: 'Carousel',
   present: 'Present',
   object: 'Object',
 }
@@ -21,6 +22,9 @@ export const INSPECTOR_TABS = [
   { id: 'layout', label: 'Layout', group: 'document' },
   { id: 'colors', label: 'Colors', group: 'document' },
   { id: 'typography', label: 'Typography', group: 'document' },
+  { id: 'carousel-tools', label: 'Carousel', group: 'carousel' },
+  { id: 'caption', label: 'Caption', group: 'carousel' },
+  { id: 'performance', label: 'Insights', group: 'carousel' },
   { id: 'slide-bg', label: 'Background', group: 'slide' },
   { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
   { id: 'gradient', label: 'Gradient', group: 'slide' },
@@ -71,6 +75,26 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M4 7V5h16v2" />
           <path d="M12 5v14" />
           <path d="M8 19h8" />
+        </svg>
+      )
+    case 'carousel-tools':
+      return (
+        <svg {...iconProps}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M7 4v16M17 4v16" />
+        </svg>
+      )
+    case 'caption':
+      return (
+        <svg {...iconProps}>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      )
+    case 'performance':
+      return (
+        <svg {...iconProps}>
+          <path d="M3 3v18h18" />
+          <path d="M7 14l4-4 4 4 5-6" />
         </svg>
       )
     case 'slide-bg':

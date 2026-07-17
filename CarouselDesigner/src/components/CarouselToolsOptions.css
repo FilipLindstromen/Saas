@@ -1,0 +1,68 @@
+.carousel-tools-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.carousel-tools-section h4 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+
+.carousel-tools-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.carousel-tools-select,
+.carousel-tools-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.carousel-tools-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.carousel-tools-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.carousel-tools-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.carousel-tools-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.carousel-tools-btn-ghost {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  font-weight: 500;
+}

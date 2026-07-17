@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { CAROUSEL_FORMAT } from '../utils/slideFormats'
 import './ShareExportMenu.css'
 
 function ShareExportMenu({
@@ -7,6 +6,8 @@ function ShareExportMenu({
   onExportPng,
   onExportInstagram,
   onExportMeta,
+  onExportCreatorKit,
+  onExportLinkedIn,
   onCopyText,
   onSaveToFolder,
   onImport,
@@ -58,8 +59,14 @@ function ShareExportMenu({
           <button type="button" role="menuitem" className="share-export-primary" onClick={() => run(onExportMeta)} disabled={isExporting}>
             Export carousel to Meta
           </button>
+          <button type="button" role="menuitem" onClick={() => run(onExportCreatorKit)} disabled={isExporting}>
+            Creator kit (IG + LinkedIn + TikTok)
+          </button>
           <button type="button" role="menuitem" onClick={() => run(onExportInstagram)} disabled={isExporting}>
             Download carousel (ZIP)
+          </button>
+          <button type="button" role="menuitem" onClick={() => run(onExportLinkedIn)} disabled={isExporting}>
+            Export for LinkedIn
           </button>
           <div className="share-export-divider" role="separator" />
           <button type="button" role="menuitem" onClick={() => run(onImport)}>Import project…</button>

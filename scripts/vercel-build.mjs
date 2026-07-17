@@ -25,6 +25,7 @@ const VITE_APPS = [
   ["PostIt", "/PostIt/"],
   ["BulletGenerator", "/BulletGenerator/"],
   ["PitchDeck", "/PitchDeck/"],
+  ["CarouselDesigner", "/CarouselDesigner/"],
   ["VIdeoRecorder", "/VIdeoRecorder/"],
   ["ReelRecorder", "/ReelRecorder/"],
   ["InfoGraphics", "/InfoGraphics/"],
@@ -57,6 +58,9 @@ mkdirSync(DEPLOY, { recursive: true });
 console.log("Copying hub (docs)...");
 const docs = path.join(ROOT, "docs");
 cpSync(path.join(docs, "index.html"), path.join(DEPLOY, "index.html"));
+cpSync(path.join(docs, "saas-home.css"), path.join(DEPLOY, "saas-home.css"));
+cpSync(path.join(docs, "saas-home.js"), path.join(DEPLOY, "saas-home.js"));
+cpSync(path.join(docs, "apps-data.js"), path.join(DEPLOY, "apps-data.js"));
 cpSync(path.join(docs, "apiKeys.js"), path.join(DEPLOY, "apiKeys.js"));
 cpSync(path.join(docs, "saasStorage.js"), path.join(DEPLOY, "saasStorage.js"));
 cpSync(path.join(docs, "google-drive-callback.html"), path.join(DEPLOY, "google-drive-callback.html"));

@@ -2,6 +2,8 @@ import { useState, useRef } from 'react'
 import LayoutSelector from './LayoutSelector'
 import ContextMenu from './ContextMenu'
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
+import SlideRoleBadge from './SlideRoleBadge'
+import SlideLimitIndicator from './SlideLimitIndicator'
 import './SlideList.css'
 
 function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSelectedSlides = () => {}, onSelect, onAdd, onDelete, onDuplicate, onUpdate, onBatchUpdate, onReorder, chapters, currentChapterId, onMoveToChapter }) {
@@ -468,6 +470,8 @@ function SlideList({ slides, selectedSlideId, selectedSlides = new Set(), setSel
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', width: '100%' }}>
                 <div className="slide-item-number">{originalIndex + 1}</div>
+                {slide.role && <SlideRoleBadge role={slide.role} />}
+                <SlideLimitIndicator slide={slide} compact />
                 <div
                   className={`slide-item ${selectedSlideId === slide.id ? 'selected' : ''} ${selectedSlides.has(slide.id) ? 'multi-selected' : ''}`}
                   onClick={(e) => {

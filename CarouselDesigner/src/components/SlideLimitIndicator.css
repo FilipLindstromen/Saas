@@ -1,0 +1,17 @@
+.slide-limit-indicator {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.slide-limit-indicator .ok { opacity: 0.7; }
+.slide-limit-indicator .over { color: #ff8787; font-weight: 600; }
+.slide-limit-warn { color: #ffd43b; }
+.slide-limit-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff8787;
+  flex-shrink: 0;
+}

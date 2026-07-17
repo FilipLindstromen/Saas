@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { getApiKey } from '@shared/apiKeys'
+import { CAROUSEL_TEMPLATES } from '../carousel/constants'
+import { generateCarouselIdeas, generateCarouselVariants } from '../services/carouselAi'
+import SlideRoleBadge from './SlideRoleBadge'
 import './ConceptMode.css'
 
 const STORAGE_INSTRUCTIONS = 'carouselDesignerConceptInstructions'
 const STORAGE_IDEAS = 'carouselDesignerConceptIdeas'
+const STORAGE_TEMPLATE = 'carouselDesignerConceptTemplate'
+const STORAGE_VARIANTS = 'carouselDesignerConceptVariants'
 
 function loadJson(key, fallback) {
   try {
@@ -14,25 +19,24 @@ function loadJson(key, fallback) {
   }
 }
 
-function plainTextFromHtml(html) {
-  if (!html) return ''
-  return String(html)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .trim()
-}
-
 export default function ConceptMode({
   onApplyToPlan,
+  onApplyVariantToPlan,
   slides = [],
 }) {
   const [instructions, setInstructions] = useState(() => localStorage.getItem(STORAGE_INSTRUCTIONS) || '')
   const [topic, setTopic] = useState('')
   const [ideas, setIdeas] = useState(() => loadJson(STORAGE_IDEAS, []))
+  const [variants, setVariants] = useState(() => loadJson(STORAGE_VARIANTS, []))
+  const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem(STORAGE_TEMPLATE) || 'hookTipsCta')
+  const [slideCount, setSlideCount] = useState(6)
   const [loading, setLoading] = useState(false)
+  const [variantLoading, setVariantLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('ideas')
 
   const openaiKey = getApiKey('openai')?.trim()
+  const template = CAROUSEL_TEMPLATES[selectedTemplate]
 
   useEffect(() => {
     localStorage.setItem(STORAGE_INSTRUCTIONS, instructions)
@@ -41,6 +45,15 @@ export default function ConceptMode({
   useEffect(() => {
     localStorage.setItem(STORAGE_IDEAS, JSON.stringify(ideas))
   }, [ideas])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_VARIANTS, JSON.stringify(variants))
+  }, [variants])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_TEMPLATE, selectedTemplate)
+    if (template?.slideCount) setSlideCount(template.slideCount)
+  }, [selectedTemplate, template?.slideCount])
 
   const handleGenerate = async () => {
     if (!openaiKey) {
@@ -55,50 +68,16 @@ export default function ConceptMode({
     setLoading(true)
     setError('')
     try {
-      const slideCount = Math.max(3, Math.min(10, slides.length || 5))
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You generate Instagram carousel slide ideas. Each slide is one 1080×1440 image with a short headline and optional supporting line. Return ONLY valid JSON: an array of ${slideCount} objects with "headline" and "body" (body can be empty). Keep headlines punchy (under 12 words). Match the user's brand voice and instructions.`,
-            },
-            {
-              role: 'user',
-              content: [
-                instructions.trim() && `Instructions:\n${instructions.trim()}`,
-                topic.trim() && `Topic:\n${topic.trim()}`,
-                `Generate ${slideCount} carousel slide ideas.`,
-              ].filter(Boolean).join('\n\n'),
-            },
-          ],
-          temperature: 0.8,
-        }),
+      const count = template?.slideCount || slideCount
+      const generated = await generateCarouselIdeas({
+        instructions,
+        topic,
+        slideCount: count,
+        templateHint: template ? `${template.name}: ${template.promptHint}. Roles: ${template.roles?.join(', ')}` : '',
+        psychologyMode: true,
       })
-
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data?.error?.message || 'OpenAI request failed')
-      }
-
-      const text = data.choices?.[0]?.message?.content || ''
-      const jsonMatch = text.match(/\[[\s\S]*\]/)
-      if (!jsonMatch) throw new Error('Could not parse AI response')
-
-      const parsed = JSON.parse(jsonMatch[0])
-      if (!Array.isArray(parsed) || !parsed.length) throw new Error('No ideas returned')
-
-      setIdeas(parsed.map((item, i) => ({
-        id: `idea-${Date.now()}-${i}`,
-        headline: String(item.headline || item.title || '').trim(),
-        body: String(item.body || item.copy || item.subtitle || '').trim(),
-      })).filter((item) => item.headline))
+      setIdeas(generated)
+      setActiveTab('ideas')
     } catch (err) {
       setError(err?.message || 'Failed to generate ideas')
     } finally {
@@ -106,9 +85,57 @@ export default function ConceptMode({
     }
   }
 
+  const handleGenerateVariants = async () => {
+    if (!openaiKey) {
+      setError('Add your OpenAI API key on the SaaS Apps screen.')
+      return
+    }
+    if (!topic.trim() && !instructions.trim()) {
+      setError('Enter a topic or instructions first.')
+      return
+    }
+
+    setVariantLoading(true)
+    setError('')
+    try {
+      const count = template?.slideCount || slideCount
+      const result = await generateCarouselVariants({
+        instructions,
+        topic,
+        slideCount: count,
+        variantCount: 3,
+      })
+      setVariants(result.map((v, i) => ({
+        ...v,
+        id: v.id || `variant-${Date.now()}-${i}`,
+        label: v.label || String.fromCharCode(65 + i),
+      })))
+      setActiveTab('variants')
+    } catch (err) {
+      setError(err?.message || 'Failed to generate variants')
+    } finally {
+      setVariantLoading(false)
+    }
+  }
+
   const handleApply = () => {
     if (!ideas.length) return
     onApplyToPlan?.(ideas)
+  }
+
+  const handleApplyVariant = (variant) => {
+    const slidesFromVariant = (variant.slides || []).map((s, i) => ({
+      id: `idea-${Date.now()}-${i}`,
+      headline: s.headline || s.title || '',
+      body: s.body || s.copy || '',
+      role: s.role || template?.roles?.[i] || null,
+    })).filter((s) => s.headline?.trim())
+
+    if (onApplyVariantToPlan) {
+      onApplyVariantToPlan(slidesFromVariant, variant.label)
+    } else {
+      onApplyToPlan?.(slidesFromVariant)
+    }
   }
 
   const updateIdea = (id, patch) => {
@@ -120,23 +147,49 @@ export default function ConceptMode({
   }
 
   const addIdea = () => {
-    setIdeas((prev) => [...prev, { id: `idea-${Date.now()}`, headline: '', body: '' }])
+    setIdeas((prev) => [...prev, { id: `idea-${Date.now()}`, headline: '', body: '', role: 'value' }])
   }
 
   return (
     <div className="concept-mode">
       <div className="concept-mode-intro">
         <h2>Concept</h2>
-        <p>Define your carousel direction, generate slide ideas with AI, then send them to Plan — one idea becomes one carousel image.</p>
+        <p>Pick a carousel structure, generate psychology-tuned copy and A/B variants, then send to Plan — one idea per image.</p>
       </div>
 
       <div className="concept-mode-grid">
         <section className="concept-panel">
+          <label className="concept-label" htmlFor="concept-template">Carousel structure</label>
+          <select
+            id="concept-template"
+            className="concept-input"
+            value={selectedTemplate}
+            onChange={(e) => setSelectedTemplate(e.target.value)}
+          >
+            {Object.entries(CAROUSEL_TEMPLATES).map(([key, t]) => (
+              <option key={key} value={key}>{t.name} — {t.description}</option>
+            ))}
+          </select>
+          {template && (
+            <p className="concept-hint">{template.promptHint}</p>
+          )}
+
+          <label className="concept-label" htmlFor="concept-slide-count">Slide count</label>
+          <input
+            id="concept-slide-count"
+            type="number"
+            min={3}
+            max={10}
+            className="concept-input"
+            value={slideCount}
+            onChange={(e) => setSlideCount(Math.max(3, Math.min(10, parseInt(e.target.value, 10) || 5)))}
+          />
+
           <label className="concept-label" htmlFor="concept-instructions">Instructions</label>
           <textarea
             id="concept-instructions"
             className="concept-textarea"
-            rows={5}
+            rows={4}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             placeholder="Brand voice, audience, offer, tone, things to avoid…"
@@ -154,66 +207,131 @@ export default function ConceptMode({
 
           {error && <p className="concept-error">{error}</p>}
 
-          <button
-            type="button"
-            className="concept-btn concept-btn-primary"
-            onClick={handleGenerate}
-            disabled={loading || !openaiKey}
-          >
-            {loading ? 'Generating…' : 'Generate carousel ideas'}
-          </button>
+          <div className="concept-action-row">
+            <button
+              type="button"
+              className="concept-btn concept-btn-primary"
+              onClick={handleGenerate}
+              disabled={loading || variantLoading || !openaiKey}
+            >
+              {loading ? 'Generating…' : 'Generate carousel copy'}
+            </button>
+            <button
+              type="button"
+              className="concept-btn concept-btn-secondary"
+              onClick={handleGenerateVariants}
+              disabled={loading || variantLoading || !openaiKey}
+            >
+              {variantLoading ? 'Generating…' : 'Generate 3 A/B variants'}
+            </button>
+          </div>
           {!openaiKey && (
             <p className="concept-hint">Add your OpenAI API key on the SaaS Apps home screen.</p>
           )}
         </section>
 
         <section className="concept-panel concept-ideas-panel">
-          <div className="concept-ideas-header">
-            <h3>Slide ideas</h3>
-            <button type="button" className="concept-btn concept-btn-ghost" onClick={addIdea}>+ Add slide</button>
+          <div className="concept-tabs">
+            <button type="button" className={activeTab === 'ideas' ? 'active' : ''} onClick={() => setActiveTab('ideas')}>
+              Slides ({ideas.length})
+            </button>
+            <button type="button" className={activeTab === 'variants' ? 'active' : ''} onClick={() => setActiveTab('variants')}>
+              Variants ({variants.length})
+            </button>
           </div>
 
-          {ideas.length === 0 ? (
-            <p className="concept-empty">Generated ideas appear here. Each row becomes one carousel image in Plan.</p>
+          {activeTab === 'ideas' ? (
+            <>
+              <div className="concept-ideas-header">
+                <h3>Slide ideas</h3>
+                <button type="button" className="concept-btn concept-btn-ghost" onClick={addIdea}>+ Add slide</button>
+              </div>
+
+              {ideas.length === 0 ? (
+                <p className="concept-empty">Generated slides appear here with role labels (Hook, Tip, CTA…).</p>
+              ) : (
+                <ul className="concept-ideas-list">
+                  {ideas.map((idea, index) => (
+                    <li key={idea.id} className="concept-idea-card">
+                      <span className="concept-idea-index">{index + 1}</span>
+                      <div className="concept-idea-fields">
+                        <div className="concept-idea-role-row">
+                          <SlideRoleBadge
+                            role={idea.role}
+                            editable
+                            onChange={(role) => updateIdea(idea.id, { role })}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          className="concept-input"
+                          value={idea.headline}
+                          onChange={(e) => updateIdea(idea.id, { headline: e.target.value })}
+                          placeholder="Headline"
+                        />
+                        <textarea
+                          className="concept-textarea concept-textarea-sm"
+                          rows={2}
+                          value={idea.body}
+                          onChange={(e) => updateIdea(idea.id, { body: e.target.value })}
+                          placeholder="Supporting line (optional)"
+                        />
+                      </div>
+                      <button type="button" className="concept-remove" onClick={() => removeIdea(idea.id)} aria-label="Remove">×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <button
+                type="button"
+                className="concept-btn concept-btn-primary"
+                onClick={handleApply}
+                disabled={!ideas.some((i) => i.headline?.trim())}
+              >
+                Use in Plan →
+              </button>
+            </>
           ) : (
-            <ul className="concept-ideas-list">
-              {ideas.map((idea, index) => (
-                <li key={idea.id} className="concept-idea-card">
-                  <span className="concept-idea-index">{index + 1}</span>
-                  <div className="concept-idea-fields">
-                    <input
-                      type="text"
-                      className="concept-input"
-                      value={idea.headline}
-                      onChange={(e) => updateIdea(idea.id, { headline: e.target.value })}
-                      placeholder="Headline"
-                    />
-                    <textarea
-                      className="concept-textarea concept-textarea-sm"
-                      rows={2}
-                      value={idea.body}
-                      onChange={(e) => updateIdea(idea.id, { body: e.target.value })}
-                      placeholder="Supporting line (optional)"
-                    />
-                  </div>
-                  <button type="button" className="concept-remove" onClick={() => removeIdea(idea.id)} aria-label="Remove">×</button>
-                </li>
-              ))}
-            </ul>
+            <>
+              {variants.length === 0 ? (
+                <p className="concept-empty">Generate 3 A/B variants to compare different hooks and CTAs side by side.</p>
+              ) : (
+                <div className="concept-variants-grid">
+                  {variants.map((variant) => (
+                    <div key={variant.id} className="concept-variant-card">
+                      <div className="concept-variant-header">
+                        <strong>Variant {variant.label}</strong>
+                        {variant.hookAngle && <span className="concept-variant-angle">{variant.hookAngle}</span>}
+                      </div>
+                      <ol className="concept-variant-slides">
+                        {(variant.slides || []).slice(0, 6).map((s, i) => (
+                          <li key={i}>
+                            {s.role && <SlideRoleBadge role={s.role} />}
+                            <span>{s.headline || s.title}</span>
+                          </li>
+                        ))}
+                        {(variant.slides || []).length > 6 && (
+                          <li className="concept-variant-more">+{(variant.slides || []).length - 6} more</li>
+                        )}
+                      </ol>
+                      <button
+                        type="button"
+                        className="concept-btn concept-btn-primary concept-btn-sm"
+                        onClick={() => handleApplyVariant(variant)}
+                      >
+                        Use variant {variant.label} in Plan
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
-          <button
-            type="button"
-            className="concept-btn concept-btn-primary"
-            onClick={handleApply}
-            disabled={!ideas.some((i) => i.headline?.trim())}
-          >
-            Use in Plan →
-          </button>
-
-          {slides.length > 0 && ideas.length > 0 && (
+          {slides.length > 0 && ideas.length > 0 && activeTab === 'ideas' && (
             <p className="concept-hint">
-              Current carousel has {slides.length} slide{slides.length === 1 ? '' : 's'}. Applying will replace them with {ideas.filter((i) => i.headline?.trim()).length} slides from your ideas.
+              Current carousel has {slides.length} slide{slides.length === 1 ? '' : 's'}. Applying replaces them with {ideas.filter((i) => i.headline?.trim()).length} slides.
             </p>
           )}
         </section>
@@ -221,5 +339,3 @@ export default function ConceptMode({
     </div>
   )
 }
-
-export { plainTextFromHtml }

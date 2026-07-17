@@ -14,9 +14,14 @@ import { normalizeInspectorTab } from './components/InspectorIcons'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import InstagramCarouselExportModal from './components/InstagramCarouselExportModal'
 import MetaCarouselExportModal from './components/MetaCarouselExportModal'
+import SwipePreviewMode from './components/SwipePreviewMode'
+import CreatorKitExportModal from './components/CreatorKitExportModal'
 import { formatTimeAgo } from './utils/formatTimeAgo'
 import { CAROUSEL_FORMAT } from './utils/slideFormats'
 import { exportCarouselToMeta } from './services/metaCarouselExport'
+import { exportCreatorKit, exportLinkedInPdf } from './services/carouselExportKit'
+import { applyStylePresetToSlides, applyStylePresetToSettings, fillSlidesWithImages } from './services/carouselAssets'
+import { fitAllSlidesCopy } from './services/carouselAi'
 import { getApiKey } from '@shared/apiKeys'
 import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
@@ -162,6 +167,14 @@ function App() {
   const [showMetaExport, setShowMetaExport] = useState(false)
   const [metaExportError, setMetaExportError] = useState('')
   const [metaExportSuccess, setMetaExportSuccess] = useState(null)
+  const [lastExportedAdId, setLastExportedAdId] = useState(() => localStorage.getItem('carouselDesignerLastAdId') || '')
+  const [showCreatorKit, setShowCreatorKit] = useState(false)
+  const [carouselCaption, setCarouselCaption] = useState('')
+  const [carouselHashtags, setCarouselHashtags] = useState('')
+  const [carouselFirstComment, setCarouselFirstComment] = useState('')
+  const [visualTheme, setVisualTheme] = useState(() => localStorage.getItem('carouselDesignerVisualTheme') || 'cohesive modern editorial photography, muted tones')
+  const [carouselToolsBusy, setCarouselToolsBusy] = useState(false)
+  const [conceptInstructions] = useState(() => localStorage.getItem('carouselDesignerConceptInstructions') || '')
   const [recentFiles, setRecentFiles] = useState(() => {
     try {
       const saved = localStorage.getItem('carouselDesignerRecentFiles')
@@ -319,8 +332,22 @@ function App() {
   })
 
   useEffect(() => {
+    localStorage.setItem('carouselDesignerVisualTheme', visualTheme)
+  }, [visualTheme])
+
+  useEffect(() => {
+    if (lastExportedAdId) localStorage.setItem('carouselDesignerLastAdId', lastExportedAdId)
+  }, [lastExportedAdId])
+
+  useEffect(() => {
     localStorage.setItem('carouselDesignerMode', mode)
   }, [mode])
+
+  const handleCaptionUpdate = useCallback((patch) => {
+    if (patch.caption !== undefined) setCarouselCaption(patch.caption)
+    if (patch.hashtags !== undefined) setCarouselHashtags(patch.hashtags)
+    if (patch.firstComment !== undefined) setCarouselFirstComment(patch.firstComment)
+  }, [])
 
   // Update current chapter's slides when slides change
   useEffect(() => {
@@ -956,6 +983,8 @@ function App() {
         id: nextId,
         content: toStorage(idea.headline.trim()),
         subtitle: idea.body?.trim() ? toStorage(idea.body.trim()) : '',
+        role: idea.role || undefined,
+        variantLabel: idea.variantLabel || undefined,
         imageUrl: '',
         backgroundVideoUrl: '',
         layout: 'default',
@@ -983,6 +1012,10 @@ function App() {
     saveToHistory({ slides: newSlides, selectedSlideId: newSlides[0]?.id ?? 1, chapters: newChapters, currentChapterId, settings, recordSettings })
     setMode('plan')
   }, [slides, chapters, currentChapterId, settings, recordSettings, saveToHistory])
+
+  const handleApplyVariantToPlan = useCallback((ideas, variantLabel) => {
+    handleApplyConceptToPlan((ideas || []).map((i) => ({ ...i, variantLabel })))
+  }, [handleApplyConceptToPlan])
 
   const handleMetaCarouselExport = useCallback(async ({ adSetId, pageId, destinationUrl, primaryText, adName }) => {
     if (isExportingPng) return
@@ -1022,6 +1055,7 @@ function App() {
       })
 
       setMetaExportSuccess(result)
+      if (result?.adId) setLastExportedAdId(result.adId)
       setShowMetaExport(false)
     } catch (err) {
       console.error('Meta carousel export failed:', err)
@@ -1031,6 +1065,140 @@ function App() {
       setExportProgress('')
     }
   }, [chapters, settings, isExportingPng])
+
+  const handleApplyStylePreset = useCallback((preset) => {
+    const newSettings = applyStylePresetToSettings(settings, preset)
+    const newSlides = applyStylePresetToSlides(slides, preset)
+    setSettings(newSettings)
+    setSlides(newSlides)
+    const newChapters = chapters.map((c) => (
+      c.id === currentChapterId ? { ...c, slides: newSlides } : c
+    ))
+    setChapters(newChapters)
+    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings: newSettings, recordSettings })
+  }, [slides, settings, chapters, currentChapterId, selectedSlideId, recordSettings, saveToHistory])
+
+  const handleApplyStyleToAllSlides = useCallback(() => {
+    const source = slides.find((s) => s.id === selectedSlideId) || slides[0]
+    if (!source) return
+    const styleKeys = ['gradientStrength', 'gradientFlipped', 'backgroundOpacity', 'imageScale', 'imagePositionX', 'imagePositionY', 'textHeadingLevel', 'subtitleHeadingLevel', 'layout']
+    const patch = {}
+    styleKeys.forEach((k) => { if (source[k] !== undefined) patch[k] = source[k] })
+    const newSlides = slides.map((s) => ((s.layout || 'default') === 'section' ? s : { ...s, ...patch }))
+    setSlides(newSlides)
+    const newChapters = chapters.map((c) => (
+      c.id === currentChapterId ? { ...c, slides: newSlides } : c
+    ))
+    setChapters(newChapters)
+    saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
+  }, [slides, selectedSlideId, chapters, currentChapterId, settings, recordSettings, saveToHistory])
+
+  const handleFillCarouselImages = useCallback(async () => {
+    if (carouselToolsBusy) return
+    setCarouselToolsBusy(true)
+    setExportProgress('Filling images…')
+    try {
+      const { slides: updated, filled, failed } = await fillSlidesWithImages({
+        slides,
+        openaiKey: settings.openaiKey,
+        unsplashKey: settings.unsplashKey,
+        visualTheme,
+        onProgress: setExportProgress,
+      })
+      if (filled === 0 && failed > 0) {
+        alert('Could not fill images. Check API keys and slide copy.')
+      } else {
+        setSlides(updated)
+        const newChapters = chapters.map((c) => (
+          c.id === currentChapterId ? { ...c, slides: updated } : c
+        ))
+        setChapters(newChapters)
+        saveToHistory({ slides: updated, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
+        if (filled > 0) alert(`Added images to ${filled} slide(s).`)
+      }
+    } catch (err) {
+      alert(err?.message || 'Image fill failed')
+    } finally {
+      setCarouselToolsBusy(false)
+      setExportProgress('')
+    }
+  }, [carouselToolsBusy, slides, settings, visualTheme, chapters, currentChapterId, selectedSlideId, recordSettings, saveToHistory])
+
+  const handleFitAllCopy = useCallback(async () => {
+    if (carouselToolsBusy) return
+    setCarouselToolsBusy(true)
+    try {
+      const fitted = await fitAllSlidesCopy(slides)
+      const toStorage = (text) => String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+      const newSlides = fitted.map((s) => {
+        if (!s._fittedHeadline) return s
+        const { _fittedHeadline, _fittedBody, ...rest } = s
+        return {
+          ...rest,
+          content: toStorage(_fittedHeadline),
+          subtitle: _fittedBody ? toStorage(_fittedBody) : rest.subtitle,
+        }
+      })
+      setSlides(newSlides)
+      const newChapters = chapters.map((c) => (
+        c.id === currentChapterId ? { ...c, slides: newSlides } : c
+      ))
+      setChapters(newChapters)
+      saveToHistory({ slides: newSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
+    } catch (err) {
+      alert(err?.message || 'Fit copy failed')
+    } finally {
+      setCarouselToolsBusy(false)
+    }
+  }, [carouselToolsBusy, slides, chapters, currentChapterId, selectedSlideId, settings, recordSettings, saveToHistory])
+
+  const handleCreatorKitExport = useCallback(async () => {
+    if (isExportingPng) return
+    setIsExportingPng(true)
+    setExportProgress('Building creator kit…')
+    try {
+      const allSlides = chapters.flatMap((ch) => ch.slides)
+      const altTextsById = {}
+      allSlides.forEach((s) => {
+        altTextsById[s.id] = String(s.content || '').replace(/<[^>]+>/g, '').slice(0, 120)
+      })
+      await exportCreatorKit({
+        slides: allSlides,
+        settings,
+        projectName,
+        caption: carouselCaption,
+        hashtags: carouselHashtags,
+        firstComment: carouselFirstComment,
+        altTextsById,
+        onProgress: setExportProgress,
+      })
+      setShowCreatorKit(false)
+    } catch (err) {
+      alert(err?.message || 'Creator kit export failed')
+    } finally {
+      setIsExportingPng(false)
+      setExportProgress('')
+    }
+  }, [chapters, settings, projectName, carouselCaption, carouselHashtags, carouselFirstComment, isExportingPng])
+
+  const handleLinkedInExport = useCallback(async () => {
+    if (isExportingPng) return
+    setIsExportingPng(true)
+    setExportProgress('Exporting for LinkedIn…')
+    try {
+      await exportLinkedInPdf({
+        slides: chapters.flatMap((ch) => ch.slides),
+        settings,
+        projectName,
+        onProgress: setExportProgress,
+      })
+    } catch (err) {
+      alert(err?.message || 'LinkedIn export failed')
+    } finally {
+      setIsExportingPng(false)
+      setExportProgress('')
+    }
+  }, [chapters, settings, projectName, isExportingPng])
 
   const addSlide = () => {
     const newId = Math.max(...slides.map(s => s.id), 0) + 1
@@ -1791,7 +1959,7 @@ function App() {
   }
 
   return (
-    <div className={`app${mode === 'concept' ? ' concept-mode-app' : ''}${mode === 'plan' ? ' plan-mode-app' : ''}${mode === 'edit' ? ' edit-mode-app' : ''}`}>
+    <div className={`app${mode === 'concept' ? ' concept-mode-app' : ''}${mode === 'plan' ? ' plan-mode-app' : ''}${mode === 'preview' ? ' preview-mode-app' : ''}${mode === 'edit' ? ' edit-mode-app' : ''}`}>
         <AppHeader
           mode={mode}
           projectName={projectName}
@@ -1818,6 +1986,8 @@ function App() {
           onExportPng={handleExportSlidesAsPng}
           onExportInstagram={() => setShowInstagramExport(true)}
           onExportMeta={() => setShowMetaExport(true)}
+          onExportCreatorKit={() => setShowCreatorKit(true)}
+          onExportLinkedIn={handleLinkedInExport}
           onCopyText={exportSlidesAsText}
           onSaveToFolder={handleSaveToFolder}
           onImport={handleImportFile}
@@ -1831,11 +2001,12 @@ function App() {
           inspectorOpen={inspectorDrawerOpen}
           showLayoutToggles={mode === 'edit'}
         />
-      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''}${mode === 'plan' ? ' plan-mode-content' : ''}${mode === 'concept' ? ' concept-mode-content' : ''}`}>
+      <div className={`app-content ${(isResizing || isResizingInspector) ? 'resizing' : ''}${mode === 'plan' ? ' plan-mode-content' : ''}${mode === 'concept' ? ' concept-mode-content' : ''}${mode === 'preview' ? ' preview-mode-content' : ''}`}>
         {mode === 'concept' ? (
           <ConceptMode
             slides={slides}
             onApplyToPlan={handleApplyConceptToPlan}
+            onApplyVariantToPlan={handleApplyVariantToPlan}
           />
         ) : mode === 'plan' ? (
           <PlanMode
@@ -1852,6 +2023,18 @@ function App() {
             settings={settings}
             projectName={projectName}
             onProjectNameChange={setProjectName}
+            carouselCaption={carouselCaption}
+            carouselHashtags={carouselHashtags}
+            carouselFirstComment={carouselFirstComment}
+            onCaptionUpdate={handleCaptionUpdate}
+            conceptInstructions={conceptInstructions}
+          />
+        ) : mode === 'preview' ? (
+          <SwipePreviewMode
+            slides={slides}
+            settings={settings}
+            selectedSlideId={selectedSlideId}
+            onSelectSlide={setSelectedSlideId}
           />
         ) : (
           <>
@@ -1964,6 +2147,19 @@ function App() {
                     selectedGraphicId={selectedGraphicId}
                     onDeselectGraphic={() => setSelectedGraphicId(null)}
                     backgroundColor={settings.backgroundColor}
+                    carouselCaption={carouselCaption}
+                    carouselHashtags={carouselHashtags}
+                    carouselFirstComment={carouselFirstComment}
+                    onCaptionUpdate={handleCaptionUpdate}
+                    conceptInstructions={conceptInstructions}
+                    onApplyStylePreset={handleApplyStylePreset}
+                    onApplyStyleToAllSlides={handleApplyStyleToAllSlides}
+                    onFillImages={handleFillCarouselImages}
+                    onFitAllCopy={handleFitAllCopy}
+                    carouselToolsBusy={carouselToolsBusy || isExportingPng}
+                    visualTheme={visualTheme}
+                    onVisualThemeChange={setVisualTheme}
+                    lastExportedAdId={lastExportedAdId}
                   />
                 </div>
               </>
@@ -2011,6 +2207,21 @@ function App() {
           onClose={() => { if (!isExportingPng) setShowInstagramExport(false) }}
           onExport={handleInstagramCarouselExport}
           isExporting={isExportingPng}
+          exportProgress={exportProgress}
+        />
+      )}
+      {showCreatorKit && (
+        <CreatorKitExportModal
+          isOpen={showCreatorKit}
+          onClose={() => { if (!isExportingPng) setShowCreatorKit(false) }}
+          onExport={handleCreatorKitExport}
+          slides={chapters.flatMap((ch) => ch.slides)}
+          instructions={conceptInstructions}
+          caption={carouselCaption}
+          hashtags={carouselHashtags}
+          firstComment={carouselFirstComment}
+          onCaptionUpdate={handleCaptionUpdate}
+          busy={isExportingPng}
           exportProgress={exportProgress}
         />
       )}

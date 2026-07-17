@@ -20,5 +20,7 @@ export function normalizeSlide(slide) {
     backgroundVideoUrl: slide.backgroundVideoUrl || '',
     webcamEnabled: slide.webcamEnabled === true,
     selectedCameraId: slide.selectedCameraId || '',
+    role: slide.role || undefined,
+    variantLabel: slide.variantLabel || undefined,
   }
 }
