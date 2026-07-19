@@ -5,6 +5,7 @@ import ImagePicker from './ImagePicker'
 import VideoPicker from './VideoPicker'
 import InfographicPicker from './InfographicPicker'
 import GraphicPicker from './GraphicPicker'
+import GenerateBackgroundModal from './GenerateBackgroundModal'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -24,6 +25,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   const [showVideoPicker, setShowVideoPicker] = useState(false)
   const [showInfographicPicker, setShowInfographicPicker] = useState(false)
   const [showGraphicPicker, setShowGraphicPicker] = useState(null) // 'giphy' | 'icon' | null
+  const [showGenerateBackground, setShowGenerateBackground] = useState(false)
   const [backgroundMenuOpen, setBackgroundMenuOpen] = useState(false)
   const [overlayMenuOpen, setOverlayMenuOpen] = useState(false)
   const backgroundMenuRef = useRef(null)
@@ -295,6 +297,13 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
                     <button type="button" onClick={() => { handleSelectImages(); setBackgroundMenuOpen(false) }} disabled={isSelectingImages || !slide.content || (slide.layout || 'default') === 'video'}>
                       {isSelectingImages ? 'Selecting…' : 'Auto-select image'}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowGenerateBackground(true); setBackgroundMenuOpen(false) }}
+                      disabled={(slide.layout || 'default') === 'video'}
+                    >
+                      Generate background…
+                    </button>
                     <button type="button" onClick={() => { setShowInfographicPicker(true); setBackgroundMenuOpen(false) }}>Infographic</button>
                     <button type="button" onClick={() => { setShowVideoPicker(true); setBackgroundMenuOpen(false) }} disabled={!(settings.pexelsKey?.trim() || settings.pixabayKey?.trim())}>Video</button>
                     {slide.imageUrl && <button type="button" onClick={() => { handleRemoveImage(); setBackgroundMenuOpen(false) }}>Remove image</button>}
@@ -455,6 +464,14 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
           // Save the search query to the slide
           onUpdate({ unsplashSearchQuery: query })
         }}
+      />
+      <GenerateBackgroundModal
+        isOpen={showGenerateBackground}
+        onClose={() => setShowGenerateBackground(false)}
+        onApply={onUpdate}
+        slide={slide}
+        settings={settings}
+        slideFormat={slideFormat}
       />
     </div>
   )

@@ -90,3 +90,125 @@ export async function transcribeAudio(audioBlob, apiKey) {
   const data = await res.json();
   return (data.text || '').trim();
 }
+
+async function dataUrlToBlob(dataUrl) {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+async function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function imageItemToDataUrl(item) {
+  if (item?.b64_json) return `data:image/png;base64,${item.b64_json}`;
+  return null;
+}
+
+async function resolveImageResponse(data) {
+  const item = data?.data?.[0];
+  const fromBase64 = imageItemToDataUrl(item);
+  if (fromBase64) return fromBase64;
+  if (item?.url) {
+    const imgRes = await fetch(item.url);
+    if (!imgRes.ok) throw new Error('Failed to download generated image.');
+    return blobToDataUrl(await imgRes.blob());
+  }
+  throw new Error('Image API returned no image data.');
+}
+
+/**
+ * Generate an image from a text prompt.
+ * @param {Object} options
+ * @param {string} options.prompt
+ * @param {string} [options.size] - e.g. 1536x1024, 1024x1024, 1024x1536
+ * @param {string} [options.model] - default gpt-image-1
+ * @param {string} [options.quality] - low | medium | high
+ * @param {string} [options.apiKey]
+ * @returns {Promise<string>} data URL
+ */
+export async function generateImage({
+  prompt,
+  size = '1536x1024',
+  model = 'gpt-image-1',
+  quality = 'high',
+  apiKey,
+}) {
+  const key = getKey(apiKey);
+  if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
+  if (!prompt?.trim()) throw new Error('Prompt is required.');
+
+  const res = await fetch(`${OPENAI_API}/images/generations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt: prompt.trim(),
+      size,
+      quality,
+      n: 1,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Image generation failed: ${res.status}`);
+  }
+
+  return resolveImageResponse(await res.json());
+}
+
+/**
+ * Generate an image using a reference image and prompt.
+ * @param {Object} options
+ * @param {string} options.prompt
+ * @param {string} options.imageDataUrl - reference image as data URL
+ * @param {string} [options.size]
+ * @param {string} [options.model]
+ * @param {string} [options.quality]
+ * @param {string} [options.apiKey]
+ * @returns {Promise<string>} data URL
+ */
+export async function editImage({
+  prompt,
+  imageDataUrl,
+  size = '1536x1024',
+  model = 'gpt-image-1',
+  quality = 'high',
+  apiKey,
+}) {
+  const key = getKey(apiKey);
+  if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
+  if (!prompt?.trim()) throw new Error('Prompt is required.');
+  if (!imageDataUrl) throw new Error('Reference image is required.');
+
+  const blob = await dataUrlToBlob(imageDataUrl);
+  const form = new FormData();
+  form.append('model', model);
+  form.append('prompt', prompt.trim());
+  form.append('size', size);
+  form.append('quality', quality);
+  form.append('input_fidelity', 'high');
+  form.append('image', blob, 'reference.png');
+
+  const res = await fetch(`${OPENAI_API}/images/edits`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Image edit failed: ${res.status}`);
+  }
+
+  return resolveImageResponse(await res.json());
+}
