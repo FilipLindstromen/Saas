@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
 import GraphicOverlay from './GraphicOverlay'
+import SubSlideFrame from './SubSlideFrame'
 import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
 import {
@@ -11,6 +12,8 @@ import {
   getVideoBackgroundStyle,
   getInfographicContainScale,
   isImageScaleCustomized,
+  KEN_BURNS_AMOUNT_PCT,
+  KEN_BURNS_DURATION_S,
 } from '../utils/backgroundFit'
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
 import { resolveMotionSettings } from '../utils/motionPresets'
@@ -112,7 +115,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -143,6 +146,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const imagePositionY = slide.imagePositionY !== undefined ? slide.imagePositionY : 50
 
   const motion = useMemo(() => resolveMotionSettings({
+    motionPreset,
     textAnimation,
     textAnimationUnit,
     textAnimationSpeed,
@@ -151,10 +155,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     subtitleDelay,
     backgroundKenBurnsDirection,
     backgroundBlurOnTextEnter,
-    backgroundScaleAnimation,
+    kenBurns,
     graphicAnimationIn,
   }, slide), [
     slide,
+    motionPreset,
     textAnimation,
     textAnimationUnit,
     textAnimationSpeed,
@@ -163,7 +168,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     subtitleDelay,
     backgroundKenBurnsDirection,
     backgroundBlurOnTextEnter,
-    backgroundScaleAnimation,
+    kenBurns,
     graphicAnimationIn,
   ])
 
@@ -255,6 +260,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     : (slide.backgroundColorOverride && slide.backgroundColorOverrideValue)
       ? slide.backgroundColorOverrideValue
       : backgroundColor
+  const slideTextColor = (slide.textColorOverride && slide.textColorOverrideValue)
+    ? slide.textColorOverrideValue
+    : textColor
   const rgb = hexToRgb(slideBgColor === 'transparent' ? backgroundColor : slideBgColor)
 
   // Calculate gradient opacity based on strength (0-1)
@@ -1229,7 +1237,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return lineHeight
     }
     const baseTextStyle = {
-      color: textColor,
+      color: slideTextColor,
       textShadow: textDropShadow 
         ? `${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}` 
         : undefined,
@@ -1639,11 +1647,27 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     '--slide-h2-line-height': h2LineHeight,
     '--slide-h3-line-height': h3LineHeight
   }
+
+  const graphicEditing = !isPlayMode && !!onSelectGraphic && !!onUpdate && !isPreload
+  const subSlideEditing = !isPlayMode && !!onSelectSubSlide && !!onUpdate && !isPreload
+  const hasSelectedGraphic = graphicEditing && !!selectedGraphicId
+  const hasSelectedSubSlide = subSlideEditing && !!selectedSubSlideId
+
+  const handleSlidePointerDown = (e) => {
+    if (isPlayMode || isPreload) return
+    if (e.target.closest('.slide-graphic-overlay')) return
+    if (e.target.closest('.slide-subslide-frame')) return
+    if (e.target.closest('[contenteditable="true"]')) return
+    onDeselectGraphic?.()
+    onDeselectSubSlide?.()
+  }
+
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''}`}
+      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''}`}
       ref={slideRef} 
       style={slideStyle}
+      onPointerDown={handleSlidePointerDown}
       onMouseDown={(!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)) ? handleImageMouseDown : undefined}
     >
       <style>{`
@@ -1776,7 +1800,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {/* 1. Background image (z-index 0) - behind video; skip when infographic is used */}
       {!hideBackground && !slide.infographicProjectId && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
-          className={`slide-background ${(!isPlayMode && onUpdate && !previewTextAnimation) ? 'editable' : ''} ${(isPlayMode || previewTextAnimation) && motion.backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${(!isPlayMode && onUpdate && !previewTextAnimation) ? 'editable' : ''} ${(isPlayMode || previewTextAnimation) && motion.kenBurns ? 'background-scale-animation' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: getImageBackgroundSize(slide),
@@ -1786,9 +1810,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             cursor: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'move' : 'default',
             pointerEvents: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'auto' : 'none',
-            ...((isPlayMode || previewTextAnimation) && motion.backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
-              '--scale-duration': `${backgroundScaleTime}s`,
-              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount, motion.backgroundKenBurnsDirection),
+            ...((isPlayMode || previewTextAnimation) && motion.kenBurns ? {
+              '--scale-duration': `${KEN_BURNS_DURATION_S}s`,
+              ...getBackgroundScaleAnimationVars(slide, KEN_BURNS_AMOUNT_PCT, motion.backgroundKenBurnsDirection),
             } : {})
           }}
         />
@@ -1880,7 +1904,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           <div 
             className="slide-content slide-content-video"
             style={{ 
-              color: textColor,
+              color: slideTextColor,
               fontFamily: `"${fontFamily}", sans-serif`,
               ...(isPlayMode ? {
                 position: 'absolute',
@@ -1902,7 +1926,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         <div 
           className={`slide-content ${layout === 'default' ? 'default' : ''} ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''}`}
           style={{ 
-            color: textColor,
+            color: slideTextColor,
             fontFamily: `"${fontFamily}", sans-serif`,
             pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : undefined,
             ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 10 } : {})
@@ -1926,13 +1950,16 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         </div>
       )}
       {Array.isArray(slide.graphicOverlays) && slide.graphicOverlays.length > 0 && (
-        <div className="slide-graphic-overlays" aria-hidden="true">
+        <div className="slide-graphic-overlays">
           {slide.graphicOverlays.map((g) => (
             <GraphicOverlay
               key={g.id}
               graphic={g}
               isSelected={selectedGraphicId === g.id}
-              onSelect={() => onSelectGraphic?.(g.id)}
+              onSelect={() => {
+                onSelectGraphic?.(g.id)
+                onDeselectSubSlide?.()
+              }}
               onUpdate={onUpdate ? (updates) => {
                 const overlays = [...(slide.graphicOverlays || [])]
                 const idx = overlays.findIndex(o => o.id === g.id)
@@ -1942,10 +1969,41 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 }
               } : undefined}
               containerRef={slideRef}
-              isEditing={!!onSelectGraphic && !!onUpdate && !previewTextAnimation}
+              isEditing={graphicEditing}
               isPlayMode={isPlayMode || previewTextAnimation}
               animationIn={g.animationIn || motion.graphicAnimationIn || 'fade-scale'}
               animationDelay={g.animationDelay ?? motion.subtitleDelay ?? 0.25}
+            />
+          ))}
+        </div>
+      )}
+      {subSlideEditing && Array.isArray(slide.subSlides) && slide.subSlides.length > 0 && (
+        <div className="slide-subslide-overlays">
+          {slide.subSlides.map((subSlide, index) => (
+            <SubSlideFrame
+              key={subSlide.id}
+              subSlide={subSlide}
+              index={index}
+              isSelected={selectedSubSlideId === subSlide.id}
+              onSelect={() => {
+                onSelectSubSlide?.(subSlide.id)
+                onDeselectGraphic?.()
+              }}
+              onUpdate={onUpdate ? (updates) => {
+                const subSlides = [...(slide.subSlides || [])]
+                const idx = subSlides.findIndex((item) => item.id === subSlide.id)
+                if (idx >= 0) {
+                  subSlides[idx] = { ...subSlides[idx], ...updates }
+                  onUpdate({ subSlides })
+                }
+              } : undefined}
+              onDelete={onUpdate ? () => {
+                const subSlides = (slide.subSlides || []).filter((item) => item.id !== subSlide.id)
+                onUpdate({ subSlides })
+                if (selectedSubSlideId === subSlide.id) onDeselectSubSlide?.()
+              } : undefined}
+              containerRef={slideRef}
+              isEditing={subSlideEditing}
             />
           ))}
         </div>

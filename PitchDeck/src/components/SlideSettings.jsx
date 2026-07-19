@@ -44,52 +44,6 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}
-      {show('bg') && (
-      <div className="slide-settings-section">
-        <div className="slide-settings-field slide-settings-bg-color">
-          <label htmlFor="slide-settings-bg-override">Bg color:</label>
-          <label className="slide-settings-toggle" htmlFor="slide-settings-bg-override">
-            <input
-              id="slide-settings-bg-override"
-              type="checkbox"
-              checked={!!slide.backgroundColorOverride}
-              onChange={(e) => {
-                const on = e.target.checked
-                onUpdate(on
-                  ? { backgroundColorOverride: true, backgroundColorOverrideValue: slide.backgroundColorOverrideValue || backgroundColor }
-                  : { backgroundColorOverride: false }
-                )
-              }}
-            />
-          </label>
-          {slide.backgroundColorOverride && (
-            <>
-              <input
-                type="color"
-                className="slide-settings-color-picker"
-                value={(slide.backgroundColorOverrideValue || backgroundColor).slice(0, 7)}
-                onChange={(e) => onUpdate({ backgroundColorOverrideValue: e.target.value })}
-                title="Background color"
-              />
-              <input
-                type="text"
-                className="slide-settings-color-hex"
-                value={(slide.backgroundColorOverrideValue || backgroundColor).replace(/^#?/, '#')}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (/^#[0-9A-Fa-f]{0,6}$/.test(v) || /^[0-9A-Fa-f]{0,6}$/.test(v)) {
-                    const hex = v.startsWith('#') ? v : `#${v}`
-                    if (hex.length === 7) onUpdate({ backgroundColorOverrideValue: hex })
-                  }
-                }}
-                placeholder="#1a1a1a"
-                title="Hex color"
-              />
-            </>
-          )}
-        </div>
-      </div>
-      )}
 
       {show('lines') && (
       <div className="slide-settings-section">
@@ -109,6 +63,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
 
       {show('motion') && (
       <div className="slide-settings-section">
+        <h3 className="slide-settings-section-title">Slide override</h3>
         <div className="slide-settings-field">
           <label htmlFor="slide-motion-preset">Motion preset</label>
           <select
@@ -132,37 +87,10 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
               className="slide-settings-btn"
               onClick={() => onUpdate({ motionPreset: 'default', revealOneLineAtATime: false })}
             >
-              Reset to deck defaults
+              Use deck preset
             </button>
           </div>
         )}
-        <div className="slide-settings-field">
-          <label htmlFor="slide-ken-burns-direction">Ken Burns direction override</label>
-          <select
-            id="slide-ken-burns-direction"
-            className="slide-settings-select"
-            value={slide.backgroundKenBurnsDirection || ''}
-            onChange={(e) => onUpdate({ backgroundKenBurnsDirection: e.target.value || undefined })}
-          >
-            <option value="">Use preset / deck default</option>
-            <option value="zoom-in">Zoom in</option>
-            <option value="zoom-out">Zoom out</option>
-            <option value="pan-left">Pan left</option>
-            <option value="pan-right">Pan right</option>
-            <option value="pan-up">Pan up</option>
-            <option value="pan-down">Pan down</option>
-          </select>
-        </div>
-        <div className="slide-settings-field">
-          <label className="slide-settings-toggle">
-            <input
-              type="checkbox"
-              checked={slide.backgroundBlurOnTextEnter === true}
-              onChange={(e) => onUpdate({ backgroundBlurOnTextEnter: e.target.checked || undefined })}
-            />
-            <span>Blur background while text enters</span>
-          </label>
-        </div>
       </div>
       )}
 
@@ -273,17 +201,6 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
                   />
                   <span className="slide-settings-value">{Math.round((slide.imageScale !== undefined ? slide.imageScale : 1.0) * 100)}%</span>
                 </div>
-              </div>
-              <div className="slide-settings-field">
-                <label className="slide-settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={!!slide.overrideBackgroundScaleAnimation}
-                    onChange={(e) => onUpdate({ overrideBackgroundScaleAnimation: e.target.checked })}
-                  />
-                  <span>Override background scale animation</span>
-                </label>
-                <p className="slide-settings-hint">When enabled, this slide uses static scale instead of the global scale animation.</p>
               </div>
             </>
           )}

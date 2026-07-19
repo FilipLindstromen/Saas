@@ -148,3 +148,101 @@ export async function generateSlideBackground({
 
   return generateImage(options)
 }
+
+export const OVERLAY_STYLE_PRESETS = [
+  {
+    id: 'illustration',
+    label: 'Illustration',
+    hint: 'Polished vector or flat illustration with a clear focal subject.',
+  },
+  {
+    id: 'realistic',
+    label: 'Realistic',
+    hint: 'Photo-real object or scene fragment with believable lighting.',
+  },
+  {
+    id: 'iconic',
+    label: 'Iconic',
+    hint: 'Bold symbol, simplified shape, or memorable silhouette.',
+  },
+  {
+    id: 'infographic',
+    label: 'Infographic',
+    hint: 'Charts, diagrams, or data-inspired shapes without readable labels.',
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    hint: 'Simple forms, soft gradients, and generous negative space.',
+  },
+  {
+    id: 'abstract',
+    label: 'Abstract',
+    hint: 'Textures, color fields, or geometric forms without literal subjects.',
+  },
+]
+
+export function normalizeOverlayStyleId(styleId) {
+  if (!styleId) return 'illustration'
+  if (OVERLAY_STYLE_PRESETS.some((item) => item.id === styleId)) return styleId
+  return normalizeBackgroundStyleId(styleId)
+}
+
+export function buildOverlayPrompt({
+  instructions = '',
+  styleId = 'illustration',
+  styleNotes = '',
+  slideText = '',
+  useSlideText = true,
+}) {
+  const preset = OVERLAY_STYLE_PRESETS.find((item) => item.id === normalizeOverlayStyleId(styleId))
+    || OVERLAY_STYLE_PRESETS[0]
+  const styleDescription = styleNotes.trim() || preset.hint
+
+  const parts = [
+    'Create a standalone graphic for a presentation slide overlay.',
+    'It should read clearly when placed on top of slide content.',
+    'Prefer an isolated subject on a clean, simple, or transparent-friendly background.',
+    'Avoid watermarks, borders, mockup frames, or slide chrome.',
+    `Visual style: ${preset.label}. ${styleDescription}`,
+  ]
+
+  if (instructions.trim()) {
+    parts.push(`Creative direction: ${instructions.trim()}.`)
+  }
+
+  if (useSlideText && slideText.trim()) {
+    parts.push(
+      `The slide message is "${slideText.trim()}". Reflect this theme in the graphic without adding slide copy unless explicitly requested.`
+    )
+  }
+
+  parts.push('Square composition with a centered subject.')
+
+  return parts.join(' ')
+}
+
+export async function generateOverlayImage({
+  instructions,
+  styleId,
+  styleNotes,
+  slideText,
+  useSlideText,
+  referenceImageDataUrl,
+  apiKey,
+}) {
+  const prompt = buildOverlayPrompt({
+    instructions,
+    styleId,
+    styleNotes,
+    slideText,
+    useSlideText,
+  })
+  const options = { prompt, size: '1024x1024', apiKey }
+
+  if (referenceImageDataUrl) {
+    return editImage({ ...options, imageDataUrl: referenceImageDataUrl })
+  }
+
+  return generateImage(options)
+}

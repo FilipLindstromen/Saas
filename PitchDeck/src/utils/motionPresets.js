@@ -1,10 +1,13 @@
-/** Per-slide motion presets and resolved animation settings. */
+/** Deck-wide and per-slide motion presets with resolved animation settings. */
+
+export const KEN_BURNS_DURATION_S = 10
+export const KEN_BURNS_AMOUNT_PCT = 20
 
 export const MOTION_PRESET_OPTIONS = [
   {
     id: 'default',
-    label: 'Default',
-    description: 'Use deck-wide animation settings from the inspector.',
+    label: 'Use deck preset',
+    description: 'Inherit the deck motion preset from Motion settings.',
   },
   {
     id: 'hook',
@@ -16,7 +19,7 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationStagger: 0.05,
       textExitAnimation: 'match-in',
       subtitleDelay: 0.35,
-      backgroundScaleAnimation: true,
+      kenBurns: true,
       backgroundKenBurnsDirection: 'zoom-in',
       backgroundBlurOnTextEnter: true,
       graphicAnimationIn: 'fade-scale',
@@ -32,7 +35,7 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationStagger: 0.18,
       textExitAnimation: 'match-in',
       revealOneLineAtATime: true,
-      backgroundScaleAnimation: true,
+      kenBurns: true,
       backgroundKenBurnsDirection: 'pan-right',
       graphicAnimationIn: 'fade',
     },
@@ -47,7 +50,7 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationStagger: 0.22,
       textExitAnimation: 'fade-out',
       subtitleDelay: 0.55,
-      backgroundScaleAnimation: true,
+      kenBurns: true,
       backgroundKenBurnsDirection: 'zoom-out',
     },
   },
@@ -61,7 +64,7 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationStagger: 0.08,
       textExitAnimation: 'match-in',
       subtitleDelay: 0.25,
-      backgroundScaleAnimation: true,
+      kenBurns: true,
       backgroundKenBurnsDirection: 'zoom-in',
       graphicAnimationIn: 'fade-scale',
     },
@@ -75,18 +78,43 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationUnit: 'sentence',
       textAnimationStagger: 0.15,
       textExitAnimation: 'match-in',
-      backgroundScaleAnimation: false,
+      kenBurns: false,
       graphicAnimationIn: 'slide-y',
     },
   },
+]
+
+export const DECK_MOTION_PRESET_OPTIONS = [
+  {
+    id: 'custom',
+    label: 'Custom',
+    description: 'Fine-tune text, background, and graphic animations below.',
+  },
+  ...MOTION_PRESET_OPTIONS.filter((item) => item.id !== 'default'),
 ]
 
 export function getMotionPreset(id) {
   return MOTION_PRESET_OPTIONS.find((item) => item.id === id) || MOTION_PRESET_OPTIONS[0]
 }
 
+export function getDeckMotionPreset(id) {
+  return DECK_MOTION_PRESET_OPTIONS.find((item) => item.id === id) || DECK_MOTION_PRESET_OPTIONS[0]
+}
+
+/** Resolve which named preset applies (deck-wide or per-slide override). */
+export function resolveEffectiveMotionPresetId(globalSettings = {}, slide = null) {
+  const slidePreset = slide?.motionPreset
+  if (slidePreset && slidePreset !== 'default') return slidePreset
+
+  const deckPreset = globalSettings.motionPreset || 'custom'
+  if (deckPreset && deckPreset !== 'custom') return deckPreset
+
+  return 'default'
+}
+
 export function resolveMotionSettings(globalSettings = {}, slide = null) {
-  const preset = getMotionPreset(slide?.motionPreset || 'default')
+  const effectivePresetId = resolveEffectiveMotionPresetId(globalSettings, slide)
+  const preset = getMotionPreset(effectivePresetId)
   const presetSettings = preset.id === 'default' ? {} : (preset.settings || {})
 
   const pick = (slideKey, presetKey, globalKey, fallback) => {
@@ -98,17 +126,17 @@ export function resolveMotionSettings(globalSettings = {}, slide = null) {
     return fallback
   }
 
+  const kenBurnsFromGlobal = globalSettings.kenBurns ?? globalSettings.backgroundScaleAnimation ?? false
+
   return {
-    motionPreset: preset.id,
+    motionPreset: effectivePresetId,
     textAnimation: pick('textAnimationOverride', 'textAnimation', 'textAnimation', 'none'),
     textAnimationUnit: pick(null, 'textAnimationUnit', 'textAnimationUnit', 'word'),
     textAnimationSpeed: pick(null, 'textAnimationSpeed', 'textAnimationSpeed', 1),
     textAnimationStagger: pick('textAnimationStagger', 'textAnimationStagger', 'textAnimationStagger', 0.07),
     textExitAnimation: pick('textExitAnimationOverride', 'textExitAnimation', 'textExitAnimation', 'match-in'),
     subtitleDelay: pick('subtitleDelay', 'subtitleDelay', 'subtitleDelay', 0),
-    backgroundScaleAnimation: slide?.overrideBackgroundScaleAnimation
-      ? false
-      : pick(null, 'backgroundScaleAnimation', 'backgroundScaleAnimation', false),
+    kenBurns: pick(null, 'kenBurns', 'kenBurns', kenBurnsFromGlobal),
     backgroundKenBurnsDirection: pick(
       'backgroundKenBurnsDirection',
       'backgroundKenBurnsDirection',
@@ -149,19 +177,13 @@ export function getTextExitClass(textExitAnimation, textAnimation) {
 }
 
 export function applyMotionPresetToSlide(slide, presetId) {
-  const preset = getMotionPreset(presetId)
-  if (preset.id === 'default') {
+  if (presetId === 'default') {
     return {
       motionPreset: 'default',
-      textAnimationOverride: undefined,
-      textExitAnimationOverride: undefined,
-      textAnimationStagger: undefined,
-      subtitleDelay: undefined,
-      backgroundKenBurnsDirection: undefined,
-      backgroundBlurOnTextEnter: undefined,
-      graphicAnimationIn: undefined,
+      revealOneLineAtATime: false,
     }
   }
+  const preset = getMotionPreset(presetId)
   const patch = { motionPreset: preset.id }
   if (preset.settings?.revealOneLineAtATime) patch.revealOneLineAtATime = true
   return patch

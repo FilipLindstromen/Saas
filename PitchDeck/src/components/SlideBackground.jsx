@@ -8,6 +8,8 @@ import {
   getFrozenBackgroundScaleSize,
   isImageScaleCustomized,
   shouldAnimateBackgroundScale,
+  KEN_BURNS_AMOUNT_PCT,
+  KEN_BURNS_DURATION_S,
 } from '../utils/backgroundFit'
 import './Slide.css'
 
@@ -16,7 +18,7 @@ import './Slide.css'
  * Used in PlayMode when consecutive slides share the same background - we keep this layer visible
  * and only fade the content to avoid redundant background fade in/out.
  */
-function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, backgroundKenBurnsDirection = 'zoom-in', frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
+function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection = 'zoom-in', frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
@@ -100,10 +102,10 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
 
   const currentPosition = { x: imagePositionX, y: imagePositionY }
   const layoutClass = layout === 'left-video' ? 'layout-left-video' : layout === 'right-video' ? 'layout-right-video' : ''
-  const kenBurnsActive = shouldAnimateBackgroundScale(slide, backgroundScaleAnimation)
+  const kenBurnsActive = shouldAnimateBackgroundScale(slide, kenBurns)
   const freezeScale = frozenScaleProgress !== null && frozenScaleProgress !== undefined && kenBurnsActive
   const imageBackgroundSize = freezeScale
-    ? getFrozenBackgroundScaleSize(slide, backgroundScaleAmount, frozenScaleProgress)
+    ? getFrozenBackgroundScaleSize(slide, KEN_BURNS_AMOUNT_PCT, frozenScaleProgress)
     : getImageBackgroundSize(slide)
 
   if (slide.infographicProjectId) {
@@ -140,8 +142,8 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             ...(kenBurnsActive && !freezeScale ? {
-              '--scale-duration': `${backgroundScaleTime}s`,
-              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount, backgroundKenBurnsDirection),
+              '--scale-duration': `${KEN_BURNS_DURATION_S}s`,
+              ...getBackgroundScaleAnimationVars(slide, KEN_BURNS_AMOUNT_PCT, backgroundKenBurnsDirection),
             } : {})
           }}
         />

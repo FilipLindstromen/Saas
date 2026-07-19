@@ -6,6 +6,9 @@ import VideoPicker from './VideoPicker'
 import InfographicPicker from './InfographicPicker'
 import GraphicPicker from './GraphicPicker'
 import GenerateBackgroundModal from './GenerateBackgroundModal'
+import GenerateOverlayModal from './GenerateOverlayModal'
+import { createSubSlide } from '../utils/subSlides'
+import { resolveMotionSettings } from '../utils/motionPresets'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -17,7 +20,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, selectedSubSlideId, onSelectSubSlide, onDeselectSubSlide, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9' }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', webcamFlipHorizontal: false, webcamFlipVertical: false }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -26,6 +29,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   const [showInfographicPicker, setShowInfographicPicker] = useState(false)
   const [showGraphicPicker, setShowGraphicPicker] = useState(null) // 'giphy' | 'icon' | null
   const [showGenerateBackground, setShowGenerateBackground] = useState(false)
+  const [showGenerateOverlay, setShowGenerateOverlay] = useState(false)
   const [backgroundMenuOpen, setBackgroundMenuOpen] = useState(false)
   const [overlayMenuOpen, setOverlayMenuOpen] = useState(false)
   const backgroundMenuRef = useRef(null)
@@ -41,7 +45,23 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     return 1
   })
   const [previewAnimKey, setPreviewAnimKey] = useState(0)
-  const previewAnimationActive = !!(settings?.textAnimation && settings.textAnimation !== 'none')
+  const resolvedMotion = resolveMotionSettings({
+    motionPreset: settings?.motionPreset || 'custom',
+    textAnimation: settings?.textAnimation || 'none',
+    textAnimationUnit: settings?.textAnimationUnit || 'word',
+    textAnimationSpeed: settings?.textAnimationSpeed ?? 1,
+    textAnimationStagger: settings?.textAnimationStagger ?? 0.07,
+    textExitAnimation: settings?.textExitAnimation || 'match-in',
+    subtitleDelay: settings?.subtitleDelay ?? 0,
+    backgroundKenBurnsDirection: settings?.backgroundKenBurnsDirection || 'zoom-in',
+    backgroundBlurOnTextEnter: settings?.backgroundBlurOnTextEnter === true,
+    kenBurns: settings?.kenBurns === true,
+    graphicAnimationIn: settings?.graphicAnimationIn || 'fade-scale',
+  }, slide)
+  const previewAnimationActive = !!(
+    (resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none')
+    || resolvedMotion.kenBurns
+  )
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -202,23 +222,42 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     setShowInfographicPicker(false)
   }
 
-  const handleGraphicSelect = (url, source) => {
+  const addGraphicOverlay = (url, type, size = 80) => {
     const overlays = Array.isArray(slide.graphicOverlays) ? [...slide.graphicOverlays] : []
     const id = 'g' + Date.now()
     overlays.push({
       id,
-      type: source === 'iconify' ? 'icon' : 'giphy',
+      type,
       url,
       x: 50,
       y: 50,
-      width: 80,
-      height: 80,
+      width: size,
+      height: size,
       rotation: 0,
       flipHorizontal: false
     })
     onUpdate({ graphicOverlays: overlays })
-    setShowGraphicPicker(null)
     onSelectGraphic?.(id)
+    return id
+  }
+
+  const handleGraphicSelect = (url, source) => {
+    addGraphicOverlay(url, source === 'iconify' ? 'icon' : 'giphy')
+    setShowGraphicPicker(null)
+  }
+
+  const handleGeneratedOverlayApply = (imageUrl) => {
+    addGraphicOverlay(imageUrl, 'generated', 200)
+    setShowGenerateOverlay(false)
+  }
+
+  const handleAddSubSlide = () => {
+    const subSlides = Array.isArray(slide.subSlides) ? [...slide.subSlides] : []
+    const created = createSubSlide(subSlides.length)
+    subSlides.push(created)
+    onUpdate({ subSlides })
+    onSelectSubSlide?.(created.id)
+    onDeselectGraphic?.()
   }
 
   if (!slide) {
@@ -277,8 +316,23 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
                 <div className="preview-toolbar-dropdown">
                   <button type="button" onClick={() => { setShowGraphicPicker('giphy'); setOverlayMenuOpen(false) }}>Add Giphy</button>
                   <button type="button" onClick={() => { setShowGraphicPicker('icon'); setOverlayMenuOpen(false) }}>Add icon</button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowGenerateOverlay(true); setOverlayMenuOpen(false) }}
+                    disabled={!settings.openaiKey?.trim()}
+                  >
+                    Generate image…
+                  </button>
                 </div>
               )}
+              <button
+                type="button"
+                className="preview-toolbar-group-btn preview-subslide-btn"
+                onClick={handleAddSubSlide}
+                title="Add a sub slide region (camera zoom target in present mode)"
+              >
+                Sub slide
+              </button>
             </div>
           )}
         </div>
@@ -334,13 +388,13 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       </div>
       <div className="preview-content">
         <div
-          className={`preview-zoom-wrap ${settings.textAnimation && settings.textAnimation !== 'none' ? 'has-text-animation' : ''}`}
+          className={`preview-zoom-wrap ${previewAnimationActive ? 'has-text-animation' : ''}`}
           style={{
             transform: `scale(${previewZoom})`,
             transformOrigin: 'center center'
           }}
         >
-          <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}`}>
+          <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}${selectedGraphicId ? ' has-selected-graphic' : ''}${selectedSubSlideId ? ' has-selected-subslide' : ''}`}>
           <Slide 
             key={`${slide.id}-${previewAnimKey}`}
             slide={slide} 
@@ -402,21 +456,24 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
-            textAnimation={settings.textAnimation || 'none'}
-            textAnimationUnit={settings.textAnimationUnit || 'word'}
-            textAnimationSpeed={settings.textAnimationSpeed ?? 1}
-            textAnimationStagger={settings.textAnimationStagger ?? 0.07}
-            textExitAnimation={settings.textExitAnimation || 'match-in'}
-            subtitleDelay={settings.subtitleDelay ?? 0}
-            backgroundKenBurnsDirection={settings.backgroundKenBurnsDirection || 'zoom-in'}
-            backgroundBlurOnTextEnter={settings.backgroundBlurOnTextEnter === true}
-            graphicAnimationIn={settings.graphicAnimationIn || 'fade-scale'}
-            backgroundScaleAnimation={settings.backgroundScaleAnimation === true}
-            backgroundScaleTime={settings.backgroundScaleTime || 10}
-            backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}
+            textAnimation={resolvedMotion.textAnimation}
+            textAnimationUnit={resolvedMotion.textAnimationUnit}
+            textAnimationSpeed={resolvedMotion.textAnimationSpeed ?? 1}
+            textAnimationStagger={resolvedMotion.textAnimationStagger ?? 0.07}
+            textExitAnimation={resolvedMotion.textExitAnimation}
+            subtitleDelay={resolvedMotion.subtitleDelay ?? 0}
+            backgroundKenBurnsDirection={resolvedMotion.backgroundKenBurnsDirection}
+            backgroundBlurOnTextEnter={resolvedMotion.backgroundBlurOnTextEnter === true}
+            graphicAnimationIn={resolvedMotion.graphicAnimationIn || 'fade-scale'}
+            motionPreset={settings.motionPreset || 'custom'}
+            kenBurns={resolvedMotion.kenBurns === true}
             previewTextAnimation={previewAnimationActive}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}
+            onDeselectGraphic={onDeselectGraphic}
+            selectedSubSlideId={selectedSubSlideId}
+            onSelectSubSlide={onSelectSubSlide}
+            onDeselectSubSlide={onDeselectSubSlide}
           />
           {safeRecordSettings.captionsEnabled && (
             <div className="caption-preview-in-slide">
@@ -495,6 +552,13 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
         slide={slide}
         settings={settings}
         slideFormat={slideFormat}
+      />
+      <GenerateOverlayModal
+        isOpen={showGenerateOverlay}
+        onClose={() => setShowGenerateOverlay(false)}
+        onApply={handleGeneratedOverlayApply}
+        slide={slide}
+        settings={settings}
       />
     </div>
   )

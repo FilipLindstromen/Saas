@@ -121,6 +121,10 @@ function InspectorPanel({
           <ColorOptions
             settings={settings}
             onUpdateSettings={onUpdateSettings}
+            slide={displaySlide}
+            onUpdateSlide={handleSlideUpdate}
+            selectedCount={getIdsToUpdate().length}
+            backgroundColor={backgroundColor}
             embedded
           />
         )}
@@ -138,52 +142,25 @@ function InspectorPanel({
           />
         )}
 
-        {(tab === 'slide-bg' || tab === 'slide-lines' || tab === 'slide-motion' || tab === 'gradient' || tab === 'media') && (
+        {(tab === 'slide-lines' || tab === 'gradient' || tab === 'media') && (
           <SlideSettings
             {...slideSettingsProps}
             section={
-              tab === 'slide-bg' ? 'bg'
-                : tab === 'slide-lines' ? 'lines'
-                  : tab === 'slide-motion' ? 'motion'
-                    : tab
+              tab === 'slide-lines' ? 'lines'
+                : tab
             }
           />
         )}
 
-        {tab === 'playback' && (
-          <TransitionOptions
-            settings={settings}
-            onUpdateSettings={onUpdateSettings}
-            embedded
-            section="autoAdvance"
-          />
-        )}
-
-        {tab === 'transitions' && (
-          <TransitionOptions
-            settings={settings}
-            onUpdateSettings={onUpdateSettings}
-            embedded
-            section="transitions"
-          />
-        )}
-
-        {tab === 'text-anim' && (
-          <TransitionOptions
-            settings={settings}
-            onUpdateSettings={onUpdateSettings}
-            embedded
-            section="textAnimation"
-          />
-        )}
-
-        {tab === 'bg-anim' && (
-          <TransitionOptions
-            settings={settings}
-            onUpdateSettings={onUpdateSettings}
-            embedded
-            section="backgroundAnimation"
-          />
+        {tab === 'slide-motion' && (
+          <>
+            <SlideSettings {...slideSettingsProps} section="motion" />
+            <TransitionOptions
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+              embedded
+            />
+          </>
         )}
 
         {tab === 'devices' && (

@@ -1,8 +1,7 @@
-import React, { useCallback, useRef } from 'react'
+import { useCallback, useRef } from 'react'
+import { SUB_SLIDE_MIN_SIZE } from '../utils/subSlides'
 
 const DRAG_THRESHOLD = 4
-const MIN_SIZE = 32
-const MAX_SIZE = 800
 
 function attachGlobalListeners(onMove, onUp) {
   const move = (ev) => {
@@ -24,52 +23,38 @@ function attachGlobalListeners(onMove, onUp) {
 }
 
 function isResizeHandle(target) {
-  return target?.closest?.('.slide-graphic-resize-handle')
+  return target?.closest?.('.slide-subslide-resize-handle')
 }
 
-export default function GraphicOverlay({
-  graphic,
+export default function SubSlideFrame({
+  subSlide,
+  index,
   isSelected,
   onSelect,
   onUpdate,
+  onDelete,
   containerRef,
   isEditing,
-  isPlayMode = false,
-  animationIn = 'fade-scale',
-  animationDelay = 0.25,
 }) {
   const dragRef = useRef(null)
   const pendingDragRef = useRef(null)
   const resizeRef = useRef(null)
   const suppressClickRef = useRef(false)
 
-  const x = graphic.x ?? 50
-  const y = graphic.y ?? 50
-  const width = graphic.width ?? 80
-  const height = graphic.height ?? 80
-  const rotation = graphic.rotation ?? 0
-  const flipHorizontal = graphic.flipHorizontal ?? false
-  const tintColor = graphic.tintColor ?? null
-  const tintOpacity = graphic.tintOpacity ?? 100
+  const x = subSlide.x ?? 50
+  const y = subSlide.y ?? 50
+  const width = subSlide.width ?? 40
+  const height = subSlide.height ?? 30
 
   const getContainerRect = useCallback(() => containerRef?.current?.getBoundingClientRect(), [containerRef])
-
-  const getScaleFactor = useCallback(() => {
-    const rect = getContainerRect()
-    const el = containerRef?.current
-    if (!rect || !el?.offsetWidth) return 1
-    return rect.width / el.offsetWidth
-  }, [getContainerRect, containerRef])
 
   const handlePointerMove = useCallback((e) => {
     const rect = getContainerRect()
     if (!rect || !onUpdate) return
-    const scale = getScaleFactor()
 
     if (pendingDragRef.current && !dragRef.current) {
       const { startX, startY } = pendingDragRef.current
-      const dist = Math.hypot(e.clientX - startX, e.clientY - startY)
-      if (dist > DRAG_THRESHOLD) {
+      if (Math.hypot(e.clientX - startX, e.clientY - startY) > DRAG_THRESHOLD) {
         dragRef.current = { ...pendingDragRef.current }
         pendingDragRef.current = null
         suppressClickRef.current = true
@@ -79,10 +64,8 @@ export default function GraphicOverlay({
 
     if (dragRef.current) {
       const { startX, startY, startGx, startGy } = dragRef.current
-      const dx = e.clientX - startX
-      const dy = e.clientY - startY
-      const dxPercent = (dx / rect.width) * 100
-      const dyPercent = (dy / rect.height) * 100
+      const dxPercent = ((e.clientX - startX) / rect.width) * 100
+      const dyPercent = ((e.clientY - startY) / rect.height) * 100
       const newX = Math.max(0, Math.min(100, startGx + dxPercent))
       const newY = Math.max(0, Math.min(100, startGy + dyPercent))
       onUpdate({ x: newX, y: newY })
@@ -90,17 +73,16 @@ export default function GraphicOverlay({
     }
 
     if (resizeRef.current) {
-      const { startX, startY, startW, aspect } = resizeRef.current
-      const dx = (e.clientX - startX) / scale
-      const dy = (e.clientY - startY) / scale
-      const delta = Math.max(dx, dy)
-      const newW = Math.max(MIN_SIZE, Math.min(MAX_SIZE, startW + delta))
-      const newH = Math.max(MIN_SIZE, Math.min(MAX_SIZE, newW * aspect))
+      const { startX, startY, startW, startH } = resizeRef.current
+      const dxPercent = ((e.clientX - startX) / rect.width) * 100
+      const dyPercent = ((e.clientY - startY) / rect.height) * 100
+      const newW = Math.max(SUB_SLIDE_MIN_SIZE, Math.min(100, startW + dxPercent))
+      const newH = Math.max(SUB_SLIDE_MIN_SIZE, Math.min(100, startH + dyPercent))
       onUpdate({ width: newW, height: newH })
-      resizeRef.current = { ...resizeRef.current, startX: e.clientX, startY: e.clientY, startW: newW }
+      resizeRef.current = { ...resizeRef.current, startX: e.clientX, startY: e.clientY, startW: newW, startH: newH }
       suppressClickRef.current = true
     }
-  }, [getContainerRect, getScaleFactor, onUpdate])
+  }, [getContainerRect, onUpdate])
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null
@@ -114,8 +96,7 @@ export default function GraphicOverlay({
     e.preventDefault()
     e.stopPropagation()
     if (!isSelected) onSelect?.()
-    const state = { startX: e.clientX, startY: e.clientY, startGx: x, startGy: y }
-    pendingDragRef.current = state
+    pendingDragRef.current = { startX: e.clientX, startY: e.clientY, startGx: x, startGy: y }
     document.body.style.cursor = 'grab'
     attachGlobalListeners(handlePointerMove, handlePointerUp)
   }, [isEditing, isSelected, onSelect, x, y, handlePointerMove, handlePointerUp])
@@ -125,9 +106,7 @@ export default function GraphicOverlay({
     e.preventDefault()
     e.stopPropagation()
     if (!isSelected) onSelect?.()
-    const aspect = width > 0 ? height / width : 1
-    const state = { startX: e.clientX, startY: e.clientY, startW: width, aspect }
-    resizeRef.current = state
+    resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: width, startH: height }
     document.body.style.cursor = 'nwse-resize'
     attachGlobalListeners(handlePointerMove, handlePointerUp)
   }, [isEditing, isSelected, onSelect, onUpdate, width, height, handlePointerMove, handlePointerUp])
@@ -141,44 +120,47 @@ export default function GraphicOverlay({
     onSelect?.()
   }, [onSelect])
 
+  const onDeleteClick = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onDelete?.()
+  }, [onDelete])
+
+  if (!isEditing) return null
+
   return (
     <div
-      className={`slide-graphic-overlay ${isSelected ? 'selected' : ''}${isPlayMode ? ` graphic-anim-${animationIn || 'fade-scale'}` : ''}`}
+      className={`slide-subslide-frame ${isSelected ? 'selected' : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
-        width: `${width}px`,
-        height: `${height}px`,
-        transform: `translate(-50%, -50%) rotate(${rotation}deg)${flipHorizontal ? ' scaleX(-1)' : ''}`,
-        transformOrigin: 'center center',
-        cursor: isEditing ? (isSelected ? 'grab' : 'pointer') : 'default',
-        zIndex: isSelected ? 2 : 1,
-        ...(isPlayMode ? { '--graphic-anim-delay': `${animationDelay}s` } : {}),
+        width: `${width}%`,
+        height: `${height}%`,
+        transform: 'translate(-50%, -50%)',
       }}
       onClick={onSelectClick}
       onPointerDown={onMoveDown}
     >
-      <div className="slide-graphic-overlay-inner">
-        <img src={graphic.url} alt="" draggable={false} />
-        {tintColor && (
+      <span className="slide-subslide-label">Sub slide {index + 1}</span>
+      {isSelected && (
+        <>
+          <button
+            type="button"
+            className="slide-subslide-delete"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onDeleteClick}
+            title="Remove sub slide"
+            aria-label="Remove sub slide"
+          >
+            ×
+          </button>
           <div
-            className="slide-graphic-tint-mask"
-            style={{
-              backgroundColor: tintColor,
-              opacity: tintOpacity / 100,
-              WebkitMaskImage: `url(${graphic.url})`,
-              maskImage: `url(${graphic.url})`
-            }}
+            className="slide-subslide-resize-handle"
+            onPointerDown={onResizeDown}
+            title="Drag corner to resize"
+            aria-label="Resize sub slide"
           />
-        )}
-      </div>
-      {isSelected && isEditing && (
-        <div
-          className="slide-graphic-resize-handle"
-          onPointerDown={onResizeDown}
-          title="Drag corner to resize"
-          aria-label="Resize graphic"
-        />
+        </>
       )}
     </div>
   )

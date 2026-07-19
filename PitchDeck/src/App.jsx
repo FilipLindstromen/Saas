@@ -46,6 +46,7 @@ function App() {
       infographicProjectId: undefined,
       infographicTabId: undefined,
       graphicOverlays: [],
+      subSlides: [],
     },
   ])
 
@@ -73,7 +74,8 @@ function App() {
             imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
             textHeadingLevel: slide.textHeadingLevel || null,
             subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
-            graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : []
+            graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : [],
+            subSlides: Array.isArray(slide.subSlides) ? slide.subSlides : []
           }))
           return {
             slides: slidesWithLayout,
@@ -161,6 +163,7 @@ function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedSlides, setSelectedSlides] = useState(new Set())
   const [selectedGraphicId, setSelectedGraphicId] = useState(null)
+  const [selectedSubSlideId, setSelectedSubSlideId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [isExportingPng, setIsExportingPng] = useState(false)
@@ -235,6 +238,7 @@ function App() {
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
       transitionStyle: localStorage.getItem('transitionStyle') || 'default',
       transitionSpeed: parseFloat(localStorage.getItem('transitionSpeed')) || 1,
+      canvasPushDirection: localStorage.getItem('canvasPushDirection') || 'left',
       textAnimation: localStorage.getItem('textAnimation') || 'none',
       textAnimationUnit: localStorage.getItem('textAnimationUnit') || 'word',
       textAnimationSpeed: parseFloat(localStorage.getItem('textAnimationSpeed')) || 1,
@@ -244,9 +248,8 @@ function App() {
       backgroundKenBurnsDirection: localStorage.getItem('backgroundKenBurnsDirection') || 'zoom-in',
       backgroundBlurOnTextEnter: localStorage.getItem('backgroundBlurOnTextEnter') === 'true',
       graphicAnimationIn: localStorage.getItem('graphicAnimationIn') || 'fade-scale',
-      backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
-      backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
-      backgroundScaleAmount: parseFloat(localStorage.getItem('backgroundScaleAmount')) || 20,
+      motionPreset: localStorage.getItem('motionPreset') || 'custom',
+      kenBurns: localStorage.getItem('kenBurns') === 'true' || localStorage.getItem('backgroundScaleAnimation') === 'true',
       lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1,
       bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1,
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
@@ -268,8 +271,6 @@ function App() {
       pexelsKey: apiKeys.pexels || '',
       pixabayKey: apiKeys.pixabay || '',
       showBullets: localStorage.getItem('showBullets') !== 'false',
-      autoAdvance: localStorage.getItem('autoAdvance') === 'true',
-      autoAdvanceDurationSeconds: parseFloat(localStorage.getItem('autoAdvanceDurationSeconds')) || 5,
     }
     return savedSettings
   })
@@ -402,6 +403,7 @@ function App() {
   const prevSelectedSlideIdRef = useRef(selectedSlideId)
   useEffect(() => {
     setSelectedGraphicId(null)
+    setSelectedSubSlideId(null)
   }, [selectedSlideId])
   useEffect(() => {
     if (selectedGraphicId) setInspectorTab('active-object')
@@ -599,6 +601,7 @@ function App() {
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
     localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
     localStorage.setItem('transitionSpeed', (settings.transitionSpeed ?? 1).toString())
+    localStorage.setItem('canvasPushDirection', settings.canvasPushDirection || 'left')
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('textAnimationUnit', settings.textAnimationUnit || 'word')
     localStorage.setItem('textAnimationSpeed', (settings.textAnimationSpeed ?? 1).toString())
@@ -608,9 +611,8 @@ function App() {
     localStorage.setItem('backgroundKenBurnsDirection', settings.backgroundKenBurnsDirection || 'zoom-in')
     localStorage.setItem('backgroundBlurOnTextEnter', settings.backgroundBlurOnTextEnter ? 'true' : 'false')
     localStorage.setItem('graphicAnimationIn', settings.graphicAnimationIn || 'fade-scale')
-    localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
-    localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
-    localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
+    localStorage.setItem('motionPreset', settings.motionPreset || 'custom')
+    localStorage.setItem('kenBurns', settings.kenBurns ? 'true' : 'false')
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
@@ -630,8 +632,6 @@ function App() {
     if (settings.h2LineHeight !== undefined) localStorage.setItem('h2LineHeight', settings.h2LineHeight.toString())
     if (settings.h3LineHeight !== undefined) localStorage.setItem('h3LineHeight', settings.h3LineHeight.toString())
     if (settings.slideFormat) localStorage.setItem('slideFormat', settings.slideFormat)
-    localStorage.setItem('autoAdvance', settings.autoAdvance ? 'true' : 'false')
-    localStorage.setItem('autoAdvanceDurationSeconds', (settings.autoAdvanceDurationSeconds ?? 5).toString())
   }, [settings])
 
   // Save workspace data when it changes
@@ -754,7 +754,9 @@ function App() {
     textHeadingLevel: null,
     subtitleHeadingLevel: null,
     backgroundColorOverride: false,
-    backgroundColorOverrideValue: undefined
+    backgroundColorOverrideValue: undefined,
+    textColorOverride: false,
+    textColorOverrideValue: undefined
   }), [])
 
   const getExportData = useCallback(() => {
@@ -1917,6 +1919,7 @@ function App() {
           initialSlideId={selectedSlideId}
           transitionStyle={settings.transitionStyle || 'default'}
           transitionSpeed={settings.transitionSpeed ?? 1}
+          canvasPushDirection={settings.canvasPushDirection || 'left'}
           textAnimation={settings.textAnimation || 'none'}
           textAnimationUnit={settings.textAnimationUnit || 'word'}
           textAnimationSpeed={settings.textAnimationSpeed ?? 1}
@@ -1926,9 +1929,8 @@ function App() {
           backgroundKenBurnsDirection={settings.backgroundKenBurnsDirection || 'zoom-in'}
           backgroundBlurOnTextEnter={settings.backgroundBlurOnTextEnter === true}
           graphicAnimationIn={settings.graphicAnimationIn || 'fade-scale'}
-          backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
-          backgroundScaleTime={settings.backgroundScaleTime || 10}
-          backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}
+          motionPreset={settings.motionPreset || 'custom'}
+          kenBurns={settings.kenBurns === true}
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
@@ -1944,8 +1946,6 @@ function App() {
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
           showBullets={settings.showBullets !== false}
-          autoAdvance={settings.autoAdvance === true}
-          autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}
@@ -2071,6 +2071,9 @@ function App() {
           selectedGraphicId={selectedGraphicId}
           onSelectGraphic={setSelectedGraphicId}
           onDeselectGraphic={() => setSelectedGraphicId(null)}
+          selectedSubSlideId={selectedSubSlideId}
+          onSelectSubSlide={setSelectedSubSlideId}
+          onDeselectSubSlide={() => setSelectedSubSlideId(null)}
           settings={settings}
           slideFormat={settings.slideFormat || '16:9'}
           onUpdateSettings={setSettings}
@@ -2105,8 +2108,6 @@ function App() {
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
           showBullets={settings.showBullets !== false}
-          autoAdvance={settings.autoAdvance === true}
-          autoAdvanceDurationSeconds={settings.autoAdvanceDurationSeconds ?? 5}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}

@@ -48,7 +48,7 @@ export function buildSlideExportProps(settings) {
     h3LineHeight: settings.h3LineHeight ?? 1.2,
     textStyleMode: settings.textStyleMode || 'standard',
     fontPairingSerifFont: settings.fontPairingSerifFont || 'Playfair Display',
-    backgroundScaleAnimation: false,
+    kenBurns: false,
     webcamEnabled: false,
     previewTextAnimation: false,
     textAnimation: 'none',

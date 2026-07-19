@@ -13,7 +13,6 @@ const iconProps = {
 export const INSPECTOR_GROUP_LABELS = {
   document: 'Document',
   slide: 'Slide',
-  present: 'Present',
   record: 'Record',
   object: 'Object',
 }
@@ -22,15 +21,10 @@ export const INSPECTOR_TABS = [
   { id: 'layout', label: 'Layout', group: 'document' },
   { id: 'colors', label: 'Colors', group: 'document' },
   { id: 'typography', label: 'Typography', group: 'document' },
-  { id: 'slide-bg', label: 'Background', group: 'slide' },
   { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
-  { id: 'slide-motion', label: 'Motion preset', group: 'slide' },
+  { id: 'slide-motion', label: 'Motion', group: 'slide' },
   { id: 'gradient', label: 'Gradient', group: 'slide' },
   { id: 'media', label: 'Media', group: 'slide' },
-  { id: 'playback', label: 'Auto-advance', group: 'present' },
-  { id: 'transitions', label: 'Transitions', group: 'present' },
-  { id: 'text-anim', label: 'Text animation', group: 'present' },
-  { id: 'bg-anim', label: 'Background animation', group: 'present' },
   { id: 'devices', label: 'Camera & microphone', group: 'record' },
   { id: 'output', label: 'Recording output', group: 'record' },
   { id: 'video-adj', label: 'Video adjustments', group: 'record' },
@@ -40,8 +34,13 @@ export const INSPECTOR_TABS = [
 
 const LEGACY_TAB_IDS = {
   document: 'layout',
-  slide: 'slide-bg',
-  present: 'playback',
+  slide: 'gradient',
+  'slide-bg': 'colors',
+  present: 'slide-motion',
+  playback: 'slide-motion',
+  transitions: 'slide-motion',
+  'text-anim': 'slide-motion',
+  'bg-anim': 'slide-motion',
   'active-object': 'object',
 }
 
@@ -79,13 +78,6 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M8 19h8" />
         </svg>
       )
-    case 'slide-bg':
-      return (
-        <svg {...iconProps}>
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M3 15h18" fill="currentColor" stroke="none" opacity="0.25" />
-        </svg>
-      )
     case 'slide-lines':
       return (
         <svg {...iconProps}>
@@ -120,13 +112,6 @@ export function InspectorTabIcon({ tabId }) {
           <rect x="3" y="5" width="18" height="14" rx="2" />
           <circle cx="8.5" cy="10.5" r="1.5" fill="currentColor" stroke="none" />
           <path d="M21 16l-5.5-5.5L5 19" />
-        </svg>
-      )
-    case 'playback':
-      return (
-        <svg {...iconProps}>
-          <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none" />
-          <path d="M19 5v14" />
         </svg>
       )
     case 'transitions':

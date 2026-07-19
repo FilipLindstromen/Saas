@@ -1,5 +1,9 @@
+import { KEN_BURNS_AMOUNT_PCT, KEN_BURNS_DURATION_S } from './motionPresets'
+
 /** Default background scale when the user has not customized it. */
 export const DEFAULT_IMAGE_SCALE = 1.0
+
+export { KEN_BURNS_AMOUNT_PCT, KEN_BURNS_DURATION_S }
 
 /** True when the user has manually set scale (slider, Fill Screen, or non-default saved value). */
 export function isImageScaleCustomized(slide) {
@@ -42,24 +46,24 @@ export function interpolateBackgroundSize(initial, final, progress) {
 }
 
 /** Ken Burns background-size frozen at a point in the animation (0 = start, 1 = end). */
-export function getFrozenBackgroundScaleSize(slide, backgroundScaleAmount = 20, progress = 0) {
+export function getFrozenBackgroundScaleSize(slide, backgroundScaleAmount = KEN_BURNS_AMOUNT_PCT, progress = 0) {
   const vars = getBackgroundScaleAnimationVars(slide, backgroundScaleAmount)
   return interpolateBackgroundSize(vars['--initial-scale'], vars['--final-scale'], progress)
 }
 
 /** Progress 0–1 for Ken Burns based on time spent on the current slide. */
-export function getBackgroundScaleProgress(elapsedMs, durationSeconds = 10) {
-  const durationMs = Math.max(1, (durationSeconds || 10) * 1000)
+export function getBackgroundScaleProgress(elapsedMs, durationSeconds = KEN_BURNS_DURATION_S) {
+  const durationMs = Math.max(1, (durationSeconds || KEN_BURNS_DURATION_S) * 1000)
   return Math.min(1, Math.max(0, elapsedMs / durationMs))
 }
 
-/** True when this slide should use Ken Burns background scale animation in play mode. */
-export function shouldAnimateBackgroundScale(slide, backgroundScaleAnimation = false) {
-  return !!(backgroundScaleAnimation && slide && !slide.overrideBackgroundScaleAnimation)
+/** True when this slide should use Ken Burns background animation in play mode. */
+export function shouldAnimateBackgroundScale(slide, kenBurns = false) {
+  return !!(kenBurns && slide)
 }
 
 /** CSS custom properties for Ken Burns-style background animation. */
-export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = 20, direction = 'zoom-in') {
+export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = KEN_BURNS_AMOUNT_PCT, direction = 'zoom-in') {
   const x = slide?.imagePositionX !== undefined ? slide.imagePositionX : 50
   const y = slide?.imagePositionY !== undefined ? slide.imagePositionY : 50
   const grow = Math.max(0, backgroundScaleAmount || 20)
