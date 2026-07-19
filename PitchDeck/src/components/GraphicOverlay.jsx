@@ -1,4 +1,5 @@
 import React, { useCallback, useRef } from 'react'
+import { GRAPHIC_COORDINATE_WIDTH } from '../utils/slideFormats'
 
 const DRAG_THRESHOLD = 4
 const MIN_SIZE = 32
@@ -61,6 +62,12 @@ export default function GraphicOverlay({
     return rect.width / el.offsetWidth
   }, [getContainerRect, containerRef])
 
+  const getCoordScale = useCallback(() => {
+    const el = containerRef?.current
+    if (!el?.offsetWidth) return 1
+    return el.offsetWidth / GRAPHIC_COORDINATE_WIDTH
+  }, [containerRef])
+
   const handlePointerMove = useCallback((e) => {
     const rect = getContainerRect()
     if (!rect || !onUpdate) return
@@ -94,13 +101,16 @@ export default function GraphicOverlay({
       const dx = (e.clientX - startX) / scale
       const dy = (e.clientY - startY) / scale
       const delta = Math.max(dx, dy)
-      const newW = Math.max(MIN_SIZE, Math.min(MAX_SIZE, startW + delta))
+      const coordScale = getCoordScale()
+      const startDisplayW = startW * coordScale
+      const newDisplayW = Math.max(MIN_SIZE * coordScale, Math.min(MAX_SIZE * coordScale, startDisplayW + delta))
+      const newW = newDisplayW / coordScale
       const newH = Math.max(MIN_SIZE, Math.min(MAX_SIZE, newW * aspect))
       onUpdate({ width: newW, height: newH })
       resizeRef.current = { ...resizeRef.current, startX: e.clientX, startY: e.clientY, startW: newW }
       suppressClickRef.current = true
     }
-  }, [getContainerRect, getScaleFactor, onUpdate])
+  }, [getContainerRect, getScaleFactor, getCoordScale, onUpdate])
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null
@@ -147,8 +157,8 @@ export default function GraphicOverlay({
       style={{
         left: `${x}%`,
         top: `${y}%`,
-        width: `${width}px`,
-        height: `${height}px`,
+        width: `calc(${width}px * var(--slide-coord-scale, 1))`,
+        height: `calc(${height}px * var(--slide-coord-scale, 1))`,
         transform: `translate(-50%, -50%) rotate(${rotation}deg)${flipHorizontal ? ' scaleX(-1)' : ''}`,
         transformOrigin: 'center center',
         cursor: isEditing ? (isSelected ? 'grab' : 'pointer') : 'default',

@@ -57,9 +57,9 @@ export function getBackgroundScaleProgress(elapsedMs, durationSeconds = KEN_BURN
   return Math.min(1, Math.max(0, elapsedMs / durationMs))
 }
 
-/** True when this slide should use Ken Burns background animation in play mode. */
-export function shouldAnimateBackgroundScale(slide, kenBurns = false) {
-  return !!(kenBurns && slide)
+/** Ken Burns background scale animation is disabled; backgrounds stay static while a slide is active. */
+export function shouldAnimateBackgroundScale(_slide, _kenBurns = false) {
+  return false
 }
 
 /** CSS custom properties for Ken Burns-style background animation. */

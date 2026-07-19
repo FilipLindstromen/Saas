@@ -24,3 +24,24 @@ export function getSlidePlainText(slide) {
   if (main && subtitle) return `${main}\n${subtitle}`
   return main || subtitle
 }
+
+/** Parse bullet lines for bullet layout slides (matches Slide.jsx / PlayMode). */
+export function getBulletPointsFromSlide(slide) {
+  if (!slide || (slide.layout || 'default') !== 'bulletpoints') return []
+  const normalized = (slide.content || '').replace(/<br\s*\/?>/gi, '\n')
+  const raw = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line.replace(/^[-•*]\s*/, ''))
+    .filter((line) => {
+      const plain = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim()
+      return plain.length > 0
+    })
+  const seen = new Set()
+  return raw.filter((line) => {
+    if (seen.has(line)) return false
+    seen.add(line)
+    return true
+  })
+}

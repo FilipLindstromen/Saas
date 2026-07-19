@@ -8,14 +8,12 @@ import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
 import {
   getImageBackgroundSize,
-  getBackgroundScaleAnimationVars,
   getVideoBackgroundStyle,
   getInfographicContainScale,
   isImageScaleCustomized,
-  KEN_BURNS_AMOUNT_PCT,
-  KEN_BURNS_DURATION_S,
 } from '../utils/backgroundFit'
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
+import { getBulletPointsFromSlide } from '../utils/slidePlainText'
 import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { getSlideFormatMeta } from '../utils/slideFormats'
@@ -115,7 +113,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, suppressTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -145,34 +143,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const imagePositionX = slide.imagePositionX !== undefined ? slide.imagePositionX : 50
   const imagePositionY = slide.imagePositionY !== undefined ? slide.imagePositionY : 50
 
-  const motion = useMemo(() => resolveMotionSettings({
-    motionPreset,
-    textAnimation,
-    textAnimationUnit,
-    textAnimationSpeed,
-    textAnimationStagger,
-    textExitAnimation,
-    subtitleDelay,
-    backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter,
-    kenBurns,
-    graphicAnimationIn,
-  }, slide), [
-    slide,
-    motionPreset,
-    textAnimation,
-    textAnimationUnit,
-    textAnimationSpeed,
-    textAnimationStagger,
-    textExitAnimation,
-    subtitleDelay,
-    backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter,
-    kenBurns,
-    graphicAnimationIn,
-  ])
+  const motion = useMemo(() => resolveMotionSettings({}, slide), [slide])
 
-  const shouldAnimateText = (isPlayMode || previewTextAnimation) && motion.textAnimation && motion.textAnimation !== 'none'
+  const shouldAnimateText = (isPlayMode || previewTextAnimation) && motion.textAnimation && motion.textAnimation !== 'none' && !suppressTextAnimation
 
   // Fetch cross-origin video to blob URL so <video> loads same-origin (avoids COEP block)
   useEffect(() => {
@@ -270,28 +243,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const midOpacity = gradientStrength * 0.57 // ~0.4 when strength is 0.7
 
   // Parse bullet points (one per line); support both \n and <br> as separators so HTML renders correctly
-  const getBulletPoints = () => {
-    if (layout !== 'bulletpoints') return []
-    // Normalize <br> to newlines so "A<br>B<br>C" and "A\nB\nC" both yield multiple bullets
-    const normalized = (slide.content || '').replace(/<br\s*\/?>/gi, '\n')
-    const raw = normalized
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .map(line => line.replace(/^[-•*]\s*/, '')) // Remove bullet markers if present
-      .filter(line => {
-        // Strip HTML tags to get plain text; drop bullets that have no visible text
-        const plain = line.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim()
-        return plain.length > 0
-      })
-    // Keep only first occurrence of each line so duplicated text from layout/slide switching never appears
-    const seen = new Set()
-    return raw.filter(line => {
-      if (seen.has(line)) return false
-      seen.add(line)
-      return true
-    })
-  }
+  const getBulletPoints = () => getBulletPointsFromSlide({ ...slide, layout })
 
   // Split content into lines (for "show one line at a time" in play mode).
   // Normalize contentEditable line breaks: <div>, <p>, <br> become newlines so each line is one "reveal" step.
@@ -1514,9 +1466,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         const slideWidth = slideRef.current.offsetWidth
         // At 1200px width, base = defaultTextSize * 16px (e.g. 5rem -> 80px at 16px root); scales with slide width
         if (slideWidth > 0) {
-          const baseFontSize = (slideWidth / 1200) * 16 * defaultTextSize
+          const coordScale = slideWidth / 1200
+          slideRef.current.style.setProperty('--slide-coord-scale', String(coordScale))
+          const baseFontSize = coordScale * 16 * defaultTextSize
           slideRef.current.style.setProperty('--slide-base-font-size', `${baseFontSize}px`)
-          const bulletFontSize = (slideWidth / 1200) * 16 * bulletTextSize
+          const bulletFontSize = coordScale * 16 * bulletTextSize
           slideRef.current.style.setProperty('--slide-bullet-font-size', `${bulletFontSize}px`)
         }
       }
@@ -1800,7 +1754,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {/* 1. Background image (z-index 0) - behind video; skip when infographic is used */}
       {!hideBackground && !slide.infographicProjectId && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
-          className={`slide-background ${(!isPlayMode && onUpdate && !previewTextAnimation) ? 'editable' : ''} ${(isPlayMode || previewTextAnimation) && motion.kenBurns ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${(!isPlayMode && onUpdate && !previewTextAnimation) ? 'editable' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: getImageBackgroundSize(slide),
@@ -1810,10 +1764,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             cursor: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'move' : 'default',
             pointerEvents: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'auto' : 'none',
-            ...((isPlayMode || previewTextAnimation) && motion.kenBurns ? {
-              '--scale-duration': `${KEN_BURNS_DURATION_S}s`,
-              ...getBackgroundScaleAnimationVars(slide, KEN_BURNS_AMOUNT_PCT, motion.backgroundKenBurnsDirection),
-            } : {})
           }}
         />
       )}

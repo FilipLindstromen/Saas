@@ -157,6 +157,15 @@
   }
 }
 
+/* Canvas push already reveals content during the transition — skip the generic fade-in after */
+.play-slide-container.play-slide-content-transition.transition-canvas-push:not(.text-out) .slide .slide-content,
+.play-slide-container.play-slide-content-transition.transition-canvas-push:not(.text-out) .slide .slide-content-video,
+.play-slide-container.play-slide-content-transition.transition-canvas-push:not(.text-out) .slide .slide-text-centered-wrapper,
+.play-slide-container.play-slide-content-transition.transition-canvas-push:not(.text-out) .slide .slide-section-name,
+.play-slide-container.play-slide-content-transition.transition-canvas-push:not(.text-out) .slide .slide-bullets {
+  animation: none;
+}
+
 /* Video layout: content layer above gradient (z-index 5 for text to be on top) */
 .play-slide-container-video-layout {
   z-index: 5;
@@ -482,6 +491,7 @@
 
 .play-canvas-push-track {
   display: flex;
+  flex-direction: row;
   width: 200%;
   height: 100%;
   animation: canvasPushMove var(--transition-duration, 550ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -497,9 +507,13 @@
 .play-canvas-push-panel {
   position: relative;
   flex: 0 0 50%;
-  width: 50%;
-  height: 50%;
   overflow: hidden;
+}
+
+/* Horizontal push: two full-size slides side by side */
+.play-canvas-push-track.canvas-push-horizontal .play-canvas-push-panel {
+  width: 50%;
+  height: 100%;
 }
 
 .play-canvas-push-track.canvas-push-vertical .play-canvas-push-panel {
@@ -521,6 +535,17 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play-canvas-push-panel .play-slide-container .slide {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: auto !important;
 }
 
 @keyframes canvasPushMove {

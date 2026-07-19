@@ -150,7 +150,13 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
-  const [inspectorTab, setInspectorTabState] = useState('layout')
+  const [inspectorTab, setInspectorTabState] = useState(() => {
+    try {
+      return normalizeInspectorTab(localStorage.getItem('pitchDeckInspectorTab') || 'layout')
+    } catch {
+      return 'layout'
+    }
+  })
   const setInspectorTab = useCallback((tab) => {
     setInspectorTabState(normalizeInspectorTab(tab))
   }, [])
@@ -399,23 +405,14 @@ function App() {
     }
   }, [slides, selectedSlideId])
 
-  // Switch to slide settings tab when user selects a different slide (edit/plan mode)
-  const prevSelectedSlideIdRef = useRef(selectedSlideId)
+  // Clear overlay selection when changing slides; keep inspector tab as-is
   useEffect(() => {
     setSelectedGraphicId(null)
     setSelectedSubSlideId(null)
   }, [selectedSlideId])
   useEffect(() => {
     if (selectedGraphicId) setInspectorTab('active-object')
-  }, [selectedGraphicId])
-  useEffect(() => {
-    if ((mode === 'edit' || mode === 'plan') && selectedSlideId != null && prevSelectedSlideIdRef.current !== selectedSlideId) {
-      setInspectorTab('slide')
-      prevSelectedSlideIdRef.current = selectedSlideId
-    } else {
-      prevSelectedSlideIdRef.current = selectedSlideId
-    }
-  }, [mode, selectedSlideId])
+  }, [selectedGraphicId, setInspectorTab])
 
   // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
@@ -434,6 +431,14 @@ function App() {
       console.error('Error saving inspector width:', error)
     }
   }, [inspectorWidth])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckInspectorTab', inspectorTab)
+    } catch (error) {
+      console.error('Error saving inspector tab:', error)
+    }
+  }, [inspectorTab])
 
   // Save recordSettings to localStorage whenever it changes
   useEffect(() => {
@@ -1357,7 +1362,7 @@ function App() {
 
   useEffect(() => {
     if (selectedGraphicId) setInspectorTab('object')
-  }, [selectedGraphicId])
+  }, [selectedGraphicId, setInspectorTab])
 
   useEffect(() => {
     try {
@@ -1920,17 +1925,6 @@ function App() {
           transitionStyle={settings.transitionStyle || 'default'}
           transitionSpeed={settings.transitionSpeed ?? 1}
           canvasPushDirection={settings.canvasPushDirection || 'left'}
-          textAnimation={settings.textAnimation || 'none'}
-          textAnimationUnit={settings.textAnimationUnit || 'word'}
-          textAnimationSpeed={settings.textAnimationSpeed ?? 1}
-          textAnimationStagger={settings.textAnimationStagger ?? 0.07}
-          textExitAnimation={settings.textExitAnimation || 'match-in'}
-          subtitleDelay={settings.subtitleDelay ?? 0}
-          backgroundKenBurnsDirection={settings.backgroundKenBurnsDirection || 'zoom-in'}
-          backgroundBlurOnTextEnter={settings.backgroundBlurOnTextEnter === true}
-          graphicAnimationIn={settings.graphicAnimationIn || 'fade-scale'}
-          motionPreset={settings.motionPreset || 'custom'}
-          kenBurns={settings.kenBurns === true}
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}

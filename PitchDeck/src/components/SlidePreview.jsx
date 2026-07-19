@@ -45,22 +45,9 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     return 1
   })
   const [previewAnimKey, setPreviewAnimKey] = useState(0)
-  const resolvedMotion = resolveMotionSettings({
-    motionPreset: settings?.motionPreset || 'custom',
-    textAnimation: settings?.textAnimation || 'none',
-    textAnimationUnit: settings?.textAnimationUnit || 'word',
-    textAnimationSpeed: settings?.textAnimationSpeed ?? 1,
-    textAnimationStagger: settings?.textAnimationStagger ?? 0.07,
-    textExitAnimation: settings?.textExitAnimation || 'match-in',
-    subtitleDelay: settings?.subtitleDelay ?? 0,
-    backgroundKenBurnsDirection: settings?.backgroundKenBurnsDirection || 'zoom-in',
-    backgroundBlurOnTextEnter: settings?.backgroundBlurOnTextEnter === true,
-    kenBurns: settings?.kenBurns === true,
-    graphicAnimationIn: settings?.graphicAnimationIn || 'fade-scale',
-  }, slide)
+  const resolvedMotion = resolveMotionSettings({}, slide)
   const previewAnimationActive = !!(
-    (resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none')
-    || resolvedMotion.kenBurns
+    resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none'
   )
   const fileInputRef = useRef(null)
 
@@ -456,17 +443,6 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
-            textAnimation={resolvedMotion.textAnimation}
-            textAnimationUnit={resolvedMotion.textAnimationUnit}
-            textAnimationSpeed={resolvedMotion.textAnimationSpeed ?? 1}
-            textAnimationStagger={resolvedMotion.textAnimationStagger ?? 0.07}
-            textExitAnimation={resolvedMotion.textExitAnimation}
-            subtitleDelay={resolvedMotion.subtitleDelay ?? 0}
-            backgroundKenBurnsDirection={resolvedMotion.backgroundKenBurnsDirection}
-            backgroundBlurOnTextEnter={resolvedMotion.backgroundBlurOnTextEnter === true}
-            graphicAnimationIn={resolvedMotion.graphicAnimationIn || 'fade-scale'}
-            motionPreset={settings.motionPreset || 'custom'}
-            kenBurns={resolvedMotion.kenBurns === true}
             previewTextAnimation={previewAnimationActive}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}

@@ -10,6 +10,7 @@
   /* This ensures font-size scales with the slide's actual width */
   /* Default: 16px at 1200px width */
   font-size: var(--slide-base-font-size, 1rem);
+  --slide-coord-scale: 1;
 }
 
 .png-export-wrap .slide {
@@ -280,8 +281,17 @@
 }
 
 .slide-content.bulletpoints {
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
   padding: 4% 0 var(--slide-content-bottom, 12%) var(--slide-content-edge, 9%);
+}
+
+.slide-content.bulletpoints .slide-bullets {
+  width: 100%;
+  max-width: 66.67%;
 }
 
 .slide-content.centered {
@@ -330,7 +340,7 @@
 }
 
 /* Present mode: ensure content position matches edit mode (same distance from edge/bottom) */
-.play-mode .slide .slide-content:not(.centered):not(.section) {
+.play-mode .slide .slide-content:not(.centered):not(.section):not(.bulletpoints) {
   justify-content: flex-start;
   align-items: flex-end;
   /* Explicit padding so --slide-content-edge and --slide-content-bottom apply in present mode */
@@ -346,6 +356,21 @@
   padding-right: 0;
   padding-top: 4%;
   padding-bottom: var(--slide-content-bottom, 12%);
+}
+.play-mode .slide .slide-content.bulletpoints {
+  width: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+  padding-top: 4%;
+  padding-bottom: var(--slide-content-bottom, 12%);
+}
+.play-mode .slide .slide-content.bulletpoints .slide-bullets {
+  width: 100%;
+  max-width: 66.67%;
 }
 .play-mode .slide .slide-content.right,
 .play-mode .slide .slide-content.right-video {
@@ -404,6 +429,8 @@
 .slide.content-vertical-top .slide-content.bulletpoints,
 .slide.content-vertical-top .slide-content-video,
 .slide.content-vertical-top .slide-content.left-video {
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: flex-start;
   padding: var(--slide-content-top, 12%) 0 4% var(--slide-content-edge, 9%);
 }
@@ -419,12 +446,23 @@
   padding: var(--slide-content-top, 12%) var(--slide-content-edge, 9%) 4% 0;
 }
 
-.play-mode .slide.content-vertical-top .slide-content:not(.centered):not(.section),
+.play-mode .slide.content-vertical-top .slide-content:not(.centered):not(.section):not(.bulletpoints),
 .play-mode .slide.content-vertical-top .slide-content.bulletpoints,
 .play-mode .slide.content-vertical-top .slide-content-video,
 .play-mode .slide.content-vertical-top .slide-content.left-video {
+  width: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: flex-start;
-  padding: var(--slide-content-top, 12%) 0 4% var(--slide-content-edge, 9%);
+  padding-top: var(--slide-content-top, 12%);
+  padding-bottom: 4%;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+}
+.play-mode .slide.content-vertical-top .slide-content.bulletpoints .slide-bullets {
+  width: 100%;
+  max-width: 66.67%;
 }
 
 .play-mode .slide.content-vertical-top .slide-content.default {
@@ -788,9 +826,9 @@
   line-height: var(--slide-h2-line-height, 1.2) !important;
 }
 
-/* Present mode: top-align bullet with text (edit mode keeps bottom alignment above) */
+/* Present mode: match edit-mode bullet marker alignment */
 .play-mode .slide-bullet {
-  align-items: flex-start;
+  align-items: flex-end;
 }
 
 .slide-bullet::before {

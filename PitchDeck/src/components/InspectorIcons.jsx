@@ -23,8 +23,7 @@ export const INSPECTOR_TABS = [
   { id: 'typography', label: 'Typography', group: 'document' },
   { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
   { id: 'slide-motion', label: 'Motion', group: 'slide' },
-  { id: 'gradient', label: 'Gradient', group: 'slide' },
-  { id: 'media', label: 'Media', group: 'slide' },
+  { id: 'slide-background', label: 'Background', group: 'slide' },
   { id: 'devices', label: 'Camera & microphone', group: 'record' },
   { id: 'output', label: 'Recording output', group: 'record' },
   { id: 'video-adj', label: 'Video adjustments', group: 'record' },
@@ -34,8 +33,10 @@ export const INSPECTOR_TABS = [
 
 const LEGACY_TAB_IDS = {
   document: 'layout',
-  slide: 'gradient',
+  slide: 'slide-background',
   'slide-bg': 'colors',
+  gradient: 'slide-background',
+  media: 'slide-background',
   present: 'slide-motion',
   playback: 'slide-motion',
   transitions: 'slide-motion',
@@ -99,13 +100,8 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M8 21h8M12 17v4" />
         </svg>
       )
+    case 'slide-background':
     case 'gradient':
-      return (
-        <svg {...iconProps}>
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M3 15l6-6 4 4 8-8" />
-        </svg>
-      )
     case 'media':
       return (
         <svg {...iconProps}>

@@ -142,13 +142,10 @@ function InspectorPanel({
           />
         )}
 
-        {(tab === 'slide-lines' || tab === 'gradient' || tab === 'media') && (
+        {(tab === 'slide-lines' || tab === 'slide-background') && (
           <SlideSettings
             {...slideSettingsProps}
-            section={
-              tab === 'slide-lines' ? 'lines'
-                : tab
-            }
+            section={tab === 'slide-lines' ? 'lines' : 'background'}
           />
         )}
 
@@ -158,6 +155,9 @@ function InspectorPanel({
             <TransitionOptions
               settings={settings}
               onUpdateSettings={onUpdateSettings}
+              slide={displaySlide}
+              onUpdateSlide={handleSlideUpdate}
+              selectedCount={getIdsToUpdate().length}
               embedded
             />
           </>

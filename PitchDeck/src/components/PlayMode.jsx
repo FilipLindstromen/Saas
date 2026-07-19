@@ -6,7 +6,8 @@ import { getWebcamCameraId, isWebcamActiveForSlide, isAnyWebcamActive } from '..
 import { getWebcamCirclePixelSize, normalizeWebcamSizePercent } from '../utils/webcamSize'
 import { getExportCanvasSize } from '../utils/slideFormats'
 import { getBackgroundScaleProgress } from '../utils/backgroundFit'
-import { resolveMotionSettings, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
+import { getBulletPointsFromSlide } from '../utils/slidePlainText'
+import { resolveMotionSettings, resolveCanvasPushDirection, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
 import { getSubSlides, getActiveSubSlideRect, getSubSlideCameraStyle } from '../utils/subSlides'
 import './PlayMode.css'
 
@@ -645,6 +646,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   // Two-phase transition: text/background out first, then switch slide, then in
   const [pendingIndex, setPendingIndex] = useState(null)
   const pendingDirectionRef = useRef(1) // 1 = next, -1 = prev
+  const suppressTextEntranceAfterCanvasPushRef = useRef(false)
   const transitionTimeoutsRef = useRef([])
   const slideEnteredAtRef = useRef(Date.now())
   const [frozenBgScale, setFrozenBgScale] = useState({ outgoing: 0, incoming: 0 })
@@ -666,6 +668,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }, [currentIndex])
 
   useEffect(() => {
+    if (suppressTextEntranceAfterCanvasPushRef.current) {
+      suppressTextEntranceAfterCanvasPushRef.current = false
+    }
+  }, [currentIndex, transitionPhase])
+
+  useEffect(() => {
     setSubSlideIndex(-1)
   }, [currentIndex])
   
@@ -680,14 +688,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const isStartingRecordingRef = useRef(false) // Prevent multiple simultaneous recording starts
 
   // Get bullet points for current slide
-  const getBulletPoints = (slide) => {
-    if (!slide || (slide.layout || 'default') !== 'bulletpoints') return []
-    return slide.content
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .map(line => line.replace(/^[-•*]\s*/, ''))
-  }
+  const getBulletPoints = (slide) => getBulletPointsFromSlide(slide)
 
   // Canvas size by aspect ratio (see slideFormats.js)
   const canvasSize = getExportCanvasSize(slideFormat)
@@ -719,31 +720,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
 
-  const globalMotionSettings = useMemo(() => ({
-    motionPreset,
-    textAnimation,
-    textAnimationUnit,
-    textAnimationSpeed,
-    textAnimationStagger,
-    textExitAnimation,
-    subtitleDelay,
-    backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter,
-    kenBurns,
-    graphicAnimationIn,
-  }), [
-    motionPreset,
-    textAnimation,
-    textAnimationUnit,
-    textAnimationSpeed,
-    textAnimationStagger,
-    textExitAnimation,
-    subtitleDelay,
-    backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter,
-    kenBurns,
-    graphicAnimationIn,
-  ])
+  const globalMotionSettings = useMemo(() => ({}), [])
 
   const motion = useMemo(
     () => resolveMotionSettings(globalMotionSettings, currentSlide),
@@ -793,11 +770,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     return () => clearTimeout(t)
   }, [currentIndex])
 
-  // Reset line/bullet reveal when changing slides (start with first line visible for line reveal)
+  // Reset line/bullet reveal when changing slides (first line/bullet visible when reveal is on)
   useEffect(() => {
-    setVisibleBulletIndex(-1)
+    setVisibleBulletIndex(revealOneLineAtATime && isBulletSlide ? 0 : -1)
     setVisibleLineIndex(0)
-  }, [currentIndex])
+  }, [currentIndex, revealOneLineAtATime, isBulletSlide])
 
   // Get transition duration based on style
   const getTransitionDuration = (style) => {
@@ -830,7 +807,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     const currentHasWebcam = isWebcamActiveForSlide(currentSlideData, recordSettings)
     const nextHasWebcam = nextSlideDataForNav && isWebcamActiveForSlide(nextSlideDataForNav, recordSettings)
 
-    setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
     if (transitionStyle === 'canvas-push') {
@@ -848,6 +824,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setTransitionPhase('canvas-push')
       const transitionDuration = getTransitionDuration('canvas-push')
       scheduleTransition(() => {
+        suppressTextEntranceAfterCanvasPushRef.current = true
         setCurrentIndex(nextIndex)
         setPendingIndex(null)
         setTransitionPhase('idle')
@@ -963,7 +940,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     const currentHasWebcam = isWebcamActiveForSlide(currentSlideData, recordSettings)
     const prevHasWebcam = prevSlideDataForNav && isWebcamActiveForSlide(prevSlideDataForNav, recordSettings)
 
-    setVisibleBulletIndex(-1)
     setTransitionPhase('idle')
 
     if (transitionStyle === 'canvas-push') {
@@ -981,6 +957,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setTransitionPhase('canvas-push')
       const transitionDuration = getTransitionDuration('canvas-push')
       scheduleTransition(() => {
+        suppressTextEntranceAfterCanvasPushRef.current = true
         setCurrentIndex(prevIndex)
         setPendingIndex(null)
         setTransitionPhase('idle')
@@ -1137,11 +1114,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     subSlideIndex,
     prevSlide,
   ])
-
-  // Reset bullet index when slide changes
-  useEffect(() => {
-    setVisibleBulletIndex(-1)
-  }, [currentIndex])
 
   // Cleanup only on unmount. Do NOT stop the screen stream if it came from App (initialScreenStreamRef) so it survives React double-mount and recording can start.
   useEffect(() => {
@@ -1511,17 +1483,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     h1LineHeight,
     h2LineHeight,
     h3LineHeight,
-    motionPreset,
-    kenBurns: motion.kenBurns,
-    backgroundKenBurnsDirection: motion.backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter: motion.backgroundBlurOnTextEnter,
-    textAnimation: motion.textAnimation,
-    textAnimationUnit: motion.textAnimationUnit,
-    textAnimationSpeed: motion.textAnimationSpeed ?? 1,
-    textAnimationStagger: motion.textAnimationStagger,
-    textExitAnimation: motion.textExitAnimation,
-    subtitleDelay: motion.subtitleDelay,
-    graphicAnimationIn: motion.graphicAnimationIn,
     textStyleMode: textStyleMode || 'standard',
     fontPairingSerifFont: fontPairingSerifFont || 'Playfair Display',
     slideFormat
@@ -1542,23 +1503,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const transitionDurationMs = getTransitionDuration(transitionStyle)
   const activeTransitionStyle = normalizeTransitionStyle(transitionStyle)
 
-  const slidePropsFromMotion = (slideMotion) => ({
-    ...commonSlideProps,
-    kenBurns: slideMotion.kenBurns,
-    backgroundKenBurnsDirection: slideMotion.backgroundKenBurnsDirection,
-    backgroundBlurOnTextEnter: slideMotion.backgroundBlurOnTextEnter,
-    textAnimation: slideMotion.textAnimation,
-    textAnimationUnit: slideMotion.textAnimationUnit,
-    textAnimationSpeed: slideMotion.textAnimationSpeed ?? 1,
-    textAnimationStagger: slideMotion.textAnimationStagger,
-    textExitAnimation: slideMotion.textExitAnimation,
-    subtitleDelay: slideMotion.subtitleDelay,
-    graphicAnimationIn: slideMotion.graphicAnimationIn,
-  })
-
   const canvasPushActive = transitionPhase === 'canvas-push' && targetSlide
+  const activeCanvasPushDirection = targetSlide
+    ? resolveCanvasPushDirection(canvasPushDirection, targetSlide)
+    : canvasPushDirection
   const canvasPushConfig = canvasPushActive
-    ? getCanvasPushTransform(canvasPushDirection, pendingDirectionRef.current)
+    ? getCanvasPushTransform(activeCanvasPushDirection, pendingDirectionRef.current)
     : null
   const canvasPushPanels = canvasPushActive && canvasPushConfig
     ? (canvasPushConfig.panelOrder === 'out-in'
@@ -1606,10 +1556,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
                 <div className="play-slide-container play-slide-content-only">
                   <Slide
                     slide={slide}
-                    {...slidePropsFromMotion(panelMotion)}
+                    {...commonSlideProps}
                     cameraOverrideEnabled={false}
                     visibleBulletIndex={-1}
                     visibleLineIndex={null}
+                    suppressTextAnimation={key === 'out'}
                     isPreload={false}
                     hideBackground={true}
                     hideGradient={true}
@@ -1755,6 +1706,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           cameraOverridePosition={currentSlide?.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}
           visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : visibleBulletIndex}
           visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
+          suppressTextAnimation={suppressTextEntranceAfterCanvasPushRef.current}
           isPreload={false}
           hideBackground={usePersistentBackground || usePersistentVideo || backgroundTransitionActive}
           hideGradient={usePersistentGradient}

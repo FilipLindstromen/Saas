@@ -1,4 +1,8 @@
 /** Slide format metadata for preview, present, and export. */
+
+/** Edit preview max width; graphic overlay width/height are stored in this coordinate space. */
+export const GRAPHIC_COORDINATE_WIDTH = 1200
+
 export const SLIDE_FORMATS = {
   '16:9': { label: '16:9', w: 1920, h: 1080 },
   '1:1': { label: '1:1', w: 1080, h: 1080 },
