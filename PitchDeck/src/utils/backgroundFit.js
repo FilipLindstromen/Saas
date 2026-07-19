@@ -58,20 +58,75 @@ export function shouldAnimateBackgroundScale(slide, backgroundScaleAnimation = f
   return !!(backgroundScaleAnimation && slide && !slide.overrideBackgroundScaleAnimation)
 }
 
-/** CSS custom properties for Ken Burns-style background scale animation. */
-export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = 20) {
+/** CSS custom properties for Ken Burns-style background animation. */
+export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = 20, direction = 'zoom-in') {
+  const x = slide?.imagePositionX !== undefined ? slide.imagePositionX : 50
+  const y = slide?.imagePositionY !== undefined ? slide.imagePositionY : 50
+  const grow = Math.max(0, backgroundScaleAmount || 20)
+
+  const positionPair = (dx = 0, dy = 0) => ({
+    '--initial-position': `${Math.max(0, Math.min(100, x + dx))}% ${Math.max(0, Math.min(100, y + dy))}%`,
+    '--final-position': `${Math.max(0, Math.min(100, x - dx))}% ${Math.max(0, Math.min(100, y - dy))}%`,
+  })
+
   if (!isImageScaleCustomized(slide)) {
-    const grow = Math.max(0, backgroundScaleAmount || 20)
-    return {
-      '--initial-scale': 'auto 100%',
-      '--final-scale': `auto ${100 + grow}%`,
+    const initial = 'auto 100%'
+    const final = `auto ${100 + grow}%`
+    switch (direction) {
+      case 'zoom-out':
+        return {
+          '--initial-scale': final,
+          '--final-scale': initial,
+          '--initial-position': `${x}% ${y}%`,
+          '--final-position': `${x}% ${y}%`,
+        }
+      case 'pan-left':
+        return { '--initial-scale': initial, '--final-scale': final, ...positionPair(8, 0) }
+      case 'pan-right':
+        return { '--initial-scale': initial, '--final-scale': final, ...positionPair(-8, 0) }
+      case 'pan-up':
+        return { '--initial-scale': initial, '--final-scale': final, ...positionPair(0, 6) }
+      case 'pan-down':
+        return { '--initial-scale': initial, '--final-scale': final, ...positionPair(0, -6) }
+      case 'zoom-in':
+      default:
+        return {
+          '--initial-scale': initial,
+          '--final-scale': final,
+          '--initial-position': `${x}% ${y}%`,
+          '--final-position': `${x}% ${y}%`,
+        }
     }
   }
+
   const scale = slide.imageScale !== undefined ? slide.imageScale : DEFAULT_IMAGE_SCALE
   const pct = scale * 100
-  return {
-    '--initial-scale': `${pct}%`,
-    '--final-scale': `${pct + (backgroundScaleAmount || 20)}%`,
+  const initialUniform = `${pct}%`
+  const finalUniform = `${pct + grow}%`
+
+  switch (direction) {
+    case 'zoom-out':
+      return {
+        '--initial-scale': finalUniform,
+        '--final-scale': initialUniform,
+        '--initial-position': `${x}% ${y}%`,
+        '--final-position': `${x}% ${y}%`,
+      }
+    case 'pan-left':
+      return { '--initial-scale': initialUniform, '--final-scale': finalUniform, ...positionPair(8, 0) }
+    case 'pan-right':
+      return { '--initial-scale': initialUniform, '--final-scale': finalUniform, ...positionPair(-8, 0) }
+    case 'pan-up':
+      return { '--initial-scale': initialUniform, '--final-scale': finalUniform, ...positionPair(0, 6) }
+    case 'pan-down':
+      return { '--initial-scale': initialUniform, '--final-scale': finalUniform, ...positionPair(0, -6) }
+    default:
+      return {
+        '--initial-scale': initialUniform,
+        '--final-scale': finalUniform,
+        '--initial-position': `${x}% ${y}%`,
+        '--final-position': `${x}% ${y}%`,
+      }
   }
 }
 

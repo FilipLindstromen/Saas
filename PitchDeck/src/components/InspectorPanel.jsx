@@ -138,13 +138,14 @@ function InspectorPanel({
           />
         )}
 
-        {(tab === 'slide-bg' || tab === 'slide-lines' || tab === 'gradient' || tab === 'media') && (
+        {(tab === 'slide-bg' || tab === 'slide-lines' || tab === 'slide-motion' || tab === 'gradient' || tab === 'media') && (
           <SlideSettings
             {...slideSettingsProps}
             section={
               tab === 'slide-bg' ? 'bg'
                 : tab === 'slide-lines' ? 'lines'
-                  : tab
+                  : tab === 'slide-motion' ? 'motion'
+                    : tab
             }
           />
         )}

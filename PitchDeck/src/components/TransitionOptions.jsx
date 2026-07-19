@@ -10,6 +10,12 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
     textAnimation: settings?.textAnimation || 'none',
     textAnimationUnit: settings?.textAnimationUnit || 'word',
     textAnimationSpeed: settings?.textAnimationSpeed ?? 1,
+    textAnimationStagger: settings?.textAnimationStagger ?? 0.07,
+    textExitAnimation: settings?.textExitAnimation || 'match-in',
+    subtitleDelay: settings?.subtitleDelay ?? 0,
+    backgroundKenBurnsDirection: settings?.backgroundKenBurnsDirection || 'zoom-in',
+    backgroundBlurOnTextEnter: settings?.backgroundBlurOnTextEnter === true,
+    graphicAnimationIn: settings?.graphicAnimationIn || 'fade-scale',
     backgroundScaleAnimation: settings?.backgroundScaleAnimation || false,
     backgroundScaleTime: settings?.backgroundScaleTime || 10,
     backgroundScaleAmount: settings?.backgroundScaleAmount ?? 20,
@@ -164,6 +170,52 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
               )}
             </div>
             {localSettings.textAnimation !== 'none' && (
+              <>
+              <div className="transition-options-field">
+                <label htmlFor="text-animation-stagger-slider">
+                  Word stagger: {localSettings.textAnimationStagger.toFixed(2)}s
+                </label>
+                <input
+                  id="text-animation-stagger-slider"
+                  type="range"
+                  min="0.03"
+                  max="0.2"
+                  step="0.01"
+                  value={localSettings.textAnimationStagger}
+                  onChange={(e) => handleChange('textAnimationStagger', parseFloat(e.target.value))}
+                  className="transition-options-slider"
+                />
+              </div>
+              <div className="transition-options-field">
+                <label htmlFor="text-exit-animation-select">Text exit animation</label>
+                <select
+                  id="text-exit-animation-select"
+                  value={localSettings.textExitAnimation}
+                  onChange={(e) => handleChange('textExitAnimation', e.target.value)}
+                  className="transition-options-select"
+                >
+                  <option value="match-in">Match entrance (recommended)</option>
+                  <option value="fade-out">Fade out</option>
+                  <option value="fade-out-up">Fade out + slide up</option>
+                  <option value="fade-out-down">Fade out + slide down</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              <div className="transition-options-field">
+                <label htmlFor="subtitle-delay-slider">
+                  Subtitle delay: {localSettings.subtitleDelay.toFixed(2)}s
+                </label>
+                <input
+                  id="subtitle-delay-slider"
+                  type="range"
+                  min="0"
+                  max="1.5"
+                  step="0.05"
+                  value={localSettings.subtitleDelay}
+                  onChange={(e) => handleChange('subtitleDelay', parseFloat(e.target.value))}
+                  className="transition-options-slider"
+                />
+              </div>
               <div className="transition-options-field">
                 <label htmlFor="text-animation-speed-slider">
                   Animation speed: {localSettings.textAnimationSpeed === 1 ? 'Normal' : localSettings.textAnimationSpeed < 1 ? 'Slower' : 'Faster'}
@@ -179,6 +231,7 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
                   className="transition-options-slider"
                 />
               </div>
+              </>
             )}
           </div>
           )}
@@ -198,6 +251,22 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
             </div>
             {localSettings.backgroundScaleAnimation && (
               <>
+                <div className="transition-options-field">
+                  <label htmlFor="background-ken-burns-direction">Ken Burns direction</label>
+                  <select
+                    id="background-ken-burns-direction"
+                    value={localSettings.backgroundKenBurnsDirection}
+                    onChange={(e) => handleChange('backgroundKenBurnsDirection', e.target.value)}
+                    className="transition-options-select"
+                  >
+                    <option value="zoom-in">Zoom in</option>
+                    <option value="zoom-out">Zoom out</option>
+                    <option value="pan-left">Pan left</option>
+                    <option value="pan-right">Pan right</option>
+                    <option value="pan-up">Pan up</option>
+                    <option value="pan-down">Pan down</option>
+                  </select>
+                </div>
                 <div className="transition-options-field">
                   <label htmlFor="background-scale-time-slider">
                     Scale Animation Duration: {localSettings.backgroundScaleTime}s
@@ -230,6 +299,29 @@ function TransitionOptions({ settings, onUpdateSettings, onClose, buttonRef, emb
                 </div>
               </>
             )}
+            <div className="transition-options-field">
+              <label className="transition-options-checkbox">
+                <input
+                  type="checkbox"
+                  checked={localSettings.backgroundBlurOnTextEnter}
+                  onChange={(e) => handleChange('backgroundBlurOnTextEnter', e.target.checked)}
+                />
+                <span>Blur background while text enters</span>
+              </label>
+            </div>
+            <div className="transition-options-field">
+              <label htmlFor="graphic-animation-in">Graphic overlay entrance</label>
+              <select
+                id="graphic-animation-in"
+                value={localSettings.graphicAnimationIn}
+                onChange={(e) => handleChange('graphicAnimationIn', e.target.value)}
+                className="transition-options-select"
+              >
+                <option value="fade-scale">Fade + scale</option>
+                <option value="fade">Fade</option>
+                <option value="slide-y">Slide up</option>
+              </select>
+            </div>
           </div>
           )}
     </div>

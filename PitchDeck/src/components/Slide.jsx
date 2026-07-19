@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import './Slide.css'
 import TextFormatToolbar from './TextFormatToolbar'
@@ -13,6 +13,7 @@ import {
   isImageScaleCustomized,
 } from '../utils/backgroundFit'
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
+import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { getSlideFormatMeta } from '../utils/slideFormats'
 
@@ -111,7 +112,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', previewTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -140,6 +141,33 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const imageScale = slide.imageScale !== undefined ? slide.imageScale : 1.0
   const imagePositionX = slide.imagePositionX !== undefined ? slide.imagePositionX : 50
   const imagePositionY = slide.imagePositionY !== undefined ? slide.imagePositionY : 50
+
+  const motion = useMemo(() => resolveMotionSettings({
+    textAnimation,
+    textAnimationUnit,
+    textAnimationSpeed,
+    textAnimationStagger,
+    textExitAnimation,
+    subtitleDelay,
+    backgroundKenBurnsDirection,
+    backgroundBlurOnTextEnter,
+    backgroundScaleAnimation,
+    graphicAnimationIn,
+  }, slide), [
+    slide,
+    textAnimation,
+    textAnimationUnit,
+    textAnimationSpeed,
+    textAnimationStagger,
+    textExitAnimation,
+    subtitleDelay,
+    backgroundKenBurnsDirection,
+    backgroundBlurOnTextEnter,
+    backgroundScaleAnimation,
+    graphicAnimationIn,
+  ])
+
+  const shouldAnimateText = (isPlayMode || previewTextAnimation) && motion.textAnimation && motion.textAnimation !== 'none'
 
   // Fetch cross-origin video to blob URL so <video> loads same-origin (avoids COEP block)
   useEffect(() => {
@@ -432,7 +460,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     return getWordsWithFormatting(html)
   }
   // Ensure we always use word/sentence unit (default to word if undefined)
-  const effectiveTextAnimationUnit = textAnimationUnit === 'sentence' ? 'sentence' : 'word'
+  const effectiveTextAnimationUnit = motion.textAnimationUnit === 'sentence' ? 'sentence' : 'word'
 
   // Render chunked content with h1/h2/h3 wrappers so present-mode text animation preserves heading styling
   const renderChunksWithHeadings = (chunks, chunkDelay, offset = 0) => {
@@ -1170,7 +1198,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const renderContent = () => {
     const textHeadingLevel = slide.textHeadingLevel || null
     const subtitleHeadingLevel = slide.subtitleHeadingLevel || null
-    const isEditable = !isPlayMode && onUpdate
+    const isEditable = !isPlayMode && onUpdate && !previewTextAnimation
     
     // Get heading size and font based on heading level
     const getHeadingSize = (level) => {
@@ -1224,19 +1252,22 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       fontSize: subtitleHeadingLevel ? `${getHeadingSize(subtitleHeadingLevel)}rem` : undefined,
       fontFamily: subtitleHeadingLevel ? `"${getHeadingFont(subtitleHeadingLevel)}", sans-serif` : undefined,
       lineHeight: subtitleHeadingLevel ? getHeadingLineHeight(subtitleHeadingLevel) : textStyle.lineHeight,
-      pointerEvents: isEditable ? 'auto' : undefined
+      pointerEvents: isEditable ? 'auto' : undefined,
+      ...(shouldAnimateText && motion.subtitleDelay > 0 ? { animationDelay: `${motion.subtitleDelay}s` } : {}),
     }
 
-    const useChunkedText = isPlayMode && textAnimation && textAnimation !== 'none'
-    const chunkDelay = effectiveTextAnimationUnit === 'word' ? 0.07 : 0.2
+    const useChunkedText = shouldAnimateText
+    const chunkDelay = effectiveTextAnimationUnit === 'word'
+      ? motion.textAnimationStagger
+      : Math.max(motion.textAnimationStagger * 2.5, 0.12)
 
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
       const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, effectiveTextAnimationUnit).length); return acc }, [0]) : []
       const getBulletStyle = (index) => {
         const base = { pointerEvents: undefined, lineHeight: bulletLineHeight }
-        if (!isPlayMode || !textAnimation || textAnimation === 'none') return base
-        if (textAnimation === 'typewriter') {
+        if (!shouldAnimateText) return base
+        if (motion.textAnimation === 'typewriter') {
           return { ...base, animationDelay: `${0.3 + index * 1.4}s` }
         }
         return { ...base, animationDelay: `${index * 0.2}s` }
@@ -1385,9 +1416,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
     }
 
-    // For play mode only: render as div with formatted content (or chunk spans when text animation is on)
-    // In preview/edit mode we use contentEditable below so text can be edited
-    if (isPlayMode) {
+    // Animated present/preview: render chunked text or line reveals
+    if (isPlayMode || previewTextAnimation) {
       if (useChunkedText) {
         const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
         const textContent = (
@@ -1588,12 +1618,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [isDragging, handleImageMouseMove, handleImageMouseUp])
 
-  // Only apply text animation in play mode; in preview/edit mode keep text static so it stays editable
-  const textAnimationClass = isPlayMode && textAnimation && textAnimation !== 'none' ? `text-animation-${textAnimation}` : ''
+  const textAnimationClass = shouldAnimateText ? `text-animation-${motion.textAnimation}` : ''
+  const bgBlurClass = (isPlayMode || previewTextAnimation) && motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''
 
   const { aspectRatio: aspectRatioValue, className: formatClass } = getSlideFormatMeta(slideFormat)
-  const hasDraggableBackground = !isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
-  const textAnimSpeed = textAnimationSpeed ?? 1
+  const hasDraggableBackground = !isPlayMode && onUpdate && !previewTextAnimation && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
+  const textAnimSpeed = motion.textAnimationSpeed ?? 1
   const isTopAligned = contentVerticalAlign === 'top'
   const slideStyle = {
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
@@ -1611,7 +1641,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''}`}
+      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onMouseDown={(!isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)) ? handleImageMouseDown : undefined}
@@ -1746,7 +1776,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       {/* 1. Background image (z-index 0) - behind video; skip when infographic is used */}
       {!hideBackground && !slide.infographicProjectId && slide.imageUrl && !slide.backgroundVideoUrl && layout !== 'section' && (
         <div
-          className={`slide-background ${(!isPlayMode && onUpdate) ? 'editable' : ''} ${isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
+          className={`slide-background ${(!isPlayMode && onUpdate && !previewTextAnimation) ? 'editable' : ''} ${(isPlayMode || previewTextAnimation) && motion.backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? 'background-scale-animation' : ''}`}
           style={{ 
             backgroundImage: `url(${slide.imageUrl})`,
             backgroundSize: getImageBackgroundSize(slide),
@@ -1754,11 +1784,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             backgroundRepeat: 'no-repeat',
             opacity: backgroundOpacity,
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
-            cursor: (!isPlayMode && onUpdate) ? 'move' : 'default',
-            pointerEvents: (!isPlayMode && onUpdate) ? 'auto' : 'none',
-            ...(isPlayMode && backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
+            cursor: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'move' : 'default',
+            pointerEvents: (!isPlayMode && onUpdate && !previewTextAnimation) ? 'auto' : 'none',
+            ...((isPlayMode || previewTextAnimation) && motion.backgroundScaleAnimation && !slide.overrideBackgroundScaleAnimation ? {
               '--scale-duration': `${backgroundScaleTime}s`,
-              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount),
+              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount, motion.backgroundKenBurnsDirection),
             } : {})
           }}
         />
@@ -1912,7 +1942,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                 }
               } : undefined}
               containerRef={slideRef}
-              isEditing={!!onSelectGraphic && !!onUpdate}
+              isEditing={!!onSelectGraphic && !!onUpdate && !previewTextAnimation}
+              isPlayMode={isPlayMode || previewTextAnimation}
+              animationIn={g.animationIn || motion.graphicAnimationIn || 'fade-scale'}
+              animationDelay={g.animationDelay ?? motion.subtitleDelay ?? 0.25}
             />
           ))}
         </div>

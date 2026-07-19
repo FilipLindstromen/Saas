@@ -193,8 +193,19 @@
 }
 
 .slide-background.background-scale-animation {
-  animation: backgroundScale var(--scale-duration, 10s) linear forwards;
+  animation: backgroundKenBurns var(--scale-duration, 10s) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   animation-fill-mode: forwards;
+}
+
+@keyframes backgroundKenBurns {
+  from {
+    background-size: var(--initial-scale, 100%);
+    background-position: var(--initial-position, 50% 50%);
+  }
+  to {
+    background-size: var(--final-scale, 120%);
+    background-position: var(--final-position, 50% 50%);
+  }
 }
 
 @keyframes backgroundScale {
@@ -1306,4 +1317,90 @@
     opacity: 1;
     filter: blur(0);
   }
+}
+
+/* Words fade down (exit counterpart) */
+.slide.text-animation-words-fade-down .slide-text-words .text-animation-word,
+.slide.text-animation-words-fade-down .slide-text-centered-wrapper .slide-text-words .text-animation-word,
+.slide.text-animation-words-fade-down .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  animation: text-word-fade-down var(--text-animation-duration, 0.6s) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes text-word-fade-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/* Serif emphasis pop on staggered word entrances */
+.slide.text-animation-words-fade-up .text-animation-word.font-pairing-serif {
+  animation:
+    text-word-fade-up var(--text-animation-duration, 0.6s) cubic-bezier(0.4, 0, 0.2, 1) both,
+    text-emphasis-pop 0.4s ease-out calc(var(--text-animation-duration, 0.6s) + 0.15s) both;
+}
+
+@keyframes text-emphasis-pop {
+  0%, 60% { transform: scale(1); }
+  80% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* Background blur reveal while text enters */
+.slide.bg-blur-on-text-enter.play-mode .slide-background,
+.slide.bg-blur-on-text-enter.preview-text-animation .slide-background {
+  filter: blur(10px);
+  animation: bgBlurReveal calc(var(--text-animation-duration, 0.6s) * 2.5) ease-out forwards;
+}
+
+@keyframes bgBlurReveal {
+  to { filter: blur(0); }
+}
+
+.slide.play-mode .slide-graphic-overlay.graphic-anim-fade .slide-graphic-overlay-inner,
+.slide.preview-text-animation .slide-graphic-overlay.graphic-anim-fade .slide-graphic-overlay-inner {
+  opacity: 0;
+  animation: graphicFadeIn 0.55s ease-out var(--graphic-anim-delay, 0.25s) both;
+}
+
+.slide.play-mode .slide-graphic-overlay.graphic-anim-fade-scale .slide-graphic-overlay-inner,
+.slide.preview-text-animation .slide-graphic-overlay.graphic-anim-fade-scale .slide-graphic-overlay-inner {
+  opacity: 0;
+  transform: scale(0.75);
+  animation: graphicFadeScaleIn 0.65s cubic-bezier(0.34, 1.2, 0.64, 1) var(--graphic-anim-delay, 0.25s) both;
+}
+
+.slide.play-mode .slide-graphic-overlay.graphic-anim-slide-y .slide-graphic-overlay-inner,
+.slide.preview-text-animation .slide-graphic-overlay.graphic-anim-slide-y .slide-graphic-overlay-inner {
+  opacity: 0;
+  transform: translateY(24px);
+  animation: graphicSlideYIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) var(--graphic-anim-delay, 0.25s) both;
+}
+
+@keyframes graphicFadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes graphicFadeScaleIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes graphicSlideYIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide.preview-text-animation .slide-content,
+.slide.preview-text-animation .slide-text-centered-wrapper {
+  pointer-events: none;
 }

@@ -1,4 +1,5 @@
 import './SlideSettings.css'
+import { MOTION_PRESET_OPTIONS, applyMotionPresetToSlide } from '../utils/motionPresets'
 
 function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', section }) {
   const show = (name) => !section || section === name
@@ -103,6 +104,65 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
           </label>
         </div>
         <p className="slide-settings-hint">When enabled, each click in present mode reveals one more text line (or bullet).</p>
+      </div>
+      )}
+
+      {show('motion') && (
+      <div className="slide-settings-section">
+        <div className="slide-settings-field">
+          <label htmlFor="slide-motion-preset">Motion preset</label>
+          <select
+            id="slide-motion-preset"
+            className="slide-settings-select"
+            value={slide.motionPreset || 'default'}
+            onChange={(e) => onUpdate(applyMotionPresetToSlide(slide, e.target.value))}
+          >
+            {MOTION_PRESET_OPTIONS.map((preset) => (
+              <option key={preset.id} value={preset.id}>{preset.label}</option>
+            ))}
+          </select>
+          <p className="slide-settings-hint">
+            {MOTION_PRESET_OPTIONS.find((item) => item.id === (slide.motionPreset || 'default'))?.description}
+          </p>
+        </div>
+        {(slide.motionPreset && slide.motionPreset !== 'default') && (
+          <div className="slide-settings-field">
+            <button
+              type="button"
+              className="slide-settings-btn"
+              onClick={() => onUpdate({ motionPreset: 'default', revealOneLineAtATime: false })}
+            >
+              Reset to deck defaults
+            </button>
+          </div>
+        )}
+        <div className="slide-settings-field">
+          <label htmlFor="slide-ken-burns-direction">Ken Burns direction override</label>
+          <select
+            id="slide-ken-burns-direction"
+            className="slide-settings-select"
+            value={slide.backgroundKenBurnsDirection || ''}
+            onChange={(e) => onUpdate({ backgroundKenBurnsDirection: e.target.value || undefined })}
+          >
+            <option value="">Use preset / deck default</option>
+            <option value="zoom-in">Zoom in</option>
+            <option value="zoom-out">Zoom out</option>
+            <option value="pan-left">Pan left</option>
+            <option value="pan-right">Pan right</option>
+            <option value="pan-up">Pan up</option>
+            <option value="pan-down">Pan down</option>
+          </select>
+        </div>
+        <div className="slide-settings-field">
+          <label className="slide-settings-toggle">
+            <input
+              type="checkbox"
+              checked={slide.backgroundBlurOnTextEnter === true}
+              onChange={(e) => onUpdate({ backgroundBlurOnTextEnter: e.target.checked || undefined })}
+            />
+            <span>Blur background while text enters</span>
+          </label>
+        </div>
       </div>
       )}
 

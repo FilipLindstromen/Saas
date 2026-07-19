@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Slide from './Slide'
 import SlideBackground from './SlideBackground'
 import PersistentVideoLayer from './PersistentVideoLayer'
@@ -6,10 +6,16 @@ import { getWebcamCameraId, isWebcamActiveForSlide, isAnyWebcamActive } from '..
 import { getWebcamCirclePixelSize, normalizeWebcamSizePercent } from '../utils/webcamSize'
 import { getExportCanvasSize } from '../utils/slideFormats'
 import { getBackgroundScaleProgress } from '../utils/backgroundFit'
+import { resolveMotionSettings, getTextExitClass } from '../utils/motionPresets'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
 const WEBCAM_TRANSITION_MS = 500
+const VALID_TRANSITION_STYLES = new Set(['default', 'slide', 'zoom', 'dissolve', 'crossfade', 'blur', 'sequence'])
+
+function normalizeTransitionStyle(style) {
+  return VALID_TRANSITION_STYLES.has(style) ? style : 'default'
+}
 
 // Slide has image, video, or infographic background (not section layout)
 function slideHasBackgroundMedia(slide) {
@@ -589,7 +595,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, autoAdvance = false, autoAdvanceDurationSeconds = 5, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -684,7 +690,45 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const videoLayoutForLayer = (videoSlideForLayer?.layout || 'video') === 'title' ? 'centered' : (videoSlideForLayer?.layout || 'video')
   const bulletPoints = getBulletPoints(currentSlide)
   const isBulletSlide = (currentSlide?.layout || 'default') === 'bulletpoints'
-  const revealOneLineAtATime = !!currentSlide?.revealOneLineAtATime
+
+  const globalMotionSettings = useMemo(() => ({
+    textAnimation,
+    textAnimationUnit,
+    textAnimationSpeed,
+    textAnimationStagger,
+    textExitAnimation,
+    subtitleDelay,
+    backgroundKenBurnsDirection,
+    backgroundBlurOnTextEnter,
+    backgroundScaleAnimation,
+    graphicAnimationIn,
+  }), [
+    textAnimation,
+    textAnimationUnit,
+    textAnimationSpeed,
+    textAnimationStagger,
+    textExitAnimation,
+    subtitleDelay,
+    backgroundKenBurnsDirection,
+    backgroundBlurOnTextEnter,
+    backgroundScaleAnimation,
+    graphicAnimationIn,
+  ])
+
+  const motion = useMemo(
+    () => resolveMotionSettings(globalMotionSettings, currentSlide),
+    [globalMotionSettings, currentSlide]
+  )
+  const incomingMotion = useMemo(
+    () => (targetSlide ? resolveMotionSettings(globalMotionSettings, targetSlide) : motion),
+    [globalMotionSettings, targetSlide, motion]
+  )
+  const outgoingMotion = useMemo(
+    () => resolveMotionSettings(globalMotionSettings, currentSlide),
+    [globalMotionSettings, currentSlide]
+  )
+  const textExitClass = getTextExitClass(motion.textExitAnimation, motion.textAnimation)
+  const revealOneLineAtATime = !!motion.revealOneLineAtATime
 
   // Content line count for non-bullet slides (must match Slide getContentLines: <div>, <p>, <br> → newline)
   const getContentLineCount = (slide) => {
@@ -795,7 +839,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const transitionDuration = getTransitionDuration(transitionStyle)
 
       if (sameBgExact) {
-        // Same bg image/video, same position & scale: no transition
+        setPendingIndex(null)
+        setTransitionPhase('idle')
         setCurrentIndex(nextIndex)
         setSlideKey(k => k + 1)
         return
@@ -902,6 +947,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const transitionDuration = getTransitionDuration(transitionStyle)
 
       if (sameBgExact) {
+        setPendingIndex(null)
+        setTransitionPhase('idle')
         setCurrentIndex(prevIndex)
         setSlideKey(k => k + 1)
         return
@@ -1368,12 +1415,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     h1LineHeight,
     h2LineHeight,
     h3LineHeight,
-    backgroundScaleAnimation,
+    backgroundScaleAnimation: motion.backgroundScaleAnimation,
     backgroundScaleTime,
     backgroundScaleAmount,
-    textAnimation,
-    textAnimationUnit,
-    textAnimationSpeed: textAnimationSpeed ?? 1,
+    backgroundKenBurnsDirection: motion.backgroundKenBurnsDirection,
+    backgroundBlurOnTextEnter: motion.backgroundBlurOnTextEnter,
+    textAnimation: motion.textAnimation,
+    textAnimationUnit: motion.textAnimationUnit,
+    textAnimationSpeed: motion.textAnimationSpeed ?? 1,
+    textAnimationStagger: motion.textAnimationStagger,
+    textExitAnimation: motion.textExitAnimation,
+    subtitleDelay: motion.subtitleDelay,
+    graphicAnimationIn: motion.graphicAnimationIn,
     textStyleMode: textStyleMode || 'standard',
     fontPairingSerifFont: fontPairingSerifFont || 'Playfair Display',
     slideFormat
@@ -1392,6 +1445,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
   const backgroundSlideForLayer = backgroundTransitionActive && targetSlide ? targetSlide : backgroundSlideForPosScale
   const transitionDurationMs = getTransitionDuration(transitionStyle)
+  const activeTransitionStyle = normalizeTransitionStyle(transitionStyle)
 
   return (
     <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a', '--transition-duration': `${transitionDurationMs}ms` }}>
@@ -1424,24 +1478,46 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         )}
         {backgroundTransitionActive && targetSlide && (
           <div
-            className="play-crossfade-layer play-crossfade-out play-bg-crossfade-out"
-            style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
-            aria-hidden="true"
+            className={`play-bg-dual-layer transition-${activeTransitionStyle}`}
+            style={{ position: 'absolute', inset: 0, zIndex: 1, '--transition-duration': `${transitionDurationMs}ms` }}
           >
-            <SlideBackground
-              slide={currentSlide}
-              backgroundScaleAnimation={backgroundScaleAnimation}
-              backgroundScaleTime={backgroundScaleTime}
-              backgroundScaleAmount={backgroundScaleAmount}
-              frozenScaleProgress={frozenBgScale.outgoing}
-              isPreload={false}
-              isPlayMode={true}
-            />
+            <div
+              className="play-crossfade-layer play-crossfade-out"
+              style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
+              aria-hidden="true"
+            >
+              <SlideBackground
+                slide={currentSlide}
+                backgroundScaleAnimation={outgoingMotion.backgroundScaleAnimation}
+                backgroundScaleTime={backgroundScaleTime}
+                backgroundScaleAmount={backgroundScaleAmount}
+                backgroundKenBurnsDirection={outgoingMotion.backgroundKenBurnsDirection}
+                frozenScaleProgress={frozenBgScale.outgoing}
+                isPreload={false}
+                isPlayMode={true}
+              />
+            </div>
+            <div
+              className="play-crossfade-layer play-crossfade-in"
+              style={{ '--bg-opacity': targetSlide?.backgroundOpacity !== undefined ? targetSlide.backgroundOpacity : 0.6 }}
+              aria-hidden="true"
+            >
+              <SlideBackground
+                slide={targetSlide}
+                backgroundScaleAnimation={incomingMotion.backgroundScaleAnimation}
+                backgroundScaleTime={backgroundScaleTime}
+                backgroundScaleAmount={backgroundScaleAmount}
+                backgroundKenBurnsDirection={incomingMotion.backgroundKenBurnsDirection}
+                frozenScaleProgress={frozenBgScale.incoming}
+                isPreload={false}
+                isPlayMode={true}
+              />
+            </div>
           </div>
         )}
-        {usePersistentBackground && (
+        {usePersistentBackground && !backgroundTransitionActive && (
           <div
-            className={`play-background-layer ${backgroundTransitionActive ? 'play-crossfade-layer play-crossfade-in play-bg-crossfade-in' : ''} ${!backgroundTransitionActive && sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!backgroundTransitionActive && !sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${transitionStyle} fade-out` : ''} ${!backgroundTransitionActive && !sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${transitionStyle} fade-in` : ''}`}
+            className={`play-background-layer ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${activeTransitionStyle} fade-out` : ''} ${!sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${activeTransitionStyle} fade-in` : ''}`}
             style={{
               '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
               '--pos-scale-duration': `${transitionDurationMs}ms`,
@@ -1450,10 +1526,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           >
             <SlideBackground
               slide={backgroundSlideForLayer}
-              backgroundScaleAnimation={backgroundScaleAnimation}
+              backgroundScaleAnimation={motion.backgroundScaleAnimation}
               backgroundScaleTime={backgroundScaleTime}
               backgroundScaleAmount={backgroundScaleAmount}
-              frozenScaleProgress={backgroundTransitionActive ? frozenBgScale.incoming : null}
+              backgroundKenBurnsDirection={motion.backgroundKenBurnsDirection}
+              frozenScaleProgress={null}
               isPreload={false}
               isPlayMode={true}
             />
@@ -1488,7 +1565,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       {/* Content layer: transition on background (not webcam); text-out before new text in */}
       <div 
         key={slideKey}
-        className={`play-slide-container play-slide-content-transition transition-${transitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''} ${transitionPhase === 'fade-out' ? 'fade-out text-out' : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''} ${backgroundTransitionActive ? 'text-out' : ''}`}
+        className={`play-slide-container play-slide-content-transition transition-${activeTransitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${currentIndex === 0 && !firstSlideTextVisible ? 'first-slide-text-delayed' : ''} ${transitionPhase === 'fade-out' ? `fade-out text-out ${textExitClass}` : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''} ${backgroundTransitionActive ? `text-out ${textExitClass}` : ''} ${motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''}`}
         style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
       >
         <Slide 

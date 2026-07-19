@@ -24,6 +24,7 @@ export const INSPECTOR_TABS = [
   { id: 'typography', label: 'Typography', group: 'document' },
   { id: 'slide-bg', label: 'Background', group: 'slide' },
   { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
+  { id: 'slide-motion', label: 'Motion preset', group: 'slide' },
   { id: 'gradient', label: 'Gradient', group: 'slide' },
   { id: 'media', label: 'Media', group: 'slide' },
   { id: 'playback', label: 'Auto-advance', group: 'present' },
@@ -91,6 +92,12 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M4 7h16" />
           <path d="M4 12h12" />
           <path d="M4 17h8" />
+        </svg>
+      )
+    case 'slide-motion':
+      return (
+        <svg {...iconProps}>
+          <path d="M5 12h3l2 7 4-14 2 7h3" />
         </svg>
       )
     case 'slide':

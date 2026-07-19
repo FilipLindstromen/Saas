@@ -31,7 +31,10 @@ export default function GraphicOverlay({
   onSelect,
   onUpdate,
   containerRef,
-  isEditing
+  isEditing,
+  isPlayMode = false,
+  animationIn = 'fade-scale',
+  animationDelay = 0.25,
 }) {
   const dragRef = useRef(null)
   const pendingDragRef = useRef(null)
@@ -206,7 +209,7 @@ export default function GraphicOverlay({
 
   return (
     <div
-      className={`slide-graphic-overlay ${isSelected ? 'selected' : ''}`}
+      className={`slide-graphic-overlay ${isSelected ? 'selected' : ''}${isPlayMode ? ` graphic-anim-${animationIn || 'fade-scale'}` : ''}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
@@ -215,7 +218,8 @@ export default function GraphicOverlay({
         transform: `translate(-50%, -50%) rotate(${rotation}deg)${flipHorizontal ? ' scaleX(-1)' : ''}`,
         transformOrigin: 'center center',
         cursor: isEditing ? (isSelected ? 'grab' : 'pointer') : 'default',
-        zIndex: isSelected ? 2 : 1
+        zIndex: isSelected ? 2 : 1,
+        ...(isPlayMode ? { '--graphic-anim-delay': `${animationDelay}s` } : {}),
       }}
       onClick={onSelectClick}
       onPointerDown={onMoveDown}

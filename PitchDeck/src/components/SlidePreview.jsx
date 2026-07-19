@@ -40,7 +40,8 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     } catch (e) {}
     return 1
   })
-  const fileInputRef = useRef(null)
+  const [previewAnimKey, setPreviewAnimKey] = useState(0)
+  const previewAnimationActive = !!(settings?.textAnimation && settings.textAnimation !== 'none')
 
   useEffect(() => {
     try {
@@ -250,6 +251,16 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             />
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
+          {previewAnimationActive && (
+            <button
+              type="button"
+              className="preview-toolbar-group-btn"
+              onClick={() => setPreviewAnimKey((value) => value + 1)}
+              title="Replay text and overlay animations"
+            >
+              Replay animation
+            </button>
+          )}
           {(slide.layout || 'default') !== 'section' && (
             <div className="preview-header-graphic-btns" ref={overlayMenuRef}>
               <button
@@ -330,6 +341,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
         >
           <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}`}>
           <Slide 
+            key={`${slide.id}-${previewAnimKey}`}
             slide={slide} 
             backgroundColor={backgroundColor} 
             textColor={textColor} 
@@ -391,7 +403,17 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             slideFormat={slideFormat}
             textAnimation={settings.textAnimation || 'none'}
             textAnimationUnit={settings.textAnimationUnit || 'word'}
-            previewTextAnimation={!!(settings.textAnimation && settings.textAnimation !== 'none')}
+            textAnimationSpeed={settings.textAnimationSpeed ?? 1}
+            textAnimationStagger={settings.textAnimationStagger ?? 0.07}
+            textExitAnimation={settings.textExitAnimation || 'match-in'}
+            subtitleDelay={settings.subtitleDelay ?? 0}
+            backgroundKenBurnsDirection={settings.backgroundKenBurnsDirection || 'zoom-in'}
+            backgroundBlurOnTextEnter={settings.backgroundBlurOnTextEnter === true}
+            graphicAnimationIn={settings.graphicAnimationIn || 'fade-scale'}
+            backgroundScaleAnimation={settings.backgroundScaleAnimation === true}
+            backgroundScaleTime={settings.backgroundScaleTime || 10}
+            backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}
+            previewTextAnimation={previewAnimationActive}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}
           />

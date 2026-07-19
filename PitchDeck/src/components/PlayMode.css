@@ -126,12 +126,12 @@
   pointer-events: auto;
 }
 
-/* Content fades in when slide changes — text only, never the background layer */
-.play-slide-content-transition .slide .slide-content,
-.play-slide-content-transition .slide .slide-content-video,
-.play-slide-content-transition .slide .slide-text-centered-wrapper,
-.play-slide-content-transition .slide .slide-section-name,
-.play-slide-content-transition .slide .slide-bullets {
+/* Content fades in when slide changes — skip while text is exiting */
+.play-slide-content-transition:not(.text-out) .slide .slide-content,
+.play-slide-content-transition:not(.text-out) .slide .slide-content-video,
+.play-slide-content-transition:not(.text-out) .slide .slide-text-centered-wrapper,
+.play-slide-content-transition:not(.text-out) .slide .slide-section-name,
+.play-slide-content-transition:not(.text-out) .slide .slide-bullets {
   animation: playContentFadeIn var(--transition-duration, 300ms) ease-out;
 }
 
@@ -204,10 +204,13 @@
   pointer-events: none;
 }
 
-/* Text out: play before new text appears */
-.play-slide-container.text-out .slide .slide-content,
-.play-slide-container.text-out .slide .slide-content-video {
-  animation: textFadeOut var(--transition-duration, 300ms) ease-out forwards;
+/* Text out: paired exit animations (avoid generic fade fighting specialized exits) */
+.play-slide-container.text-out.text-exit-none .slide .slide-content,
+.play-slide-container.text-out.text-exit-none .slide .slide-content-video,
+.play-slide-container.text-out.text-exit-none .slide .slide-text-centered-wrapper,
+.play-slide-container.text-out.text-exit-none .slide .slide-bullets,
+.play-slide-container.text-out.text-exit-none .slide-graphic-overlays {
+  animation: none !important;
 }
 
 @keyframes textFadeOut {
@@ -357,34 +360,37 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   animation-duration: var(--transition-duration, 500ms);
   animation-timing-function: ease-in-out;
   animation-fill-mode: forwards;
-  will-change: opacity;
+  will-change: opacity, transform, filter;
 }
 
-/* Background crossfade between different slides: opacity only (no zoom/slide/blur) */
-.play-bg-crossfade-out {
-  z-index: 2;
-  animation-name: crossfadeOut;
-  transform: none !important;
-  filter: none !important;
-}
-
-.play-bg-crossfade-in {
+/* Background crossfade between different slides — uses selected transition style via play-bg-dual-layer */
+.play-bg-dual-layer {
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  opacity: 0;
-  animation-name: crossfadeIn;
-  transform: none !important;
-  filter: none !important;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-.play-bg-crossfade-out .slide-background.background-scale-animation,
-.play-bg-crossfade-in .slide-background.background-scale-animation {
+.play-bg-dual-layer .play-crossfade-layer .slide-background.background-scale-animation,
+.play-bg-dual-layer .play-crossfade-layer .slide-background.background-scale-animation {
   animation: none !important;
 }
 
-/* Dual-layer transitions (legacy path): outgoing and incoming backgrounds animate at the same time */
+.play-crossfade-layer.play-crossfade-out {
+  z-index: 2;
+}
+
+.play-crossfade-layer.play-crossfade-in {
+  z-index: 1;
+  opacity: 0;
+}
+
+/* Dual-layer transition styles */
 .play-bg-dual-layer.transition-default .play-crossfade-out {
   animation-name: fadeOut;
 }
@@ -443,15 +449,6 @@
   opacity: 0;
   transform: scale(1.1) translateY(-20px);
   animation-name: sequenceIn;
-}
-
-.play-crossfade-layer.play-crossfade-out {
-  z-index: 1;
-}
-
-.play-crossfade-layer.play-crossfade-in {
-  z-index: 2;
-  opacity: 0;
 }
 
 /* Legacy: when crossfade used with slide container (different bg path) */
@@ -892,4 +889,94 @@
   color: var(--text-tertiary);
   font-size: 1.5rem;
   text-align: center;
+}
+
+/* Text exit animations (paired with entrance styles) */
+.play-slide-container.text-out.text-exit-fade-out .slide .slide-content,
+.play-slide-container.text-out.text-exit-fade-out .slide .slide-content-video,
+.play-slide-container.text-out.text-exit-fade-out .slide .slide-text-centered-wrapper,
+.play-slide-container.text-out.text-exit-fade-out .slide .slide-section-name,
+.play-slide-container.text-out.text-exit-fade-out .slide .slide-bullets {
+  animation: textExitFadeOut var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-fade-out-down .slide .slide-content,
+.play-slide-container.text-out.text-exit-fade-out-down .slide .slide-text-centered-wrapper,
+.play-slide-container.text-out.text-exit-fade-out-down .slide .slide-bullets {
+  animation: textExitFadeDown var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-fade-out-up .slide .slide-content,
+.play-slide-container.text-out.text-exit-fade-out-up .slide .slide-text-centered-wrapper,
+.play-slide-container.text-out.text-exit-fade-out-up .slide .slide-bullets {
+  animation: textExitFadeUp var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-slide-out-right .slide .slide-content,
+.play-slide-container.text-out.text-exit-slide-out-right .slide .slide-text-centered-wrapper {
+  animation: textExitSlideRight var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-slide-out-left .slide .slide-content,
+.play-slide-container.text-out.text-exit-slide-out-left .slide .slide-text-centered-wrapper {
+  animation: textExitSlideLeft var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-zoom-out .slide .slide-content,
+.play-slide-container.text-out.text-exit-zoom-out .slide .slide-text-centered-wrapper {
+  animation: textExitZoomOut var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-blur-out .slide .slide-content,
+.play-slide-container.text-out.text-exit-blur-out .slide .slide-text-centered-wrapper {
+  animation: textExitBlurOut var(--transition-duration, 300ms) ease-in forwards !important;
+}
+
+.play-slide-container.text-out.text-exit-words-fade-down .slide .text-animation-word {
+  animation: textExitWordFadeDown calc(var(--transition-duration, 300ms) * 0.8) ease-in forwards !important;
+}
+
+.play-slide-container.text-out:not(.text-exit-none) .slide-graphic-overlays {
+  animation: textExitFadeOut var(--transition-duration, 300ms) ease-in forwards;
+}
+
+.play-slide-container.bg-blur-on-text-enter .play-background-layer .slide-background {
+  filter: blur(8px);
+  animation: playBgBlurReveal calc(var(--transition-duration, 300ms) + 600ms) ease-out forwards;
+}
+
+@keyframes textExitFadeOut {
+  to { opacity: 0; }
+}
+
+@keyframes textExitFadeDown {
+  to { opacity: 0; transform: translateY(24px); }
+}
+
+@keyframes textExitFadeUp {
+  to { opacity: 0; transform: translateY(-24px); }
+}
+
+@keyframes textExitSlideRight {
+  to { opacity: 0; transform: translateX(40px); }
+}
+
+@keyframes textExitSlideLeft {
+  to { opacity: 0; transform: translateX(-40px); }
+}
+
+@keyframes textExitZoomOut {
+  to { opacity: 0; transform: scale(0.92); }
+}
+
+@keyframes textExitBlurOut {
+  to { opacity: 0; filter: blur(10px); }
+}
+
+@keyframes textExitWordFadeDown {
+  to { opacity: 0; transform: translateY(20px); }
+}
+
+@keyframes playBgBlurReveal {
+  to { filter: blur(0); }
 }

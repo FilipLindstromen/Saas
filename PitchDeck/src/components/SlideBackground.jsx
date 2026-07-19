@@ -16,7 +16,7 @@ import './Slide.css'
  * Used in PlayMode when consecutive slides share the same background - we keep this layer visible
  * and only fade the content to avoid redundant background fade in/out.
  */
-function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
+function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundScaleTime = 10, backgroundScaleAmount = 20, backgroundKenBurnsDirection = 'zoom-in', frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
@@ -141,7 +141,7 @@ function SlideBackground({ slide, backgroundScaleAnimation = false, backgroundSc
             transform: slide.flipHorizontal ? 'scaleX(-1)' : 'none',
             ...(kenBurnsActive && !freezeScale ? {
               '--scale-duration': `${backgroundScaleTime}s`,
-              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount),
+              ...getBackgroundScaleAnimationVars(slide, backgroundScaleAmount, backgroundKenBurnsDirection),
             } : {})
           }}
         />

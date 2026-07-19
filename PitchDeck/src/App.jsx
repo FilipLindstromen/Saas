@@ -238,6 +238,12 @@ function App() {
       textAnimation: localStorage.getItem('textAnimation') || 'none',
       textAnimationUnit: localStorage.getItem('textAnimationUnit') || 'word',
       textAnimationSpeed: parseFloat(localStorage.getItem('textAnimationSpeed')) || 1,
+      textAnimationStagger: parseFloat(localStorage.getItem('textAnimationStagger')) || 0.07,
+      textExitAnimation: localStorage.getItem('textExitAnimation') || 'match-in',
+      subtitleDelay: parseFloat(localStorage.getItem('subtitleDelay')) || 0,
+      backgroundKenBurnsDirection: localStorage.getItem('backgroundKenBurnsDirection') || 'zoom-in',
+      backgroundBlurOnTextEnter: localStorage.getItem('backgroundBlurOnTextEnter') === 'true',
+      graphicAnimationIn: localStorage.getItem('graphicAnimationIn') || 'fade-scale',
       backgroundScaleAnimation: localStorage.getItem('backgroundScaleAnimation') === 'true',
       backgroundScaleTime: parseFloat(localStorage.getItem('backgroundScaleTime')) || 10,
       backgroundScaleAmount: parseFloat(localStorage.getItem('backgroundScaleAmount')) || 20,
@@ -596,6 +602,12 @@ function App() {
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
     localStorage.setItem('textAnimationUnit', settings.textAnimationUnit || 'word')
     localStorage.setItem('textAnimationSpeed', (settings.textAnimationSpeed ?? 1).toString())
+    localStorage.setItem('textAnimationStagger', (settings.textAnimationStagger ?? 0.07).toString())
+    localStorage.setItem('textExitAnimation', settings.textExitAnimation || 'match-in')
+    localStorage.setItem('subtitleDelay', (settings.subtitleDelay ?? 0).toString())
+    localStorage.setItem('backgroundKenBurnsDirection', settings.backgroundKenBurnsDirection || 'zoom-in')
+    localStorage.setItem('backgroundBlurOnTextEnter', settings.backgroundBlurOnTextEnter ? 'true' : 'false')
+    localStorage.setItem('graphicAnimationIn', settings.graphicAnimationIn || 'fade-scale')
     localStorage.setItem('backgroundScaleAnimation', settings.backgroundScaleAnimation ? 'true' : 'false')
     localStorage.setItem('backgroundScaleTime', settings.backgroundScaleTime?.toString() || '10')
     localStorage.setItem('backgroundScaleAmount', settings.backgroundScaleAmount?.toString() || '20')
@@ -1908,6 +1920,12 @@ function App() {
           textAnimation={settings.textAnimation || 'none'}
           textAnimationUnit={settings.textAnimationUnit || 'word'}
           textAnimationSpeed={settings.textAnimationSpeed ?? 1}
+          textAnimationStagger={settings.textAnimationStagger ?? 0.07}
+          textExitAnimation={settings.textExitAnimation || 'match-in'}
+          subtitleDelay={settings.subtitleDelay ?? 0}
+          backgroundKenBurnsDirection={settings.backgroundKenBurnsDirection || 'zoom-in'}
+          backgroundBlurOnTextEnter={settings.backgroundBlurOnTextEnter === true}
+          graphicAnimationIn={settings.graphicAnimationIn || 'fade-scale'}
           backgroundScaleAnimation={settings.backgroundScaleAnimation || false}
           backgroundScaleTime={settings.backgroundScaleTime || 10}
           backgroundScaleAmount={settings.backgroundScaleAmount ?? 20}
