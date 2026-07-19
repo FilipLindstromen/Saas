@@ -42,6 +42,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   })
   const [previewAnimKey, setPreviewAnimKey] = useState(0)
   const previewAnimationActive = !!(settings?.textAnimation && settings.textAnimation !== 'none')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     try {
