@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import TemplateSelector from './TemplateSelector'
 import { parsePasteTextToSlideDrafts } from '../utils/parsePasteText'
+import { searchUnsplashImage } from '../api/unsplashSearch'
 import './PlanMode.css'
 
 // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
@@ -66,6 +67,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [showGenerate, setShowGenerate] = useState(false)
   const [slideCount, setSlideCount] = useState(() => localStorage.getItem('pitchDeckSlideCount') || '')
   const [pasteTextInput, setPasteTextInput] = useState('')
+  const [isPastingSlides, setIsPastingSlides] = useState(false)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
@@ -747,33 +749,63 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     }
   }
 
-  const handlePasteToSlides = () => {
+  const handlePasteToSlides = async () => {
     const text = pasteTextInput.trim()
     if (!text) return
     const drafts = parsePasteTextToSlideDrafts(text)
     if (drafts.length === 0) return
+
+    const slidesNeedImages = drafts.some((draft) => draft.imageQuery && draft.layout !== 'section')
+    if (slidesNeedImages && !settings?.unsplashKey?.trim()) {
+      alert('Some slides include [image instructions] but no Unsplash API key is set in Settings. Slides will be created without images.')
+    }
+
     const contextKey = isOverview ? (currentChapter?.id ?? currentChapterId) : null
     let nextId = maxSlideId() + 1
-    const newSlides = drafts.map((draft) => ({
-      id: nextId++,
-      content: plainTextToStorage(draft.content),
-      subtitle: '',
-      imageUrl: '',
-      layout: draft.layout,
-      gradientStrength: 0.7,
-      flipHorizontal: false,
-      backgroundOpacity: 0.6,
-      gradientFlipped: false,
-      imageScale: 1.0,
-      imagePositionX: 50,
-      imagePositionY: 50,
-      textHeadingLevel: null,
-      subtitleHeadingLevel: null,
-    }))
-    applyUpdate(contextKey, newSlides)
-    setPasteTextInput('')
-    setEditingId(newSlides[0]?.id ?? null)
-    setEditContent(drafts[0]?.content ?? '')
+    setIsPastingSlides(true)
+
+    try {
+      const newSlides = []
+
+      for (let i = 0; i < drafts.length; i++) {
+        const draft = drafts[i]
+        let imageUrl = ''
+
+        if (draft.imageQuery && draft.layout !== 'section' && settings?.unsplashKey?.trim()) {
+          const found = await searchUnsplashImage(draft.imageQuery, settings.unsplashKey)
+          if (found) {
+            imageUrl = found
+          }
+          if (i < drafts.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 300))
+          }
+        }
+
+        newSlides.push({
+          id: nextId++,
+          content: plainTextToStorage(draft.content),
+          subtitle: '',
+          imageUrl,
+          layout: draft.layout,
+          gradientStrength: 0.7,
+          flipHorizontal: false,
+          backgroundOpacity: 0.6,
+          gradientFlipped: false,
+          imageScale: 1.0,
+          imagePositionX: 50,
+          imagePositionY: 50,
+          textHeadingLevel: null,
+          subtitleHeadingLevel: null,
+        })
+      }
+
+      applyUpdate(contextKey, newSlides)
+      setPasteTextInput('')
+      setEditingId(newSlides[0]?.id ?? null)
+      setEditContent(drafts[0]?.content ?? '')
+    } finally {
+      setIsPastingSlides(false)
+    }
   }
 
   const handleGenerateSlides = async () => {
@@ -1131,7 +1163,7 @@ Example format:
                 <div className="plan-generate-section plan-paste-section">
                   <label className="plan-ramble-label">Paste text</label>
                   <p className="plan-paste-hint">
-                    Blank lines separate slides (extra blank lines are ignored). Use [PART 1] for section slides and lines starting with &quot;-&quot; for bullet slides.
+                    Blank lines separate slides (extra blank lines are ignored). Use [PART 1] for section slides, [Person thinking] at the start of a slide for Unsplash images, and lines starting with &quot;-&quot; for bullet slides.
                   </p>
                   <textarea
                     className="plan-generate-input plan-paste-input"
@@ -1143,9 +1175,9 @@ Example format:
                   <button
                     className="plan-generate-btn plan-paste-btn"
                     onClick={handlePasteToSlides}
-                    disabled={!pasteTextInput.trim()}
+                    disabled={!pasteTextInput.trim() || isPastingSlides}
                   >
-                    Create slides from text
+                    {isPastingSlides ? 'Creating slides…' : 'Create slides from text'}
                   </button>
                 </div>
               </div>

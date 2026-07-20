@@ -26,6 +26,16 @@ const VideoEditingMode = lazy(() => import('./components/VideoEditingMode'))
 // Dynamic import keeps IndexedDB folder helpers out of the initial graph when unused
 const getProjectFolderStorage = () => import('@shared/projectFolderStorage')
 
+const PERSISTED_APP_MODES = ['plan', 'edit']
+
+function readPersistedAppMode() {
+  try {
+    const saved = localStorage.getItem('pitchDeckMode')
+    if (PERSISTED_APP_MODES.includes(saved)) return saved
+  } catch (_) {}
+  return 'plan'
+}
+
 function App() {
   const makeDefaultSlides = () => ([
     {
@@ -138,7 +148,7 @@ function App() {
     return currentChapter ? currentChapter.slides : initialData.slides
   })
   const [selectedSlideId, setSelectedSlideId] = useState(validSelectedId)
-  const [mode, setMode] = useState('plan') // Always start in Plan; 'edit', 'present', 'record', 'video-editing' during session
+  const [mode, setMode] = useState(readPersistedAppMode)
   const lastRecordingBlobRef = useRef(null)
   const [lastRecordingBlobVersion, setLastRecordingBlobVersion] = useState(0)
   const [isRecordingInPlace, setIsRecordingInPlace] = useState(false)
@@ -163,7 +173,7 @@ function App() {
   }, [])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('pitchDeckSidebarCollapsed') === 'true')
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false)
-  const previousModeRef = useRef('plan')
+  const previousModeRef = useRef(readPersistedAppMode())
   const [theme, setTheme] = useState(() => getTheme())
   const [showProjectOverview, setShowProjectOverview] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -337,7 +347,7 @@ function App() {
   })
 
   useEffect(() => {
-    if (mode === 'present' || mode === 'record') return
+    if (mode === 'present' || mode === 'record' || mode === 'video-editing') return
     localStorage.setItem('pitchDeckMode', mode)
   }, [mode])
 
