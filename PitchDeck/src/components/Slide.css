@@ -859,10 +859,9 @@
 
 .slide-bullet {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   gap: 0.5em;
   margin-bottom: var(--slide-bullet-gap, 0);
-  --bullet-first-line-h: calc(1em * var(--bullet-line-height, 1.2));
 }
 
 .slide-bullet:last-child {
@@ -893,32 +892,27 @@
   line-height: var(--slide-h2-line-height, 1.2) !important;
 }
 
-/* Present mode: match edit-mode bullet marker alignment */
-.play-mode .slide-bullet {
-  align-items: flex-start;
-}
-
 .slide-bullet::before {
   content: '•';
-  font-size: 1.2em;
-  line-height: 1;
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--bullet-first-line-h);
+  line-height: 1;
+  font-size: 1.2em;
+  align-self: baseline;
 }
 
 .slide-bullets.bullet-style-dash .slide-bullet::before {
   content: '–';
+  font-size: 1em;
 }
 
 .slide-bullets.bullet-style-arrow .slide-bullet::before {
   content: '→';
+  font-size: 1em;
 }
 
 .slide-bullets.bullet-style-check .slide-bullet::before {
   content: '✓';
+  font-size: 1em;
 }
 
 .slide-bullets.bullet-style-square .slide-bullet::before {
@@ -937,6 +931,7 @@
 .slide-bullets.bullet-style-number .slide-bullet::before {
   content: counter(slide-bullet-counter) '.';
   font-size: 1em;
+  line-height: 1;
   min-width: 1.5em;
   text-align: right;
 }
@@ -1027,7 +1022,7 @@
   min-width: 0;
   color: inherit;
   font-weight: 700;
-  line-height: inherit;
+  line-height: var(--bullet-line-height, 1.2);
   /* Color, fontFamily, and textShadow are set via inline style */
   background: transparent;
   overflow: visible;

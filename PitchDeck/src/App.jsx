@@ -900,15 +900,15 @@ function App() {
     })
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
 
-  // Copy all slide texts to clipboard (Share menu)
+  // Copy current chapter's slide texts to clipboard
   const exportSlidesAsText = useCallback(async () => {
-    const allSlides = chapters.flatMap((ch) => ch.slides)
-    if (!allSlides.length) {
+    const currentChapter = chapters.find((c) => c.id === currentChapterId) ?? chapters[0]
+    if (!currentChapter?.slides?.length) {
       alert('No slides to copy.')
       return false
     }
 
-    const output = formatSlidesForClipboard(chapters)
+    const output = formatSlidesForClipboard([currentChapter])
     try {
       await copyTextToClipboard(output)
       return true
@@ -917,7 +917,7 @@ function App() {
       alert('Could not copy to clipboard. Check browser permissions and try again.')
       return false
     }
-  }, [chapters])
+  }, [chapters, currentChapterId])
 
   const handleExportSlidesAsPng = useCallback(async () => {
     if (isExportingPng) return

@@ -16,6 +16,7 @@ import { prepareBulletLayoutContent } from '../utils/bulletStyles'
 import { getBulletPointsFromSlide, decodeBasicHtmlEntities, fixDoubleEncodedEntities } from '../utils/slidePlainText'
 import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
+import { startWebcamStream } from '../utils/webcamStream'
 import { getSlideFormatMeta } from '../utils/slideFormats'
 import { clampTextMaxWidth, getDefaultTextMaxWidth, getSlideTextMaxWidth } from '../utils/textFieldWidth'
 
@@ -47,14 +48,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
 
     const startStream = async () => {
       try {
-        let stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: cameraId } }
-        }).catch(() => null)
-        if (!stream && cameraId) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { ideal: cameraId } }
-          }).catch(() => null)
-        }
+        const stream = await startWebcamStream(cameraId)
         if (stream && videoRef.current) {
           videoRef.current.srcObject = stream
           streamRef.current = stream

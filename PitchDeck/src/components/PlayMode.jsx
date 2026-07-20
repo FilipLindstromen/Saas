@@ -4,6 +4,7 @@ import SlideBackground from './SlideBackground'
 import PersistentVideoLayer from './PersistentVideoLayer'
 import { getWebcamCameraId, isWebcamActiveForSlide, isAnyWebcamActive } from '../utils/webcamSettings'
 import { getWebcamCirclePixelSize, normalizeWebcamSizePercent } from '../utils/webcamSize'
+import { startWebcamStream } from '../utils/webcamStream'
 import { getExportCanvasSize } from '../utils/slideFormats'
 import { getBackgroundScaleProgress } from '../utils/backgroundFit'
 import { getBulletPointsFromSlide } from '../utils/slidePlainText'
@@ -342,17 +343,7 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 20, isVisible = true, sh
 
     const startStream = async () => {
       try {
-        let stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: cameraId } }
-        }).catch(() => null)
-        if (!stream && cameraId) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { ideal: cameraId } }
-          }).catch(() => null)
-        }
-        if (!stream && cameraId) {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true }).catch(() => null)
-        }
+        const stream = await startWebcamStream(cameraId)
         if (videoRef.current && stream) {
           videoRef.current.srcObject = stream
           streamRef.current = stream
