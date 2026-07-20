@@ -13,7 +13,7 @@ import {
   isImageScaleCustomized,
 } from '../utils/backgroundFit'
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
-import { getBulletPointsFromSlide } from '../utils/slidePlainText'
+import { getBulletPointsFromSlide, decodeBasicHtmlEntities, fixDoubleEncodedEntities } from '../utils/slidePlainText'
 import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { getSlideFormatMeta } from '../utils/slideFormats'
@@ -140,7 +140,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const layout = slide.layout === 'title' ? 'centered' : (slide.layout || 'default')
   const isEditable = !isPlayMode && !!onUpdate
-  const supportsTextWidthResize = isEditable && layout !== 'section'
+  const supportsTextWidthConstraint = layout !== 'section'
+  const supportsTextWidthResize = isEditable && supportsTextWidthConstraint
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
   const backgroundOpacity = slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6
   const gradientFlipped = slide.gradientFlipped !== undefined ? slide.gradientFlipped : false
@@ -280,6 +281,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     
     // Normalize contentEditable line breaks: Chrome etc. use <div> for Enter, use <br> so editor and present mode match
     content = content.replace(/<div[^>]*>\s*/gi, '<br>').replace(/<\/div>\s*/gi, '')
+
+    // Fix double-encoded entities from prior saves (e.g. &amp; → &amp;amp;)
+    content = fixDoubleEncodedEntities(content)
     
     // Check if content contains HTML tags (including mark tags)
     const hasHtmlTags = content.includes('<') && content.includes('>')
@@ -324,8 +328,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       return stripTrailingLineBreaks(content)
     }
     
-    // For plain text content, we need to escape HTML but preserve <br> tags
-    // Use a placeholder to protect <br> tags during escaping
+    // For plain text content, decode entities from storage then escape once for safe HTML output
+    content = decodeBasicHtmlEntities(content)
     const brPlaceholder = '___BR_TAG_PLACEHOLDER___'
     content = content
       .replace(/<br\s*\/?>/gi, brPlaceholder)  // Protect <br> tags
@@ -523,6 +527,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       .replace(/<\/p>\s*/gi, '')
       .replace(/<div[^>]*>\s*/gi, '<br>')
       .replace(/<\/div>\s*/gi, '')
+    out = fixDoubleEncodedEntities(out)
     return out.replace(/^(<br\s*\/?>\s*)+/i, '')
   }
 
@@ -1260,6 +1265,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
               style={{
                 lineHeight: bulletLineHeight,
+                '--bullet-line-height': bulletLineHeight,
                 ...(shouldAnimateText ? { '--bullet-anim-delay': getBulletMarkerDelay(index) } : {}),
               }}
             >
@@ -1531,7 +1537,17 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   }, [supportsTextWidthResize, onUpdate, slide, layout, onDeselectGraphic, onDeselectSubSlide])
 
   const wrapTextField = useCallback((node) => {
-    if (!supportsTextWidthResize || !node) return node
+    if (!supportsTextWidthConstraint || !node) return node
+    if (!supportsTextWidthResize) {
+      return (
+        <div
+          className="slide-text-field-wrap"
+          style={{ maxWidth: `${textMaxWidth}%` }}
+        >
+          {node}
+        </div>
+      )
+    }
     return (
       <div
         className={`slide-text-field-wrap${isTextFieldSelected ? ' selected' : ''}`}
@@ -1554,7 +1570,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         )}
       </div>
     )
-  }, [supportsTextWidthResize, isTextFieldSelected, textMaxWidth, onTextResizeDown, onDeselectGraphic, onDeselectSubSlide])
+  }, [supportsTextWidthConstraint, supportsTextWidthResize, isTextFieldSelected, textMaxWidth, onTextResizeDown, onDeselectGraphic, onDeselectSubSlide])
 
   // Update current position when imagePositionX/Y changes from outside
   useEffect(() => {

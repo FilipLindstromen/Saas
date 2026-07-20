@@ -1,20 +1,39 @@
 /** Strip HTML and decode common entities from slide content. */
-export function htmlToPlainText(content) {
+export function decodeBasicHtmlEntities(content) {
   if (!content || typeof content !== 'string') return ''
   return content
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<div[^>]*>\s*/gi, '\n')
-    .replace(/<\/div>\s*/gi, '')
-    .replace(/<p[^>]*>\s*/gi, '\n')
-    .replace(/<\/p>\s*/gi, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/<[^>]*>/g, '')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .trim()
+    .replace(/&nbsp;/g, '\u00A0')
+}
+
+/** Collapse accidental double-encoding from contentEditable round-trips. */
+export function fixDoubleEncodedEntities(content) {
+  if (!content || typeof content !== 'string') return ''
+  let prev = ''
+  let cur = content
+  while (cur !== prev) {
+    prev = cur
+    cur = cur.replace(/&amp;amp;/g, '&amp;')
+  }
+  return cur
+}
+
+export function htmlToPlainText(content) {
+  if (!content || typeof content !== 'string') return ''
+  return decodeBasicHtmlEntities(
+    content
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<div[^>]*>\s*/gi, '\n')
+      .replace(/<\/div>\s*/gi, '')
+      .replace(/<p[^>]*>\s*/gi, '\n')
+      .replace(/<\/p>\s*/gi, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]*>/g, '')
+  ).trim()
 }
 
 export function getSlidePlainText(slide) {

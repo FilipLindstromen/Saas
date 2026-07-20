@@ -155,6 +155,68 @@
   animation: playContentFadeIn var(--transition-duration, 300ms) ease-out forwards;
 }
 
+/* Skip content fade-in while outgoing overlay is visible — prevents text flicker */
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-content,
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-content-video,
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-text-centered-wrapper,
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-section-name,
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-bullets,
+.play-slide-content-transition.transition-in-progress:not(.text-out) .slide-graphic-overlays {
+  animation: none !important;
+  opacity: 1;
+}
+
+/* Incoming background layer animates in during bg transitions (outgoing is a separate overlay) */
+.play-background-layer.play-bg-incoming-transition {
+  animation-duration: var(--transition-duration, 500ms);
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-default {
+  opacity: 0;
+  animation-name: fadeIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-crossfade {
+  opacity: 0;
+  animation-name: crossfadeIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-slide {
+  opacity: 0;
+  transform: translateX(-100%);
+  animation-name: slideIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-zoom {
+  opacity: 0;
+  transform: scale(1.2);
+  animation-name: zoomIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-dissolve {
+  opacity: 0;
+  animation-name: dissolveIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-blur {
+  opacity: 0;
+  filter: blur(10px);
+  animation-name: blurIn;
+}
+
+.play-background-layer.play-bg-incoming-transition.transition-sequence {
+  opacity: 0;
+  transform: scale(1.1) translateY(-20px);
+  animation-name: sequenceIn;
+}
+
+.play-background-layer.play-bg-incoming-transition .slide-background,
+.play-background-layer.play-bg-incoming-transition .slide-background-video {
+  will-change: opacity, transform, filter;
+}
+
 @keyframes playContentFadeIn {
   from {
     opacity: 0;

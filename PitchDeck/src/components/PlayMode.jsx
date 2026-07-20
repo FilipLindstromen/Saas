@@ -68,6 +68,14 @@ function sameBackgroundExact(a, b) {
   return eq(a.imagePositionX, b.imagePositionX) && eq(a.imagePositionY, b.imagePositionY) && eqScale(a.imageScale, b.imageScale)
 }
 
+function getBackgroundMediaKey(slide) {
+  if (!slide) return 'none'
+  if (slide.infographicProjectId) {
+    return `infographic-${slide.infographicProjectId}-${slide.infographicTabId || ''}`
+  }
+  return slide.backgroundVideoUrl || slide.imageUrl || `slide-${slide.id}`
+}
+
 // Both slides use video layout with background video - keep video layer persistent to avoid fade/flicker
 function bothVideoLayoutWithMedia(a, b) {
   if (!a || !b) return false
@@ -632,7 +640,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(0)
-  const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
   const [preloadReady, setPreloadReady] = useState(false) // Defer preload until after first paint to avoid overlapping text on play start
   // Video persistence: when transitioning from video slide to non-video, slide video off to right
   const [isSlidingOff, setIsSlidingOff] = useState(false)
@@ -792,10 +799,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     if (navTransitionStyle === 'canvas-push') {
       const sameBgExact = sameBackgroundExact(currentSlideData, nextSlideDataForNav)
       if (sameBgExact) {
-        setPendingIndex(null)
-        setTransitionPhase('idle')
+        setOutgoingTransitionSlide(currentSlideData)
+        setIsTransitioning(true)
+        setPendingIndex(nextIndex)
         setCurrentIndex(nextIndex)
-        setSlideKey(k => k + 1)
+        setTransitionPhase('fade-out')
+        const transitionDuration = getTransitionDuration('canvas-push')
+        scheduleTransition(() => {
+          setOutgoingTransitionSlide(null)
+          setPendingIndex(null)
+          setTransitionPhase('idle')
+          setIsTransitioning(false)
+        }, transitionDuration)
         return
       }
       setIsTransitioning(true)
@@ -808,7 +823,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setCurrentIndex(nextIndex)
         setPendingIndex(null)
         setTransitionPhase('idle')
-        setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, transitionDuration)
       return
@@ -829,7 +843,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setIsSlidingOff(false)
         setIsWebcamSlidingOff(false)
         videoSlideForTransitionRef.current = null
-        setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !nextHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
     } else if (!currentHasVideo && nextHasVideo && !sameBgForNav && !useCrossfadeForVideo) {
@@ -838,7 +851,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setIsSlidingIn(true)
       if (!currentHasWebcam && nextHasWebcam) setIsWebcamSlidingIn(true)
       setCurrentIndex(nextIndex)
-      setSlideKey(k => k + 1)
       scheduleTransition(() => {
         setIsSlidingIn(false)
         setIsWebcamSlidingIn(false)
@@ -851,10 +863,17 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
-        setPendingIndex(null)
-        setTransitionPhase('idle')
+        setOutgoingTransitionSlide(currentSlideData)
+        setIsTransitioning(true)
+        setPendingIndex(nextIndex)
         setCurrentIndex(nextIndex)
-        setSlideKey(k => k + 1)
+        setTransitionPhase('fade-out')
+        scheduleTransition(() => {
+          setOutgoingTransitionSlide(null)
+          setPendingIndex(null)
+          setTransitionPhase('idle')
+          setIsTransitioning(false)
+        }, transitionDuration)
         return
       }
 
@@ -875,7 +894,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setFrozenBgScale({ outgoing: outgoingScale, incoming: 0 })
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(nextIndex)
-        setSlideKey(k => k + 1)
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -891,7 +909,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         // Same bg, different position/scale: incoming content starts immediately, outgoing text fades out on top
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(nextIndex)
-        setSlideKey(k => k + 1)
         setTransitionPhase('fade-out')
         const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -927,10 +944,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     if (navTransitionStyle === 'canvas-push') {
       const sameBgExact = sameBackgroundExact(currentSlideData, prevSlideDataForNav)
       if (sameBgExact) {
-        setPendingIndex(null)
-        setTransitionPhase('idle')
+        setOutgoingTransitionSlide(currentSlideData)
+        setIsTransitioning(true)
+        setPendingIndex(prevIndex)
         setCurrentIndex(prevIndex)
-        setSlideKey(k => k + 1)
+        setTransitionPhase('fade-out')
+        const transitionDuration = getTransitionDuration('canvas-push')
+        scheduleTransition(() => {
+          setOutgoingTransitionSlide(null)
+          setPendingIndex(null)
+          setTransitionPhase('idle')
+          setIsTransitioning(false)
+        }, transitionDuration)
         return
       }
       setIsTransitioning(true)
@@ -943,7 +968,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setCurrentIndex(prevIndex)
         setPendingIndex(null)
         setTransitionPhase('idle')
-        setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, transitionDuration)
       return
@@ -963,7 +987,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setIsSlidingOff(false)
         setIsWebcamSlidingOff(false)
         videoSlideForTransitionRef.current = null
-        setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, Math.max(VIDEO_TRANSITION_MS, (currentHasWebcam && !prevHasWebcam) ? WEBCAM_TRANSITION_MS : 0))
     } else if (!currentHasVideo && prevHasVideo && !sameBgForNavPrev && !useCrossfadeForVideoPrev) {
@@ -972,7 +995,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       setIsSlidingIn(true)
       if (!currentHasWebcam && prevHasWebcam) setIsWebcamSlidingIn(true)
       setCurrentIndex(prevIndex)
-      setSlideKey(k => k + 1)
       scheduleTransition(() => {
         setIsSlidingIn(false)
         setIsWebcamSlidingIn(false)
@@ -985,10 +1007,17 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
-        setPendingIndex(null)
-        setTransitionPhase('idle')
+        setOutgoingTransitionSlide(currentSlideData)
+        setIsTransitioning(true)
+        setPendingIndex(prevIndex)
         setCurrentIndex(prevIndex)
-        setSlideKey(k => k + 1)
+        setTransitionPhase('fade-out')
+        scheduleTransition(() => {
+          setOutgoingTransitionSlide(null)
+          setPendingIndex(null)
+          setTransitionPhase('idle')
+          setIsTransitioning(false)
+        }, transitionDuration)
         return
       }
 
@@ -1003,11 +1032,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         const outgoingScale = getBackgroundScaleProgress(Date.now() - slideEnteredAtRef.current, KEN_BURNS_DURATION_S)
         setFrozenBgScale({ outgoing: outgoingScale, incoming: 0 })
         setOutgoingTransitionSlide(currentSlideData)
-        setIsTransitioning(true)
-        setPendingIndex(prevIndex)
-        pendingDirectionRef.current = -1
         setCurrentIndex(prevIndex)
-        setSlideKey(k => k + 1)
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -1021,11 +1046,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phaseDuration)
       } else if (sameBg) {
         setOutgoingTransitionSlide(currentSlideData)
-        setIsTransitioning(true)
-        setPendingIndex(prevIndex)
-        pendingDirectionRef.current = -1
         setCurrentIndex(prevIndex)
-        setSlideKey(k => k + 1)
         setTransitionPhase('fade-out')
         const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
         scheduleTransition(() => {
@@ -1599,6 +1620,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
               aria-hidden="true"
             >
               <SlideBackground
+                key={getBackgroundMediaKey(outgoingTransitionSlide)}
                 slide={outgoingTransitionSlide}
                 kenBurns={outgoingMotion.kenBurns}
                 backgroundKenBurnsDirection={outgoingMotion.backgroundKenBurnsDirection}
@@ -1611,19 +1633,20 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         )}
         {usePersistentBackground && (
           <div
-            className={`play-background-layer ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${activeTransitionStyle} fade-out` : ''} ${!sameBgNoTransition && transitionPhase === 'fade-in' ? `transition-${activeTransitionStyle} fade-in` : ''}`}
+            className={`play-background-layer ${backgroundTransitionActive ? `play-bg-incoming-transition transition-${activeTransitionStyle}` : ''} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${activeTransitionStyle} fade-out` : ''}`}
             style={{
               '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
               '--pos-scale-duration': `${transitionDurationMs}ms`,
+              '--transition-duration': `${transitionDurationMs}ms`,
             }}
             aria-hidden="true"
           >
             <SlideBackground
-              key={backgroundSlideForLayer?.backgroundVideoUrl || backgroundSlideForLayer?.imageUrl || backgroundSlideForLayer?.infographicProjectId || backgroundSlideForLayer?.id}
+              key={getBackgroundMediaKey(backgroundSlideForLayer)}
               slide={backgroundSlideForLayer}
               kenBurns={motion.kenBurns}
               backgroundKenBurnsDirection={motion.backgroundKenBurnsDirection}
-              frozenScaleProgress={null}
+              frozenScaleProgress={backgroundTransitionActive ? 0 : null}
               isPreload={false}
               isPlayMode={true}
             />
@@ -1681,8 +1704,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       )}
       {!canvasPushActive && (
       <div 
-        key={slideKey}
-        className={`play-slide-container play-slide-content-transition transition-${activeTransitionStyle} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${transitionPhase === 'fade-in' ? 'fade-in' : ''} ${motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''}`}
+        key={currentSlide?.id ?? currentIndex}
+        className={`play-slide-container play-slide-content-transition transition-${activeTransitionStyle} ${outgoingTransitionSlide ? 'transition-in-progress' : ''} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''}`}
         style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
       >
         <Slide 
@@ -1692,7 +1715,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           cameraOverridePosition={currentSlide?.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}
           visibleBulletIndex={isBulletSlide ? Math.max(0, visibleBulletIndex) : visibleBulletIndex}
           visibleLineIndex={null}
-          suppressTextAnimation={suppressTextEntranceAfterCanvasPushRef.current}
+          suppressTextAnimation={suppressTextEntranceAfterCanvasPushRef.current || !!outgoingTransitionSlide}
           isPreload={false}
           hideBackground={usePersistentBackground || usePersistentVideo || backgroundTransitionActive}
           hideGradient={usePersistentGradient}

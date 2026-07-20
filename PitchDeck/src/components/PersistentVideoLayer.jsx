@@ -37,6 +37,7 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
   const videoRef = useRef(null)
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
   const blobUrlRef = useRef(null)
+  const lastMediaUrlRef = useRef(null)
 
   const effectiveLayout = layout || 'video'
   const hasVideo = !!(videoSlide?.backgroundVideoUrl || videoSlide?.imageUrl)
@@ -57,9 +58,14 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
         URL.revokeObjectURL(blobUrlRef.current)
         blobUrlRef.current = null
       }
+      lastMediaUrlRef.current = null
       setBackgroundVideoSrc(null)
       return
     }
+    if (url === lastMediaUrlRef.current && backgroundVideoSrc) {
+      return
+    }
+    lastMediaUrlRef.current = url
     const isExternal = url.startsWith('http://') || url.startsWith('https://')
     if (!isExternal) {
       setBackgroundVideoSrc(url)
@@ -82,12 +88,8 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
       .catch(() => !cancelled && setBackgroundVideoSrc(null))
     return () => {
       cancelled = true
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current)
-        blobUrlRef.current = null
-      }
     }
-  }, [videoSlide?.backgroundVideoUrl, videoSlide?.imageUrl, showVideo, showSlidingOff, showSlidingIn])
+  }, [videoSlide?.backgroundVideoUrl, videoSlide?.imageUrl, showVideo, showSlidingOff, showSlidingIn, backgroundVideoSrc])
 
   // Play video when ready (showVideo or sliding off - keep playing during slide-off)
   useEffect(() => {

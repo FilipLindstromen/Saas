@@ -4,6 +4,47 @@ import AppLogo from './AppLogo'
 import ShareExportMenu from './ShareExportMenu'
 import './AppHeader.css'
 
+function CopySlideCopyButton({ onCopyText }) {
+  const [feedback, setFeedback] = useState(null)
+  const feedbackTimerRef = useRef(null)
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+  }, [])
+
+  const handleClick = async () => {
+    if (!onCopyText) return
+    try {
+      const ok = await onCopyText()
+      if (ok === false) return
+      setFeedback('Copied!')
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2000)
+    } catch {
+      setFeedback('Copy failed')
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`header-btn-labeled copy-slide-copy-btn${feedback === 'Copied!' ? ' copy-slide-copy-btn-copied' : ''}`}
+      onClick={handleClick}
+      disabled={!onCopyText}
+      title="Copy all slide copy to clipboard"
+      aria-label="Copy all slide copy to clipboard"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+      <span>{feedback || 'Copy all copy'}</span>
+    </button>
+  )
+}
+
 function PresentMenu({
   mode,
   isRecordingInPlace,
@@ -319,6 +360,7 @@ function AppHeader({
               <div className="header-icon-group-divider" aria-hidden="true" />
             </>
           )}
+          <CopySlideCopyButton onCopyText={onCopyText} />
           <ShareExportMenu
             onExportProject={onExportProject}
             onExportPng={onExportPng}

@@ -24,6 +24,14 @@
   cursor: not-allowed;
 }
 
+.copy-slide-copy-btn {
+  white-space: nowrap;
+}
+
+.copy-slide-copy-btn-copied {
+  color: var(--accent-primary, #e67e22);
+}
+
 .present-menu {
   position: relative;
   display: flex;
