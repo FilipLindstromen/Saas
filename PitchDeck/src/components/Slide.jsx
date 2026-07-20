@@ -17,6 +17,7 @@ import { getBulletPointsFromSlide } from '../utils/slidePlainText'
 import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { getSlideFormatMeta } from '../utils/slideFormats'
+import { clampTextMaxWidth, getDefaultTextMaxWidth, getSlideTextMaxWidth } from '../utils/textFieldWidth'
 
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
 function getVideoFilterFromProps({ videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0 }) {
@@ -123,6 +124,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const isEditingSubtitleRef = useRef(false)
   // Font pairing context menu: store selection so we can wrap/unwrap on menu action
   const [fontPairingMenu, setFontPairingMenu] = useState(null)
+  const [isTextFieldSelected, setIsTextFieldSelected] = useState(false)
+  const [textMaxWidthLive, setTextMaxWidthLive] = useState(null)
   const fontPairingRangeRef = useRef(null)
   const fontPairingTargetRef = useRef(null) // { field: 'content'|'subtitle'|'bullet', bulletIndex?: number }
   const bulletContentFixedRef = useRef(new Set())
@@ -136,6 +139,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
 
   const layout = slide.layout === 'title' ? 'centered' : (slide.layout || 'default')
+  const isEditable = !isPlayMode && !!onUpdate
+  const supportsTextWidthResize = isEditable && layout !== 'section'
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
   const backgroundOpacity = slide.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6
   const gradientFlipped = slide.gradientFlipped !== undefined ? slide.gradientFlipped : false
@@ -145,7 +150,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const motion = useMemo(() => resolveMotionSettings({}, slide), [slide])
 
-  const shouldAnimateText = (isPlayMode || previewTextAnimation) && motion.textAnimation && motion.textAnimation !== 'none' && !suppressTextAnimation
+  const shouldAnimateText = (isPlayMode || (previewTextAnimation && !onUpdate)) && motion.textAnimation && motion.textAnimation !== 'none' && !suppressTextAnimation
 
   // Fetch cross-origin video to blob URL so <video> loads same-origin (avoids COEP block)
   useEffect(() => {
@@ -469,8 +474,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     onUpdate({ content: newContent })
   }
 
-  const handleContentFocus = (e) => {
+  const handleContentFocus = () => {
     isEditingContentRef.current = true
+    if (supportsTextWidthResize) {
+      setIsTextFieldSelected(true)
+      onDeselectGraphic?.()
+      onDeselectSubSlide?.()
+    }
   }
 
   const handleSubtitleChange = (e) => {
@@ -1158,7 +1168,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const renderContent = () => {
     const textHeadingLevel = slide.textHeadingLevel || null
     const subtitleHeadingLevel = slide.subtitleHeadingLevel || null
-    const isEditable = !isPlayMode && onUpdate && !previewTextAnimation
     
     // Get heading size and font based on heading level
     const getHeadingSize = (level) => {
@@ -1320,7 +1329,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
 
     if (layout === 'centered') {
-      if (!useChunkedText) {
+      if (!useChunkedText || isEditable) {
       return (
         <div key={slide.id} className="slide-text-centered-wrapper">
           {isPlayMode ? (
@@ -1389,8 +1398,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       }
     }
 
-    // Animated present/preview: render chunked text or line reveals
-    if (isPlayMode || previewTextAnimation) {
+    // Animated present / explicit animation replay only — edit mode always uses contentEditable below
+    if ((isPlayMode || previewTextAnimation) && !isEditable) {
       if (useChunkedText) {
         const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
         const textContent = (
@@ -1464,6 +1473,88 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, imageX: 0, imageY: 0 })
   const [currentPosition, setCurrentPosition] = useState({ x: imagePositionX, y: imagePositionY })
   const slideRef = useRef(null)
+  const textResizeDragRef = useRef(null)
+
+  const textMaxWidth = textMaxWidthLive ?? getSlideTextMaxWidth(slide)
+
+  useEffect(() => {
+    setIsTextFieldSelected(false)
+    setTextMaxWidthLive(null)
+  }, [slide.id])
+
+  useEffect(() => () => {
+    if (textResizeDragRef.current) {
+      document.removeEventListener('pointermove', textResizeDragRef.current.onMove)
+      document.removeEventListener('pointerup', textResizeDragRef.current.onUp)
+      textResizeDragRef.current = null
+      document.body.style.cursor = ''
+    }
+  }, [])
+
+  const onTextResizeDown = useCallback((e) => {
+    if (!supportsTextWidthResize || !onUpdate || !slideRef.current) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsTextFieldSelected(true)
+    onDeselectGraphic?.()
+    onDeselectSubSlide?.()
+
+    const startX = e.clientX
+    const startW = getSlideTextMaxWidth(slide)
+    const slideWidth = slideRef.current.offsetWidth || 1
+    let latestW = startW
+
+    const onMove = (ev) => {
+      const deltaPct = ((ev.clientX - startX) / slideWidth) * 100
+      latestW = clampTextMaxWidth(startW + deltaPct)
+      setTextMaxWidthLive(latestW)
+    }
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.body.style.cursor = ''
+      textResizeDragRef.current = null
+      const defaultW = getDefaultTextMaxWidth(layout)
+      if (Math.abs(latestW - defaultW) < 0.5) {
+        onUpdate({ textMaxWidth: undefined })
+      } else {
+        onUpdate({ textMaxWidth: latestW })
+      }
+      setTextMaxWidthLive(null)
+    }
+
+    textResizeDragRef.current = { onMove, onUp }
+    document.body.style.cursor = 'ew-resize'
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }, [supportsTextWidthResize, onUpdate, slide, layout, onDeselectGraphic, onDeselectSubSlide])
+
+  const wrapTextField = useCallback((node) => {
+    if (!supportsTextWidthResize || !node) return node
+    return (
+      <div
+        className={`slide-text-field-wrap${isTextFieldSelected ? ' selected' : ''}`}
+        style={{ maxWidth: `${textMaxWidth}%` }}
+        onPointerDown={(e) => {
+          if (e.target.closest('.slide-text-resize-handle')) return
+          setIsTextFieldSelected(true)
+          onDeselectGraphic?.()
+          onDeselectSubSlide?.()
+        }}
+      >
+        {node}
+        {isTextFieldSelected && (
+          <div
+            className="slide-text-resize-handle"
+            onPointerDown={onTextResizeDown}
+            title="Drag to adjust text width"
+            aria-label="Adjust text width"
+          />
+        )}
+      </div>
+    )
+  }, [supportsTextWidthResize, isTextFieldSelected, textMaxWidth, onTextResizeDown, onDeselectGraphic, onDeselectSubSlide])
 
   // Update current position when imagePositionX/Y changes from outside
   useEffect(() => {
@@ -1612,26 +1703,31 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     '--slide-content-edge': `${contentEdgeOffset}%`,
     '--slide-h1-line-height': h1LineHeight,
     '--slide-h2-line-height': h2LineHeight,
-    '--slide-h3-line-height': h3LineHeight
+    '--slide-h3-line-height': h3LineHeight,
+    '--slide-text-max-width': `${textMaxWidth}%`,
   }
 
   const graphicEditing = !isPlayMode && !!onSelectGraphic && !!onUpdate && !isPreload
   const subSlideEditing = !isPlayMode && !!onSelectSubSlide && !!onUpdate && !isPreload
   const hasSelectedGraphic = graphicEditing && !!selectedGraphicId
   const hasSelectedSubSlide = subSlideEditing && !!selectedSubSlideId
+  const hasSelectedTextField = supportsTextWidthResize && isTextFieldSelected
 
   const handleSlidePointerDown = (e) => {
     if (isPlayMode || isPreload) return
     if (e.target.closest('.slide-graphic-overlay')) return
     if (e.target.closest('.slide-subslide-frame')) return
+    if (e.target.closest('.slide-text-resize-handle')) return
+    if (e.target.closest('.slide-text-field-wrap')) return
     if (e.target.closest('[contenteditable="true"]')) return
+    setIsTextFieldSelected(false)
     onDeselectGraphic?.()
     onDeselectSubSlide?.()
   }
 
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''}`}
+      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onPointerDown={handleSlidePointerDown}
@@ -1882,7 +1978,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               } : { position: 'relative' })
             }}
           >
-            {renderContent()}
+            {wrapTextField(renderContent())}
           </div>
         )
       ) : (
@@ -1895,7 +1991,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             ...(cameraOverrideEnabled && cameraOverridePosition === 'fullscreen' ? { zIndex: 10 } : {})
           }}
         >
-          {renderContent()}
+          {wrapTextField(renderContent())}
         </div>
       )}
       {fontPairingMenu && (
@@ -1920,6 +2016,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               graphic={g}
               isSelected={selectedGraphicId === g.id}
               onSelect={() => {
+                setIsTextFieldSelected(false)
                 onSelectGraphic?.(g.id)
                 onDeselectSubSlide?.()
               }}
@@ -1949,6 +2046,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               index={index}
               isSelected={selectedSubSlideId === subSlide.id}
               onSelect={() => {
+                setIsTextFieldSelected(false)
                 onSelectSubSlide?.(subSlide.id)
                 onDeselectGraphic?.()
               }}

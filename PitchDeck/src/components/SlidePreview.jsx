@@ -46,7 +46,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   })
   const [previewAnimKey, setPreviewAnimKey] = useState(0)
   const resolvedMotion = resolveMotionSettings({}, slide)
-  const previewAnimationActive = !!(
+  const previewAnimationConfigured = !!(
     resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none'
   )
   const fileInputRef = useRef(null)
@@ -278,7 +278,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             />
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
-          {previewAnimationActive && (
+          {previewAnimationConfigured && (
             <button
               type="button"
               className="preview-toolbar-group-btn"
@@ -375,7 +375,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       </div>
       <div className="preview-content">
         <div
-          className={`preview-zoom-wrap ${previewAnimationActive ? 'has-text-animation' : ''}`}
+          className={`preview-zoom-wrap ${previewAnimationConfigured ? 'has-text-animation' : ''}`}
           style={{
             transform: `scale(${previewZoom})`,
             transformOrigin: 'center center'
@@ -443,7 +443,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
-            previewTextAnimation={previewAnimationActive}
+            previewTextAnimation={false}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}
             onDeselectGraphic={onDeselectGraphic}

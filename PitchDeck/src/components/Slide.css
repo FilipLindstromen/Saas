@@ -142,6 +142,65 @@
   transform: scale(1.1);
 }
 
+/* Text field width override (edit mode) */
+.slide-text-field-wrap {
+  position: relative;
+  width: 100%;
+  max-width: var(--slide-text-max-width, 66.67%);
+  box-sizing: border-box;
+}
+
+.slide-content.centered .slide-text-field-wrap {
+  max-width: var(--slide-text-max-width, 85%);
+}
+
+.slide-content.right .slide-text-field-wrap,
+.slide-content.right-video .slide-text-field-wrap {
+  align-self: flex-end;
+}
+
+.slide-text-field-wrap.selected {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.slide-text-field-wrap .slide-text,
+.slide-text-field-wrap .slide-bullets,
+.slide-text-field-wrap .slide-text-centered-wrapper {
+  max-width: 100% !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slide-text-field-wrap .slide-text-centered-wrapper .slide-text {
+  max-width: 100% !important;
+}
+
+.slide-text-resize-handle {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: ew-resize;
+  z-index: 12;
+  touch-action: none;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.slide-text-resize-handle:hover {
+  transform: scale(1.1);
+}
+
+.slide:not(.play-mode).has-selected-text-field {
+  overflow: visible;
+}
+
 /* Sub-slide camera regions (edit mode) */
 .slide-subslide-overlays {
   position: absolute;
@@ -291,7 +350,7 @@
 
 .slide-content.bulletpoints .slide-bullets {
   width: 100%;
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 .slide-content.centered {
@@ -317,7 +376,7 @@
 .slide-text-centered-wrapper .slide-subtitle {
   text-align: center;
   width: 100%;
-  max-width: 85%;
+  max-width: var(--slide-text-max-width, 85%);
   box-sizing: border-box;
 }
 
@@ -495,7 +554,7 @@
   color: inherit;
   font-weight: 700;
   line-height: 1.2;
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
   /* Color, fontFamily, and textShadow are set via inline style */
   outline: none;
   border: none;
@@ -568,7 +627,7 @@
 /* Narrower text area only; same left position as default Left layout */
 .slide-text.left-video {
   text-align: left;
-  max-width: 45%;
+  max-width: var(--slide-text-max-width, 45%);
 }
 
 /* Present mode: ensure left-video text uses distance from edge/bottom and stays left-aligned */
@@ -581,7 +640,7 @@
 /* Right with Video: text on right, narrower text area */
 .slide-text.right-video {
   text-align: right;
-  max-width: 45%;
+  max-width: var(--slide-text-max-width, 45%);
 }
 
 .slide-text:empty::before {
@@ -1552,7 +1611,6 @@
   }
 }
 
-.slide.preview-text-animation .slide-content,
-.slide.preview-text-animation .slide-text-centered-wrapper {
-  pointer-events: none;
+.slide.preview-text-animation .slide-graphic-overlays {
+  pointer-events: auto;
 }
