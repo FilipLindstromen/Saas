@@ -78,7 +78,7 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
     const el = backgroundVideoRef.current
     const play = () => {
       const video = backgroundVideoRef.current
-      if (video) video.play().catch(() => {})
+      if (video && video.paused) video.play().catch(() => {})
     }
     if (el) {
       if (el.readyState >= 2) play()

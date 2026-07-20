@@ -18,6 +18,8 @@ import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
 import { useUndoRedo } from './hooks/useUndoRedo'
 import { searchStockVideo } from './api/videoSearch'
+import { formatSlidesForClipboard } from './utils/slidePlainText'
+import { copyTextToClipboard } from './utils/clipboard'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
@@ -271,7 +273,10 @@ function App() {
       lineHeight: parseFloat(localStorage.getItem('lineHeight')) || 1,
       bulletLineHeight: parseFloat(localStorage.getItem('bulletLineHeight')) || 1,
       bulletTextSize: parseFloat(localStorage.getItem('bulletTextSize')) || 3,
-      bulletGap: parseFloat(localStorage.getItem('bulletGap')) || 0.5,
+      bulletGap: (() => {
+        const v = parseFloat(localStorage.getItem('bulletGap'))
+        return Number.isFinite(v) ? v : 0
+      })(),
       bulletStyle: localStorage.getItem('bulletStyle') || 'dot',
       textStyleMode: localStorage.getItem('textStyleMode') || 'fontPairing',
       fontPairingSerifFont: localStorage.getItem('fontPairingSerifFont') || 'Playfair Display',
@@ -633,7 +638,7 @@ function App() {
     localStorage.setItem('lineHeight', settings.lineHeight?.toString() || '1')
     localStorage.setItem('bulletLineHeight', settings.bulletLineHeight?.toString() || '1')
     localStorage.setItem('bulletTextSize', settings.bulletTextSize?.toString() || '3')
-    localStorage.setItem('bulletGap', settings.bulletGap?.toString() || '0.5')
+    localStorage.setItem('bulletGap', String(settings.bulletGap ?? 0))
     localStorage.setItem('bulletStyle', settings.bulletStyle || 'dot')
     localStorage.setItem('textStyleMode', settings.textStyleMode || 'fontPairing')
     localStorage.setItem('fontPairingSerifFont', settings.fontPairingSerifFont || 'Playfair Display')
@@ -894,38 +899,22 @@ function App() {
     })
   }, [chapters, currentChapterId, slides, selectedSlideId, settings, recordSettings, sidebarWidth, projectName])
 
-  // Copy slides as plain text to clipboard (Slide 1: ... Slide 2: ...)
+  // Copy all slide texts to clipboard (Share menu)
   const exportSlidesAsText = useCallback(async () => {
-    const getPlainText = (content) => {
-      if (!content || typeof content !== 'string') return ''
-      return content
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<div[^>]*>\s*/gi, '\n')
-        .replace(/<\/div>\s*/gi, '')
-        .replace(/<p[^>]*>\s*/gi, '\n')
-        .replace(/<\/p>\s*/gi, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .trim()
+    const allSlides = chapters.flatMap((ch) => ch.slides)
+    if (!allSlides.length) {
+      alert('No slides to copy.')
+      return false
     }
 
-    const allSlides = chapters.flatMap(ch => ch.slides)
-    const lines = allSlides.map((slide, i) => {
-      const num = i + 1
-      const text = getPlainText(slide.content || '')
-      return `Slide ${num}:\n${text || '(empty)'}`
-    })
-    const output = lines.join('\n\n')
-
+    const output = formatSlidesForClipboard(chapters)
     try {
-      await navigator.clipboard.writeText(output)
+      await copyTextToClipboard(output)
+      return true
     } catch (err) {
       console.error('Failed to copy to clipboard:', err)
+      alert('Could not copy to clipboard. Check browser permissions and try again.')
+      return false
     }
   }, [chapters])
 
@@ -1860,6 +1849,7 @@ function App() {
       case 'export': handleExportFile(); break
       case 'exportPng': handleExportSlidesAsPng(); break
       case 'exportInstagram': setShowInstagramExport(true); break
+      case 'copyText': exportSlidesAsText(); break
       case 'import': handleImportFile(); break
       case 'settings': setShowSettings(true); break
       case 'transitions':
@@ -2063,7 +2053,7 @@ function App() {
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
-          bulletGap={settings.bulletGap ?? 0.5}
+          bulletGap={settings.bulletGap ?? 0}
           bulletStyle={settings.bulletStyle || 'dot'}
           recordSettings={recordSettings}
           isRecording={false}
@@ -2229,7 +2219,7 @@ function App() {
           lineHeight={settings.lineHeight ?? 1}
           bulletLineHeight={settings.bulletLineHeight ?? 1}
           bulletTextSize={settings.bulletTextSize ?? 3}
-          bulletGap={settings.bulletGap ?? 0.5}
+          bulletGap={settings.bulletGap ?? 0}
           bulletStyle={settings.bulletStyle || 'dot'}
           contentBottomOffset={settings.contentBottomOffset ?? 12}
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}

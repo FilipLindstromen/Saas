@@ -113,7 +113,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0.5, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, suppressTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, suppressTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -1224,13 +1224,23 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
       const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, effectiveTextAnimationUnit).length); return acc }, [0]) : []
+      const revealBulletsProgressively = isPlayMode && visibleBulletIndex !== null && visibleBulletIndex >= 0 && !!slide.revealOneLineAtATime
+      const getBulletWordDelay = (bulletIndex, wordIndexInBullet) => {
+        if (revealBulletsProgressively) return wordIndexInBullet * chunkDelay
+        return (bulletChunkOffsets[bulletIndex] + wordIndexInBullet) * chunkDelay
+      }
+      const getBulletMarkerDelay = (bulletIndex) => {
+        if (!shouldAnimateText) return undefined
+        if (motion.textAnimation === 'typewriter') return `${0.3 + bulletIndex * 1.4}s`
+        return `${getBulletWordDelay(bulletIndex, 0)}s`
+      }
       const getBulletStyle = (index) => {
         const base = { pointerEvents: undefined, lineHeight: bulletLineHeight }
         if (!shouldAnimateText) return base
         if (motion.textAnimation === 'typewriter') {
           return { ...base, animationDelay: `${0.3 + index * 1.4}s` }
         }
-        return { ...base, animationDelay: `${index * 0.2}s` }
+        return { ...base, animationDelay: `${getBulletWordDelay(index, 0)}s` }
       }
       const bulletListClass = `slide-bullets bullet-style-${bulletStyle || 'dot'}${!showBullets ? ' bullets-hidden' : ''}`
       return (
@@ -1239,7 +1249,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             <div
               key={index}
               className={`slide-bullet ${isPlayMode && visibleBulletIndex !== null ? (index <= visibleBulletIndex ? 'visible' : 'hidden') : 'visible'}`}
-              style={{ lineHeight: bulletLineHeight }}
+              style={{
+                lineHeight: bulletLineHeight,
+                ...(shouldAnimateText ? { '--bullet-anim-delay': getBulletMarkerDelay(index) } : {}),
+              }}
             >
               {useChunkedText ? (
                 <span className="bullet-text slide-text-words" style={{ lineHeight: bulletLineHeight }}>
@@ -1247,7 +1260,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                     item.lineBreak ? (
                       <br key={wi} />
                     ) : (
-                      <span key={wi} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${(bulletChunkOffsets[index] + wi) * chunkDelay}s` }}>
+                      <span key={wi} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${getBulletWordDelay(index, wi)}s` }}>
                         {item.word != null ? item.word + ' ' : item.text}
                       </span>
                     )

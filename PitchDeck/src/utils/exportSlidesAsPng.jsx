@@ -33,7 +33,7 @@ export function buildSlideExportProps(settings) {
     lineHeight: settings.lineHeight ?? 1,
     bulletLineHeight: settings.bulletLineHeight ?? 1,
     bulletTextSize: settings.bulletTextSize ?? 3,
-    bulletGap: settings.bulletGap ?? 0.5,
+    bulletGap: settings.bulletGap ?? 0,
     bulletStyle: settings.bulletStyle || 'dot',
     contentBottomOffset: settings.contentBottomOffset ?? 12,
     contentEdgeOffset: settings.contentEdgeOffset ?? 9,

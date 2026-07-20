@@ -6,6 +6,10 @@
   white-space: nowrap;
 }
 
+.share-export-trigger.share-export-trigger-copied {
+  color: var(--accent-primary, #e67e22);
+}
+
 .share-export-dropdown {
   position: absolute;
   top: calc(100% + 6px);

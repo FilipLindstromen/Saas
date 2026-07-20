@@ -13,7 +13,9 @@ function ShareExportMenu({
   isExporting = false,
 }) {
   const [open, setOpen] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState(null)
   const ref = useRef(null)
+  const copyFeedbackTimerRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -31,16 +33,36 @@ function ShareExportMenu({
     }
   }, [open])
 
+  useEffect(() => () => {
+    if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+  }, [])
+
   const run = (fn) => {
     setOpen(false)
     fn?.()
+  }
+
+  const handleCopyText = async () => {
+    setOpen(false)
+    if (!onCopyText) return
+    try {
+      const ok = await onCopyText()
+      if (ok === false) return
+      setCopyFeedback('Copied!')
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+      copyFeedbackTimerRef.current = setTimeout(() => setCopyFeedback(null), 2000)
+    } catch {
+      setCopyFeedback('Copy failed')
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current)
+      copyFeedbackTimerRef.current = setTimeout(() => setCopyFeedback(null), 2500)
+    }
   }
 
   return (
     <div className="share-export-menu" ref={ref}>
       <button
         type="button"
-        className="header-btn-labeled share-export-trigger"
+        className={`header-btn-labeled share-export-trigger${copyFeedback === 'Copied!' ? ' share-export-trigger-copied' : ''}`}
         onClick={() => setOpen((v) => !v)}
         disabled={isExporting}
         aria-expanded={open}
@@ -51,7 +73,7 @@ function ShareExportMenu({
           <polyline points="16 6 12 2 8 6" />
           <line x1="12" y1="2" x2="12" y2="15" />
         </svg>
-        <span>Share</span>
+        <span>{copyFeedback || 'Share'}</span>
       </button>
       {open && (
         <div className="share-export-dropdown" role="menu">
@@ -66,7 +88,9 @@ function ShareExportMenu({
               Export Instagram carousel
             </button>
           )}
-          <button type="button" role="menuitem" onClick={() => run(onCopyText)}>Copy slides as text</button>
+          <button type="button" role="menuitem" onClick={handleCopyText} disabled={!onCopyText}>
+            Copy slide texts to clipboard
+          </button>
           <button type="button" role="menuitem" onClick={() => run(onSaveToFolder)}>Save to folder</button>
         </div>
       )}

@@ -57,6 +57,12 @@ function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId,
       action: () => onAction('exportInstagram')
     }] : []),
     {
+      id: 'copy-text',
+      label: 'Copy Slide Texts to Clipboard',
+      keywords: ['copy', 'text', 'clipboard', 'slides', 'export'],
+      action: () => onAction('copyText')
+    },
+    {
       id: 'import',
       label: 'Import Project',
       keywords: ['import', 'load', 'open'],

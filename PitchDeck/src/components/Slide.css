@@ -660,7 +660,7 @@
 .slide-bullets {
   display: flex;
   flex-direction: column;
-  gap: var(--slide-bullet-gap, 0.5em);
+  gap: 0;
   width: 100%;
   max-width: 66.67%;
   list-style: none;
@@ -795,7 +795,7 @@
   display: flex;
   align-items: flex-end;
   gap: 0.5em;
-  margin-bottom: 0.5em;
+  margin-bottom: var(--slide-bullet-gap, 0);
 }
 
 .slide-bullet:last-child {
@@ -874,6 +874,80 @@
 
 .play-mode .slide-bullet::before {
   margin-top: 0;
+}
+
+/* Bullet marker enters with the first word of each bullet (present + preview) */
+.play-mode .slide[class*="text-animation-"]:not(.text-animation-none) .slide-bullet.visible::before,
+.slide.preview-text-animation[class*="text-animation-"]:not(.text-animation-none) .slide-bullet.visible::before {
+  opacity: 0;
+  animation-duration: var(--text-animation-duration, 0.7s);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+  animation-delay: var(--bullet-anim-delay, 0s);
+}
+
+.slide.text-animation-fade-in .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-fade-in .slide-bullet.visible::before {
+  animation-name: text-fade-in;
+}
+
+.slide.text-animation-fade-in-up .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-fade-in-up .slide-bullet.visible::before {
+  transform: translateY(32px);
+  animation-name: text-fade-in-up;
+}
+
+.slide.text-animation-fade-in-down .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-fade-in-down .slide-bullet.visible::before {
+  transform: translateY(-32px);
+  animation-name: text-fade-in-down;
+}
+
+.slide.text-animation-slide-in-left .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-slide-in-left .slide-bullet.visible::before {
+  transform: translateX(-48px);
+  animation-name: text-slide-in-left;
+}
+
+.slide.text-animation-slide-in-right .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-slide-in-right .slide-bullet.visible::before {
+  transform: translateX(48px);
+  animation-name: text-slide-in-right;
+}
+
+.slide.text-animation-zoom-in .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-zoom-in .slide-bullet.visible::before {
+  transform: scale(0.85);
+  animation-name: text-zoom-in;
+}
+
+.slide.text-animation-bounce-in .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-bounce-in .slide-bullet.visible::before {
+  animation-name: text-bounce-in;
+}
+
+.slide.text-animation-words-fade-up .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-words-fade-up .slide-bullet.visible::before {
+  transform: translateY(24px);
+  animation-name: text-word-fade-up;
+  animation-duration: var(--text-animation-duration, 0.6s);
+}
+
+.slide.text-animation-words-fade-down .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-words-fade-down .slide-bullet.visible::before {
+  animation-name: text-word-fade-down;
+  animation-duration: var(--text-animation-duration, 0.6s);
+}
+
+.slide.text-animation-blur-in .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-blur-in .slide-bullet.visible::before {
+  filter: blur(12px);
+  animation-name: text-blur-in;
+}
+
+.slide.text-animation-typewriter .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-typewriter .slide-bullet.visible::before {
+  animation-name: text-fade-in;
 }
 
 /* Hide bullet marker when "Show bullets" is off (text only) */

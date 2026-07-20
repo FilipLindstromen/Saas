@@ -129,7 +129,7 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
     lineHeight: 1,
     bulletLineHeight: 1,
     bulletTextSize: 3,
-    bulletGap: 0.5,
+    bulletGap: 0,
     bulletStyle: 'dot',
     contentBottomOffset: 12,
     contentEdgeOffset: 9,
@@ -633,11 +633,14 @@ function TypographyOptions({ settings, onUpdateSettings, onClose, buttonRef, sli
               <label>Spacing between (rem)</label>
               <input
                 type="number"
-                min="0"
+                min="-5"
                 max="5"
                 step="0.1"
-                value={settings.bulletGap !== undefined ? settings.bulletGap : 0.5}
-                onChange={(e) => handleChange('bulletGap', parseFloat(e.target.value) ?? 0.5)}
+                value={settings.bulletGap !== undefined ? settings.bulletGap : 0}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value)
+                  handleChange('bulletGap', Number.isFinite(v) ? v : 0)
+                }}
                 className="style-dropdown-input"
               />
             </div>

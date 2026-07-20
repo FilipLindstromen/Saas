@@ -134,6 +134,13 @@
   filter: none;
 }
 
+/* Outgoing text/background overlay during slide transitions — sits above incoming content */
+.play-slide-container.play-content-outgoing,
+.play-bg-outgoing-overlay {
+  z-index: 6;
+  pointer-events: none;
+}
+
 /* Slide content needs pointer-events for click-through navigation (handled by parent play-mode) */
 .play-slide-container .slide {
   pointer-events: auto;
@@ -145,7 +152,7 @@
 .play-slide-content-transition:not(.text-out) .slide .slide-text-centered-wrapper,
 .play-slide-content-transition:not(.text-out) .slide .slide-section-name,
 .play-slide-content-transition:not(.text-out) .slide .slide-bullets {
-  animation: playContentFadeIn var(--transition-duration, 300ms) ease-out;
+  animation: playContentFadeIn var(--transition-duration, 300ms) ease-out forwards;
 }
 
 @keyframes playContentFadeIn {
@@ -169,14 +176,6 @@
 /* Video layout: content layer above gradient (z-index 5 for text to be on top) */
 .play-slide-container-video-layout {
   z-index: 5;
-}
-
-/* First slide: 2 second delay before text shows - hide text initially, then fade in */
-.play-slide-container.first-slide-text-delayed .slide .slide-content {
-  opacity: 0;
-}
-.play-slide-container .slide .slide-content {
-  transition: opacity 0.5s ease;
 }
 
 /* Preload zone: next slides rendered off-screen so their videos buffer (bounded count to limit memory).
