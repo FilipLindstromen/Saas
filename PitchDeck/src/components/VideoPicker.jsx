@@ -14,6 +14,41 @@ function pickPixabayLink(hit) {
   return v.large?.url || v.medium?.url || v.small?.url || ''
 }
 
+async function searchVideosPage({ source, searchQuery, pageNum, settings }) {
+  if (source === 'pexels') {
+    const res = await fetch(
+      'https://api.pexels.com/videos/search?query=' + encodeURIComponent(searchQuery.trim()) + '&per_page=12&page=' + pageNum,
+      { headers: { Authorization: settings.pexelsKey.trim() } }
+    )
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Pexels search failed. Check your API key.')
+    }
+    const data = await res.json()
+    const list = (data.videos || []).map(v => ({
+      id: v.id,
+      link: pickPexelsLink(v),
+      thumb: v.image || (v.video_pictures && v.video_pictures[0] && v.video_pictures[0].picture)
+    }))
+    return { list, hasMore: list.length === 12 && (data.total_results || 0) > pageNum * 12 }
+  }
+
+  const res = await fetch(
+    'https://pixabay.com/api/videos/?key=' + encodeURIComponent(settings.pixabayKey.trim()) + '&q=' + encodeURIComponent(searchQuery.trim()) + '&page=' + pageNum + '&per_page=12'
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'Pixabay search failed. Check your API key.')
+  }
+  const data = await res.json()
+  const list = (data.hits || []).map(h => ({
+    id: h.id,
+    link: pickPixabayLink(h),
+    thumb: h.pictures?.large || h.pictures?.medium || h.userImageURL
+  })).filter(v => v.link)
+  return { list, hasMore: list.length === 12 && (data.totalHits || 0) > pageNum * 12 }
+}
+
 function VideoPicker({ isOpen, onClose, onSelect, settings }) {
   const [source, setSource] = useState('pexels') // 'pexels' | 'pixabay'
   const [searchQuery, setSearchQuery] = useState('')
@@ -47,66 +82,18 @@ function VideoPicker({ isOpen, onClose, onSelect, settings }) {
       setError('Enter a search term (e.g. ocean, office, nature).')
       return
     }
-    if (source === 'pexels') {
-      if (!hasPexels) {
-        setError('Please set your Pexels API key in Settings.')
-        return
-      }
-      if (pageNum === 1) setIsLoading(true)
-      else setIsLoadingMore(true)
-      setError(null)
-      try {
-        const res = await fetch(
-          'https://api.pexels.com/videos/search?query=' + encodeURIComponent(searchQuery.trim()) + '&per_page=12&page=' + pageNum,
-          { headers: { Authorization: settings.pexelsKey.trim() } }
-        )
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          throw new Error(err.error || 'Pexels search failed. Check your API key.')
-        }
-        const data = await res.json()
-        const list = (data.videos || []).map(v => ({
-          id: v.id,
-          link: pickPexelsLink(v),
-          thumb: v.image || (v.video_pictures && v.video_pictures[0] && v.video_pictures[0].picture)
-        }))
-        setVideos(append ? prev => [...prev, ...list] : list)
-        setPage(pageNum)
-        setHasMore(list.length === 12 && (data.total_results || 0) > pageNum * 12)
-      } catch (err) {
-        setError(err.message || 'Failed to search videos.')
-        if (!append) setVideos([])
-      } finally {
-        setIsLoading(false)
-        setIsLoadingMore(false)
-      }
-      return
-    }
-    // Pixabay
-    if (!hasPixabay) {
-      setError('Please set your Pixabay API key in Settings.')
+    if (!canSearch) {
+      setError(source === 'pexels' ? 'Please set your Pexels API key in Settings.' : 'Please set your Pixabay API key in Settings.')
       return
     }
     if (pageNum === 1) setIsLoading(true)
     else setIsLoadingMore(true)
     setError(null)
     try {
-      const res = await fetch(
-        'https://pixabay.com/api/videos/?key=' + encodeURIComponent(settings.pixabayKey.trim()) + '&q=' + encodeURIComponent(searchQuery.trim()) + '&page=' + pageNum + '&per_page=12'
-      )
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || 'Pixabay search failed. Check your API key.')
-      }
-      const data = await res.json()
-      const list = (data.hits || []).map(h => ({
-        id: h.id,
-        link: pickPixabayLink(h),
-        thumb: h.pictures?.large || h.pictures?.medium || h.userImageURL
-      })).filter(v => v.link)
+      const { list, hasMore: more } = await searchVideosPage({ source, searchQuery, pageNum, settings })
       setVideos(append ? prev => [...prev, ...list] : list)
       setPage(pageNum)
-      setHasMore(list.length === 12 && (data.totalHits || 0) > pageNum * 12)
+      setHasMore(more)
     } catch (err) {
       setError(err.message || 'Failed to search videos.')
       if (!append) setVideos([])

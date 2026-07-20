@@ -354,13 +354,9 @@ input[type="checkbox"]:disabled {
   overflow: hidden;
 }
 
-/* Undo/redo visible in header */
+/* Undo/redo hidden from header; keyboard shortcuts still work */
 .header-right > .header-icon-group:first-child {
   display: flex;
-}
-
-.header-right > .header-icon-group-divider:first-of-type {
-  display: block;
 }
 
 /* Logical groups for header icons */

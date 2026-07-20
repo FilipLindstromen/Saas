@@ -17,6 +17,7 @@ import { isInstagramCarouselFormat } from './utils/slideFormats'
 import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
 import { useUndoRedo } from './hooks/useUndoRedo'
+import { searchStockVideo } from './api/videoSearch'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
@@ -173,6 +174,7 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [isExportingPng, setIsExportingPng] = useState(false)
+  const [isBulkSelectingVideos, setIsBulkSelectingVideos] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [showInstagramExport, setShowInstagramExport] = useState(false)
   const [recentFiles, setRecentFiles] = useState(() => {
@@ -1591,15 +1593,17 @@ function App() {
       return
     }
 
-    // Find slides without images (exclude sections and fullscreen camera layout)
-    const slidesWithoutImages = slides.filter(slide => 
-      (slide.layout || 'default') !== 'section' && 
-      (slide.layout || 'default') !== 'video' && 
-      (!slide.imageUrl || slide.imageUrl.trim() === '')
-    )
+    // Find slides without image or video background (exclude sections and fullscreen camera layout)
+    const slidesWithoutImages = slides.filter(slide => {
+      const layout = slide.layout || 'default'
+      if (layout === 'section' || layout === 'video') return false
+      const hasImage = !!(slide.imageUrl && slide.imageUrl.trim())
+      const hasVideo = !!(slide.backgroundVideoUrl && slide.backgroundVideoUrl.trim())
+      return !hasImage && !hasVideo
+    })
     
     if (slidesWithoutImages.length === 0) {
-      alert('All slides already have images!')
+      alert('All slides already have an image or video background!')
       return
     }
 
@@ -1697,6 +1701,127 @@ function App() {
     
     const message = `Image selection complete!\n${successCount} image(s) added successfully.${failCount > 0 ? `\n${failCount} slide(s) could not be processed.` : ''}`
     alert(message)
+  }
+
+  const handleBulkSelectVideos = async () => {
+    if (!settings.openaiKey) {
+      alert('Please set your OpenAI API key in settings first.')
+      return
+    }
+    if (!settings.pexelsKey && !settings.pixabayKey) {
+      alert('Please set your Pexels or Pixabay API key in settings first.')
+      return
+    }
+
+    const slidesWithoutBackground = slides.filter((slide) => {
+      const layout = slide.layout || 'default'
+      if (layout === 'section' || layout === 'video') return false
+      const hasImage = !!(slide.imageUrl && slide.imageUrl.trim())
+      const hasVideo = !!(slide.backgroundVideoUrl && slide.backgroundVideoUrl.trim())
+      const hasInfographic = !!slide.infographicProjectId
+      return !hasImage && !hasVideo && !hasInfographic
+    })
+
+    if (slidesWithoutBackground.length === 0) {
+      alert('All slides already have an image or video background!')
+      return
+    }
+
+    const confirmMessage = `This will automatically select videos for ${slidesWithoutBackground.length} slide(s). This may take a moment. Continue?`
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    setIsBulkSelectingVideos(true)
+    const updatedSlides = [...slides]
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      for (let i = 0; i < slidesWithoutBackground.length; i++) {
+        const slide = slidesWithoutBackground[i]
+
+        try {
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = slide.content || ''
+          const slideText = tempDiv.textContent || tempDiv.innerText || ''
+
+          if (!slideText.trim()) {
+            failCount++
+            continue
+          }
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${settings.openaiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-3.5-turbo',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a helpful assistant that generates concise, descriptive search queries for finding stock videos on Pexels or Pixabay. Return only a single search query (2-4 words) that best represents the content and mood of the text.'
+                },
+                {
+                  role: 'user',
+                  content: `Generate a stock video search query for this slide text: "${slideText}"`
+                }
+              ],
+              max_tokens: 20
+            })
+          })
+
+          const data = await response.json()
+          if (!response.ok || !data.choices?.[0]?.message?.content) {
+            failCount++
+            continue
+          }
+          const searchQuery = String(data.choices[0].message.content).trim().replace(/['"]/g, '')
+
+          const { url: videoUrl } = await searchStockVideo({
+            query: searchQuery,
+            pexelsKey: settings.pexelsKey,
+            pixabayKey: settings.pixabayKey,
+          })
+
+          if (videoUrl) {
+            const slideIndex = updatedSlides.findIndex((s) => s.id === slide.id)
+            if (slideIndex !== -1) {
+              updatedSlides[slideIndex] = {
+                ...updatedSlides[slideIndex],
+                backgroundVideoUrl: videoUrl,
+                imageUrl: '',
+                backgroundOpacity: 0.6,
+                imageScale: 1.0,
+                imageScaleCustomized: false,
+              }
+              successCount++
+            }
+          } else {
+            failCount++
+          }
+
+          if (i < slidesWithoutBackground.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+        } catch (error) {
+          console.error(`Error selecting video for slide ${slide.id}:`, error)
+          failCount++
+        }
+      }
+
+      setSlides(updatedSlides)
+      const newChapters = chapters.map((c) => (c.id === currentChapterId ? { ...c, slides: updatedSlides } : c))
+      setChapters(newChapters)
+      saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
+
+      const message = `Video selection complete!\n${successCount} video(s) added successfully.${failCount > 0 ? `\n${failCount} slide(s) could not be processed.` : ''}`
+      alert(message)
+    } finally {
+      setIsBulkSelectingVideos(false)
+    }
   }
 
   const selectedSlide =
@@ -1978,12 +2103,10 @@ function App() {
           onRecord={handleRecordClick}
           onVideoEditing={handleEnterVideoEditing}
           isRecordingInPlace={isRecordingInPlace}
-          undo={undo}
-          redo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
           onBulkSelectImages={handleBulkSelectImages}
           bulkImagesDisabled={!settings.openaiKey || !settings.unsplashKey}
+          onBulkSelectVideos={handleBulkSelectVideos}
+          bulkVideosDisabled={isBulkSelectingVideos || !settings.openaiKey || (!settings.pexelsKey && !settings.pixabayKey)}
           onExportProject={handleExportFile}
           onExportPng={handleExportSlidesAsPng}
           onExportInstagram={() => setShowInstagramExport(true)}

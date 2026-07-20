@@ -87,12 +87,10 @@ function AppHeader({
   onRecord,
   onVideoEditing,
   isRecordingInPlace,
-  undo,
-  redo,
-  canUndo,
-  canRedo,
   onBulkSelectImages,
   bulkImagesDisabled,
+  onBulkSelectVideos,
+  bulkVideosDisabled,
   onExportProject,
   onExportPng,
   onExportInstagram,
@@ -287,35 +285,6 @@ function AppHeader({
         </div>
 
         <div className="header-right">
-          <div className="header-icon-group">
-            <button
-              type="button"
-              className="btn-icon-header btn-undo"
-              onClick={undo}
-              title="Undo (Ctrl+Z)"
-              aria-label="Undo"
-              disabled={!canUndo}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 10h10a5 5 0 0 1 5 5v2" />
-                <polyline points="3 10 8 5 3 0" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="btn-icon-header btn-redo"
-              onClick={redo}
-              title="Redo (Ctrl+Y)"
-              aria-label="Redo"
-              disabled={!canRedo}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10H11a5 5 0 0 0-5 5v2" />
-                <polyline points="21 10 16 5 21 0" />
-              </svg>
-            </button>
-          </div>
-          <div className="header-icon-group-divider" aria-hidden="true" />
           {mode === 'edit' && (
             <>
               <div className="header-icon-group">
@@ -323,7 +292,7 @@ function AppHeader({
                   type="button"
                   className="btn-icon-header btn-bulk-images"
                   onClick={onBulkSelectImages}
-                  title="Auto-select images for all slides without images"
+                  title="Auto-select images for all slides without image or video backgrounds"
                   aria-label="Auto-select images"
                   disabled={bulkImagesDisabled}
                 >
@@ -331,6 +300,19 @@ function AppHeader({
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header btn-bulk-videos"
+                  onClick={onBulkSelectVideos}
+                  title="Auto-select videos for all slides without image or video backgrounds"
+                  aria-label="Auto-select videos"
+                  disabled={bulkVideosDisabled}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <polygon points="10 8 16 12 10 16 10 8" />
                   </svg>
                 </button>
               </div>

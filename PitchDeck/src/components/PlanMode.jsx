@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import TemplateSelector from './TemplateSelector'
+import { parsePasteTextToSlideDrafts } from '../utils/parsePasteText'
 import './PlanMode.css'
 
 // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
@@ -749,17 +750,16 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const handlePasteToSlides = () => {
     const text = pasteTextInput.trim()
     if (!text) return
-    // Split by blank lines (one or more newlines) - each paragraph = one slide
-    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
-    if (paragraphs.length === 0) return
+    const drafts = parsePasteTextToSlideDrafts(text)
+    if (drafts.length === 0) return
     const contextKey = isOverview ? (currentChapter?.id ?? currentChapterId) : null
     let nextId = maxSlideId() + 1
-    const newSlides = paragraphs.map(content => ({
+    const newSlides = drafts.map((draft) => ({
       id: nextId++,
-      content: plainTextToStorage(content),
+      content: plainTextToStorage(draft.content),
       subtitle: '',
       imageUrl: '',
-      layout: 'default',
+      layout: draft.layout,
       gradientStrength: 0.7,
       flipHorizontal: false,
       backgroundOpacity: 0.6,
@@ -773,7 +773,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     applyUpdate(contextKey, newSlides)
     setPasteTextInput('')
     setEditingId(newSlides[0]?.id ?? null)
-    setEditContent(paragraphs[0] ?? '')
+    setEditContent(drafts[0]?.content ?? '')
   }
 
   const handleGenerateSlides = async () => {
@@ -1130,7 +1130,9 @@ Example format:
                 </div>
                 <div className="plan-generate-section plan-paste-section">
                   <label className="plan-ramble-label">Paste text</label>
-                  <p className="plan-paste-hint">Each paragraph (separated by blank lines) becomes one slide.</p>
+                  <p className="plan-paste-hint">
+                    Blank lines separate slides (extra blank lines are ignored). Use [PART 1] for section slides and lines starting with &quot;-&quot; for bullet slides.
+                  </p>
                   <textarea
                     className="plan-generate-input plan-paste-input"
                     placeholder="If you operate at a high level during the day…&#10;&#10;make decisions… carry responsibility… solve problems…&#10;&#10;…but when you lie down at night your brain won't shut off…&#10;&#10;this training is for you."
