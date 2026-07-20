@@ -64,33 +64,17 @@ export function formatSlideTextBody(slide) {
   return getSlidePlainText(slide)
 }
 
-/** Format one slide for clipboard export. */
-export function formatSlideForClipboard(slide, slideNumber) {
-  const body = formatSlideTextBody(slide)
-  return `Slide ${slideNumber}:\n${body || '(empty)'}`
-}
-
-/** Format all slides (optionally grouped by chapter) for clipboard. */
+/** Format all slide copy for clipboard — plain text with a blank line between slides. */
 export function formatSlidesForClipboard(chapters) {
   if (!chapters?.length) return ''
 
-  const blocks = []
-  let slideNumber = 0
-  const multiChapter = chapters.length > 1
-
+  const slideTexts = []
   for (const chapter of chapters) {
-    const chapterSlides = chapter.slides || []
-    if (!chapterSlides.length) continue
-
-    if (multiChapter && chapter.name) {
-      blocks.push(chapter.name)
-    }
-
-    for (const slide of chapterSlides) {
-      slideNumber += 1
-      blocks.push(formatSlideForClipboard(slide, slideNumber))
+    for (const slide of chapter.slides || []) {
+      const body = formatSlideTextBody(slide).trim()
+      if (body) slideTexts.push(body)
     }
   }
 
-  return blocks.join('\n\n')
+  return slideTexts.join('\n\n')
 }

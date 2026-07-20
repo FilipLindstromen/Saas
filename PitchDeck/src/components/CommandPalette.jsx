@@ -58,8 +58,8 @@ function CommandPalette({ onClose, onAction, slides, chapters, currentChapterId,
     }] : []),
     {
       id: 'copy-text',
-      label: 'Copy Slide Texts to Clipboard',
-      keywords: ['copy', 'text', 'clipboard', 'slides', 'export'],
+      label: 'Copy All Slide Copy',
+      keywords: ['copy', 'text', 'clipboard', 'slides', 'export', 'copywriting'],
       action: () => onAction('copyText')
     },
     {

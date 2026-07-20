@@ -7,7 +7,7 @@ import { getWebcamCirclePixelSize, normalizeWebcamSizePercent } from '../utils/w
 import { getExportCanvasSize } from '../utils/slideFormats'
 import { getBackgroundScaleProgress } from '../utils/backgroundFit'
 import { getBulletPointsFromSlide } from '../utils/slidePlainText'
-import { resolveMotionSettings, resolveCanvasPushDirection, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
+import { resolveMotionSettings, resolveCanvasPushDirection, resolveTransitionStyle, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
 import { getSubSlides, getActiveSubSlideRect, getSubSlideCameraStyle } from '../utils/subSlides'
 import './PlayMode.css'
 
@@ -804,7 +804,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     setTransitionPhase('idle')
 
-    if (transitionStyle === 'canvas-push') {
+    const navTransitionStyle = resolveTransitionStyle(transitionStyle, nextSlideDataForNav)
+
+    if (navTransitionStyle === 'canvas-push') {
       const sameBgExact = sameBackgroundExact(currentSlideData, nextSlideDataForNav)
       if (sameBgExact) {
         setPendingIndex(null)
@@ -831,7 +833,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     const sameBgForNav = sameBackground(currentSlideData, nextSlideDataForNav)
     // When crossfade selected, use crossfade for all transitions (including video) - bg fades out as new fades in
-    const useCrossfadeForVideo = transitionStyle === 'crossfade'
+    const useCrossfadeForVideo = navTransitionStyle === 'crossfade'
     // When same bg, skip video slide-off/slide-in - keep background, only transition content
     if (currentHasVideo && !nextHasVideo && !sameBgForNav && !useCrossfadeForVideo) {
       // Video → no video: slide video off to right, webcam off if needed
@@ -863,7 +865,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const sameBgExact = sameBackgroundExact(currentSlideData, nextSlideDataForNav)
       const sameBg = sameBackground(currentSlideData, nextSlideDataForNav)
       const hasWebcamChange = currentHasWebcam !== nextHasWebcam
-      const transitionDuration = getTransitionDuration(transitionStyle)
+      const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
         setPendingIndex(null)
@@ -937,7 +939,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     setTransitionPhase('idle')
 
-    if (transitionStyle === 'canvas-push') {
+    const navTransitionStyle = resolveTransitionStyle(transitionStyle, prevSlideDataForNav)
+
+    if (navTransitionStyle === 'canvas-push') {
       const sameBgExact = sameBackgroundExact(currentSlideData, prevSlideDataForNav)
       if (sameBgExact) {
         setPendingIndex(null)
@@ -963,7 +967,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     }
 
     const sameBgForNavPrev = sameBackground(currentSlideData, prevSlideDataForNav)
-    const useCrossfadeForVideoPrev = transitionStyle === 'crossfade'
+    const useCrossfadeForVideoPrev = navTransitionStyle === 'crossfade'
     // When same bg, skip video slide-off/slide-in - keep background, only transition content
     if (currentHasVideo && !prevHasVideo && !sameBgForNavPrev && !useCrossfadeForVideoPrev) {
       // Video → no video (going back): slide video off to right, webcam off if needed
@@ -995,7 +999,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const sameBgExact = sameBackgroundExact(currentSlideData, prevSlideDataForNav)
       const sameBg = sameBackground(currentSlideData, prevSlideDataForNav)
       const hasWebcamChange = currentHasWebcam !== prevHasWebcam
-      const transitionDuration = getTransitionDuration(transitionStyle)
+      const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
         setPendingIndex(null)
@@ -1501,8 +1505,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   // Use target slide for background during same-bg transition so position/scale animates smoothly
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
   const backgroundSlideForLayer = backgroundTransitionActive && targetSlide ? targetSlide : backgroundSlideForPosScale
-  const transitionDurationMs = getTransitionDuration(transitionStyle)
-  const activeTransitionStyle = normalizeTransitionStyle(transitionStyle)
+  const transitionStyleSlide = targetSlide ?? currentSlide
+  const resolvedTransitionStyle = resolveTransitionStyle(transitionStyle, transitionStyleSlide)
+  const transitionDurationMs = getTransitionDuration(resolvedTransitionStyle)
+  const activeTransitionStyle = normalizeTransitionStyle(resolvedTransitionStyle)
 
   const canvasPushActive = transitionPhase === 'canvas-push' && targetSlide
   const activeCanvasPushDirection = targetSlide

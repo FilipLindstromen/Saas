@@ -164,6 +164,32 @@ export function getTextExitClass(textExitAnimation, textAnimation) {
   return `text-exit-${textExitAnimation}`
 }
 
+export const VALID_TRANSITION_STYLES = new Set(['default', 'slide', 'zoom', 'dissolve', 'crossfade', 'blur', 'sequence', 'canvas-push'])
+
+const TRANSITION_STYLE_LABELS = {
+  default: 'Default',
+  slide: 'Slide',
+  zoom: 'Zoom',
+  dissolve: 'Dissolve',
+  crossfade: 'Crossfade',
+  blur: 'Blur',
+  sequence: 'Object Sequence',
+  'canvas-push': 'Canvas push',
+}
+
+export function getTransitionStyleLabel(style = 'default') {
+  return TRANSITION_STYLE_LABELS[style] || TRANSITION_STYLE_LABELS.default
+}
+
+/** Per-slide transition style override; falls back to deck default. */
+export function resolveTransitionStyle(deckStyle = 'default', slide = null) {
+  const slideStyle = slide?.transitionStyle
+  if (typeof slideStyle === 'string' && slideStyle !== '' && VALID_TRANSITION_STYLES.has(slideStyle)) {
+    return slideStyle
+  }
+  return VALID_TRANSITION_STYLES.has(deckStyle) ? deckStyle : 'default'
+}
+
 const VALID_CANVAS_PUSH_DIRECTIONS = new Set(['left', 'right', 'up', 'down'])
 
 export function getCanvasPushDirectionLabel(direction = 'left') {

@@ -89,7 +89,7 @@ function ShareExportMenu({
             </button>
           )}
           <button type="button" role="menuitem" onClick={handleCopyText} disabled={!onCopyText}>
-            Copy slide texts to clipboard
+            Copy all slide copy
           </button>
           <button type="button" role="menuitem" onClick={() => run(onSaveToFolder)}>Save to folder</button>
         </div>
