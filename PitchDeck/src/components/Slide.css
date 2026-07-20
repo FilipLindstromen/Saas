@@ -599,7 +599,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(1rem, 8vw, 12rem) !important;
+  font-size: var(--dynamic-font-size, var(--slide-base-font-size, 4rem)) !important;
   line-height: 1.1 !important;
   white-space: normal;
   overflow: hidden;

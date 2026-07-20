@@ -79,6 +79,19 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+  opacity: 1;
+}
+
+.play-background-layer.play-bg-settled .slide-background,
+.play-background-layer.play-bg-settled .slide-background-video {
+  opacity: var(--bg-opacity, 1);
+}
+
+/* During dual-layer bg transition, hide the persistent layer to avoid double-draw flash */
+.play-background-layer.play-bg-incoming-hidden {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Layer 4: Webcam — above gradient, below slide text; persists across slide changes */
@@ -181,16 +194,16 @@
   pointer-events: auto;
 }
 
-/* Content fades in when slide changes — skip while text is exiting */
-.play-slide-content-transition:not(.text-out) .slide .slide-content,
-.play-slide-content-transition:not(.text-out) .slide .slide-content-video,
-.play-slide-content-transition:not(.text-out) .slide .slide-text-centered-wrapper,
-.play-slide-content-transition:not(.text-out) .slide .slide-section-name,
-.play-slide-content-transition:not(.text-out) .slide .slide-bullets {
+/* Content fades in when slide changes — skip when text entrance animation handles visibility */
+.play-slide-content-transition:not(.text-out):not(.has-text-entrance-anim) .slide .slide-content,
+.play-slide-content-transition:not(.text-out):not(.has-text-entrance-anim) .slide .slide-content-video,
+.play-slide-content-transition:not(.text-out):not(.has-text-entrance-anim) .slide .slide-text-centered-wrapper,
+.play-slide-content-transition:not(.text-out):not(.has-text-entrance-anim) .slide .slide-section-name,
+.play-slide-content-transition:not(.text-out):not(.has-text-entrance-anim) .slide .slide-bullets {
   animation: playContentFadeIn var(--transition-duration, 300ms) ease-out forwards;
 }
 
-/* Skip content fade-in while outgoing overlay is visible — prevents text flicker */
+/* During slide transition: suppress generic fade-in; text stays hidden until entrance animation runs */
 .play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-content,
 .play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-content-video,
 .play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-text-centered-wrapper,
@@ -198,7 +211,27 @@
 .play-slide-content-transition.transition-in-progress:not(.text-out) .slide .slide-bullets,
 .play-slide-content-transition.transition-in-progress:not(.text-out) .slide-graphic-overlays {
   animation: none !important;
-  opacity: 1;
+}
+
+/* Keep incoming copy hidden until text exit finishes and entrance animation is allowed */
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-content,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-content-video,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-text,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-text-centered-wrapper,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-text-centered-wrapper .slide-text,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-subtitle,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-text-centered-wrapper .slide-subtitle,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-section-name,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-bullets,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-bullet .bullet-text,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-bullet::before,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .text-animation-word,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-graphic-overlays,
+.play-mode .slide.text-entrance-pending[class*="text-animation-"] .slide-graphic-overlay .slide-graphic-overlay-inner {
+  opacity: 0 !important;
+  animation: none !important;
+  transform: none !important;
+  filter: none !important;
 }
 
 /* Incoming background layer animates in during bg transitions (outgoing is a separate overlay) */
@@ -496,6 +529,11 @@
   overflow: hidden;
 }
 
+.play-bg-dual-layer .play-crossfade-layer .slide-background,
+.play-bg-dual-layer .play-crossfade-layer .slide-background-video {
+  opacity: var(--bg-opacity, 1);
+}
+
 .play-bg-dual-layer .play-crossfade-layer .slide-background.background-scale-animation,
 .play-bg-dual-layer .play-crossfade-layer .slide-background.background-scale-animation {
   animation: none !important;
@@ -508,6 +546,14 @@
 .play-crossfade-layer.play-crossfade-in {
   z-index: 1;
   opacity: 0;
+}
+
+.play-bg-dual-layer .play-crossfade-layer {
+  position: absolute;
+  inset: 0;
+  animation-duration: var(--transition-duration, 500ms);
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: both;
 }
 
 /* Dual-layer transition styles */

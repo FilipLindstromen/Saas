@@ -20,6 +20,7 @@ import './Slide.css'
  */
 function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection = 'zoom-in', frozenScaleProgress = null, isPreload = false, isPlayMode = false }) {
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
+  const [videoReady, setVideoReady] = useState(false)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
 
@@ -72,6 +73,10 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
       setBackgroundVideoSrc(null)
     }
   }, [slide?.backgroundVideoUrl, layout])
+
+  useEffect(() => {
+    setVideoReady(false)
+  }, [slide?.backgroundVideoUrl, backgroundVideoSrc])
 
   useEffect(() => {
     if (!slide?.backgroundVideoUrl || layout === 'section' || isPreload) return
@@ -152,11 +157,15 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
         const raw = slide.backgroundVideoUrl
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
+        const showVideo = !isPlayMode || isPreload || videoReady
         return (
           <div
             className="slide-background slide-background-video"
             aria-hidden="true"
-            style={{ opacity: backgroundOpacity }}
+            style={{
+              opacity: showVideo ? backgroundOpacity : 0,
+              transition: isPlayMode ? 'opacity 0.2s ease-out' : undefined,
+            }}
           >
             <video
               ref={backgroundVideoRef}
@@ -168,6 +177,8 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
               playsInline
               preload="auto"
               className="slide-background-video-el"
+              onLoadedData={() => setVideoReady(true)}
+              onCanPlay={() => setVideoReady(true)}
               style={getVideoBackgroundStyle(
                 slide,
                 { x: currentPosition.x, y: currentPosition.y },

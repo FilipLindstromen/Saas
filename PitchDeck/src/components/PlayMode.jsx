@@ -1576,6 +1576,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         ])
     : []
 
+  const hasTextEntranceAnim = motion.textAnimation && motion.textAnimation !== 'none'
   const outgoingBulletPoints = outgoingTransitionSlide ? getBulletPoints(outgoingTransitionSlide) : []
   const outgoingIsBulletSlide = outgoingTransitionSlide && (outgoingTransitionSlide.layout || 'default') === 'bulletpoints'
 
@@ -1673,11 +1674,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         {backgroundTransitionActive && outgoingTransitionSlide && (
           <div
             className={`play-bg-outgoing-overlay play-bg-dual-layer transition-${activeTransitionStyle}`}
-            style={{ position: 'absolute', inset: 0, zIndex: 2, '--transition-duration': `${transitionDurationMs}ms` }}
+            style={{ position: 'absolute', inset: 0, zIndex: 2, '--transition-duration': `${transitionDurationMs}ms`, '--bg-opacity': outgoingTransitionSlide?.backgroundOpacity !== undefined ? outgoingTransitionSlide.backgroundOpacity : 0.6 }}
           >
             <div
               className="play-crossfade-layer play-crossfade-out"
-              style={{ '--bg-opacity': outgoingTransitionSlide?.backgroundOpacity !== undefined ? outgoingTransitionSlide.backgroundOpacity : 0.6 }}
               aria-hidden="true"
             >
               <SlideBackground
@@ -1690,11 +1690,26 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
                 isPlayMode={true}
               />
             </div>
+            <div
+              className="play-crossfade-layer play-crossfade-in"
+              style={{ '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6 }}
+              aria-hidden="true"
+            >
+              <SlideBackground
+                key={getBackgroundMediaKey(backgroundSlideForLayer)}
+                slide={backgroundSlideForLayer}
+                kenBurns={incomingMotion.kenBurns}
+                backgroundKenBurnsDirection={incomingMotion.backgroundKenBurnsDirection}
+                frozenScaleProgress={0}
+                isPreload={false}
+                isPlayMode={true}
+              />
+            </div>
           </div>
         )}
         {usePersistentBackground && (
           <div
-            className={`play-background-layer ${backgroundTransitionActive ? `play-bg-incoming-transition transition-${activeTransitionStyle}` : ''} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''} ${!sameBgNoTransition && transitionPhase === 'fade-out' ? `transition-${activeTransitionStyle} fade-out` : ''}`}
+            className={`play-background-layer ${backgroundTransitionActive ? 'play-bg-incoming-hidden' : 'play-bg-settled'} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
             style={{
               '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
               '--pos-scale-duration': `${transitionDurationMs}ms`,
@@ -1771,7 +1786,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       {!canvasPushActive && (
       <div 
         key={currentSlide?.id ?? currentIndex}
-        className={`play-slide-container play-slide-content-transition transition-${activeTransitionStyle} ${outgoingTransitionSlide ? 'transition-in-progress' : ''} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''}`}
+        className={`play-slide-container play-slide-content-transition transition-${activeTransitionStyle} ${outgoingTransitionSlide ? 'transition-in-progress' : ''} ${hasTextEntranceAnim ? 'has-text-entrance-anim' : ''} ${currentSlideLayout === 'video' || currentSlideLayout === 'left-video' || currentSlideLayout === 'right-video' ? 'play-slide-container-video-layout' : ''} ${usePersistentBackground || usePersistentVideo || backgroundTransitionActive ? 'play-slide-content-only' : ''} ${motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''}`}
         style={{ '--bg-opacity': currentSlide?.backgroundOpacity !== undefined ? currentSlide.backgroundOpacity : 0.6 }}
       >
         <Slide 

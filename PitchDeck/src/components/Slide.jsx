@@ -18,6 +18,7 @@ import { resolveMotionSettings } from '../utils/motionPresets'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { startWebcamStream } from '../utils/webcamStream'
 import { getSlideFormatMeta } from '../utils/slideFormats'
+import { computeSlideTypographyPx } from '../utils/typography'
 import { clampTextMaxWidth, getDefaultTextMaxWidth, getSlideTextMaxWidth } from '../utils/textFieldWidth'
 
 // Build CSS filter string for video adjustments (shadows/midtones/highlights + color hue per zone)
@@ -145,7 +146,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   const motion = useMemo(() => resolveMotionSettings({}, slide), [slide])
 
-  const shouldAnimateText = (isPlayMode || (previewTextAnimation && !onUpdate)) && motion.textAnimation && motion.textAnimation !== 'none' && !suppressTextAnimation
+  const inPlayOrPreview = (isPlayMode || (previewTextAnimation && !onUpdate))
+  const hasTextAnimation = inPlayOrPreview && motion.textAnimation && motion.textAnimation !== 'none'
+  const shouldRunTextEntrance = hasTextAnimation && !suppressTextAnimation
 
   // Fetch cross-origin video to blob URL so <video> loads same-origin (avoids COEP block)
   useEffect(() => {
@@ -1196,6 +1199,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       if (level === 'h3') return h3LineHeight
       return lineHeight
     }
+    const getHeadingFontSizePx = (level) => {
+      if (!typographyPx || !level) return undefined
+      if (level === 'h1') return `${typographyPx.h1FontSize}px`
+      if (level === 'h2') return `${typographyPx.h2FontSize}px`
+      if (level === 'h3') return `${typographyPx.h3FontSize}px`
+      return undefined
+    }
+
     const baseTextStyle = {
       color: slideTextColor,
       textShadow: textDropShadow 
@@ -1203,7 +1214,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         : undefined,
       WebkitTextStroke: textOutline ? `${outlineWidth}px ${outlineColor}` : undefined,
       paintOrder: textOutline ? 'stroke fill' : undefined,
-      fontSize: textHeadingLevel ? `${getHeadingSize(textHeadingLevel)}rem` : undefined,
+      fontSize: textHeadingLevel ? getHeadingFontSizePx(textHeadingLevel) : undefined,
       fontFamily: textHeadingLevel ? `"${getHeadingFont(textHeadingLevel)}", sans-serif` : `"${fontFamily}", sans-serif`,
       fontWeight: textHeadingLevel ? getHeadingWeight(textHeadingLevel) : defaultFontWeight,
       lineHeight: textHeadingLevel ? getHeadingLineHeight(textHeadingLevel) : lineHeight,
@@ -1217,14 +1228,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     
     const subtitleStyle = {
       ...textStyle,
-      fontSize: subtitleHeadingLevel ? `${getHeadingSize(subtitleHeadingLevel)}rem` : undefined,
+      fontSize: subtitleHeadingLevel ? getHeadingFontSizePx(subtitleHeadingLevel) : undefined,
       fontFamily: subtitleHeadingLevel ? `"${getHeadingFont(subtitleHeadingLevel)}", sans-serif` : undefined,
       lineHeight: subtitleHeadingLevel ? getHeadingLineHeight(subtitleHeadingLevel) : textStyle.lineHeight,
       pointerEvents: isEditable ? 'auto' : undefined,
-      ...(shouldAnimateText && motion.subtitleDelay > 0 ? { animationDelay: `${motion.subtitleDelay}s` } : {}),
+      ...(shouldRunTextEntrance && motion.subtitleDelay > 0 ? { animationDelay: `${motion.subtitleDelay}s` } : {}),
     }
 
-    const useChunkedText = shouldAnimateText
+    const useChunkedText = hasTextAnimation
     const chunkDelay = effectiveTextAnimationUnit === 'word'
       ? motion.textAnimationStagger
       : Math.max(motion.textAnimationStagger * 2.5, 0.12)
@@ -1238,13 +1249,13 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         return (bulletChunkOffsets[bulletIndex] + wordIndexInBullet) * chunkDelay
       }
       const getBulletMarkerDelay = (bulletIndex) => {
-        if (!shouldAnimateText) return undefined
+        if (!shouldRunTextEntrance) return undefined
         if (motion.textAnimation === 'typewriter') return `${0.3 + bulletIndex * 1.4}s`
         return `${getBulletWordDelay(bulletIndex, 0)}s`
       }
       const getBulletStyle = (index) => {
         const base = { pointerEvents: undefined, lineHeight: bulletLineHeight }
-        if (!shouldAnimateText) return base
+        if (!shouldRunTextEntrance) return base
         if (motion.textAnimation === 'typewriter') {
           return { ...base, animationDelay: `${0.3 + index * 1.4}s` }
         }
@@ -1260,7 +1271,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
               style={{
                 lineHeight: bulletLineHeight,
                 '--bullet-line-height': bulletLineHeight,
-                ...(shouldAnimateText ? { '--bullet-anim-delay': getBulletMarkerDelay(index) } : {}),
+                ...(shouldRunTextEntrance ? { '--bullet-anim-delay': getBulletMarkerDelay(index) } : {}),
               }}
             >
               {useChunkedText ? (
@@ -1474,6 +1485,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const [currentPosition, setCurrentPosition] = useState({ x: imagePositionX, y: imagePositionY })
   const slideRef = useRef(null)
   const textResizeDragRef = useRef(null)
+  const [typographyPx, setTypographyPx] = useState(null)
 
   const textMaxWidth = textMaxWidthLive ?? getSlideTextMaxWidth(slide)
 
@@ -1573,56 +1585,52 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [imagePositionX, imagePositionY, isDragging])
 
-  // Set base font-size as percentage of slide width for consistent scaling; respect defaultTextSize (rem)
+  // Typography scales with slide width; present mode uses export-canvas density to match edit preview
   useEffect(() => {
-    const updateFontSize = () => {
-      if (slideRef.current) {
-        const slideWidth = slideRef.current.offsetWidth
-        // At 1200px width, base = defaultTextSize * 16px (e.g. 5rem -> 80px at 16px root); scales with slide width
-        if (slideWidth > 0) {
-          const coordScale = slideWidth / 1200
-          slideRef.current.style.setProperty('--slide-coord-scale', String(coordScale))
-          const baseFontSize = coordScale * 16 * defaultTextSize
-          slideRef.current.style.setProperty('--slide-base-font-size', `${baseFontSize}px`)
-          const bulletFontSize = coordScale * 16 * bulletTextSize
-          slideRef.current.style.setProperty('--slide-bullet-font-size', `${bulletFontSize}px`)
-        }
-      }
+    const typographySizes = {
+      defaultTextSize,
+      bulletTextSize,
+      h1Size,
+      h2Size,
+      h3Size,
     }
-    
-    // Initial update with a small delay to ensure DOM is ready
-    const timeoutId = setTimeout(() => {
-      updateFontSize()
-    }, 0)
-    
-    // Update on resize (handles both preview and present mode resizing)
+
+    const updateTypography = () => {
+      if (!slideRef.current) return
+      const slideWidth = slideRef.current.offsetWidth
+      if (slideWidth <= 0) return
+      setTypographyPx(computeSlideTypographyPx(slideWidth, { isPlayMode, slideFormat }, typographySizes))
+    }
+
+    const timeoutId = setTimeout(updateTypography, 0)
+
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(updateFontSize)
+      requestAnimationFrame(updateTypography)
     })
-    
+
     if (slideRef.current) {
       resizeObserver.observe(slideRef.current)
     }
-    
+
     const handleResize = () => {
-      requestAnimationFrame(updateFontSize)
+      requestAnimationFrame(updateTypography)
     }
     window.addEventListener('resize', handleResize)
-    
+
     const handleFullscreenChange = () => {
       setTimeout(() => {
-        requestAnimationFrame(updateFontSize)
+        requestAnimationFrame(updateTypography)
       }, 100)
     }
     document.addEventListener('fullscreenchange', handleFullscreenChange)
-    
+
     return () => {
       clearTimeout(timeoutId)
       resizeObserver.disconnect()
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [isPlayMode, defaultTextSize, bulletTextSize]) // Re-run when play mode or text sizes change
+  }, [isPlayMode, slideFormat, defaultTextSize, bulletTextSize, h1Size, h2Size, h3Size])
 
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl && !slide.infographicProjectId)) return
@@ -1694,7 +1702,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [isDragging, handleImageMouseMove, handleImageMouseUp])
 
-  const textAnimationClass = shouldAnimateText ? `text-animation-${motion.textAnimation}` : ''
+  const textAnimationClass = hasTextAnimation ? `text-animation-${motion.textAnimation}` : ''
+  const textEntrancePendingClass = hasTextAnimation && suppressTextAnimation ? 'text-entrance-pending' : ''
   const bgBlurClass = (isPlayMode || previewTextAnimation) && motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''
 
   const { aspectRatio: aspectRatioValue, className: formatClass } = getSlideFormatMeta(slideFormat)
@@ -1705,7 +1714,23 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
     cursor: hasDraggableBackground ? 'move' : undefined,
-    '--slide-base-font-size': `${defaultTextSize}rem`,
+    ...(typographyPx ? {
+      '--slide-coord-scale': String(typographyPx.coordScale),
+      '--slide-base-font-size': `${typographyPx.baseFontSize}px`,
+      '--slide-bullet-font-size': `${typographyPx.bulletFontSize}px`,
+      '--slide-h1-font-size': `${typographyPx.h1FontSize}px`,
+      '--slide-h2-font-size': `${typographyPx.h2FontSize}px`,
+      '--slide-h3-font-size': `${typographyPx.h3FontSize}px`,
+      '--slide-h1-subtitle-font-size': `${typographyPx.h1SubtitleFontSize}px`,
+      '--slide-h2-subtitle-font-size': `${typographyPx.h2SubtitleFontSize}px`,
+      '--slide-h3-subtitle-font-size': `${typographyPx.h3SubtitleFontSize}px`,
+      '--slide-h1-bullet-font-size': `${typographyPx.h1BulletFontSize}px`,
+      '--slide-h2-bullet-font-size': `${typographyPx.h2BulletFontSize}px`,
+      '--slide-h3-bullet-font-size': `${typographyPx.h3BulletFontSize}px`,
+      '--dynamic-font-size': `${typographyPx.dynamicFontSize}px`,
+    } : {
+      '--slide-base-font-size': `${defaultTextSize}rem`,
+    }),
     '--text-animation-duration': `${0.6 / textAnimSpeed}s`,
     '--slide-pairing-font': `"${fontPairingSerifFont}", serif`,
     '--slide-content-bottom': isTopAligned ? undefined : `${contentBottomOffset}%`,
@@ -1737,7 +1762,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
+      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onPointerDown={handleSlidePointerDown}
@@ -1751,12 +1776,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .slide .bullet-text {
           font-weight: ${defaultFontWeight} !important;
         }
-        /* H1/H2/H3 in edit and present mode */
+        /* H1/H2/H3 in edit and present mode — scaled via --slide-*-font-size from slide root */
         .slide .slide-content h1,
         .slide .slide-content-video h1,
         .slide.play-mode .slide-content h1,
         .slide.play-mode .slide-content-video h1 {
-          font-size: ${h1Size}rem !important;
+          font-size: var(--slide-h1-font-size, ${h1Size}rem) !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
           line-height: ${h1LineHeight}em !important;
@@ -1765,7 +1790,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .slide .slide-content-video h2,
         .slide.play-mode .slide-content h2,
         .slide.play-mode .slide-content-video h2 {
-          font-size: ${h2Size}rem !important;
+          font-size: var(--slide-h2-font-size, ${h2Size}rem) !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
           line-height: ${h2LineHeight}em !important;
@@ -1775,21 +1800,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .slide .slide-content-video h3,
         .slide.play-mode .slide-content h3,
         .slide.play-mode .slide-content-video h3 {
-          font-size: ${h3Size}rem !important;
+          font-size: var(--slide-h3-font-size, ${h3Size}rem) !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
           line-height: ${h3LineHeight}em !important;
         }
         .slide .slide-subtitle h1,
         .slide.play-mode .slide-subtitle h1 {
-          font-size: ${h1Size * 0.5}rem !important;
+          font-size: var(--slide-h1-subtitle-font-size, ${h1Size * 0.5}rem) !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
           line-height: ${h1LineHeight}em !important;
         }
         .slide .slide-subtitle h2,
         .slide.play-mode .slide-subtitle h2 {
-          font-size: ${h2Size * 0.5}rem !important;
+          font-size: var(--slide-h2-subtitle-font-size, ${h2Size * 0.5}rem) !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
           line-height: ${h2LineHeight}em !important;
@@ -1797,17 +1822,29 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         }
         .slide .slide-subtitle h3,
         .slide.play-mode .slide-subtitle h3 {
-          font-size: ${h3Size * 0.5}rem !important;
+          font-size: var(--slide-h3-subtitle-font-size, ${h3Size * 0.5}rem) !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
           line-height: ${h3LineHeight}em !important;
+        }
+        .slide .slide-text.text-heading-h1,
+        .slide.play-mode .slide-text.text-heading-h1,
+        .slide .slide-subtitle.text-heading-h1,
+        .slide.play-mode .slide-subtitle.text-heading-h1 {
+          font-size: var(--slide-h1-font-size, ${h1Size}rem) !important;
+        }
+        .slide .slide-text.text-heading-h2,
+        .slide.play-mode .slide-text.text-heading-h2,
+        .slide .slide-subtitle.text-heading-h2,
+        .slide.play-mode .slide-subtitle.text-heading-h2 {
+          font-size: var(--slide-h2-font-size, ${h2Size}rem) !important;
         }
         /* Block-level H3: when subtitle/content has text-heading-h3 class (edit + present) */
         .slide .slide-subtitle.text-heading-h3,
         .slide .slide-text.text-heading-h3,
         .slide.play-mode .slide-subtitle.text-heading-h3,
         .slide.play-mode .slide-text.text-heading-h3 {
-          font-size: ${h3Size * 0.5}rem !important;
+          font-size: var(--slide-h3-subtitle-font-size, ${h3Size * 0.5}rem) !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
           line-height: ${h3LineHeight}em !important;
@@ -1816,21 +1853,21 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         .slide .slide-content-video .slide-text.text-heading-h3,
         .slide.play-mode .slide-content .slide-text.text-heading-h3,
         .slide.play-mode .slide-content-video .slide-text.text-heading-h3 {
-          font-size: ${h3Size}rem !important;
+          font-size: var(--slide-h3-font-size, ${h3Size}rem) !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
           line-height: ${h3LineHeight}em !important;
         }
         .slide .bullet-text h1,
         .slide.play-mode .bullet-text h1 {
-          font-size: ${h1Size * 0.6}rem !important;
+          font-size: var(--slide-h1-bullet-font-size, ${h1Size * 0.6}rem) !important;
           font-family: "${getHeadingFont(h1FontFamily)}", sans-serif !important;
           font-weight: ${h1Weight} !important;
           line-height: ${h1LineHeight}em !important;
         }
         .slide .bullet-text h2,
         .slide.play-mode .bullet-text h2 {
-          font-size: ${h2Size * 0.6}rem !important;
+          font-size: var(--slide-h2-bullet-font-size, ${h2Size * 0.6}rem) !important;
           font-family: "${getHeadingFont(h2FontFamily)}", sans-serif !important;
           font-weight: ${h2Weight} !important;
           line-height: ${h2LineHeight}em !important;
@@ -1838,7 +1875,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         }
         .slide .bullet-text h3,
         .slide.play-mode .bullet-text h3 {
-          font-size: ${h3Size * 0.6}rem !important;
+          font-size: var(--slide-h3-bullet-font-size, ${h3Size * 0.6}rem) !important;
           font-family: "${getHeadingFont(h3FontFamily)}", sans-serif !important;
           font-weight: ${h3Weight} !important;
           line-height: ${h3LineHeight}em !important;
