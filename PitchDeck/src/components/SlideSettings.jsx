@@ -60,22 +60,6 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
       )}
 
-      {show('lines') && (
-      <div className="slide-settings-section">
-        <div className="slide-settings-field">
-          <label className="slide-settings-toggle">
-            <input
-              type="checkbox"
-              checked={!!slide.revealOneLineAtATime}
-              onChange={(e) => onUpdate({ revealOneLineAtATime: e.target.checked })}
-            />
-            <span>Show one line at a time</span>
-          </label>
-        </div>
-        <p className="slide-settings-hint">When enabled, each click in present mode reveals one more text line (or bullet).</p>
-      </div>
-      )}
-
       {show('motion') && (
       <div className="slide-settings-section">
         <h3 className="slide-settings-section-title">Motion preset</h3>

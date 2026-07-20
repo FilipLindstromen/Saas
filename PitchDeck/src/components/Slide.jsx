@@ -1233,7 +1233,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     if (layout === 'bulletpoints') {
       const bullets = getBulletPoints()
       const bulletChunkOffsets = useChunkedText ? bullets.reduce((acc, b, i) => { acc.push(acc[i] + getChunksWithFormatting(b, effectiveTextAnimationUnit).length); return acc }, [0]) : []
-      const revealBulletsProgressively = isPlayMode && visibleBulletIndex !== null && visibleBulletIndex >= 0 && !!slide.revealOneLineAtATime
+      const revealBulletsProgressively = isPlayMode && visibleBulletIndex !== null && visibleBulletIndex >= 0
       const getBulletWordDelay = (bulletIndex, wordIndexInBullet) => {
         if (revealBulletsProgressively) return wordIndexInBullet * chunkDelay
         return (bulletChunkOffsets[bulletIndex] + wordIndexInBullet) * chunkDelay

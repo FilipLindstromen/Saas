@@ -142,10 +142,10 @@ function InspectorPanel({
           />
         )}
 
-        {(tab === 'slide-lines' || tab === 'slide-background') && (
+        {tab === 'slide-background' && (
           <SlideSettings
             {...slideSettingsProps}
-            section={tab === 'slide-lines' ? 'lines' : 'background'}
+            section="background"
           />
         )}
 

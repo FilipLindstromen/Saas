@@ -43,7 +43,6 @@ export const MOTION_PRESET_OPTIONS = [
       textAnimationUnit: 'sentence',
       textAnimationStagger: 0.18,
       textExitAnimation: 'match-in',
-      revealOneLineAtATime: true,
       graphicAnimationIn: 'fade',
     },
   },
@@ -137,8 +136,6 @@ export function resolveMotionSettings(_globalSettings = {}, slide = null) {
     backgroundKenBurnsDirection: pick('backgroundKenBurnsDirection', 'backgroundKenBurnsDirection', 'zoom-in'),
     backgroundBlurOnTextEnter: pick('backgroundBlurOnTextEnter', 'backgroundBlurOnTextEnter', SLIDE_MOTION_DEFAULTS.backgroundBlurOnTextEnter),
     graphicAnimationIn: pick('graphicAnimationIn', 'graphicAnimationIn', SLIDE_MOTION_DEFAULTS.graphicAnimationIn),
-    revealOneLineAtATime: slide?.revealOneLineAtATime === true
-      || (slide?.revealOneLineAtATime !== false && presetSettings.revealOneLineAtATime === true),
   }
 }
 
@@ -216,7 +213,6 @@ export function applyMotionPresetToSlide(_slide, presetId) {
     return {
       motionPreset: 'default',
       ...SLIDE_MOTION_DEFAULTS,
-      revealOneLineAtATime: false,
     }
   }
   const preset = getMotionPreset(presetId)
@@ -231,6 +227,5 @@ export function applyMotionPresetToSlide(_slide, presetId) {
     subtitleDelay: presetSettings.subtitleDelay ?? SLIDE_MOTION_DEFAULTS.subtitleDelay,
     backgroundBlurOnTextEnter: presetSettings.backgroundBlurOnTextEnter ?? SLIDE_MOTION_DEFAULTS.backgroundBlurOnTextEnter,
     graphicAnimationIn: presetSettings.graphicAnimationIn ?? SLIDE_MOTION_DEFAULTS.graphicAnimationIn,
-    revealOneLineAtATime: presetSettings.revealOneLineAtATime === true,
   }
 }

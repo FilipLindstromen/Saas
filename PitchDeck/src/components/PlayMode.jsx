@@ -632,7 +632,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(0)
-  const [visibleLineIndex, setVisibleLineIndex] = useState(0)
   const [slideKey, setSlideKey] = useState(0) // Force re-render on slide change
   const [preloadReady, setPreloadReady] = useState(false) // Defer preload until after first paint to avoid overlapping text on play start
   // Video persistence: when transitioning from video slide to non-video, slide video off to right
@@ -741,21 +740,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const outgoingTextExitClass = outgoingTransitionSlide
     ? getTextExitClass(outgoingMotion.textExitAnimation, outgoingMotion.textAnimation)
     : textExitClass
-  const revealOneLineAtATime = !!motion.revealOneLineAtATime
-
-  // Content line count for non-bullet slides (must match Slide getContentLines: <div>, <p>, <br> → newline)
-  const getContentLineCount = (slide) => {
-    if (!slide?.content) return 1
-    const normalized = (slide.content + '')
-      .replace(/<div[^>]*>\s*/gi, '\n')
-      .replace(/<\/div>\s*/gi, '\n')
-      .replace(/<p[^>]*>\s*/gi, '\n')
-      .replace(/<\/p>\s*/gi, '\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-    const lines = normalized.split('\n')
-    return Math.max(1, lines.length)
-  }
-  const contentLineCount = !isBulletSlide && currentSlide ? getContentLineCount(currentSlide) : 0
 
   // Defer preload slides until after first paint so only the selected slide shows when play starts
   useEffect(() => {
@@ -765,11 +749,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     return () => cancelAnimationFrame(rafId)
   }, [])
 
-  // Reset line/bullet reveal when changing slides (first line/bullet visible when reveal is on)
+  // Reset bullet reveal when changing slides (first bullet visible on bullet slides)
   useEffect(() => {
-    setVisibleBulletIndex(revealOneLineAtATime && isBulletSlide ? 0 : -1)
-    setVisibleLineIndex(0)
-  }, [currentIndex, revealOneLineAtATime, isBulletSlide])
+    setVisibleBulletIndex(isBulletSlide ? 0 : -1)
+  }, [currentIndex, isBulletSlide])
 
   // Get transition duration based on style
   const getTransitionDuration = (style) => {
@@ -1060,12 +1043,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const advancePresentation = useCallback(() => {
     if (isTransitioning) return
 
-    if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
+    if (isBulletSlide && visibleBulletIndex < bulletPoints.length - 1) {
       setVisibleBulletIndex((prev) => prev + 1)
-      return
-    }
-    if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex < contentLineCount - 1) {
-      setVisibleLineIndex((prev) => prev + 1)
       return
     }
 
@@ -1077,12 +1056,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     nextSlide()
   }, [
     isTransitioning,
-    revealOneLineAtATime,
     isBulletSlide,
     visibleBulletIndex,
     bulletPoints.length,
-    visibleLineIndex,
-    contentLineCount,
     subSlides.length,
     subSlideIndex,
     nextSlide,
@@ -1091,12 +1067,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const retreatPresentation = useCallback(() => {
     if (isTransitioning) return
 
-    if (revealOneLineAtATime && isBulletSlide && visibleBulletIndex >= 0) {
+    if (isBulletSlide && visibleBulletIndex >= 0) {
       setVisibleBulletIndex((prev) => prev - 1)
-      return
-    }
-    if (revealOneLineAtATime && !isBulletSlide && visibleLineIndex >= 0) {
-      setVisibleLineIndex((prev) => prev - 1)
       return
     }
 
@@ -1112,10 +1084,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     prevSlide()
   }, [
     isTransitioning,
-    revealOneLineAtATime,
     isBulletSlide,
     visibleBulletIndex,
-    visibleLineIndex,
     subSlideIndex,
     prevSlide,
   ])
@@ -1720,8 +1690,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           {...commonSlideProps}
           cameraOverrideEnabled={currentSlide?.cameraOverrideEnabled === true || recordSettings?.cameraOverrideEnabled === true}
           cameraOverridePosition={currentSlide?.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}
-          visibleBulletIndex={isBulletSlide && !revealOneLineAtATime ? Math.max(0, bulletPoints.length - 1) : (revealOneLineAtATime && isBulletSlide ? Math.max(0, visibleBulletIndex) : visibleBulletIndex)}
-          visibleLineIndex={!isBulletSlide && revealOneLineAtATime ? visibleLineIndex : null}
+          visibleBulletIndex={isBulletSlide ? Math.max(0, visibleBulletIndex) : visibleBulletIndex}
+          visibleLineIndex={null}
           suppressTextAnimation={suppressTextEntranceAfterCanvasPushRef.current}
           isPreload={false}
           hideBackground={usePersistentBackground || usePersistentVideo || backgroundTransitionActive}

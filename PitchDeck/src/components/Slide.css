@@ -852,7 +852,7 @@
 
 .slide-bullet {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 0.5em;
   margin-bottom: var(--slide-bullet-gap, 0);
 }
@@ -887,7 +887,7 @@
 
 /* Present mode: match edit-mode bullet marker alignment */
 .play-mode .slide-bullet {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .slide-bullet::before {
@@ -913,7 +913,7 @@
 .slide-bullets.bullet-style-square .slide-bullet::before {
   content: '■';
   font-size: 0.65em;
-  margin-top: 0.35em;
+  margin-top: 0.2em;
 }
 
 .slide-bullets.bullet-style-number {

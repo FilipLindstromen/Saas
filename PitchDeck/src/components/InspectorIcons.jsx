@@ -21,7 +21,6 @@ export const INSPECTOR_TABS = [
   { id: 'layout', label: 'Layout', group: 'document' },
   { id: 'colors', label: 'Colors', group: 'document' },
   { id: 'typography', label: 'Typography', group: 'document' },
-  { id: 'slide-lines', label: 'Line reveal', group: 'slide' },
   { id: 'slide-motion', label: 'Motion', group: 'slide' },
   { id: 'slide-background', label: 'Background', group: 'slide' },
   { id: 'devices', label: 'Camera & microphone', group: 'record' },
@@ -37,6 +36,7 @@ const LEGACY_TAB_IDS = {
   'slide-bg': 'colors',
   gradient: 'slide-background',
   media: 'slide-background',
+  'slide-lines': 'slide-background',
   present: 'slide-motion',
   playback: 'slide-motion',
   transitions: 'slide-motion',
@@ -77,14 +77,6 @@ export function InspectorTabIcon({ tabId }) {
           <path d="M4 7V5h16v2" />
           <path d="M12 5v14" />
           <path d="M8 19h8" />
-        </svg>
-      )
-    case 'slide-lines':
-      return (
-        <svg {...iconProps}>
-          <path d="M4 7h16" />
-          <path d="M4 12h12" />
-          <path d="M4 17h8" />
         </svg>
       )
     case 'slide-motion':
