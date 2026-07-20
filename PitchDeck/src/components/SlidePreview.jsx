@@ -9,6 +9,8 @@ import GenerateBackgroundModal from './GenerateBackgroundModal'
 import GenerateOverlayModal from './GenerateOverlayModal'
 import { createSubSlide } from '../utils/subSlides'
 import { resolveMotionSettings } from '../utils/motionPresets'
+import { generateMediaSearchQuery } from '../utils/mediaSearchQuery'
+import { searchStockVideo } from '../api/videoSearch'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -24,6 +26,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', webcamFlipHorizontal: false, webcamFlipVertical: false }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
+  const [isSelectingVideos, setIsSelectingVideos] = useState(false)
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [showVideoPicker, setShowVideoPicker] = useState(false)
   const [showInfographicPicker, setShowInfographicPicker] = useState(false)
@@ -81,33 +84,17 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
 
     setIsSelectingImages(true)
     try {
-      // Use OpenAI to generate a search query based on slide content
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that generates concise, descriptive search queries for finding images on Unsplash. Return only a single search query (2-4 words) that best represents the content and mood of the text.'
-            },
-            {
-              role: 'user',
-              content: `Generate an Unsplash search query for this slide text: "${slide.content}"`
-            }
-          ],
-          max_tokens: 20
-        })
+      const searchQuery = await generateMediaSearchQuery({
+        slide,
+        mediaType: 'image',
+        openaiKey: settings.openaiKey,
       })
 
-      const data = await response.json()
-      const searchQuery = data.choices[0].message.content.trim().replace(/['"]/g, '')
+      if (!searchQuery) {
+        alert('No slide text to search from.')
+        return
+      }
 
-      // Search Unsplash for images
       const unsplashResponse = await fetch(
         `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=5&orientation=landscape`,
         {
@@ -120,7 +107,6 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       const unsplashData = await unsplashResponse.json()
       
       if (unsplashData.results && unsplashData.results.length > 0) {
-        // Use the first result
         const imageUrl = unsplashData.results[0].urls.regular
         onUpdate({ imageUrl, backgroundOpacity: 0.6, imageScale: 1.0, imageScaleCustomized: false })
       } else {
@@ -131,6 +117,57 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
       alert('Error selecting image. Please check your API keys and try again.')
     } finally {
       setIsSelectingImages(false)
+    }
+  }
+
+  const handleSelectVideo = async () => {
+    if (!settings.openaiKey) {
+      alert('Please set your OpenAI API key in settings first.')
+      return
+    }
+    if (!settings.pexelsKey?.trim() && !settings.pixabayKey?.trim()) {
+      alert('Please set your Pexels or Pixabay API key in settings first.')
+      return
+    }
+    if ((slide.layout || 'default') === 'video') {
+      return
+    }
+
+    setIsSelectingVideos(true)
+    try {
+      const searchQuery = await generateMediaSearchQuery({
+        slide,
+        mediaType: 'video',
+        openaiKey: settings.openaiKey,
+      })
+
+      if (!searchQuery) {
+        alert('No slide text to search from.')
+        return
+      }
+
+      const { url: videoUrl } = await searchStockVideo({
+        query: searchQuery,
+        pexelsKey: settings.pexelsKey,
+        pixabayKey: settings.pixabayKey,
+      })
+
+      if (videoUrl) {
+        onUpdate({
+          backgroundVideoUrl: videoUrl,
+          imageUrl: '',
+          backgroundOpacity: 0.6,
+          imageScale: 1.0,
+          imageScaleCustomized: false,
+        })
+      } else {
+        alert('No videos found. Try a different search query.')
+      }
+    } catch (error) {
+      console.error('Error selecting video:', error)
+      alert('Error selecting video. Please check your API keys and try again.')
+    } finally {
+      setIsSelectingVideos(false)
     }
   }
 
@@ -349,6 +386,13 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
                     <button type="button" onClick={() => { handleSwapImage(); setBackgroundMenuOpen(false) }} disabled={!settings.unsplashKey}>Choose image</button>
                     <button type="button" onClick={() => { handleSelectImages(); setBackgroundMenuOpen(false) }} disabled={isSelectingImages || !slide.content || (slide.layout || 'default') === 'video'}>
                       {isSelectingImages ? 'Selecting…' : 'Auto-select image'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { handleSelectVideo(); setBackgroundMenuOpen(false) }}
+                      disabled={isSelectingVideos || !slide.content || (slide.layout || 'default') === 'video' || !(settings.pexelsKey?.trim() || settings.pixabayKey?.trim()) || !settings.openaiKey?.trim()}
+                    >
+                      {isSelectingVideos ? 'Selecting…' : 'Auto-select video'}
                     </button>
                     <button
                       type="button"

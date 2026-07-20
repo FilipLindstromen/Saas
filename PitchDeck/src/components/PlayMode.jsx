@@ -13,7 +13,33 @@ import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
 const WEBCAM_TRANSITION_MS = 500
+const WEBCAM_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 const VALID_TRANSITION_STYLES = new Set(['default', 'slide', 'zoom', 'dissolve', 'crossfade', 'blur', 'sequence', 'canvas-push'])
+
+function getSlideBackgroundColor(slide, fallback = '#1a1a1a') {
+  if (!slide) return fallback
+  if (slide.backgroundColorOverride && slide.backgroundColorOverrideValue) {
+    return slide.backgroundColorOverrideValue
+  }
+  return fallback
+}
+
+function getWebcamLayoutKey(slide, recordSettings) {
+  if (!slide) return ''
+  const overrideEnabled = slide.cameraOverrideEnabled === true || recordSettings?.cameraOverrideEnabled === true
+  if (overrideEnabled) {
+    return `override:${slide.cameraOverridePosition || recordSettings?.cameraOverridePosition || 'fullscreen'}`
+  }
+  return slide.layout || 'default'
+}
+
+function hasWebcamLayoutChange(fromSlide, toSlide, recordSettings) {
+  if (!fromSlide || !toSlide) return false
+  if (!isWebcamActiveForSlide(fromSlide, recordSettings) || !isWebcamActiveForSlide(toSlide, recordSettings)) {
+    return false
+  }
+  return getWebcamLayoutKey(fromSlide, recordSettings) !== getWebcamLayoutKey(toSlide, recordSettings)
+}
 
 function normalizeTransitionStyle(style) {
   return VALID_TRANSITION_STYLES.has(style) ? style : 'default'
@@ -174,6 +200,79 @@ function getVideoFilterString(recordSettings) {
   return `brightness(${brightness}) contrast(${contrast}) saturate(${s})${huePart}`
 }
 
+function getWebcamOverlayPosition({
+  layout,
+  dimensions,
+  webcamSize,
+  cameraOverrideEnabled = false,
+  cameraOverridePosition = 'fullscreen',
+}) {
+  const circleSize = getWebcamCirclePixelSize(dimensions.height, webcamSize)
+  const webcamWidth = circleSize.width
+  const webcamHeight = circleSize.height
+  const bottomOffset = dimensions.height * 0.04
+  const sideOffset = dimensions.width * 0.04
+
+  if (cameraOverrideEnabled) {
+    switch (cameraOverridePosition) {
+      case 'fullscreen':
+        return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, borderRadius: '0' }
+      case 'left-third': {
+        const w = dimensions.width / 3
+        return { top: 0, left: 0, width: w, height: dimensions.height, borderRadius: '0' }
+      }
+      case 'right-third': {
+        const w = dimensions.width / 3
+        return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, borderRadius: '0' }
+      }
+      case 'circle-top-left':
+        return { top: bottomOffset, left: sideOffset, width: webcamWidth, height: webcamHeight, borderRadius: '50%' }
+      case 'circle-top-right':
+        return { top: bottomOffset, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, borderRadius: '50%' }
+      case 'circle-bottom-left':
+        return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, borderRadius: '50%' }
+      case 'circle-bottom-right':
+      default:
+        return {
+          top: dimensions.height - bottomOffset - webcamHeight,
+          left: dimensions.width - sideOffset - webcamWidth,
+          width: webcamWidth,
+          height: webcamHeight,
+          borderRadius: '50%',
+        }
+    }
+  }
+
+  const effectiveLayout = layout || 'default'
+  if (effectiveLayout === 'video') {
+    return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, borderRadius: '0' }
+  }
+  if (effectiveLayout === 'left-video') {
+    const w = dimensions.width / 3
+    return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, borderRadius: '0' }
+  }
+  if (effectiveLayout === 'right-video') {
+    const w = dimensions.width / 3
+    return { top: 0, left: 0, width: w, height: dimensions.height, borderRadius: '0' }
+  }
+  if (effectiveLayout === 'right') {
+    return {
+      top: dimensions.height - bottomOffset - webcamHeight,
+      left: sideOffset,
+      width: webcamWidth,
+      height: webcamHeight,
+      borderRadius: '50%',
+    }
+  }
+  return {
+    top: dimensions.height - bottomOffset - webcamHeight,
+    left: dimensions.width - sideOffset - webcamWidth,
+    width: webcamWidth,
+    height: webcamHeight,
+    borderRadius: '50%',
+  }
+}
+
 // Webcam overlay component - separate from slide transitions
 // isVisible: show the video. shouldPreload: start stream hidden (next slide needs webcam). shouldKeepAlive: keep stream running when no slide needs it yet (avoids activation delay).
 // isSlidingOff: animate webcam out to the right. isSlidingIn: animate webcam in from the right.
@@ -223,54 +322,13 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 20, isVisible = true, sh
   // Get webcam position: when camera override is enabled use cameraOverridePosition; otherwise use layout
   // Use stored layout when transitioning out so overlay doesn't jump
   const effectiveLayout = (isTransitioningOut || isSlidingOff) ? layoutWhenVisibleRef.current : layout
-  const getWebcamPosition = () => {
-    const circleSize = getWebcamCirclePixelSize(dimensions.height, webcamSize)
-    const webcamWidth = circleSize.width
-    const webcamHeight = circleSize.height
-    const bottomOffset = dimensions.height * 0.04
-    const sideOffset = dimensions.width * 0.04
-
-    if (cameraOverrideEnabled) {
-      switch (cameraOverridePosition) {
-        case 'fullscreen':
-          return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, isCircle: false }
-        case 'left-third': {
-          const w = dimensions.width / 3
-          return { top: 0, left: 0, width: w, height: dimensions.height, isCircle: false }
-        }
-        case 'right-third': {
-          const w = dimensions.width / 3
-          return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, isCircle: false }
-        }
-        case 'circle-top-left':
-          return { top: bottomOffset, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
-        case 'circle-top-right':
-          return { top: bottomOffset, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
-        case 'circle-bottom-left':
-          return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
-        case 'circle-bottom-right':
-        default:
-          return { top: dimensions.height - bottomOffset - webcamHeight, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
-      }
-    }
-
-    // Use layout when override is disabled
-    if (effectiveLayout === 'video') {
-      return { top: 0, left: 0, width: dimensions.width, height: dimensions.height, isCircle: false }
-    }
-    if (effectiveLayout === 'left-video') {
-      const w = dimensions.width / 3
-      return { top: 0, left: dimensions.width - w, width: w, height: dimensions.height, isCircle: false }
-    }
-    if (effectiveLayout === 'right-video') {
-      const w = dimensions.width / 3
-      return { top: 0, left: 0, width: w, height: dimensions.height, isCircle: false }
-    }
-    if (effectiveLayout === 'right') {
-      return { top: dimensions.height - bottomOffset - webcamHeight, left: sideOffset, width: webcamWidth, height: webcamHeight, isCircle: true }
-    }
-    return { top: dimensions.height - bottomOffset - webcamHeight, left: dimensions.width - sideOffset - webcamWidth, width: webcamWidth, height: webcamHeight, isCircle: true }
-  }
+  const position = getWebcamOverlayPosition({
+    layout: effectiveLayout,
+    dimensions,
+    webcamSize,
+    cameraOverrideEnabled,
+    cameraOverridePosition,
+  })
 
   useEffect(() => {
     if (!shouldHaveStream) return
@@ -325,18 +383,14 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 20, isVisible = true, sh
   if ((!isVisible && !shouldPreload && !isTransitioningOut && !shouldKeepAlive && !isSlidingOff && !isSlidingIn) || !cameraId) return null
   if (cameraOverrideEnabled && cameraOverridePosition === 'disabled') return null
 
-  const position = getWebcamPosition()
-  const useCircle = position.isCircle
-  const isFullscreen = position.width >= dimensions.width - 2 && position.height >= dimensions.height - 2
-
   const isHidden = (shouldPreload && !isVisible) || (isTransitioningOut && !isSlidingOff)
   const webcamOffRight = shouldKeepAlive && !isVisible && !isSlidingOff && !isSlidingIn
   const slideStyle = useCanvasCoords ? {
     position: 'absolute',
     inset: 0,
     transform: isSlidingOff || webcamOffRight ? 'translateX(100%)' : 'translateX(0)',
-    transition: isSlidingIn ? 'none' : `transform ${WEBCAM_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-    animation: isSlidingIn ? `play-webcam-slide-in ${WEBCAM_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards` : 'none',
+    transition: isSlidingIn ? 'none' : `transform ${WEBCAM_TRANSITION_MS}ms ${WEBCAM_EASING}`,
+    animation: isSlidingIn ? `play-webcam-slide-in ${WEBCAM_TRANSITION_MS}ms ${WEBCAM_EASING} forwards` : 'none',
   } : undefined
 
   const style = {
@@ -345,18 +399,13 @@ function WebcamOverlay({ cameraId, layout, webcamSize = 20, isVisible = true, sh
     left: `${position.left}px`,
     width: `${position.width}px`,
     height: `${position.height}px`,
-    minWidth: isFullscreen ? '0' : '0',
-    minHeight: isFullscreen ? '0' : '0',
-    maxWidth: 'none',
-    maxHeight: 'none',
-    aspectRatio: (isFullscreen || position.width !== position.height) ? 'auto' : '1 / 1',
-    borderRadius: useCircle ? '50%' : '0',
-    clipPath: useCircle ? 'circle(50% at center)' : 'none',
-    WebkitClipPath: useCircle ? 'circle(50% at center)' : 'none',
+    borderRadius: position.borderRadius,
+    overflow: 'hidden',
     zIndex: useCanvasCoords ? 1 : 1000,
     pointerEvents: 'none',
     opacity: isHidden ? 0 : 1,
-    transition: 'opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+    background: position.borderRadius === '50%' ? 'var(--bg-secondary, #2a2a2a)' : '#000',
+    boxShadow: position.borderRadius === '50%' ? '0 4px 20px rgba(0, 0, 0, 0.5)' : 'none',
   }
 
   return (
@@ -860,6 +909,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const sameBgExact = sameBackgroundExact(currentSlideData, nextSlideDataForNav)
       const sameBg = sameBackground(currentSlideData, nextSlideDataForNav)
       const hasWebcamChange = currentHasWebcam !== nextHasWebcam
+      const webcamLayoutChanged = hasWebcamLayoutChange(currentSlideData, nextSlideDataForNav, recordSettings)
+      const webcamTransitionMs = (hasWebcamChange || webcamLayoutChanged) ? WEBCAM_TRANSITION_MS : 0
       const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
@@ -895,7 +946,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(nextIndex)
         setTransitionPhase('background-transition')
-        const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+        const phaseDuration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
           setOutgoingTransitionSlide(null)
           setPendingIndex(null)
@@ -910,7 +961,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(nextIndex)
         setTransitionPhase('fade-out')
-        const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+        const phase1Duration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
           setOutgoingTransitionSlide(null)
           setPendingIndex(null)
@@ -1004,6 +1055,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       const sameBgExact = sameBackgroundExact(currentSlideData, prevSlideDataForNav)
       const sameBg = sameBackground(currentSlideData, prevSlideDataForNav)
       const hasWebcamChange = currentHasWebcam !== prevHasWebcam
+      const webcamLayoutChanged = hasWebcamLayoutChange(prevSlideDataForNav, currentSlideData, recordSettings)
+      const webcamTransitionMs = (hasWebcamChange || webcamLayoutChanged) ? WEBCAM_TRANSITION_MS : 0
       const transitionDuration = getTransitionDuration(navTransitionStyle)
 
       if (sameBgExact) {
@@ -1034,7 +1087,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(prevIndex)
         setTransitionPhase('background-transition')
-        const phaseDuration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+        const phaseDuration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
           setOutgoingTransitionSlide(null)
           setPendingIndex(null)
@@ -1048,7 +1101,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setOutgoingTransitionSlide(currentSlideData)
         setCurrentIndex(prevIndex)
         setTransitionPhase('fade-out')
-        const phase1Duration = Math.max(transitionDuration, hasWebcamChange ? WEBCAM_TRANSITION_MS : 0)
+        const phase1Duration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
           setOutgoingTransitionSlide(null)
           setPendingIndex(null)
@@ -1448,6 +1501,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     outlineColor,
     webcamEnabled: false,
     selectedCameraId: recordSettings?.selectedCameraId ?? '',
+    webcamSize: normalizeWebcamSizePercent(recordSettings.webcamSize),
     webcamFlipHorizontal: recordSettings?.webcamFlipHorizontal === true,
     webcamFlipVertical: recordSettings?.webcamFlipVertical === true,
     videoBrightness: typeof recordSettings?.videoBrightness === 'number' ? recordSettings.videoBrightness : 1,
@@ -1483,6 +1537,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     fontPairingSerifFont: fontPairingSerifFont || 'Playfair Display',
     slideFormat
   }
+
+  const webcamTargetSlide = webcamShouldPreload ? nextSlideData : currentSlide
+  const webcamTargetLayout = webcamShouldPreload ? nextSlideLayout : currentSlideLayout
 
   // Scale canvas to fit viewport while preserving exact pixel dimensions
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
@@ -1539,7 +1596,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           <div key={key} className="play-canvas-push-panel">
             {layerKind === 'bg' ? (
               <>
-                <div className="play-layer-bg-color" style={{ backgroundColor: backgroundColor || '#1a1a1a' }} />
+                <div className="play-layer-bg-color" style={{ backgroundColor: getSlideBackgroundColor(slide, backgroundColor || '#1a1a1a') }} />
                 {slideHasBackgroundMedia(slide) && (
                   <SlideBackground
                     slide={slide}
@@ -1575,6 +1632,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
     </div>
   )
 
+  const currentSlideBgColor = getSlideBackgroundColor(currentSlide, backgroundColor || '#1a1a1a')
+
   const cameraStyle = getSubSlideCameraStyle(activeSubSlideRect)
 
   return (
@@ -1594,7 +1653,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       <>
       <div
         className="play-layer-bg-color"
-        style={{ backgroundColor: backgroundColor || '#1a1a1a' }}
+        style={{
+          backgroundColor: currentSlideBgColor,
+          transition: `background-color ${WEBCAM_TRANSITION_MS}ms ${WEBCAM_EASING}`,
+        }}
         aria-hidden="true"
       />
       {/* Layer 1: Background image/video - transition applied here (not webcam) */}
@@ -1656,30 +1718,34 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       </>
       )}
       {canvasPushActive && canvasPushConfig && renderCanvasPushTrack('bg')}
-      {/* Layer 2: Webcam - inside canvas for correct layer order, stays fixed during canvas push */}
+      {!canvasPushActive && usePersistentGradient && (
+        <GradientOverlay
+          slide={currentSlide}
+          backgroundColor={backgroundColor}
+        />
+      )}
+      {/* Persistent webcam — above gradient, below slide text; survives slide changes for smooth layout morphs */}
       {anySlideHasWebcam && webcamCameraId && (
-        <div className="play-webcam-layer" aria-hidden="true">
+        <div
+          className="play-webcam-layer"
+          aria-hidden="true"
+          style={{ '--webcam-transition-duration': `${WEBCAM_TRANSITION_MS}ms` }}
+        >
           <WebcamOverlay
             cameraId={webcamCameraId}
-            layout={webcamShouldPreload ? nextSlideLayout : currentSlideLayout}
+            layout={webcamTargetLayout}
             webcamSize={normalizeWebcamSizePercent(recordSettings.webcamSize)}
             isVisible={currentSlideHasWebcam}
             shouldPreload={webcamShouldPreload}
             shouldKeepAlive={webcamShouldKeepAlive}
             isSlidingOff={isWebcamSlidingOff}
             isSlidingIn={isWebcamSlidingIn}
-            cameraOverrideEnabled={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
-            cameraOverridePosition={(webcamShouldPreload ? nextSlideData : currentSlide)?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
+            cameraOverrideEnabled={webcamTargetSlide?.cameraOverrideEnabled === true || recordSettings.cameraOverrideEnabled === true}
+            cameraOverridePosition={webcamTargetSlide?.cameraOverridePosition || recordSettings.cameraOverridePosition || 'fullscreen'}
             recordSettings={recordSettings}
             canvasSize={canvasSize}
           />
         </div>
-      )}
-      {!canvasPushActive && usePersistentGradient && (
-        <GradientOverlay
-          slide={currentSlide}
-          backgroundColor={backgroundColor}
-        />
       )}
       {canvasPushActive && canvasPushConfig && renderCanvasPushTrack('content')}
       {/* Content layer: incoming slide renders below; outgoing overlay fades out on top during transitions */}
@@ -1717,8 +1783,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           visibleLineIndex={null}
           suppressTextAnimation={suppressTextEntranceAfterCanvasPushRef.current || !!outgoingTransitionSlide}
           isPreload={false}
-          hideBackground={usePersistentBackground || usePersistentVideo || backgroundTransitionActive}
-          hideGradient={usePersistentGradient}
+          hideBackground={true}
+          hideGradient={true}
         />
       </div>
       )}
@@ -1738,6 +1804,8 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
                 visibleBulletIndex={-1}
                 visibleLineIndex={null}
                 isPreload={true}
+                hideBackground={true}
+                hideGradient={true}
               />
             </div>
           )

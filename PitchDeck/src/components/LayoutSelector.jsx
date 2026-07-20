@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import './LayoutSelector.css'
 
 const LAYOUTS = [
@@ -109,56 +110,96 @@ const CAMERA_OVERRIDE_POSITIONS = [
 ]
 
 function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1 }) {
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pitchDeckLayoutsExpanded')
+      if (saved === 'false') return false
+      if (saved === 'true') return true
+    } catch (e) {}
+    return true
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pitchDeckLayoutsExpanded', String(expanded))
+    } catch (e) {}
+  }, [expanded])
+
   return (
-    <div className="layout-selector">
+    <div className={`layout-selector${expanded ? '' : ' layout-selector-collapsed'}`}>
       <div className="layout-selector-header">
-        <span className="layout-selector-title">Layouts</span>
-        {selectedCount > 1 && (
+        <button
+          type="button"
+          className="layout-selector-toggle"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls="layout-selector-panel"
+          title={expanded ? 'Hide layouts' : 'Show layouts'}
+        >
+          <span className="layout-selector-title">Layouts</span>
+          <svg
+            className={`layout-selector-chevron${expanded ? ' expanded' : ''}`}
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        {expanded && selectedCount > 1 && (
           <span className="layout-selector-multi-hint">Applying to {selectedCount} slides</span>
         )}
       </div>
-      <div className="layout-thumbnails">
-        {LAYOUTS.map((layout) => (
-          <div
-            key={layout.id}
-            className={`layout-thumbnail ${selectedLayout === layout.id ? 'selected' : ''}`}
-            onClick={() => onSelectLayout(layout.id)}
-            title={layout.description}
-          >
-            <div className="layout-thumbnail-preview">
-              {layout.thumbnail}
-            </div>
-            <div className="layout-thumbnail-name">{layout.name}</div>
-          </div>
-        ))}
-      </div>
-      <div className="camera-override-row">
-        <div className="camera-override-toggles">
-          <label className="camera-override-toggle">
-            <input
-              type="checkbox"
-              checked={!!cameraOverrideEnabled}
-              onChange={(e) => onCameraOverrideChange?.(e.target.checked)}
-            />
-            <span className="camera-override-label">Camera Override</span>
-          </label>
-        </div>
-        {cameraOverrideEnabled && (
-          <div className="camera-override-icons">
-            {CAMERA_OVERRIDE_POSITIONS.map((pos) => (
-              <button
-                key={pos.id}
-                type="button"
-                className={`camera-override-icon ${cameraOverridePosition === pos.id ? 'selected' : ''}`}
-                onClick={() => onCameraOverridePositionSelect?.(pos.id)}
-                title={pos.title}
+      {expanded && (
+        <div id="layout-selector-panel">
+          <div className="layout-thumbnails">
+            {LAYOUTS.map((layout) => (
+              <div
+                key={layout.id}
+                className={`layout-thumbnail ${selectedLayout === layout.id ? 'selected' : ''}`}
+                onClick={() => onSelectLayout(layout.id)}
+                title={layout.description}
               >
-                {pos.icon}
-              </button>
+                <div className="layout-thumbnail-preview">
+                  {layout.thumbnail}
+                </div>
+                <div className="layout-thumbnail-name">{layout.name}</div>
+              </div>
             ))}
           </div>
-        )}
-      </div>
+          <div className="camera-override-row">
+            <div className="camera-override-toggles">
+              <label className="camera-override-toggle">
+                <input
+                  type="checkbox"
+                  checked={!!cameraOverrideEnabled}
+                  onChange={(e) => onCameraOverrideChange?.(e.target.checked)}
+                />
+                <span className="camera-override-label">Camera Override</span>
+              </label>
+            </div>
+            {cameraOverrideEnabled && (
+              <div className="camera-override-icons">
+                {CAMERA_OVERRIDE_POSITIONS.map((pos) => (
+                  <button
+                    key={pos.id}
+                    type="button"
+                    className={`camera-override-icon ${cameraOverridePosition === pos.id ? 'selected' : ''}`}
+                    onClick={() => onCameraOverridePositionSelect?.(pos.id)}
+                    title={pos.title}
+                  >
+                    {pos.icon}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

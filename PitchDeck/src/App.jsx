@@ -20,6 +20,7 @@ import { useUndoRedo } from './hooks/useUndoRedo'
 import { searchStockVideo } from './api/videoSearch'
 import { formatSlidesForClipboard } from './utils/slidePlainText'
 import { copyTextToClipboard } from './utils/clipboard'
+import { generateMediaSearchQuery, getSlideSearchKeywords } from './utils/mediaSearchQuery'
 import './App.css'
 
 const ProjectOverview = lazy(() => import('./components/ProjectOverview'))
@@ -1620,45 +1621,21 @@ function App() {
       const slide = slidesWithoutImages[i]
       
       try {
-        // Get slide content (remove HTML tags)
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = slide.content || ''
-        const slideText = tempDiv.textContent || tempDiv.innerText || ''
-        
-        if (!slideText.trim()) {
+        if (!getSlideSearchKeywords(slide)) {
           failCount++
           continue
         }
 
-        // Use OpenAI to generate a search query
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.openaiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a helpful assistant that generates concise, descriptive search queries for finding images on Unsplash. Return only a single search query (2-4 words) that best represents the content and mood of the text.'
-              },
-              {
-                role: 'user',
-                content: `Generate an Unsplash search query for this slide text: "${slideText}"`
-              }
-            ],
-            max_tokens: 20
-          })
+        const searchQuery = await generateMediaSearchQuery({
+          slide,
+          mediaType: 'image',
+          openaiKey: settings.openaiKey,
         })
 
-        const data = await response.json()
-        if (!response.ok || !data.choices?.[0]?.message?.content) {
+        if (!searchQuery) {
           failCount++
           continue
         }
-        const searchQuery = String(data.choices[0].message.content).trim().replace(/['"]/g, '')
 
         // Search Unsplash for images
         const unsplashResponse = await fetch(
@@ -1741,43 +1718,21 @@ function App() {
         const slide = slidesWithoutBackground[i]
 
         try {
-          const tempDiv = document.createElement('div')
-          tempDiv.innerHTML = slide.content || ''
-          const slideText = tempDiv.textContent || tempDiv.innerText || ''
-
-          if (!slideText.trim()) {
+          if (!getSlideSearchKeywords(slide)) {
             failCount++
             continue
           }
 
-          const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${settings.openaiKey}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-3.5-turbo',
-              messages: [
-                {
-                  role: 'system',
-                  content: 'You are a helpful assistant that generates concise, descriptive search queries for finding stock videos on Pexels or Pixabay. Return only a single search query (2-4 words) that best represents the content and mood of the text.'
-                },
-                {
-                  role: 'user',
-                  content: `Generate a stock video search query for this slide text: "${slideText}"`
-                }
-              ],
-              max_tokens: 20
-            })
+          const searchQuery = await generateMediaSearchQuery({
+            slide,
+            mediaType: 'video',
+            openaiKey: settings.openaiKey,
           })
 
-          const data = await response.json()
-          if (!response.ok || !data.choices?.[0]?.message?.content) {
+          if (!searchQuery) {
             failCount++
             continue
           }
-          const searchQuery = String(data.choices[0].message.content).trim().replace(/['"]/g, '')
 
           const { url: videoUrl } = await searchStockVideo({
             query: searchQuery,

@@ -81,15 +81,50 @@
   pointer-events: none;
 }
 
-/* Layer 2: Webcam - WebcamOverlay when inside canvas */
+/* Layer 4: Webcam — above gradient, below slide text; persists across slide changes */
 .play-webcam-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 2;
+  z-index: 4;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.play-webcam-overlay-wrapper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.play-webcam-overlay {
+  will-change: top, left, width, height, border-radius, opacity;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  background: var(--bg-secondary, #2a2a2a);
+  transition:
+    top var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    left var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    width var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    height var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    opacity var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1),
+    background-color var(--webcam-transition-duration, 500ms) cubic-bezier(0.4, 0, 0.2, 1);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.play-webcam-overlay video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: inherit;
 }
 
 /* Layer 3: Gradient */
@@ -785,6 +820,12 @@
   max-height: 100% !important;
   /* Override format aspect-ratio so slide fills viewport; padding % then matches edit */
   aspect-ratio: auto !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.play-layer-bg-color {
+  transition: background-color 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Video layouts: slide and content must be fully transparent so video shows through */
@@ -979,34 +1020,6 @@
   border-radius: 6px;
   font-size: 0.9rem;
   color: #fff;
-}
-
-/* Webcam overlay - behind slide content (play-canvas-wrapper has z-index 10001) */
-.play-webcam-overlay {
-  position: fixed;
-  z-index: 100;
-  pointer-events: none;
-  /* Use 'all' for seamless transitions in both directions */
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: top, right, bottom, left, width, height, min-width, min-height, border-radius, clip-path, aspect-ratio;
-  /* Ensure smooth rendering and prevent layout shifts */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  /* Contain layout to prevent reflows during transitions */
-  contain: layout style paint;
-}
-
-.play-webcam-overlay video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  /* Ensure video doesn't cause layout shifts */
-  position: absolute;
-  top: 0;
-  left: 0;
 }
 
 .btn-fullscreen {
