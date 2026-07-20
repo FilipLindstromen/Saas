@@ -114,7 +114,7 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
           {showMediaControls && (
             <>
               <div className="slide-settings-field">
-                <label htmlFor="slide-settings-opacity">Image:</label>
+                <label htmlFor="slide-settings-opacity">Background:</label>
                 <div className="slide-settings-slider-wrap">
                   <input
                     id="slide-settings-opacity"

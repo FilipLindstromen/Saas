@@ -137,17 +137,20 @@ export function getBackgroundScaleAnimationVars(slide, backgroundScaleAmount = K
 /** Inline styles for background video elements. */
 export function getVideoBackgroundStyle(slide, position, flipHorizontal = false) {
   const { x, y } = position
+  const scale = slide?.imageScale !== undefined ? slide.imageScale : DEFAULT_IMAGE_SCALE
+  const flip = flipHorizontal ? 'scaleX(-1) ' : ''
+
   if (isImageScaleCustomized(slide)) {
-    const scale = slide.imageScale !== undefined ? slide.imageScale : DEFAULT_IMAGE_SCALE
     return {
       objectFit: 'cover',
       objectPosition: `${x}% ${y}%`,
-      transform: `${flipHorizontal ? 'scaleX(-1) ' : ''}scale(${scale})`,
+      transform: `${flip}scale(${scale})`,
       transformOrigin: `${x}% ${y}%`,
       width: '100%',
       height: '100%',
     }
   }
+
   return {
     objectFit: 'cover',
     objectPosition: `${x}% ${y}%`,
@@ -157,7 +160,8 @@ export function getVideoBackgroundStyle(slide, position, flipHorizontal = false)
     maxWidth: 'none',
     display: 'block',
     margin: '0 auto',
-    transform: flipHorizontal ? 'scaleX(-1)' : 'none',
+    transform: `${flip}scale(${scale})`,
+    transformOrigin: `${x}% ${y}%`,
   }
 }
 

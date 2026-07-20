@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { getVideoBackgroundStyle } from '../utils/backgroundFit'
 
 const VIDEO_TRANSITION_MS = 500
 
@@ -46,6 +47,7 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
   const imageScale = videoSlide?.imageScale ?? 1
   const imagePositionX = videoSlide?.imagePositionX ?? 50
   const imagePositionY = videoSlide?.imagePositionY ?? 50
+  const backgroundOpacity = videoSlide?.backgroundOpacity !== undefined ? videoSlide.backgroundOpacity : 0.6
 
   // Resolve video/image URL (blob for cross-origin)
   useEffect(() => {
@@ -138,6 +140,7 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
         style={{
           position: 'absolute',
           ...layoutStyle,
+          opacity: backgroundOpacity,
           transform: isSlidingOff ? 'translateX(100%)' : 'translateX(0)',
           transition: isSlidingIn
             ? 'none'
@@ -162,12 +165,11 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
               position: 'absolute',
               top: 0,
               left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: `${imagePositionX}% ${imagePositionY}%`,
-              transform: `${videoSlide?.flipHorizontal ? 'scaleX(-1) ' : ''}scale(${imageScale})`,
-              transformOrigin: `${imagePositionX}% ${imagePositionY}%`,
+              ...getVideoBackgroundStyle(
+                videoSlide,
+                { x: imagePositionX, y: imagePositionY },
+                videoSlide?.flipHorizontal
+              ),
               filter,
             }}
           />

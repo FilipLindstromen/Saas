@@ -1888,7 +1888,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             aria-hidden="true"
             style={{
               pointerEvents: videoEditable ? 'auto' : 'none',
-              cursor: videoEditable ? 'move' : undefined
+              cursor: videoEditable ? 'move' : undefined,
+              opacity: backgroundOpacity,
             }}
           >
             <video

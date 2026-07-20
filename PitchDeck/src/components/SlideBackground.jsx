@@ -153,7 +153,11 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
         return (
-          <div className="slide-background slide-background-video" aria-hidden="true">
+          <div
+            className="slide-background slide-background-video"
+            aria-hidden="true"
+            style={{ opacity: backgroundOpacity }}
+          >
             <video
               ref={backgroundVideoRef}
               src={videoSrc}
