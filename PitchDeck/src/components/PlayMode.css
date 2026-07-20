@@ -322,13 +322,15 @@
   pointer-events: none;
 }
 
-/* Text out: paired exit animations (avoid generic fade fighting specialized exits) */
+/* Text out: paired exit animations — fast so outgoing copy clears before incoming text */
 .play-slide-container.text-out.text-exit-none .slide .slide-content,
 .play-slide-container.text-out.text-exit-none .slide .slide-content-video,
 .play-slide-container.text-out.text-exit-none .slide .slide-text-centered-wrapper,
 .play-slide-container.text-out.text-exit-none .slide .slide-bullets,
 .play-slide-container.text-out.text-exit-none .slide-graphic-overlays {
   animation: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 @keyframes textFadeOut {
@@ -1071,47 +1073,56 @@
 .play-slide-container.text-out.text-exit-fade-out .slide .slide-text-centered-wrapper,
 .play-slide-container.text-out.text-exit-fade-out .slide .slide-section-name,
 .play-slide-container.text-out.text-exit-fade-out .slide .slide-bullets {
-  animation: textExitFadeOut var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitFadeOut var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-fade-out-down .slide .slide-content,
 .play-slide-container.text-out.text-exit-fade-out-down .slide .slide-text-centered-wrapper,
 .play-slide-container.text-out.text-exit-fade-out-down .slide .slide-bullets {
-  animation: textExitFadeDown var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitFadeDown var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-fade-out-up .slide .slide-content,
 .play-slide-container.text-out.text-exit-fade-out-up .slide .slide-text-centered-wrapper,
 .play-slide-container.text-out.text-exit-fade-out-up .slide .slide-bullets {
-  animation: textExitFadeUp var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitFadeUp var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-slide-out-right .slide .slide-content,
 .play-slide-container.text-out.text-exit-slide-out-right .slide .slide-text-centered-wrapper {
-  animation: textExitSlideRight var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitSlideRight var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-slide-out-left .slide .slide-content,
 .play-slide-container.text-out.text-exit-slide-out-left .slide .slide-text-centered-wrapper {
-  animation: textExitSlideLeft var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitSlideLeft var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-zoom-out .slide .slide-content,
 .play-slide-container.text-out.text-exit-zoom-out .slide .slide-text-centered-wrapper {
-  animation: textExitZoomOut var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitZoomOut var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-blur-out .slide .slide-content,
 .play-slide-container.text-out.text-exit-blur-out .slide .slide-text-centered-wrapper {
-  animation: textExitBlurOut var(--transition-duration, 300ms) ease-in forwards !important;
+  animation: textExitBlurOut var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out.text-exit-words-fade-down .slide .text-animation-word {
-  animation: textExitWordFadeDown calc(var(--transition-duration, 300ms) * 0.8) ease-in forwards !important;
+  animation: textExitWordFadeDown var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 .play-slide-container.text-out:not(.text-exit-none) .slide-graphic-overlays {
-  animation: textExitFadeOut var(--transition-duration, 300ms) ease-in forwards;
+  animation: textExitFadeOut var(--text-exit-duration, 150ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.play-slide-container.text-out:not(.text-exit-none) .slide .slide-content,
+.play-slide-container.text-out:not(.text-exit-none) .slide .slide-content-video,
+.play-slide-container.text-out:not(.text-exit-none) .slide .slide-text-centered-wrapper,
+.play-slide-container.text-out:not(.text-exit-none) .slide .slide-section-name,
+.play-slide-container.text-out:not(.text-exit-none) .slide .slide-bullets,
+.play-slide-container.text-out:not(.text-exit-none) .slide-graphic-overlays {
+  animation-fill-mode: forwards;
 }
 
 .play-slide-container.bg-blur-on-text-enter .play-background-layer .slide-background {
@@ -1120,35 +1131,35 @@
 }
 
 @keyframes textExitFadeOut {
-  to { opacity: 0; }
+  to { opacity: 0; visibility: hidden; }
 }
 
 @keyframes textExitFadeDown {
-  to { opacity: 0; transform: translateY(24px); }
+  to { opacity: 0; transform: translateY(24px); visibility: hidden; }
 }
 
 @keyframes textExitFadeUp {
-  to { opacity: 0; transform: translateY(-24px); }
+  to { opacity: 0; transform: translateY(-24px); visibility: hidden; }
 }
 
 @keyframes textExitSlideRight {
-  to { opacity: 0; transform: translateX(40px); }
+  to { opacity: 0; transform: translateX(40px); visibility: hidden; }
 }
 
 @keyframes textExitSlideLeft {
-  to { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 0; transform: translateX(-40px); visibility: hidden; }
 }
 
 @keyframes textExitZoomOut {
-  to { opacity: 0; transform: scale(0.92); }
+  to { opacity: 0; transform: scale(0.92); visibility: hidden; }
 }
 
 @keyframes textExitBlurOut {
-  to { opacity: 0; filter: blur(10px); }
+  to { opacity: 0; filter: blur(10px); visibility: hidden; }
 }
 
 @keyframes textExitWordFadeDown {
-  to { opacity: 0; transform: translateY(20px); }
+  to { opacity: 0; transform: translateY(20px); visibility: hidden; }
 }
 
 @keyframes playBgBlurReveal {

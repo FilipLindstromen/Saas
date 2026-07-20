@@ -14,7 +14,14 @@ import './PlayMode.css'
 const VIDEO_TRANSITION_MS = 500
 const WEBCAM_TRANSITION_MS = 500
 const WEBCAM_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
+const TEXT_EXIT_MIN_MS = 90
+const TEXT_EXIT_MAX_MS = 160
 const VALID_TRANSITION_STYLES = new Set(['default', 'slide', 'zoom', 'dissolve', 'crossfade', 'blur', 'sequence', 'canvas-push'])
+
+function getTextExitDuration(transitionDurationMs) {
+  const scaled = Math.round(transitionDurationMs * 0.28)
+  return Math.min(TEXT_EXIT_MAX_MS, Math.max(TEXT_EXIT_MIN_MS, scaled))
+}
 
 function getSlideBackgroundColor(slide, fallback = '#1a1a1a') {
   if (!slide) return fallback
@@ -1556,6 +1563,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const transitionStyleSlide = targetSlide ?? currentSlide
   const resolvedTransitionStyle = resolveTransitionStyle(transitionStyle, transitionStyleSlide)
   const transitionDurationMs = getTransitionDuration(resolvedTransitionStyle)
+  const textExitDurationMs = getTextExitDuration(transitionDurationMs)
   const activeTransitionStyle = normalizeTransitionStyle(resolvedTransitionStyle)
 
   const canvasPushActive = transitionPhase === 'canvas-push' && targetSlide
@@ -1637,7 +1645,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const cameraStyle = getSubSlideCameraStyle(activeSubSlideRect)
 
   return (
-    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a', '--transition-duration': `${transitionDurationMs}ms` }}>
+    <div className="play-mode" onClick={handleClick} style={{ paddingBottom: showMenu ? '80px' : '0', backgroundColor: backgroundColor || '#1a1a1a', '--transition-duration': `${transitionDurationMs}ms`, '--text-exit-duration': `${textExitDurationMs}ms` }}>
       <div
         className="play-canvas-wrapper"
         style={{
@@ -1753,6 +1761,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       <div
         className={`play-slide-container play-content-outgoing play-slide-content-only text-out ${outgoingTextExitClass}`}
         aria-hidden="true"
+        style={{ '--text-exit-duration': `${textExitDurationMs}ms` }}
       >
         <Slide
           slide={outgoingTransitionSlide}
