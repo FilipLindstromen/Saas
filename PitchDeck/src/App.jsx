@@ -1586,15 +1586,24 @@ function App() {
     e.target.value = ''
   }
 
-  // Bulk select images for all slides without images
+  // Bulk select images for slides without images (selected slides when multi-select, else whole chapter)
+  const getSlidesForBulkMediaSelection = () => {
+    if (selectedSlides.size > 1) {
+      return slides.filter((slide) => selectedSlides.has(slide.id))
+    }
+    return slides
+  }
+
   const handleBulkSelectImages = async () => {
     if (!settings.openaiKey || !settings.unsplashKey) {
       alert('Please set your OpenAI and Unsplash API keys in settings first.')
       return
     }
 
+    const selectionScope = selectedSlides.size > 1 ? getSlidesForBulkMediaSelection() : slides
+
     // Find slides without image or video background (exclude sections and fullscreen camera layout)
-    const slidesWithoutImages = slides.filter(slide => {
+    const slidesWithoutImages = selectionScope.filter(slide => {
       const layout = slide.layout || 'default'
       if (layout === 'section' || layout === 'video') return false
       const hasImage = !!(slide.imageUrl && slide.imageUrl.trim())
@@ -1603,11 +1612,15 @@ function App() {
     })
     
     if (slidesWithoutImages.length === 0) {
-      alert('All slides already have an image or video background!')
+      const emptyMessage = selectedSlides.size > 1
+        ? 'All selected slides already have an image or video background!'
+        : 'All slides already have an image or video background!'
+      alert(emptyMessage)
       return
     }
 
-    const confirmMessage = `This will automatically select images for ${slidesWithoutImages.length} slide(s). This may take a moment. Continue?`
+    const scopeLabel = selectedSlides.size > 1 ? `${slidesWithoutImages.length} selected slide(s)` : `${slidesWithoutImages.length} slide(s)`
+    const confirmMessage = `This will automatically select images for ${scopeLabel}. This may take a moment. Continue?`
     if (!window.confirm(confirmMessage)) {
       return
     }
@@ -1689,7 +1702,9 @@ function App() {
       return
     }
 
-    const slidesWithoutBackground = slides.filter((slide) => {
+    const selectionScope = selectedSlides.size > 1 ? getSlidesForBulkMediaSelection() : slides
+
+    const slidesWithoutBackground = selectionScope.filter((slide) => {
       const layout = slide.layout || 'default'
       if (layout === 'section' || layout === 'video') return false
       const hasImage = !!(slide.imageUrl && slide.imageUrl.trim())
@@ -1699,11 +1714,15 @@ function App() {
     })
 
     if (slidesWithoutBackground.length === 0) {
-      alert('All slides already have an image or video background!')
+      const emptyMessage = selectedSlides.size > 1
+        ? 'All selected slides already have an image or video background!'
+        : 'All slides already have an image or video background!'
+      alert(emptyMessage)
       return
     }
 
-    const confirmMessage = `This will automatically select videos for ${slidesWithoutBackground.length} slide(s). This may take a moment. Continue?`
+    const scopeLabel = selectedSlides.size > 1 ? `${slidesWithoutBackground.length} selected slide(s)` : `${slidesWithoutBackground.length} slide(s)`
+    const confirmMessage = `This will automatically select videos for ${scopeLabel}. This may take a moment. Continue?`
     if (!window.confirm(confirmMessage)) {
       return
     }
@@ -2062,6 +2081,7 @@ function App() {
           bulkImagesDisabled={!settings.openaiKey || !settings.unsplashKey}
           onBulkSelectVideos={handleBulkSelectVideos}
           bulkVideosDisabled={isBulkSelectingVideos || !settings.openaiKey || (!settings.pexelsKey && !settings.pixabayKey)}
+          bulkSelectSelectedCount={selectedSlides.size}
           onExportProject={handleExportFile}
           onExportPng={handleExportSlidesAsPng}
           onExportInstagram={() => setShowInstagramExport(true)}

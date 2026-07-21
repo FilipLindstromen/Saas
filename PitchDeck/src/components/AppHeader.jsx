@@ -132,6 +132,7 @@ function AppHeader({
   bulkImagesDisabled,
   onBulkSelectVideos,
   bulkVideosDisabled,
+  bulkSelectSelectedCount = 0,
   onExportProject,
   onExportPng,
   onExportInstagram,
@@ -175,6 +176,8 @@ function AppHeader({
     }
     setEditingChapter(false)
   }
+
+  const bulkMediaScope = bulkSelectSelectedCount > 1 ? 'selected slides' : 'all slides without image or video backgrounds'
 
   return (
     <div className="app-header">
@@ -333,7 +336,7 @@ function AppHeader({
                   type="button"
                   className="btn-icon-header btn-bulk-images"
                   onClick={onBulkSelectImages}
-                  title="Auto-select images for all slides without image or video backgrounds"
+                  title={`Auto-select images for ${bulkMediaScope}`}
                   aria-label="Auto-select images"
                   disabled={bulkImagesDisabled}
                 >
@@ -347,7 +350,7 @@ function AppHeader({
                   type="button"
                   className="btn-icon-header btn-bulk-videos"
                   onClick={onBulkSelectVideos}
-                  title="Auto-select videos for all slides without image or video backgrounds"
+                  title={`Auto-select videos for ${bulkMediaScope}`}
                   aria-label="Auto-select videos"
                   disabled={bulkVideosDisabled}
                 >
