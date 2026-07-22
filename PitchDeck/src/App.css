@@ -947,6 +947,10 @@ input[type="checkbox"]:disabled {
   overflow-x: hidden;
 }
 
+.app-content.plan-mode-content:has(.plan-view-text) {
+  overflow: hidden;
+}
+
 .app-content.video-editing-content {
   display: flex;
   flex-direction: column;
